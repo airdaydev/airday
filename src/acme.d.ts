@@ -1,0 +1,23 @@
+interface AcmeItem {
+  id: string;
+  text: string;
+  dateCreated: string;
+  sortKey: string; // global, persisted sort key
+  listId: string;
+}
+
+interface AcmeList {
+  id: string;
+  name: string;
+}
+
+type SelectItemMode = 'normal' | 'add' | 'addOne' | 'remove';
+
+interface SelectItemsOpts {
+  mode: SelectItemMode;
+  setOrigin?: boolean,
+}
+
+type ListDirection = 'next' | 'prev';
+
+type OrderedKey = [string, string, string];

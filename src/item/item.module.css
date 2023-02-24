@@ -1,0 +1,13 @@
+.item-edit {
+    max-width: 44em;
+    box-sizing: border-box;
+    padding: 0.5em;
+    border-radius: 3px;
+    height: 4em;
+    user-select: none;
+}
+
+.item-edit:hover {
+    background: #d9d9d9;
+    cursor: pointer;
+}

@@ -1,0 +1,49 @@
+# AcmeList Prototype Roadmap
+- [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
+- [] Edit existing item
+- [] Ensure selection is cleared on edit
+- [] Add new item
+- [] Add new item above selected item
+- [] Edit list name capability in navbar 
+- [] Edit selected items via 'enter' key
+- [] Meta keyboard navigation
+- [] Shift keyboard navigation
+- [] Shift mouse navigation
+- [] Command mouse navigation
+- [] Clear selection on 'esc' key
+- [] Prevent list navigation on edit mode
+- [] cmd+a to select all items
+- [] Command+up/down keyboard resorts
+- [] Drag creates little cards
+- [] Allow dropping items in nav bar list
+- [] Allow dropping items between open lists directly
+- [] Highlight active list in nav
+- [] Animations
+- [] Delete items
+- [] Delete lists
+- [] Add new list
+- [] Edit list name in list view
+- [] Ability to change icons
+- [] Context menu for one item
+- [] Context menu for many items
+- [] Ability to mark items as done (chronological story for past events)
+- [] Add entire history of Done items
+- [] Add now playing list, allow dragging items to now playing list
+- [] Up Next board
+- [] Trash concept
+- [] Nice empty list states
+- [] Mobile web strategy (PWA)
+- [] Kanban board
+- [] Paid web service with introductory prices
+- [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
+- [] Client-side encrypted sync ws server
+- [] Consider license type
+- [] Add search
+- [] Custom Themes / compact mode
+- [] Add board prototype
+- [] Add repeatable items - Maybe
+- [] Export data (JSON)
+- [] Secrets
+- [] Mobile app strategy
+- [] The board (canvas/webgl)
+- [] Spanish (EU) Localisation

@@ -1,0 +1,79 @@
+import { createSignal, Accessor } from 'solid-js';
+// Transient state outside of solidjs lifecycle
+// Custom differ for removing past selection states & creating new ones
+// Tracking ids or indexes or ranges of indexes
+
+// If a key is added or removed whilst a user is selecting, index mapping would need manual adjustment
+// index -> range
+
+// Track IDs and when patching, resolve to
+
+// DOM patcher: find by ID and update (less memory, maybe more complex)
+// VS state tracker + signal (more memory, maybe less complex - still have to crawl through list somehow)
+
+type SubscriptionFunc = (selected: boolean) => void;
+
+export class AcmeReactiveSelection {
+    keys = new Set<string>;
+    subscribers = new Map<string, Set<SubscriptionFunc>>(); // key, set of callbacks i.e. signal update
+    origin: string | null = null;
+    constructor() {
+        // Tracking?   
+    }
+    addKey(key: string) {
+        this.keys.add(key);
+        const subscriptions = this.subscribers.get(key);
+        subscriptions?.forEach((cb) => cb(true));
+    }
+    toggleKey(key: string) {
+        if (this.keys.has(key)) {
+            this.removeKey(key);
+        } else {
+            this.addKey(key);
+        }
+    }
+    removeKey(key: string) {
+        this.keys.delete(key);
+        const subscriptions = this.subscribers.get(key);
+        subscriptions?.forEach((cb) => cb(false));
+    }
+    addKeys(items: string[], range: number) {
+        items.map((i) => this.addKey(i));
+    }
+    removeKeys(items: string[], range: number) {
+        items.map((i) => this.removeKey(i));
+    }
+    getSignalByKey(key: string): [Accessor<Boolean>, () => void] {
+        const [selected, setSelected] = createSignal(this.keys.has(key));
+        this.subscribe(key, setSelected);
+        return [selected, () => this.unsubscribe(key, setSelected)];
+    }
+    subscribe(key: string, callback: SubscriptionFunc) {
+        let set = this.subscribers.get(key);
+        if (!set) {
+            set = new Set();
+            this.subscribers.set(key, set);
+        }
+        set.add(callback);
+        return;
+    };
+    /**
+     * Deselects all other items and selects only one
+     */
+    selectOne = (key: string) => {
+        this.keys.forEach(key => this.removeKey(key));
+        this.addKey(key);
+        this.origin = key;
+    }
+    // Index or item? (pros + cons?)
+    selectRange = (from: AcmeItem | number, to: AcmeItem | number) => {}
+    // Up, Down, 1 or to the extents
+    // If sticky & in a contiguous region (i.e. if next already selected), jump to bottom (worst case could be O(n with idb lookup for EACH) - if toggling at the top of a list and going down)
+    // we could index the index.....
+    // Fast finding -> 1. Binary Search, 2. Go to cursor in sorted index and look down or up (consider leaving up to list implementer? but provide helper  functions)
+    selectNext = (direction: 'down' | 'up' = 'down', sticky: boolean = false) => {}
+    unsubscribe(key: string, callback: SubscriptionFunc) {
+        let set = this.subscribers.get(key);
+        set?.delete(callback);
+    }
+}

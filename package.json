@@ -1,0 +1,22 @@
+{
+  "name": "solid-acme",
+  "version": "0.0.1",
+  "description": "SolidJS port of AcmeList",
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^4.1.1",
+    "vite-plugin-solid": "^2.5.0"
+  },
+  "dependencies": {
+    "fractional-indexing": "^3.2.0",
+    "idb": "^7.1.1",
+    "nanoid": "^4.0.1",
+    "solid-js": "^1.6.10"
+  }
+}
