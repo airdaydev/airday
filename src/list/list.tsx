@@ -43,6 +43,11 @@ export function List(props: ListProps) {
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
+      if (event.altKey) {
+        if (!list.length) return;
+        selection.selectOne(list[list.length - 1].id);
+        jumpToElIfOutsideView(scrollRef, containerRef.childNodes[list.length - 1])
+      }
       // - on key down, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[0];
@@ -78,6 +83,11 @@ export function List(props: ListProps) {
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
+      if (event.altKey) {
+        if (!list.length) return;
+        selection.selectOne(list[0].id);
+        jumpToElIfOutsideView(scrollRef, containerRef.childNodes[0])
+      }
       // - on key up, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[list.length - 1];
