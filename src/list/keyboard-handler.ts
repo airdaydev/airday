@@ -16,6 +16,12 @@ export const getListKeyboardHandler = ({
     containerRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
     const list = liveList.signal();
+    if (event.key === 'a' && event.metaKey) {
+        event.preventDefault();
+        const allKeys = list.map((item) => item.id);
+        selection.addKeys(allKeys);
+        return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       selection.clear();
@@ -24,7 +30,11 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        // TODO: Implement behaviour (select all the way down)
+        const firstSelectedIndex = liveList.getFirstIndexOfSet(selection.keys) as number;
+        const keys = liveList.getKeysInRange(firstSelectedIndex, list.length - 1);
+        selection.clear();
+        selection.addKeys(keys);
+        return;
       }
       if (event.altKey) {
         if (!list.length) return;
@@ -68,7 +78,11 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        // TODO: Implement behaviour (select all the way up)
+        const lastSelectedIndex = liveList.getLastIndexOfSet(selection.keys) as number;
+        const keys = liveList.getKeysInRange(0, lastSelectedIndex);
+        selection.clear();
+        selection.addKeys(keys);
+        return;
       }
       if (event.altKey) {
         if (!list.length) return;
