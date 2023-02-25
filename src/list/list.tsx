@@ -53,7 +53,6 @@ export function List(props: ListProps) {
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
         if (neighbour) {
           selection.selectOne(list[neighbour].id);
-          console.log(neighbour);
           jumpToElIfOutsideView(scrollRef, containerRef.childNodes[neighbour])
         }
       }
@@ -87,7 +86,10 @@ export function List(props: ListProps) {
       }
       if (selection.lastKeySelected && !event.shiftKey) {
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected, 'prev');
-        if (neighbour !== false) selection.selectOne(liveList.signal()[neighbour].id);
+        if (neighbour !== false) {
+          selection.selectOne(liveList.signal()[neighbour].id);
+          jumpToElIfOutsideView(scrollRef, containerRef.childNodes[neighbour]);
+        }
       }
       if (selection.rangeOrigin && event.shiftKey) {
         // contiguous area below origin, continue:
@@ -98,7 +100,10 @@ export function List(props: ListProps) {
         if (nextIndex === origin + 1 || origin === list.length - 1) {
           // select up
           const index = liveList.getNextNotInSet(origin, selection.keys, 'prev');
-          if (index !== false) selection.addKey(list[index].id);
+          if (index !== false) {
+            selection.addKey(list[index].id);
+            jumpToElIfOutsideView(scrollRef, containerRef.childNodes[index]);
+          }
         } else {
           // deselect up
           selection.removeKey(nextIndex !== false ? list[nextIndex - 1].id : list[list.length - 1].id);
