@@ -24,7 +24,7 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        // TODO: Implement behaviour
+        // TODO: Implement behaviour (select all the way down)
       }
       if (event.altKey) {
         if (!list.length) return;
@@ -68,7 +68,7 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        // TODO: Implement behaviour
+        // TODO: Implement behaviour (select all the way up)
       }
       if (event.altKey) {
         if (!list.length) return;

@@ -21,6 +21,10 @@ export function Item(props: ItemProps) {
             style={`${selected() && `background: #ccc;`}`}
             ref={containerRef}
             onClick={(event: MouseEvent) => {
+                if (event.metaKey) {
+                    props.selection.toggleKey(props.item.id);
+                    return;
+                }
                 if (!event.shiftKey) {
                     props.selection.selectOne(props.item.id)
                     return;
@@ -37,7 +41,6 @@ export function Item(props: ItemProps) {
                         props.selection.clear();
                         props.selection.addKeys(keys);
                     } else {
-                        console.log('below!');
                         const keys = props.liveList.getKeysInRange(firstSelectedIndex, props.listIndex);
                         props.selection.clear();
                         props.selection.addKeys(keys);

@@ -31,6 +31,7 @@ export class AcmeReactiveSelection {
         if (this.keys.has(key)) {
             this.removeKey(key);
         } else {
+            this.rangeOrigin = key;
             this.addKey(key);
         }
     }
@@ -45,7 +46,6 @@ export class AcmeReactiveSelection {
     clear() {
         this.rangeOrigin = null;
         this.lastKeySelected = null;
-
         this.removeKeys(Array.from(this.keys));
     }
     removeKeys(items: string[]) {
