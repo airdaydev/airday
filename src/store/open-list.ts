@@ -102,7 +102,7 @@ export class LiveList {
         }
         return false;
     }
-    getNextNotInSet(originIndex: number, keySet: Set<string>) {
+    getNextNotInSet(originIndex: number, keySet: Set<string>, direction: 'next' | 'prev' = 'next') {
         const list = this.signal();
         let rangeEnded = false;
         let i = originIndex;
@@ -110,10 +110,11 @@ export class LiveList {
             const next = list[i];
             if (!next) return false;
             if (keySet.has(next.id)) {
-                i++;
+                direction === 'next' ? i++ : i--;
             } else {
                 return i;
             }
         }
+        return false;
     }
 }

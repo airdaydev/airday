@@ -5,7 +5,7 @@ import { AcmeReactiveSelection } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
 import { store } from '../store/main';
-import { openList } from '../store/list-tree.js';
+import { openList } from '../store/open-list.js';
 import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 
@@ -41,7 +41,7 @@ export function List(props: ListProps) {
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      // - on key down, select next down, set selection origin
+      // - on key down, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[0];
         if (neighbour) selection.selectOne(neighbour.id);
@@ -54,21 +54,49 @@ export function List(props: ListProps) {
       if (selection.rangeOrigin && event.shiftKey) {
         // contiguous area below origin, continue:
         const origin = liveList.getIndexOfKey(selection.rangeOrigin);
-        if (origin === false) return; // Nothing below
-        const index = liveList.getNextNotInSet(origin, selection.keys);
-        if (index) selection.addKey(list[index].id);
+        if (origin === false) return;
+        // Check if items above
+        const prevIndex = liveList.getNextNotInSet(origin, selection.keys, 'prev');
+        if (prevIndex === origin - 1  || origin === 0) {
+          // select down
+          const index = liveList.getNextNotInSet(origin, selection.keys);
+          if (index !== false) selection.addKey(list[index].id);
+        } else {
+          // deselect down
+          selection.removeKey(prevIndex !== false ? list[prevIndex + 1].id : list[0].id);
+        }
+        return;
       }
     }
-    // - on key up, select next up, set selection origin
     if (event.key === 'ArrowUp') {
       event.preventDefault();
+      // - on key up, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[list.length - 1];
         if (neighbour) selection.selectOne(neighbour.id);
         return;
-      } else {
+      }
+      if (selection.lastKeySelected && !event.shiftKey) {
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected, 'prev');
-        if (neighbour) selection.selectOne(liveList.signal()[neighbour].id);
+        if (neighbour !== false) selection.selectOne(liveList.signal()[neighbour].id);
+      }
+      if (selection.rangeOrigin && event.shiftKey) {
+        // contiguous area below origin, continue:
+        const origin = liveList.getIndexOfKey(selection.rangeOrigin);
+        if (origin === false) return;
+        // Check if items below
+        const nextIndex = liveList.getNextNotInSet(origin, selection.keys, 'next');
+        if (nextIndex === origin + 1 || origin === list.length - 1) {
+          console.log('select up');
+          // select up
+          const index = liveList.getNextNotInSet(origin, selection.keys, 'prev');
+          if (index !== false) selection.addKey(list[index].id);
+        } else {
+          // deselect up
+          console.log('deselect up')
+          selection.removeKey(nextIndex !== false ? list[nextIndex - 1].id : list[list.length - 1].id);
+          return;
+        }
       }
     }
   })
