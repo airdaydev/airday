@@ -75,6 +75,14 @@ export class LiveList {
         const list = await store.getItemsByList(this.listId);
         if (this.setSignal) this.setSignal(list);
     }
+    /**
+     * 
+     * @param start inclusive start
+     * @param end inclusive end
+     */
+    getKeysInRange(start: number, end: number) {
+        return this.signal().slice(start, end + 1).map((item) => item.id);
+    }
     getIndexOfKey(key: string) {
         const list = this.signal();
         const originIndex = list.findIndex((item) => {
@@ -96,9 +104,15 @@ export class LiveList {
         // TODO: We could collect all sortkeys through an up-to-date hashmap
         const list = this.signal();
         for (let i = list.length - 1; i >= 0; i--) {
-            if (keySet.has(list[i].id)) {
-                return i;
-            }
+            if (keySet.has(list[i].id)) return i;
+        }
+        return false;
+    }
+    getFirstIndexOfSet(keySet: Set<string>) {
+        // TODO: We could collect all sortkeys through an up-to-date hashmap
+        const list = this.signal();
+        for (let i = 0; i < list.length; i++) {
+            if (keySet.has(list[i].id)) return i;
         }
         return false;
     }

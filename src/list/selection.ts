@@ -39,7 +39,7 @@ export class AcmeReactiveSelection {
         const subscriptions = this.subscribers.get(key);
         subscriptions?.forEach((cb) => cb(false));
     }
-    addKeys(items: string[], range: number) {
+    addKeys(items: string[]) {
         items.map((i) => this.addKey(i));
     }
     clear() {

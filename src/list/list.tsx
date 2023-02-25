@@ -46,7 +46,7 @@ export function List(props: ListProps) {
   onCleanup(() => {
     keyboardShortcuts.unregisterHandler('keydown', contextId)
     console.log(`cleaning up list ${props.listId}`)
-  })
+  });
   return (
     <section
       class={styles.list}
@@ -62,6 +62,7 @@ export function List(props: ListProps) {
                 item={item}
                 listIndex={index()}
                 selection={selection}
+                liveList={liveList}
               />
             )}
           </For>
