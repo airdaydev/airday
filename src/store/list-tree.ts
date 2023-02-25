@@ -75,14 +75,45 @@ export class LiveList {
         const list = await store.getItemsByList(this.listId);
         if (this.setSignal) this.setSignal(list);
     }
-    getSignal() {
-        
-    }
-    getNeighbour(key: string, direction: ListDirection = 'next') {
-        const vector = direction === 'next' ? 1 : -1;
-        const originIndex = this.signal().findIndex((item) => {
+    getIndexOfKey(key: string) {
+        const list = this.signal();
+        const originIndex = list.findIndex((item) => {
             return item.id === key
         });
-        return this.signal()[originIndex + vector] || false;
+        if (originIndex === -1) return false;
+        return originIndex;
+    }
+    getNeighbourIndex(key: string, direction: ListDirection = 'next') {
+        const list = this.signal();
+        const vector = direction === 'next' ? 1 : -1;
+        const originIndex = list.findIndex((item) => {
+            return item.id === key
+        });
+        const nextIndex = originIndex + vector;
+        return list[nextIndex] ? nextIndex : false;
+    }
+    getLastIndexOfSet(keySet: Set<string>) {
+        // TODO: We could collect all sortkeys through an up-to-date hashmap
+        const list = this.signal();
+        for (let i = list.length - 1; i >= 0; i--) {
+            if (keySet.has(list[i].id)) {
+                return i;
+            }
+        }
+        return false;
+    }
+    getNextNotInSet(originIndex: number, keySet: Set<string>) {
+        const list = this.signal();
+        let rangeEnded = false;
+        let i = originIndex;
+        while (!rangeEnded) {
+            const next = list[i];
+            if (!next) return false;
+            if (keySet.has(next.id)) {
+                i++;
+            } else {
+                return i;
+            }
+        }
     }
 }

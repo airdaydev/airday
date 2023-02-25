@@ -27,24 +27,48 @@ interface ListProps {
  * @returns 
  */
 export function List(props: ListProps) {
+  let containerRef;
   const liveList = openList(props.listId);
   if (!liveList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
   // TODO: Incorporate into handler and wire up to top level keyboard module
   const contextId = nanoid();
   keyboardShortcuts.registerHandler('keydown', contextId, (event: KeyboardEvent) => {
+    const list = liveList.signal();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      selection.clear();
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      if (selection.origin) {
-        const neighbour = liveList.getNeighbour(selection.origin);
+      // - on key down, select next down, set selection origin
+      if (!selection.lastKeySelected) {
+        const neighbour = list[0];
         if (neighbour) selection.selectOne(neighbour.id);
+        return;
+      }
+      if (selection.lastKeySelected && !event.shiftKey) {
+        const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
+        if (neighbour) selection.selectOne(list[neighbour].id);
+      }
+      if (selection.rangeOrigin && event.shiftKey) {
+        // contiguous area below origin, continue:
+        const origin = liveList.getIndexOfKey(selection.rangeOrigin);
+        if (origin === false) return; // Nothing below
+        const index = liveList.getNextNotInSet(origin, selection.keys);
+        if (index) selection.addKey(list[index].id);
       }
     }
+    // - on key up, select next up, set selection origin
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      if (selection.origin) {
-        const neighbour = liveList.getNeighbour(selection.origin, 'prev');
+      if (!selection.lastKeySelected) {
+        const neighbour = list[list.length - 1];
         if (neighbour) selection.selectOne(neighbour.id);
+        return;
+      } else {
+        const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected, 'prev');
+        if (neighbour) selection.selectOne(liveList.signal()[neighbour].id);
       }
     }
   })
@@ -59,16 +83,18 @@ export function List(props: ListProps) {
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
     >
         <h2>{props.listId}</h2>
-        <For each={liveList.signal()}>
-          {(item, index) => (
-            <Item
-              item={item}
-              listIndex={index()}
-              selection={selection}
-              // liveList={liveList}
-            />
-          )}
-        </For>
+        <div ref={containerRef}>
+          <For each={liveList.signal()}>
+            {(item, index) => (
+              <Item
+                item={item}
+                listIndex={index()}
+                selection={selection}
+                // liveList={liveList}
+              />
+            )}
+          </For>
+        </div>
     </section>
   );
 }

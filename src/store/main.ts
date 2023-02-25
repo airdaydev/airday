@@ -1,7 +1,6 @@
 import {
     IDBPDatabase, IDBPTransaction, openDB, deleteDB, wrap, unwrap,
 } from 'idb';
-import { nanoid } from 'nanoid';
 
 const schemaVersion = 1;
 
@@ -18,8 +17,6 @@ interface DBTypes {
 const itemStoreName = 'item';
 const dbNotReadyMessage = 'DB not loaded, pre-load buffer not yet implemented';
 
-// TODO: Buffer changes before application loads
-// TODO: Sample updates
 // Primary local persistence layer
 class AcmeLocalStore {
     db: IDBPDatabase<DBTypes> | null = null;
@@ -70,88 +67,6 @@ class AcmeLocalStore {
         const range = IDBKeyRange.bound([listId, 'A'], [listId, 'zzzzzz']);
         const items = await this.db.getAllFromIndex(itemStoreName, 'ordered', range);
         return items;
-    }
-    getRange = async (start: AcmeItem, end: AcmeItem) => {
-        if (!this.db) throw new Error(dbNotReadyMessage);
-        const tx = await this.db.transaction(itemStoreName, 'readonly');
-        const index = tx.objectStore(itemStoreName).index('ordered');
-        const startIndex = [start.listId, start.sortKey, start.id];
-        const endIndex = [end.listId, end.sortKey, end.id];
-        const range = IDBKeyRange.bound(startIndex, endIndex);
-        const cursor = await index.openCursor(range);
-        let items = [];
-        while (cursor) {
-            items.push(cursor.value);
-            await cursor.continue();
-        }
-        return items;
-    }
-    /**
-     * @deprecated
-     * @returns 
-     */
-    getRangeViaIndex = async (start: AcmeItem, vector: number, direction: ListDirection = 'next') => {
-        if (!this.db) throw new Error(dbNotReadyMessage);
-        const tx = await this.db.transaction(itemStoreName, 'readonly');
-        const index = tx.objectStore(itemStoreName).index('ordered');
-        const itemIndex = [start.listId, start.sortKey, start.id];
-        const range = IDBKeyRange.lowerBound(itemIndex, true);
-        const cursor = await index.openCursor(range, direction);
-        let items = [];
-        for (let i = 0; i < vector; i++) {
-            if (!cursor) break;
-            items.push(cursor.value);
-            await cursor.continue();
-        }
-        return items;
-    }
-    getItemById = async (id: string): Promise<AcmeItem | null> => {
-        if (!this.db) throw new Error(dbNotReadyMessage);
-        const tx = await this.db.transaction(itemStoreName, 'readonly');
-        const items = tx.objectStore(itemStoreName);
-        return items.get(id);
-    }
-    /**
-     * @deprecated
-     * @returns 
-     */
-    getOLKeyFromId = async (id: string): Promise<[string, string, string] | null> => {
-        const item = await this.getItemById(id);
-        if (!item) return null;
-        return [item.listId, item.sortKey, item.id]
-    }
-    // Optimisation opportunity - reference OLKey directly
-    /**
-     * @deprecated
-     * @returns 
-     */
-    getNeighbour = async (
-        originKey: string,
-        direction: ListDirection = 'next',
-        skipCondition?: (item: AcmeItem) => boolean,
-    ): Promise<AcmeItem | null> => {
-        if (!this.db) throw new Error(dbNotReadyMessage);
-        const key = await this.getOLKeyFromId(originKey);
-        if (!key) return null;
-        const tx = await this.db.transaction(itemStoreName, 'readonly');
-        const index = tx.objectStore(itemStoreName).index('ordered');
-        let range;
-        if (direction === 'next') {
-            range = IDBKeyRange.bound(key, [key[0], 'zzzzzz'], true);
-        } else {
-            range = IDBKeyRange.bound([key[0], 'A'], key, false);
-        }
-        const cursor = await index.openCursor(range, direction);
-        if (direction === 'prev' && cursor) await cursor.continue();
-        while (cursor) {
-            const val = cursor.value;
-            if (skipCondition && skipCondition(val)) {
-                await cursor.continue();
-            } else {
-                return val;
-            }
-        }
-        return null;
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {
         if (!this.db) throw new Error(dbNotReadyMessage);

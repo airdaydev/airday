@@ -1,6 +1,6 @@
 ## List navigation interaction design
-- on key down, select next down, set selection origin
-- on key up, select next up, set selection origin
+- on key down, select next down from last selected, set last selected, origin
+- on key up, select next down from last selected, set last selected, origin
 - on key down + shift, when moving towards selection origin i.e. above origin, deselect
 - on key down + shift, when moving away from selection origin i.e. below origin, find next unselected below and select
 - on key up + shift, when moving towards selection origin i.e. below origin, deselect

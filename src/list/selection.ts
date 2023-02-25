@@ -16,7 +16,8 @@ type SubscriptionFunc = (selected: boolean) => void;
 export class AcmeReactiveSelection {
     keys = new Set<string>;
     subscribers = new Map<string, Set<SubscriptionFunc>>(); // key, set of callbacks i.e. signal update
-    origin: string | null = null;
+    rangeOrigin: string | null = null;
+    lastKeySelected: string | null = null;
     constructor() {
         // Tracking?   
     }
@@ -24,6 +25,7 @@ export class AcmeReactiveSelection {
         this.keys.add(key);
         const subscriptions = this.subscribers.get(key);
         subscriptions?.forEach((cb) => cb(true));
+        this.lastKeySelected = key;
     }
     toggleKey(key: string) {
         if (this.keys.has(key)) {
@@ -40,7 +42,13 @@ export class AcmeReactiveSelection {
     addKeys(items: string[], range: number) {
         items.map((i) => this.addKey(i));
     }
-    removeKeys(items: string[], range: number) {
+    clear() {
+        this.rangeOrigin = null;
+        this.lastKeySelected = null;
+
+        this.removeKeys(Array.from(this.keys));
+    }
+    removeKeys(items: string[]) {
         items.map((i) => this.removeKey(i));
     }
     getSignalByKey(key: string): [Accessor<Boolean>, () => void] {
@@ -63,7 +71,8 @@ export class AcmeReactiveSelection {
     selectOne = (key: string) => {
         this.keys.forEach(key => this.removeKey(key));
         this.addKey(key);
-        this.origin = key;
+        this.rangeOrigin = key;
+        this.lastKeySelected = key;
     }
     // Index or item? (pros + cons?)
     selectRange = (from: AcmeItem | number, to: AcmeItem | number) => {}

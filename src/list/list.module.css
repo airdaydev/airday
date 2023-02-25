@@ -1,7 +1,14 @@
 .list {
     flex: 1;
     min-width: 0;
-    padding: 0 0.5em;
+    padding: 0 1em;
     height: 100vh;
     overflow-y: scroll;
+}
+
+.list h2 {
+    font-style: italic;
+    font-family: 'ibm plex sans';
+    font-weight: 400;
+    font-size: 1.25em;
 }
