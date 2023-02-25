@@ -1,5 +1,6 @@
 # AcmeList Prototype Roadmap
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
+- [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Edit existing item
 - [] Ensure selection is cleared on edit
 - [] Add new item
