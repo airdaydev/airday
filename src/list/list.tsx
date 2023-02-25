@@ -8,6 +8,7 @@ import { store } from '../store/main';
 import { openList } from '../store/open-list.js';
 import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
+import { jumpToElIfOutsideView } from './utils.js';
 
 interface ListProps {
   listId: string;
@@ -27,7 +28,8 @@ interface ListProps {
  * @returns 
  */
 export function List(props: ListProps) {
-  let containerRef;
+  let containerRef: HTMLDivElement;
+  let scrollRef: HTMLDivElement;
   const liveList = openList(props.listId);
   if (!liveList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
@@ -49,7 +51,11 @@ export function List(props: ListProps) {
       }
       if (selection.lastKeySelected && !event.shiftKey) {
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
-        if (neighbour) selection.selectOne(list[neighbour].id);
+        if (neighbour) {
+          selection.selectOne(list[neighbour].id);
+          console.log(neighbour);
+          jumpToElIfOutsideView(scrollRef, containerRef.childNodes[neighbour])
+        }
       }
       if (selection.rangeOrigin && event.shiftKey) {
         // contiguous area below origin, continue:
@@ -60,7 +66,10 @@ export function List(props: ListProps) {
         if (prevIndex === origin - 1  || origin === 0) {
           // select down
           const index = liveList.getNextNotInSet(origin, selection.keys);
-          if (index !== false) selection.addKey(list[index].id);
+          if (index !== false) {
+            selection.addKey(list[index].id);
+            jumpToElIfOutsideView(scrollRef, containerRef.childNodes[index])
+          }
         } else {
           // deselect down
           selection.removeKey(prevIndex !== false ? list[prevIndex + 1].id : list[0].id);
@@ -87,13 +96,11 @@ export function List(props: ListProps) {
         // Check if items below
         const nextIndex = liveList.getNextNotInSet(origin, selection.keys, 'next');
         if (nextIndex === origin + 1 || origin === list.length - 1) {
-          console.log('select up');
           // select up
           const index = liveList.getNextNotInSet(origin, selection.keys, 'prev');
           if (index !== false) selection.addKey(list[index].id);
         } else {
           // deselect up
-          console.log('deselect up')
           selection.removeKey(nextIndex !== false ? list[nextIndex - 1].id : list[list.length - 1].id);
           return;
         }
@@ -109,6 +116,7 @@ export function List(props: ListProps) {
       class={styles.list}
       tabIndex={props.tabId}
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
+      ref={scrollRef}
     >
         <h2>{props.listId}</h2>
         <div ref={containerRef}>
@@ -118,7 +126,6 @@ export function List(props: ListProps) {
                 item={item}
                 listIndex={index()}
                 selection={selection}
-                // liveList={liveList}
               />
             )}
           </For>
