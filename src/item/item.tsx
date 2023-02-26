@@ -3,6 +3,7 @@ import { AcmeReactiveSelection } from '../list/selection';
 import { store } from '../store/main';
 import { LiveList } from '../store/open-list';
 import styles from './item.module.css';
+import { distance } from './utils';
 
 interface ItemProps {
     listIndex: number;
@@ -16,16 +17,45 @@ export function Item(props: ItemProps) {
     const [edit, setEdit] = createSignal(false);
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
     onCleanup(() => unsubscribe());
+    const isInDragSet = () => props.selection.isDragging() && props.selection.keys.has(props.item.id);
     return (
         <div
-            style={`${selected() && `background: #ccc;`}`}
+            // https://www.solidjs.com/docs/latest/api#classlist
+            classList={{
+                'dragging': isInDragSet(),
+            }}
+            class={styles['item-container']}
+            style={`
+                ${selected() && `background: #ccc;`};
+            `}
             ref={containerRef}
-            onClick={(event: MouseEvent) => {
+            onMouseDown={(event: MouseEvent) => {
                 if (event.metaKey) {
                     props.selection.toggleKey(props.item.id);
                     return;
                 }
                 if (!event.shiftKey) {
+                    console.log('loading event handlers');
+                    const origin: [number, number] = [event.clientX, event.clientY];
+                    const mouseMove = (mouseUpEvent: MouseEvent) => {
+                        // Make moving a little more effort to avoid slips
+                        if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
+                            props.selection.setDragging(true);
+                            console.log('we draggin');
+                        }
+                    };
+                    window.addEventListener('mousemove', mouseMove);
+                    window.addEventListener('mouseup', () => {
+                        console.log('mouse up!');
+                        props.selection.setDragging(false);
+                        window.removeEventListener('mousemove', mouseMove);
+                    }, { once: true })
+                    if (props.selection.keys.has(props.item.id)) {
+                        // If we click on an already selected item, do nothing until mouse up
+                        // Bc this is the start of a drag
+                        // on mouse up, unselect if no drag
+                        return;
+                    }
                     props.selection.selectOne(props.item.id)
                     return;
                 }

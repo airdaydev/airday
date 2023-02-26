@@ -1,4 +1,4 @@
-import { createSignal, Accessor } from 'solid-js';
+import { createSignal, Accessor, Setter } from 'solid-js';
 // Transient state outside of solidjs lifecycle
 // Custom differ for removing past selection states & creating new ones
 // Tracking ids or indexes or ranges of indexes
@@ -18,8 +18,12 @@ export class AcmeReactiveSelection {
     subscribers = new Map<string, Set<SubscriptionFunc>>(); // key, set of callbacks i.e. signal update
     rangeOrigin: string | null = null;
     lastKeySelected: string | null = null;
+    isDragging: Accessor<boolean>;
+    setDragging: Setter<boolean>;
     constructor() {
-        // Tracking?   
+        const draggingSignal = createSignal<boolean>(false);
+        this.isDragging = draggingSignal[0];
+        this.setDragging = draggingSignal[1];
     }
     addKey(key: string) {
         this.keys.add(key);

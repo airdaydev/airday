@@ -1,3 +1,11 @@
+.item-container {
+    color: blue;
+}
+
+.item-container .dragging {
+    background: red;
+}
+
 .item-edit {
     max-width: 44em;
     box-sizing: border-box;

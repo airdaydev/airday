@@ -1,6 +1,9 @@
 # AcmeList Prototype Roadmap
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
+- [] Shifting up/down and deselecting doesn't move viewport
+- [] Drag items up and down
+- [] Drag items to other lists
 - [] Edit existing item
 - [] Ensure selection is cleared on edit
 - [] Add new item
@@ -15,7 +18,6 @@
 - [] Prevent list navigation on edit mode
 - [] cmd+a to select all items
 - [] Command+up/down keyboard resorts
-- [] Drag creates little cards
 - [] Allow dropping items in nav bar list
 - [] Allow dropping items between open lists directly
 - [] Highlight active list in nav
