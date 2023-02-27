@@ -1,6 +1,7 @@
 import {
   createResource, createSignal, For, onCleanup, onMount,
 } from 'solid-js';
+import TodoSVG from '../icons/todo.svg';
 import { AcmeReactiveSelection } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
@@ -52,21 +53,24 @@ export function List(props: ListProps) {
       class={styles.list}
       tabIndex={props.tabId}
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
-      ref={scrollRef}
+      ref={containerRef}
     >
+      <div style={`display: flex; align-items: center;`}>
+        <TodoSVG style={`margin: 0.5em;`} />
         <h2>{props.listId}</h2>
-        <div ref={containerRef}>
-          <For each={liveList.signal()}>
-            {(item, index) => (
-              <Item
-                item={item}
-                listIndex={index()}
-                selection={selection}
-                liveList={liveList}
-              />
-            )}
-          </For>
-        </div>
+      </div>
+      <div ref={scrollRef} class={styles['list-scroll']}>
+        <For each={liveList.signal()}>
+          {(item, index) => (
+            <Item
+              item={item}
+              listIndex={index()}
+              selection={selection}
+              liveList={liveList}
+            />
+          )}
+        </For>
+      </div>
     </section>
   );
 }

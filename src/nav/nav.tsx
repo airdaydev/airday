@@ -1,5 +1,6 @@
 import styles from './nav.module.css';
 import { replaceView } from '../view-state';
+import TodoSVG from '../icons/todo.svg';
 
 export function AcmeNav() {
   return (
@@ -10,10 +11,13 @@ export function AcmeNav() {
         <button>
           <span>Done</span>
         </button>
+        <hr />
         <button>
+          <TodoSVG />
           <span>Inbox</span>
         </button>
         <button>
+          <TodoSVG />
           <span>Read</span>
         </button>
     </nav>

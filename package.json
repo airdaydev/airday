@@ -11,7 +11,8 @@
   "license": "MIT",
   "devDependencies": {
     "vite": "^4.1.1",
-    "vite-plugin-solid": "^2.5.0"
+    "vite-plugin-solid": "^2.5.0",
+    "vite-plugin-solid-svg": "^0.6.0"
   },
   "dependencies": {
     "fractional-indexing": "^3.2.0",

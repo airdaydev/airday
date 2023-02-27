@@ -6,14 +6,12 @@ interface ListKeyboardHandlerParams {
     liveList: LiveList,
     selection: AcmeReactiveSelection,
     scrollRef: HTMLElement,
-    containerRef: HTMLElement,
 }
 
 export const getListKeyboardHandler = ({
     liveList,
     selection,
     scrollRef,
-    containerRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
     const list = liveList.signal();
     if (event.key === 'a' && event.metaKey) {
@@ -39,7 +37,7 @@ export const getListKeyboardHandler = ({
       if (event.altKey) {
         if (!list.length) return;
         selection.selectOne(list[list.length - 1].id);
-        jumpToElIfOutsideView(scrollRef, containerRef.childNodes[list.length - 1])
+        jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[list.length - 1])
         return;
       }
       // - on key down, select next down from last selected, set last selected, origin
@@ -52,7 +50,7 @@ export const getListKeyboardHandler = ({
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
         if (neighbour) {
           selection.selectOne(list[neighbour].id);
-          jumpToElIfOutsideView(scrollRef, containerRef.childNodes[neighbour])
+          jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour])
         }
       }
       if (selection.rangeOrigin && event.shiftKey) {
@@ -66,7 +64,7 @@ export const getListKeyboardHandler = ({
           const index = liveList.getNextNotInSet(origin, selection.keys);
           if (index !== false) {
             selection.addKey(list[index].id);
-            jumpToElIfOutsideView(scrollRef, containerRef.childNodes[index])
+            jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index])
           }
         } else {
           // deselect down
@@ -87,7 +85,7 @@ export const getListKeyboardHandler = ({
       if (event.altKey) {
         if (!list.length) return;
         selection.selectOne(list[0].id);
-        jumpToElIfOutsideView(scrollRef, containerRef.childNodes[0]);
+        jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[0]);
         return;
       }
       // - on key up, select next down from last selected, set last selected, origin
@@ -100,7 +98,7 @@ export const getListKeyboardHandler = ({
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected, 'prev');
         if (neighbour !== false) {
           selection.selectOne(liveList.signal()[neighbour].id);
-          jumpToElIfOutsideView(scrollRef, containerRef.childNodes[neighbour]);
+          jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour]);
         }
       }
       if (selection.rangeOrigin && event.shiftKey) {
@@ -114,7 +112,7 @@ export const getListKeyboardHandler = ({
           const index = liveList.getNextNotInSet(origin, selection.keys, 'prev');
           if (index !== false) {
             selection.addKey(list[index].id);
-            jumpToElIfOutsideView(scrollRef, containerRef.childNodes[index]);
+            jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index]);
           }
         } else {
           // deselect up
