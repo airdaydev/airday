@@ -35,18 +35,16 @@ export function Item(props: ItemProps) {
                     return;
                 }
                 if (!event.shiftKey) {
-                    console.log('loading event handlers');
                     const origin: [number, number] = [event.clientX, event.clientY];
                     const mouseMove = (mouseUpEvent: MouseEvent) => {
+                        event.preventDefault();
                         // Make moving a little more effort to avoid slips
                         if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
                             props.selection.setDragging(true);
-                            console.log('we draggin');
                         }
                     };
                     window.addEventListener('mousemove', mouseMove);
                     window.addEventListener('mouseup', () => {
-                        console.log('mouse up!');
                         props.selection.setDragging(false);
                         window.removeEventListener('mousemove', mouseMove);
                     }, { once: true })
@@ -61,6 +59,7 @@ export function Item(props: ItemProps) {
                 }
                 // TODO: Shift key but nothing selected
                 if (event.shiftKey && props.selection.keys.size) {
+                    event.preventDefault();
                     // We can (almost) guarantee this bc selection has a size
                     const firstSelectedIndex = props.liveList.getFirstIndexOfSet(props.selection.keys);
                     if (firstSelectedIndex === false) return;
@@ -79,7 +78,8 @@ export function Item(props: ItemProps) {
             }}
         >
             <div class={styles['item-edit']} onClick={(prev) => setEdit(true)}>
-                {props.listIndex} {props.item.text}
+                <div>{props.item.text}</div>
+                <div>{props.listIndex}</div>
             </div>
         </div>
     )

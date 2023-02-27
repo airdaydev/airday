@@ -3,12 +3,22 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 0 1em;
     height: 100vh;
+}
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ccc;
+    border-right: 1px solid #ccc;
 }
 
 .list-scroll {
     overflow-y: scroll;
+    padding: 0.5em;
+    border-right: 1px solid #ccc;
+    height: 100%;
 }
 
 .list h2 {

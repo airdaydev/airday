@@ -47,6 +47,7 @@ export const getListKeyboardHandler = ({
         return;
       }
       if (selection.lastKeySelected && !event.shiftKey) {
+        event.preventDefault();
         const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
         if (neighbour) {
           selection.selectOne(list[neighbour].id);
@@ -54,6 +55,7 @@ export const getListKeyboardHandler = ({
         }
       }
       if (selection.rangeOrigin && event.shiftKey) {
+        event.preventDefault();
         // contiguous area below origin, continue:
         const origin = liveList.getIndexOfKey(selection.rangeOrigin);
         if (origin === false) return;

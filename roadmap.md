@@ -1,7 +1,9 @@
 # AcmeList Prototype Roadmap
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
+- [x] cmd+a to select all items
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport
+- [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Drag items up and down
 - [] Drag items to other lists
 - [] Edit existing item
@@ -16,7 +18,6 @@
 - [] Command mouse navigation
 - [] Clear selection on 'esc' key
 - [] Prevent list navigation on edit mode
-- [] cmd+a to select all items
 - [] Command+up/down keyboard resorts
 - [] Allow dropping items in nav bar list
 - [] Allow dropping items between open lists directly

@@ -2,6 +2,7 @@ import {
   createResource, createSignal, For, onCleanup, onMount,
 } from 'solid-js';
 import TodoSVG from '../icons/todo.svg';
+import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
@@ -55,9 +56,12 @@ export function List(props: ListProps) {
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
       ref={containerRef}
     >
-      <div style={`display: flex; align-items: center;`}>
-        <TodoSVG style={`margin: 0.5em;`} />
-        <h2>{props.listId}</h2>
+      <div class={styles['list-header']}>
+        <div style={`display: flex; align-items: center;`}>
+          <TodoSVG style={`margin: 0.5em;`} />
+          <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
+        </div>
+        <XSVG />
       </div>
       <div ref={scrollRef} class={styles['list-scroll']}>
         <For each={liveList.signal()}>
