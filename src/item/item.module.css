@@ -1,12 +1,4 @@
 .item-container {
-    /* color: blue; */
-}
-
-.item-container .dragging {
-    background: red;
-}
-
-.item-edit {
     max-width: 44em;
     box-sizing: border-box;
     padding: 0.5em;
@@ -15,7 +7,18 @@
     user-select: none;
 }
 
-.item-edit:hover {
+.item-container-dragging {
+    display: none;
+}
+.item-container-selected {
+    background: #ccc;
+}
+
+.item-edit {
+    
+}
+
+.item-container:hover {
     background: #d9d9d9;
     cursor: pointer;
 }

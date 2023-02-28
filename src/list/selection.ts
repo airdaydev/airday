@@ -20,10 +20,15 @@ export class AcmeReactiveSelection {
     lastKeySelected: string | null = null;
     isDragging: Accessor<boolean>;
     setDragging: Setter<boolean>;
+    lastTouchedIndex: Accessor<boolean>;
+    setLastTouchedIndex: Setter<boolean>;
     constructor() {
         const draggingSignal = createSignal<boolean>(false);
         this.isDragging = draggingSignal[0];
         this.setDragging = draggingSignal[1];
+        const lastTouchedIndex = createSignal<boolean>(false);
+        this.lastTouchedIndex = lastTouchedIndex[0];
+        this.setLastTouchedIndex = lastTouchedIndex[1];
     }
     addKey(key: string) {
         this.keys.add(key);

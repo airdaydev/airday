@@ -1,5 +1,6 @@
 import {
-  createResource, createSignal, For, onCleanup, onMount,
+  on, createSignal, For, onCleanup, onMount,
+  createEffect,
 } from 'solid-js';
 import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
@@ -30,18 +31,40 @@ interface ListProps {
  * @returns 
  */
 export function List(props: ListProps) {
-  let containerRef: HTMLDivElement;
   let scrollRef: HTMLDivElement;
   const liveList = openList(props.listId);
   if (!liveList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
+  let placeholderRef: HTMLElement | undefined;
+  // PoC: Placeholder behaviour outside solid
+  // Not a great solution bc may not reconcile well
+  // createEffect((prev) => {
+  //   // TODO: Includes liveList as an explicit dependent, so it recalculates to list changes
+  //   // TODO: Will the For reconcile loop be unhappy?
+  //   const index = selection.lastTouchedIndex();
+  //   const isDragging = selection.isDragging();
+  //   console.log('start-effect', index);
+  //   if (typeof index !== 'number' || !isDragging) {
+  //     if (placeholderRef) {
+  //       placeholderRef.remove()
+  //     }
+  //     return;
+  //   }
+  //   if (placeholderRef) {
+  //     placeholderRef.remove()
+  //   }
+  //   placeholderRef = document.createElement('div');
+  //   placeholderRef.innerText = 'whatever';
+  //   placeholderRef.style.height = '4em';
+  //   placeholderRef.style.background = '#ccc';
+  //   scrollRef?.insertBefore(placeholderRef, scrollRef.childNodes[index + 1]);
+  // });
   // TODO: Incorporate into handler and wire up to top level keyboard module
   const contextId = nanoid();
   onMount(() => {
     keyboardShortcuts.registerHandler('keydown', contextId, getListKeyboardHandler({
       liveList,
       selection,
-      containerRef,
       scrollRef,
     }));
   });
@@ -49,12 +72,17 @@ export function List(props: ListProps) {
     keyboardShortcuts.unregisterHandler('keydown', contextId)
     console.log(`cleaning up list ${props.listId}`)
   });
+  // TODO: First attempt to do in-list dragging
+  // const [tList, setTList] = createSignal();
+  // const unsubscribe = on([selection.isDragging, selection.lastTouchedIndex, liveList.signal], () => {
+  //   const list = liveList.signal();
+  //   list.splice(selection.lastTouchedIndex(), 0, null, list[selection.lastTouchedIndex()])
+  // });
   return (
     <section
       class={styles.list}
       tabIndex={props.tabId}
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
-      ref={containerRef}
     >
       <div class={styles['list-header']}>
         <div style={`display: flex; align-items: center;`}>
@@ -71,6 +99,7 @@ export function List(props: ListProps) {
               listIndex={index()}
               selection={selection}
               liveList={liveList}
+              scrollRef={scrollRef}
             />
           )}
         </For>

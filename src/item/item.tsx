@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup } from 'solid-js';
+import { createSignal, createEffect, onCleanup, on } from 'solid-js';
 import { AcmeReactiveSelection } from '../list/selection';
 import { store } from '../store/main';
 import { LiveList } from '../store/open-list';
@@ -10,6 +10,7 @@ interface ItemProps {
     item: AcmeItem;
     selection: AcmeReactiveSelection;
     liveList: LiveList;
+    scrollRef: HTMLElement;
 }
 
 export function Item(props: ItemProps) {
@@ -22,13 +23,14 @@ export function Item(props: ItemProps) {
         <div
             // https://www.solidjs.com/docs/latest/api#classlist
             classList={{
-                'dragging': isInDragSet(),
+                [styles['item-container-dragging']]: isInDragSet(),
+                [styles['item-container-selected']]: selected(),
+                [styles['item-container']]: true,
             }}
-            class={styles['item-container']}
-            style={`
-                ${selected() && `background: #ccc;`};
-            `}
             ref={containerRef}
+            onMouseEnter={(event: MouseEvent) => {
+                props.selection.setLastTouchedIndex(props.listIndex);
+            }}
             onMouseDown={(event: MouseEvent) => {
                 if (event.metaKey) {
                     props.selection.toggleKey(props.item.id);
@@ -40,15 +42,22 @@ export function Item(props: ItemProps) {
                         event.preventDefault();
                         // Make moving a little more effort to avoid slips
                         if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
+                            // props.selection.setLastTouchedIndex(props.listIndex);
                             props.selection.setDragging(true);
                         }
+                        // Track where on list to place placeholder
+                        // On blur, remove placeholder
+                        // On 
                     };
                     window.addEventListener('mousemove', mouseMove);
                     window.addEventListener('mouseup', () => {
+                        // End drag
+                        props.selection.setLastTouchedIndex(false);
                         props.selection.setDragging(false);
                         window.removeEventListener('mousemove', mouseMove);
                     }, { once: true })
                     if (props.selection.keys.has(props.item.id)) {
+                        props.selection.setDragging(true);
                         // If we click on an already selected item, do nothing until mouse up
                         // Bc this is the start of a drag
                         // on mouse up, unselect if no drag
@@ -77,7 +86,9 @@ export function Item(props: ItemProps) {
                 }
             }}
         >
-            <div class={styles['item-edit']} onClick={(prev) => setEdit(true)}>
+            <div classList={{
+                // [styles['item-edit']]: true,,
+            }} onClick={(prev) => setEdit(true)}>
                 <div>{props.item.text}</div>
                 <div>{props.listIndex}</div>
             </div>
