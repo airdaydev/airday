@@ -28,3 +28,14 @@ TODO: Test what happens when list contents changes during selection, consider bo
 
 ## List actions (TODO)
 - Delete, move etc
+
+## Animation
+- Set last touched index on enter item
+- On mouse down -> mouse move, (hide dragged items) and place new item in last touched's (new) place i.e. its filtered index
+- On item disappearance, items shrink before leaving/disappearing
+- When item gets pushed up, it either animates depending on the difference between its current and subsequent index, or it could get pushed by the animation of placeholders shrinking and expanding.
+
+
+## Understanding For
+https://github.com/solidjs/solid/blob/main/packages/solid/src/render/flow.ts
+https://github.com/solidjs/solid/blob/main/packages/solid/src/reactive/array.ts

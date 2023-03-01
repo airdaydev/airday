@@ -78,6 +78,7 @@ export function List(props: ListProps) {
   //   const list = liveList.signal();
   //   list.splice(selection.lastTouchedIndex(), 0, null, list[selection.lastTouchedIndex()])
   // });
+  
   return (
     <section
       class={styles.list}

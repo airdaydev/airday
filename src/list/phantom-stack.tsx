@@ -1,14 +1,8 @@
-import { css } from '@emotion/css';
-import {
-    FunctionComponent, useEffect, useState,
-    useRef,
-} from 'react';
+// Ported from react prototype
 
 // PhantomStack is the component that shows a stack of currently
 // dragged objects beneath the user's mouse
 // we'll use RequestAnimationFrame to decide when to update the state
-
-// TODO: Card stack
 
 export const PhantomStack: FunctionComponent<{ size: number }> = ({ size }) => {
     // const [mousePos, setMousePos] = useState<[number, number]>([0, 0]);
