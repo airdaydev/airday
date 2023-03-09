@@ -8,7 +8,7 @@
 }
 
 .item-container-dragging {
-    display: none;
+    background: yellow !important;
 }
 .item-container-selected {
     background: #ccc;

@@ -72,18 +72,42 @@ export function List(props: ListProps) {
     keyboardShortcuts.unregisterHandler('keydown', contextId)
     console.log(`cleaning up list ${props.listId}`)
   });
+
   // TODO: First attempt to do in-list dragging
-  // const [tList, setTList] = createSignal();
-  // const unsubscribe = on([selection.isDragging, selection.lastTouchedIndex, liveList.signal], () => {
-  //   const list = liveList.signal();
-  //   list.splice(selection.lastTouchedIndex(), 0, null, list[selection.lastTouchedIndex()])
-  // });
+  // A reactive means of handling list & placeholder changes on drag
+  // TBH: An explicitly set means of doing this COULD be a little cleaner.
+  // This is better off being created from the liveList which can take a selection module.
+  const [instanceSignal, setInstanceSignal] = createSignal<AcmeItem[]>(liveList.signal());
+  const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, liveList.signal], () => {
+    console.log('on');
+    setInstanceSignal(liveList.signal());
+    // if (typeof selection.lastTouchedIndex() === 'number') {
+    //   // We have a placeholder location
+      // 
+    // }
+    if (selection.globalIsDragging()) {
+      // We are dragging, so filter if this is our list
+      // TODO: This is not known on first drag!
+      // const isDraggingLocal = selection.lastTouchedIndex();
+      // console.log('selection.isDragging()', isDraggingLocal)
+      const filtered = liveList.signal().filter((val) => !selection.keys.has(val.id));
+      // placeholder
+      const lastTouchedIndex = selection.lastTouchedIndex();
+      if (typeof lastTouchedIndex === 'number') {
+        filtered.splice(lastTouchedIndex, 1, { id: 'yo', text: 'placeholder' }, filtered[lastTouchedIndex])
+      }
+      setInstanceSignal(filtered);
+    } else {
+      setInstanceSignal(liveList.signal())
+    }
+  }));
   
   return (
     <section
       class={styles.list}
       tabIndex={props.tabId}
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
+      onMouseLeave={(() => selection.setLastTouchedIndex(false))}
     >
       <div class={styles['list-header']}>
         <div style={`display: flex; align-items: center;`}>
@@ -93,7 +117,8 @@ export function List(props: ListProps) {
         <XSVG />
       </div>
       <div ref={scrollRef} class={styles['list-scroll']}>
-        <For each={liveList.signal()}>
+        {/* <For each={selection.isDragging() ? liveList.signal().filter((value) => !selection.keys.has(value.id)) : liveList.signal()}> */}
+        <For each={instanceSignal()}>
           {(item, index) => (
             <Item
               item={item}

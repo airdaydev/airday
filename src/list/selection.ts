@@ -13,22 +13,32 @@ import { createSignal, Accessor, Setter } from 'solid-js';
 
 type SubscriptionFunc = (selected: boolean) => void;
 
+// Only one "dragging" state at a time (mouse down - dragging, mouse up - no dragging - no opportunity to drag in between)
+let activeSelection: AcmeReactiveSelection | null = null;
+const [globalIsDragging, setGlobalIsDragging] = createSignal<boolean>(false);
+
 export class AcmeReactiveSelection {
     keys = new Set<string>;
     subscribers = new Map<string, Set<SubscriptionFunc>>(); // key, set of callbacks i.e. signal update
     rangeOrigin: string | null = null;
     lastKeySelected: string | null = null;
     isDragging: Accessor<boolean>;
-    setDragging: Setter<boolean>;
-    lastTouchedIndex: Accessor<boolean>;
-    setLastTouchedIndex: Setter<boolean>;
+    setDraggingInternal: Setter<boolean>;
+    lastTouchedIndex: Accessor<number | boolean>;
+    setLastTouchedIndex: Setter<number | boolean>;
+    globalIsDragging = globalIsDragging;
     constructor() {
         const draggingSignal = createSignal<boolean>(false);
         this.isDragging = draggingSignal[0];
-        this.setDragging = draggingSignal[1];
-        const lastTouchedIndex = createSignal<boolean>(false);
+        this.setDraggingInternal = draggingSignal[1];
+        const lastTouchedIndex = createSignal<number | boolean>(false);
         this.lastTouchedIndex = lastTouchedIndex[0];
         this.setLastTouchedIndex = lastTouchedIndex[1];
+    }
+    setDragging = (isDragging: boolean) => {
+        setGlobalIsDragging(isDragging);
+        // TODO: potentially don't need this as a signal (tbc)
+        this.setDraggingInternal(isDragging);
     }
     addKey(key: string) {
         this.keys.add(key);

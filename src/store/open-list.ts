@@ -24,14 +24,17 @@ interface AcmeItemInsertion extends Partial<AcmeList> {
     listId: string;
 }
 
+// data projection
+// 1. core signal
+// 2. list instance signal (copy OR middleware applied)
+
 /**
- * Live list interaction based on array + index (btree)
+ * Live list interaction based on array + TODO: index (btree)
  * For editing and sorting lists quickly without the overhead of transactional guarantees from the main store
  */
 export class LiveList {
     listId: string;
     list: AcmeItem[] = [];
-    bTree = null; // or just a hash map?
     signal: Accessor<AcmeItem[]>;
     setSignal: Setter<AcmeItem[]>;
     constructor(listId: string) {
@@ -40,7 +43,6 @@ export class LiveList {
         this.setSignal = setSignal;
         this.listId = listId;
         // this.store.subscribe(listId, onUpdate);
-        this.initBTree();
         this.initList();
     }
     new(item: AcmeItemInsertion) {
@@ -53,12 +55,10 @@ export class LiveList {
     // Track updates, potentially batched
     onUpdate(type: string, items: AcmeItem[]) {
         if (type === 'add') {
-            // add to btree
             // put into list and sort list
         }
         if (type === 'update') {
             items.forEach(() => {
-                // add to btree
                 // put into list and sort list
             })
         }
@@ -67,9 +67,6 @@ export class LiveList {
             // remove from list
         }
         // Trigger signal update
-    }
-    initBTree() {
-
     }
     async initList() {
         const list = await store.getItemsByList(this.listId);

@@ -3,15 +3,16 @@ import { generateNKeysBetween } from 'fractional-indexing';
 import { store } from './main.js';;
 
 export const acmeItems = [
-    'Get idb working with UI',
-    'Make decision between encrypted item patches w crdts and encrypted text',
-    'Build selection module',
-    'Build keyboard listener for each segment',
-    'Add more dummy data',
+    'AcmeList',
+    'Wrap handlebars with Cinelli wrap',
+    'GET CAR SERVICED 02 xxxx xxxx',
+    'https://openstax.org/details/books/precalculus-2e'
 ]
 
 export const inboxItems = [
     'Continue agb book',
+    'Continue nutha book',
+    'Continue and another book',
 ]
 
 export function genTestData(listId: string, tasks: string[]): AcmeItem[] {

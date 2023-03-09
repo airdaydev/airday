@@ -44,6 +44,7 @@ export function Item(props: ItemProps) {
                         if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
                             // props.selection.setLastTouchedIndex(props.listIndex);
                             props.selection.setDragging(true);
+                            // TODO: FILTER THE ACTIVE SELECTION
                         }
                         // Track where on list to place placeholder
                         // On blur, remove placeholder
