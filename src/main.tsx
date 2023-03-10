@@ -12,6 +12,10 @@ const items = [
   ...genTestData('inbox', inboxItems),
 ]
 await store.insert(items);
+await store.insertLists([
+  { id: 'inbox', name: 'Inbox' },
+  { id: 'acmelist', name: 'AcmeList' },
+])
 
 const root = document.getElementById('root');
 

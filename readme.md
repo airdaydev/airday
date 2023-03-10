@@ -6,8 +6,6 @@ SolidJS port of AcmeList prototype
 - SolidJS (templating, reactivity)
 - idb (indexed-db clone, maintaining local state)
 - flexsearch
-- 
--
 
 ## Notes:
 Done = statically ordered list

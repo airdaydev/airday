@@ -79,14 +79,14 @@ export function List(props: ListProps) {
   // This is better off being created from the liveList which can take a selection module.
   const [instanceSignal, setInstanceSignal] = createSignal<AcmeItem[]>(liveList.signal());
   const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, liveList.signal], () => {
-    console.log('on');
     setInstanceSignal(liveList.signal());
     // if (typeof selection.lastTouchedIndex() === 'number') {
-    //   // We have a placeholder location
+      //   // We have a placeholder location
       // 
-    // }
+      // }
     if (selection.globalIsDragging()) {
-      // We are dragging, so filter if this is our list
+      console.log('isdragging');
+      // We are dragging, so filter if this is our list instance
       // TODO: This is not known on first drag!
       // const isDraggingLocal = selection.lastTouchedIndex();
       // console.log('selection.isDragging()', isDraggingLocal)

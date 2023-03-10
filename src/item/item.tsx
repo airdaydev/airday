@@ -21,6 +21,7 @@ export function Item(props: ItemProps) {
     const isInDragSet = () => props.selection.isDragging() && props.selection.keys.has(props.item.id);
     return (
         <div
+            onClick={(prev) => setEdit(true)}
             // https://www.solidjs.com/docs/latest/api#classlist
             classList={{
                 [styles['item-container-dragging']]: isInDragSet(),
@@ -58,7 +59,6 @@ export function Item(props: ItemProps) {
                         window.removeEventListener('mousemove', mouseMove);
                     }, { once: true })
                     if (props.selection.keys.has(props.item.id)) {
-                        props.selection.setDragging(true);
                         // If we click on an already selected item, do nothing until mouse up
                         // Bc this is the start of a drag
                         // on mouse up, unselect if no drag
@@ -87,11 +87,13 @@ export function Item(props: ItemProps) {
                 }
             }}
         >
-            <div classList={{
-                // [styles['item-edit']]: true,,
-            }} onClick={(prev) => setEdit(true)}>
+            <div class={styles['item-check']}></div>
+            <div>
                 <div>{props.item.text}</div>
-                <div>{props.listIndex}</div>
+                <div style={{color: '#ccc', "font-size": '0.8em'}}>
+                    Added 2 minutes ago
+                    <span>#{props.listIndex}</span>
+                </div>
             </div>
         </div>
     )

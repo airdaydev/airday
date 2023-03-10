@@ -1,20 +1,20 @@
 # AcmeList Prototype Roadmap
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
 - [x] cmd+a to select all items
+- [x] Meta/Alt keyboard navigation
+- [x] Shift keyboard navigation
+- [x] Shift mouse navigation
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
-- [] Drag items up and down
-- [] Drag items to other lists
+- [] Drag items up and down (& persist)
+- [] Drag items to other lists (& persist)
 - [] Edit existing item
 - [] Ensure selection is cleared on edit
 - [] Add new item
 - [] Add new item above selected item
 - [] Edit list name capability in navbar 
 - [] Edit selected items via 'enter' key
-- [] Meta keyboard navigation
-- [] Shift keyboard navigation
-- [] Shift mouse navigation
 - [] Command mouse navigation
 - [] Clear selection on 'esc' key
 - [] Prevent list navigation on edit mode
@@ -48,6 +48,8 @@
 - [] Add repeatable items - Maybe
 - [] Export data (JSON)
 - [] Secrets
-- [] Mobile app strategy
+- [] Website
+- [] Spanish (EU) localisation
+- [] Japanese localisation
+- [] Mobile native app strategy
 - [] The board (canvas/webgl)
-- [] Spanish (EU) Localisation

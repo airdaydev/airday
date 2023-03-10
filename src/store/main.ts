@@ -15,6 +15,8 @@ interface DBTypes {
 }
 
 const itemStoreName = 'item';
+const listStoreName = 'list';
+// Remote Config store per browser (but could do local storage)
 const dbNotReadyMessage = 'DB not loaded, pre-load buffer not yet implemented';
 
 // Primary local persistence layer
@@ -26,6 +28,9 @@ class AcmeLocalStore {
         this.db = await openDB<DBTypes>('acme', schemaVersion, {
             upgrade(db) {
                 const itemStore = db.createObjectStore(itemStoreName, {
+                    keyPath: 'id',
+                });
+                db.createObjectStore(listStoreName, {
                     keyPath: 'id',
                 });
                 itemStore.createIndex('listId', 'listId');
@@ -58,6 +63,23 @@ class AcmeLocalStore {
         await tx.done;
         touchedLists.forEach((listId) => this.events.dispatchEvent(new Event(`list-update-${listId}`)));
     }
+    insertLists = async(data: AcmeList | AcmeList[]) => {
+        if (!this.db) throw new Error(dbNotReadyMessage);
+        const tx = this.db.transaction(listStoreName, 'readwrite');
+        const store = tx.objectStore(listStoreName);
+        const insert = async (item: AcmeList) => {
+            const prev = await store.get(item.id);
+            if (prev) throw new Error('Key already exists');
+            const val = await store.add(item);
+            return val;
+        };
+        if (Array.isArray(data)) {
+            await data.map((item) => insert(item));
+        } else {
+            insert(data);
+        }
+        await tx.done;
+    }
     subscribe(eventName: string, callback: () => void) {
         console.log('subscribing', eventName)
         return this.events.addEventListener(eventName, callback);
@@ -66,6 +88,11 @@ class AcmeLocalStore {
         if (!this.db) throw new Error(dbNotReadyMessage);
         const range = IDBKeyRange.bound([listId, 'A'], [listId, 'zzzzzz']);
         const items = await this.db.getAllFromIndex(itemStoreName, 'ordered', range);
+        return items;
+    }
+    getLists = async (): Promise<AcmeItem[]> => {
+        if (!this.db) throw new Error(dbNotReadyMessage);
+        const items = await this.db.getAll(itemStoreName);
         return items;
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {

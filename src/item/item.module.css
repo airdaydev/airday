@@ -5,13 +5,15 @@
     border-radius: 3px;
     height: 4em;
     user-select: none;
+    display: flex;
+    align-items: center;
 }
 
 .item-container-dragging {
     background: yellow !important;
 }
 .item-container-selected {
-    background: #ccc;
+    background: var(--border, value);
 }
 
 .item-edit {
@@ -21,4 +23,12 @@
 .item-container:hover {
     background: #d9d9d9;
     cursor: pointer;
+}
+
+.item-check {
+    border: 1px solid var(--border, value);
+    border-radius: 2px;
+    width: 1.25em;
+    height: 1.25em;
+    margin-right: 0.5em;
 }

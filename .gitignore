@@ -1,2 +1,4 @@
 node_modules
 dist
+src/assets/diatype-regular.woff2
+.DS_Store

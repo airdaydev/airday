@@ -10,14 +10,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #ccc;
-    border-right: 1px solid #ccc;
+    border-bottom: 1px solid var(--border, value);
+    border-right: 1px solid var(--border, value);
 }
 
 .list-scroll {
     overflow-y: scroll;
     padding: 0.5em;
-    border-right: 1px solid #ccc;
+    border-right: 1px solid var(--border, value);
     height: 100%;
 }
 
