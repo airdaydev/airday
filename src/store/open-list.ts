@@ -27,6 +27,8 @@ interface AcmeItemInsertion extends Partial<AcmeList> {
 // data projection stack
 // 1. server (online persistence) -> idb (offline persistence) -> mem list (fast, optimistic access) -> list instance (display, interaction)
 
+export let lastTouchedList: string | false = false;
+
 /**
  * Live list interaction based on array
  * For editing and sorting lists quickly without the overhead of transactional guarantees from the main store
@@ -45,6 +47,9 @@ export class LiveList {
         // this.store.subscribe(listId, onUpdate);
         this.initList();
     }
+    setLastTouched = () => {
+        lastTouchedList = this.listId;
+    }
     new(item: AcmeItemInsertion) {
         store.insert({
             id: nanoid(),
@@ -54,15 +59,28 @@ export class LiveList {
     }
     moveItems(ids: Set<string>, targetList: string) {
         // Filter ids from list
-        const updatedList = this.signal().filter((item) => !ids.has(item.id));
+        const itemsToMove: AcmeItem[] = [];
+        const updatedList = this.signal().filter((item) => {
+            const toMove = ids.has(item.id)
+            if (toMove) itemsToMove.push(item);
+            return !toMove;
+        });
         this.setSignal(updatedList);
         const openTargetList = openLists.get(targetList);
         if (openTargetList) {
-            // add to open list
-            // openTargetList.add()...
+            openTargetList.add(itemsToMove);
         } else {
             // or add directly to store
         }
+    }
+    // no persistence add
+    // todo: performance optimisation, add to sorted list
+    add(items: AcmeItem[]) {
+        const list = this.signal();
+        list.push(...items);
+        // list.sort(() => {
+        //     // todo: sort by sortKey + id
+        // })
     }
     updateItemContents(id: string, newText: string) {
         // TODO: Move item

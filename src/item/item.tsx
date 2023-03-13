@@ -2,7 +2,7 @@ import { createSignal, createEffect, onCleanup, on } from 'solid-js';
 import { AcmeReactiveSelection } from '../list/selection';
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
-import { LiveList } from '../store/open-list';
+import { LiveList, lastTouchedList } from '../store/open-list';
 import styles from './item.module.css';
 import { distance } from './utils';
 
@@ -123,6 +123,7 @@ export function Item(props: ItemProps) {
                     }}
                     ref={containerRef}
                     onMouseEnter={(event: MouseEvent) => {
+                        props.liveList.setLastTouched();
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onMouseDown={(event: MouseEvent) => {
@@ -147,9 +148,10 @@ export function Item(props: ItemProps) {
                             window.addEventListener('mousemove', mouseMove);
                             window.addEventListener('mouseup', () => {
                                 // End drag
-                                if (props.selection.isDragging()) {
-                                    console.log(`moving ${props.selection.keys.size} to ${props.liveList.listId}`);
-                                    props.liveList.moveItems(props.selection.keys, props.liveList.listId);
+                                // TODO: Crawl out or set with 
+                                if (props.selection.isDragging() && lastTouchedList) {
+                                    console.log(`moving ${props.selection.keys.size} to ${lastTouchedList}`);
+                                    props.liveList.moveItems(props.selection.keys, lastTouchedList);
                                 }
                                 props.selection.setLastTouchedIndex(false);
                                 props.selection.setDragging(false);
