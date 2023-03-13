@@ -4,7 +4,7 @@ import {
 } from 'solid-js';
 import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
-import { AcmeReactiveSelection } from '../list/selection.js';
+import { AcmeReactiveSelection, dragOriginSelection } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
 import { store } from '../store/main';
@@ -35,30 +35,6 @@ export function List(props: ListProps) {
   const liveList = openList(props.listId);
   if (!liveList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
-  let placeholderRef: HTMLElement | undefined;
-  // PoC: Placeholder behaviour outside solid
-  // Not a great solution bc may not reconcile well
-  // createEffect((prev) => {
-  //   // TODO: Includes liveList as an explicit dependent, so it recalculates to list changes
-  //   // TODO: Will the For reconcile loop be unhappy?
-  //   const index = selection.lastTouchedIndex();
-  //   const isDragging = selection.isDragging();
-  //   console.log('start-effect', index);
-  //   if (typeof index !== 'number' || !isDragging) {
-  //     if (placeholderRef) {
-  //       placeholderRef.remove()
-  //     }
-  //     return;
-  //   }
-  //   if (placeholderRef) {
-  //     placeholderRef.remove()
-  //   }
-  //   placeholderRef = document.createElement('div');
-  //   placeholderRef.innerText = 'whatever';
-  //   placeholderRef.style.height = '4em';
-  //   placeholderRef.style.background = '#ccc';
-  //   scrollRef?.insertBefore(placeholderRef, scrollRef.childNodes[index + 1]);
-  // });
   // TODO: Incorporate into handler and wire up to top level keyboard module
   const contextId = nanoid();
   onMount(() => {
@@ -70,7 +46,6 @@ export function List(props: ListProps) {
   });
   onCleanup(() => {
     keyboardShortcuts.unregisterHandler('keydown', contextId)
-    console.log(`cleaning up list ${props.listId}`)
   });
 
   // TODO: First attempt to do in-list dragging
@@ -79,23 +54,20 @@ export function List(props: ListProps) {
   // This is better off being created from the liveList which can take a selection module.
   const [instanceSignal, setInstanceSignal] = createSignal<AcmeItem[]>(liveList.signal());
   const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, liveList.signal], () => {
-    setInstanceSignal(liveList.signal());
-    // if (typeof selection.lastTouchedIndex() === 'number') {
-      //   // We have a placeholder location
-      // 
-      // }
     if (selection.globalIsDragging()) {
-      console.log('isdragging');
       // We are dragging, so filter if this is our list instance
-      // TODO: This is not known on first drag!
-      // const isDraggingLocal = selection.lastTouchedIndex();
-      // console.log('selection.isDragging()', isDraggingLocal)
-      const filtered = liveList.signal().filter((val) => !selection.keys.has(val.id));
+      let filtered: AcmeItem[] = [...liveList.signal()];
+      if (dragOriginSelection === selection) {
+        console.log('dragOriginSelection === selection')
+        filtered = filtered.filter((val) => !selection.keys.has(val.id))
+      }
+      // dragOriginSelection
       // placeholder
       const lastTouchedIndex = selection.lastTouchedIndex();
       if (typeof lastTouchedIndex === 'number') {
-        filtered.splice(lastTouchedIndex, 1, { id: 'yo', text: 'placeholder' }, filtered[lastTouchedIndex])
+        filtered.splice(lastTouchedIndex, 0, { id: 'yo', text: 'placeholder' })
       }
+      console.log('instanceSignal', filtered);
       setInstanceSignal(filtered);
     } else {
       setInstanceSignal(liveList.signal())
@@ -117,7 +89,6 @@ export function List(props: ListProps) {
         <XSVG />
       </div>
       <div ref={scrollRef} class={styles['list-scroll']}>
-        {/* <For each={selection.isDragging() ? liveList.signal().filter((value) => !selection.keys.has(value.id)) : liveList.signal()}> */}
         <For each={instanceSignal()}>
           {(item, index) => (
             <Item

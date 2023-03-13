@@ -14,7 +14,7 @@ import { createSignal, Accessor, Setter } from 'solid-js';
 type SubscriptionFunc = (selected: boolean) => void;
 
 // Only one "dragging" state at a time (mouse down - dragging, mouse up - no dragging - no opportunity to drag in between)
-let activeSelection: AcmeReactiveSelection | null = null;
+export let dragOriginSelection: AcmeReactiveSelection | null = null;
 const [globalIsDragging, setGlobalIsDragging] = createSignal<boolean>(false);
 
 export class AcmeReactiveSelection {
@@ -36,6 +36,7 @@ export class AcmeReactiveSelection {
         this.setLastTouchedIndex = lastTouchedIndex[1];
     }
     setDragging = (isDragging: boolean) => {
+        dragOriginSelection = this;
         setGlobalIsDragging(isDragging);
         // TODO: potentially don't need this as a signal (tbc)
         this.setDraggingInternal(isDragging);

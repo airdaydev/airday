@@ -1,9 +1,9 @@
 :root {
-  --border: #1e90ff;
+  --border: #ccc;
 }
 
 @font-face {
-  font-family: 'Trial';
+  font-family: 'diatype-trial';
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -17,7 +17,7 @@ body {
   width: 100%;
   padding: 0;
   margin: 0;
-  font-family: 'PingFang hk', sans-serif;
+  font-family: 'diatype-trial', sans-serif;
   font-size: 16px;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
