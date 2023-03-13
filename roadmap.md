@@ -5,11 +5,11 @@
 - [x] Shift keyboard navigation
 - [x] Shift mouse navigation
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
-- [] Shifting up/down and deselecting doesn't move viewport
+- [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
+- [] Edit existing item
 - [] Drag items up and down (& persist)
 - [] Drag items to other lists (& persist)
-- [] Edit existing item
 - [] Ensure selection is cleared on edit
 - [] Add new item
 - [] Add new item above selected item

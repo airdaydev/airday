@@ -30,7 +30,11 @@ export function Item(props: ItemProps) {
         props.keyboardShortcuts.disable();
         setEdit(true);
     }
-    function leaveEditMode() {
+    function leaveEditMode(save?: boolean) {
+        if (save) {
+            // optimistically update livelist, then idb
+            props.liveList.updateItemContents(props.item.id, textAreaRef.value);
+        }
         props.keyboardShortcuts.enable();
         setEdit(false);
     }
@@ -93,8 +97,7 @@ export function Item(props: ItemProps) {
                       font-family: inherit;
                   `}
                   onBlur={(event) => {
-                    // save(event.target.value);
-                    leaveEditMode()
+                    leaveEditMode(true)
                   }}
               />
               </div>
@@ -144,6 +147,10 @@ export function Item(props: ItemProps) {
                             window.addEventListener('mousemove', mouseMove);
                             window.addEventListener('mouseup', () => {
                                 // End drag
+                                if (props.selection.isDragging()) {
+                                    console.log(`moving ${props.selection.keys.size} to ${props.liveList.listId}`);
+                                    props.liveList.moveItems(props.selection.keys, props.liveList.listId);
+                                }
                                 props.selection.setLastTouchedIndex(false);
                                 props.selection.setDragging(false);
                                 window.removeEventListener('mousemove', mouseMove);

@@ -67,7 +67,6 @@ export function List(props: ListProps) {
       if (typeof lastTouchedIndex === 'number') {
         filtered.splice(lastTouchedIndex, 0, { id: 'yo', text: 'placeholder' })
       }
-      console.log('instanceSignal', filtered);
       setInstanceSignal(filtered);
     } else {
       setInstanceSignal(liveList.signal())
@@ -91,14 +90,17 @@ export function List(props: ListProps) {
       <div ref={scrollRef} class={styles['list-scroll']}>
         <For each={instanceSignal()}>
           {(item, index) => (
-            <Item
-              item={item}
-              listIndex={index()}
-              selection={selection}
-              liveList={liveList}
-              scrollRef={scrollRef}
-              keyboardShortcuts={keyboardShortcuts}
-            />
+            <>
+              {/* TODO: Use custom placeholder item */}
+              <Item
+                item={item}
+                listIndex={index()}
+                selection={selection}
+                liveList={liveList}
+                scrollRef={scrollRef}
+                keyboardShortcuts={keyboardShortcuts}
+              />
+            </>
           )}
         </For>
       </div>

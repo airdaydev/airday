@@ -97,7 +97,6 @@ class AcmeLocalStore {
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {
         if (!this.db) throw new Error(dbNotReadyMessage);
-        
     }
     move = async (id: string, attributes: Partial<AcmeItem>) => {
         if (!this.db) throw new Error(dbNotReadyMessage);   

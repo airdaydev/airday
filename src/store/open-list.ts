@@ -24,13 +24,13 @@ interface AcmeItemInsertion extends Partial<AcmeList> {
     listId: string;
 }
 
-// data projection
-// 1. core signal
-// 2. list instance signal (copy OR middleware applied)
+// data projection stack
+// 1. server (online persistence) -> idb (offline persistence) -> mem list (fast, optimistic access) -> list instance (display, interaction)
 
 /**
- * Live list interaction based on array + TODO: index (btree)
+ * Live list interaction based on array
  * For editing and sorting lists quickly without the overhead of transactional guarantees from the main store
+ * TODO: Strongly consider an index
  */
 export class LiveList {
     listId: string;
@@ -51,6 +51,29 @@ export class LiveList {
             ...item,
             dateCreated: (new Date()).toString(),
         });
+    }
+    moveItems(ids: Set<string>, targetList: string) {
+        // Filter ids from list
+        const updatedList = this.signal().filter((item) => !ids.has(item.id));
+        this.setSignal(updatedList);
+        const openTargetList = openLists.get(targetList);
+        if (openTargetList) {
+            // add to open list
+            // openTargetList.add()...
+        } else {
+            // or add directly to store
+        }
+    }
+    updateItemContents(id: string, newText: string) {
+        // TODO: Move item
+        // TODO: Consider maintaining an index
+        const index = this.signal().findIndex((item) => item.id === id);
+        if (index === -1) return console.error('updateItemContents() index not found');
+        this.setSignal((prev) => {
+            prev[index].text = newText;
+            return prev;
+        });
+        // TODO: Update idb
     }
     // Track updates, potentially batched
     onUpdate(type: string, items: AcmeItem[]) {
