@@ -97,6 +97,7 @@ export function List(props: ListProps) {
               selection={selection}
               liveList={liveList}
               scrollRef={scrollRef}
+              keyboardShortcuts={keyboardShortcuts}
             />
           )}
         </For>

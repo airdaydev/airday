@@ -1,12 +1,14 @@
 const keyName = (event: string, contextId: string) =>
     `${event}:${contextId}`;
 
-class KeyboardShortcuts {
+export class KeyboardShortcuts {
     handlerMap = new Map<string, (event: KeyboardEvent) => void>();
     globalHandlerActive = true;
     currentContext: string | null = null;
+    enabled: boolean = true; // for temporarily overriding for example when editing
     constructor() {
         window.addEventListener('keydown', (event: KeyboardEvent) => {
+            if (!this.enabled) return;
             // TODO: Make this actually work (competes with local listeners for now)
             if (this.globalHandlerActive) {
                 const action = this.globalKeyboardHandler(event); // overrides
@@ -29,6 +31,12 @@ class KeyboardShortcuts {
     }
     setFocus(contextId: string) {
         this.currentContext = contextId;
+    }
+    disable() {
+        this.enabled = false;
+    }
+    enable() {
+        this.enabled = true;
     }
 }
 
