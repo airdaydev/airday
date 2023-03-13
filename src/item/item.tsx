@@ -189,7 +189,7 @@ export function Item(props: ItemProps) {
                     <div class={styles['item-check']}></div>
                     <div>
                         <div>{props.item.text}</div>
-                        <div style={{color: '#ccc', "font-size": '0.8em'}}>
+                        <div style={`color: #ccc;`}>
                             Added 2 minutes ago
                             <span>#{props.listIndex}</span>
                         </div>

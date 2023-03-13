@@ -8,7 +8,7 @@ export function App() {
   return (
     <div class={styles.App}>
       <AcmeNav />
-      <For each={listViews} fallback={<div>fallback</div>}>
+      <For each={listViews()} fallback={<div>fallback</div>}>
         {/* TODO: Views should have ids, not just indexes */}
         {(item, index) => <List listId={item} tabId={index()} />}
       </For>

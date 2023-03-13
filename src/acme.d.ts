@@ -9,6 +9,8 @@ interface AcmeItem {
 interface AcmeList {
   id: string;
   name: string;
+  // TODO: sortKey
+  // TODO: icon
 }
 
 type SelectItemMode = 'normal' | 'add' | 'addOne' | 'remove';

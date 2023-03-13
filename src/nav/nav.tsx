@@ -1,8 +1,53 @@
+import { For, createSignal } from 'solid-js';
 import styles from './nav.module.css';
-import { replaceView } from '../view-state';
+import { replaceActiveView } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
 import RepeatSVG from '../icons/repeat.svg';
 import CheckSVG from '../icons/check.svg';
+import { NavItemContextMenu } from './context-menu';
+
+interface NavListItemProps {
+  list: AcmeList,
+}
+
+export function NavListItem(props: NavListItemProps) {
+  const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
+  return (
+    <div style={`position: relative;`}>
+      <button
+        onClick={() => replaceActiveView(props.list.id)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setCtxOpen(true);
+        }}
+      >
+        <TodoSVG />
+        <span>{props.list.name}</span>
+      </button>
+      {ctxOpen() && (
+        <NavItemContextMenu
+          close={() => setCtxOpen(false)}
+          list={props.list}
+        />
+      )}
+    </div>
+  )
+}
+
+const lists: AcmeList[] = [
+  {
+    id: 'inbox',
+    name: 'Inbox',
+  },
+  {
+    id: 'acmelist',
+    name: 'AcmeList',
+  },
+  {
+    id: 'empty-list',
+    name: 'Empty List',
+  },
+]
 
 export function AcmeNav() {
   return (
@@ -16,18 +61,9 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
         <hr />
-        <button onClick={() => replaceView(0, 'inbox')}>
-          <TodoSVG />
-          <span>Inbox</span>
-        </button>
-        <button onClick={() => replaceView(0, 'acmelist')}>
-          <TodoSVG />
-          <span>Read</span>
-        </button>
-        <button onClick={() => replaceView(0, 'empty-list')}>
-          <TodoSVG />
-          <span>Empty list</span>
-        </button>
+        <For each={lists}>
+          {(list) => <NavListItem list={list} />}
+        </For>
     </nav>
   );
 }

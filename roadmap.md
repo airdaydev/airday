@@ -4,10 +4,12 @@
 - [x] Meta/Alt keyboard navigation
 - [x] Shift keyboard navigation
 - [x] Shift mouse navigation
+- [] split view
+- [] Edit existing item - persist
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
+- [] shift + click with nothing selecting regression
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
-- [] Edit existing item
 - [] Drag items up and down (& persist)
 - [] Drag items to other lists (& persist)
 - [] Ensure selection is cleared on edit
@@ -28,6 +30,7 @@
 - [] Add new list
 - [] Edit list name in list view
 - [] Ability to change icons
+- [] COntext menu for list
 - [] Context menu for one item
 - [] Context menu for many items
 - [] Ability to mark items as done (chronological story for past events)

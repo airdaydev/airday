@@ -12,6 +12,7 @@ import { openList } from '../store/open-list.js';
 import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
+import { closeView } from '../view-state';
 
 interface ListProps {
   listId: string;
@@ -85,7 +86,9 @@ export function List(props: ListProps) {
           <TodoSVG style={`margin: 0.5em;`} />
           <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
         </div>
-        <XSVG />
+        <button onClick={() => closeView(props.tabId)}>
+          <XSVG />
+        </button>
       </div>
       <div ref={scrollRef} class={styles['list-scroll']}>
         <For each={instanceSignal()}>
