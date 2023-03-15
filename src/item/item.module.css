@@ -13,7 +13,7 @@
     background: yellow !important;
 }
 .item-container-selected {
-    background: var(--border, value);
+    background: #eee;
 }
 
 .item-edit {
@@ -21,7 +21,7 @@
 }
 
 .item-container:hover {
-    background: #d9d9d9;
+    background: #eee;
     cursor: pointer;
 }
 

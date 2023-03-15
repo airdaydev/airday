@@ -1,19 +1,19 @@
-import { LiveList } from '../store/open-list';
+import { FastList } from '../store/fast-list';
 import { AcmeReactiveSelection } from './selection';
 import { jumpToElIfOutsideView } from './utils.js';
 
 interface ListKeyboardHandlerParams {
-    liveList: LiveList,
+    fastList: FastList,
     selection: AcmeReactiveSelection,
     scrollRef: HTMLElement,
 }
 
 export const getListKeyboardHandler = ({
-    liveList,
+    fastList,
     selection,
     scrollRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
-    const list = liveList.signal();
+    const list = fastList.signal();
     if (event.key === 'a' && event.metaKey) {
         event.preventDefault();
         const allKeys = list.map((item) => item.id);
@@ -28,8 +28,8 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        const firstSelectedIndex = liveList.getFirstIndexOfSet(selection.keys) as number;
-        const keys = liveList.getKeysInRange(firstSelectedIndex, list.length - 1);
+        const firstSelectedIndex = fastList.getFirstIndexOfSet(selection.keys) as number;
+        const keys = fastList.getKeysInRange(firstSelectedIndex, list.length - 1);
         selection.clear();
         selection.addKeys(keys);
         return;
@@ -48,7 +48,7 @@ export const getListKeyboardHandler = ({
       }
       if (selection.lastKeySelected && !event.shiftKey) {
         event.preventDefault();
-        const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected);
+        const neighbour = fastList.getNeighbourIndex(selection.lastKeySelected);
         if (neighbour) {
           selection.selectOne(list[neighbour].id);
           jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour])
@@ -57,13 +57,13 @@ export const getListKeyboardHandler = ({
       if (selection.rangeOrigin && event.shiftKey) {
         event.preventDefault();
         // contiguous area below origin, continue:
-        const origin = liveList.getIndexOfKey(selection.rangeOrigin);
+        const origin = fastList.getIndexOfKey(selection.rangeOrigin);
         if (origin === false) return;
         // Check if items above
-        const prevIndex = liveList.getNextNotInSet(origin, selection.keys, 'prev');
+        const prevIndex = fastList.getNextNotInSet(origin, selection.keys, 'prev');
         if (prevIndex === origin - 1  || origin === 0) {
           // select down
-          const index = liveList.getNextNotInSet(origin, selection.keys);
+          const index = fastList.getNextNotInSet(origin, selection.keys);
           if (index !== false) {
             selection.addKey(list[index].id);
             jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index])
@@ -78,8 +78,8 @@ export const getListKeyboardHandler = ({
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (event.altKey && event.shiftKey && selection.keys.size) {
-        const lastSelectedIndex = liveList.getLastIndexOfSet(selection.keys) as number;
-        const keys = liveList.getKeysInRange(0, lastSelectedIndex);
+        const lastSelectedIndex = fastList.getLastIndexOfSet(selection.keys) as number;
+        const keys = fastList.getKeysInRange(0, lastSelectedIndex);
         selection.clear();
         selection.addKeys(keys);
         return;
@@ -97,21 +97,21 @@ export const getListKeyboardHandler = ({
         return;
       }
       if (selection.lastKeySelected && !event.shiftKey) {
-        const neighbour = liveList.getNeighbourIndex(selection.lastKeySelected, 'prev');
+        const neighbour = fastList.getNeighbourIndex(selection.lastKeySelected, 'prev');
         if (neighbour !== false) {
-          selection.selectOne(liveList.signal()[neighbour].id);
+          selection.selectOne(fastList.signal()[neighbour].id);
           jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour]);
         }
       }
       if (selection.rangeOrigin && event.shiftKey) {
         // contiguous area below origin, continue:
-        const origin = liveList.getIndexOfKey(selection.rangeOrigin);
+        const origin = fastList.getIndexOfKey(selection.rangeOrigin);
         if (origin === false) return;
         // Check if items below
-        const nextIndex = liveList.getNextNotInSet(origin, selection.keys, 'next');
+        const nextIndex = fastList.getNextNotInSet(origin, selection.keys, 'next');
         if (nextIndex === origin + 1 || origin === list.length - 1) {
           // select up
-          const index = liveList.getNextNotInSet(origin, selection.keys, 'prev');
+          const index = fastList.getNextNotInSet(origin, selection.keys, 'prev');
           if (index !== false) {
             selection.addKey(list[index].id);
             jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index]);

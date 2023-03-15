@@ -4,6 +4,7 @@ type ViewState = string[];
 
 /**
  * Views, left to right
+ * State should be saved in local storage
  */
 export let activeViewIndex = 0;
 export const [listViews, setListViews] = createSignal<string[]>(['inbox']);

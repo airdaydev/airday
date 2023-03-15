@@ -2,13 +2,13 @@ import { nanoid } from 'nanoid';
 import { createSignal, Accessor, Setter } from 'solid-js';
 import { store } from './main.js';
 
-export const openLists = new Map<string, LiveList>();
+export const openLists = new Map<string, FastList>();
 
 export function openList(listId: string) {
     if (openLists.has(listId)) return openLists.get(listId);
-    const liveList = new LiveList(listId);
-    openLists.set(listId, liveList);
-    return liveList;
+    const fastList = new FastList(listId);
+    openLists.set(listId, fastList);
+    return fastList;
 }
 
 // https://github.com/solidjs/solid/discussions/1524
@@ -25,16 +25,16 @@ interface AcmeItemInsertion extends Partial<AcmeList> {
 }
 
 // data projection stack
-// 1. server (online persistence) -> idb (offline persistence) -> mem list (fast, optimistic access) -> list instance (display, interaction)
+// 1. server (online persistence) -> idb (offline persistence) -> fast list (fast, optimistic access) -> list instance (display, interaction)
 
 export let lastTouchedList: string | false = false;
 
 /**
- * Live list interaction based on array
+ * Fast list interaction based on array
  * For editing and sorting lists quickly without the overhead of transactional guarantees from the main store
  * TODO: Strongly consider an index
  */
-export class LiveList {
+export class FastList {
     listId: string;
     list: AcmeItem[] = [];
     signal: Accessor<AcmeItem[]>;
@@ -57,7 +57,8 @@ export class LiveList {
             dateCreated: (new Date()).toString(),
         });
     }
-    moveItems(ids: Set<string>, targetList: string) {
+    // TODO: Deconflate move / add
+    moveItems(ids: Set<string>, targetList: string, between: [string | null, string | null]) {
         // Filter ids from list
         const itemsToMove: AcmeItem[] = [];
         const updatedList = this.signal().filter((item) => {
@@ -68,16 +69,23 @@ export class LiveList {
         this.setSignal(updatedList);
         const openTargetList = openLists.get(targetList);
         if (openTargetList) {
-            openTargetList.add(itemsToMove);
+            openTargetList.add(itemsToMove, between[0]);
         } else {
             // or add directly to store
         }
     }
     // no persistence add
     // todo: performance optimisation, add to sorted list
-    add(items: AcmeItem[]) {
-        const list = this.signal();
-        list.push(...items);
+    add(items: AcmeItem[], at: string | null) {
+        // const list = this.signal();
+        // list.push(...items);
+        // sort ids individually by previous sort order
+        // insert between items
+        // TODO: calculate sort key
+        const l = this.signal();
+        const index = l.findIndex((item) => item.id === at);
+        l.splice(index + 1, 0, ...items);
+        this.setSignal(l);
         // list.sort(() => {
         //     // todo: sort by sortKey + id
         // })

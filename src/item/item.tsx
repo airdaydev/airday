@@ -1,8 +1,8 @@
-import { createSignal, createEffect, onCleanup, on } from 'solid-js';
+import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
 import { AcmeReactiveSelection } from '../list/selection';
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
-import { LiveList, lastTouchedList } from '../store/open-list';
+import { FastList, lastTouchedList } from '../store/fast-list';
 import styles from './item.module.css';
 import { distance } from './utils';
 
@@ -14,9 +14,10 @@ interface ItemProps {
     listIndex: number;
     item: AcmeItem;
     selection: AcmeReactiveSelection;
-    liveList: LiveList;
+    fastList: FastList;
     scrollRef: HTMLElement;
     keyboardShortcuts: KeyboardShortcuts;
+    displayList: Accessor<AcmeItem[]>; // TODO: OR NULL
 }
 
 export function Item(props: ItemProps) {
@@ -32,8 +33,8 @@ export function Item(props: ItemProps) {
     }
     function leaveEditMode(save?: boolean) {
         if (save) {
-            // optimistically update livelist, then idb
-            props.liveList.updateItemContents(props.item.id, textAreaRef.value);
+            // optimistically update fastList, then idb
+            props.fastList.updateItemContents(props.item.id, textAreaRef.value);
         }
         props.keyboardShortcuts.enable();
         setEdit(false);
@@ -123,7 +124,7 @@ export function Item(props: ItemProps) {
                     }}
                     ref={containerRef}
                     onMouseEnter={(event: MouseEvent) => {
-                        props.liveList.setLastTouched();
+                        props.fastList.setLastTouched();
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onMouseDown={(event: MouseEvent) => {
@@ -149,9 +150,17 @@ export function Item(props: ItemProps) {
                             window.addEventListener('mouseup', () => {
                                 // End drag
                                 // TODO: Crawl out or set with 
-                                if (props.selection.isDragging() && lastTouchedList) {
-                                    console.log(`moving ${props.selection.keys.size} to ${lastTouchedList}`);
-                                    props.liveList.moveItems(props.selection.keys, lastTouchedList);
+                                const ltIndex = props.selection.lastTouchedIndex();
+                                const displayList = props.displayList();
+                                console.log('ltIndex', ltIndex);
+                                console.log('displayLength', displayList);
+                                if (props.selection.isDragging() && lastTouchedList && typeof ltIndex === 'number') {
+                                    const beforeIndex = ltIndex - 1;
+                                    const afterIndex = Math.min(displayList.length, ltIndex + 1);
+                                    const beforeId = displayList[beforeIndex] ? displayList[beforeIndex].id : null;
+                                    const afterId = displayList[afterIndex] ? displayList[afterIndex].id : null;
+                                    console.log(`moving ${props.selection.keys.size} to ${lastTouchedList} between ${beforeId} & ${afterId}`);
+                                    props.fastList.moveItems(props.selection.keys, lastTouchedList, [beforeId, afterId]);
                                 }
                                 props.selection.setLastTouchedIndex(false);
                                 props.selection.setDragging(false);
@@ -170,16 +179,16 @@ export function Item(props: ItemProps) {
                         if (event.shiftKey && props.selection.keys.size) {
                             event.preventDefault();
                             // We can (almost) guarantee this bc selection has a size
-                            const firstSelectedIndex = props.liveList.getFirstIndexOfSet(props.selection.keys);
+                            const firstSelectedIndex = props.fastList.getFirstIndexOfSet(props.selection.keys);
                             if (firstSelectedIndex === false) return;
                             if (props.listIndex < firstSelectedIndex) {
-                                const lastIndex = props.liveList.getLastIndexOfSet(props.selection.keys);
+                                const lastIndex = props.fastList.getLastIndexOfSet(props.selection.keys);
                                 if (!lastIndex) return;
-                                const keys = props.liveList.getKeysInRange(props.listIndex, lastIndex);
+                                const keys = props.fastList.getKeysInRange(props.listIndex, lastIndex);
                                 props.selection.clear();
                                 props.selection.addKeys(keys);
                             } else {
-                                const keys = props.liveList.getKeysInRange(firstSelectedIndex, props.listIndex);
+                                const keys = props.fastList.getKeysInRange(firstSelectedIndex, props.listIndex);
                                 props.selection.clear();
                                 props.selection.addKeys(keys);
                             }

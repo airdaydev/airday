@@ -8,7 +8,7 @@ import { AcmeReactiveSelection, dragOriginSelection } from '../list/selection.js
 import styles from './list.module.css';
 import { Item } from '../item/item';
 import { store } from '../store/main';
-import { openList } from '../store/open-list.js';
+import { openList } from '../store/fast-list.js';
 import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
@@ -27,20 +27,20 @@ interface ListProps {
 // Challenge, index tracking without refreshing the list
 
 /**
- * A virtual, ordered list supporting inter-list drag & drop
+ * An ordered list supporting inter-list drag & drop
  * @param props 
  * @returns 
  */
 export function List(props: ListProps) {
   let scrollRef: HTMLDivElement;
-  const liveList = openList(props.listId);
-  if (!liveList) throw new Error('List not found');
+  const fastList = openList(props.listId);
+  if (!fastList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
   // TODO: Incorporate into handler and wire up to top level keyboard module
   const contextId = nanoid();
   onMount(() => {
     keyboardShortcuts.registerHandler('keydown', contextId, getListKeyboardHandler({
-      liveList,
+      fastList,
       selection,
       scrollRef,
     }));
@@ -49,15 +49,14 @@ export function List(props: ListProps) {
     keyboardShortcuts.unregisterHandler('keydown', contextId)
   });
 
-  // TODO: First attempt to do in-list dragging
   // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
-  // This is better off being created from the liveList which can take a selection module.
-  const [instanceSignal, setInstanceSignal] = createSignal<AcmeItem[]>(liveList.signal());
-  const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, liveList.signal], () => {
+  // This is better off being created from the fastList which can take a selection module.
+  const [displayList, setDisplayList] = createSignal<AcmeItem[]>(fastList.signal());
+  const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, fastList.signal], () => {
     if (selection.globalIsDragging()) {
       // We are dragging, so filter if this is our list instance
-      let filtered: AcmeItem[] = [...liveList.signal()];
+      let filtered: AcmeItem[] = [...fastList.signal()];
       if (dragOriginSelection === selection) {
         console.log('dragOriginSelection === selection')
         filtered = filtered.filter((val) => !selection.keys.has(val.id))
@@ -66,11 +65,12 @@ export function List(props: ListProps) {
       // placeholder
       const lastTouchedIndex = selection.lastTouchedIndex();
       if (typeof lastTouchedIndex === 'number') {
+        // TODO: Use a null val here for placeholder (or type: placeholder)
         filtered.splice(lastTouchedIndex, 0, { id: 'yo', text: 'placeholder' })
       }
-      setInstanceSignal(filtered);
+      setDisplayList(filtered);
     } else {
-      setInstanceSignal(liveList.signal())
+      setDisplayList(fastList.signal())
     }
   }));
   
@@ -86,12 +86,15 @@ export function List(props: ListProps) {
           <TodoSVG style={`margin: 0.5em;`} />
           <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
         </div>
-        <button onClick={() => closeView(props.tabId)}>
+        <button
+          onClick={() => closeView(props.tabId)}
+          style={`border: none; background: none; cursor: pointer;`}
+        >
           <XSVG />
         </button>
       </div>
       <div ref={scrollRef} class={styles['list-scroll']}>
-        <For each={instanceSignal()}>
+        <For each={displayList()}>
           {(item, index) => (
             <>
               {/* TODO: Use custom placeholder item */}
@@ -99,7 +102,8 @@ export function List(props: ListProps) {
                 item={item}
                 listIndex={index()}
                 selection={selection}
-                liveList={liveList}
+                fastList={fastList}
+                displayList={displayList}
                 scrollRef={scrollRef}
                 keyboardShortcuts={keyboardShortcuts}
               />

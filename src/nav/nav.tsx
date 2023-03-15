@@ -2,7 +2,7 @@ import { For, createSignal } from 'solid-js';
 import styles from './nav.module.css';
 import { replaceActiveView } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
-import RepeatSVG from '../icons/repeat.svg';
+import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import { NavItemContextMenu } from './context-menu';
 
@@ -53,7 +53,7 @@ export function AcmeNav() {
   return (
     <nav class={styles.nav}>
         <button>
-          <RepeatSVG />
+          <CornerDownRightSVG />
           <span>Up Next</span>
         </button>
         <button>
