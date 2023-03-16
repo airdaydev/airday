@@ -58,6 +58,7 @@ export class FastList {
         });
     }
     // TODO: Optimisation: if only moving, skip first step
+    // TODO: Clear selection in source list, create selection in new list
     moveItems(ids: Set<string>, sourceListId: string, between: [string | null, string | null]) {
         // Filter ids from list
         const itemsToMove: AcmeItem[] = [];
@@ -70,12 +71,6 @@ export class FastList {
         });
         sourceList.setSignal(updatedList); // Filter out items from source list
         this.add(itemsToMove, between[0]);
-        // const openTargetList = openLists.get(targetList);
-        // if (openTargetList) {
-        //     openTargetList.add(itemsToMove, between[0]);
-        // } else {
-        //     // or add directly to store
-        // }
     }
     // no persistence add
     // todo: performance optimisation, add to sorted list

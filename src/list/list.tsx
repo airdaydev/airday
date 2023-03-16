@@ -71,8 +71,9 @@ export function List(props: ListProps) {
       const afterIndex = Math.min(dl.length, ltIndex + 1);
       const beforeId = dl[beforeIndex] ? dl[beforeIndex] : null;
       const afterId = dl[afterIndex] ? dl[afterIndex] : null;
-      console.log(`moving ${dragOriginSelection.keys.size} to ${dragOriginList} between ${beforeId?.text} & ${afterId?.text}`);
       fastList?.moveItems(dragOriginSelection.keys, dragOriginList, [beforeId?.id || null, afterId?.text || null]);
+      selection.clear();
+      selection.addKeys(Array.from(dragOriginSelection.keys));
     }
   }
   onMount(() => {
