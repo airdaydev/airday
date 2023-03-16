@@ -81,7 +81,6 @@ class AcmeLocalStore {
         await tx.done;
     }
     subscribe(eventName: string, callback: () => void) {
-        console.log('subscribing', eventName)
         return this.events.addEventListener(eventName, callback);
     }
     getItemsByList = async (listId: string): Promise<AcmeItem[]> => {

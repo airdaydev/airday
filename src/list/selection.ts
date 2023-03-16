@@ -16,7 +16,9 @@ type SubscriptionFunc = (selected: boolean) => void;
 // Only one "dragging" state at a time (mouse down - dragging, mouse up - no dragging - no opportunity to drag in between)
 export let dragOriginSelection: AcmeReactiveSelection | null = null;
 const [globalIsDragging, setGlobalIsDragging] = createSignal<boolean>(false);
+export let globalLastDisplayIndex: number | false = 0;
 
+// TODO: Consider moving display list logic in here, don't worry about agnostic selection
 export class AcmeReactiveSelection {
     keys = new Set<string>;
     subscribers = new Map<string, Set<SubscriptionFunc>>(); // key, set of callbacks i.e. signal update
@@ -25,7 +27,7 @@ export class AcmeReactiveSelection {
     isDragging: Accessor<boolean>;
     setDraggingInternal: Setter<boolean>;
     lastTouchedIndex: Accessor<number | boolean>;
-    setLastTouchedIndex: Setter<number | boolean>;
+    setLastTouchedIndexInternal: Setter<number | boolean>;
     globalIsDragging = globalIsDragging;
     constructor() {
         const draggingSignal = createSignal<boolean>(false);
@@ -33,7 +35,11 @@ export class AcmeReactiveSelection {
         this.setDraggingInternal = draggingSignal[1];
         const lastTouchedIndex = createSignal<number | boolean>(false);
         this.lastTouchedIndex = lastTouchedIndex[0];
-        this.setLastTouchedIndex = lastTouchedIndex[1];
+        this.setLastTouchedIndexInternal = lastTouchedIndex[1];
+    }
+    setLastTouchedIndex = (index: number | false) => {
+        this.setLastTouchedIndexInternal(index);
+        globalLastDisplayIndex = index;
     }
     setDragging = (isDragging: boolean) => {
         dragOriginSelection = this;

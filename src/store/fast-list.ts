@@ -27,7 +27,7 @@ interface AcmeItemInsertion extends Partial<AcmeList> {
 // data projection stack
 // 1. server (online persistence) -> idb (offline persistence) -> fast list (fast, optimistic access) -> list instance (display, interaction)
 
-export let lastTouchedList: string | false = false;
+export let dragOriginList: string | null = null; // TODO: move to Selection or hybrid
 
 /**
  * Fast list interaction based on array
@@ -47,8 +47,8 @@ export class FastList {
         // this.store.subscribe(listId, onUpdate);
         this.initList();
     }
-    setLastTouched = () => {
-        lastTouchedList = this.listId;
+    setDragOriginList = (listId: string) => {
+        dragOriginList = listId;
     }
     new(item: AcmeItemInsertion) {
         store.insert({
@@ -57,38 +57,33 @@ export class FastList {
             dateCreated: (new Date()).toString(),
         });
     }
-    // TODO: Deconflate move / add
-    moveItems(ids: Set<string>, targetList: string, between: [string | null, string | null]) {
+    // TODO: Optimisation: if only moving, skip first step
+    moveItems(ids: Set<string>, sourceListId: string, between: [string | null, string | null]) {
         // Filter ids from list
         const itemsToMove: AcmeItem[] = [];
-        const updatedList = this.signal().filter((item) => {
+        const sourceList = openLists.get(sourceListId);
+        if (!sourceList) return; // Should not happen (TODO: Log validation error)
+        const updatedList = sourceList.signal().filter((item) => {
             const toMove = ids.has(item.id)
             if (toMove) itemsToMove.push(item);
             return !toMove;
         });
-        this.setSignal(updatedList);
-        const openTargetList = openLists.get(targetList);
-        if (openTargetList) {
-            openTargetList.add(itemsToMove, between[0]);
-        } else {
-            // or add directly to store
-        }
+        sourceList.setSignal(updatedList); // Filter out items from source list
+        this.add(itemsToMove, between[0]);
+        // const openTargetList = openLists.get(targetList);
+        // if (openTargetList) {
+        //     openTargetList.add(itemsToMove, between[0]);
+        // } else {
+        //     // or add directly to store
+        // }
     }
     // no persistence add
     // todo: performance optimisation, add to sorted list
     add(items: AcmeItem[], at: string | null) {
-        // const list = this.signal();
-        // list.push(...items);
-        // sort ids individually by previous sort order
-        // insert between items
-        // TODO: calculate sort key
         const l = this.signal();
         const index = l.findIndex((item) => item.id === at);
         l.splice(index + 1, 0, ...items);
         this.setSignal(l);
-        // list.sort(() => {
-        //     // todo: sort by sortKey + id
-        // })
     }
     updateItemContents(id: string, newText: string) {
         // TODO: Move item

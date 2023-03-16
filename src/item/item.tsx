@@ -1,8 +1,8 @@
 import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
-import { AcmeReactiveSelection } from '../list/selection';
+import { AcmeReactiveSelection, globalLastDisplayIndex } from '../list/selection';
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
-import { FastList, lastTouchedList } from '../store/fast-list';
+import { FastList } from '../store/fast-list';
 import styles from './item.module.css';
 import { distance } from './utils';
 
@@ -124,7 +124,6 @@ export function Item(props: ItemProps) {
                     }}
                     ref={containerRef}
                     onMouseEnter={(event: MouseEvent) => {
-                        props.fastList.setLastTouched();
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onMouseDown={(event: MouseEvent) => {
@@ -140,6 +139,7 @@ export function Item(props: ItemProps) {
                                 if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
                                     // props.selection.setLastTouchedIndex(props.listIndex);
                                     props.selection.setDragging(true);
+                                    props.fastList.setDragOriginList(props.fastList.listId);
                                     // TODO: FILTER THE ACTIVE SELECTION
                                 }
                                 // Track where on list to place placeholder
@@ -148,20 +148,9 @@ export function Item(props: ItemProps) {
                             };
                             window.addEventListener('mousemove', mouseMove);
                             window.addEventListener('mouseup', () => {
-                                // End drag
-                                // TODO: Crawl out or set with 
-                                const ltIndex = props.selection.lastTouchedIndex();
-                                const displayList = props.displayList();
-                                console.log('ltIndex', ltIndex);
-                                console.log('displayLength', displayList);
-                                if (props.selection.isDragging() && lastTouchedList && typeof ltIndex === 'number') {
-                                    const beforeIndex = ltIndex - 1;
-                                    const afterIndex = Math.min(displayList.length, ltIndex + 1);
-                                    const beforeId = displayList[beforeIndex] ? displayList[beforeIndex].id : null;
-                                    const afterId = displayList[afterIndex] ? displayList[afterIndex].id : null;
-                                    console.log(`moving ${props.selection.keys.size} to ${lastTouchedList} between ${beforeId} & ${afterId}`);
-                                    props.fastList.moveItems(props.selection.keys, lastTouchedList, [beforeId, afterId]);
-                                }
+                            //     // TODO: Add drop zone event here
+                            //     console.log('mouse up yo');
+                            //     window.dispatchEvent(new Event('acme-drop-items'));
                                 props.selection.setLastTouchedIndex(false);
                                 props.selection.setDragging(false);
                                 window.removeEventListener('mousemove', mouseMove);

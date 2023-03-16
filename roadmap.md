@@ -4,7 +4,7 @@
 - [x] Meta/Alt keyboard navigation
 - [x] Shift keyboard navigation
 - [x] Shift mouse navigation
-- [] split view
+- [x] split view
 - [] Edit existing item - persist
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting

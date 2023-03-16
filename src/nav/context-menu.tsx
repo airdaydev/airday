@@ -8,7 +8,6 @@ interface NavItemContextMenu {
 
 export function NavItemContextMenu(props: NavItemContextMenu) {
     let containerRef: HTMLDivElement | undefined;
-    console.log('wtf');
     const clickOutside = (event: MouseEvent) => {
         if (!containerRef?.contains(event.target)) {
             props.close();

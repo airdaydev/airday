@@ -4,11 +4,11 @@ import {
 } from 'solid-js';
 import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
-import { AcmeReactiveSelection, dragOriginSelection } from '../list/selection.js';
+import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
 import { store } from '../store/main';
-import { openList } from '../store/fast-list.js';
+import { dragOriginList, openList } from '../store/fast-list.js';
 import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
@@ -36,29 +36,17 @@ export function List(props: ListProps) {
   const fastList = openList(props.listId);
   if (!fastList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
-  // TODO: Incorporate into handler and wire up to top level keyboard module
   const contextId = nanoid();
-  onMount(() => {
-    keyboardShortcuts.registerHandler('keydown', contextId, getListKeyboardHandler({
-      fastList,
-      selection,
-      scrollRef,
-    }));
-  });
-  onCleanup(() => {
-    keyboardShortcuts.unregisterHandler('keydown', contextId)
-  });
-
-  // A reactive means of handling list & placeholder changes on drag
+    // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
   // This is better off being created from the fastList which can take a selection module.
   const [displayList, setDisplayList] = createSignal<AcmeItem[]>(fastList.signal());
+  // TODO: Desub on unmount
   const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, fastList.signal], () => {
     if (selection.globalIsDragging()) {
       // We are dragging, so filter if this is our list instance
       let filtered: AcmeItem[] = [...fastList.signal()];
       if (dragOriginSelection === selection) {
-        console.log('dragOriginSelection === selection')
         filtered = filtered.filter((val) => !selection.keys.has(val.id))
       }
       // dragOriginSelection
@@ -73,6 +61,30 @@ export function List(props: ListProps) {
       setDisplayList(fastList.signal())
     }
   }));
+  function handleDrop() {
+    const ltIndex = globalLastDisplayIndex;
+    const dl = displayList();
+    console.log(selection.globalIsDragging(), fastList?.listId);
+    if (selection.globalIsDragging() && typeof ltIndex === 'number' && dragOriginSelection && dragOriginList) {
+      // TODO: A map between displayList and fastlist might be beneficial
+      const beforeIndex = ltIndex - 1;
+      const afterIndex = Math.min(dl.length, ltIndex + 1);
+      const beforeId = dl[beforeIndex] ? dl[beforeIndex] : null;
+      const afterId = dl[afterIndex] ? dl[afterIndex] : null;
+      console.log(`moving ${dragOriginSelection.keys.size} to ${dragOriginList} between ${beforeId?.text} & ${afterId?.text}`);
+      fastList?.moveItems(dragOriginSelection.keys, dragOriginList, [beforeId?.id || null, afterId?.text || null]);
+    }
+  }
+  onMount(() => {
+    keyboardShortcuts.registerHandler('keydown', contextId, getListKeyboardHandler({
+      fastList,
+      selection,
+      scrollRef,
+    }));
+  });
+  onCleanup(() => {
+    keyboardShortcuts.unregisterHandler('keydown', contextId)
+  });
   
   return (
     <section
@@ -80,6 +92,7 @@ export function List(props: ListProps) {
       tabIndex={props.tabId}
       onFocus={() => keyboardShortcuts.setFocus(contextId)}
       onMouseLeave={(() => selection.setLastTouchedIndex(false))}
+      onMouseUp={handleDrop}
     >
       <div class={styles['list-header']}>
         <div style={`display: flex; align-items: center;`}>
