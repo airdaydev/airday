@@ -4,15 +4,15 @@ import styles from './item.module.css';
 interface PlaceholderProps {
     listIndex: number;
     selection: AcmeReactiveSelection;
+    noBg: true;
 }
 
 export function Placeholder(props: PlaceholderProps) {
     let containerRef: HTMLDivElement | undefined;
     return (
         <div
-            classList={{
-                [styles['item-container']]: true,
-            }}
+            class={styles['placeholder']}
+            style={`${props.noBg && 'background: none;'}`}
             ref={containerRef}
             onMouseEnter={(event: MouseEvent) => {
                 props.selection.setLastTouchedIndex(props.listIndex);

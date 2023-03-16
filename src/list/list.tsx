@@ -62,7 +62,10 @@ export function List(props: ListProps) {
       }
       setDisplayList(filtered);
     } else {
-      setDisplayList(fastList.signal())
+      const noFilter = [...fastList.signal()];
+      // Deal with list empty case
+      // Deal with list empty and drag onto list case
+      setDisplayList(noFilter);
     }
   }));
   /**
@@ -103,6 +106,7 @@ export function List(props: ListProps) {
         class={styles.list}
         tabIndex={props.tabId}
         onFocus={() => keyboardShortcuts.setFocus(contextId)}
+        onClick={() => keyboardShortcuts.setFocus(contextId)}
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >

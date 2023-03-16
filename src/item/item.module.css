@@ -1,3 +1,15 @@
+.placeholder {
+    max-width: 44em;
+    box-sizing: border-box;
+    padding: 0.5em;
+    border-radius: 3px;
+    height: 4em;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    background: #eee;
+}
+
 .item-container {
     max-width: 44em;
     box-sizing: border-box;
@@ -9,9 +21,6 @@
     align-items: center;
 }
 
-.item-container-dragging {
-    background: yellow !important;
-}
 .item-container-selected {
     background: #eee;
 }

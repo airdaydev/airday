@@ -57,16 +57,18 @@ export const DragStack = ({ cards }: DragStackProps) => {
                 ref={stackRef}
                 style={`
                     position: relative;
-                    background: red;
-                    width: 4em;
-                    height: 4em;
+                    background: #eee;
+                    width: 12em;
+                    height: 10em;
                     z-index: 100;
                     top: -100%;
                     left: -100%;
+                    box-shadow: 1px 1px 2px #0000002e;
+                    border-radius: 2px;
+                    transform: rotateZ(2deg);
                 `}
             >
                 {/* {`${cards.length} cards`} */}
-                x
             </div>
         </div>
     );

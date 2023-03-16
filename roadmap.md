@@ -5,32 +5,35 @@
 - [x] Shift keyboard navigation
 - [x] Shift mouse navigation
 - [x] split view
-- [] Edit existing item - persist
+- [x] Edit existing item
+- [x] Drag items up and down
+- [x] Drag items to other lists
+- [x] Prevent list navigation on edit mode
+- [x] Prevent list navigation in context menu
+- [] Context menu for list (at mouse cursor)
+- [] Delete items
+- [] Delete lists
+- [] Add new list
+- [] Add new item
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] shift + click with nothing selecting regression
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
-- [] Drag items up and down (& persist)
-- [] Drag items to other lists (& persist)
+- [] Calculate & persist sort changes
+- [] Calculate & persist updates, moves
 - [] Ensure selection is cleared on edit
-- [] Add new item
-- [] Add new item above selected item
 - [] Edit list name capability in navbar 
 - [] Edit selected items via 'enter' key
 - [] Command mouse navigation
 - [] Clear selection on 'esc' key
-- [] Prevent list navigation on edit mode
 - [] Command+up/down keyboard resorts
 - [] Allow dropping items in nav bar list
 - [] Allow dropping items between open lists directly
 - [] Highlight active list in nav
-- [] Animations
-- [] Delete items
-- [] Delete lists
-- [] Add new list
+- [] List animations
 - [] Edit list name in list view
-- [] Ability to change icons
-- [] COntext menu for list
+- [] Change list icons
+- [] Drag stack make it nice
 - [] Context menu for one item
 - [] Context menu for many items
 - [] Ability to mark items as done (chronological story for past events)
@@ -49,9 +52,10 @@
 - [] Custom Themes / compact mode
 - [] Add board prototype
 - [] Add repeatable items - Maybe
-- [] Export data (JSON)
+- [] Export data (JSON, excel, markdown)
 - [] Secrets
 - [] Website
+- [] WS layer
 - [] Spanish (EU) localisation
 - [] Japanese localisation
 - [] Mobile native app strategy
