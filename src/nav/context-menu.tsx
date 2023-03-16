@@ -1,9 +1,10 @@
-import { onCleanup } from "solid-js";
+import { Accessor, onCleanup } from "solid-js";
 import { addView } from "../view-state";
 
 interface NavItemContextMenu {
     close: () => void;
     list: AcmeList;
+    offset: Accessor<[number, number]>;
 }
 
 export function NavItemContextMenu(props: NavItemContextMenu) {
@@ -15,6 +16,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
     }
     window.addEventListener('mousedown', clickOutside);
     onCleanup(() => window.removeEventListener('mousedown', clickOutside))
+    console.log(props.offset())
     return (
         <div
             ref={containerRef}
@@ -25,6 +27,9 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
                 border-radius: 3px;
                 box-shadow: 1px 1px 2px #0000002e;
                 padding: 0.25em;
+                width: 100%;
+                left: ${props.offset()[0]}px;
+                top: ${props.offset()[1]}px;
             `}
             tabIndex={0}
         >

@@ -43,6 +43,8 @@
 - [] Trash concept
 - [] Nice empty list states
 - [] Mobile web strategy (PWA)
+- [] PWA update strategy
+- [] API update strategy
 - [] Kanban board
 - [] Paid web service with introductory prices
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting

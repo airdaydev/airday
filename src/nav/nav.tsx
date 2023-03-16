@@ -10,15 +10,25 @@ interface NavListItemProps {
   list: AcmeList,
 }
 
+// TODO: Turn off keyboard when context menu open
 export function NavListItem(props: NavListItemProps) {
+  let button: HTMLButtonElement | undefined;
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
+  const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
     <div style={`position: relative;`}>
       <button
+        ref={button}
         onClick={() => replaceActiveView(props.list.id)}
-        onContextMenu={(event) => {
+        onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
-          setCtxOpen(true);
+          if (button) {
+            const bbox = button.getBoundingClientRect();
+            const offsetLeft = event.clientX - bbox.left;
+            const offsetRight = event.clientY - bbox.top;
+            setCtxOffset([offsetLeft, offsetRight]);
+            setCtxOpen(true);
+          }
         }}
       >
         <TodoSVG />
@@ -28,6 +38,7 @@ export function NavListItem(props: NavListItemProps) {
         <NavItemContextMenu
           close={() => setCtxOpen(false)}
           list={props.list}
+          offset={ctxOffset}
         />
       )}
     </div>

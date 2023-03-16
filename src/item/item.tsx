@@ -29,6 +29,7 @@ export function Item(props: ItemProps) {
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
     function enterEditMode() {
         props.keyboardShortcuts.disable();
+        props.selection.clear();
         setEdit(true);
     }
     function leaveEditMode(save?: boolean) {
@@ -98,7 +99,8 @@ export function Item(props: ItemProps) {
                       font-family: inherit;
                   `}
                   onBlur={(event) => {
-                    leaveEditMode(true)
+                    // TODO, not enough, check if external click with contains with ref
+                    leaveEditMode(true);
                   }}
               />
               </div>
