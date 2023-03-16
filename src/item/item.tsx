@@ -127,6 +127,7 @@ export function Item(props: ItemProps) {
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onMouseDown={(event: MouseEvent) => {
+                        event.preventDefault(); // prevents selection on Safari
                         if (event.metaKey) {
                             props.selection.toggleKey(props.item.id);
                             return;

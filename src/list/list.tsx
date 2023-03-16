@@ -2,6 +2,7 @@ import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
 } from 'solid-js';
+import { nanoid } from 'nanoid';
 import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
@@ -9,11 +10,11 @@ import styles from './list.module.css';
 import { Item } from '../item/item';
 import { store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
-import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { closeView } from '../view-state';
 import { Placeholder } from '../item/placeholder';
+import { DragStack } from './drag-stack';
 
 interface ListProps {
   listId: string;
@@ -96,47 +97,50 @@ export function List(props: ListProps) {
   });
   
   return (
-    <section
-      class={styles.list}
-      tabIndex={props.tabId}
-      onFocus={() => keyboardShortcuts.setFocus(contextId)}
-      onMouseLeave={(() => selection.setLastTouchedIndex(false))}
-      onMouseUp={handleDrop}
-    >
-      <div class={styles['list-header']}>
-        <div style={`display: flex; align-items: center;`}>
-          <TodoSVG style={`margin: 0.5em;`} />
-          <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
+    <>
+      {selection.isDragging() && <DragStack />}
+      <section
+        class={styles.list}
+        tabIndex={props.tabId}
+        onFocus={() => keyboardShortcuts.setFocus(contextId)}
+        onMouseLeave={(() => selection.setLastTouchedIndex(false))}
+        onMouseUp={handleDrop}
+      >
+        <div class={styles['list-header']}>
+          <div style={`display: flex; align-items: center;`}>
+            <TodoSVG style={`margin: 0.5em;`} />
+            <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
+          </div>
+          <button
+            onClick={() => closeView(props.tabId)}
+            style={`border: none; background: none; cursor: pointer;`}
+          >
+            <XSVG />
+          </button>
         </div>
-        <button
-          onClick={() => closeView(props.tabId)}
-          style={`border: none; background: none; cursor: pointer;`}
-        >
-          <XSVG />
-        </button>
-      </div>
-      <div ref={scrollRef} class={styles['list-scroll']}>
-        <For each={displayList()}>
-          {(item, index) => (
-            <>
-              {item.type === 'placeholder' && (
-                <Placeholder listIndex={index()} selection={selection} />
-              )}
-              {item.id && (
-                <Item
-                  item={item}
-                  listIndex={index()}
-                  selection={selection}
-                  fastList={fastList}
-                  displayList={displayList}
-                  scrollRef={scrollRef}
-                  keyboardShortcuts={keyboardShortcuts}
-                />
-              )}
-            </>
-          )}
-        </For>
-      </div>
-    </section>
+        <div ref={scrollRef} class={styles['list-scroll']}>
+          <For each={displayList()}>
+            {(item, index) => (
+              <>
+                {item.type === 'placeholder' && (
+                  <Placeholder listIndex={index()} selection={selection} />
+                )}
+                {item.id && (
+                  <Item
+                    item={item}
+                    listIndex={index()}
+                    selection={selection}
+                    fastList={fastList}
+                    displayList={displayList}
+                    scrollRef={scrollRef}
+                    keyboardShortcuts={keyboardShortcuts}
+                  />
+                )}
+              </>
+            )}
+          </For>
+        </div>
+      </section>
+    </>
   );
 }

@@ -18,7 +18,6 @@ export function Placeholder(props: PlaceholderProps) {
                 props.selection.setLastTouchedIndex(props.listIndex);
             }}
         >
-            <div>Placeholder</div>
             <div style={`color: #ccc;`}>
                 <span>#{props.listIndex}</span>
             </div>
