@@ -13,11 +13,14 @@ import { nanoid } from 'nanoid';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { closeView } from '../view-state';
+import { Placeholder } from '../item/placeholder';
 
 interface ListProps {
   listId: string;
   tabId: number;
 }
+
+type DisplayList = (AcmeItem | { type: 'placeholder' })[];
 
 // const bigList = new Array(2000).fill(0).map((val, index, arr) => ({
 //   id: index,
@@ -40,12 +43,12 @@ export function List(props: ListProps) {
     // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
   // This is better off being created from the fastList which can take a selection module.
-  const [displayList, setDisplayList] = createSignal<AcmeItem[]>(fastList.signal());
+  const [displayList, setDisplayList] = createSignal<DisplayList>(fastList.signal());
   // TODO: Desub on unmount
   const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, fastList.signal], () => {
     if (selection.globalIsDragging()) {
       // We are dragging, so filter if this is our list instance
-      let filtered: AcmeItem[] = [...fastList.signal()];
+      let filtered: DisplayList = [...fastList.signal()];
       if (dragOriginSelection === selection) {
         filtered = filtered.filter((val) => !selection.keys.has(val.id))
       }
@@ -54,17 +57,19 @@ export function List(props: ListProps) {
       const lastTouchedIndex = selection.lastTouchedIndex();
       if (typeof lastTouchedIndex === 'number') {
         // TODO: Use a null val here for placeholder (or type: placeholder)
-        filtered.splice(lastTouchedIndex, 0, { id: 'yo', text: 'placeholder' })
+        filtered.splice(lastTouchedIndex, 0, { type: 'placeholder' })
       }
       setDisplayList(filtered);
     } else {
       setDisplayList(fastList.signal())
     }
   }));
+  /**
+   * Handles drops from same or foreign display list
+   */
   function handleDrop() {
     const ltIndex = globalLastDisplayIndex;
     const dl = displayList();
-    console.log(selection.globalIsDragging(), fastList?.listId);
     if (selection.globalIsDragging() && typeof ltIndex === 'number' && dragOriginSelection && dragOriginList) {
       // TODO: A map between displayList and fastlist might be beneficial
       const beforeIndex = ltIndex - 1;
@@ -72,8 +77,11 @@ export function List(props: ListProps) {
       const beforeId = dl[beforeIndex] ? dl[beforeIndex] : null;
       const afterId = dl[afterIndex] ? dl[afterIndex] : null;
       fastList?.moveItems(dragOriginSelection.keys, dragOriginList, [beforeId?.id || null, afterId?.text || null]);
-      selection.clear();
-      selection.addKeys(Array.from(dragOriginSelection.keys));
+      if (dragOriginSelection !== selection) {
+        selection.clear();
+        selection.addKeys(Array.from(dragOriginSelection.keys));
+        dragOriginSelection.clear();
+      }
     }
   }
   onMount(() => {
@@ -111,16 +119,20 @@ export function List(props: ListProps) {
         <For each={displayList()}>
           {(item, index) => (
             <>
-              {/* TODO: Use custom placeholder item */}
-              <Item
-                item={item}
-                listIndex={index()}
-                selection={selection}
-                fastList={fastList}
-                displayList={displayList}
-                scrollRef={scrollRef}
-                keyboardShortcuts={keyboardShortcuts}
-              />
+              {item.type === 'placeholder' && (
+                <Placeholder listIndex={index()} selection={selection} />
+              )}
+              {item.id && (
+                <Item
+                  item={item}
+                  listIndex={index()}
+                  selection={selection}
+                  fastList={fastList}
+                  displayList={displayList}
+                  scrollRef={scrollRef}
+                  keyboardShortcuts={keyboardShortcuts}
+                />
+              )}
             </>
           )}
         </For>
