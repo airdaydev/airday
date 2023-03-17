@@ -191,7 +191,7 @@ export function Item(props: ItemProps) {
                     <div>
                         <div>{props.item.text}</div>
                         <div style={`color: #ccc;`}>
-                            Added 2 minutes ago
+                            2m
                             <span>#{props.listIndex}</span>
                         </div>
                     </div>

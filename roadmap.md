@@ -10,11 +10,12 @@
 - [x] Drag items to other lists
 - [x] Prevent list navigation on edit mode
 - [x] Prevent list navigation in context menu
-- [] Context menu for list (at mouse cursor)
+- [x] Context menu for list (at mouse cursor)
 - [] Delete items
 - [] Delete lists
 - [] Add new list
 - [] Add new item
+- [] Dark mode
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] shift + click with nothing selecting regression
