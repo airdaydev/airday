@@ -1,5 +1,5 @@
-import { Accessor, createSignal, Signal } from 'solid-js';
-import { store, AcmeIDB, dbNotReadyMessage } from './store';
+import { Accessor, createSignal, Setter, Signal } from 'solid-js';
+import { store, AcmeIDB, dbNotReadyMessage } from './main';
 
 export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 
@@ -11,18 +11,33 @@ export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 export class ContainerModel {
     storeName = 'container';
     acmedb: AcmeIDB | null = null;
-    signal: Signal<AcmeContainer[]>;
+    accessor: Accessor<AcmeContainer[]>;
+    setter: Setter<AcmeContainer[]>;
     constructor() {
-        this.signal = createSignal<
-        AcmeContainer[]>([]);
+        const signal = createSignal<AcmeContainer[]>([]);
+        this.accessor = signal[0];
+        this.setter = signal[1];
     }
     init = (db: AcmeIDB) => { this.acmedb = db; }
     ready() { return !!this.db; }
     get db() {
+        // TODO: This COULD be made redundant with proper queuing system
         if (!this.acmedb) throw new Error('Item store uninitialised');
         return this.acmedb;
     }
-    insert = async(data: AcmeContainer | AcmeContainer[]) => {
+    insert = (data: AcmeContainer | AcmeContainer[]) => {
+        // TODO: Insert into queue, then update idb
+        const list = this.setter((prev) => {
+            if (Array.isArray(data)) {
+                const arr = [...prev, ...data];
+                return arr;
+            } else {
+                const arr = [...prev, data];
+                return arr
+            }
+        });
+    }
+    idb_insert = async(data: AcmeContainer | AcmeContainer[]) => {
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
         const insert = async (item: AcmeContainer) => {
@@ -43,4 +58,3 @@ export class ContainerModel {
         return items;
     }
 }
-

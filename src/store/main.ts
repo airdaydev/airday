@@ -14,8 +14,9 @@ interface DBTypes {
 export type AcmeIDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage = 'DB not loaded, pre-load buffer not yet implemented';
 
+// TODO: Retrieve these from model
 const itemStoreName = 'item';
-const listStoreName = 'list';
+const listStoreName = 'container';
 // Remote Config store per browser (but could do local storage)
 
 // Primary local persistence layer
@@ -24,6 +25,7 @@ class AcmeLocalStore {
     init = async () => {
         await deleteDB('acme');
         const db = await openDB<DBTypes>('acme', schemaVersion, {
+            // TODO: Get upgrades as static methods from classes
             upgrade(db) {
                 const itemStore = db.createObjectStore(itemStoreName, {
                     keyPath: 'id',

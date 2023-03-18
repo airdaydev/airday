@@ -5,6 +5,8 @@ import TodoSVG from '../icons/todo.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import { NavItemContextMenu } from './context-menu';
+import { containerModel } from '../store/main';
+import { nanoid } from 'nanoid';
 
 interface NavListItemProps {
   list: AcmeContainer,
@@ -45,21 +47,6 @@ export function NavListItem(props: NavListItemProps) {
   )
 }
 
-const lists: AcmeContainer[] = [
-  {
-    id: 'inbox',
-    name: 'Inbox',
-  },
-  {
-    id: 'acmelist',
-    name: 'AcmeList',
-  },
-  {
-    id: 'empty-list',
-    name: 'Empty List',
-  },
-]
-
 export function AcmeNav() {
   return (
     <nav class={styles.nav}>
@@ -72,12 +59,15 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
         <hr />
-        <For each={lists}>
+        <For each={containerModel.accessor()}>
           {(list) => <NavListItem list={list} />}
         </For>
-        {/* <button onClick={}>
+        <button onClick={() => containerModel.insert({
+          id: nanoid(),
+          name: 'New list',
+        })}>
           + Create new list
-        </button> */}
+        </button>
     </nav>
   );
 }

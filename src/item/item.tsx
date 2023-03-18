@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
 import { AcmeReactiveSelection, globalLastDisplayIndex } from '../list/selection';
 import { KeyboardShortcuts } from '../keyboard';
-import { store } from '../store/store';
+import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
 import styles from './item.module.css';
 import { distance } from './utils';

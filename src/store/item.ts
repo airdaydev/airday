@@ -1,4 +1,4 @@
-import { AcmeIDB, dbNotReadyMessage } from './store';
+import { AcmeIDB, dbNotReadyMessage } from './main';
 
 /**
  * Item model

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { generateNKeysBetween } from 'fractional-indexing';
-import { store } from './store.js';;
+import { store } from './main.js';;
 
 export const acmeItems = [
     'AcmeList',

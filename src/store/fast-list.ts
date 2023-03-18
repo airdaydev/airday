@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { createSignal, Accessor, Setter } from 'solid-js';
-import { itemModel } from './store.js';
+import { itemModel } from './main.js';
 
 export const openLists = new Map<string, FastList>();
 

@@ -11,17 +11,20 @@
 - [x] Prevent list navigation on edit mode
 - [x] Prevent list navigation in context menu
 - [x] Context menu for list (at mouse cursor)
+- [x] Add new list
 - [] Delete items
 - [] Delete lists
-- [] Add new list
 - [] Add new item
 - [] Dark mode
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] shift + click with nothing selecting regression
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
-- [] Calculate & persist sort changes
-- [] Calculate & persist updates, moves
+- [] Work out persistence pipeline
+- [] Calculate & persist sort changes to idb
+- [] Calculate & persist updates, moves to idb
+- [] Persist list changes to idb
+- [] Autoscroll when dragging items at bottom/top of list
 - [] Ensure selection is cleared on edit
 - [] Edit list name capability in navbar 
 - [] Edit selected items via 'enter' key
@@ -31,7 +34,6 @@
 - [] Allow dropping items in nav bar list
 - [] Allow dropping items between open lists directly
 - [] Highlight active list in nav
-- [] List animations
 - [] Edit list name in list view
 - [] Change list icons
 - [] Drag stack make it nice
@@ -42,24 +44,24 @@
 - [] Add now playing list, allow dragging items to now playing list
 - [] Up Next board
 - [] Trash concept
+- [] Kanban board
 - [] Nice empty list states
 - [] Mobile web strategy (PWA)
 - [] PWA update strategy
 - [] API update strategy
-- [] Kanban board
-- [] Paid web service with introductory prices
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Client-side encrypted sync ws server
+- [] Encryption layer
+- [] List animations
+- [] Paid web service with introductory prices
 - [] Consider license type
 - [] Add search
 - [] Custom Themes / compact mode
-- [] Add board prototype
 - [] Add repeatable items - Maybe
 - [] Export data (JSON, excel, markdown)
 - [] Secrets
 - [] Website
-- [] WS layer
 - [] Spanish (EU) localisation
 - [] Japanese localisation
 - [] Mobile native app strategy
-- [] The board (canvas/webgl)
+- [] The board prototype (canvas/webgl)
