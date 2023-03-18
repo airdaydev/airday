@@ -49,9 +49,18 @@ export class AcmeReactiveSelection {
     }
     addKey(key: string) {
         this.keys.add(key);
-        const subscriptions = this.subscribers.get(key);
-        subscriptions?.forEach((cb) => cb(true));
+        this.publishToAllSelected()
         this.lastKeySelected = key;
+    }
+    publishToAllSelected() {
+        this.keys.forEach((key) => {
+            this.subscribers.get(key)?.forEach(cb => cb(true));
+        })
+    }
+    addKeys(keys: string[]) {
+        keys.forEach((key) => this.keys.add(key));
+        this.lastKeySelected = keys[keys.length - 1];
+        this.publishToAllSelected();
     }
     toggleKey(key: string) {
         if (this.keys.has(key)) {
@@ -65,9 +74,6 @@ export class AcmeReactiveSelection {
         this.keys.delete(key);
         const subscriptions = this.subscribers.get(key);
         subscriptions?.forEach((cb) => cb(false));
-    }
-    addKeys(items: string[]) {
-        items.map((i) => this.addKey(i));
     }
     clear() {
         this.rangeOrigin = null;

@@ -1,9 +1,9 @@
 import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
-import { AcmeReactiveSelection, globalLastDisplayIndex } from '../list/selection';
+import { AcmeReactiveSelection, globalLastDisplayIndex } from './selection';
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
-import itemStyles from './item.module.css';
+import styles from './list.module.css';
 import { distance } from './utils';
 
 function moveCaretToPosition(el: HTMLInputElement, index: number) {
@@ -44,6 +44,19 @@ export function Item(props: ItemProps) {
         }
         props.keyboardShortcuts.enable();
         setEdit(false);
+    }
+    function getSelectClasses() {
+        const classes: Record<string, boolean> = {
+            [styles['selected']]: selected(),
+        };
+        if (!props.selection.keys.has(props.displayList()[props.listIndex - 1]?.id)) {
+            classes[styles['selected-first']] = true;
+        }
+        if (!props.selection.keys.has(props.displayList()[props.listIndex + 1]?.id)) {
+            classes[styles['selected-last']] = true;
+        }
+        console.log(props.item.text, selected())
+        return classes;
     }
     onCleanup(() => unsubscribe());
     createEffect(on([edit], () => {
@@ -126,8 +139,8 @@ export function Item(props: ItemProps) {
                     }}
                     // https://www.solidjs.com/docs/latest/api#classlist
                     classList={{
-                        [itemStyles['container-selected']]: selected(),
-                        [itemStyles['container']]: true,
+                        [styles['item']]: true,
+                        ...(selected()) && { ...getSelectClasses() },
                     }}
                     ref={containerRef}
                     onMouseEnter={(event: MouseEvent) => {
@@ -157,7 +170,6 @@ export function Item(props: ItemProps) {
                             window.addEventListener('mousemove', mouseMove);
                             window.addEventListener('mouseup', () => {
                             //     // TODO: Add drop zone event here
-                            //     console.log('mouse up yo');
                             //     window.dispatchEvent(new Event('acme-drop-items'));
                                 props.selection.setLastTouchedIndex(false);
                                 props.selection.setDragging(false);
@@ -192,7 +204,7 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <div class={itemStyles['check-box']}></div>
+                    <div class={styles['check']}></div>
                     <div>
                         <div>{props.item.text}</div>
                         <div style={`color: #ccc;`}>

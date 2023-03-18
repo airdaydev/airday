@@ -1,5 +1,5 @@
 import { AcmeReactiveSelection } from '../list/selection';
-import styles from './item.module.css';
+import styles from './list.module.css';
 
 interface PlaceholderProps {
     listIndex: number;

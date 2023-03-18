@@ -15,6 +15,10 @@
     padding-left: 0.5em;
 }
 
+.active .list-header svg {
+    color: black;
+}
+
 .list-scroll {
     overflow-y: scroll;
     padding: 0.5em;
@@ -25,4 +29,58 @@
 .list h2 {
     font-weight: 500;
     font-size: 1.25em;
+}
+
+.placeholder {
+    max-width: 44em;
+    box-sizing: border-box;
+    padding: 0.5em;
+    border-radius: 3px;
+    height: 4em;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    background: #eee;
+}
+
+.item {
+    max-width: 44em;
+    box-sizing: border-box;
+    padding: 0.5em;
+    /* border-radius: 3px; */
+    min-height: 4em;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    white-space: pre;
+}
+
+.active .item.selected {
+    background: #e0e0e0;
+}
+
+.item.selected {
+    background: #eee;
+}
+
+.item.selected-first {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+}
+.item.selected-last {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.item:hover {
+    background: #eee;
+    cursor: pointer;
+}
+
+.check {
+    border: 1px solid var(--border, value);
+    border-radius: 2px;
+    width: 1.25em;
+    height: 1.25em;
+    margin-right: 0.5em;
 }

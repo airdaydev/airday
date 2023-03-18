@@ -6,13 +6,13 @@ import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
-import { Item } from '../list-item/item';
+import { Item } from './item';
 import { containerModel, store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { activeViewId, closeView, setActiveViewId } from '../view-state';
-import { Placeholder } from '../list-item/placeholder';
+import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
 
 interface ListProps {
@@ -102,7 +102,10 @@ export function List(props: ListProps) {
     <>
       {selection.isDragging() && <DragStack size={selection.keys.size} />}
       <section
-        class={styles.list}
+        classList={{
+          [styles.list]: true,
+          [styles.active]: activeViewId() === props.view.id,
+        }}
         tabIndex={props.tabId}
         onFocus={() => setActiveViewId(props.view.id)}
         onClick={() => setActiveViewId(props.view.id)}
@@ -113,7 +116,6 @@ export function List(props: ListProps) {
           <div style={`display: flex; align-items: center;`}>
             <TodoSVG style={`margin: 0.5em;`} />
             <h2 style={`margin: 0.5em 0;`}>{containerModel.accessor().find((list) => list.id === props.view.containerId)?.name}</h2>
-            {activeViewId() === props.view.id && (<div>active!</div>)}
           </div>
           <button
             onClick={() => closeView(props.tabId)}
