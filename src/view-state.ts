@@ -12,6 +12,7 @@ export const [views, setViews] = createSignal<AcmeView[]>([{
     projection: 'list',
 }]);
 
+// TODO: Cache or index
 export function findActiveViewIndex() {
     if (!activeViewId()) return false;
     return views().findIndex((view) => view.id === activeViewId());
@@ -21,15 +22,17 @@ export function findActiveViewIndex() {
  * Open list at specified index
  */
 export function replaceView(containerId: string, index: number = 0) {
-    return setViews((prev: AcmeView[]) => {
+    const newView: AcmeView = {
+        id: createUniqueId(),
+        containerId,
+        projection: 'list',
+    };
+    setViews((prev: AcmeView[]) => {
         const next = [...prev];
-        next[index] = {
-            id: createUniqueId(),
-            containerId,
-            projection: 'list',
-        };
+        next[index] = newView;
         return next;
     });
+    setActiveViewId(newView.id);
 }
 
 /**

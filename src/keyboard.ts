@@ -1,4 +1,4 @@
-import { activeViewId } from "./view-state";
+import { activeViewId } from './view-state';
 
 const keyName = (event: string, contextId: string) =>
     `${event}:${contextId}`;

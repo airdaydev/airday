@@ -10,7 +10,7 @@
     background: #eee;
 }
 
-.item-container {
+.container {
     max-width: 44em;
     box-sizing: border-box;
     padding: 0.5em;
@@ -22,20 +22,16 @@
     white-space: pre;
 }
 
-.item-container-selected {
+.container-selected {
     background: #eee;
 }
 
-.item-edit {
-    
-}
-
-.item-container:hover {
+.container:hover {
     background: #eee;
     cursor: pointer;
 }
 
-.item-check {
+.check {
     border: 1px solid var(--border, value);
     border-radius: 2px;
     width: 1.25em;

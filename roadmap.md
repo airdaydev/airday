@@ -16,6 +16,7 @@
 - [] Delete lists
 - [] Add new item
 - [] Dark mode
+- [] Multi-select & reorder lists
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] shift + click with nothing selecting regression

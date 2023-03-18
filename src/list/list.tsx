@@ -2,18 +2,17 @@ import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
 } from 'solid-js';
-import { nanoid } from 'nanoid';
 import TodoSVG from '../icons/todo.svg';
 import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
-import { Item } from '../item/item';
+import { Item } from '../list-item/item';
 import { containerModel, store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { activeViewId, closeView, setActiveViewId } from '../view-state';
-import { Placeholder } from '../item/placeholder';
+import { Placeholder } from '../list-item/placeholder';
 import { DragStack } from './drag-stack';
 
 interface ListProps {

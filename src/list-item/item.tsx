@@ -3,7 +3,7 @@ import { AcmeReactiveSelection, globalLastDisplayIndex } from '../list/selection
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
-import styles from './item.module.css';
+import itemStyles from './item.module.css';
 import { distance } from './utils';
 
 function moveCaretToPosition(el: HTMLInputElement, index: number) {
@@ -126,9 +126,8 @@ export function Item(props: ItemProps) {
                     }}
                     // https://www.solidjs.com/docs/latest/api#classlist
                     classList={{
-                        [styles['item-container-dragging']]: isInDragSet(),
-                        [styles['item-container-selected']]: selected(),
-                        [styles['item-container']]: true,
+                        [itemStyles['container-selected']]: selected(),
+                        [itemStyles['container']]: true,
                     }}
                     ref={containerRef}
                     onMouseEnter={(event: MouseEvent) => {
@@ -193,7 +192,7 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <div class={styles['item-check']}></div>
+                    <div class={itemStyles['check-box']}></div>
                     <div>
                         <div>{props.item.text}</div>
                         <div style={`color: #ccc;`}>

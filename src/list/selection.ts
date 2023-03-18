@@ -77,7 +77,7 @@ export class AcmeReactiveSelection {
     removeKeys(items: string[]) {
         items.map((i) => this.removeKey(i));
     }
-    getSignalByKey(key: string): [Accessor<Boolean>, () => void] {
+    getSignalByKey(key: string): [Accessor<boolean>, () => void] {
         const [selected, setSelected] = createSignal(this.keys.has(key));
         this.subscribe(key, setSelected);
         return [selected, () => this.unsubscribe(key, setSelected)];

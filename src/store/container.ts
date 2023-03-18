@@ -4,7 +4,7 @@ import { store, AcmeIDB, dbNotReadyMessage } from './main';
 export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 
 /**
- * Container model
+ * Container model i.e. data bucket e.g. a list
  * Provides fast in memory store, idb persistence layer & websocket interface
  * TODO: Put DB functions in a base class
  */
