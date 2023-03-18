@@ -9,14 +9,14 @@ import { createSignal, onCleanup, onMount } from 'solid-js';
 // Sorted by top first
 
 interface DragStackProps {
-    cards: AcmeItem[];
+    size: number;
 }
 
 const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([document.body.scrollWidth, document.body.scrollHeight]);
 const onResize = (event: UIEvent) => requestAnimationFrame(() =>
         setBoardDimensions([document.body.scrollWidth, document.body.scrollHeight]));
 
-export const DragStack = ({ cards }: DragStackProps) => {
+export const DragStack = ({ size }: DragStackProps) => {
     let stackRef: HTMLDivElement | undefined = undefined;
     const onMouseMove = (event: MouseEvent) => {
         requestAnimationFrame(() => {
@@ -68,7 +68,7 @@ export const DragStack = ({ cards }: DragStackProps) => {
                     transform: rotateZ(2deg);
                 `}
             >
-                {/* {`${cards.length} cards`} */}
+                {`${size} cards`}
             </div>
         </div>
     );

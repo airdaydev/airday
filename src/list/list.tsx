@@ -8,7 +8,7 @@ import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
-import { store } from '../store/main';
+import { containerModel, store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
@@ -17,7 +17,7 @@ import { Placeholder } from '../item/placeholder';
 import { DragStack } from './drag-stack';
 
 interface ListProps {
-  listId: string;
+  view: AcmeView;
   tabId: number;
 }
 
@@ -37,7 +37,7 @@ type DisplayList = (AcmeItem | { type: 'placeholder' })[];
  */
 export function List(props: ListProps) {
   let scrollRef: HTMLDivElement;
-  const fastList = openList(props.listId);
+  const fastList = openList(props.view.containerId);
   if (!fastList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
   const contextId = nanoid();
@@ -101,7 +101,7 @@ export function List(props: ListProps) {
   
   return (
     <>
-      {selection.isDragging() && <DragStack />}
+      {selection.isDragging() && <DragStack size={selection.keys.size} />}
       <section
         class={styles.list}
         tabIndex={props.tabId}
@@ -113,7 +113,7 @@ export function List(props: ListProps) {
         <div class={styles['list-header']}>
           <div style={`display: flex; align-items: center;`}>
             <TodoSVG style={`margin: 0.5em;`} />
-            <h2 style={`margin: 0.5em 0;`}>{props.listId}</h2>
+            <h2 style={`margin: 0.5em 0;`}>{containerModel.accessor().find((list) => list.id === props.view.containerId)?.name}</h2>
           </div>
           <button
             onClick={() => closeView(props.tabId)}

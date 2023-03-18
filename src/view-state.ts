@@ -1,21 +1,29 @@
-import { createSignal } from 'solid-js';
+import { createSignal, createUniqueId } from 'solid-js';
 
-type ViewState = string[];
+
 
 /**
  * Views, left to right
  * State should be saved in local storage
  */
 export let activeViewIndex = 0;
-export const [listViews, setListViews] = createSignal<string[]>(['inbox']);
+export const [views, setViews] = createSignal<AcmeView[]>([{
+    id: createUniqueId(),
+    containerId: 'inbox',
+    projection: 'list',
+}]);
 
 /**
  * Open list at specified index
  */
-export function replaceActiveView(listId: string) {
-    return setListViews((prev: ViewState) => {
+export function replaceActiveView(containerId: string) {
+    return setViews((prev: AcmeView[]) => {
         const next = [...prev];
-        next[activeViewIndex] = listId;
+        next[activeViewIndex] = {
+            id: createUniqueId(),
+            containerId,
+            projection: 'list',
+        };
         return next;
     });
 }
@@ -24,16 +32,22 @@ export function replaceActiveView(listId: string) {
  * Open list at specified index
  */
 export function closeView(index: number) {
-    return setListViews((prev: ViewState) => {
+    return setViews((prev: AcmeView[]) => {
         prev.splice(index, 1);
         return [...prev];
     });
 }
 
-export function addView(listId: string) {
+export function addView(containerId: string) {
     // TODO: Allow 100 horizontal lists
-    if (listViews.length > 8) return;
-    return setListViews((prev: ViewState) => {
-        return [...prev, listId];
+    if (views.length > 8) return;
+    const view: AcmeView = {
+        // TODO: Detect clash / or how does this lib work
+        id: createUniqueId(),
+        containerId,
+        projection: 'list',
+    }
+    return setViews((prev) => {
+        return [...prev, view];
     })
 }

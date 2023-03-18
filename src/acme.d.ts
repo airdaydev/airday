@@ -23,3 +23,9 @@ interface SelectItemsOpts {
 type ListDirection = 'next' | 'prev';
 
 type OrderedKey = [string, string, string];
+
+interface AcmeView {
+  id: string;
+  containerId: string;
+  projection: 'list' | 'kanban';
+}

@@ -16,7 +16,6 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
     }
     window.addEventListener('mousedown', clickOutside);
     onCleanup(() => window.removeEventListener('mousedown', clickOutside))
-    console.log(props.offset())
     return (
         <div
             ref={containerRef}
