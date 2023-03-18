@@ -3,7 +3,7 @@ import { addView } from "../view-state";
 
 interface NavItemContextMenu {
     close: () => void;
-    list: AcmeList;
+    list: AcmeContainer;
     offset: Accessor<[number, number]>;
 }
 

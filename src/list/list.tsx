@@ -8,7 +8,7 @@ import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from '../item/item';
-import { store } from '../store/main';
+import { store } from '../store/store';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
@@ -123,26 +123,32 @@ export function List(props: ListProps) {
           </button>
         </div>
         <div ref={scrollRef} class={styles['list-scroll']}>
-          <For each={displayList()}>
-            {(item, index) => (
-              <>
-                {item.type === 'placeholder' && (
-                  <Placeholder listIndex={index()} selection={selection} />
-                )}
-                {item.id && (
-                  <Item
-                    item={item}
-                    listIndex={index()}
-                    selection={selection}
-                    fastList={fastList}
-                    displayList={displayList}
-                    scrollRef={scrollRef}
-                    keyboardShortcuts={keyboardShortcuts}
-                  />
-                )}
-              </>
-            )}
-          </For>
+          {displayList().length ? (
+            <For each={displayList()}>
+              {(item, index) => (
+                <>
+                  {item.type === 'placeholder' && (
+                    <Placeholder listIndex={index()} selection={selection} />
+                  )}
+                  {item.id && (
+                    <Item
+                      item={item}
+                      listIndex={index()}
+                      selection={selection}
+                      fastList={fastList}
+                      displayList={displayList}
+                      scrollRef={scrollRef}
+                      keyboardShortcuts={keyboardShortcuts}
+                    />
+                  )}
+                </>
+              )}
+            </For>
+          ) : (
+            <div style={`height: 100%;`} onMouseOver={() => selection.setLastTouchedIndex(0)}>
+              empty list
+            </div>
+          )}
         </div>
       </section>
     </>

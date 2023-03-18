@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { createSignal, Accessor, Setter } from 'solid-js';
-import { store } from './main.js';
+import { itemModel } from './store.js';
 
 export const openLists = new Map<string, FastList>();
 
@@ -14,25 +14,20 @@ export function openList(listId: string) {
 // https://github.com/solidjs/solid/discussions/1524
 // https://www.reddit.com/r/solidjs/comments/ilebtl/efficient_state_updates_to_arrays/
 // https://github.com/solidjs/solid/discussions/366
-// SIT ON THIS ONE.
-// Maybe the answer here is to use both a list (ordered updates) & a store (finegrained updates)
-// OR just creating a signal within the item via a key (similar to selection) (yeah i like this)
 
-interface AcmeItemInsertion extends Partial<AcmeList> {
+interface AcmeItemInsertion extends Partial<AcmeContainer> {
     text: string;
     sortKey: string;
     listId: string;
 }
 
-// data projection stack
-// 1. server (online persistence) -> idb (offline persistence) -> fast list (fast, optimistic access) -> list instance (display, interaction)
-
 export let dragOriginList: string | null = null; // TODO: move to Selection or hybrid
 
 /**
- * Fast list interaction based on array
- * For editing and sorting lists quickly without the overhead of transactional guarantees from the main store
+ * Optimistic in-memory list
+ * For editing and sorting lists quickly without the overhead of transactional guarantees and sort keys etc from the main store
  * TODO: Strongly consider an index
+ * TODO: Handling 3000+ items without log(n) - roll the list DOM patcher yourself
  */
 export class FastList {
     listId: string;
@@ -51,7 +46,7 @@ export class FastList {
         dragOriginList = listId;
     }
     new(item: AcmeItemInsertion) {
-        store.insert({
+        itemModel.insert({
             id: nanoid(),
             ...item,
             dateCreated: (new Date()).toString(),
@@ -108,7 +103,7 @@ export class FastList {
         // Trigger signal update
     }
     async initList() {
-        const list = await store.getItemsByList(this.listId);
+        const list = await itemModel.getItemsByList(this.listId);
         if (this.setSignal) this.setSignal(list);
     }
     /**

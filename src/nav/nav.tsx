@@ -7,7 +7,7 @@ import CheckSVG from '../icons/check.svg';
 import { NavItemContextMenu } from './context-menu';
 
 interface NavListItemProps {
-  list: AcmeList,
+  list: AcmeContainer,
 }
 
 // TODO: Turn off keyboard when context menu open
@@ -45,7 +45,7 @@ export function NavListItem(props: NavListItemProps) {
   )
 }
 
-const lists: AcmeList[] = [
+const lists: AcmeContainer[] = [
   {
     id: 'inbox',
     name: 'Inbox',
@@ -75,6 +75,9 @@ export function AcmeNav() {
         <For each={lists}>
           {(list) => <NavListItem list={list} />}
         </For>
+        {/* <button onClick={}>
+          + Create new list
+        </button> */}
     </nav>
   );
 }

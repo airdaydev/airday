@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
 import { AcmeReactiveSelection, globalLastDisplayIndex } from '../list/selection';
 import { KeyboardShortcuts } from '../keyboard';
-import { store } from '../store/main';
+import { store } from '../store/store';
 import { FastList } from '../store/fast-list';
 import styles from './item.module.css';
 import { distance } from './utils';
@@ -27,6 +27,11 @@ export function Item(props: ItemProps) {
     const [edit, setEdit] = createSignal(false);
     const [caretPos, setCaretPos] = createSignal(0);
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
+    function editModeKeyboardHandler(event: KeyboardEventInit) {
+        if (event.key === 'Escape') {
+            leaveEditMode(true);
+        }
+    }
     function enterEditMode() {
         props.keyboardShortcuts.disable();
         props.selection.clear();
@@ -53,6 +58,7 @@ export function Item(props: ItemProps) {
         <>
             {edit() && (
                 <div
+                    onKeyDown={editModeKeyboardHandler}
                     style={`
                     min-height: 4em;
                     position: relative;

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { generateNKeysBetween } from 'fractional-indexing';
-import { store } from './main.js';;
+import { store } from './store.js';;
 
 export const acmeItems = [
     'AcmeList',
@@ -10,9 +10,10 @@ export const acmeItems = [
 ]
 
 export const inboxItems = [
-    'Continue agb book',
-    'Continue nutha book',
-    'Continue and another book',
+    'Eat a cantaloupe',
+    'Eat watermelon',
+    'Eat a fig',
+    'Drink prune juice',
 ]
 
 export function genTestData(listId: string, tasks: string[]): AcmeItem[] {

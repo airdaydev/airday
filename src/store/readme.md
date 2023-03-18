@@ -1,5 +1,8 @@
 # Notes on item lifecycle etc
 
+## data pipeline
+server (online persistence) -> ws (comms) -> idb (offline persistence) -> fast list (fast, optimistic access) -> display list (rendering & interaction)
+
 ## Lists
 - Store in indexeddb in lists "table"
 

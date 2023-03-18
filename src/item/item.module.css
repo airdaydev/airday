@@ -15,10 +15,11 @@
     box-sizing: border-box;
     padding: 0.5em;
     border-radius: 3px;
-    height: 4em;
+    min-height: 4em;
     user-select: none;
     display: flex;
     align-items: center;
+    white-space: pre;
 }
 
 .item-container-selected {

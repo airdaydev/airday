@@ -6,7 +6,7 @@ interface AcmeItem {
   listId: string;
 }
 
-interface AcmeList {
+interface AcmeContainer {
   id: string;
   name: string;
   // TODO: sortKey

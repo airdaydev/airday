@@ -2,20 +2,20 @@
 import { render } from 'solid-js/web';
 import { App } from './app';
 import './main.css';
-import { store } from './store/main';
+import { itemModel } from './store/store';
 import { genTestData, acmeItems, inboxItems } from './store/dummy-data';
 
-await store.init();
+// TODO: Render while store is alive (i.e. Allow models to run without db layer)
 
 const items = [
   ...genTestData('acmelist', acmeItems),
   ...genTestData('inbox', inboxItems),
 ]
-await store.insert(items);
-await store.insertLists([
-  { id: 'inbox', name: 'Inbox' },
-  { id: 'acmelist', name: 'AcmeList' },
-])
+await itemModel.insert(items);
+// await itemModel.insertLists([
+//   { id: 'inbox', name: 'Inbox' },
+//   { id: 'acmelist', name: 'AcmeList' },
+// ]);
 
 const root = document.getElementById('root');
 
