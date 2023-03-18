@@ -1,25 +1,29 @@
 import { createSignal, createUniqueId } from 'solid-js';
 
-
-
 /**
  * Views, left to right
- * State should be saved in local storage
+ * State should be saved in local storage, per workspace
  */
-export let activeViewIndex = 0;
+
+export const [activeViewId, setActiveViewId] = createSignal<string | null>(null);
 export const [views, setViews] = createSignal<AcmeView[]>([{
     id: createUniqueId(),
     containerId: 'inbox',
     projection: 'list',
 }]);
 
+export function findActiveViewIndex() {
+    if (!activeViewId()) return false;
+    return views().findIndex((view) => view.id === activeViewId());
+}
+
 /**
  * Open list at specified index
  */
-export function replaceActiveView(containerId: string) {
+export function replaceView(containerId: string, index: number = 0) {
     return setViews((prev: AcmeView[]) => {
         const next = [...prev];
-        next[activeViewIndex] = {
+        next[index] = {
             id: createUniqueId(),
             containerId,
             projection: 'list',

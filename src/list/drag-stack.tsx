@@ -8,6 +8,9 @@ import { createSignal, onCleanup, onMount } from 'solid-js';
 // Show top 3 cards (small post-it note style) + total number of cards
 // Sorted by top first
 
+// TODO: Drag physics?
+// https://greensock.com/forums/topic/16928-physics-while-dragging/
+
 interface DragStackProps {
     size: number;
 }

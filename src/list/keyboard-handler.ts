@@ -13,7 +13,6 @@ export const getListKeyboardHandler = ({
     selection,
     scrollRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
-  console.log('wtf');
     const list = fastList.signal();
     if (event.key === 'a' && event.metaKey) {
         event.preventDefault();

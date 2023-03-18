@@ -1,10 +1,11 @@
+import { activeViewId } from "./view-state";
+
 const keyName = (event: string, contextId: string) =>
     `${event}:${contextId}`;
 
 export class KeyboardShortcuts {
     handlerMap = new Map<string, (event: KeyboardEvent) => void>();
     globalHandlerActive = true;
-    currentContext: string | null = null;
     enabled: boolean = true; // for temporarily overriding for example when editing
     constructor() {
         window.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -14,8 +15,9 @@ export class KeyboardShortcuts {
                 const action = this.globalKeyboardHandler(event); // overrides
                 if (action) return;
             }
-            if (this.currentContext) {
-                const handler = this.handlerMap.get(keyName('keydown', this.currentContext));
+            const currentContext = activeViewId();
+            if (currentContext) {
+                const handler = this.handlerMap.get(keyName('keydown', currentContext));
                 if (handler) handler(event);
             }
         });
@@ -28,9 +30,6 @@ export class KeyboardShortcuts {
     }
     unregisterHandler(event: string, contextId: string) {
         this.handlerMap.delete(keyName(event, contextId));
-    }
-    setFocus(contextId: string) {
-        this.currentContext = contextId;
     }
     disable() {
         this.enabled = false;

@@ -12,7 +12,7 @@ import { containerModel, store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
-import { closeView } from '../view-state';
+import { activeViewId, closeView, setActiveViewId } from '../view-state';
 import { Placeholder } from '../item/placeholder';
 import { DragStack } from './drag-stack';
 
@@ -40,7 +40,6 @@ export function List(props: ListProps) {
   const fastList = openList(props.view.containerId);
   if (!fastList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
-  const contextId = nanoid();
     // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
   // This is better off being created from the fastList which can take a selection module.
@@ -72,6 +71,7 @@ export function List(props: ListProps) {
    * Handles drops from same or foreign display list
    */
   function handleDrop() {
+    setActiveViewId(props.view.id);
     const ltIndex = globalLastDisplayIndex;
     const dl = displayList();
     if (selection.globalIsDragging() && typeof ltIndex === 'number' && dragOriginSelection && dragOriginList) {
@@ -89,14 +89,14 @@ export function List(props: ListProps) {
     }
   }
   onMount(() => {
-    keyboardShortcuts.registerHandler('keydown', contextId, getListKeyboardHandler({
+    keyboardShortcuts.registerHandler('keydown', props.view.id, getListKeyboardHandler({
       fastList,
       selection,
       scrollRef,
     }));
   });
   onCleanup(() => {
-    keyboardShortcuts.unregisterHandler('keydown', contextId)
+    keyboardShortcuts.unregisterHandler('keydown', props.view.id)
   });
   
   return (
@@ -105,8 +105,8 @@ export function List(props: ListProps) {
       <section
         class={styles.list}
         tabIndex={props.tabId}
-        onFocus={() => keyboardShortcuts.setFocus(contextId)}
-        onClick={() => keyboardShortcuts.setFocus(contextId)}
+        onFocus={() => setActiveViewId(props.view.id)}
+        onClick={() => setActiveViewId(props.view.id)}
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >
@@ -114,6 +114,7 @@ export function List(props: ListProps) {
           <div style={`display: flex; align-items: center;`}>
             <TodoSVG style={`margin: 0.5em;`} />
             <h2 style={`margin: 0.5em 0;`}>{containerModel.accessor().find((list) => list.id === props.view.containerId)?.name}</h2>
+            {activeViewId() === props.view.id && (<div>active!</div>)}
           </div>
           <button
             onClick={() => closeView(props.tabId)}
