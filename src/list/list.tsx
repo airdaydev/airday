@@ -14,6 +14,7 @@ import { getListKeyboardHandler } from './keyboard-handler.js';
 import { activeViewId, closeView, setActiveViewId } from '../view-state';
 import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
+import { EditableListTitle } from './list-title';
 
 interface ListProps {
   view: AcmeView;
@@ -115,7 +116,7 @@ export function List(props: ListProps) {
         <div class={styles['list-header']}>
           <div style={`display: flex; align-items: center;`}>
             <TodoSVG style={`margin: 0.5em;`} />
-            <h2 style={`margin: 0.5em 0;`}>{containerModel.accessor().find((list) => list.id === props.view.containerId)?.name}</h2>
+            <EditableListTitle containerId={props.view.containerId} />
           </div>
           <button
             onClick={() => closeView(props.tabId)}

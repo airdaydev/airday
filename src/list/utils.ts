@@ -20,3 +20,7 @@ export function jumpToElIfOutsideView(targetView: HTMLElement, node: Node) {
 export function distance(coordPairA: [number, number], coordPairB: [number, number]) {
     return Math.sqrt(Math.pow(coordPairB[0] - coordPairA[0], 2) + Math.pow(coordPairB[1] - coordPairA[1], 2));
 }
+
+export function moveCaretToPosition(el: HTMLInputElement, index: number) {
+    el.selectionStart = el.selectionEnd = index;
+}

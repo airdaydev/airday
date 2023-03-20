@@ -39,7 +39,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
                 <span>Open in new view</span>
             </button>
             <button disabled>
-                <span>Rename</span>
+                <span>Export</span>
             </button>
             <button disabled>
                 <span>Delete</span>

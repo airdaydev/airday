@@ -12,6 +12,8 @@
 - [x] Prevent list navigation in context menu
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new list
+- [] Rename list
+- [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
 - [] Delete lists
 - [] Add new item

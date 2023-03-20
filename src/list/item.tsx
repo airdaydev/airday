@@ -4,11 +4,7 @@ import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
 import styles from './list.module.css';
-import { distance } from './utils';
-
-function moveCaretToPosition(el: HTMLInputElement, index: number) {
-    el.selectionStart = el.selectionEnd = index;
-}
+import { distance, moveCaretToPosition } from './utils';
 
 interface ItemProps {
     listIndex: number;
@@ -28,8 +24,13 @@ export function Item(props: ItemProps) {
     const [caretPos, setCaretPos] = createSignal(0);
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
     function editModeKeyboardHandler(event: KeyboardEventInit) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            leaveEditMode(true);
+            return;
+        }
         if (event.key === 'Escape') {
             leaveEditMode(true);
+            return;
         }
     }
     function enterEditMode() {
@@ -45,6 +46,9 @@ export function Item(props: ItemProps) {
         props.keyboardShortcuts.enable();
         setEdit(false);
     }
+    /**
+     * Creates rounded corners arounded contiguous selection boundary
+     */
     function getSelectClasses() {
         const classes: Record<string, boolean> = {
             [styles['selected']]: selected(),
@@ -55,7 +59,6 @@ export function Item(props: ItemProps) {
         if (!props.selection.keys.has(props.displayList()[props.listIndex + 1]?.id)) {
             classes[styles['selected-last']] = true;
         }
-        console.log(props.item.text, selected())
         return classes;
     }
     onCleanup(() => unsubscribe());
@@ -66,7 +69,6 @@ export function Item(props: ItemProps) {
             dummyRef.textContent = textAreaRef.value;
         }
     }))
-    const isInDragSet = () => props.selection.isDragging() && props.selection.keys.has(props.item.id);
     return (
         <>
             {edit() && (
