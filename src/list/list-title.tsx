@@ -46,7 +46,7 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
             onChange={(event) => props.container[1]((prev) => {
                 return {
                     ...prev,
-                    name: event.target.value,
+                    name: event.target.value || 'Untitled',
                 }
             })}
             style={`
