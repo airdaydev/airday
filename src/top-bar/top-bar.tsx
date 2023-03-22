@@ -8,12 +8,12 @@ import ChevronDownSVG from '../icons/chevron-down.svg';
 export function TopBar() {
   return (
     <div class={styles['top-bar']}>
-        <nav>
+        <section>
             <SidebarSVG />
             <SlidersSVG />
             <CloudOffSVG />
             <SearchSVG />
-        </nav>
+        </section>
         <div style='display: flex; align-items: center;'>
           <span>Daniel</span>
           <ChevronDownSVG />

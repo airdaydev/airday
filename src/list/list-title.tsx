@@ -54,6 +54,7 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
                 font-size: 1.25rem;
                 border: none;
                 outline: none;
+                background: none;
             `}
         />
     )

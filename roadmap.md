@@ -13,8 +13,17 @@
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new container
 - [x] Rename container
+- [] Habit list = set target + smiley
+- [] Colors & tags (stickers)
+width: 1.5em;
+height: 1.5em;
+background: #cdffc6;
+border-radius: 1em;
+margin-left: auto;
+box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Resort containers
 - [] Rename container in nav bar
+- [] Status bar
 - [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
 - [] Delete containers
@@ -56,16 +65,18 @@
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Client-side encrypted sync ws server
 - [] Encryption layer
-- [] List animations
+- [] Export data (JSON, excel, markdown)
 - [] Paid web service with introductory prices
 - [] Consider license type
 - [] Add search
 - [] Custom Themes / compact mode
 - [] Add repeatable items - Maybe
-- [] Export data (JSON, excel, markdown)
-- [] Secrets
 - [] Website
 - [] Spanish (EU) localisation
 - [] Japanese localisation
 - [] Mobile native app strategy
+- [] Secrets
+- [] Lock
+- [] Multiple users
 - [] The board prototype (canvas/webgl)
+- [] List animations

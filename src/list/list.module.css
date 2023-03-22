@@ -12,7 +12,7 @@
     align-items: center;
     border-bottom: 1px solid var(--border, value);
     border-right: 1px solid var(--border, value);
-    padding-left: 0.5em;
+    padding: 0.5em;
 }
 
 .active .list-header svg {
@@ -32,7 +32,6 @@
 }
 
 .placeholder {
-    max-width: 44em;
     box-sizing: border-box;
     padding: 0.5em;
     border-radius: 3px;
@@ -44,7 +43,6 @@
 }
 
 .item {
-    max-width: 44em;
     box-sizing: border-box;
     padding: 0.5em;
     /* border-radius: 3px; */

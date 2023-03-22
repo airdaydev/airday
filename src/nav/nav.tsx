@@ -58,17 +58,19 @@ export function AcmeNav() {
     <nav class={styles.nav}>
       <div class={styles['nav-list']}>
         <button>
-          <CornerDownRightSVG />
+          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Up Next</span>
         </button>
         <button>
-          <CheckSVG />
+          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Done</span>
         </button>
       </div>
         <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
         <div style={'display: flex; justify-content: space-between; align-items: center;'}>
-          <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>Lists</h2>
+          <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>
+            Lists
+          </h2>
           <button
             style='border: none; background: none; cursor: pointer; padding: 0.5em;'
             onClick={() => {
