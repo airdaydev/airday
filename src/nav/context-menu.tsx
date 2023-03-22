@@ -3,7 +3,7 @@ import { addView } from "../view-state";
 
 interface NavItemContextMenu {
     close: () => void;
-    list: AcmeContainer;
+    container: Accessor<AcmeContainer>;
     offset: Accessor<[number, number]>;
 }
 
@@ -33,7 +33,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
             tabIndex={0}
         >
             <button onClick={() => {
-                addView(props.list.id);
+                addView(props.container().id);
                 props.close();
             }}>
                 <span>Open in new view</span>

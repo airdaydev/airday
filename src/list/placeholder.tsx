@@ -4,7 +4,7 @@ import styles from './list.module.css';
 interface PlaceholderProps {
     listIndex: number;
     selection: AcmeReactiveSelection;
-    noBg: true;
+    noBg?: true;
 }
 
 export function Placeholder(props: PlaceholderProps) {

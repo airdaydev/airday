@@ -38,6 +38,7 @@ type DisplayList = (AcmeItem | { type: 'placeholder' })[];
 export function List(props: ListProps) {
   let scrollRef: HTMLDivElement;
   const fastList = openList(props.view.containerId);
+  const container = containerModel.index.get(props.view.containerId);
   if (!fastList) throw new Error('List not found');
   const selection = new AcmeReactiveSelection();
     // A reactive means of handling list & placeholder changes on drag
@@ -116,7 +117,7 @@ export function List(props: ListProps) {
         <div class={styles['list-header']}>
           <div style={`display: flex; align-items: center;`}>
             <TodoSVG style={`margin: 0.5em;`} />
-            <EditableListTitle containerId={props.view.containerId} />
+            <EditableListTitle container={container} />
           </div>
           <button
             onClick={() => closeView(props.tabId)}

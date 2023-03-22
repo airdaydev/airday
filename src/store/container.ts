@@ -3,6 +3,11 @@ import { store, AcmeIDB, dbNotReadyMessage } from './main';
 
 export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 
+// Structure:
+// 1. signal(list of signal(items)) (sorted index)
+// 2. Set(id, signal(items)) (hashed index of live item)
+// TODO: Read https://github.com/solidjs/solid/discussions/749
+
 /**
  * Container model i.e. data bucket e.g. a list
  * Provides fast in memory store, idb persistence layer & websocket interface
@@ -11,12 +16,14 @@ export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 export class ContainerModel {
     storeName = 'container';
     acmedb: AcmeIDB | null = null;
-    accessor: Accessor<AcmeContainer[]>;
-    setter: Setter<AcmeContainer[]>;
+    ol: Accessor<Accessor<AcmeContainer>[]>;
+    setOl: Setter<Accessor<AcmeContainer>[]>;
+    index = new Map<string, Signal<AcmeContainer>>();
+    map: Map<string, AcmeContainer> = new Map();
     constructor() {
-        const signal = createSignal<AcmeContainer[]>([]);
-        this.accessor = signal[0];
-        this.setter = signal[1];
+        const signal = createSignal<Accessor<AcmeContainer>[]>([]);
+        this.ol = signal[0];
+        this.setOl = signal[1];
     }
     init = (db: AcmeIDB) => { this.acmedb = db; }
     ready() { return !!this.db; }
@@ -26,16 +33,26 @@ export class ContainerModel {
         return this.acmedb;
     }
     insert = (data: AcmeContainer | AcmeContainer[]) => {
-        // TODO: Insert into queue, then update idb
-        const list = this.setter((prev) => {
-            if (Array.isArray(data)) {
-                const arr = [...prev, ...data];
-                return arr;
-            } else {
-                const arr = [...prev, data];
-                return arr
-            }
+        // Convert to array
+        const src = Array.isArray(data) ? data : [data];
+        // Create signals
+        const newItems = src.map((item, index) => {
+            const signal = createSignal(item);
+            this.index.set(item.id, signal);
+            return signal[0];
         });
+        const newOl = [...this.ol(), ...newItems];
+        // Calc sortKeys
+        this.setOl(newOl);
+    }
+    updateName = (id: string, name: string) => {
+        const item = this.index.get(id);
+        if (item) {
+            item[1]((prev) => {
+                prev.name = name;
+                return prev;
+            });
+        }
     }
     idb_insert = async(data: AcmeContainer | AcmeContainer[]) => {
         const tx = this.db.transaction(this.storeName, 'readwrite');

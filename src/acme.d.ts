@@ -9,6 +9,7 @@ interface AcmeItem {
 interface AcmeContainer {
   id: string;
   name: string;
+  sortKey: string;
   // TODO: sortKey
   // TODO: icon
 }

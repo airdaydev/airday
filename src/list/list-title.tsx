@@ -1,10 +1,10 @@
-import { createSignal } from 'solid-js';
+import { createSignal, Signal } from 'solid-js';
 import { keyboardShortcuts } from '../keyboard';
 import { containerModel } from "../store/main";
 import { moveCaretToPosition } from './utils';
 
 interface EditableListTitleProps {
-    containerId: string;
+    container: Signal<AcmeContainer>;
 }
 
 export const EditableListTitle = (props: EditableListTitleProps) => {
@@ -42,7 +42,13 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
             autocorrect="off"
             autocapitalize="off"
             spellcheck={false}
-            value={containerModel.accessor().find((list) => list.id === props.containerId)?.name}
+            value={props.container[0]().name}
+            onChange={(event) => props.container[1]((prev) => {
+                return {
+                    ...prev,
+                    name: event.target.value,
+                }
+            })}
             style={`
                 font-family: inherit;
                 font-size: 1.25rem;

@@ -1,4 +1,4 @@
-import { For, createSignal } from 'solid-js';
+import { For, createSignal, Accessor } from 'solid-js';
 import styles from './nav.module.css';
 import { activeViewId, findActiveViewIndex, replaceView } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
@@ -9,7 +9,7 @@ import { containerModel } from '../store/main';
 import { nanoid } from 'nanoid';
 
 interface NavListItemProps {
-  list: AcmeContainer,
+  container: Accessor<AcmeContainer>,
 }
 
 // TODO: Turn off keyboard when context menu open
@@ -21,7 +21,7 @@ export function NavListItem(props: NavListItemProps) {
     <div style={`position: relative;`}>
       <button
         ref={button}
-        onClick={() => replaceView(props.list.id, findActiveViewIndex() || 0)}
+        onClick={() => replaceView(props.container().id, findActiveViewIndex() || 0)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (button) {
@@ -34,12 +34,12 @@ export function NavListItem(props: NavListItemProps) {
         }}
       >
         <TodoSVG />
-        <span>{props.list.name}</span>
+        <span>{props.container() && props.container().name}</span>
       </button>
       {ctxOpen() && (
         <NavItemContextMenu
           close={() => setCtxOpen(false)}
-          list={props.list}
+          container={props.container}
           offset={ctxOffset}
         />
       )}
@@ -59,8 +59,8 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
         <hr />
-        <For each={containerModel.accessor()}>
-          {(list) => <NavListItem list={list} />}
+        <For each={containerModel.ol()}>
+          {(container) => <NavListItem container={container} />}
         </For>
         <button onClick={() => containerModel.insert({
           id: nanoid(),

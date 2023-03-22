@@ -1,0 +1,15 @@
+/** sorting example
+ * .sort((signalA, signalB) => {
+                const a = signalA();
+                const b = signalB();
+                if (a.sortKey === b.sortKey) {
+                    if (a.id < b.id) return 1;
+                    if (a.id > b.id) return -1;
+                    // Should never collide
+                    console.warn('Collision when sorting containers by id', a, b)
+                    return 0;
+                }
+                if (a.sortKey < b.sortKey) return 1;
+                return -1;
+            });
+ */
