@@ -4,6 +4,7 @@ import { viewState } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
+import PlusSVG from '../icons/plus.svg';
 import { NavItemContextMenu } from './context-menu';
 import { containerModel } from '../store/main';
 import { nanoid } from 'nanoid';
@@ -65,18 +66,21 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
       </div>
-        <hr />
-        <div style={'display: flex; justify-content: space-between;'}>
+        <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+        <div style={'display: flex; justify-content: space-between; align-items: center;'}>
           <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>Lists</h2>
-          <button onClick={() => {
-            const id = nanoid();
-            containerModel.insert({
-              id,
-              name: 'New list',
-            });
-            viewState.replaceActiveView(id);
-          }}>
-            + New
+          <button
+            style='border: none; background: none; cursor: pointer; padding: 0.5em;'
+            onClick={() => {
+              const id = nanoid();
+              containerModel.insert({
+                id,
+                name: 'New list',
+              });
+              viewState.replaceActiveView(id);
+          }}
+          >
+            <PlusSVG style={'width: 1em; height: 1em;'} />
           </button>
         </div>
         <div class={styles['nav-list']}>
