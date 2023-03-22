@@ -1,4 +1,4 @@
-import { activeViewId } from './view-state';
+import { viewState } from './view-state';
 
 const keyName = (event: string, contextId: string) =>
     `${event}:${contextId}`;
@@ -15,7 +15,7 @@ export class KeyboardShortcuts {
                 const action = this.globalKeyboardHandler(event); // overrides
                 if (action) return;
             }
-            const currentContext = activeViewId();
+            const currentContext = viewState.activeViewId;
             if (currentContext) {
                 const handler = this.handlerMap.get(keyName('keydown', currentContext));
                 if (handler) handler(event);

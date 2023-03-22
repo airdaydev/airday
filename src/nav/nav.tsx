@@ -1,6 +1,6 @@
 import { For, createSignal, Accessor } from 'solid-js';
 import styles from './nav.module.css';
-import { activeViewId, findActiveViewIndex, replaceView } from '../view-state';
+import { viewState } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
@@ -21,7 +21,7 @@ export function NavListItem(props: NavListItemProps) {
     <div style={`position: relative;`}>
       <button
         ref={button}
-        onClick={() => replaceView(props.container().id, findActiveViewIndex() || 0)}
+        onClick={() => viewState.openContainerViewAt(props.container().id, viewState.active.index || 0)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (button) {

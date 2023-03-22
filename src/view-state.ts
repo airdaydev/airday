@@ -1,60 +1,62 @@
-import { createSignal, createUniqueId } from 'solid-js';
+import { createSignal, createUniqueId, Signal } from 'solid-js';
 
 /**
  * Views, left to right
  * State should be saved in local storage, per workspace
  */
-
-export const [activeViewId, setActiveViewId] = createSignal<string | null>(null);
-export const [views, setViews] = createSignal<AcmeView[]>([{
-    id: createUniqueId(),
-    containerId: 'inbox',
-    projection: 'list',
-}]);
-
-// TODO: Cache or index
-export function findActiveViewIndex() {
-    if (!activeViewId()) return false;
-    return views().findIndex((view) => view.id === activeViewId());
-}
-
-/**
- * Open list at specified index
- */
-export function replaceView(containerId: string, index: number = 0) {
-    const newView: AcmeView = {
-        id: createUniqueId(),
-        containerId,
-        projection: 'list',
-    };
-    setViews((prev: AcmeView[]) => {
-        const next = [...prev];
-        next[index] = newView;
-        return next;
-    });
-    setActiveViewId(newView.id);
-}
-
-/**
- * Open list at specified index
- */
-export function closeView(index: number) {
-    return setViews((prev: AcmeView[]) => {
-        prev.splice(index, 1);
-        return [...prev];
-    });
-}
-
-export function addView(containerId: string) {
-    // TODO: Allow 100 horizontal lists
-    if (views.length > 8) return;
-    const view: AcmeView = {
-        // TODO: Detect clash / or how does this lib work
-        id: createUniqueId(),
-        containerId,
-        projection: 'list',
+class ViewState {
+    list = createSignal<Signal<AcmeView>[]>([]);
+    activeViewId: string | undefined;
+    constructor() {
+        if (!this.list[0]().length) {
+            this.addContainerView('inbox');
+        }
     }
-    return setViews((prev) => {
-        return [...prev, view];
-    })
+    get active() {
+        const index = this.list[0]().findIndex((view) => view[0]().id === this.activeViewId);
+        return {
+            signal: this.list[0]()[index],
+            index: index < 0 ? 0 : index,
+        };
+    }
+    openContainerViewAt(containerId: string, index: number = 0) {
+        const newView = createSignal<AcmeView>({
+            id: createUniqueId(),
+            containerId,
+            projection: 'list',
+        });
+        const [list, setList] = this.list;
+        setList((prev) => {
+            const next = [...prev];
+            next[index] = newView;
+            return next;
+        });
+        this.activeViewId = newView[0]().id;
+    }
+    closeView(index: number) {
+        // TODO: if active view, remove active view (does it matter?)
+        const [list, setList] = this.list;
+        const view = list()[index][0]().id;
+        if (!view) return;
+        return setList((prev) => {
+            prev.splice(index, 1);
+            return [...prev];
+        });
+    }
+    addContainerView(containerId: string) {
+        // TODO: Allow more lists
+        if (this.list[0]().length > 8) return;
+        const view = createSignal<AcmeView>({
+            // TODO: Detect clash / or how does this lib work
+            id: createUniqueId(),
+            containerId,
+            projection: 'list',
+        });
+        const [list, setList] = this.list;
+        return setList((prev) => {
+            return [...prev, view];
+        })
+    }
 }
+
+export const viewState = new ViewState();

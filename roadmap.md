@@ -11,11 +11,13 @@
 - [x] Prevent list navigation on edit mode
 - [x] Prevent list navigation in context menu
 - [x] Context menu for list (at mouse cursor)
-- [x] Add new list
-- [] Rename list
+- [x] Add new container
+- [x] Rename container
+- [] Resort containers
+- [] Rename container in nav bar
 - [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
-- [] Delete lists
+- [] Delete containers
 - [] Add new item
 - [] Dark mode
 - [] Multi-select & reorder lists
@@ -37,7 +39,6 @@
 - [] Allow dropping items in nav bar list
 - [] Allow dropping items between open lists directly
 - [] Highlight active list in nav
-- [] Edit list name in list view
 - [] Change list icons
 - [] Drag stack make it nice
 - [] Context menu for one item

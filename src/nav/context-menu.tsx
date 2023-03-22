@@ -1,5 +1,5 @@
 import { Accessor, onCleanup } from "solid-js";
-import { addView } from "../view-state";
+import { viewState } from "../view-state";
 
 interface NavItemContextMenu {
     close: () => void;
@@ -33,7 +33,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
             tabIndex={0}
         >
             <button onClick={() => {
-                addView(props.container().id);
+                viewState.addContainerView(props.container().id);
                 props.close();
             }}>
                 <span>Open in new view</span>

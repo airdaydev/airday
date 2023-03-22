@@ -11,7 +11,7 @@ import { containerModel, store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
-import { activeViewId, closeView, setActiveViewId } from '../view-state';
+import { viewState } from '../view-state';
 import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
 import { EditableListTitle } from './list-title';
@@ -72,7 +72,7 @@ export function List(props: ListProps) {
    * Handles drops from same or foreign display list
    */
   function handleDrop() {
-    setActiveViewId(props.view.id);
+    viewState.activeViewId = props.view.id;
     const ltIndex = globalLastDisplayIndex;
     const dl = displayList();
     if (selection.globalIsDragging() && typeof ltIndex === 'number' && dragOriginSelection && dragOriginList) {
@@ -106,11 +106,11 @@ export function List(props: ListProps) {
       <section
         classList={{
           [styles.list]: true,
-          [styles.active]: activeViewId() === props.view.id,
+          [styles.active]: viewState.activeViewId === props.view.id,
         }}
         tabIndex={props.tabId}
-        onFocus={() => setActiveViewId(props.view.id)}
-        onClick={() => setActiveViewId(props.view.id)}
+        onFocus={() => { viewState.activeViewId = props.view.id }}
+        onClick={() => { viewState.activeViewId = props.view.id }}
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >
@@ -120,7 +120,7 @@ export function List(props: ListProps) {
             <EditableListTitle container={container} />
           </div>
           <button
-            onClick={() => closeView(props.tabId)}
+            onClick={() => viewState.closeView(props.tabId)}
             style={`border: none; background: none; cursor: pointer;`}
           >
             <XSVG />
