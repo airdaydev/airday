@@ -15,7 +15,7 @@ export class KeyboardShortcuts {
                 const action = this.globalKeyboardHandler(event); // overrides
                 if (action) return;
             }
-            const currentContext = viewState.activeViewId;
+            const currentContext = viewState.activeViewId();
             if (currentContext) {
                 const handler = this.handlerMap.get(keyName('keydown', currentContext));
                 if (handler) handler(event);

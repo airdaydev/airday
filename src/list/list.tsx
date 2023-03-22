@@ -72,7 +72,7 @@ export function List(props: ListProps) {
    * Handles drops from same or foreign display list
    */
   function handleDrop() {
-    viewState.activeViewId = props.view.id;
+    viewState.setActiveViewId(props.view.id);
     const ltIndex = globalLastDisplayIndex;
     const dl = displayList();
     if (selection.globalIsDragging() && typeof ltIndex === 'number' && dragOriginSelection && dragOriginList) {
@@ -106,11 +106,11 @@ export function List(props: ListProps) {
       <section
         classList={{
           [styles.list]: true,
-          [styles.active]: viewState.activeViewId === props.view.id,
+          [styles.active]: viewState.activeViewId() === props.view.id,
         }}
         tabIndex={props.tabId}
-        onFocus={() => { viewState.activeViewId = props.view.id }}
-        onClick={() => { viewState.activeViewId = props.view.id }}
+        onFocus={() => { viewState.setActiveViewId(props.view.id) }}
+        onClick={() => { viewState.setActiveViewId(props.view.id) }}
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >

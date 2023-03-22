@@ -1,30 +1,43 @@
-import { createSignal, createUniqueId, Signal } from 'solid-js';
+import {
+    createSignal, createUniqueId, Signal,
+    Accessor, Setter,
+} from 'solid-js';
 
 /**
  * Views, left to right
  * State should be saved in local storage, per workspace
  */
 class ViewState {
+    activeViewId: Accessor<string | undefined>;
+    setActiveViewId: Setter<string | undefined>;
     list = createSignal<Signal<AcmeView>[]>([]);
-    activeViewId: string | undefined;
     constructor() {
+        const activeView = createSignal<string>();
+        this.activeViewId = activeView[0];
+        this.setActiveViewId = activeView[1];
         if (!this.list[0]().length) {
             this.addContainerView('inbox');
         }
     }
     get active() {
-        const index = this.list[0]().findIndex((view) => view[0]().id === this.activeViewId);
+        const index = this.list[0]().findIndex((view) => view[0]().id === this.activeViewId());
         return {
             signal: this.list[0]()[index],
             index: index < 0 ? 0 : index,
         };
     }
+    isContainerActive(containerId: string) {
+        const activeContainer = this.list[0]().find((view) => view[0]().id === this.activeViewId());
+        if (!activeContainer) return false;
+        return activeContainer[0]().containerId === containerId;
+    }
     replaceActiveView(containerId: string) {
         this.openContainerViewAt(containerId, viewState.active.index || 0);
     }
-    openContainerViewAt(containerId: string, index: number = 0) {
+    openContainerViewAt = (containerId: string, index: number = 0) => {
+        const id = createUniqueId(); // TODO: How does uniqueness work here
         const newView = createSignal<AcmeContainerView>({
-            id: createUniqueId(),
+            id,
             type: 'container',
             containerId,
             projection: 'list',
@@ -35,7 +48,7 @@ class ViewState {
             next[index] = newView;
             return next;
         });
-        this.activeViewId = newView[0]().id;
+        this.setActiveViewId(id);
     }
     closeView(index: number) {
         // TODO: if active view, remove active view (does it matter?)
@@ -47,16 +60,18 @@ class ViewState {
             return [...prev];
         });
     }
-    addContainerView(containerId: string) {
+    addContainerView = (containerId: string) => {
         // TODO: Allow more lists
         if (this.list[0]().length > 8) return;
+        const id = createUniqueId();
         const view = createSignal<AcmeContainerView>({
             // TODO: Detect clash / or how does this lib work
-            id: createUniqueId(),
+            id,
             type: 'container',
             containerId,
             projection: 'list',
         });
+        this.setActiveViewId(id);
         const [list, setList] = this.list;
         return setList((prev) => {
             return [...prev, view];

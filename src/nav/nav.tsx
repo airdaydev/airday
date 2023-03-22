@@ -20,6 +20,9 @@ export function NavListItem(props: NavListItemProps) {
   return (
     <div style={`position: relative;`}>
       <button
+        classList={{
+          [styles.active]: viewState.isContainerActive(props.container().id),
+        }}
         ref={button}
         onClick={() => viewState.replaceActiveView(props.container().id)}
         onContextMenu={(event: MouseEvent) => {
@@ -34,7 +37,9 @@ export function NavListItem(props: NavListItemProps) {
         }}
       >
         <TodoSVG style={`display: block;flex-shrink: 0;`} />
-        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap;'>{props.container() && props.container().name}</span>
+        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap;'>
+          {props.container() && props.container().name}
+        </span>
       </button>
       {ctxOpen() && (
         <NavItemContextMenu
@@ -50,6 +55,7 @@ export function NavListItem(props: NavListItemProps) {
 export function AcmeNav() {
   return (
     <nav class={styles.nav}>
+      <div class={styles['nav-list']}>
         <button>
           <CornerDownRightSVG />
           <span>Up Next</span>
@@ -58,20 +64,26 @@ export function AcmeNav() {
           <CheckSVG />
           <span>Done</span>
         </button>
+      </div>
         <hr />
-        <For each={containerModel.ol()}>
-          {(container) => <NavListItem container={container} />}
-        </For>
-        <button onClick={() => {
-          const id = nanoid();
-          containerModel.insert({
-            id,
-            name: 'New list',
-          });
-          viewState.replaceActiveView(id);
-        }}>
-          + Create new list
-        </button>
+        <div style={'display: flex; justify-content: space-between;'}>
+          <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>Lists</h2>
+          <button onClick={() => {
+            const id = nanoid();
+            containerModel.insert({
+              id,
+              name: 'New list',
+            });
+            viewState.replaceActiveView(id);
+          }}>
+            + New
+          </button>
+        </div>
+        <div class={styles['nav-list']}>
+          <For each={containerModel.ol()}>
+            {(container) => <NavListItem container={container} />}
+          </For>
+        </div>
     </nav>
   );
 }

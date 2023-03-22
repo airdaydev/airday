@@ -6,7 +6,7 @@
     border-right: 1px solid var(--border, value);
 }
 
-.nav button {
+.nav-list button {
     position: relative;
     display: flex;
     align-items: center;
@@ -20,6 +20,10 @@
     cursor: pointer;
     margin: 0;
     line-height: 1em;
+}
+
+.nav-list button.active {
+    background: var(--border, value);
 }
 
 .nav button span {
