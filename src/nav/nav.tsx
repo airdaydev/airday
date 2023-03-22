@@ -21,7 +21,7 @@ export function NavListItem(props: NavListItemProps) {
     <div style={`position: relative;`}>
       <button
         ref={button}
-        onClick={() => viewState.openContainerViewAt(props.container().id, viewState.active.index || 0)}
+        onClick={() => viewState.replaceActiveView(props.container().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (button) {
@@ -33,8 +33,8 @@ export function NavListItem(props: NavListItemProps) {
           }
         }}
       >
-        <TodoSVG />
-        <span>{props.container() && props.container().name}</span>
+        <TodoSVG style={`display: block;flex-shrink: 0;`} />
+        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap;'>{props.container() && props.container().name}</span>
       </button>
       {ctxOpen() && (
         <NavItemContextMenu
@@ -62,10 +62,14 @@ export function AcmeNav() {
         <For each={containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
         </For>
-        <button onClick={() => containerModel.insert({
-          id: nanoid(),
-          name: 'New list',
-        })}>
+        <button onClick={() => {
+          const id = nanoid();
+          containerModel.insert({
+            id,
+            name: 'New list',
+          });
+          viewState.replaceActiveView(id);
+        }}>
           + Create new list
         </button>
     </nav>

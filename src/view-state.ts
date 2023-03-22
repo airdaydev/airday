@@ -19,9 +19,13 @@ class ViewState {
             index: index < 0 ? 0 : index,
         };
     }
+    replaceActiveView(containerId: string) {
+        this.openContainerViewAt(containerId, viewState.active.index || 0);
+    }
     openContainerViewAt(containerId: string, index: number = 0) {
-        const newView = createSignal<AcmeView>({
+        const newView = createSignal<AcmeContainerView>({
             id: createUniqueId(),
+            type: 'container',
             containerId,
             projection: 'list',
         });
@@ -46,9 +50,10 @@ class ViewState {
     addContainerView(containerId: string) {
         // TODO: Allow more lists
         if (this.list[0]().length > 8) return;
-        const view = createSignal<AcmeView>({
+        const view = createSignal<AcmeContainerView>({
             // TODO: Detect clash / or how does this lib work
             id: createUniqueId(),
+            type: 'container',
             containerId,
             projection: 'list',
         });

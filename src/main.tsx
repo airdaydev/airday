@@ -23,7 +23,7 @@ await containerModel.insert([
   },
   {
     id: 'empty-list',
-    name: 'Empty List',
+    name: 'a really really long named list',
   },
 ]);
 

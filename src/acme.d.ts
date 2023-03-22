@@ -25,8 +25,15 @@ type ListDirection = 'next' | 'prev';
 
 type OrderedKey = [string, string, string];
 
-interface AcmeView {
+interface AcmeViewBase {
   id: string;
+  type: 'upNext' | 'container' | 'done';
+}
+
+interface AcmeContainerView extends AcmeViewBase {
   containerId: string;
+  type: 'container';
   projection: 'list' | 'kanban';
 }
+
+type AcmeView = AcmeContainerView;
