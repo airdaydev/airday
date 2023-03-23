@@ -62,7 +62,7 @@ export const DragStack = ({ size }: DragStackProps) => {
                     position: relative;
                     background: #eee;
                     width: 12em;
-                    height: 10em;
+                    height: 4em;
                     z-index: 100;
                     top: -100%;
                     left: -100%;

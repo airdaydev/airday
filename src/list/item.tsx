@@ -77,7 +77,6 @@ export function Item(props: ItemProps) {
                     style={`
                     min-height: 4em;
                     position: relative;
-                    max-width: 44em;
                     box-sizing: border-box;
                     padding: 0.5em;
                     border-radius: 3px;

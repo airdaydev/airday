@@ -13,7 +13,7 @@
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new container
 - [x] Rename container
-- [] Habit list = set target + smiley
+- [] Habit items = set target + smiley, Amalgamated Habit list with sorting (worst/best)
 - [] Colors & tags (stickers)
 width: 1.5em;
 height: 1.5em;

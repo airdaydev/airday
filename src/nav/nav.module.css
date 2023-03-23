@@ -4,6 +4,7 @@
     width: 14em;
     padding: 0.5em;
     border-right: 1px solid var(--border, value);
+    background: var(--shade, value);
 }
 
 .nav-list button {

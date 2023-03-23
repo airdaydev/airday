@@ -4,7 +4,7 @@ import { viewState } from '../view-state';
 import TodoSVG from '../icons/todo.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
-import PlusSVG from '../icons/plus.svg';
+import ChevronDownSVG from '../icons/chevron-down.svg';
 import { NavItemContextMenu } from './context-menu';
 import { containerModel } from '../store/main';
 import { nanoid } from 'nanoid';
@@ -37,7 +37,7 @@ export function NavListItem(props: NavListItemProps) {
           }
         }}
       >
-        <TodoSVG style={`display: block;flex-shrink: 0;`} />
+        <TodoSVG style={`display: block;flex-shrink: 0;height: 1.25rem;width: 1.25rem;`} />
         <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap;'>
           {props.container() && props.container().name}
         </span>
@@ -67,12 +67,15 @@ export function AcmeNav() {
         </button>
       </div>
         <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
-        <div style={'display: flex; justify-content: space-between; align-items: center;'}>
-          <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>
-            Lists
-          </h2>
+        <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>
+          Lists
+        </h2>
+        <div class={styles['nav-list']}>
+          <For each={containerModel.ol()}>
+            {(container) => <NavListItem container={container} />}
+          </For>
           <button
-            style='border: none; background: none; cursor: pointer; padding: 0.5em;'
+            style='border: none; background: none; cursor: pointer; padding: 0.5em; color: #888;'
             onClick={() => {
               const id = nanoid();
               containerModel.insert({
@@ -82,13 +85,19 @@ export function AcmeNav() {
               viewState.replaceActiveView(id);
           }}
           >
-            <PlusSVG style={'width: 1em; height: 1em;'} />
+            Add list...
           </button>
         </div>
-        <div class={styles['nav-list']}>
-          <For each={containerModel.ol()}>
-            {(container) => <NavListItem container={container} />}
-          </For>
+        <hr style="margin-top: auto;width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+        <div style={`
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.5em 1em;
+          border-radius: 5px;
+        `}>
+          <span>Daniel's Space</span>
+          <ChevronDownSVG style='width: 1em;' />
         </div>
     </nav>
   );

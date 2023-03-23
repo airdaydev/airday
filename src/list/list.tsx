@@ -116,14 +116,14 @@ export function List(props: ListProps) {
       >
         <div class={styles['list-header']}>
           <div style={`display: flex; align-items: center;`}>
-            <TodoSVG style={`margin: 0.5em;`} />
+            <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
             <EditableListTitle container={container} />
           </div>
           <button
             onClick={() => viewState.closeView(props.tabId)}
             style={`border: none; background: none; cursor: pointer;`}
           >
-            <XSVG />
+            <XSVG style={'width: 1.25em; stroke-width: 1.25px;'} />
           </button>
         </div>
         <div ref={scrollRef} class={styles['list-scroll']}>
