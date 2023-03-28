@@ -7,7 +7,7 @@ import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
 import { NavItemContextMenu } from './context-menu';
 import { containerModel } from '../store/main';
-import { nanoid } from 'nanoid';
+import { AddListButton } from './add-list';
 
 interface NavListItemProps {
   container: Accessor<AcmeContainer>,
@@ -54,8 +54,11 @@ export function NavListItem(props: NavListItemProps) {
 }
 
 export function AcmeNav() {
+  const [ sidebarVisible ] = viewState.sidebarVisible;
   return (
-    <nav class={styles.nav}>
+    <nav class={styles.nav} style={{
+      'margin-left': sidebarVisible() ? '-210px' : '0',
+    }}>
       <div class={styles['nav-list']}>
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
@@ -74,27 +77,16 @@ export function AcmeNav() {
           <For each={containerModel.ol()}>
             {(container) => <NavListItem container={container} />}
           </For>
-          <button
-            style='border: none; background: none; cursor: pointer; padding: 0.5em; color: #888;'
-            onClick={() => {
-              const id = nanoid();
-              containerModel.insert({
-                id,
-                name: 'New list',
-              });
-              viewState.replaceActiveView(id);
-          }}
-          >
-            Add list...
-          </button>
+          <AddListButton />
         </div>
-        <hr style="margin-top: auto;width: 100%; border: none; border-top: 1px solid var(--border, value);" />
         <div style={`
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0.5em 1em;
           border-radius: 5px;
+          margin-top: auto;
+          border: 1px solid #ccc;
         `}>
           <span>Daniel's Space</span>
           <ChevronDownSVG style='width: 1em;' />

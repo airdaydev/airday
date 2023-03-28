@@ -4,7 +4,7 @@
     width: 14em;
     padding: 0.5em;
     border-right: 1px solid var(--border, value);
-    background: var(--shade, value);
+    transition: all 0.1s;
 }
 
 .nav-list button {

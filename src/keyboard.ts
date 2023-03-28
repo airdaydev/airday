@@ -23,6 +23,9 @@ export class KeyboardShortcuts {
         });
     }
     globalKeyboardHandler(event: KeyboardEvent) {
+        if (event.key === 's') {
+            viewState.sidebarVisible[1]((prev) => !prev);
+        }
         return false;
     }
     registerHandler(event: string, contextId: string, handler: (event: KeyboardEvent) => void) {

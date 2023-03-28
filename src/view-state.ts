@@ -10,6 +10,7 @@ import {
 class ViewState {
     activeViewId: Accessor<string | undefined>;
     setActiveViewId: Setter<string | undefined>;
+    sidebarVisible = createSignal<boolean>(true);
     list = createSignal<Signal<AcmeView>[]>([]);
     constructor() {
         const activeView = createSignal<string>();
