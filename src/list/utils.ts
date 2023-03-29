@@ -22,5 +22,6 @@ export function distance(coordPairA: [number, number], coordPairB: [number, numb
 }
 
 export function moveCaretToPosition(el: HTMLInputElement, index: number) {
-    el.selectionStart = el.selectionEnd = index;
+    el.selectionStart = index;
+    el.selectionEnd = index;
 }

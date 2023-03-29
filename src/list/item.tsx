@@ -1,4 +1,7 @@
-import { createSignal, createEffect, onCleanup, on, Accessor } from 'solid-js';
+import {
+    createSignal, createEffect, onCleanup, on, Accessor,
+    onMount,
+} from 'solid-js';
 import { AcmeReactiveSelection, globalLastDisplayIndex } from './selection';
 import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
@@ -71,12 +74,19 @@ export function Item(props: ItemProps) {
     }
     onCleanup(() => unsubscribe());
     createEffect(on([edit], () => {
+        // TODO: Don't run on start?
+        console.log('wtf', textAreaRef, dummyRef)
         if (textAreaRef && dummyRef) {
             textAreaRef.focus();
             moveCaretToPosition(textAreaRef, caretPos());
             dummyRef.textContent = textAreaRef.value;
         }
     }))
+    onMount(() => {
+        if (props.item.open === true) {
+            enterEditMode();
+        }
+    })
     return (
         <>
             {edit() && (

@@ -68,11 +68,11 @@ export class FastList {
     }
     // no persistence add
     // todo: performance optimisation, add to sorted list
-    add(items: AcmeItem[], at: string | null) {
+    add(items: AcmeItem[], at: string | number | null) {
         const l = this.signal();
-        const index = l.findIndex((item) => item.id === at);
+        const index = typeof at === 'number' ? at : l.findIndex((item) => item.id === at);
         l.splice(index + 1, 0, ...items);
-        this.setSignal(l);
+        this.setSignal([...l]);
     }
     updateItemContents(id: string, newText: string) {
         // TODO: Move item

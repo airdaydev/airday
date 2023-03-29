@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid';
 import { FastList } from '../store/fast-list';
 import { AcmeReactiveSelection } from './selection';
 import { jumpToElIfOutsideView } from './utils.js';
@@ -14,6 +15,22 @@ export const getListKeyboardHandler = ({
     scrollRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
     const list = fastList.signal();
+    if (event.key === 'n') {
+      // TODO: Find position:
+      // find active list (or first list)
+      // find item below currently selected item (and jump to it)
+      const firstSelected = fastList.getFirstIndexOfSet(selection.keys);
+      const position = firstSelected ? firstSelected - 1 : 0;
+      console.log(firstSelected, position)
+      fastList.add([{
+          id: nanoid(),
+          listId: fastList.listId,
+          text: 'nuttin',
+          dateCreated: new Date().toISOString(),
+          open: true,
+      }], position);
+      // TODO: Create item
+    }
     if (event.key === 'a' && event.metaKey) {
         event.preventDefault();
         const allKeys = list.map((item) => item.id);

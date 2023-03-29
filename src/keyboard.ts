@@ -1,3 +1,5 @@
+import { nanoid } from 'nanoid';
+import { openList } from './store/fast-list';
 import { viewState } from './view-state';
 
 const keyName = (event: string, contextId: string) =>
@@ -25,10 +27,6 @@ export class KeyboardShortcuts {
     globalKeyboardHandler(event: KeyboardEvent) {
         if (event.key === 's') {
             viewState.sidebarVisible[1]((prev) => !prev);
-        }
-        if (event.key === 'n') {
-            // find active list (or first list)
-            // find item below currently selected item (and jump to it)
         }
         return false;
     }
