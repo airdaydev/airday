@@ -26,6 +26,10 @@ export class KeyboardShortcuts {
         if (event.key === 's') {
             viewState.sidebarVisible[1]((prev) => !prev);
         }
+        if (event.key === 'n') {
+            // find active list (or first list)
+            // find item below currently selected item (and jump to it)
+        }
         return false;
     }
     registerHandler(event: string, contextId: string, handler: (event: KeyboardEvent) => void) {

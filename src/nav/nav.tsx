@@ -55,10 +55,16 @@ export function NavListItem(props: NavListItemProps) {
 
 export function AcmeNav() {
   const [ sidebarVisible ] = viewState.sidebarVisible;
+  let ref: HTMLDivElement | undefined = undefined;
+  const getMargin = () => sidebarVisible() ? '0' : `-${ref ? ref.getBoundingClientRect().width : 0}px`;
   return (
-    <nav class={styles.nav} style={{
-      'margin-left': sidebarVisible() ? '0' : '-210px',
-    }}>
+    <nav
+      class={styles.nav}
+      ref={ref}
+      style={{
+        'margin-left': getMargin(),
+      }}
+    >
       <div class={styles['nav-list']}>
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />

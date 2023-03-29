@@ -13,6 +13,7 @@
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new container
 - [x] Rename container
+- [] Add new item
 - [] Habit items = set target + smiley, Amalgamated Habit list with sorting (worst/best)
 - [] Colors & tags (stickers)
 width: 1.5em;
@@ -27,7 +28,6 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
 - [] Delete containers
-- [] Add new item
 - [] Dark mode
 - [] Multi-select & reorder lists
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift

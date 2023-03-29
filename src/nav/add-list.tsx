@@ -40,12 +40,12 @@ export const AddListButton = () => {
     createEffect(on([editing], () => {
         if (inputRef) { inputRef.focus(); }
     }))
-    // if editing, turn off keyboard handler
+    // TODO: handle outside click
     return (
         <>
         {editing() ? (
             <input
-                style='border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0;'
+                style='border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;'
                 type="text"
                 placeholder="New list"
                 ref={inputRef}
