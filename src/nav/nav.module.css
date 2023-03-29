@@ -34,3 +34,11 @@
 .nav button:hover {
     background: #BDD4FF;
 }
+
+.add-list-button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0.5em;
+    color: #888;
+}

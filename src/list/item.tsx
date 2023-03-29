@@ -33,10 +33,16 @@ export function Item(props: ItemProps) {
             return;
         }
     }
+    const clickOutside = (event: MouseEvent) => {
+        if (!containerRef?.contains(event.target)) {
+            leaveEditMode(true);
+        }
+    }
     function enterEditMode() {
         props.keyboardShortcuts.disable();
         props.selection.clear();
         setEdit(true);
+        window.addEventListener('mousedown', clickOutside);
     }
     function leaveEditMode(save?: boolean) {
         if (save) {
@@ -45,7 +51,9 @@ export function Item(props: ItemProps) {
         }
         props.keyboardShortcuts.enable();
         setEdit(false);
+        window.removeEventListener('mousedown', clickOutside)
     }
+    
     /**
      * Creates rounded corners arounded contiguous selection boundary
      */

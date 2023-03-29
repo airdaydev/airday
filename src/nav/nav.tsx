@@ -57,7 +57,7 @@ export function AcmeNav() {
   const [ sidebarVisible ] = viewState.sidebarVisible;
   return (
     <nav class={styles.nav} style={{
-      'margin-left': sidebarVisible() ? '-210px' : '0',
+      'margin-left': sidebarVisible() ? '0' : '-210px',
     }}>
       <div class={styles['nav-list']}>
         <button>
@@ -88,7 +88,7 @@ export function AcmeNav() {
           margin-top: auto;
           border: 1px solid #ccc;
         `}>
-          <span>Daniel's Space</span>
+          <span>Personal</span>
           <ChevronDownSVG style='width: 1em;' />
         </div>
     </nav>

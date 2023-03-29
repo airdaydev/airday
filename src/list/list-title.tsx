@@ -32,7 +32,7 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
     }
     // prevent keyboard shortcuts when in edit mode
     // no renaming Inbox (i.e. special container attr - or literally by name)
-    // explicit blur behaviour (window.addEventListener, is element target or does it contain it?)
+    // TODO: explicit blur behaviour (window.addEventListener, is element target or does it contain it?)
     return (
         <input
             ref={inputRef}
