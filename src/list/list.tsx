@@ -126,7 +126,21 @@ export function List(props: ListProps) {
             <XSVG style={'width: 1.25em; stroke-width: 1.25px;'} />
           </button>
         </div>
-        <div ref={scrollRef} class={styles['list-scroll']}>
+        <div
+          ref={scrollRef}
+          class={styles['list-scroll']}
+          onMouseEnter={(event) => {
+            const target = event.target;
+            // Are we in the blank space below all items?
+            // TODO: Or are there 0 items?
+            const lastChild = target.lastElementChild;
+            if (!lastChild) return;
+            const bbox = lastChild.getBoundingClientRect();
+            if (event.clientY > bbox.bottom) {
+              selection.setLastTouchedIndex(displayList().length)
+            }
+          }}
+        >
           {displayList().length ? (
             <For each={displayList()}>
               {(item, index) => (

@@ -31,7 +31,6 @@ export let dragOriginList: string | null = null; // TODO: move to Selection or h
  */
 export class FastList {
     listId: string;
-    list: AcmeItem[] = [];
     signal: Accessor<AcmeItem[]>;
     setSignal: Setter<AcmeItem[]>;
     constructor(listId: string) {
