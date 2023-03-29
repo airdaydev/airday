@@ -48,9 +48,11 @@ export function Item(props: ItemProps) {
         window.addEventListener('mousedown', clickOutside);
     }
     function leaveEditMode(save?: boolean) {
+        // Delete if new item
         if (save) {
             // optimistically update fastList, then idb
             props.fastList.updateItemContents(props.item.id, textAreaRef.value);
+            props.fastList.updateItem(props.item.id, { open: false })
         }
         props.keyboardShortcuts.enable();
         setEdit(false);
@@ -74,8 +76,6 @@ export function Item(props: ItemProps) {
     }
     onCleanup(() => unsubscribe());
     createEffect(on([edit], () => {
-        // TODO: Don't run on start?
-        console.log('wtf', textAreaRef, dummyRef)
         if (textAreaRef && dummyRef) {
             textAreaRef.focus();
             moveCaretToPosition(textAreaRef, caretPos());
