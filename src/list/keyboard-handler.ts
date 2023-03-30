@@ -16,16 +16,16 @@ export const getListKeyboardHandler = ({
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
     const list = fastList.signal();
     if (event.key === 'n') {
+      event.preventDefault();
       // TODO: Find position:
       // find active list (or first list)
       // find item below currently selected item (and jump to it)
       const firstSelected = fastList.getFirstIndexOfSet(selection.keys);
-      const position = firstSelected ? firstSelected - 1 : 0;
-      console.log(firstSelected, position)
+      const position = firstSelected ? firstSelected : 0;
       fastList.add([{
           id: nanoid(),
           listId: fastList.listId,
-          text: 'nuttin',
+          text: '',
           dateCreated: new Date().toISOString(),
           open: true,
       }], position);

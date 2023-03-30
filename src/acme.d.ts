@@ -6,6 +6,14 @@ interface AcmeItem {
   listId: string;
 }
 
+interface AcmeItemDone {
+  id: string;
+  text: string;
+  dateCreated: string;
+  dateCompleted: number;
+  listId: string;
+}
+
 interface AcmeContainer {
   id: string;
   name: string;

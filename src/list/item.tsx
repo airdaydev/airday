@@ -20,6 +20,7 @@ interface ItemProps {
 }
 
 export function Item(props: ItemProps) {
+    let editContainer: HTMLDivElement | undefined;
     let containerRef: HTMLDivElement | undefined;
     let dummyRef: HTMLDivElement | undefined;
     let textAreaRef: HTMLInputElement | undefined;
@@ -37,7 +38,7 @@ export function Item(props: ItemProps) {
         }
     }
     const clickOutside = (event: MouseEvent) => {
-        if (!containerRef?.contains(event.target)) {
+        if (!editContainer?.contains(event.target)) {
             leaveEditMode(true);
         }
     }
@@ -91,9 +92,10 @@ export function Item(props: ItemProps) {
         <>
             {edit() && (
                 <div
+                    ref={editContainer}
                     onKeyDown={editModeKeyboardHandler}
                     style={`
-                    min-height: 4em;
+                    min-height: 3.5em;
                     position: relative;
                     box-sizing: border-box;
                     padding: 0.5em;
@@ -166,6 +168,7 @@ export function Item(props: ItemProps) {
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onMouseDown={(event: MouseEvent) => {
+                        if (event.button === 2) return; // context click behaviour
                         event.preventDefault(); // prevents selection on Safari
                         if (event.metaKey) {
                             props.selection.toggleKey(props.item.id);
@@ -223,13 +226,22 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <div class={styles['check']}></div>
+                    <button
+                        class={styles['check']}
+                        onClick={(event) => {
+                            console.log('yo');
+                        }}
+                        onMouseDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                        onDblClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                    ></button>
                     <div>
                         <div>{props.item.text}</div>
-                        <div style={`color: #ccc;`}>
-                            2m
-                            <span>#{props.listIndex}</span>
-                        </div>
                     </div>
                 </div>
             )}

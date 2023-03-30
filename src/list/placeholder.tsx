@@ -19,7 +19,6 @@ export function Placeholder(props: PlaceholderProps) {
             }}
         >
             <div style={`color: #ccc;`}>
-                <span>#{props.listIndex}</span>
             </div>
         </div>
     )

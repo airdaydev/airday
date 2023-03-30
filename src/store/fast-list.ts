@@ -96,6 +96,14 @@ export class FastList {
         });
         // TODO: Update idb
     }
+    completeItem(id: string) {
+        // const index = this.signal().findIndex((item) => item.id === id);
+        // if (index === -1) return console.error('updateItemContents() index not found');
+        // this.setSignal((prev) => {
+        //     Object.assign(prev[index], attrs)
+        //     return prev;
+        // });
+    }
     // Track updates, potentially batched
     onUpdate(type: string, items: AcmeItem[]) {
         if (type === 'add') {

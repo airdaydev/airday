@@ -3,6 +3,8 @@ import {
   createEffect,
 } from 'solid-js';
 import TodoSVG from '../icons/todo.svg';
+import PlusSVG from '../icons/plus.svg';
+import MoreSVG from '../icons/more-horizontal.svg';
 import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
@@ -119,12 +121,20 @@ export function List(props: ListProps) {
             <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
             <EditableListTitle container={container} />
           </div>
-          <button
-            onClick={() => viewState.closeView(props.tabId)}
-            style={`border: none; background: none; cursor: pointer;`}
-          >
-            <XSVG style={'width: 1.25em; stroke-width: 1.25px;'} />
-          </button>
+          <div>
+            <button class={styles['list-button']}>
+              <MoreSVG />
+            </button>
+            <button class={styles['list-button']}>
+              <PlusSVG />
+            </button>
+            <button
+              class={styles['list-button']}
+              onClick={() => viewState.closeView(props.tabId)}
+            >
+              <XSVG />
+            </button>
+          </div>
         </div>
         <div
           ref={scrollRef}

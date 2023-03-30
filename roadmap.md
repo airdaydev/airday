@@ -14,6 +14,8 @@
 - [x] Add new container
 - [x] Rename container
 - [] Add new item
+- [] Ability to mark items as done (chronological story for past events)
+- [] Add entire history of Done items
 - [] Habit items = set target + smiley, Amalgamated Habit list with sorting (worst/best)
 - [] Colors & tags (stickers)
 width: 1.5em;
@@ -22,12 +24,12 @@ background: #cdffc6;
 border-radius: 1em;
 margin-left: auto;
 box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
+- [] Delete containers
 - [] Resort containers
 - [] Rename container in nav bar
 - [] Status bar
 - [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
-- [] Delete containers
 - [] Dark mode
 - [] Multi-select & reorder lists
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
@@ -52,8 +54,6 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Drag stack make it nice
 - [] Context menu for one item
 - [] Context menu for many items
-- [] Ability to mark items as done (chronological story for past events)
-- [] Add entire history of Done items
 - [] Add now playing list, allow dragging items to now playing list
 - [] Up Next board
 - [] Trash concept

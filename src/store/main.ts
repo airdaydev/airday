@@ -16,7 +16,8 @@ export const dbNotReadyMessage = 'DB not loaded, pre-load buffer not yet impleme
 
 // TODO: Retrieve these from model
 const itemStoreName = 'item';
-const listStoreName = 'container';
+const doneStoreName = 'done';
+const containerStoreName = 'container';
 // Remote Config store per browser (but could do local storage)
 
 // Primary local persistence layer
@@ -30,11 +31,15 @@ class AcmeLocalStore {
                 const itemStore = db.createObjectStore(itemStoreName, {
                     keyPath: 'id',
                 });
-                db.createObjectStore(listStoreName, {
+                const doneStore = db.createObjectStore(doneStoreName, {
+                    keyPath: 'id',
+                });
+                db.createObjectStore(containerStoreName, {
                     keyPath: 'id',
                 });
                 itemStore.createIndex('listId', 'listId');
                 itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
+                itemStore.createIndex('completed', ['listId', 'dateCompleted']);
             },
         });
         this.db = db;
