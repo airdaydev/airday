@@ -1,6 +1,10 @@
 :root {
   --border: #e1e1e1;
   --shade: #f0f0f0;
+  --blur: 0.8399999999999994px;
+  --spread: -0.5999999999999996px;
+  --horiz: 0.3693968851953951px;
+  --vert: 0.47280645216403266px;
 }
 
 @font-face {
@@ -23,4 +27,5 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: rgb(249, 248, 244);
 }

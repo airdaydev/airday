@@ -7,12 +7,18 @@
 }
 
 .list-header {
+    border-right: 1px solid var(--border, value);
+    padding: 0.5em;
+}
+
+.list-header-internal {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border, value);
-    border-right: 1px solid var(--border, value);
-    padding: 0.5em;
+    background: white;
+    border-radius: 2px;
+    box-shadow: 0 2px 4px 0 rgba(126,126,126,0.20); 
+    padding: 0.25em 0;
 }
 
 .active .list-header svg {
@@ -21,7 +27,7 @@
 
 .list-scroll {
     overflow-y: scroll;
-    padding: 0.5em;
+    padding: 0 0.5em;
     border-right: 1px solid var(--border, value);
     height: 100%;
 }
@@ -76,12 +82,14 @@
 }
 
 .check {
-    background: none;
-    border: 1px solid var(--border, value);
-    border-radius: 2px;
-    width: 1.25em;
-    height: 1.25em;
+    background: #dcdde1;
+    /* border: 1px solid var(--border, value); */
+    border-radius: 2.5em;
+    width: 2.5em;
+    height: 2.5em;
     margin-right: 0.5em;
+    box-shadow: calc(clamp(0px, var(--horiz), 2px)) calc(clamp(0px, var(--vert), 2px)) 2px calc(var(--spread)) rgba(0, 0, 0, 0.233), calc(2 * var(--horiz)) calc(2 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.20), calc(3 * var(--horiz)) calc(3 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.123), calc(5 * var(--horiz)) calc(5 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.076), calc(8 * var(--horiz)) calc(8 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.047), calc(13 * var(--horiz)) calc(13 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.028);
+    border: 1px solid rgba(0, 0, 0, 0.068);
 }
 
 .check:hover {

@@ -13,8 +13,8 @@
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new container
 - [x] Rename container
-- [] Add new item
 - [] Ability to mark items as done (chronological story for past events)
+- [] Add new item
 - [] Add entire history of Done items
 - [] Habit items = set target + smiley, Amalgamated Habit list with sorting (worst/best)
 - [] Colors & tags (stickers)
@@ -24,6 +24,7 @@ background: #cdffc6;
 border-radius: 1em;
 margin-left: auto;
 box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
+- [] Tick seed, underline length
 - [] Delete containers
 - [] Resort containers
 - [] Rename container in nav bar

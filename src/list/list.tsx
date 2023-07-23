@@ -117,23 +117,25 @@ export function List(props: ListProps) {
         onMouseUp={handleDrop}
       >
         <div class={styles['list-header']}>
-          <div style={`display: flex; align-items: center;`}>
-            <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
-            <EditableListTitle container={container} />
-          </div>
-          <div>
-            <button class={styles['list-button']}>
-              <MoreSVG />
-            </button>
-            <button class={styles['list-button']}>
-              <PlusSVG />
-            </button>
-            <button
-              class={styles['list-button']}
-              onClick={() => viewState.closeView(props.tabId)}
-            >
-              <XSVG />
-            </button>
+          <div class={styles['list-header-internal']}>
+            <div style={`display: flex; align-items: center;`}>
+              <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
+              <EditableListTitle container={container} />
+            </div>
+            <div>
+              <button class={styles['list-button']}>
+                <MoreSVG />
+              </button>
+              <button class={styles['list-button']}>
+                <PlusSVG />
+              </button>
+              <button
+                class={styles['list-button']}
+                onClick={() => viewState.closeView(props.tabId)}
+              >
+                <XSVG />
+              </button>
+            </div>
           </div>
         </div>
         <div
