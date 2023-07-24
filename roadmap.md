@@ -81,3 +81,4 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Multiple users
 - [] The board prototype (canvas/webgl)
 - [] List animations
+- [] Consider https://github.com/tauri-apps/tauri
