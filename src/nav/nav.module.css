@@ -24,7 +24,7 @@
 }
 
 .nav-list button.active {
-    background: var(--border, value);
+    background: #E4DDE3;
 }
 
 .nav button span {

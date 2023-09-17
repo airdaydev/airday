@@ -76,8 +76,8 @@ export function AcmeNav() {
         </button>
       </div>
         <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
-        <h2 style='font-size: 1rem; font-weight: 500; padding: 0 0.5em;'>
-          Lists
+        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+          By area
         </h2>
         <div class={styles['nav-list']}>
           <For each={containerModel.ol()}>
@@ -85,18 +85,16 @@ export function AcmeNav() {
           </For>
           <AddListButton />
         </div>
-        <div style={`
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.5em 1em;
-          border-radius: 5px;
-          margin-top: auto;
-          border: 1px solid #ccc;
-        `}>
-          <span>Personal</span>
-          <ChevronDownSVG style='width: 1em;' />
-        </div>
+        <section>
+          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+            By sticker
+          </h2>
+        </section>
+        <section>
+          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+            By filter
+          </h2>
+        </section>
     </nav>
   );
 }

@@ -56,11 +56,10 @@
     user-select: none;
     display: flex;
     align-items: center;
-    white-space: pre;
 }
 
 .active .item.selected {
-    background: #e0e0e0;
+    background: #E4DDE3;
 }
 
 .item.selected {

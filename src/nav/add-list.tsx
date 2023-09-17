@@ -56,7 +56,7 @@ export const AddListButton = () => {
                 class={styles['add-list-button']}
                 onClick={() => enterEditMode()}
               >
-                Add list...
+                Add area
               </button>
             )}
         </>
