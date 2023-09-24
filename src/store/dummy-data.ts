@@ -10,10 +10,10 @@ export const acmeItems = [
 ]
 
 export const inboxItems = [
-    'Eat a cantaloupe',
-    'Eat watermelon',
-    'Eat a fig',
-    'Drink prune juice',
+    'Munro (Get other car key from home)',
+    'Research Stable Diffusion',
+    'Seguir viendo la casa de papel temporada 3',
+    'more regular incline press from 22kg',
 ]
 
 export function genTestData(listId: string, tasks: string[]): AcmeItem[] {

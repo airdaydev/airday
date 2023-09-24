@@ -6,7 +6,7 @@ import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
 import { NavItemContextMenu } from './context-menu';
-import { containerModel } from '../store/main';
+import { containerModel, store } from '../store/main';
 import { AddListButton } from './add-list';
 
 interface NavListItemProps {
@@ -85,15 +85,35 @@ export function AcmeNav() {
           </For>
           <AddListButton />
         </div>
-        <section>
+        <section class={styles['nav-list']}>
           <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
             By sticker
           </h2>
+          <div>
+            <button>
+              TODO: Sticker
+            </button>
+          </div>
         </section>
-        <section>
+        <section class={styles['nav-list']}>
           <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
             By filter
           </h2>
+          <div>
+            <button>
+              Most neglected
+            </button>
+          </div>
+        </section>
+        <section>
+          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+            Dev
+          </h2>
+          <div>
+            <button onClick={store.refreshDev}>
+              Refresh db
+            </button>
+          </div>
         </section>
     </nav>
   );

@@ -13,6 +13,7 @@
 - [x] Context menu for list (at mouse cursor)
 - [x] Add new container
 - [x] Rename container
+- [] Button to delete & refresh db!
 - [] Ability to mark items as done (chronological story for past events)
 - [] Add new item
 - [] Add entire history of Done items

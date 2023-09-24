@@ -23,28 +23,16 @@ Files should go to file storage and be online first (or set user limit)
 #### Completing an item
 1. Create new item
 2. Click complete
-3. op1: save in same storage in same list but marked as completed (Another index would be needed to differentiate both)
-3. op2: save in same storage but in counterpast list labelled "done_*" (no specific need for a sort key, redundant information, complete time required - looking like different schema)
-3. op3: save in "log" store <- yeah
+3. op1: save in same storage in same list but marked as completed (add another index to differentiate/filter) <- the way to go in crdt
+4. Client indexes
 
-#### 2 people complete the same item
-- What is the end state you want to achive? Either 1. Both log completed version - fine but there should still only be one end item - because items can pick up a bit of metadata, maybe there are docs, images etc in the future - not really a good reason to clone that. Or more simply, you just have a finished or not state - and maybe a DUMB activity log per item i.e. text only (Who did what - i.e. what if two or three people completed it offline)
-- 
-
-- Back-end only needs to index by date last changed, clients just sync via last update date
+The key is that the server is dumb as a fucking brick
 
 #### Recurring item
-1. Create new recurring item
-2. Click log
-3. op1 (above): we would clone these which is weird
-3. op2: still have to clone
-4. op3: log item would always generate a new id. sooo no explicit link between original item & new item (except mayyybe some telemetry?).
-if two people clicked complete on the same item, what should happen in op3?
+Log formed ON the item itself! Statistics calculated on the item asynchronously, when last update received. (this should be a worker job)
 
 #### Putting back an item
-
-## data pipeline
-server (online persistence) -> ws (comms) -> idb (offline persistence) -> fast list (fast, optimistic access) -> display list (rendering & interaction)
+Undone
 
 ## Lists
 - Store in indexeddb in lists "table"

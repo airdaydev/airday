@@ -15,9 +15,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: white;
+    background: #e6e3ea;
     border-radius: 2px;
-    box-shadow: 0 2px 4px 0 rgba(126,126,126,0.20); 
     padding: 0.25em 0;
 }
 
@@ -81,14 +80,13 @@
 }
 
 .check {
-    background: #dcdde1;
+    background: none;
     /* border: 1px solid var(--border, value); */
-    border-radius: 2.5em;
-    width: 2.5em;
-    height: 2.5em;
+    border-radius: 3px;
+    width: 1.25em;
+    height: 1.25em;
     margin-right: 0.5em;
-    box-shadow: calc(clamp(0px, var(--horiz), 2px)) calc(clamp(0px, var(--vert), 2px)) 2px calc(var(--spread)) rgba(0, 0, 0, 0.233), calc(2 * var(--horiz)) calc(2 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.20), calc(3 * var(--horiz)) calc(3 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.123), calc(5 * var(--horiz)) calc(5 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.076), calc(8 * var(--horiz)) calc(8 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.047), calc(13 * var(--horiz)) calc(13 * var(--vert)) calc(var(--blur)) calc(var(--spread)) rgba(0, 0, 0, 0.028);
-    border: 1px solid rgba(0, 0, 0, 0.068);
+    border: 1px solid rgba(0, 0, 0, 0.10);
 }
 
 .check:hover {

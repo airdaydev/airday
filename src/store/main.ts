@@ -24,7 +24,7 @@ const containerStoreName = 'container';
 class AcmeLocalStore {
     db: AcmeIDB | null = null;
     init = async () => {
-        await deleteDB('acme');
+        // TODO: Check if items etc exist
         const db = await openDB<DBTypes>('acme', schemaVersion, {
             // TODO: Get upgrades as static methods from classes
             upgrade(db) {
@@ -44,6 +44,13 @@ class AcmeLocalStore {
         });
         this.db = db;
         return db;
+    }
+    /**
+     * A dev only route to delete and refresh db
+     */
+    refreshDev = async () => {
+        const t = await deleteDB('acme');
+        // this.init();
     }
 }
 
