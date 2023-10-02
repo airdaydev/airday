@@ -110,7 +110,7 @@ export function AcmeNav() {
             Dev
           </h2>
           <div>
-            <button onClick={store.refreshDev}>
+            <button onClick={store.reset}>
               Refresh db
             </button>
           </div>

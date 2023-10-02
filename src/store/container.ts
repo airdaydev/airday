@@ -26,6 +26,13 @@ export class ContainerModel {
         this.setOl = signal[1];
     }
     init = (db: AcmeIDB) => { this.acmedb = db; }
+    upgrade = (db: AcmeIDB) => {
+        this.init(db);
+        console.log('wtf', this.acmedb);
+        db.createObjectStore(this.storeName, {
+            keyPath: 'id',
+        });
+    }
     ready() { return !!this.db; }
     get db() {
         // TODO: This COULD be made redundant with proper queuing system

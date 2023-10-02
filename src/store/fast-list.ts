@@ -5,7 +5,9 @@ import { store } from './main.js';
 export const openLists = new Map<string, FastList>();
 
 export function openList(listId: string) {
-    if (openLists.has(listId)) return openLists.get(listId);
+    if (openLists.has(listId)) {
+        return openLists.get(listId);
+    }
     const fastList = new FastList(listId);
     openLists.set(listId, fastList);
     return fastList;

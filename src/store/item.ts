@@ -10,6 +10,15 @@ export class ItemModel {
     storeName = 'item';
     acmedb: AcmeIDB | null = null;
     init = (db: AcmeIDB) => { this.acmedb = db; }
+    upgrade = (db: AcmeIDB) => {
+        this.init(db);
+        const itemStore = db.createObjectStore(this.storeName, {
+            keyPath: 'id',
+        });
+        itemStore.createIndex('listId', 'listId');
+        itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
+        itemStore.createIndex('completed', ['listId', 'dateCompleted']);
+    }
     ready() { return !!this.db; }
     get db() {
         if (!this.acmedb) throw new Error('Item store uninitialised');

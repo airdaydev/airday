@@ -3,6 +3,8 @@ import {
 } from 'idb';
 import { ItemModel } from './item';
 import { ContainerModel } from './container';
+import { genTestData, acmeItems, inboxItems } from './dummy-data';
+import { openLists } from './fast-list';
 
 const schemaVersion = 1;
 
@@ -25,41 +27,65 @@ class AcmeLocalStore {
     db: AcmeIDB | null = null;
     itemModel = new ItemModel();
     containerModel = new ContainerModel();
-    init = async () => {
+    name = 'acme';
+    get ref () {
+        return `idb://${this.name}@${schemaVersion}`;
+    }
+    /**
+     * Creates connection to existing database, alters schema where version changes
+     */
+    connect = async () => {
         // TODO: Check if items etc exist
-        const db = await openDB<DBTypes>('acme', schemaVersion, {
+        console.debug(`Connecting to ${this.ref}`);
+        const db = await openDB<DBTypes>(this.name, schemaVersion, {
             // TODO: Get upgrades as static methods from classes
             upgrade(db) {
-                const itemStore = db.createObjectStore(itemStoreName, {
-                    keyPath: 'id',
-                });
-                const doneStore = db.createObjectStore(doneStoreName, {
-                    keyPath: 'id',
-                });
-                db.createObjectStore(containerStoreName, {
-                    keyPath: 'id',
-                });
-                itemStore.createIndex('listId', 'listId');
-                itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
-                itemStore.createIndex('completed', ['listId', 'dateCompleted']);
+                console.debug(`Running upgrade`);
+                store.itemModel.upgrade(db);
+                store.containerModel.upgrade(db);
+                // const doneStore = db.createObjectStore(doneStoreName, {
+                //     keyPath: 'id',
+                // });
             },
         });
+        console.debug(`Connected to ${this.ref}`);
+        store.containerModel.init(db);
+        store.itemModel.init(db);
         this.db = db;
         return db;
     }
     /**
      * A dev only route to delete and refresh db
      */
-    refreshDev = async () => {
-        const t = await deleteDB('acme');
-        // this.init();
+    reset = async () => {
+        console.log('Resetting database');
+        await this.db?.close();
+        await deleteDB(this.name)
+            .catch((err) => console.log(err));
+        console.log('Deleted DB');
+        await this.connect();
+        openLists.clear();
+        const items = [
+            ...genTestData('acmelist', acmeItems),
+            ...genTestData('inbox', inboxItems),
+          ]
+          await store.itemModel.insert(items);
+          await store.containerModel.insert([
+            {
+              id: 'inbox',
+              name: 'Inbox',
+            },
+            {
+              id: 'acmelist',
+              name: 'AcmeList',
+            },
+            {
+              id: 'empty-list',
+              name: 'a really really long named list',
+            },
+          ]);
     }
 }
 
 export const store = new AcmeLocalStore();
-
-await store.init()
-    .then((db) => {
-        store.itemModel.init(db);
-        store.containerModel.init(db);
-    });
+await store.connect();

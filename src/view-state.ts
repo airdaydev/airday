@@ -17,7 +17,7 @@ class ViewState {
         this.activeViewId = activeView[0];
         this.setActiveViewId = activeView[1];
         if (!this.list[0]().length) {
-            this.addContainerView('inbox');
+            // this.addContainerView('inbox');
         }
     }
     get active() {

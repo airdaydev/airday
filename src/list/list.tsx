@@ -41,7 +41,9 @@ export function List(props: ListProps) {
   let scrollRef: HTMLDivElement;
   const fastList = openList(props.view.containerId);
   const container = store.containerModel.index.get(props.view.containerId);
-  if (!fastList) throw new Error('List not found');
+  if (!fastList || !container) {
+    return <div>List '{props.view.containerId}' not found</div>
+  }
   const selection = new AcmeReactiveSelection();
     // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
