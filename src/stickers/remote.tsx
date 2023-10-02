@@ -1,0 +1,1 @@
+// TODO: Resolves remote stickers/sticker sets
