@@ -30,6 +30,7 @@ The key is that the server is dumb as a fucking brick
 
 #### Recurring item
 Log formed ON the item itself! Statistics calculated on the item asynchronously, when last update received. (this should be a worker job)
+- The disadvantage is that the item will not show up in overall logged items - an artifact could be created. a historical record linked to main item
 
 #### Putting back an item
 Undone

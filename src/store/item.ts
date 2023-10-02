@@ -24,7 +24,7 @@ export class ItemModel {
         });
         itemStore.createIndex('listId', 'listId');
         itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
-        itemStore.createIndex('completed', ['listId', 'dateCompleted']);
+        itemStore.createIndex('done', ['dateDone']);
     }
     ready() { return !!this.db; }
     get db() {
