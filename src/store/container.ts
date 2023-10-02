@@ -25,10 +25,19 @@ export class ContainerModel {
         this.ol = signal[0];
         this.setOl = signal[1];
     }
-    init = (db: AcmeIDB) => { this.acmedb = db; }
+    init = async (db: AcmeIDB) => {
+        this.acmedb = db;
+        this.clearCache();
+    }
+    clearCache = async () => {
+        this.index.clear();
+        this.setOl([]);
+    }
+    load = async () => {
+        const items = await this.db.getAll(this.storeName);
+        this.insert(items, false);
+    }
     upgrade = (db: AcmeIDB) => {
-        this.init(db);
-        console.log('wtf', this.acmedb);
         db.createObjectStore(this.storeName, {
             keyPath: 'id',
         });
@@ -39,15 +48,26 @@ export class ContainerModel {
         if (!this.acmedb) throw new Error('Item store uninitialised');
         return this.acmedb;
     }
-    insert = (data: AcmeContainer | AcmeContainer[]) => {
+    insert = async (data: AcmeContainer | AcmeContainer[], persist = true) => {
         // Convert to array
         const src = Array.isArray(data) ? data : [data];
+        // Store in database (TODO: Optimisation: Immediately store in mem)
+        // Generalised queue for database storage, prevent browser from closing while persistence layer continues
+        // User UI treats memory as source of truth, though insight into persistence layers available
+        // Dependent updates are possible and should occur as DAG (e.g. list -> item)
+        const dbPromises: Promise<any>[] = [];
+        const tx = this.db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
         // Create signals
         const newItems = src.map((item, index) => {
+            // TODO: Centralise queue
+            if (persist) { dbPromises.push(store.add(item)); }
             const signal = createSignal(item);
             this.index.set(item.id, signal);
             return signal[0];
         });
+        // TODO: Centralise queue
+        Promise.all(dbPromises).catch((err) => console.log(err));
         const newOl = [...this.ol(), ...newItems];
         // Calc sortKeys
         this.setOl(newOl);

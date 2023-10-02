@@ -9,9 +9,16 @@ import { AcmeIDB, dbNotReadyMessage } from './main';
 export class ItemModel {
     storeName = 'item';
     acmedb: AcmeIDB | null = null;
-    init = (db: AcmeIDB) => { this.acmedb = db; }
+    init = (db: AcmeIDB) => {
+        this.acmedb = db;
+        // this.load();
+        // load
+    }
+    // load = async () => {
+    //     const items = await this.db.getAll(this.storeName);
+    //     console.log(items);
+    // }
     upgrade = (db: AcmeIDB) => {
-        this.init(db);
         const itemStore = db.createObjectStore(this.storeName, {
             keyPath: 'id',
         });
@@ -30,14 +37,14 @@ export class ItemModel {
      */
     insert = async (data: AcmeItem | AcmeItem[]) => {
         // Track touched lists to trigger batched UI refresh
-        const touchedLists = new Set<string>();
+        // const touchedLists = new Set<string>();
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
         const insert = async (item: AcmeItem) => {
             const prev = await store.get(item.id);
             if (prev) throw new Error('Key already exists');
             const val = await store.add(item);
-            touchedLists.add(item.listId);
+            // touchedLists.add(item.listId);
             return val;
         };
         if (Array.isArray(data)) {

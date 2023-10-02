@@ -33,24 +33,26 @@ class AcmeLocalStore {
     }
     /**
      * Creates connection to existing database, alters schema where version changes
+     * TODO: Loading screen while db is not ready
      */
     connect = async () => {
         // TODO: Check if items etc exist
         console.debug(`Connecting to ${this.ref}`);
         const db = await openDB<DBTypes>(this.name, schemaVersion, {
             // TODO: Get upgrades as static methods from classes
-            upgrade(db) {
+            async upgrade(db) {
                 console.debug(`Running upgrade`);
-                store.itemModel.upgrade(db);
-                store.containerModel.upgrade(db);
+                await store.itemModel.upgrade(db);
+                await store.containerModel.upgrade(db);
+                console.log('Completed upgrade');
                 // const doneStore = db.createObjectStore(doneStoreName, {
                 //     keyPath: 'id',
                 // });
             },
         });
-        console.debug(`Connected to ${this.ref}`);
         store.containerModel.init(db);
         store.itemModel.init(db);
+        console.debug(`Connected to ${this.ref}`);
         this.db = db;
         return db;
     }
@@ -89,3 +91,4 @@ class AcmeLocalStore {
 
 export const store = new AcmeLocalStore();
 await store.connect();
+await store.containerModel.load();
