@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { createSignal, createEffect, on } from 'solid-js';
 import { keyboardShortcuts } from '../keyboard';
-import { containerModel } from '../store/main';
+import { store } from '../store/main';
 import { viewState } from '../view-state';
 import styles from './nav.module.css';
 
@@ -17,7 +17,7 @@ export const AddListButton = () => {
         keyboardShortcuts.enable();
         if (save) {
             const id = nanoid();
-            containerModel.insert({
+            store.containerModel.insert({
                 id,
                 name: inputRef?.value || 'New list',
             });

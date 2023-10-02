@@ -6,7 +6,7 @@ import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
 import { NavItemContextMenu } from './context-menu';
-import { containerModel, store } from '../store/main';
+import { store } from '../store/main';
 import { AddListButton } from './add-list';
 
 interface NavListItemProps {
@@ -38,7 +38,7 @@ export function NavListItem(props: NavListItemProps) {
         }}
       >
         <TodoSVG style={`display: block;flex-shrink: 0;height: 1.25rem;width: 1.25rem;`} />
-        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap;'>
+        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;'>
           {props.container() && props.container().name}
         </span>
       </button>
@@ -80,7 +80,7 @@ export function AcmeNav() {
           By area
         </h2>
         <div class={styles['nav-list']}>
-          <For each={containerModel.ol()}>
+          <For each={store.containerModel.ol()}>
             {(container) => <NavListItem container={container} />}
           </For>
           <AddListButton />

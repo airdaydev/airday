@@ -23,6 +23,8 @@ const containerStoreName = 'container';
 // Primary local persistence layer
 class AcmeLocalStore {
     db: AcmeIDB | null = null;
+    itemModel = new ItemModel();
+    containerModel = new ContainerModel();
     init = async () => {
         // TODO: Check if items etc exist
         const db = await openDB<DBTypes>('acme', schemaVersion, {
@@ -55,10 +57,9 @@ class AcmeLocalStore {
 }
 
 export const store = new AcmeLocalStore();
-export const itemModel = new ItemModel();
-export const containerModel = new ContainerModel();
+
 await store.init()
     .then((db) => {
-        itemModel.init(db);
-        containerModel.init(db);
+        store.itemModel.init(db);
+        store.containerModel.init(db);
     });

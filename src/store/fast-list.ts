@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { createSignal, Accessor, Setter } from 'solid-js';
-import { itemModel } from './main.js';
+import { store } from './main.js';
 
 export const openLists = new Map<string, FastList>();
 
@@ -45,7 +45,7 @@ export class FastList {
         dragOriginList = listId;
     }
     new(item: AcmeItemInsertion) {
-        itemModel.insert({
+        store.itemModel.insert({
             id: nanoid(),
             ...item,
             dateCreated: (new Date()).toString(),
@@ -121,7 +121,7 @@ export class FastList {
         // Trigger signal update
     }
     async initList() {
-        const list = await itemModel.getItemsByList(this.listId);
+        const list = await store.itemModel.getItemsByList(this.listId);
         if (this.setSignal) this.setSignal(list);
     }
     /**
