@@ -85,3 +85,4 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Consider https://github.com/tauri-apps/tauri
 - [] Consider https://codeberg.org/explore/repos
 - [] Consider https://github.com/Linen-dev/linen.dev
+- [] Consider https://motion.dev/

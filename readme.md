@@ -33,3 +33,4 @@ Trash = statically ordered list
 - https://www.inkandswitch.com/
 - https://github.com/serenity-kit/secsync
 - https://jakelazaroff.com/words/an-interactive-intro-to-crdts/
+- https://jakelazaroff.com/words/building-a-collaborative-pixel-art-editor-with-crdts/
