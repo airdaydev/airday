@@ -24,9 +24,9 @@
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
 - [] Up Next board
-- [] Trashed items
+- [] Trash items
+- [] Empty trash
 - [] Delete containers
-- [] Delete items
 - [] Add new item adds saves item into store
 - [] Habit items = set target + smiley
 - [] Filter for habit tracking with sorting (worst/best)
@@ -44,6 +44,7 @@
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] regression: shift + click with nothing selected
 - [] Dark mode
+- [] Toast notification whenever an item disappears from current context e.g. moves to done, or inbox
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Autoscroll when dragging items at bottom/top of list
 - [] Ensure selection is cleared on edit 
@@ -66,6 +67,7 @@
 
 ## Sync/Data structure
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
+- [] Undo/redo... in general, save granular outcomes & apply them (consider a changelog or something visible, otherwise just console)
 - [] Client-side encrypted sync server
 - [] Persistence strategy (Clickhouse...? Something easier to scale, partitioning should be simple)
 - [] CRDT: How will sorting work
