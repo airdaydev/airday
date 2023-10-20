@@ -16,6 +16,8 @@
 - [x] Button to delete & refresh db!
 - [x] Ability to mark items as done
 - [] Add entire history of Done items chronology
+- [] List should scroll up as you drag up
+- [] Item in shadow copy of same list should update as you complete update!
 - [] Delete containers
 - [] Delete items
 - [] Add new item adds saves item into store

@@ -15,3 +15,21 @@
 .active .list-header svg {
     color: black;
 }
+
+.list-button {
+    height: 2.5em;
+    width: 2.5em;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.list-button:hover {
+    background: #f2f2f2;
+}
+
+.list-button svg {
+    width: 1.25em;
+    stroke-width: 1.25px;
+}
