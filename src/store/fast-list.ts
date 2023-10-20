@@ -2,17 +2,6 @@ import { nanoid } from 'nanoid';
 import { createSignal, Accessor, Setter } from 'solid-js';
 import { store } from './main.js';
 
-export const openLists = new Map<string, FastList>();
-
-export function openList(listId: string) {
-    if (openLists.has(listId)) {
-        return openLists.get(listId);
-    }
-    const fastList = new ContainerFL(listId);
-    openLists.set(listId, fastList);
-    return fastList;
-}
-
 // https://github.com/solidjs/solid/discussions/1524
 // https://www.reddit.com/r/solidjs/comments/ilebtl/efficient_state_updates_to_arrays/
 // https://github.com/solidjs/solid/discussions/366
@@ -34,7 +23,9 @@ type FastListType = 'trash' | 'up-next' | 'container' | 'done';
  * TODO: Handling 3000+ items without log(n) - roll the list DOM patcher yourself
  */
 export abstract class FastList {
-    type: FastListType | null = null;
+    abstract type: FastListType | null;
+    createItems: boolean = false; // Can items be created under this list
+    sortable: boolean = false;
     listId: string;
     signal: Accessor<AcmeItem[]>;
     setSignal: Setter<AcmeItem[]>;
@@ -62,7 +53,7 @@ export abstract class FastList {
     moveItems(ids: Set<string>, sourceListId: string, between: [string | null, string | null]) {
         // Filter ids from list
         const itemsToMove: AcmeItem[] = [];
-        const sourceList = openLists.get(sourceListId);
+        const sourceList = openLists.get(`c#${sourceListId}`);
         if (!sourceList) return; // Should not happen (TODO: Log validation error)
         const updatedList = sourceList.signal().filter((item) => {
             const toMove = ids.has(item.id)
@@ -184,36 +175,23 @@ export abstract class FastList {
     }
 }
 
-// Fast list variant for showing completed items
-// Characteristics:
-// - Fully Draggable, but only droppable in only one position, top of the list.
-// - Completing an item moves it to its original list, or inbox if not found
-export class DoneFL extends FastList {
-    type: FastListType = 'done';
-    constructor(props) {
-        super(props);
-    }
-}
-
 // Fast list variant for showing up next items
-// Characteristics:
-// - All items are a copy
-// - New items go to index
-// - Draggable, droppable
 export class UpNextFL extends FastList {
     type: FastListType = 'up-next';
+    createItems = true;
+    sortable = true;
+    // - All items are by reference only
+    // - New items go to index
     constructor(props) {
         super(props);
     }
 }
 
-// Fast list variant for showing up next items
-// Characteristics:
-// - All items are a copy
-// - New items go to this list
-// - Draggable, droppable
+// Container items
 export class ContainerFL extends FastList {
     type: FastListType = 'container';
+    createItems = true;
+    sortable = true;
     constructor(props) {
         super(props);
     }
@@ -222,14 +200,38 @@ export class ContainerFL extends FastList {
     }
 }
 
-// Fast list variant for showing up next items
-// Characteristics:
-// - All items are a copy
-// - New items go to inbox
-// - Draggable, droppable
+// Trash list
 export class TrashFL extends FastList {
     type: FastListType = 'trash';
+    createItems = false;
+    sortable = false;
     constructor(props) {
         super(props);
     }
+}
+
+/**
+ * Fast list variant for showing completed items
+ */
+export class DoneFL extends FastList {
+    type: FastListType = 'done';
+    createItems = true;
+    sortable = false;
+    constructor(props) {
+        super(props);
+    }
+    // Completing an item moves it to its original list, or inbox if not found
+    // Dropping drops on top of the list (generally, due to time deleted)
+}
+
+export const openLists = new Map<string, FastList>();
+
+export function openContainerFL(listId: string) {
+    const identifier = `c#${listId}`;
+    if (openLists.has(identifier)) {
+        return openLists.get(identifier);
+    }
+    const fastList = new ContainerFL(listId);
+    openLists.set(identifier, fastList);
+    return fastList;
 }

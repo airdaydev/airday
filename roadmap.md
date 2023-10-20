@@ -61,6 +61,7 @@
 - [] Drag divider to change view size
 - [] Nice empty list states
 - [] Export data (JSON, excel, markdown)
+- [] Keyboard only, accessibility
 
 ## Stickers
 - [] Sticker system
