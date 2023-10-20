@@ -15,17 +15,12 @@
 - [x] Rename container
 - [x] Button to delete & refresh db!
 - [] Ability to mark items as done (chronological story for past events)
-- [] Add new item
 - [] Add entire history of Done items
-- [] Habit items = set target + smiley, Amalgamated Habit list with sorting (worst/best)
-- [] Colors & tags (stickers)
-width: 1.5em;
-height: 1.5em;
-background: #cdffc6;
-border-radius: 1em;
-margin-left: auto;
-box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
-- [] Tick seed, underline length
+- [] Add new item adds saves item into store
+- [] Habit items = set target + smiley
+- [] Filter for habit tracking with sorting (worst/best)
+- [] Sticker system
+- [] Natural looking cross outs? Consider tick seed, underline length
 - [] Delete containers
 - [] Resort containers
 - [] Rename container in nav bar
@@ -33,13 +28,14 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Drop to bottom of list when list is not empty but has space below it
 - [] Delete items
 - [] Dark mode
-- [] Multi-select & reorder lists
+- [] Multi-select containers
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
 - [] shift + click with nothing selecting regression
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Work out persistence pipeline
-- [] Calculate & persist sort changes to idb
+- [] Calculate & persist item sort changes to idb
+- [] Calculate & persist container sort changes to idb
 - [] Calculate & persist updates, moves to idb
 - [] Persist list changes to idb
 - [] Autoscroll when dragging items at bottom/top of list
@@ -58,33 +54,36 @@ box-shadow: rgba(129, 170, 126, 0.87) 0.5px 0.5px 0.5px;
 - [] Context menu for many items
 - [] Add now playing list, allow dragging items to now playing list
 - [] Up Next board
-- [] Trash concept
-- [] Kanban board
+- [] Trashed items, tombstones
 - [] Nice empty list states
 - [] Mobile web strategy (PWA)
 - [] PWA update strategy
 - [] API update strategy
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Client-side encrypted sync ws server
-- [] Encryption layer
 - [] Export data (JSON, excel, markdown)
 - [] Paid web service with introductory prices
-- [] Consider license type
+- [] Consider license type for copyleft (reselling no)
 - [] Add search
 - [] Custom Themes / compact mode
-- [] Add repeatable items - Maybe
 - [] Website
 - [] Spanish (EU) localisation
 - [] Japanese localisation
-- [] Mobile native app strategy
-- [] Secrets
-- [] Lock
-- [] Multiple users
-- [] The board prototype (canvas/webgl)
-- [] List animations
-- [] Consider https://github.com/tauri-apps/tauri
+- [] Ensure multiple users are accounted for
+
+## Release ideas
 - [] Consider https://codeberg.org/explore/repos
 - [] Consider https://github.com/Linen-dev/linen.dev
 - [] Consider https://motion.dev/
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
+
+## Stretch goals
+- [] Desktop app https://github.com/tauri-apps/tauri
+- [] Optional encrypted server
+- [] Lock
+- [] Mobile native app strategy
+- [] Kanban board
+- [] Secrets
+- [] List animations
+- [] Board prototype (canvas/webgl)
