@@ -1,4 +1,6 @@
-# AcmeList Prototype Roadmap
+# AcmeList SolidJS Roadmap
+
+## Prototype
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
 - [x] cmd+a to select all items
 - [x] Meta/Alt keyboard navigation
@@ -15,68 +17,75 @@
 - [x] Rename container
 - [x] Button to delete & refresh db!
 - [x] Ability to mark items as done
-- [] Add entire history of Done items chronology
-- [] List should scroll up as you drag up
-- [] Item in shadow copy of same list should update as you complete update!
+- [x] Drop to bottom of list when list is not empty but has space below it
+- [x] Allow dropping items between open lists directly
+- [x] Highlight active list in nav
+
+## Frontend Lifecycle
+- [] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
+- [] Up Next board
+- [] Trashed items
 - [] Delete containers
 - [] Delete items
 - [] Add new item adds saves item into store
 - [] Habit items = set target + smiley
 - [] Filter for habit tracking with sorting (worst/best)
-- [] Sticker system
-- [] Natural looking cross outs? Consider tick seed, underline length
 - [] Resort containers
-- [] Rename container in nav bar
-- [] Status bar
-- [] Drop to bottom of list when list is not empty but has space below it
-- [] Dark mode
 - [] Multi-select containers
+- [] When dragging while holding down command, duplicate
+- [] Add search
+
+## UI
+- [] List should scroll up as you drag up
+- [] Item in shadow copy of same list should update as you complete update!
+- [] Natural looking cross outs? Consider tick seed, underline length
+- [] Rename container in sidenav
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
 - [] Shifting up/down and deselecting doesn't move viewport when deselecting
-- [] shift + click with nothing selecting regression
+- [] regression: shift + click with nothing selected
+- [] Dark mode
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
-- [] Work out persistence pipeline
-- [] Calculate & persist item sort changes to idb
-- [] Calculate & persist container sort changes to idb
-- [] Calculate & persist updates, moves to idb
-- [] Persist list changes to idb
 - [] Autoscroll when dragging items at bottom/top of list
-- [] Ensure selection is cleared on edit
-- [] Edit list name capability in navbar 
+- [] Ensure selection is cleared on edit 
 - [] Edit selected items via 'enter' key
-- [] Command mouse navigation
 - [] Clear selection on 'esc' key
 - [] Command+up/down keyboard resorts
 - [] Allow dropping items in nav bar list
-- [] Allow dropping items between open lists directly
-- [] Highlight active list in nav
 - [] Change list icons
-- [] Timeline index (GL?)
 - [] Drag stack make it nice
 - [] Context menu for one item
 - [] Context menu for many items
+- [] Timeline index (GL?)
 - [] Add now playing list, allow dragging items to now playing list
-- [] Up Next board
-- [] Trashed items, tombstones
+- [] Drag divider to change view size
 - [] Nice empty list states
+- [] Export data (JSON, excel, markdown)
+
+## Stickers
+- [] Sticker system
+
+## Sync/Data structure
+- [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
+- [] Client-side encrypted sync server (persistence story)
+- [] CRDT: How will sorting work
+- [] CRDT: Define all data structures
+- [] Update strategy (anticipate changes)
+
+## Predeploy, meta app
+- [] Friends alpha and testing
 - [] Mobile web strategy (PWA)
 - [] PWA update strategy
 - [] Automated testing story
-- [] API update strategy
-- [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
-- [] Client-side encrypted sync ws server
-- [] Export data (JSON, excel, markdown)
 - [] Paid web service with introductory prices
+- [] Opens immediately into application, (no landing page?) or landing page at acmelist.com/help
 - [] Consider license type for copyleft (reselling no)
-- [] Add search
 - [] Custom Themes / compact mode
-- [] Website
 - [] Spanish (EU) localisation
 - [] Japanese localisation
 - [] Ensure multiple users are accounted for
 
-## Release ideas
-- [] Friends alpha and testing
+## Marketing, community
+- [] Website
 - [] Consider https://codeberg.org/explore/repos
 - [] Consider https://github.com/Linen-dev/linen.dev
 - [] Consider https://motion.dev/
@@ -84,6 +93,7 @@
 - Pricing https://www.principlesofpricing.com/the-customer
 
 ## Stretch goals
+- [] Markdown descriptions, with TODO sublists
 - [] Desktop app https://github.com/tauri-apps/tauri
 - [] Optional encrypted server
 - [] Lock
