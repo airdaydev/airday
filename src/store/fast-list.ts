@@ -8,7 +8,7 @@ export function openList(listId: string) {
     if (openLists.has(listId)) {
         return openLists.get(listId);
     }
-    const fastList = new FastList(listId);
+    const fastList = new ContainerFL(listId);
     openLists.set(listId, fastList);
     return fastList;
 }
@@ -25,13 +25,16 @@ interface AcmeItemInsertion extends Partial<AcmeContainer> {
 
 export let dragOriginList: string | null = null; // TODO: move to Selection or hybrid
 
+type FastListType = 'trash' | 'up-next' | 'container' | 'done';
+
 /**
  * Optimistic in-memory list
  * For editing and sorting lists quickly without the overhead of transactional guarantees and sort keys etc from the main store
  * TODO: Strongly consider an index
  * TODO: Handling 3000+ items without log(n) - roll the list DOM patcher yourself
  */
-export class FastList {
+export abstract class FastList {
+    type: FastListType | null = null;
     listId: string;
     signal: Accessor<AcmeItem[]>;
     setSignal: Setter<AcmeItem[]>;
@@ -178,5 +181,55 @@ export class FastList {
             }
         }
         return false;
+    }
+}
+
+// Fast list variant for showing completed items
+// Characteristics:
+// - Fully Draggable, but only droppable in only one position, top of the list.
+// - Completing an item moves it to its original list, or inbox if not found
+export class DoneFL extends FastList {
+    type: FastListType = 'done';
+    constructor(props) {
+        super(props);
+    }
+}
+
+// Fast list variant for showing up next items
+// Characteristics:
+// - All items are a copy
+// - New items go to index
+// - Draggable, droppable
+export class UpNextFL extends FastList {
+    type: FastListType = 'up-next';
+    constructor(props) {
+        super(props);
+    }
+}
+
+// Fast list variant for showing up next items
+// Characteristics:
+// - All items are a copy
+// - New items go to this list
+// - Draggable, droppable
+export class ContainerFL extends FastList {
+    type: FastListType = 'container';
+    constructor(props) {
+        super(props);
+    }
+    load() {
+
+    }
+}
+
+// Fast list variant for showing up next items
+// Characteristics:
+// - All items are a copy
+// - New items go to inbox
+// - Draggable, droppable
+export class TrashFL extends FastList {
+    type: FastListType = 'trash';
+    constructor(props) {
+        super(props);
     }
 }
