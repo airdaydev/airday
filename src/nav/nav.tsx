@@ -25,7 +25,7 @@ export function NavListItem(props: NavListItemProps) {
           [styles.active]: viewState.isContainerActive(props.container().id),
         }}
         ref={button}
-        onClick={() => viewState.replaceActiveView(props.container().id)}
+        onClick={() => viewState.replaceActiveViewWithContainer(props.container().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (button) {

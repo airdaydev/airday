@@ -32,7 +32,8 @@ class ViewState {
         if (!activeContainer) return false;
         return activeContainer[0]().containerId === containerId;
     }
-    replaceActiveView(containerId: string) {
+    // TODO: argument should be view, create view and pass into this
+    replaceActiveViewWithContainer(containerId: string) {
         this.openContainerViewAt(containerId, viewState.active.index || 0);
     }
     openContainerViewAt = (containerId: string, index: number = 0) => {
