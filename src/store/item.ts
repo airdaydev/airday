@@ -1,3 +1,4 @@
+import { IDBPObjectStore } from 'idb';
 import { AcmeIDB, dbNotReadyMessage } from './main';
 
 /**
@@ -9,6 +10,7 @@ import { AcmeIDB, dbNotReadyMessage } from './main';
 export class ItemModel {
     storeName = 'item';
     acmedb: AcmeIDB | null = null;
+    itemStore: IDBPObjectStore | null = null;
     init = (db: AcmeIDB) => {
         this.acmedb = db;
         // this.load();
@@ -24,7 +26,7 @@ export class ItemModel {
         });
         itemStore.createIndex('listId', 'listId');
         itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
-        itemStore.createIndex('done', ['dateDone']);
+        itemStore.createIndex('done', ['doneTimestamp']);
     }
     ready() { return !!this.db; }
     get db() {
@@ -60,6 +62,16 @@ export class ItemModel {
         const range = IDBKeyRange.bound([listId, 'A'], [listId, 'zzzzzz']);
         const items = await this.db.getAllFromIndex(this.storeName, 'ordered', range);
         return items;
+    }
+    getCompletedItems = async (fromDate: Date): Promise<AcmeItem[]> => {
+        if (!this.itemStore) {
+            throw new Error('Item store not initialised.');
+        }
+        const now = IDBKeyRange.upperBound([new Date()])
+        const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
+        // this.db.
+        // const items = await this.db.g(this.storeName, 'done', now);
+        // return items;
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {
     }

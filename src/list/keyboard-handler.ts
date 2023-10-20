@@ -26,7 +26,7 @@ export const getListKeyboardHandler = ({
           id: nanoid(),
           listId: fastList.listId,
           text: '',
-          dateCreated: new Date().toISOString(),
+          tsCreated: new Date().toISOString(),
           open: true,
       }], position);
       // TODO: Create item

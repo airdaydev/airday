@@ -1,16 +1,9 @@
 interface AcmeItem {
   id: string;
   text: string;
-  dateCreated: string;
+  tsCreated: string;
+  tsCompleted: Date | null;
   sortKey: string; // global, persisted sort key
-  listId: string;
-}
-
-interface AcmeItemDone {
-  id: string;
-  text: string;
-  dateCreated: string;
-  dateCompleted: number;
   listId: string;
 }
 

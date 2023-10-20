@@ -26,7 +26,8 @@ export function genTestData(listId: string, tasks: string[]): AcmeItem[] {
             id: nanoid(),
             text: tasks[index],
             sortKey: sortKeys[i],
-            dateCreated: (new Date()).toString(),
+            tsCreated: (new Date()).toString(),
+            tsCompleted: null,
             listId,
         })
     }
@@ -40,7 +41,7 @@ export function genTestData(listId: string, tasks: string[]): AcmeItem[] {
 //         id: nanoid(),
 //         text: tasks[index],
 //         sortKey: sortKeys[i],
-//         dateCreated: (new Date()).toString(),
+//         tsCreated: (new Date()).toString(),
 //         listId,
 //     }))
 // }

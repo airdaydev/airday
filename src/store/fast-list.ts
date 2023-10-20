@@ -50,7 +50,8 @@ export class FastList {
         store.itemModel.insert({
             id: nanoid(),
             ...item,
-            dateCreated: (new Date()).toString(),
+            tsCreated: (new Date()).toString(),
+            tsCompleted: null,
         });
     }
     // TODO: Optimisation: if only moving, skip first step
