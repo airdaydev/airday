@@ -66,12 +66,14 @@
 
 ## Sync/Data structure
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
-- [] Client-side encrypted sync server (persistence story)
+- [] Client-side encrypted sync server
+- [] Persistence strategy (Clickhouse...? Something easier to scale, partitioning should be simple)
 - [] CRDT: How will sorting work
 - [] CRDT: Define all data structures
 - [] Update strategy (anticipate changes)
 
 ## Predeploy, meta app
+- [] Help item type for new users - how to pin in Safari on IOS and same with android
 - [] Friends alpha and testing
 - [] Mobile web strategy (PWA)
 - [] PWA update strategy
@@ -82,7 +84,7 @@
 - [] Custom Themes / compact mode
 - [] Spanish (EU) localisation
 - [] Japanese localisation
-- [] Ensure multiple users are accounted for
+- [] Ensure multiple users / tenancy is accounted for
 
 ## Marketing, community
 - [] Website
