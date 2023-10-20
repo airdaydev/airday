@@ -6,24 +6,6 @@
     height: 100%;
 }
 
-.list-header {
-    border-right: 1px solid var(--border, value);
-    padding: 0.5em;
-}
-
-.list-header-internal {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #e6e3ea;
-    border-radius: 2px;
-    padding: 0.25em 0;
-}
-
-.active .list-header svg {
-    color: black;
-}
-
 .list-scroll {
     overflow-y: scroll;
     padding: 0 0.5em;

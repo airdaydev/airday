@@ -2,10 +2,6 @@ import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
 } from 'solid-js';
-import TodoSVG from '../icons/todo.svg';
-import PlusSVG from '../icons/plus.svg';
-import MoreSVG from '../icons/more-horizontal.svg';
-import XSVG from '../icons/x.svg';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from './item';
@@ -13,10 +9,10 @@ import { store } from '../store/main';
 import { dragOriginList, openList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
+import { ListHeader } from './list-header.jsx';
 import { viewState } from '../view-state';
 import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
-import { EditableListTitle } from './list-title';
 
 interface ListProps {
   view: AcmeView;
@@ -118,28 +114,7 @@ export function List(props: ListProps) {
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >
-        <div class={styles['list-header']}>
-          <div class={styles['list-header-internal']}>
-            <div style={`display: flex; align-items: center;`}>
-              <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
-              <EditableListTitle container={container} />
-            </div>
-            <div>
-              <button class={styles['list-button']}>
-                <MoreSVG />
-              </button>
-              <button class={styles['list-button']}>
-                <PlusSVG />
-              </button>
-              <button
-                class={styles['list-button']}
-                onClick={() => viewState.closeView(props.tabId)}
-              >
-                <XSVG />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ListHeader tabId={props.tabId} container={container} />
         <div
           ref={scrollRef}
           class={styles['list-scroll']}
