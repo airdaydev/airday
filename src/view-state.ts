@@ -11,7 +11,7 @@ class ViewState {
     activeViewId: Accessor<string | undefined>;
     setActiveViewId: Setter<string | undefined>;
     sidebarVisible = createSignal<boolean>(true);
-    list = createSignal<Signal<AcmeView>[]>([]);
+    list = createSignal<Signal<AcmeView>[]>([]); // views, left to right
     constructor() {
         const activeView = createSignal<string>();
         this.activeViewId = activeView[0];
@@ -32,25 +32,31 @@ class ViewState {
         if (!activeContainer) return false;
         return activeContainer[0]().containerId === containerId;
     }
-    // TODO: argument should be view, create view and pass into this
-    replaceActiveViewWithContainer(containerId: string) {
-        this.openContainerViewAt(containerId, viewState.active.index || 0);
+    openContainerView(containerId: string) {
+        const view = this.createContainerView(containerId);
+        this.replaceActiveView(view);
     }
-    openContainerViewAt = (containerId: string, index: number = 0) => {
+    createContainerView(containerId: string): AcmeContainerView {
         const id = createUniqueId(); // TODO: How does uniqueness work here
-        const newView = createSignal<AcmeContainerView>({
+        return {
             id,
             type: 'container',
             containerId,
             projection: 'list',
-        });
+        }
+    }
+    replaceActiveView(view: AcmeView) {
+        this.replaceView(view, viewState.active.index || 0);
+    }
+    replaceView(view: AcmeView, index: number = 0) {
+        const newView = createSignal<AcmeContainerView>(view);
         const [list, setList] = this.list;
         setList((prev) => {
             const next = [...prev];
             next[index] = newView;
             return next;
         });
-        this.setActiveViewId(id);
+        this.setActiveViewId(view.id);
     }
     closeView(index: number) {
         // TODO: if active view, remove active view (does it matter?)

@@ -21,7 +21,7 @@ export const AddListButton = () => {
                 id,
                 name: inputRef?.value || 'New list',
             });
-            viewState.replaceActiveViewWithContainer(id);
+            viewState.openContainerView(id);
         }
         setEditing(false);
     }
