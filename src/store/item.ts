@@ -25,6 +25,7 @@ export class ItemModel {
             keyPath: 'id',
         });
         itemStore.createIndex('listId', 'listId');
+        // itemStore.createIndex('id', 'id');
         itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
         itemStore.createIndex('done', ['doneTimestamp']);
     }
@@ -74,6 +75,10 @@ export class ItemModel {
         // return items;
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {
+        const item = await this.db.get(this.storeName, id);
+        const update = { ...item, ...attributes };
+        await this.db.put(this.storeName, update)
+            .catch((err) => console.log(err))
     }
     move = async (id: string, attributes: Partial<AcmeItem>) => {   
     }

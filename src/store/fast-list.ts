@@ -86,10 +86,11 @@ export class FastList {
             prev[index].text = newText;
             return prev;
         });
+        // TODO: Abstract as action & persist as queue
+        store.itemModel.update(id, { text: newText }).then(() => {});
         // TODO: Update idb
     }
     updateItem(id: string, attrs: Partial<AcmeItem>) {
-        // TODO: Move item
         // TODO: Consider maintaining an index
         const index = this.signal().findIndex((item) => item.id === id);
         if (index === -1) return console.error('updateItemContents() index not found');
