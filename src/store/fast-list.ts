@@ -100,14 +100,8 @@ export class FastList {
         });
         // TODO: Update idb
     }
-    completeItem(id: string) {
-        this.updateItemContents(id, { tsCompleted: new Date() })
-        // const index = this.signal().findIndex((item) => item.id === id);
-        // if (index === -1) return console.error('updateItemContents() index not found');
-        // this.setSignal((prev) => {
-        //     Object.assign(prev[index], attrs)
-        //     return prev;
-        // });
+    completeItem(id: string, tsCompleted: Date | null ) {
+        this.updateItemContents(id, { tsCompleted })
     }
     // Track updates, potentially batched
     onUpdate(type: string, items: AcmeItem[]) {

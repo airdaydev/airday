@@ -234,7 +234,7 @@ export function Item(props: ItemProps) {
                             
                         }}
                         onChange={(event) => {
-                            props.fastList.completeItem(props.item.id);
+                            props.fastList.completeItem(props.item.id, event.target.checked ? new Date() : null);
                             // event.preventDefault();
                             // event.stopPropagation();
                         }}
