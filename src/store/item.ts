@@ -85,5 +85,9 @@ export class ItemModel {
     remove = async (id: string, attributes: Partial<AcmeItem>) => {
     }
     complete = async (id: string) => {
+        const item = await this.db.get(this.storeName, id);
+        const update = { ...item, tsCompleted: new Date() };
+        await this.db.put(this.storeName, update)
+            .catch((err) => console.log(err))
     }
 }

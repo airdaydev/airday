@@ -52,7 +52,7 @@ export function Item(props: ItemProps) {
         // Delete if new item
         if (save) {
             // optimistically update fastList, then idb
-            props.fastList.updateItemContents(props.item.id, textAreaRef.value);
+            props.fastList.updateItemContents(props.item.id, { text: textAreaRef.value });
             props.fastList.updateItem(props.item.id, { open: false })
         }
         props.keyboardShortcuts.enable();
@@ -226,21 +226,24 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <button
+                    <input
+                        type="checkbox"
                         class={styles['check']}
+                        checked={!!props.item.tsCompleted}
                         onClick={(event) => {
-                            console.log('yo');
+                            
                         }}
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
+                        onChange={(event) => {
+                            props.fastList.completeItem(props.item.id);
+                            // event.preventDefault();
+                            // event.stopPropagation();
                         }}
                         onDblClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
                         }}
-                    ></button>
-                    <div>
+                    ></input>
+                    <div style={`white-space: pre;`}>
                         <div>{props.item.text}</div>
                     </div>
                 </div>

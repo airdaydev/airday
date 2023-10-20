@@ -77,17 +77,17 @@ export class FastList {
         l.splice(index + 1, 0, ...items);
         this.setSignal([...l]);
     }
-    updateItemContents(id: string, newText: string) {
+    updateItemContents(id: string, attrs: Partial<AcmeItem>) {
         // TODO: Move item
         // TODO: Consider maintaining an index
         const index = this.signal().findIndex((item) => item.id === id);
         if (index === -1) return console.error('updateItemContents() index not found');
         this.setSignal((prev) => {
-            prev[index].text = newText;
+            Object.assign(prev[index], attrs)
             return prev;
         });
         // TODO: Abstract as action & persist as queue
-        store.itemModel.update(id, { text: newText }).then(() => {});
+        store.itemModel.update(id, attrs).then(() => {});
         // TODO: Update idb
     }
     updateItem(id: string, attrs: Partial<AcmeItem>) {
@@ -101,6 +101,7 @@ export class FastList {
         // TODO: Update idb
     }
     completeItem(id: string) {
+        this.updateItemContents(id, { tsCompleted: new Date() })
         // const index = this.signal().findIndex((item) => item.id === id);
         // if (index === -1) return console.error('updateItemContents() index not found');
         // this.setSignal((prev) => {
