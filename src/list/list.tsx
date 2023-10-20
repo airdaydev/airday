@@ -15,16 +15,11 @@ import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
 
 interface ListProps {
-  view: AcmeView;
+  view: AcmeContainerView;
   tabId: number;
 }
 
 type DisplayList = (AcmeItem | { type: 'placeholder' })[];
-
-// const bigList = new Array(2000).fill(0).map((val, index, arr) => ({
-//   id: index,
-//   text: `yo-${index}`,
-// }));
 
 // Challenge, index tracking without refreshing the list
 
@@ -41,7 +36,7 @@ export function List(props: ListProps) {
     return <div>List '{props.view.containerId}' not found</div>
   }
   const selection = new AcmeReactiveSelection();
-    // A reactive means of handling list & placeholder changes on drag
+  // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
   // This is better off being created from the fastList which can take a selection module.
   const [displayList, setDisplayList] = createSignal<DisplayList>(fastList.signal());
@@ -69,7 +64,7 @@ export function List(props: ListProps) {
     }
   }));
   /**
-   * Handles drops from same or foreign display list
+   * Handles drops from same or foreign display list, necessary on all lists
    */
   function handleDrop() {
     viewState.setActiveViewId(props.view.id);
@@ -97,7 +92,7 @@ export function List(props: ListProps) {
     }));
   });
   onCleanup(() => {
-    keyboardShortcuts.unregisterHandler('keydown', props.view.id)
+    keyboardShortcuts.unregisterHandler('keydown', props.view.id);
   });
   
   return (
