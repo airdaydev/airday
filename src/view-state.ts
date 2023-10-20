@@ -36,6 +36,14 @@ class ViewState {
         const view = this.createContainerView(containerId);
         this.replaceActiveView(view);
     }
+    openDoneView = () => {
+        const id = createUniqueId();
+        const view: AcmeDoneView = {
+            id,
+            type: 'done',
+        };
+        this.replaceActiveView(view);
+    }
     createContainerView(containerId: string): AcmeContainerView {
         const id = createUniqueId(); // TODO: How does uniqueness work here
         return {
@@ -49,7 +57,7 @@ class ViewState {
         this.replaceView(view, viewState.active.index || 0);
     }
     replaceView(view: AcmeView, index: number = 0) {
-        const newView = createSignal<AcmeContainerView>(view);
+        const newView = createSignal<AcmeView>(view);
         const [list, setList] = this.list;
         setList((prev) => {
             const next = [...prev];

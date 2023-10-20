@@ -14,19 +14,19 @@
 - [x] Add new container
 - [x] Rename container
 - [x] Button to delete & refresh db!
-- [] Ability to mark items as done (chronological story for past events)
-- [] Add entire history of Done items
+- [x] Ability to mark items as done
+- [] Add entire history of Done items chronology
+- [] Delete containers
+- [] Delete items
 - [] Add new item adds saves item into store
 - [] Habit items = set target + smiley
 - [] Filter for habit tracking with sorting (worst/best)
 - [] Sticker system
 - [] Natural looking cross outs? Consider tick seed, underline length
-- [] Delete containers
 - [] Resort containers
 - [] Rename container in nav bar
 - [] Status bar
 - [] Drop to bottom of list when list is not empty but has space below it
-- [] Delete items
 - [] Dark mode
 - [] Multi-select containers
 - [] Implement keyboard undefined behaviour - deselecting origin and trying to shift
@@ -49,6 +49,7 @@
 - [] Allow dropping items between open lists directly
 - [] Highlight active list in nav
 - [] Change list icons
+- [] Timeline index (GL?)
 - [] Drag stack make it nice
 - [] Context menu for one item
 - [] Context menu for many items
@@ -58,6 +59,7 @@
 - [] Nice empty list states
 - [] Mobile web strategy (PWA)
 - [] PWA update strategy
+- [] Automated testing story
 - [] API update strategy
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Client-side encrypted sync ws server
@@ -72,6 +74,7 @@
 - [] Ensure multiple users are accounted for
 
 ## Release ideas
+- [] Friends alpha and testing
 - [] Consider https://codeberg.org/explore/repos
 - [] Consider https://github.com/Linen-dev/linen.dev
 - [] Consider https://motion.dev/

@@ -70,7 +70,7 @@ export function AcmeNav() {
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Up Next</span>
         </button>
-        <button>
+        <button onClick={viewState.openDoneView}>
           <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Done</span>
         </button>

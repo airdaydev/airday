@@ -37,4 +37,8 @@ interface AcmeContainerView extends AcmeViewBase {
   projection: 'list' | 'kanban';
 }
 
-type AcmeView = AcmeContainerView;
+interface AcmeDoneView extends AcmeViewBase {
+  type: 'done';
+}
+
+type AcmeView = AcmeContainerView | AcmeDoneView;
