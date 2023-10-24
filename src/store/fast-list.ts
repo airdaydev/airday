@@ -14,7 +14,7 @@ interface AcmeItemInsertion extends Partial<AcmeContainer> {
 
 export let dragOriginList: string | null = null; // TODO: move to Selection or hybrid
 
-type FastListType = 'trash' | 'up-next' | 'container' | 'done';
+type FastListType = 'trash' | 'upNext' | 'container' | 'done';
 
 /**
  * Optimistic in-memory list
@@ -173,7 +173,7 @@ export abstract class FastList {
 
 // Fast list variant for showing up next items
 export class UpNextFL extends FastList {
-    type: FastListType = 'up-next';
+    type: FastListType = 'upNext';
     createItems = true;
     sortable = true;
     // - All items are by reference only
@@ -228,11 +228,27 @@ export class DoneFL extends FastList {
 
 export const openLists = new Map<string, FastList>();
 
-export function openContainerFL(listId: string): FastList {
-    const identifier = `c#${listId}`;
-    const openList = openLists.get(identifier);
-    if (openList) { return openList; }
-    const fastList = new ContainerFL(listId);
-    openLists.set(identifier, fastList);
+
+
+export function openFastList(view: AcmeView): FastList {
+    let identifier = null;
+    let fastList = null;
+    if (view.type === 'container') {
+        identifier = `c#${view.containerId}`;
+        fastList = openLists.get(identifier);
+        if (!fastList) {
+            fastList = new ContainerFL(view.containerId);
+            openLists.set(identifier, fastList);
+        }
+    }
+    if (view.type === 'done') {
+        identifier = 'done';
+        fastList = openLists.get(identifier);
+        if (!fastList) {
+            fastList = new DoneFL();
+            openLists.set(identifier, fastList);
+        }
+    }
+    if (!fastList) throw new Error('Cannot determine list from view');
     return fastList;
 }

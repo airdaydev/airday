@@ -26,15 +26,22 @@ type ListDirection = 'next' | 'prev';
 
 type OrderedKey = [string, string, string];
 
+type FastListType = 'trash' | 'upNext' | 'container' | 'done';
+
 interface AcmeViewBase {
   id: string;
-  type: 'upNext' | 'container' | 'done';
+  type: FastListType;
 }
 
-interface AcmeFastListView extends AcmeViewBase {
+// TODO: Finish these, useful for type checking
+interface AcmeContainerView extends AcmeViewBase {
   containerId: string;
   type: 'container';
   projection: 'list' | 'kanban';
 }
 
-type AcmeView = AcmeFastListView;
+interface AcmeDoneView extends AcmeViewBase {
+  type: 'done';
+}
+
+type AcmeView = AcmeContainerView | AcmeDoneView;

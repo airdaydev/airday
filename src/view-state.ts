@@ -44,7 +44,7 @@ class ViewState {
         };
         this.replaceActiveView(view);
     }
-    createContainerView(containerId: string): AcmeFastListView {
+    createContainerView(containerId: string): AcmeView {
         const id = createUniqueId(); // TODO: How does uniqueness work here
         return {
             id,
