@@ -32,7 +32,7 @@ export function List(props: ListProps) {
   let scrollRef: HTMLDivElement;
   let fastList = openFastList(props.view);
   const container = store.containerModel.index.get(props.view.containerId);
-  if (!fastList || !container) {
+  if (!fastList) {
     return <div>{props.view.type}</div>
   }
   const selection = new AcmeReactiveSelection();
@@ -109,7 +109,7 @@ export function List(props: ListProps) {
         onMouseLeave={(() => selection.setLastTouchedIndex(false))}
         onMouseUp={handleDrop}
       >
-        <ListHeader tabId={props.tabId} container={container} />
+        {container && <ListHeader tabId={props.tabId} container={container} />}
         <div
           ref={scrollRef}
           class={styles['list-scroll']}

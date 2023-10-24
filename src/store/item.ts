@@ -65,11 +65,11 @@ export class ItemModel {
         return items;
     }
     getCompletedItems = async (fromDate: Date): Promise<AcmeItem[]> => {
-        if (!this.itemStore) {
-            throw new Error('Item store not initialised.');
-        }
-        const now = IDBKeyRange.upperBound([new Date()])
-        const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
+        // if (!this.itemStore) {
+        //     throw new Error('Item store not initialised.');
+        // }
+        // const now = IDBKeyRange.upperBound([new Date()])
+        // const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
         // this.db.
         // const items = await this.db.g(this.storeName, 'done', now);
         // return items;

@@ -221,6 +221,11 @@ export class DoneFL extends FastList {
     sortable = false;
     constructor() {
         super();
+        this.load();
+    }
+    async load() {
+        const list = await store.itemModel.getCompletedItems(new Date());
+        if (this.setSignal) this.setSignal(list);
     }
     // Completing an item moves it to its original list, or inbox if not found
     // Dropping drops on top of the list (generally, due to time deleted)
