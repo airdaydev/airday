@@ -60,6 +60,7 @@
 - [] Timeline index (GL?)
 - [] Add now playing list, allow dragging items to now playing list
 - [] Drag divider to change view size
+- [] Focus mode
 - [] Nice empty list states
 - [] Export data (JSON, excel, markdown)
 - [] Keyboard only, accessibility
@@ -108,3 +109,4 @@
 - [] Secrets
 - [] List animations
 - [] Board prototype (canvas/webgl)
+- [] Pins?
