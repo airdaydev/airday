@@ -22,7 +22,7 @@
 - [x] Highlight active list in nav
 
 ## Frontend Lifecycle
-- [] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
+- [x] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
 - [] Up Next board
 - [] Trash items
 - [] Empty trash
@@ -38,6 +38,8 @@
 
 ## UI
 - [] List should scroll up as you drag up
+- [] Show date finished on completed items
+- [] Show completed item in og list for 5 seconds before disappearing
 - [] Item in shadow copy of same list should update as you complete update!
 - [] Natural looking cross outs? Consider tick seed, underline length
 - [] Rename container in sidenav
@@ -62,7 +64,8 @@
 - [] Drag divider to change view size
 - [] Focus mode
 - [] Nice empty list states
-- [] Export data (JSON, excel, markdown)
+- [] Export data markdown, json, csv
+- [] Import markdown, json
 - [] Keyboard only, accessibility
 
 ## Stickers
@@ -110,3 +113,4 @@
 - [] List animations
 - [] Board prototype (canvas/webgl)
 - [] Pins?
+- [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
