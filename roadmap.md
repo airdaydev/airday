@@ -34,6 +34,7 @@
 - [] Multi-select containers
 - [] When dragging while holding down command, duplicate
 - [] Add search
+- [] Persist views (per device)
 
 ## UI
 - [] List should scroll up as you drag up

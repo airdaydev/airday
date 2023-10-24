@@ -31,14 +31,10 @@ interface AcmeViewBase {
   type: 'upNext' | 'container' | 'done';
 }
 
-interface AcmeContainerView extends AcmeViewBase {
+interface AcmeFastListView extends AcmeViewBase {
   containerId: string;
   type: 'container';
   projection: 'list' | 'kanban';
 }
 
-interface AcmeDoneView extends AcmeViewBase {
-  type: 'done';
-}
-
-type AcmeView = AcmeContainerView | AcmeDoneView;
+type AcmeView = AcmeFastListView;

@@ -26,16 +26,16 @@ export abstract class FastList {
     abstract type: FastListType | null;
     createItems: boolean = false; // Can items be created under this list
     sortable: boolean = false;
-    listId: string;
     signal: Accessor<AcmeItem[]>;
     setSignal: Setter<AcmeItem[]>;
-    constructor(listId: string) {
+    constructor() {
         const [signal, setSignal] = createSignal([]);
         this.signal = signal;
         this.setSignal = setSignal;
-        this.listId = listId;
         // this.store.subscribe(listId, onUpdate);
-        this.initList();
+    }
+    load() {
+        console.log('load() not yet implemented');
     }
     setDragOriginList = (listId: string) => {
         dragOriginList = listId;
@@ -113,10 +113,6 @@ export abstract class FastList {
         }
         // Trigger signal update
     }
-    async initList() {
-        const list = await store.itemModel.getItemsByList(this.listId);
-        if (this.setSignal) this.setSignal(list);
-    }
     /**
      * 
      * @param start inclusive start
@@ -182,21 +178,27 @@ export class UpNextFL extends FastList {
     sortable = true;
     // - All items are by reference only
     // - New items go to index
-    constructor(props) {
-        super(props);
+    constructor() {
+        super();
     }
 }
 
 // Container items
 export class ContainerFL extends FastList {
     type: FastListType = 'container';
+    listId: string;
     createItems = true;
     sortable = true;
-    constructor(props) {
-        super(props);
+    constructor(listId: string) {
+        super();
+        this.listId = listId;
+        this.load();
     }
-    load() {
-
+    async initList() {
+    }
+    async load() {
+        const list = await store.itemModel.getItemsByList(this.listId);
+        if (this.setSignal) this.setSignal(list);
     }
 }
 
@@ -205,8 +207,8 @@ export class TrashFL extends FastList {
     type: FastListType = 'trash';
     createItems = false;
     sortable = false;
-    constructor(props) {
-        super(props);
+    constructor() {
+        super();
     }
 }
 
@@ -217,8 +219,8 @@ export class DoneFL extends FastList {
     type: FastListType = 'done';
     createItems = true;
     sortable = false;
-    constructor(props) {
-        super(props);
+    constructor() {
+        super();
     }
     // Completing an item moves it to its original list, or inbox if not found
     // Dropping drops on top of the list (generally, due to time deleted)
@@ -226,11 +228,10 @@ export class DoneFL extends FastList {
 
 export const openLists = new Map<string, FastList>();
 
-export function openContainerFL(listId: string) {
+export function openContainerFL(listId: string): FastList {
     const identifier = `c#${listId}`;
-    if (openLists.has(identifier)) {
-        return openLists.get(identifier);
-    }
+    const openList = openLists.get(identifier);
+    if (openList) { return openList; }
     const fastList = new ContainerFL(listId);
     openLists.set(identifier, fastList);
     return fastList;

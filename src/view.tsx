@@ -11,14 +11,7 @@ interface ViewProps {
  */
 export function View(props: ViewProps) {
   // Type checking
-  if (props.view.type === 'container') {
-    return (
-      <List view={props.view} tabId={props.tabId} />
-    );
-  }
-  if (props.view.type === 'done') {
-    return (
-      <Done tabId={props.tabId} />
-    );
-  }
+  return (
+    <List view={props.view} tabId={props.tabId} />
+  );
 }

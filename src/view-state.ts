@@ -44,7 +44,7 @@ class ViewState {
         };
         this.replaceActiveView(view);
     }
-    createContainerView(containerId: string): AcmeContainerView {
+    createContainerView(containerId: string): AcmeFastListView {
         const id = createUniqueId(); // TODO: How does uniqueness work here
         return {
             id,
@@ -80,7 +80,7 @@ class ViewState {
         // TODO: Allow more lists
         if (this.list[0]().length > 8) return;
         const id = createUniqueId();
-        const view = createSignal<AcmeContainerView>({
+        const view = createSignal<AcmeFastListView>({
             // TODO: Detect clash / or how does this lib work
             id,
             type: 'container',
