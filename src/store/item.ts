@@ -27,7 +27,7 @@ export class ItemModel {
         itemStore.createIndex('listId', 'listId');
         // itemStore.createIndex('id', 'id');
         itemStore.createIndex('ordered', ['listId', 'sortKey', 'id']);
-        itemStore.createIndex('done', ['doneTimestamp']);
+        itemStore.createIndex('done', ['tsCompleted']);
     }
     ready() { return !!this.db; }
     get db() {
@@ -65,14 +65,15 @@ export class ItemModel {
         return items;
     }
     getCompletedItems = async (fromDate: Date): Promise<AcmeItem[]> => {
-        // if (!this.itemStore) {
-        //     throw new Error('Item store not initialised.');
-        // }
+        if (!this.db) {
+            throw new Error('Item store not initialised.');
+        }
         // const now = IDBKeyRange.upperBound([new Date()])
         // const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
-        // this.db.
+        const items = await this.db.getAllFromIndex(this.storeName, 'done');
+        console.log(items);
         // const items = await this.db.g(this.storeName, 'done', now);
-        // return items;
+        return items;
     }
     update = async (id: string, attributes: Partial<AcmeItem>) => {
         const item = await this.db.get(this.storeName, id);
