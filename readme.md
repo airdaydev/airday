@@ -21,6 +21,7 @@ Trash = statically ordered list
 
 
 ## CRDT references
+- How does excalidraw work https://github.com/excalidraw/excalidraw
 - https://medium.com/hackernoon/building-conclave-a-decentralized-real-time-collaborative-text-editor-a6ab438fe79f
 - https://news.ycombinator.com/item?id=33865672
 - https://josephg.com/blog/crdts-go-brrr/
