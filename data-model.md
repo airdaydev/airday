@@ -10,6 +10,26 @@ IDB: fully unencrypted & assembled (?) (Support for in-flight updates)
 Fast list: in memory optimistic access
 Display list: rendering & interaction
 
+## Pseudocode stream for completing an item - upstream
+1. New action { action: completed, date: new Date() }
+#### OPTIMISTIC UI Updates:
+2. Done list adds completed item
+3. regular lists remove item (queries to consider later)
+#### Sync/Storage
+Transaction:
+1. Action applied immediately to crdt & result stored
+2. Pending action idb queue
+
+(UNDO/REDO):
+Pending actions for session stored in-memory store as counter actions
+
+## downstream:
+Update received
+1. Action applied immediately to crdt & results stored with vector clock
+2. IDB item computed
+3. Fast list item updated
+
+
 ## Resource types (with tombstones)
 Items
 Lists

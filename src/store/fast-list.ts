@@ -71,6 +71,10 @@ export abstract class FastList {
         l.splice(index + 1, 0, ...items);
         this.setSignal([...l]);
     }
+    onComplete(id: string) {
+        // 1. After 3 seconds, update fast list (move into done list)
+        // 2. 
+    }
     updateItemContents(id: string, attrs: Partial<AcmeItem>) {
         // TODO: Move item
         // TODO: Consider maintaining an index
@@ -232,8 +236,6 @@ export class DoneFL extends FastList {
 }
 
 export const openLists = new Map<string, FastList>();
-
-
 
 export function openFastList(view: AcmeView): FastList {
     let identifier = null;

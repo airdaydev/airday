@@ -17,7 +17,7 @@
   "dependencies": {
     "fractional-indexing": "^3.2.0",
     "idb": "^7.1.1",
-    "nanoid": "^5.0.2",
-    "solid-js": "^1.8.3"
+    "nanoid": "^5.0.3",
+    "solid-js": "^1.8.5"
   }
 }
