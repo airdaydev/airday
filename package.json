@@ -1,7 +1,7 @@
 {
   "name": "solid-acme",
   "version": "0.0.1",
-  "description": "SolidJS port of AcmeList",
+  "description": "SolidJS port of Borde (formerly AcmeList)",
   "scripts": {
     "start": "vite",
     "dev": "vite",

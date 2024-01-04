@@ -1,7 +1,7 @@
 import { For, createSignal, Accessor } from 'solid-js';
 import styles from './nav.module.css';
 import { viewState } from '../view-state';
-import TodoSVG from '../icons/todo.svg';
+import TodoSVG from '../icons/nb-todo.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
@@ -37,7 +37,7 @@ export function NavListItem(props: NavListItemProps) {
           }
         }}
       >
-        <TodoSVG style={`display: block;flex-shrink: 0;height: 1.25rem;width: 1.25rem;`} />
+        <TodoSVG style={`display: block;flex-shrink: 0;height: 1.75rem;width: 1.75rem;`} />
         <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;'>
           {props.container() && props.container().name}
         </span>
@@ -65,7 +65,7 @@ export function AcmeNav() {
         'margin-left': getMargin(),
       }}
     >
-      <div class={styles['nav-list']}>
+      <div class={styles['nav-list']} style="border-top: 1px solid var(--border, value);">
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Up Next</span>
@@ -75,46 +75,49 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
       </div>
-        <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+        Boards
+      </h2>
+      <div class={styles['nav-list']}>
+        <For each={store.containerModel.ol()}>
+          {(container) => <NavListItem container={container} />}
+        </For>
+        <AddListButton />
+      </div>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <section class={styles['nav-list']}>
         <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-          By area
+          Stickers
         </h2>
-        <div class={styles['nav-list']}>
-          <For each={store.containerModel.ol()}>
-            {(container) => <NavListItem container={container} />}
-          </For>
-          <AddListButton />
+        <div>
+          <button>
+            TODO: Sticker
+          </button>
         </div>
-        <section class={styles['nav-list']}>
-          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-            By sticker
-          </h2>
-          <div>
-            <button>
-              TODO: Sticker
-            </button>
-          </div>
-        </section>
-        <section class={styles['nav-list']}>
-          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-            By filter
-          </h2>
-          <div>
-            <button>
-              Most neglected
-            </button>
-          </div>
-        </section>
-        <section>
-          <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-            Dev
-          </h2>
-          <div>
-            <button onClick={store.reset}>
-              Refresh db
-            </button>
-          </div>
-        </section>
+      </section>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <section class={styles['nav-list']}>
+        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+          Filters
+        </h2>
+        <div>
+          <button>
+            Most neglected
+          </button>
+        </div>
+      </section>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <section>
+        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
+          Dev
+        </h2>
+        <div>
+          <button onClick={store.reset}>
+            Refresh db
+          </button>
+        </div>
+      </section>
     </nav>
   );
 }

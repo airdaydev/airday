@@ -68,7 +68,7 @@ class AcmeLocalStore {
         await this.connect();
         openLists.clear();
         const items = [
-            ...genTestData('acmelist', acmeItems),
+            ...genTestData('bordelist', acmeItems),
             ...genTestData('inbox', inboxItems),
           ]
           await store.itemModel.insert(items);
@@ -78,8 +78,8 @@ class AcmeLocalStore {
               name: 'Inbox',
             },
             {
-              id: 'acmelist',
-              name: 'AcmeList',
+              id: 'borde',
+              name: 'Borde',
             },
             {
               id: 'empty-list',

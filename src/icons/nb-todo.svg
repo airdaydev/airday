@@ -1,0 +1,25 @@
+<svg width="16px" height="20px" viewBox="0 0 16 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Artboard</title>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="13" height="17" rx="0.5"></rect>
+        <filter x="-7.7%" y="-5.9%" width="130.8%" height="123.5%" filterUnits="objectBoundingBox" id="filter-2">
+            <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0.25537817   0 0 0 0 0.25537817   0 0 0 0 0.25537817  0 0 0 0.440013112 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Artboard" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-8" transform="translate(1, 1)">
+            <g id="Rectangle">
+                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                <use fill="#F6EAD8" fill-rule="evenodd" xlink:href="#path-1"></use>
+            </g>
+            <path d="M3,12.5739666 L3.63316244,13.0218173 C3.67503978,13.0514381 3.73253819,13.0445701 3.76626068,13.0059191 L4.64391239,12 L4.64391239,12" id="Path-2" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></path>
+            <line x1="7" y1="12.6041629" x2="10.0000005" y2="12.5437703" id="Path-3" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></line>
+            <path d="M3,8.57396663 L3.63316244,9.0218173 C3.67503978,9.05143813 3.73253819,9.04457013 3.76626068,9.00591915 L4.64391239,8 L4.64391239,8" id="Path-2" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></path>
+            <line x1="7" y1="8.60416293" x2="10.0000005" y2="8.54377032" id="Path-3" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></line>
+            <path d="M3,4.57396663 L3.63316244,5.0218173 C3.67503978,5.05143813 3.73253819,5.04457013 3.76626068,5.00591915 L4.64391239,4 L4.64391239,4" id="Path-2" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></path>
+            <line x1="7" y1="4.60416293" x2="10.0000005" y2="4.54377032" id="Path-3" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></line>
+        </g>
+    </g>
+</svg>

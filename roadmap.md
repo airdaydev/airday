@@ -1,4 +1,4 @@
-# AcmeList SolidJS Roadmap
+# Borde SolidJS Roadmap
 
 ## Prototype
 - [x] Before going any further w/selection mechanism, make the list reactive to item updates, moves & edits. Preferably the selection mechanism attaches to the projection of the list, rather than the list itself
@@ -87,7 +87,7 @@
 - [] PWA update strategy
 - [] Automated testing story
 - [] Paid web service with introductory prices
-- [] Opens immediately into application, (no landing page?) or landing page at acmelist.com/help
+- [] Opens immediately into application, (no landing page?) or landing page at borde.app/help
 - [] Consider license type for copyleft (reselling no)
 - [] Custom Themes / compact mode
 - [] Spanish (EU) localisation

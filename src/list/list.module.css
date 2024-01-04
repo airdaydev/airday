@@ -40,11 +40,11 @@
 }
 
 .active .item.selected {
-    background: #E4DDE3;
+    background: var(--shade, value);
 }
 
 .item.selected {
-    background: #eee;
+    background: var(--shade, value);
 }
 
 .item.selected-first {

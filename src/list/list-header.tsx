@@ -2,7 +2,7 @@ import { Signal } from 'solid-js';
 import { viewState } from '../view-state';
 import { EditableListTitle } from './list-title';
 import styles from './list-header.module.css';
-import TodoSVG from '../icons/todo.svg';
+import TodoSVG from '../icons/nb-todo.svg';
 import PlusSVG from '../icons/plus.svg';
 import MoreSVG from '../icons/more-horizontal.svg';
 import XSVG from '../icons/x.svg';
@@ -17,7 +17,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         <div class={styles['list-header']}>
             <div class={styles['list-header-internal']}>
             <div style={`display: flex; align-items: center;`}>
-                <TodoSVG style={`margin: 0.5em;height: 1.25rem;width: 1.25rem;`} />
+                <TodoSVG style={`margin: 0.5em;height: 1.75rem;width: 1.75rem;`} />
                 <EditableListTitle container={props.container} />
             </div>
             <div>

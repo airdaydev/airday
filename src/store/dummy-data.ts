@@ -3,7 +3,7 @@ import { generateNKeysBetween } from 'fractional-indexing';
 import { store } from './main.js';;
 
 export const acmeItems = [
-    'AcmeList',
+    'Borde',
     'Wrap handlebars with Cinelli wrap',
     'GET CAR SERVICED 02 xxxx xxxx',
     'https://openstax.org/details/books/precalculus-2e'

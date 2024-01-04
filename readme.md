@@ -1,6 +1,6 @@
 ## solid-acme
 
-AcmeList early days
+Borde early days
 
 ## Architecture
 - SolidJS (templating, reactivity)
