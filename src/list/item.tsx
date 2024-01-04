@@ -243,7 +243,7 @@ export function Item(props: ItemProps) {
                             event.stopPropagation();
                         }}
                     ></input>
-                    <div style={`white-space: pre;`}>
+                    <div style={`white-space: pre-line;`}>
                         <div>{props.item.text}</div>
                     </div>
                 </div>
