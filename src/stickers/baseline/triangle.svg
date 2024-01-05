@@ -1,0 +1,6 @@
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>triangle@1x</title>
+    <g id="triangle" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <polygon id="Triangle" fill="#32B274" transform="translate(12, 12) rotate(180) translate(-12, -12)" points="12 1 23 23 1 23"></polygon>
+    </g>
+</svg>

@@ -7,6 +7,7 @@ import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
 import styles from './list.module.css';
+import checkStyles from './check.module.css';
 import { distance, moveCaretToPosition } from './utils';
 
 interface ItemProps {
@@ -226,23 +227,25 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <input
-                        type="checkbox"
-                        class={styles['check']}
-                        checked={!!props.item.tsCompleted}
-                        onClick={(event) => {
-                            
-                        }}
-                        onChange={(event) => {
-                            props.fastList.completeItem(props.item.id, event.target.checked ? new Date() : null);
-                            // event.preventDefault();
-                            // event.stopPropagation();
-                        }}
-                        onDblClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }}
-                    ></input>
+                    <label class={checkStyles['check']}>
+                        <input
+                            type="checkbox"
+                            checked={!!props.item.tsCompleted}
+                            onClick={(event) => {
+                                
+                            }}
+                            onChange={(event) => {
+                                props.fastList.completeItem(props.item.id, event.target.checked ? new Date() : null);
+                                // event.preventDefault();
+                                // event.stopPropagation();
+                            }}
+                            onDblClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }}
+                        ></input>
+                        <span></span>
+                    </label>
                     <div style={`white-space: pre-line;`}>
                         <div>{props.item.text}</div>
                     </div>

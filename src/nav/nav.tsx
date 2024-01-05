@@ -1,4 +1,5 @@
 import { For, createSignal, Accessor } from 'solid-js';
+import { Stickers } from './stickers';
 import styles from './nav.module.css';
 import { viewState } from '../view-state';
 import TodoSVG from '../icons/nb-todo.svg';
@@ -65,7 +66,10 @@ export function AcmeNav() {
         'margin-left': getMargin(),
       }}
     >
-      <div class={styles['nav-list']} style="border-top: 1px solid var(--border, value);">
+      <div
+        class={`${styles['nav-list']} ${styles['nav-text']}`}
+        style="border-top: 1px solid var(--border, value);"
+      >
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Up Next</span>
@@ -79,25 +83,16 @@ export function AcmeNav() {
       <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
         Boards
       </h2>
-      <div class={styles['nav-list']}>
+      <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
         <For each={store.containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
         </For>
         <AddListButton />
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
-      <section class={styles['nav-list']}>
-        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-          Stickers
-        </h2>
-        <div>
-          <button>
-            TODO: Sticker
-          </button>
-        </div>
-      </section>
+      <Stickers />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
-      <section class={styles['nav-list']}>
+      <section class={`${styles['nav-list']} ${styles['nav-text']}`}>
         <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
           Filters
         </h2>
@@ -112,7 +107,7 @@ export function AcmeNav() {
         <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
           Dev
         </h2>
-        <div>
+        <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
           <button onClick={store.reset}>
             Refresh db
           </button>
