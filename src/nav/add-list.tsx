@@ -19,7 +19,7 @@ export const AddListButton = () => {
             const id = nanoid();
             store.containerModel.insert({
                 id,
-                name: inputRef?.value || 'New list',
+                name: inputRef?.value || 'New board',
             });
             viewState.openContainerView(id);
         }
@@ -47,7 +47,7 @@ export const AddListButton = () => {
             <input
                 style='border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;'
                 type="text"
-                placeholder="New list"
+                placeholder="New board"
                 ref={inputRef}
                 onKeyDown={handleKeyDown}
             />
@@ -56,7 +56,7 @@ export const AddListButton = () => {
                 class={styles['add-list-button']}
                 onClick={() => enterEditMode()}
               >
-                Add area
+                Add board
               </button>
             )}
         </>
