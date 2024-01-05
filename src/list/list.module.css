@@ -74,3 +74,44 @@
 .check:hover {
     background: #f2f2f2;
 }
+
+/* List Header */
+
+.list-header {
+    border-right: 1px solid var(--border, value);
+}
+
+.list-header-internal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--shade, value);
+    padding: 0.25em 0;
+}
+
+.active .list-header svg {
+    color: black;
+}
+
+.active .list-header-internal {
+    /* border-left: 1px solid blue; */
+    background: #DFD1DC;
+}
+
+.list-button {
+    height: 2.5em;
+    width: 2.5em;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.list-button:hover {
+    background: var(--shade, value);
+}
+
+.list-button svg {
+    width: 1.25em;
+    stroke-width: 1.25px;
+}

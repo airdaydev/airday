@@ -5,7 +5,7 @@ import styles from './app.module.css';
 import { viewState } from './view-state';
 import { Bar } from './bar/bar';
 import { View } from './view';
-import { Header } from './header';
+import { Header } from './nav/header';
           
 export function App() {
   return (

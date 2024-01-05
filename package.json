@@ -12,7 +12,7 @@
   "devDependencies": {
     "vite": "^4.5.0",
     "vite-plugin-solid": "^2.7.2",
-    "vite-plugin-solid-svg": "^0.7.0"
+    "vite-plugin-solid-svg": "^0.8.0"
   },
   "dependencies": {
     "fractional-indexing": "^3.2.0",

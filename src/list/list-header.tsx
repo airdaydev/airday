@@ -1,7 +1,7 @@
 import { Signal } from 'solid-js';
 import { viewState } from '../view-state';
 import { EditableListTitle } from './list-title';
-import styles from './list-header.module.css';
+import styles from './list.module.css';
 import TodoSVG from '../icons/nb-todo.svg';
 import PlusSVG from '../icons/plus.svg';
 import MoreSVG from '../icons/more-horizontal.svg';
