@@ -1,10 +1,19 @@
 :root {
   --border: #e1e1e1;
+  --background: #FAF7FF;
   --shade: #F0E7EE;
-  --blur: 0.8399999999999994px;
-  --spread: -0.5999999999999996px;
-  --horiz: 0.3693968851953951px;
-  --vert: 0.47280645216403266px;
+}
+
+[data-theme="botanic"] {
+  --background: #D8D8D8;
+}
+
+[data-theme="dark"] {
+  --background: #D8D8D8;
+}
+
+[data-theme="paper"] {
+  --background: #D8D8D8;
 }
 
 @font-face {
@@ -27,5 +36,5 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #FAF7FF;
+  background-color: var(--background, value);
 }
