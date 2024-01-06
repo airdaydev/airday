@@ -6,6 +6,7 @@ import TodoSVG from '../icons/nb-todo.svg';
 import PlusSVG from '../icons/plus.svg';
 import MoreSVG from '../icons/more-horizontal.svg';
 import XSVG from '../icons/x.svg';
+import { ListIcon } from './list-icon';
 
 interface ListHeaderProps {
     container: Signal<BordeContainer>;
@@ -17,8 +18,8 @@ export const ListHeader = (props: ListHeaderProps) => {
         <div class={styles['list-header']}>
             <div class={styles['list-header-internal']}>
             <div style={`display: flex; align-items: center;`}>
-                <TodoSVG style={`margin: 0.5em;height: 1.75rem;width: 1.75rem;`} />
-                <EditableListTitle container={props.container} />
+              <ListIcon container={props.container[0]()} />
+              <EditableListTitle container={props.container} />
             </div>
             <div>
                 <button class={styles['list-button']}>

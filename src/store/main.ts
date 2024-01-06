@@ -76,7 +76,7 @@ class AcmeLocalStore {
             {
               id: 'inbox',
               name: 'Inbox',
-              icon: 'notepads',
+              icon: 'inbox',
               sortKey: 'a',
             },
             {
@@ -86,9 +86,9 @@ class AcmeLocalStore {
               sortKey: 'b',
             },
             {
-              id: 'travel',
+              id: 'work',
               name: 'a really really long named list',
-              icon: 'airmail',
+              icon: 'notepads',
               sortKey: 'c',
             },
           ]);
