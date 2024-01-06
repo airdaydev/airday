@@ -8,7 +8,7 @@
 
 .list-scroll {
     overflow-y: scroll;
-    border-right: 1px solid var(--border, value);
+    border-right: 1px solid var(--border);
     height: 100%;
 }
 
@@ -39,11 +39,11 @@
 }
 
 .active .item.selected {
-    background: var(--shade, value);
+    background: var(--shade);
 }
 
 .item.selected {
-    background: var(--shade, value);
+    background: var(--shade);
 }
 
 .item.selected-first {
@@ -63,14 +63,14 @@
 /* List Header */
 
 .list-header {
-    border-right: 1px solid var(--border, value);
+    border-right: 1px solid var(--border);
 }
 
 .list-header-internal {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--shade, value);
+    background: var(--shade);
     padding: 0.25em 0;
 }
 
@@ -93,7 +93,7 @@
 }
 
 .list-button:hover {
-    background: var(--shade, value);
+    background: var(--shade);
 }
 
 .list-button svg {

@@ -68,7 +68,7 @@ export function AcmeNav() {
     >
       <div
         class={`${styles['nav-list']} ${styles['nav-text']}`}
-        style="border-top: 1px solid var(--border, value);"
+        style="border-top: 1px solid var(--border);"
       >
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
@@ -79,7 +79,7 @@ export function AcmeNav() {
           <span>Done</span>
         </button>
       </div>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
         Boards
       </h2>
@@ -89,9 +89,9 @@ export function AcmeNav() {
         </For>
         <AddListButton />
       </div>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <section class={`${styles['nav-list']} ${styles['nav-text']}`}>
         <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
           Filters
@@ -102,7 +102,7 @@ export function AcmeNav() {
           </button>
         </div>
       </section>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border, value);" />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <section>
         <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
           Dev
