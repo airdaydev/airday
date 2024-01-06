@@ -1,7 +1,7 @@
 import { Accessor, createSignal, Setter, Signal } from 'solid-js';
 import { store, AcmeIDB, dbNotReadyMessage } from './main';
 
-export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
+export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 
 // Structure:
 // 1. signal(list of signal(items)) (sorted index)
@@ -16,12 +16,12 @@ export const [containers, setContainers] = createSignal<AcmeContainer[]>([]);
 export class ContainerModel {
     storeName = 'container';
     acmedb: AcmeIDB | null = null;
-    ol: Accessor<Accessor<AcmeContainer>[]>;
-    setOl: Setter<Accessor<AcmeContainer>[]>;
-    index = new Map<string, Signal<AcmeContainer>>();
-    map: Map<string, AcmeContainer> = new Map();
+    ol: Accessor<Accessor<BordeContainer>[]>;
+    setOl: Setter<Accessor<BordeContainer>[]>;
+    index = new Map<string, Signal<BordeContainer>>();
+    map: Map<string, BordeContainer> = new Map();
     constructor() {
-        const signal = createSignal<Accessor<AcmeContainer>[]>([]);
+        const signal = createSignal<Accessor<BordeContainer>[]>([]);
         this.ol = signal[0];
         this.setOl = signal[1];
     }
@@ -48,7 +48,7 @@ export class ContainerModel {
         if (!this.acmedb) throw new Error('Item store uninitialised');
         return this.acmedb;
     }
-    insert = async (data: AcmeContainer | AcmeContainer[], persist = true) => {
+    insert = async (data: BordeContainer | BordeContainer[], persist = true) => {
         // Convert to array
         const src = Array.isArray(data) ? data : [data];
         // Store in database (TODO: Optimisation: Immediately store in mem)
@@ -61,6 +61,7 @@ export class ContainerModel {
         // Create signals
         const newItems = src.map((item, index) => {
             // TODO: Centralise queue
+            console.log(item)
             if (persist) { dbPromises.push(store.add(item)); }
             const signal = createSignal(item);
             this.index.set(item.id, signal);
@@ -81,10 +82,10 @@ export class ContainerModel {
             });
         }
     }
-    idb_insert = async(data: AcmeContainer | AcmeContainer[]) => {
+    idb_insert = async(data: BordeContainer | BordeContainer[]) => {
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
-        const insert = async (item: AcmeContainer) => {
+        const insert = async (item: BordeContainer) => {
             const prev = await store.get(item.id);
             if (prev) throw new Error('Key already exists');
             const val = await store.add(item);

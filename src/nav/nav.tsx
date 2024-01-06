@@ -3,6 +3,9 @@ import { Stickers } from './stickers';
 import styles from './nav.module.css';
 import { viewState } from '../view-state';
 import TodoSVG from '../icons/nb-todo.svg';
+import CuttingBoardSVG from '../icons/cutting-board.svg';
+import AirmailSVG from '../icons/airmail.svg';
+import NotepadsSVG from '../icons/notepads.svg';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
@@ -11,12 +14,22 @@ import { store } from '../store/main';
 import { AddListButton } from './add-list';
 
 interface NavListItemProps {
-  container: Accessor<AcmeContainer>,
+  container: Accessor<BordeContainer>,
 }
+
+const icons = new Map([
+  ['cutting-board', CuttingBoardSVG],
+  ['airmail', AirmailSVG],
+  ['notepads', NotepadsSVG],
+])
 
 // TODO: Turn off keyboard when context menu open
 export function NavListItem(props: NavListItemProps) {
   let button: HTMLButtonElement | undefined;
+  const iconText = props.container().icon;
+  const icon = iconText && icons.get(iconText);
+  const Icon = icon || TodoSVG;
+  console.log('iconText', iconText);
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
@@ -38,7 +51,7 @@ export function NavListItem(props: NavListItemProps) {
           }
         }}
       >
-        <TodoSVG style={`display: block;flex-shrink: 0;height: 1.75rem;width: 1.75rem;`} />
+        <Icon style={`display: block;flex-shrink: 0;height: 1.75rem;width: 1.75rem;`} />
         <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;'>
           {props.container() && props.container().name}
         </span>
@@ -68,7 +81,7 @@ export function AcmeNav() {
     >
       <div
         class={`${styles['nav-list']} ${styles['nav-text']}`}
-        style="border-top: 1px solid var(--border);"
+        style="border-top: 1px solid var(--border); padding-top: 0.5em;"
       >
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />

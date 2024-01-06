@@ -8,7 +8,7 @@ import MoreSVG from '../icons/more-horizontal.svg';
 import XSVG from '../icons/x.svg';
 
 interface ListHeaderProps {
-    container: Signal<AcmeContainer>;
+    container: Signal<BordeContainer>;
     tabId: number;
 }
 

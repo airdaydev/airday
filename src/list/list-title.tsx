@@ -4,7 +4,7 @@ import { containerModel } from "../store/main";
 import { moveCaretToPosition } from './utils';
 
 interface EditableListTitleProps {
-    container: Signal<AcmeContainer>;
+    container: Signal<BordeContainer>;
 }
 
 export const EditableListTitle = (props: EditableListTitleProps) => {

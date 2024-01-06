@@ -71,7 +71,7 @@
     justify-content: space-between;
     align-items: center;
     background: var(--shade);
-    padding: 0.25em 0;
+    padding: 0.125em 0;
 }
 
 .active .list-header svg {

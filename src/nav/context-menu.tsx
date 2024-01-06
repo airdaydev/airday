@@ -3,7 +3,7 @@ import { viewState } from "../view-state";
 
 interface NavItemContextMenu {
     close: () => void;
-    container: Accessor<AcmeContainer>;
+    container: Accessor<BordeContainer>;
     offset: Accessor<[number, number]>;
 }
 

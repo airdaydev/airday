@@ -10,7 +10,7 @@ const schemaVersion = 1;
 
 interface DBTypes {
     items: AcmeItem;
-    lists: AcmeContainer;
+    lists: BordeContainer;
 }
 
 export type AcmeIDB = IDBPDatabase<DBTypes>;
@@ -76,14 +76,20 @@ class AcmeLocalStore {
             {
               id: 'inbox',
               name: 'Inbox',
+              icon: 'notepads',
+              sortKey: 'a',
             },
             {
               id: 'borde',
               name: 'Borde',
+              icon: 'cutting-board',
+              sortKey: 'b',
             },
             {
-              id: 'empty-list',
+              id: 'travel',
               name: 'a really really long named list',
+              icon: 'airmail',
+              sortKey: 'c',
             },
           ]);
     }

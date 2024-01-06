@@ -6,7 +6,7 @@ import { store } from './main.js';
 // https://www.reddit.com/r/solidjs/comments/ilebtl/efficient_state_updates_to_arrays/
 // https://github.com/solidjs/solid/discussions/366
 
-interface AcmeItemInsertion extends Partial<AcmeContainer> {
+interface AcmeItemInsertion extends Partial<BordeContainer> {
     text: string;
     sortKey: string;
     listId: string;

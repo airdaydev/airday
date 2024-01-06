@@ -7,12 +7,12 @@ interface AcmeItem {
   listId: string;
 }
 
-interface AcmeContainer {
+interface BordeContainer {
   id: string;
   name: string;
   sortKey: string;
+  icon?: string;
   // TODO: sortKey
-  // TODO: icon
 }
 
 type SelectItemMode = 'normal' | 'add' | 'addOne' | 'remove';
@@ -34,7 +34,7 @@ interface AcmeViewBase {
 }
 
 // TODO: Finish these, useful for type checking
-interface AcmeContainerView extends AcmeViewBase {
+interface BordeContainerView extends AcmeViewBase {
   containerId: string;
   type: 'container';
   projection: 'list' | 'kanban';
@@ -44,4 +44,4 @@ interface AcmeDoneView extends AcmeViewBase {
   type: 'done';
 }
 
-type AcmeView = AcmeContainerView | AcmeDoneView;
+type AcmeView = BordeContainerView | AcmeDoneView;
