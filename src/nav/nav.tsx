@@ -5,6 +5,7 @@ import { viewState } from '../view-state';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
+import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
 import { NavItemContextMenu } from './context-menu';
 import { store } from '../store/main';
@@ -77,6 +78,10 @@ export function AcmeNav() {
         <button onClick={viewState.openDoneView}>
           <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Done</span>
+        </button>
+        <button onClick={viewState.openDoneView}>
+          <TrashSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Trash</span>
         </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />

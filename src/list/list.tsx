@@ -147,8 +147,8 @@ export function List(props: ListProps) {
               )}
             </For>
           ) : (
-            <div style={`height: 100%;`} onMouseOver={() => selection.setLastTouchedIndex(0)}>
-              empty list
+            <div class={styles['blank-list']} onMouseOver={() => selection.setLastTouchedIndex(0)}>
+              To insert a new item, press <span>⌘+n</span>.
             </div>
           )}
         </div>

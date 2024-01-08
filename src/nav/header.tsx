@@ -21,10 +21,14 @@ export const Header = () => (
       </button>
     </div>
     <div class={styles['nav-section']}>
-      <ThemeToggle />
-      <SearchSVG />
-      <CloudOffSVG />
-      <button class={styles['workspace-button']}>
+      <ThemeToggle class={styles['nav-button']} />
+      <button class={styles['nav-button']} >
+        <SearchSVG />
+      </button>
+      <button class={styles['nav-button']} >
+        <CloudOffSVG />
+      </button>
+      <button class={`${styles['workspace-button']} ${styles['nav-button']}`}>
         <span style="padding-right: 0.25em;">Daniel</span>
         <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
       </button>

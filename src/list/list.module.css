@@ -100,3 +100,19 @@
     width: 1.25em;
     stroke-width: 1.25px;
 }
+
+.blank-list {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #939393;
+}
+
+
+.blank-list span {
+  padding: 0.125em 0.25em;
+  border: 1px solid var(--shade);
+  border-radius: 2px;
+  margin-left: 0.25em;
+}

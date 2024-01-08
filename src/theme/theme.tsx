@@ -13,11 +13,15 @@ createEffect(() => {
   setTheme(themeVal);
 }, theme);
 
-export const ThemeToggle = () => {
+interface ThemeToggleProps {
+  class: string;
+}
+
+export const ThemeToggle = (props: ThemeToggleProps) => {
   let Icon = theme[0]() === 'dark' ? MoonSVG : SunSVG;
   return (
     <button
-      style="background: none; border: none; cursor: pointer;"
+      class={props.class}
       onClick={() => {
         const newTheme = theme[0]() === 'dark' ? 'light' : 'dark';
         theme[1](newTheme);
