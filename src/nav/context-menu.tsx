@@ -22,7 +22,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
             style={`
                 position: absolute;
                 z-index: 10;
-                background: #f6f7fa;
+                background: var(--light-shade);
                 border-radius: 3px;
                 box-shadow: 1px 1px 2px #0000002e;
                 padding: 0.25em;

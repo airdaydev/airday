@@ -25,7 +25,7 @@
     user-select: none;
     display: flex;
     align-items: center;
-    background: #eee;
+    background: var(--shade);
 }
 
 .item {
@@ -75,12 +75,12 @@
 }
 
 .active .list-header svg {
-    color: black;
+    color: var(--body);
 }
 
 .active .list-header-internal {
     /* border-left: 1px solid blue; */
-    background: var(--shade);
+    background: var(--light-shade);
 }
 
 .list-button {

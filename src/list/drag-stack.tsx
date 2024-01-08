@@ -60,7 +60,7 @@ export const DragStack = ({ size }: DragStackProps) => {
                 ref={stackRef}
                 style={`
                     position: relative;
-                    background: #eee;
+                    background: var(--shade);
                     width: 12em;
                     height: 4em;
                     z-index: 100;

@@ -1,8 +1,8 @@
 .check {
     display: block;
     position: relative;
-    padding-left: 35px;
-    margin-bottom: 12px;
+    padding-left: 1.25em;
+    margin-bottom: 1em;
     cursor: pointer;
     font-size: 22px;
     -webkit-user-select: none;
@@ -19,8 +19,8 @@
     background: none;
     /* border: 1px solid var(--border); */
     border-radius: 3px;
-    width: 1em;
-    height: 1em;
+    width: 0.75em;
+    height: 0.75em;
     margin-right: 0.5em;
     border: 1px solid var(--light-shade);
 }

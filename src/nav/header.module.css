@@ -3,7 +3,7 @@
     width: 100%;
     box-sizing: border-box;
     justify-content: space-between;
-    padding: 1em;
+    padding: 0.5em;
 }
 
 .nav-section {
@@ -24,4 +24,16 @@
     border: none;
     cursor: pointer;
     font-weight: 600;
+}
+
+.nav-button {
+  padding: 0.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.nav-button:hover {
+  background: var(--shade);
 }
