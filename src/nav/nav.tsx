@@ -31,9 +31,8 @@ export function NavListItem(props: NavListItemProps) {
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (button) {
-            const bbox = button.getBoundingClientRect();
-            const offsetLeft = event.clientX - bbox.left;
-            const offsetRight = event.clientY - bbox.top;
+            const offsetLeft = event.clientX;
+            const offsetRight = event.clientY;
             setCtxOffset([offsetLeft, offsetRight]);
             setCtxOpen(true);
           }
