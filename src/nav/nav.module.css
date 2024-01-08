@@ -5,6 +5,7 @@
     padding: 0 0.5em 0.5em 0.5em;
     border-right: 1px solid var(--border);
     transition: margin 0.1s;
+    overflow-y: scroll;
 }
 
 .nav-text button {

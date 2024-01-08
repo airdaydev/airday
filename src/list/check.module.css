@@ -26,11 +26,11 @@
 }
 
 .check:hover input ~ span {
-  background: var(--body);
+  background: var(--light-shade);
   }
 
 .check:hover {
-    background: var(--body);
+    background: var(--light-shade);
 }
 
 .check input {
