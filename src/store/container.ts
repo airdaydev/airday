@@ -61,7 +61,6 @@ export class ContainerModel {
         // Create signals
         const newItems = src.map((item, index) => {
             // TODO: Centralise queue
-            console.log(item)
             if (persist) { dbPromises.push(store.add(item)); }
             const signal = createSignal(item);
             this.index.set(item.id, signal);

@@ -18,7 +18,6 @@ export class ItemModel {
     }
     // load = async () => {
     //     const items = await this.db.getAll(this.storeName);
-    //     console.log(items);
     // }
     upgrade = (db: AcmeIDB) => {
         const itemStore = db.createObjectStore(this.storeName, {
@@ -71,7 +70,6 @@ export class ItemModel {
         // const now = IDBKeyRange.upperBound([new Date()])
         // const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
         const items = await this.db.getAllFromIndex(this.storeName, 'done');
-        console.log(items);
         // const items = await this.db.g(this.storeName, 'done', now);
         return items;
     }

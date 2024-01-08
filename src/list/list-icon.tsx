@@ -16,7 +16,6 @@ interface ListIconProps {
 }
 
 export const ListIcon = (props: ListIconProps) => {
-  console.log(props.container);
   const iconText = props.container.icon;
   const icon = iconText && icons.get(iconText);
   const Icon = icon || TodoSVG;

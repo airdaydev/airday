@@ -4,6 +4,7 @@ import Caret from '../icons/caret.svg';
 import CloudOffSVG from '../icons/cloud-off.svg';
 import SearchSVG from '../icons/search.svg';
 import styles from './header.module.css';
+import { ThemeToggle } from '../theme/theme';
 
 export const Header = () => (
   <header class={styles.header}>
@@ -20,6 +21,7 @@ export const Header = () => (
       </button>
     </div>
     <div class={styles['nav-section']}>
+      <ThemeToggle />
       <SearchSVG />
       <CloudOffSVG />
       <button class={styles['workspace-button']}>

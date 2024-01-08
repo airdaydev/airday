@@ -4,16 +4,8 @@
   --shade: #F0E7EE;
 }
 
-[data-theme="botanic"] {
-  --background: #D8D8D8;
-}
-
 [data-theme="dark"] {
-  --background: #D8D8D8;
-}
-
-[data-theme="paper"] {
-  --background: #D8D8D8;
+  --background: #1E1E1E;
 }
 
 @font-face {
