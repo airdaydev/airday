@@ -6,7 +6,6 @@ function setTheme(name: string) {
   document.body.setAttribute('data-theme', name);
 }
 
-
 export const theme = createSignal<string>('dark');
 
 createEffect(() => {

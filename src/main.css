@@ -2,10 +2,16 @@
   --border: #e1e1e1;
   --background: #FAF7FF;
   --shade: #F0E7EE;
+  --light-shade: #F0E7EE;
+  --body: black;
 }
 
 [data-theme="dark"] {
   --background: #1E1E1E;
+  --border: #28282C;
+  --shade: #28282C;
+  --light-shade: #28282C;
+  --body: white;
 }
 
 @font-face {
@@ -29,4 +35,13 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--background);
+  color: var(--body);
+}
+
+button {
+  color: inherit;
+}
+
+input {
+  color: inherit;
 }

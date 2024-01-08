@@ -15,22 +15,22 @@
     position: absolute;
     top: 0;
     left: 0;
-    background-color: #eee;
+    background-color: red;
     background: none;
     /* border: 1px solid var(--border); */
     border-radius: 3px;
     width: 1em;
     height: 1em;
     margin-right: 0.5em;
-    border: 1px solid rgba(0, 0, 0, 0.10);
+    border: 1px solid var(--light-shade);
 }
 
 .check:hover input ~ span {
-    background-color: #ccc;
+  background: var(--body);
   }
 
 .check:hover {
-    background: #f2f2f2;
+    background: var(--body);
 }
 
 .check input {
@@ -57,7 +57,7 @@ left: 9px;
 top: 5px;
 width: 5px;
 height: 10px;
-border: solid white;
+border: solid yellow;
 border-width: 0 3px 3px 0;
 -webkit-transform: rotate(45deg);
 -ms-transform: rotate(45deg);

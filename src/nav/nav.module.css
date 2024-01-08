@@ -4,7 +4,7 @@
     width: 14em;
     padding: 0 0.5em 0.5em 0.5em;
     border-right: 1px solid var(--border);
-    transition: all 0.1s;
+    transition: margin 0.1s;
 }
 
 .nav-text button {
@@ -24,7 +24,7 @@
 }
 
 .nav-text button.active {
-    background: #E4DDE3;
+    background: var(--shade);
 }
 
 .nav-text button span {
@@ -32,7 +32,7 @@
 }
 
 .nav-text button:hover {
-    background: #BDD4FF;
+    background: var(--shade);
 }
 
 .add-list-button {

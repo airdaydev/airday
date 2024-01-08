@@ -56,7 +56,7 @@
 }
 
 .item:hover {
-    background: #f8f8f8;
+    background: var(--shade);
     cursor: pointer;
 }
 
@@ -80,7 +80,7 @@
 
 .active .list-header-internal {
     /* border-left: 1px solid blue; */
-    background: #DFD1DC;
+    background: var(--shade);
 }
 
 .list-button {
