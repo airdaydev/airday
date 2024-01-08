@@ -6,6 +6,11 @@
   --body: black;
 }
 
+#root {
+  /* z-index: 0; */
+  position: relative;
+}
+
 [data-theme="dark"] {
   --background: #1E1E1E;
   --border: #28282C;
@@ -52,4 +57,5 @@ input {
   position: absolute;
   top: 0;
   left: 0;
+  /* z-index: 10; */
 }
