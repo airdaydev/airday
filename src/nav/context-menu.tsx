@@ -1,6 +1,7 @@
 import { Accessor, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
 import { viewState } from "../view-state";
+import styles from './context-menu.module.css';
 
 interface NavItemContextMenu {
     close: () => void;
@@ -25,15 +26,8 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
       <Portal mount={document.getElementById('context-menu')}>
         <div
             ref={containerRef}
+            class={styles['context-menu']}
             style={`
-                position: absolute;
-                z-index: 10;
-                display: flex;
-                flex-direction: column;
-                background: var(--light-shade);
-                border-radius: 3px;
-                box-shadow: 1px 1px 2px #0000002e;
-                padding: 0.25em;
                 left: ${props.offset()[0]}px;
                 top: ${props.offset()[1]}px;
             `}
