@@ -17,11 +17,19 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
         }
     }
     window.addEventListener('mousedown', clickOutside);
+    const closeOneEsc = (event: KeyboardEvent) => {
+      // TODO: Consider global keyboard handler
+      if (event.key === 'Escape') {
+        props.close();
+      }
+    };
+    window.addEventListener('keydown', closeOneEsc);
     // TODO: Show context menu div
     onCleanup(() => {
       window.removeEventListener('mousedown', clickOutside)
+      window.removeEventListener('keydown', closeOneEsc)
       // TODO: Hide context menu div
-    })
+    });
     return (
       <Portal mount={document.getElementById('context-menu')}>
         <div
