@@ -82,7 +82,7 @@ export function Item(props: ItemProps) {
             props.fastList.updateItem(props.item.id, { open: false })
         }
         props.keyboardShortcuts.enable();
-        // setEdit(false);
+        setEdit(false);
         window.removeEventListener('mousedown', clickOutside)
     }
     
@@ -120,14 +120,7 @@ export function Item(props: ItemProps) {
                 <div
                     ref={editContainer}
                     onKeyDown={editModeKeyboardHandler}
-                    style={`
-                    min-height: 3.5em;
-                    position: relative;
-                    box-sizing: border-box;
-                    padding: 0.5em;
-                    border-radius: 3px;
-                    background: #e7ebff;
-                    `}
+                    class={styles['edit-container']}
               >
                 <Checkbox
                     onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
@@ -135,14 +128,7 @@ export function Item(props: ItemProps) {
                 />
                 <div
                   ref={dummyRef}
-                  style={`
-                    visibility: hidden;
-                    white-space: pre-wrap;
-                    word-break: break-word;
-                    &::after {
-                      content: "\A";
-                    }
-                  `}
+                  class={styles['dummy-ref']}
                 />
                 <textarea
                   ref={textAreaRef}
@@ -150,24 +136,7 @@ export function Item(props: ItemProps) {
                   onInput={(event) => {
                     if (dummyRef) dummyRef.textContent = event.target.value;
                   }}
-                  style={`
-                      position: absolute;
-                      resize: none;
-                      width: 100%;
-                      height: 100%;
-                      box-sizing: border-box;
-                      outline-style: none;
-                      margin: 0;
-                      padding: 0.5em;
-                      left: 0;
-                      right: 0;
-                      top: 0;
-                      bottom: 0;
-                      background: none;
-                      border: none;
-                      font-size: 1em;
-                      font-family: inherit;
-                  `}
+                  class={styles['text-area']}
                   onBlur={(event) => {
                     // TODO, not enough, check if external click with contains with ref
                     leaveEditMode(true);
@@ -256,13 +225,20 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                  <Checkbox
-                    onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
-                    checked={!!props.item.tsCompleted}
-                  />
-                    <div style={`white-space: pre-line; max-width: 48em;`}>
-                        <div>{props.item.text}</div>
+                  <div class={styles[`item-content-box`]}>
+                    <Checkbox
+                      onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
+                      checked={!!props.item.tsCompleted}
+                    />
+                    <div>
+                      <div style={`white-space: pre-line; max-width: 48em;`}>
+                        {props.item.text}
+                      </div>
+                      <div style={`color: grey;`}>
+                        Meta line
+                      </div>
                     </div>
+                  </div>
                 </div>
             )}
         </>
