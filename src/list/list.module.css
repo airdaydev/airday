@@ -39,11 +39,11 @@
 }
 
 .active .item.selected {
-    background: var(--shade);
+    background: var(--light-shade);
 }
 
 .item.selected {
-    background: var(--light-shade);
+    background: var(--ultra-light-shade);
 }
 
 .item.selected-first {

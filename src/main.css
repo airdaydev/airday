@@ -3,6 +3,7 @@
   --border: #e1e1e1;
   --shade: #E8D9E4;
   --light-shade: #F4E9F2;
+  --ultra-light-shade: #F2EBF1;
   --body: black;
 }
 
@@ -16,6 +17,7 @@
   --border: #28282C;
   --shade: #28282C;
   --light-shade: #313135;
+  --ultra-light-shade: ##3e3e44;
   --body: white;
 }
 
