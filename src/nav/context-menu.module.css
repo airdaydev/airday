@@ -3,7 +3,7 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
-  background: var(--shade);
+  background: var(--ultra-light-shade);
   border-radius: 3px;
   box-shadow: 1px 1px 2px #0000002e;
   padding: 0.25em;
@@ -19,5 +19,5 @@
 }
 
 .context-menu button:hover {
-  background: var(--light-shade);
+  background: var(--shade);
 }

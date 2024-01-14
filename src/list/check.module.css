@@ -43,7 +43,7 @@
 
 /* When the checkbox is checked, add a blue background */
 .check input:checked ~ span {
-    background-color: #2196F3;
+    /* background-color: #2196F3; */
 }
 
 /* Show the checkmark when checked */
@@ -52,14 +52,11 @@
 }
 
 /* Style the checkmark/indicator */
-.check span:after {
-left: 9px;
-top: 5px;
-width: 5px;
-height: 10px;
-border: solid yellow;
-border-width: 0 3px 3px 0;
--webkit-transform: rotate(45deg);
--ms-transform: rotate(45deg);
-transform: rotate(45deg);
+.check input:checked ~ span::after {
+  position: relative;
+  left: 2px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  content: url(../icons/check-hand.svg);
 }
