@@ -10,6 +10,31 @@ import styles from './list.module.css';
 import checkStyles from './check.module.css';
 import { distance, moveCaretToPosition } from './utils';
 
+interface CheckboxProps {
+  checked: boolean;
+  onChange: (val: any) => void;
+}
+
+export function Checkbox(props: CheckboxProps) {
+  return (
+    <label class={checkStyles['check']}>
+      <input
+          type="checkbox"
+          checked={!!props.checked}
+          onClick={(event) => {
+              
+          }}
+          onChange={props.onChange}
+          onDblClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+          }}
+      ></input>
+      <span></span>
+    </label>
+  );
+}
+
 interface ItemProps {
     listIndex: number;
     item: AcmeItem;
@@ -57,7 +82,7 @@ export function Item(props: ItemProps) {
             props.fastList.updateItem(props.item.id, { open: false })
         }
         props.keyboardShortcuts.enable();
-        setEdit(false);
+        // setEdit(false);
         window.removeEventListener('mousedown', clickOutside)
     }
     
@@ -104,6 +129,10 @@ export function Item(props: ItemProps) {
                     background: #e7ebff;
                     `}
               >
+                <Checkbox
+                    onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
+                    checked={!!props.item.tsCompleted}
+                />
                 <div
                   ref={dummyRef}
                   style={`
@@ -227,26 +256,11 @@ export function Item(props: ItemProps) {
                         }
                     }}
                 >
-                    <label class={checkStyles['check']}>
-                        <input
-                            type="checkbox"
-                            checked={!!props.item.tsCompleted}
-                            onClick={(event) => {
-                                
-                            }}
-                            onChange={(event) => {
-                                props.fastList.completeItem(props.item.id, event.target.checked ? new Date() : null);
-                                // event.preventDefault();
-                                // event.stopPropagation();
-                            }}
-                            onDblClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                            }}
-                        ></input>
-                        <span></span>
-                    </label>
-                    <div style={`white-space: pre-line;`}>
+                  <Checkbox
+                    onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
+                    checked={!!props.item.tsCompleted}
+                  />
+                    <div style={`white-space: pre-line; max-width: 48em;`}>
                         <div>{props.item.text}</div>
                     </div>
                 </div>
