@@ -57,7 +57,7 @@
 }
 
 .item:hover {
-    background: var(--shade);
+    background: var(--ultra-light-shade);
     cursor: pointer;
 }
 

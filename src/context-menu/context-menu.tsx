@@ -3,13 +3,14 @@ import { Portal } from "solid-js/web";
 import { viewState } from "../view-state";
 import styles from './context-menu.module.css';
 
-interface NavItemContextMenu {
+interface ContextMenu {
     close: () => void;
     container: Accessor<BordeContainer>;
     offset: Accessor<[number, number]>;
+    children: any;
 }
 
-export function NavItemContextMenu(props: NavItemContextMenu) {
+export function ContextMenu(props: ContextMenu) {
     let containerRef: HTMLDivElement | undefined;
     const clickOutside = (event: MouseEvent) => {
         if (!containerRef?.contains(event.target)) {
@@ -41,18 +42,7 @@ export function NavItemContextMenu(props: NavItemContextMenu) {
             `}
             tabIndex={0}
         >
-            <button onClick={() => {
-                viewState.addContainerView(props.container().id);
-                props.close();
-            }}>
-                <span>Open in new view</span>
-            </button>
-            <button disabled>
-                <span>Export</span>
-            </button>
-            <button disabled>
-                <span>Delete</span>
-            </button>
+          {props.children}
         </div>
       </Portal>
     )

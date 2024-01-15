@@ -7,9 +7,38 @@ import CheckSVG from '../icons/check.svg';
 import ChevronDownSVG from '../icons/chevron-down.svg';
 import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
-import { NavItemContextMenu } from './context-menu';
+import { ContextMenu } from '../context-menu/context-menu';
 import { store } from '../store/main';
 import { AddListButton } from './add-list';
+
+interface NavItemContextMenuProps {
+  close: () => void;
+  container: Accessor<BordeContainer>,
+  offset: Accessor<[number, number]>;
+}
+
+export function NavItemContextMenu(props: NavItemContextMenuProps) {
+  return (
+    <ContextMenu
+      close={props.close}
+      container={props.container}
+      offset={props.offset}
+    >
+      <button onClick={() => {
+        viewState.addContainerView(props.container().id);
+        props.close();
+      }}>
+        <span>Open in new view</span>
+      </button>
+      <button disabled>
+        <span>Export</span>
+      </button>
+      <button disabled>
+        <span>Delete</span>
+      </button>
+    </ContextMenu>
+  )
+}
 
 interface NavListItemProps {
   container: Accessor<BordeContainer>,

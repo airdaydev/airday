@@ -235,7 +235,7 @@ export function Item(props: ItemProps) {
                         {props.item.text}
                       </div>
                       <div style={`color: grey;`}>
-                        Meta line
+                        {/* {props.item?.sticker} */}
                       </div>
                     </div>
                   </div>
