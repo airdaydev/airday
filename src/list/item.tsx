@@ -7,32 +7,33 @@ import { KeyboardShortcuts } from '../keyboard';
 import { store } from '../store/main';
 import { FastList } from '../store/fast-list';
 import styles from './list.module.css';
-import checkStyles from './check.module.css';
 import { distance, moveCaretToPosition } from './utils';
+import { Checkbox } from './checkbox';
+import { ContextMenu } from '../context-menu/context-menu';
 
-interface CheckboxProps {
-  checked: boolean;
-  onChange: (val: any) => void;
+interface ItemContextMenuProps {
+  close: () => void;
+  item: Accessor<AcmeItem>,
+  offset: Accessor<[number, number]>;
 }
 
-export function Checkbox(props: CheckboxProps) {
+export function ItemContextMenu(props: ItemContextMenuProps) {
   return (
-    <label class={checkStyles['check']}>
-      <input
-          type="checkbox"
-          checked={!!props.checked}
-          onClick={(event) => {
-              
-          }}
-          onChange={props.onChange}
-          onDblClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-          }}
-      ></input>
-      <span></span>
-    </label>
-  );
+    <ContextMenu
+      close={props.close}
+      offset={props.offset}
+    >
+      <button disabled>
+        <span>Duplicate</span>
+      </button>
+      <button disabled>
+        <span>Focus</span>
+      </button>
+      <button disabled>
+        <span>Delete</span>
+      </button>
+    </ContextMenu>
+  )
 }
 
 interface ItemProps {
@@ -53,6 +54,14 @@ export function Item(props: ItemProps) {
     const [edit, setEdit] = createSignal(false);
     const [caretPos, setCaretPos] = createSignal(0);
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
+    // ContextMenu
+    const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
+    const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
+    function openContextMenu(event: MouseEvent) {
+      event.preventDefault();
+      setCtxOffset([event.clientX, event.clientY]);
+      setCtxOpen(true);
+    }
     function editModeKeyboardHandler(event: KeyboardEventInit) {
         if (event.key === 'Enter' && !event.shiftKey) {
             leaveEditMode(true);
@@ -166,6 +175,7 @@ export function Item(props: ItemProps) {
                     onMouseEnter={(event: MouseEvent) => {
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
+                    onContextMenu={openContextMenu}
                     onMouseDown={(event: MouseEvent) => {
                         if (event.button === 2) return; // context click behaviour
                         event.preventDefault(); // prevents selection on Safari
@@ -240,6 +250,13 @@ export function Item(props: ItemProps) {
                     </div>
                   </div>
                 </div>
+            )}
+            {ctxOpen() && (
+              <ItemContextMenu
+                close={() => setCtxOpen(false)}
+                item={props.item}
+                offset={ctxOffset}
+              />
             )}
         </>
     )

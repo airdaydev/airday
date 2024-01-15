@@ -4,7 +4,6 @@ import styles from './nav.module.css';
 import { viewState } from '../view-state';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
-import ChevronDownSVG from '../icons/chevron-down.svg';
 import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
 import { ContextMenu } from '../context-menu/context-menu';
@@ -55,16 +54,11 @@ export function NavListItem(props: NavListItemProps) {
         classList={{
           [styles.active]: viewState.isContainerActive(props.container().id),
         }}
-        ref={button}
         onClick={() => viewState.openContainerView(props.container().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
-          if (button) {
-            const offsetLeft = event.clientX;
-            const offsetRight = event.clientY;
-            setCtxOffset([offsetLeft, offsetRight]);
-            setCtxOpen(true);
-          }
+          setCtxOffset([event.clientX, event.clientY]);
+          setCtxOpen(true);
         }}
       >
         <ListIcon container={props.container()} />

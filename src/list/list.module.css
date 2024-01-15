@@ -149,6 +149,7 @@
 
 .edit-container {
   display: flex;
+  font-family: var(--body-font);
   min-height: 3.5em;
   position: relative;
   box-sizing: border-box;
@@ -172,4 +173,8 @@
 .item-content-box {
   display: flex;
   flex-direction: row;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
 }

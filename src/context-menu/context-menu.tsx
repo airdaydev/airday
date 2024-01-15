@@ -5,7 +5,6 @@ import styles from './context-menu.module.css';
 
 interface ContextMenu {
     close: () => void;
-    container: Accessor<BordeContainer>;
     offset: Accessor<[number, number]>;
     children: any;
 }
