@@ -13,7 +13,7 @@ interface DBTypes {
     lists: BordeContainer;
 }
 
-export type AcmeIDB = IDBPDatabase<DBTypes>;
+export type BordeIDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage = 'DB not loaded, pre-load buffer not yet implemented';
 
 // TODO: Retrieve these from model
@@ -24,7 +24,7 @@ const containerStoreName = 'container';
 
 // Primary local persistence layer
 class AcmeLocalStore {
-    db: AcmeIDB | null = null;
+    db: BordeIDB | null = null;
     itemModel = new ItemModel();
     containerModel = new ContainerModel();
     name = 'acme';

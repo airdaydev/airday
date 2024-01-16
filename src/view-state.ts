@@ -11,7 +11,7 @@ class ViewState {
     activeViewId: Accessor<string | undefined>;
     setActiveViewId: Setter<string | undefined>;
     sidebarVisible = createSignal<boolean>(true);
-    list = createSignal<Signal<AcmeView>[]>([]); // views, left to right
+    list = createSignal<Signal<BordeView>[]>([]); // views, left to right
     constructor() {
         const activeView = createSignal<string>();
         this.activeViewId = activeView[0];
@@ -38,13 +38,13 @@ class ViewState {
     }
     openDoneView = () => {
         const id = createUniqueId();
-        const view: AcmeDoneView = {
+        const view: BordeDoneView = {
             id,
             type: 'done',
         };
         this.replaceActiveView(view);
     }
-    createContainerView(containerId: string): AcmeView {
+    createContainerView(containerId: string): BordeView {
         const id = createUniqueId(); // TODO: How does uniqueness work here
         return {
             id,
@@ -53,11 +53,11 @@ class ViewState {
             projection: 'list',
         }
     }
-    replaceActiveView(view: AcmeView) {
+    replaceActiveView(view: BordeView) {
         this.replaceView(view, viewState.active.index || 0);
     }
-    replaceView(view: AcmeView, index: number = 0) {
-        const newView = createSignal<AcmeView>(view);
+    replaceView(view: BordeView, index: number = 0) {
+        const newView = createSignal<BordeView>(view);
         const [list, setList] = this.list;
         setList((prev) => {
             const next = [...prev];
@@ -80,7 +80,7 @@ class ViewState {
         // TODO: Allow more lists
         if (this.list[0]().length > 8) return;
         const id = createUniqueId();
-        const view = createSignal<AcmeFastListView>({
+        const view = createSignal<BordeView>({
             // TODO: Detect clash / or how does this lib work
             id,
             type: 'container',

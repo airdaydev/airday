@@ -2,7 +2,7 @@ import { Done } from './list/done';
 import { List } from './list/list';
 
 interface ViewProps {
-  view: AcmeView,
+  view: BordeView,
   tabId: number,
 }
 

@@ -15,7 +15,7 @@ import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
 
 interface ListProps {
-  view: AcmeView;
+  view: BordeView;
   tabId: number;
 }
 

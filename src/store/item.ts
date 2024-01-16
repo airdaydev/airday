@@ -1,5 +1,5 @@
 import { IDBPObjectStore } from 'idb';
-import { AcmeIDB, dbNotReadyMessage } from './main';
+import { BordeIDB, dbNotReadyMessage } from './main';
 
 /**
  * Item model
@@ -9,9 +9,9 @@ import { AcmeIDB, dbNotReadyMessage } from './main';
  */
 export class ItemModel {
     storeName = 'item';
-    acmedb: AcmeIDB | null = null;
+    acmedb: BordeIDB | null = null;
     itemStore: IDBPObjectStore | null = null;
-    init = (db: AcmeIDB) => {
+    init = (db: BordeIDB) => {
         this.acmedb = db;
         // this.load();
         // load
@@ -19,7 +19,7 @@ export class ItemModel {
     // load = async () => {
     //     const items = await this.db.getAll(this.storeName);
     // }
-    upgrade = (db: AcmeIDB) => {
+    upgrade = (db: BordeIDB) => {
         const itemStore = db.createObjectStore(this.storeName, {
             keyPath: 'id',
         });

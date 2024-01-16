@@ -77,7 +77,7 @@ export function NavListItem(props: NavListItemProps) {
   )
 }
 
-export function AcmeNav() {
+export function BordeNav() {
   const [ sidebarVisible ] = viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined = undefined;
   const getMargin = () => sidebarVisible() ? '0' : `-${ref ? ref.getBoundingClientRect().width : 0}px`;

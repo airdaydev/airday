@@ -237,7 +237,7 @@ export class DoneFL extends FastList {
 
 export const openLists = new Map<string, FastList>();
 
-export function openFastList(view: AcmeView): FastList {
+export function openFastList(view: BordeView): FastList {
     let identifier = null;
     let fastList = null;
     if (view.type === 'container') {

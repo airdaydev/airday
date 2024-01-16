@@ -1,5 +1,5 @@
 import { Accessor, createSignal, Setter, Signal } from 'solid-js';
-import { store, AcmeIDB, dbNotReadyMessage } from './main';
+import { store, BordeIDB, dbNotReadyMessage } from './main';
 
 export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 
@@ -15,7 +15,7 @@ export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
  */
 export class ContainerModel {
     storeName = 'container';
-    acmedb: AcmeIDB | null = null;
+    acmedb: BordeIDB | null = null;
     ol: Accessor<Accessor<BordeContainer>[]>;
     setOl: Setter<Accessor<BordeContainer>[]>;
     index = new Map<string, Signal<BordeContainer>>();
@@ -25,7 +25,7 @@ export class ContainerModel {
         this.ol = signal[0];
         this.setOl = signal[1];
     }
-    init = async (db: AcmeIDB) => {
+    init = async (db: BordeIDB) => {
         this.acmedb = db;
         this.clearCache();
     }
@@ -37,7 +37,7 @@ export class ContainerModel {
         const items = await this.db.getAll(this.storeName);
         this.insert(items, false);
     }
-    upgrade = (db: AcmeIDB) => {
+    upgrade = (db: BordeIDB) => {
         db.createObjectStore(this.storeName, {
             keyPath: 'id',
         });
