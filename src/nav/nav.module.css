@@ -1,8 +1,8 @@
 .nav {
     display: flex;
     flex-direction: column;
-    width: 14em;
-    padding: 0 0.5em 0.5em 0.5em;
+    width: 16em;
+    padding: 0 4px 4px 4px;
     border-right: 1px solid var(--border);
     transition: margin 0.1s;
     overflow-y: scroll;

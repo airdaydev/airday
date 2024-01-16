@@ -111,6 +111,7 @@
 - [] Mobile native app strategy
 - [] Kanban board
 - [] Secrets
+- [] Code snippets
 - [] List animations
 - [] Board prototype (canvas/webgl)
 - [] Pins?

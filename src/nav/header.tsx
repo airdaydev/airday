@@ -18,7 +18,6 @@ export const Header = () => (
       </button>
       <button class={`${styles['workspace-button']} ${styles['nav-button']}`}>
         <span style="padding-right: 0.25em;">Workspace 1</span>
-        <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
       </button>
     </div>
     <div class={styles['nav-section']}>
