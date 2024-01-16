@@ -253,7 +253,7 @@ export function Item(props: ItemProps) {
                           name={props.item.sticker}
                           />
                         )}
-                        <span>Updated {elapsedString(props.item.tsCreated)}</span>
+                        {/* <span>Updated {elapsedString(props.item.tsCreated)}</span> */}
                       </div>
                     </div>
                   </div>

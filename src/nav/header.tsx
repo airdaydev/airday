@@ -10,10 +10,11 @@ export const Header = () => (
   <header class={styles.header}>
     <div class={styles['nav-section']}>
       <button
-        onClick={() => viewState.sidebarVisible[1]((prev) => !prev)}
+        // onClick={() => viewState.sidebarVisible[1]((prev) => !prev)}
         class={styles['nav-button']}
+        style={'font-weight: 500;'}
       >
-        <Sidebar style="stroke-width: 1.25px; top: 1.5px; position: relative;" />
+        Borde
       </button>
       <button class={`${styles['workspace-button']} ${styles['nav-button']}`}>
         <span style="padding-right: 0.25em;">Workspace 1</span>
