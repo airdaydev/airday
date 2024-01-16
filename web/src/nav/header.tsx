@@ -1,76 +1,18 @@
-import { createSignal, Accessor } from 'solid-js';
-import { ContextMenu } from '../context-menu/context-menu';
-import { viewState } from '../view-state';
-import Sidebar from '../icons/sidebar.svg';
+import { createSignal } from 'solid-js';
 import Caret from '../icons/caret.svg';
 import CloudOffSVG from '../icons/cloud-off.svg';
 import SearchSVG from '../icons/search.svg';
 import styles from './header.module.css';
 import { ThemeToggle } from '../theme/theme';
+import { BordeContextMenu, WorkspaceContextMenu, AccountContextMenu } from './context-menus';
 
-interface BordeContextMenuProps {
-  close: () => void;
-  offset: Accessor<[number, number]>;
-}
-
-export function BordeContextMenu(props: BordeContextMenuProps) {
-  return (
-    <ContextMenu
-      close={props.close}
-      offset={props.offset}
-    >
-      <button
-        onClick={() => {
-          viewState.sidebarVisible[1]((prev) => !prev)
-          props.close();
-        }}
-      >
-        <span>{viewState.sidebarVisible[0]() ? 'Hide' : 'Show'} Sidebar</span>
-      </button>
-      <button disabled>
-        <span>Settings</span>
-      </button>
-      <hr />
-      <button disabled>
-        <span>About Borde</span>
-      </button>
-    </ContextMenu>
-  )
-}
-
-interface WorkspaceContextMenuProps {
-  close: () => void;
-  offset: Accessor<[number, number]>;
-}
-
-export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
-  return (
-    <ContextMenu
-      close={props.close}
-      offset={props.offset}
-    >
-      <button disabled>
-        <span>Workspace 1</span>
-      </button>
-      <button disabled>
-        <span>Create new workspace</span>
-      </button>
-      <hr />
-      <button disabled>
-        <span>Import</span>
-      </button>
-      <button disabled>
-        <span>Export</span>
-      </button>
-    </ContextMenu>
-  )
-}
+type ContextMenu = 'main' | 'workspace' | 'account';
 
 export const Header = () => {
   // ContextMenu
-  const [bordeCtxOpen, setBordeCtxOpen] = createSignal<'main' | 'workspace' | boolean>(false);
+  const [bordeCtxOpen, setBordeCtxOpen] = createSignal<ContextMenu | boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
-  function openContextMenu(event: MouseEvent, menu: 'main' | 'workspace') {
+  function openContextMenu(event: MouseEvent, menu: ContextMenu) {
     event.preventDefault();
     if (event.target) {
       const bounds = event.target.getBoundingClientRect();
@@ -88,6 +30,12 @@ export const Header = () => {
       )}
       {bordeCtxOpen() === 'workspace' && (
         <WorkspaceContextMenu
+          offset={ctxOffset}
+          close={() => setBordeCtxOpen(false)}
+        />
+      )}
+      {bordeCtxOpen() === 'account' && (
+        <AccountContextMenu
           offset={ctxOffset}
           close={() => setBordeCtxOpen(false)}
         />
@@ -121,7 +69,10 @@ export const Header = () => {
         <button class={styles['nav-button']} >
           <CloudOffSVG />
         </button>
-        <button class={`${styles['workspace-button']} ${styles['nav-button']}`}>
+        <button
+          class={`${styles['workspace-button']} ${styles['nav-button']}`}
+          onClick={(event) => openContextMenu(event, 'account')}
+        >
           <span style="padding-right: 0.25em;">Daniel</span>
           <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
         </button>
