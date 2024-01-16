@@ -21,3 +21,10 @@
 .context-menu button:hover {
   background: var(--shade);
 }
+
+.context-menu hr {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--shade);
+  margin: 0.25em 0em;
+}

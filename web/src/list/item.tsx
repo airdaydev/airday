@@ -26,10 +26,19 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       offset={props.offset}
     >
       <button disabled>
+        <span>Focus</span>
+      </button>
+      <button disabled>
         <span>Duplicate</span>
       </button>
       <button disabled>
-        <span>Focus</span>
+        <span>Copy as JSON</span>
+      </button>
+      <button disabled>
+        <span>Copy as CSV</span>
+      </button>
+      <button disabled>
+        <span>Copy as Markdown</span>
       </button>
       <button disabled>
         <span>Delete</span>
