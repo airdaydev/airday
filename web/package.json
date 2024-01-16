@@ -1,0 +1,23 @@
+{
+  "name": "solid-borde",
+  "version": "0.0.1",
+  "description": "SolidJS port of Borde (formerly AcmeList)",
+  "scripts": {
+    "start": "vite --host 0.0.0.0 --port 8000",
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^4.5.0",
+    "vite-plugin-solid": "^2.7.2",
+    "vite-plugin-solid-svg": "^0.8.0"
+  },
+  "dependencies": {
+    "fractional-indexing": "^3.2.0",
+    "idb": "^7.1.1",
+    "nanoid": "^5.0.3",
+    "solid-js": "^1.8.5"
+  }
+}

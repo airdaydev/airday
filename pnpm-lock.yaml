@@ -4,30 +4,34 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-dependencies:
-  fractional-indexing:
-    specifier: ^3.2.0
-    version: 3.2.0
-  idb:
-    specifier: ^7.1.1
-    version: 7.1.1
-  nanoid:
-    specifier: ^5.0.3
-    version: 5.0.3
-  solid-js:
-    specifier: ^1.8.5
-    version: 1.8.5
+importers:
 
-devDependencies:
-  vite:
-    specifier: ^4.5.0
-    version: 4.5.0
-  vite-plugin-solid:
-    specifier: ^2.7.2
-    version: 2.7.2(solid-js@1.8.5)(vite@4.5.0)
-  vite-plugin-solid-svg:
-    specifier: ^0.8.0
-    version: 0.8.0(solid-js@1.8.5)(vite@4.5.0)
+  .: {}
+
+  web:
+    dependencies:
+      fractional-indexing:
+        specifier: ^3.2.0
+        version: 3.2.0
+      idb:
+        specifier: ^7.1.1
+        version: 7.1.1
+      nanoid:
+        specifier: ^5.0.3
+        version: 5.0.3
+      solid-js:
+        specifier: ^1.8.5
+        version: 1.8.5
+    devDependencies:
+      vite:
+        specifier: ^4.5.0
+        version: 4.5.0
+      vite-plugin-solid:
+        specifier: ^2.7.2
+        version: 2.7.2(solid-js@1.8.5)(vite@4.5.0)
+      vite-plugin-solid-svg:
+        specifier: ^0.8.0
+        version: 0.8.0(solid-js@1.8.5)(vite@4.5.0)
 
 packages:
 
