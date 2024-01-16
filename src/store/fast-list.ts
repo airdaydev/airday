@@ -6,7 +6,7 @@ import { store } from './main.js';
 // https://www.reddit.com/r/solidjs/comments/ilebtl/efficient_state_updates_to_arrays/
 // https://github.com/solidjs/solid/discussions/366
 
-interface AcmeItemInsertion extends Partial<BordeContainer> {
+interface BordeItemInsertion extends Partial<BordeContainer> {
     text: string;
     sortKey: string;
     listId: string;
@@ -26,8 +26,8 @@ export abstract class FastList {
     abstract type: FastListType | null;
     createItems: boolean = false; // Can items be created under this list
     sortable: boolean = false;
-    signal: Accessor<AcmeItem[]>;
-    setSignal: Setter<AcmeItem[]>;
+    signal: Accessor<BordeItem[]>;
+    setSignal: Setter<BordeItem[]>;
     constructor() {
         const [signal, setSignal] = createSignal([]);
         this.signal = signal;
@@ -40,11 +40,11 @@ export abstract class FastList {
     setDragOriginList = (listId: string) => {
         dragOriginList = listId;
     }
-    new(item: AcmeItemInsertion) {
+    new(item: BordeItemInsertion) {
         store.itemModel.insert({
             id: nanoid(),
             ...item,
-            tsCreated: (new Date()).toString(),
+            tsCreated: new Date(),
             tsCompleted: null,
         });
     }
@@ -52,7 +52,7 @@ export abstract class FastList {
     // TODO: Clear selection in source list, create selection in new list
     moveItems(ids: Set<string>, sourceListId: string, between: [string | null, string | null]) {
         // Filter ids from list
-        const itemsToMove: AcmeItem[] = [];
+        const itemsToMove: BordeItem[] = [];
         const sourceList = openLists.get(`c#${sourceListId}`);
         if (!sourceList) return; // Should not happen (TODO: Log validation error)
         const updatedList = sourceList.signal().filter((item) => {
@@ -65,7 +65,7 @@ export abstract class FastList {
     }
     // no persistence add
     // todo: performance optimisation, add to sorted list
-    add(items: AcmeItem[], at: string | number | null) {
+    add(items: BordeItem[], at: string | number | null) {
         const l = this.signal();
         const index = typeof at === 'number' ? at : l.findIndex((item) => item.id === at);
         l.splice(index + 1, 0, ...items);
@@ -75,7 +75,7 @@ export abstract class FastList {
         // 1. After 3 seconds, update fast list (move into done list)
         // 2. 
     }
-    updateItemContents(id: string, attrs: Partial<AcmeItem>) {
+    updateItemContents(id: string, attrs: Partial<BordeItem>) {
         // TODO: Move item
         // TODO: Consider maintaining an index
         const index = this.signal().findIndex((item) => item.id === id);
@@ -88,7 +88,7 @@ export abstract class FastList {
         store.itemModel.update(id, attrs).then(() => {});
         // TODO: Update idb
     }
-    updateItem(id: string, attrs: Partial<AcmeItem>) {
+    updateItem(id: string, attrs: Partial<BordeItem>) {
         // TODO: Consider maintaining an index
         const index = this.signal().findIndex((item) => item.id === id);
         if (index === -1) return console.error('updateItemContents() index not found');
@@ -102,7 +102,7 @@ export abstract class FastList {
         this.updateItemContents(id, { tsCompleted })
     }
     // Track updates, potentially batched
-    onUpdate(type: string, items: AcmeItem[]) {
+    onUpdate(type: string, items: BordeItem[]) {
         if (type === 'add') {
             // put into list and sort list
         }

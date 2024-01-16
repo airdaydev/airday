@@ -97,7 +97,7 @@ export class ContainerModel {
         }
         await tx.done;
     }
-    getLists = async (): Promise<AcmeItem[]> => {
+    getLists = async (): Promise<BordeItem[]> => {
         const items = await this.db.getAll(this.storeName);
         return items;
     }

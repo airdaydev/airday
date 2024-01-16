@@ -10,10 +10,12 @@ import styles from './list.module.css';
 import { distance, moveCaretToPosition } from './utils';
 import { Checkbox } from './checkbox';
 import { ContextMenu } from '../context-menu/context-menu';
+import { Sticker } from '../stickers/main';
+import { elapsedString } from '../generic/date';
 
 interface ItemContextMenuProps {
   close: () => void;
-  item: Accessor<AcmeItem>,
+  item: Accessor<BordeItem>,
   offset: Accessor<[number, number]>;
 }
 
@@ -38,12 +40,12 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
 
 interface ItemProps {
     listIndex: number;
-    item: AcmeItem;
+    item: BordeItem;
     selection: AcmeReactiveSelection;
     fastList: FastList;
     scrollRef: HTMLElement;
     keyboardShortcuts: KeyboardShortcuts;
-    displayList: Accessor<AcmeItem[]>; // TODO: OR NULL
+    displayList: Accessor<BordeItem[]>; // TODO: OR NULL
 }
 
 export function Item(props: ItemProps) {
@@ -244,8 +246,14 @@ export function Item(props: ItemProps) {
                       <div style={`white-space: pre-line; max-width: 48em;`}>
                         {props.item.text}
                       </div>
-                      <div style={`color: grey;`}>
-                        {/* {props.item?.sticker} */}
+                      <div class={styles['meta-line']}>
+                        {props.item.sticker && (
+                          <Sticker
+                          set="baseline"
+                          name={props.item.sticker}
+                          />
+                        )}
+                        <span>Updated {elapsedString(props.item.tsCreated)}</span>
                       </div>
                     </div>
                   </div>

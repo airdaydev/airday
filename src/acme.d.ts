@@ -1,9 +1,10 @@
-interface AcmeItem {
+interface BordeItem {
   id: string;
   text: string;
-  tsCreated: string;
+  tsCreated: Date;
   tsCompleted: Date | null;
   sortKey: string; // global, persisted sort key
+  sticker?: string;
   listId: string;
 }
 

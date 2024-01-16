@@ -1,27 +1,21 @@
 import { JSXElement } from 'solid-js';
 import { Modifiers, StickerDef, BaselineStickerDef, BaselineIcons } from './types';
+import Smiley from '../stickers/baseline/smiley.svg';
+import Triangle from '../stickers/baseline/triangle.svg';
+import CircleTeal from '../stickers/baseline/circle-teal.svg';
+import CirclePlaya from '../stickers/baseline/circle-playa.svg';
 
-export type BaselineStickerBase = (sticker: BaselineStickerDef) => JSXElement;
-
-const Triangle: BaselineStickerBase = (sticker: BaselineStickerDef) => (
-    <svg></svg>
-);
-const Square: BaselineStickerBase = (sticker: BaselineStickerDef) => (
-    <svg></svg>
-);
-const Circle: BaselineStickerBase = (sticker: BaselineStickerDef) => (
-    <svg></svg>
-);
-
-const map: Record<BaselineIcons | string, BaselineStickerBase> = {
-    tr: Triangle,
-    sq: Square,
-    ci: Circle,
+const map: Record<BaselineIcons | string, any> = {
+    triangle: Triangle,
+    smiley: Smiley,
+    circleTeal: CircleTeal,
+    circlePlaya: CirclePlaya,
 };
 
 // TODO: Improve typechecking
-export const BaselineSticker = (sticker: StickerDef) => {
-    const Icon = map[sticker.icon];
-    if (Icon) return <Icon />
+export const BaselineSticker = (props: string) => {
+  console.log('sticker', props)
+    const Icon = map[props.name];
+    if (Icon) return <Icon style={"height: 1em; width: 1em;"} />
     return null;
 }

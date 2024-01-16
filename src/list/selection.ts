@@ -107,7 +107,7 @@ export class AcmeReactiveSelection {
         this.lastKeySelected = key;
     }
     // Index or item? (pros + cons?)
-    selectRange = (from: AcmeItem | number, to: AcmeItem | number) => {}
+    selectRange = (from: BordeItem | number, to: BordeItem | number) => {}
     // Up, Down, 1 or to the extents
     // If sticky & in a contiguous region (i.e. if next already selected), jump to bottom (worst case could be O(n with idb lookup for EACH) - if toggling at the top of a list and going down)
     // we could index the index.....

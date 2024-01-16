@@ -178,3 +178,14 @@
   margin: 0;
   padding: 0;
 }
+
+.meta-line {
+  display: flex;
+  align-items: center;
+  color: grey;
+  font-size: 0.9em;
+}
+
+.meta-line svg {
+  margin: 0 0.25em;
+}

@@ -3,13 +3,13 @@ import {
 } from 'idb';
 import { ItemModel } from './item';
 import { ContainerModel } from './container';
-import { genTestData, acmeItems, inboxItems } from './dummy-data';
+import { genTestData, bordeItems, inboxItems } from './dummy-data';
 import { openLists } from './fast-list';
 
 const schemaVersion = 1;
 
 interface DBTypes {
-    items: AcmeItem;
+    items: BordeItem;
     lists: BordeContainer;
 }
 
@@ -68,7 +68,7 @@ class AcmeLocalStore {
         await this.connect();
         openLists.clear();
         const items = [
-            ...genTestData('bordelist', acmeItems),
+            ...genTestData('bordelist', bordeItems),
             ...genTestData('inbox', inboxItems),
           ]
           await store.itemModel.insert(items);

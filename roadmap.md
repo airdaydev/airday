@@ -37,6 +37,7 @@
 - [] Persist views (per device)
 
 ## UI
+- [] Context menus should not go past edge of screen (flipped)
 - [] List should scroll up as you drag up
 - [] Show date finished on completed items
 - [] Show completed item in og list for 5 seconds before disappearing

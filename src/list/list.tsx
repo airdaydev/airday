@@ -19,7 +19,7 @@ interface ListProps {
   tabId: number;
 }
 
-type DisplayList = (AcmeItem | { type: 'placeholder' })[];
+type DisplayList = (BordeItem | { type: 'placeholder' })[];
 
 // Challenge, index tracking without refreshing the list
 
