@@ -9,25 +9,6 @@ interface ContextMenuProps {
     offset?: [number, number];
 }
 
-function getDynamicPosition(anchor: HTMLElement, target: HTMLElement) {
-  const anchorBounds = anchor.getBoundingClientRect();
-  const targetBounds = target.getBoundingClientRect();
-  // Special condition: No target width
-  if (anchorBounds.width === 0) {
-    return 'opacity: 0;'
-  }
-  // Condition 1: Document width is less than target width (left-anchored); (bad experience)
-  if (document.body.scrollWidth < targetBounds.width) {
-    return `left: ${anchorBounds.left}px; top: ${anchorBounds.bottom}px;`;
-  }
-  // Condition 2: Target would go beyond document width, promptin right-anchor
-  if (document.body.scrollWidth < targetBounds.width) {
-    return `right: ${document.body.clientWidth - targetBounds.right}px; top: ${anchorBounds.bottom}px;`;
-  }
-  // Condition 3: Left-anchored
-  return `left: ${anchorBounds.left}px; top: ${anchorBounds.bottom}px;`;
-}
-
 export function ContextMenu(props: ContextMenuProps) {
   let containerRef: HTMLDivElement | undefined;
   let style = createSignal('opacity: 0;');
@@ -52,11 +33,18 @@ export function ContextMenu(props: ContextMenuProps) {
   });
   onMount(() => {
     if (props.offset && containerRef) {
+      let styleString = '';
       if (props.offset[0] + containerRef?.getBoundingClientRect().width > document.body.scrollWidth) {
-        style[1](`right: ${document.body.clientWidth - props.offset[0]}px; top: ${props.offset[1]}px;`);
+        styleString += `right: ${document.body.clientWidth - props.offset[0]}px;`;
       } else {
-        style[1](`left: ${props.offset[0]}px; top: ${props.offset[1]}px;`);
+        styleString += `left: ${props.offset[0]}px;`;
       }
+      if (props.offset[1] + containerRef?.getBoundingClientRect().height > document.body.scrollHeight) {
+        styleString += `bottom: 0px;`;
+      } else {
+        styleString += `top: ${props.offset[1]}px;`;
+      }
+      return style[1](styleString);
     }
     // TODO: also setup window move listener
   });
