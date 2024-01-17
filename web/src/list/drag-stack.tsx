@@ -17,7 +17,7 @@ interface DragStackProps {
 
 const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([document.body.scrollWidth, document.body.scrollHeight]);
 const onResize = (event: UIEvent) => requestAnimationFrame(() =>
-        setBoardDimensions([document.body.scrollWidth, document.body.scrollHeight]));
+        setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
 export const DragStack = ({ size }: DragStackProps) => {
     let stackRef: HTMLDivElement | undefined = undefined;
