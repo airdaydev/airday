@@ -1,0 +1,35 @@
+import { createSignal } from 'solid-js';
+import { AccountContextMenu } from './context-menus';
+import styles from './header.module.css';
+import Caret from '../icons/caret.svg';
+
+export const AccountButton = () => {
+  let buttonRef: HTMLButtonElement | undefined;
+  const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
+  const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
+  function openContextMenu(event: MouseEvent) {
+    event.preventDefault();
+    if (buttonRef) {
+      const bounds = buttonRef.getBoundingClientRect();
+      console.log(bounds);
+      setCtxOffset([bounds.left, bounds.bottom]);
+      setCtxOpen(true);
+    }
+  }
+  return (
+    <button
+    class={`${styles['workspace-button']} ${styles['nav-button']}`}
+    onClick={openContextMenu}
+    ref={buttonRef}
+    >
+      {ctxOpen() && (
+        <AccountContextMenu
+          offset={ctxOffset}
+          close={() => setCtxOpen(false)}
+        />
+      )}
+      <span style="padding-right: 0.25em;">Daniel</span>
+      <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
+    </button>
+  );
+}
