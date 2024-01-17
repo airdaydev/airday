@@ -44,17 +44,21 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
       offset={props.offset}
     >
       <button disabled>
-        <span>Workspace 1</span>
-      </button>
-      <button disabled>
-        <span>Create new workspace</span>
+        <span>My workspace</span>
       </button>
       <hr />
+      <button disabled>
+        <span>Workspace settings</span>
+      </button>
       <button disabled>
         <span>Import</span>
       </button>
       <button disabled>
         <span>Export</span>
+      </button>
+      <hr />
+      <button disabled>
+        <span>Create new workspace</span>
       </button>
     </ContextMenu>
   )
