@@ -44,10 +44,11 @@ export function ContextMenu(props: ContextMenuProps) {
       } else {
         styleString += `top: ${props.offset[1]}px;`;
       }
-      return style[1](styleString);
+      style[1](styleString);
     }
-    // TODO: also setup window move listener
+    window.addEventListener('resize', props.close);
   });
+  onCleanup(() => window.removeEventListener('resize', props.close));
   return (
     <Portal mount={document.getElementById('context-menu')}>
       <div
