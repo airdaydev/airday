@@ -11,7 +11,8 @@ interface ContextMenuProps {
 
 export function ContextMenu(props: ContextMenuProps) {
   let containerRef: HTMLDivElement | undefined;
-  let style = createSignal('opacity: 0;');
+  const style = createSignal('opacity: 0;');
+  const contextMenuDiv = document.getElementById('context-menu');
   const clickOutside = (event: MouseEvent) => {
     if (!containerRef?.contains(event.target)) {
       props.close();
@@ -47,10 +48,14 @@ export function ContextMenu(props: ContextMenuProps) {
       style[1](styleString);
     }
     window.addEventListener('resize', props.close);
+    contextMenuDiv.style.visibility = 'visible';
   });
-  onCleanup(() => window.removeEventListener('resize', props.close));
+  onCleanup(() => {
+    window.removeEventListener('resize', props.close)
+    contextMenuDiv.style.visibility = 'hidden';
+  });
   return (
-    <Portal mount={document.getElementById('context-menu')}>
+    <Portal mount={contextMenuDiv}>
       <div
           ref={containerRef}
           class={styles['context-menu']}
