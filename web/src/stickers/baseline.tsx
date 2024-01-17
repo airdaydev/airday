@@ -14,8 +14,7 @@ const map: Record<BaselineIcons | string, any> = {
 
 // TODO: Improve typechecking
 export const BaselineSticker = (props: string) => {
-  console.log('sticker', props)
-    const Icon = map[props.name];
-    if (Icon) return <Icon style={"height: 1em; width: 1em;"} />
-    return null;
+  const Icon = map[props.name];
+  if (Icon) return <Icon style={"height: 1em; width: 1em;"} />
+  return null;
 }

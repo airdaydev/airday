@@ -52,4 +52,9 @@ export const leftOffsetStyle = (offset: Accessor<[number, number]>) => `
 export const rightOffsetStyle = (offset: Accessor<[number, number]>) => `
   right: ${offset()[0]}px;
   top: ${offset()[1]}px;
-`
+`;
+
+export const dynamicOffsetStyle = (offset: Accessor<[number, number]>) => {
+  // if (document.body.clientWidth)
+  return '';
+}

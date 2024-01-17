@@ -9,21 +9,21 @@ import { FastList } from '../store/fast-list';
 import styles from './list.module.css';
 import { distance, moveCaretToPosition } from './utils';
 import { Checkbox } from './checkbox';
-import { ContextMenu } from '../context-menu/context-menu';
+import { ContextMenu, dynamicOffsetStyle, leftOffsetStyle } from '../context-menu/context-menu';
 import { Sticker } from '../stickers/main';
 import { elapsedString } from '../generic/date';
 
 interface ItemContextMenuProps {
   close: () => void;
   item: Accessor<BordeItem>,
-  offset: Accessor<[number, number]>;
+  style: string;
 }
 
 export function ItemContextMenu(props: ItemContextMenuProps) {
   return (
     <ContextMenu
       close={props.close}
-      offset={props.offset}
+      style={props.style}
     >
       <button disabled>
         <span>Focus</span>
@@ -272,7 +272,7 @@ export function Item(props: ItemProps) {
               <ItemContextMenu
                 close={() => setCtxOpen(false)}
                 item={props.item}
-                offset={ctxOffset}
+                style={dynamicOffsetStyle(ctxOffset)}
               />
             )}
         </>
