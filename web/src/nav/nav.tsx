@@ -6,14 +6,14 @@ import CornerDownRightSVG from '../icons/corner-down-right.svg';
 import CheckSVG from '../icons/check.svg';
 import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
-import { ContextMenu, leftOffsetStyle } from '../context-menu/context-menu';
+import { ContextMenu } from '../context-menu/context-menu';
 import { store } from '../store/main';
 import { AddListButton } from './add-list';
 
 interface NavItemContextMenuProps {
   close: () => void;
   container: Accessor<BordeContainer>,
-  style: string;
+  offset: [number, number];
 }
 
 export function NavItemContextMenu(props: NavItemContextMenuProps) {
@@ -21,7 +21,7 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
     <ContextMenu
       close={props.close}
       container={props.container}
-      style={props.style}
+      offset={props.offset}
     >
       <button onClick={() => {
         viewState.addContainerView(props.container().id);
@@ -70,7 +70,7 @@ export function NavListItem(props: NavListItemProps) {
         <NavItemContextMenu
           close={() => setCtxOpen(false)}
           container={props.container}
-          style={leftOffsetStyle(ctxOffset)}
+          offset={ctxOffset()}
         />
       )}
     </div>

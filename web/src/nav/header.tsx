@@ -5,7 +5,6 @@ import styles from './header.module.css';
 import { ThemeToggle } from '../theme/theme';
 import { BordeContextMenu, WorkspaceContextMenu } from './context-menus';
 import { AccountButton } from './account-button';
-import { leftOffsetStyle } from '../context-menu/context-menu';
 
 type ContextMenu = 'main' | 'workspace';
 
@@ -26,13 +25,13 @@ export const Header = () => {
       {ctxOpen() === 'main' && (
         <BordeContextMenu
           close={() => setCtxOpen(false)}
-          style={leftOffsetStyle(ctxOffset)}
+          offset={ctxOffset()}
         />
       )}
       {ctxOpen() === 'workspace' && (
         <WorkspaceContextMenu
           close={() => setCtxOpen(false)}
-          style={leftOffsetStyle(ctxOffset)}
+          offset={ctxOffset()}
         />
       )}
       <div class={styles['nav-section']}>

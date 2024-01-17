@@ -9,7 +9,7 @@ import { FastList } from '../store/fast-list';
 import styles from './list.module.css';
 import { distance, moveCaretToPosition } from './utils';
 import { Checkbox } from './checkbox';
-import { ContextMenu, dynamicOffsetStyle, leftOffsetStyle } from '../context-menu/context-menu';
+import { ContextMenu } from '../context-menu/context-menu';
 import { Sticker } from '../stickers/main';
 import { elapsedString } from '../generic/date';
 
@@ -17,6 +17,7 @@ interface ItemContextMenuProps {
   close: () => void;
   item: Accessor<BordeItem>,
   style: string;
+  offset: [number, number];
 }
 
 export function ItemContextMenu(props: ItemContextMenuProps) {
@@ -24,6 +25,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
     <ContextMenu
       close={props.close}
       style={props.style}
+      offset={props.offset}
     >
       <button disabled>
         <span>Focus</span>
@@ -67,10 +69,12 @@ export function Item(props: ItemProps) {
     const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
     // ContextMenu
     const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
-    const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
+    const [ctxOffset, setCtxOffset] = createSignal<[number, number]>();
     function openContextMenu(event: MouseEvent) {
       event.preventDefault();
-      setCtxOffset([event.clientX, event.clientY]);
+      if (event.target) {
+        setCtxOffset([event.clientX, event.clientY]);
+      }
       setCtxOpen(true);
     }
     function editModeKeyboardHandler(event: KeyboardEventInit) {
@@ -272,7 +276,7 @@ export function Item(props: ItemProps) {
               <ItemContextMenu
                 close={() => setCtxOpen(false)}
                 item={props.item}
-                style={dynamicOffsetStyle(ctxOffset)}
+                offset={ctxOffset()}
               />
             )}
         </>

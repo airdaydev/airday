@@ -4,14 +4,14 @@ import { viewState } from '../view-state';
 
 interface BordeContextMenuProps {
   close: () => void;
-  style: string;
+  offset: [number, number];
 }
 
 export function BordeContextMenu(props: BordeContextMenuProps) {
   return (
     <ContextMenu
-      style={props.style}
       close={props.close}
+      offset={props.offset}
     >
       <button
         onClick={() => {
@@ -34,14 +34,14 @@ export function BordeContextMenu(props: BordeContextMenuProps) {
 
 interface WorkspaceContextMenuProps {
   close: () => void;
-  style: string;
+  offset: [number, number];
 }
 
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
   return (
     <ContextMenu
       close={props.close}
-      style={props.style}
+      offset={props.offset}
     >
       <button disabled>
         <span>Workspace 1</span>
@@ -62,14 +62,14 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
 
 interface AccountContextMenuProps {
   close: () => void;
-  style: string;
+  offset: [number, number];
 }
 
 export function AccountContextMenu(props: AccountContextMenuProps) {
   return (
     <ContextMenu
       close={props.close}
-      style={props.style}
+      offset={props.offset}
     >
       <button disabled>
         <span>Account</span>
