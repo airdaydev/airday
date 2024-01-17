@@ -77,7 +77,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--light-shade);
+    background: var(--ultra-light-shade);
     padding: 0.125em 0;
     border-radius: 3px;
 }
@@ -92,7 +92,7 @@
 
 .active .list-header-internal {
   /* border-left: 1px solid blue; */
-  background: var(--shade);
+  background: var(--light-shade);
 }
 
 [data-theme="dark"] .active .list-header-internal {

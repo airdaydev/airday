@@ -8,6 +8,7 @@ import { View } from './view';
 import { Header } from './nav/header';
           
 export function App() {
+  // if focus mode
   return (
     <div class={styles.app}>
       <Header />
