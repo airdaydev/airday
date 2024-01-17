@@ -3,13 +3,13 @@ import { Portal } from "solid-js/web";
 import { viewState } from "../view-state";
 import styles from './context-menu.module.css';
 
-interface ContextMenu {
+interface ContextMenuProps {
     close: () => void;
-    offset: Accessor<[number, number]>;
     children: any;
+    style: string;
 }
 
-export function ContextMenu(props: ContextMenu) {
+export function ContextMenu(props: ContextMenuProps) {
     let containerRef: HTMLDivElement | undefined;
     const clickOutside = (event: MouseEvent) => {
         if (!containerRef?.contains(event.target)) {
@@ -35,10 +35,7 @@ export function ContextMenu(props: ContextMenu) {
         <div
             ref={containerRef}
             class={styles['context-menu']}
-            style={`
-                left: ${props.offset()[0]}px;
-                top: ${props.offset()[1]}px;
-            `}
+            style={props.style}
             tabIndex={0}
         >
           {props.children}
@@ -46,3 +43,13 @@ export function ContextMenu(props: ContextMenu) {
       </Portal>
     )
 }
+
+export const leftOffsetStyle = (offset: Accessor<[number, number]>) => `
+  left: ${offset()[0]}px;
+  top: ${offset()[1]}px;
+`;
+
+export const rightOffsetStyle = (offset: Accessor<[number, number]>) => `
+  right: ${offset()[0]}px;
+  top: ${offset()[1]}px;
+`

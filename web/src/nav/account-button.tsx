@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js';
 import { AccountContextMenu } from './context-menus';
 import styles from './header.module.css';
 import Caret from '../icons/caret.svg';
+import { leftOffsetStyle, rightOffsetStyle } from '../context-menu/context-menu';
 
 export const AccountButton = () => {
   let buttonRef: HTMLButtonElement | undefined;
@@ -11,8 +12,7 @@ export const AccountButton = () => {
     event.preventDefault();
     if (buttonRef) {
       const bounds = buttonRef.getBoundingClientRect();
-      console.log(bounds);
-      setCtxOffset([bounds.left, bounds.bottom]);
+      setCtxOffset([document.body.clientWidth - bounds.right, bounds.bottom]);
       setCtxOpen(true);
     }
   }
@@ -24,8 +24,8 @@ export const AccountButton = () => {
     >
       {ctxOpen() && (
         <AccountContextMenu
-          offset={ctxOffset}
           close={() => setCtxOpen(false)}
+          style={rightOffsetStyle(ctxOffset)}
         />
       )}
       <span style="padding-right: 0.25em;">Daniel</span>
