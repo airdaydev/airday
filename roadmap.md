@@ -82,6 +82,7 @@
 - [] CRDT: How will sorting work
 - [] CRDT: Define all data structures
 - [] Update strategy (anticipate changes)
+- [] Auth, consider https://next-auth.js.org/
 
 ## Predeploy, meta app
 - [] Help item type for new users - how to pin in Safari on IOS and same with android
