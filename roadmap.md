@@ -39,7 +39,8 @@
 ## UI
 - [] Context menus should not go past edge of screen (flipped)
 - [] Copy and paste many items, from csv, etc
-- [] Copy as JSON, CSV, Markdown etc
+- [] Copy as JSON, CSV, Markdown, text, rich text etc
+- Rich text https://docs.slatejs.org/ ?
 - [] List should scroll up as you drag up
 - [] Show date finished on completed items
 - [] Show completed item in og list for 5 seconds before disappearing
