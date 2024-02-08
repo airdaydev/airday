@@ -14,6 +14,7 @@ import { ContextMenu } from '../context-menu/context-menu';
 import { Sticker } from '../stickers/main';
 import Triangle from '../stickers/baseline/triangle.svg';
 import CircleTeal from '../stickers/baseline/circle-teal.svg';
+import Smiley from '../stickers/baseline/smiley.svg';
 import { elapsedString } from '../generic/date';
 
 interface ItemContextMenuProps {
@@ -38,10 +39,10 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         <span>Duplicate</span>
       </button>
       <button disabled>
-        <span>Copy as JSON</span>
+        <span>Copy</span>
       </button>
       <button disabled>
-        <span>Copy as CSV</span>
+        <span>Copy as JSON</span>
       </button>
       <button disabled>
         <span>Copy as Markdown</span>
@@ -51,7 +52,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       </button>
       <div>
         <button onClick={() => props.updateSticker('smiley')}>
-          <Sticker set="baseline" name={'smiley'} />
+          <Smiley />
         </button>
         <button  onClick={() => props.updateSticker('triangle')}>
           <Triangle />
@@ -59,7 +60,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         <button onClick={() => props.updateSticker('circleTeal')}>
           <CircleTeal />
         </button>
-        <button>X</button>
+        <button onClick={() => props.updateSticker(null)}>X</button>
       </div>
     </ContextMenu>
   )
@@ -276,7 +277,6 @@ export function Item(props: ItemProps) {
                       <div style={`white-space: pre-line; max-width: 48em;`}>
                         {item.text}
                       </div>
-                      <div>{props.item[0]().sticker}</div>
                       <div class={styles['meta-line']}>
                         {props.item[0]().sticker && (
                           <Sticker
@@ -284,7 +284,7 @@ export function Item(props: ItemProps) {
                             item={props.item}
                           />
                         )}
-                        {/* <span>Updated {elapsedString(props.item.tsCreated)}</span> */}
+                        <span>Updated {elapsedString(item.tsCreated)}</span>
                       </div>
                     </div>
                   </div>
@@ -295,7 +295,10 @@ export function Item(props: ItemProps) {
                 close={() => setCtxOpen(false)}
                 item={item}
                 offset={ctxOffset()}
-                updateSticker={(sticker: string) => props.fastList.updateItemContents(item.id, { sticker })}
+                updateSticker={(sticker: string) => {
+                  props.fastList.updateItemContents(item.id, { sticker });
+                  setCtxOpen(false);
+                }}
               />
             )}
         </>
