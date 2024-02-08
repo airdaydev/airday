@@ -1,5 +1,4 @@
 import { nanoid } from 'nanoid';
-import { openList } from './store/fast-list';
 import { viewState } from './view-state';
 
 const keyName = (event: string, contextId: string) =>

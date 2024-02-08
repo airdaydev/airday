@@ -1,6 +1,7 @@
 import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
+  Accessor,
 } from 'solid-js';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
@@ -19,7 +20,7 @@ interface ListProps {
   tabId: number;
 }
 
-type DisplayList = (BordeItem | { type: 'placeholder' })[];
+type DisplayList = (string | { type: 'placeholder' })[];
 
 // Challenge, index tracking without refreshing the list
 
@@ -39,14 +40,14 @@ export function List(props: ListProps) {
   // A reactive means of handling list & placeholder changes on drag
   // TBH: An explicitly set means of doing this COULD be a little cleaner.
   // This is better off being created from the fastList which can take a selection module.
-  const [displayList, setDisplayList] = createSignal<DisplayList>(fastList.signal());
+  const [displayList, setDisplayList] = createSignal<DisplayList>(fastList.signal[0]());
   // TODO: Desub on unmount
-  const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, fastList.signal], () => {
+  const unsubscribe = createEffect(on([selection.globalIsDragging, selection.lastTouchedIndex, fastList.signal[0]], () => {
     if (selection.globalIsDragging()) {
       // We are dragging, so filter if this is our list instance
-      let filtered: DisplayList = [...fastList.signal()];
+      let filtered: DisplayList = [...fastList.signal[0]()];
       if (dragOriginSelection === selection) {
-        filtered = filtered.filter((val) => !selection.keys.has(val.id))
+        filtered = filtered.filter((val) => !selection.keys.has(val))
       }
       // dragOriginSelection
       // placeholder
@@ -57,7 +58,7 @@ export function List(props: ListProps) {
       }
       setDisplayList(filtered);
     } else {
-      const noFilter = [...fastList.signal()];
+      const noFilter = [...fastList.signal[0]()];
       // Deal with list empty case
       // Deal with list empty and drag onto list case
       setDisplayList(noFilter);
@@ -129,12 +130,12 @@ export function List(props: ListProps) {
             <For each={displayList()}>
               {(item, index) => (
                 <>
-                  {item.type === 'placeholder' && (
+                  {(item as any).type === 'placeholder' && (
                     <Placeholder listIndex={index()} selection={selection} />
                   )}
-                  {item.id && (
+                  {typeof (item as any) === 'string' && (
                     <Item
-                      item={item}
+                      item={fastList.getItem(item)}
                       listIndex={index()}
                       selection={selection}
                       fastList={fastList}

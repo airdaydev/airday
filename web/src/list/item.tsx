@@ -1,6 +1,7 @@
 import {
     createSignal, createEffect, onCleanup, on, Accessor,
     onMount,
+    Signal,
 } from 'solid-js';
 import { AcmeReactiveSelection, globalLastDisplayIndex } from './selection';
 import { KeyboardShortcuts } from '../keyboard';
@@ -11,11 +12,14 @@ import { distance, moveCaretToPosition } from './utils';
 import { Checkbox } from './checkbox';
 import { ContextMenu } from '../context-menu/context-menu';
 import { Sticker } from '../stickers/main';
+import Triangle from '../stickers/baseline/triangle.svg';
+import CircleTeal from '../stickers/baseline/circle-teal.svg';
 import { elapsedString } from '../generic/date';
 
 interface ItemContextMenuProps {
   close: () => void;
   item: Accessor<BordeItem>,
+  updateSticker: (sticker: string) => void;
   style: string;
   offset: [number, number];
 }
@@ -45,13 +49,25 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Delete</span>
       </button>
+      <div>
+        <button onClick={() => props.updateSticker('smiley')}>
+          <Sticker set="baseline" name={'smiley'} />
+        </button>
+        <button  onClick={() => props.updateSticker('triangle')}>
+          <Triangle />
+        </button>
+        <button onClick={() => props.updateSticker('circleTeal')}>
+          <CircleTeal />
+        </button>
+        <button>X</button>
+      </div>
     </ContextMenu>
   )
 }
 
 interface ItemProps {
     listIndex: number;
-    item: BordeItem;
+    item: Signal<BordeItem>;
     selection: AcmeReactiveSelection;
     fastList: FastList;
     scrollRef: HTMLElement;
@@ -64,9 +80,10 @@ export function Item(props: ItemProps) {
     let containerRef: HTMLDivElement | undefined;
     let dummyRef: HTMLDivElement | undefined;
     let textAreaRef: HTMLInputElement | undefined;
+    const item = props.item[0]();
     const [edit, setEdit] = createSignal(false);
     const [caretPos, setCaretPos] = createSignal(0);
-    const [selected, unsubscribe] = props.selection.getSignalByKey(props.item.id);
+    const [selected, unsubscribe] = props.selection.getSignalByKey(item.id);
     // ContextMenu
     const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
     const [ctxOffset, setCtxOffset] = createSignal<[number, number]>();
@@ -102,8 +119,8 @@ export function Item(props: ItemProps) {
         // Delete if new item
         if (save) {
             // optimistically update fastList, then idb
-            props.fastList.updateItemContents(props.item.id, { text: textAreaRef.value });
-            props.fastList.updateItem(props.item.id, { open: false })
+            props.fastList.updateItemContents(item.id, { text: textAreaRef.value });
+            // props.fastList.updateItemConten(item.id, { open: false })
         }
         props.keyboardShortcuts.enable();
         setEdit(false);
@@ -134,7 +151,7 @@ export function Item(props: ItemProps) {
         }
     }))
     onMount(() => {
-        if (props.item.open === true) {
+        if (item.open === true) {
             enterEditMode();
         }
     })
@@ -147,8 +164,8 @@ export function Item(props: ItemProps) {
                     class={styles['edit-container']}
               >
                 <Checkbox
-                    onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
-                    checked={!!props.item.tsCompleted}
+                    onChange={(event: InputEvent) => props.fastList.completeItem(item.id, event.target?.checked ? new Date() : null)}
+                    checked={!!item.tsCompleted}
                 />
                 <div
                   ref={dummyRef}
@@ -156,7 +173,7 @@ export function Item(props: ItemProps) {
                 />
                 <textarea
                   ref={textAreaRef}
-                  value={props.item.text}
+                  value={item.text}
                   onInput={(event) => {
                     if (dummyRef) dummyRef.textContent = event.target.value;
                   }}
@@ -195,7 +212,7 @@ export function Item(props: ItemProps) {
                         if (event.button === 2) return; // context click behaviour
                         event.preventDefault(); // prevents selection on Safari
                         if (event.metaKey) {
-                            props.selection.toggleKey(props.item.id);
+                            props.selection.toggleKey(item.id);
                             return;
                         }
                         if (!event.shiftKey) {
@@ -221,13 +238,13 @@ export function Item(props: ItemProps) {
                                 props.selection.setDragging(false);
                                 window.removeEventListener('mousemove', mouseMove);
                             }, { once: true })
-                            if (props.selection.keys.has(props.item.id)) {
+                            if (props.selection.keys.has(item.id)) {
                                 // If we click on an already selected item, do nothing until mouse up
                                 // Bc this is the start of a drag
                                 // on mouse up, unselect if no drag
                                 return;
                             }
-                            props.selection.selectOne(props.item.id)
+                            props.selection.selectOne(item.id)
                             return;
                         }
                         // TODO: Shift key but nothing selected
@@ -252,18 +269,19 @@ export function Item(props: ItemProps) {
                 >
                   <div class={styles[`item-content-box`]}>
                     <Checkbox
-                      onChange={(event: InputEvent) => props.fastList.completeItem(props.item.id, event.target?.checked ? new Date() : null)}
-                      checked={!!props.item.tsCompleted}
+                      onChange={(event: InputEvent) => props.fastList.completeItem(item.id, event.target?.checked ? new Date() : null)}
+                      checked={!!item.tsCompleted}
                     />
                     <div>
                       <div style={`white-space: pre-line; max-width: 48em;`}>
-                        {props.item.text}
+                        {item.text}
                       </div>
+                      <div>{props.item[0]().sticker}</div>
                       <div class={styles['meta-line']}>
-                        {props.item.sticker && (
+                        {props.item[0]().sticker && (
                           <Sticker
-                          set="baseline"
-                          name={props.item.sticker}
+                            set="baseline"
+                            item={props.item}
                           />
                         )}
                         {/* <span>Updated {elapsedString(props.item.tsCreated)}</span> */}
@@ -275,8 +293,9 @@ export function Item(props: ItemProps) {
             {ctxOpen() && (
               <ItemContextMenu
                 close={() => setCtxOpen(false)}
-                item={props.item}
+                item={item}
                 offset={ctxOffset()}
+                updateSticker={(sticker: string) => props.fastList.updateItemContents(item.id, { sticker })}
               />
             )}
         </>

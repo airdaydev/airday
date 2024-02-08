@@ -14,7 +14,7 @@ export const getListKeyboardHandler = ({
     selection,
     scrollRef,
 }: ListKeyboardHandlerParams) => (event: KeyboardEvent) => {
-    const list = fastList.signal();
+    const list = fastList.signal[0]();
     if (event.key === 'n') {
       event.preventDefault();
       // TODO: Find position:
@@ -33,7 +33,7 @@ export const getListKeyboardHandler = ({
     }
     if (event.key === 'a' && event.metaKey) {
         event.preventDefault();
-        const allKeys = list.map((item) => item.id);
+        const allKeys = list.map((item) => item);
         selection.addKeys(allKeys);
         return;
     }
@@ -53,21 +53,21 @@ export const getListKeyboardHandler = ({
       }
       if (event.altKey) {
         if (!list.length) return;
-        selection.selectOne(list[list.length - 1].id);
+        selection.selectOne(list[list.length - 1]);
         jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[list.length - 1])
         return;
       }
       // - on key down, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[0];
-        if (neighbour) selection.selectOne(neighbour.id);
+        if (neighbour) selection.selectOne(neighbour);
         return;
       }
       if (selection.lastKeySelected && !event.shiftKey) {
         event.preventDefault();
         const neighbour = fastList.getNeighbourIndex(selection.lastKeySelected);
         if (neighbour) {
-          selection.selectOne(list[neighbour].id);
+          selection.selectOne(list[neighbour]);
           jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour])
         }
       }
@@ -82,12 +82,12 @@ export const getListKeyboardHandler = ({
           // select down
           const index = fastList.getNextNotInSet(origin, selection.keys);
           if (index !== false) {
-            selection.addKey(list[index].id);
+            selection.addKey(list[index]);
             jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index])
           }
         } else {
           // deselect down
-          selection.removeKey(prevIndex !== false ? list[prevIndex + 1].id : list[0].id);
+          selection.removeKey(prevIndex !== false ? list[prevIndex + 1] : list[0]);
         }
         return;
       }
@@ -103,20 +103,20 @@ export const getListKeyboardHandler = ({
       }
       if (event.altKey) {
         if (!list.length) return;
-        selection.selectOne(list[0].id);
+        selection.selectOne(list[0]);
         jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[0]);
         return;
       }
       // - on key up, select next down from last selected, set last selected, origin
       if (!selection.lastKeySelected) {
         const neighbour = list[list.length - 1];
-        if (neighbour) selection.selectOne(neighbour.id);
+        if (neighbour) selection.selectOne(neighbour);
         return;
       }
       if (selection.lastKeySelected && !event.shiftKey) {
         const neighbour = fastList.getNeighbourIndex(selection.lastKeySelected, 'prev');
         if (neighbour !== false) {
-          selection.selectOne(fastList.signal()[neighbour].id);
+          selection.selectOne(fastList.signal[0]()[neighbour]);
           jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[neighbour]);
         }
       }
@@ -130,12 +130,12 @@ export const getListKeyboardHandler = ({
           // select up
           const index = fastList.getNextNotInSet(origin, selection.keys, 'prev');
           if (index !== false) {
-            selection.addKey(list[index].id);
+            selection.addKey(list[index]);
             jumpToElIfOutsideView(scrollRef, scrollRef.childNodes[index]);
           }
         } else {
           // deselect up
-          selection.removeKey(nextIndex !== false ? list[nextIndex - 1].id : list[list.length - 1].id);
+          selection.removeKey(nextIndex !== false ? list[nextIndex - 1] : list[list.length - 1]);
           return;
         }
       }
