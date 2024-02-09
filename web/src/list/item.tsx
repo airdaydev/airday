@@ -275,7 +275,7 @@ export function Item(props: ItemProps) {
                     />
                     <div>
                       <div style={`white-space: pre-line; max-width: 48em;`}>
-                        {item.text}
+                        {props.item[0]().text}
                       </div>
                       <div class={styles['meta-line']}>
                         {props.item[0]().sticker && (

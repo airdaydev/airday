@@ -4,6 +4,8 @@ import Smiley from '../stickers/baseline/smiley.svg';
 import Triangle from '../stickers/baseline/triangle.svg';
 import CircleTeal from '../stickers/baseline/circle-teal.svg';
 import CirclePlaya from '../stickers/baseline/circle-playa.svg';
+import styles from './sticker.module.css';
+
 const map: Record<string, any> = {
   triangle: Triangle,
   smiley: Smiley,
@@ -21,9 +23,9 @@ interface StickerProps {
 export const Sticker = (props: StickerProps) => {
   if (!props.item) return null;
   return (
-    <>
+    <span class={styles['sticker']}>
       {props.item[0]() && map[props.item[0]().sticker]}
-    </>
+    </span>
   );
 }
 
