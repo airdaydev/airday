@@ -38,9 +38,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Focus</span>
       </button>
-      <button disabled>
-        <span>Duplicate</span>
-      </button>
+      <hr />
       <button disabled>
         <span>Copy text</span>
       </button>
@@ -50,9 +48,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Copy as Markdown</span>
       </button>
-      <button disabled>
-        <span>Delete</span>
-      </button>
+      <hr />
       <div>
         <button onClick={() => props.updateSticker('smiley')}>
           <Smiley />
@@ -65,6 +61,13 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         </button>
         <button onClick={() => props.updateSticker(null)}>X</button>
       </div>
+      <hr />
+      <button disabled>
+        <span>Duplicate</span>
+      </button>
+      <button disabled>
+        <span>Delete</span>
+      </button>
     </ContextMenu>
   )
 }
