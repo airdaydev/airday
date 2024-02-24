@@ -57,13 +57,10 @@ export abstract class FastList {
         // TODO: Sort memory leak! (redundant/garbage id-indexes)
         const updatedList = sourceList.signal[0]().filter((id) => {
             const toMove = ids.has(id)
-            if (toMove) itemsToMove.push(sourceList.getItem(id));
+            if (toMove) itemsToMove.push(sourceList.getItem(id)[0]());
             return !toMove;
         });
         // TODO: No need to unwrap & create new signal!
-        itemsToMove.map((i) => console.log(i[0]()))
-        console.log('between[0]', between[0])
-        console.log('updateList[0]', updatedList)
         sourceList.signal[1](updatedList); // Filter out items from source list
         this.add(itemsToMove, between[0]);
     }
