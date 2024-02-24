@@ -15,6 +15,6 @@
   },
   "dependencies": {
     "slonik": "^37.2.0",
-    "toml-config": "^0.0.5"
+    "toml-config": "^0.0.6"
   }
 }
