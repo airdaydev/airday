@@ -6,7 +6,8 @@ import { viewState } from './view-state';
 // import { Bar } from './bar/bar';
 import { View } from './view';
 import { Header } from './nav/header';
-          
+
+// TODO: Switch workspace
 export function App() {
   // if focus mode
   return (

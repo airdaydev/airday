@@ -33,13 +33,16 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       offset={props.offset}
     >
       <button disabled>
+        <span>Add to up next</span>
+      </button>
+      <button disabled>
         <span>Focus</span>
       </button>
       <button disabled>
         <span>Duplicate</span>
       </button>
       <button disabled>
-        <span>Copy</span>
+        <span>Copy text</span>
       </button>
       <button disabled>
         <span>Copy as JSON</span>
