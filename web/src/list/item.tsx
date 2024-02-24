@@ -89,11 +89,13 @@ export function Item(props: ItemProps) {
     const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
     const [ctxOffset, setCtxOffset] = createSignal<[number, number]>();
     function openContextMenu(event: MouseEvent) {
+      // TODO: Prevent shift key + context menu (too much work)
       event.preventDefault();
       if (event.target) {
         setCtxOffset([event.clientX, event.clientY]);
       }
       setCtxOpen(true);
+      onClick(event);
     }
     function editModeKeyboardHandler(event: KeyboardEventInit) {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -156,6 +158,70 @@ export function Item(props: ItemProps) {
             enterEditMode();
         }
     })
+    const onClick = (event: MouseEvent) => {
+      console.log('wtf')
+      event.preventDefault(); // prevents selection on Safari
+      // if (event.button === 2) {
+      //   openContextMenu(event);
+      // }; // context click behaviour
+      console.log('onclick')
+      if (event.metaKey) {
+          props.selection.toggleKey(item.id);
+          return;
+      }
+      console.log('onclick2')
+      if (!event.shiftKey) {
+          const origin: [number, number] = [event.clientX, event.clientY];
+          const mouseMove = (mouseUpEvent: MouseEvent) => {
+              event.preventDefault();
+              // Make moving a little more effort to avoid slips
+              if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
+                  // props.selection.setLastTouchedIndex(props.listIndex);
+                  props.selection.setDragging(true);
+                  props.fastList.setDragOriginList(props.fastList.listId);
+                  // TODO: FILTER THE ACTIVE SELECTION
+              }
+              // Track where on list to place placeholder
+              // On blur, remove placeholder
+              // On 
+          };
+          window.addEventListener('mousemove', mouseMove);
+          window.addEventListener('mouseup', () => {
+          //     // TODO: Add drop zone event here
+          //     window.dispatchEvent(new Event('acme-drop-items'));
+              props.selection.setLastTouchedIndex(false);
+              props.selection.setDragging(false);
+              window.removeEventListener('mousemove', mouseMove);
+          }, { once: true })
+          if (props.selection.keys.has(item.id)) {
+              // If we click on an already selected item, do nothing until mouse up
+              // Bc this is the start of a drag
+              // on mouse up, unselect if no drag
+              return;
+          }
+          props.selection.selectOne(item.id)
+          return;
+      }
+      console.log('onclick3')
+      // TODO: Shift key but nothing selected
+      if (event.shiftKey && props.selection.keys.size) {
+          event.preventDefault();
+          // We can (almost) guarantee this bc selection has a size
+          const firstSelectedIndex = props.fastList.getFirstIndexOfSet(props.selection.keys);
+          if (firstSelectedIndex === false) return;
+          if (props.listIndex < firstSelectedIndex) {
+              const lastIndex = props.fastList.getLastIndexOfSet(props.selection.keys);
+              if (!lastIndex) return;
+              const keys = props.fastList.getKeysInRange(props.listIndex, lastIndex);
+              props.selection.clear();
+              props.selection.addKeys(keys);
+          } else {
+              const keys = props.fastList.getKeysInRange(firstSelectedIndex, props.listIndex);
+              props.selection.clear();
+              props.selection.addKeys(keys);
+          }
+      }
+    }
     return (
         <>
             {edit() && (
@@ -188,6 +254,7 @@ export function Item(props: ItemProps) {
             )}
             {!edit() && (
                 <div
+                  id={`container-${item.id}`}
                     onDblClick={(prev) => {
                         // Firefox
                         let position = 0;
@@ -209,64 +276,7 @@ export function Item(props: ItemProps) {
                         props.selection.setLastTouchedIndex(props.listIndex);
                     }}
                     onContextMenu={openContextMenu}
-                    onMouseDown={(event: MouseEvent) => {
-                        if (event.button === 2) return; // context click behaviour
-                        event.preventDefault(); // prevents selection on Safari
-                        if (event.metaKey) {
-                            props.selection.toggleKey(item.id);
-                            return;
-                        }
-                        if (!event.shiftKey) {
-                            const origin: [number, number] = [event.clientX, event.clientY];
-                            const mouseMove = (mouseUpEvent: MouseEvent) => {
-                                event.preventDefault();
-                                // Make moving a little more effort to avoid slips
-                                if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
-                                    // props.selection.setLastTouchedIndex(props.listIndex);
-                                    props.selection.setDragging(true);
-                                    props.fastList.setDragOriginList(props.fastList.listId);
-                                    // TODO: FILTER THE ACTIVE SELECTION
-                                }
-                                // Track where on list to place placeholder
-                                // On blur, remove placeholder
-                                // On 
-                            };
-                            window.addEventListener('mousemove', mouseMove);
-                            window.addEventListener('mouseup', () => {
-                            //     // TODO: Add drop zone event here
-                            //     window.dispatchEvent(new Event('acme-drop-items'));
-                                props.selection.setLastTouchedIndex(false);
-                                props.selection.setDragging(false);
-                                window.removeEventListener('mousemove', mouseMove);
-                            }, { once: true })
-                            if (props.selection.keys.has(item.id)) {
-                                // If we click on an already selected item, do nothing until mouse up
-                                // Bc this is the start of a drag
-                                // on mouse up, unselect if no drag
-                                return;
-                            }
-                            props.selection.selectOne(item.id)
-                            return;
-                        }
-                        // TODO: Shift key but nothing selected
-                        if (event.shiftKey && props.selection.keys.size) {
-                            event.preventDefault();
-                            // We can (almost) guarantee this bc selection has a size
-                            const firstSelectedIndex = props.fastList.getFirstIndexOfSet(props.selection.keys);
-                            if (firstSelectedIndex === false) return;
-                            if (props.listIndex < firstSelectedIndex) {
-                                const lastIndex = props.fastList.getLastIndexOfSet(props.selection.keys);
-                                if (!lastIndex) return;
-                                const keys = props.fastList.getKeysInRange(props.listIndex, lastIndex);
-                                props.selection.clear();
-                                props.selection.addKeys(keys);
-                            } else {
-                                const keys = props.fastList.getKeysInRange(firstSelectedIndex, props.listIndex);
-                                props.selection.clear();
-                                props.selection.addKeys(keys);
-                            }
-                        }
-                    }}
+                    onMouseDown={onClick}
                 >
                   <div class={styles[`item-content-box`]}>
                     <Checkbox

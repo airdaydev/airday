@@ -30,7 +30,6 @@ export abstract class FastList {
     index: Record<string, Signal<BordeItem>> = {};
     constructor() {
         this.signal = createSignal<string[]>([]);
-        console.log('fast list init')
         // this.store.subscribe(listId, onUpdate);
     }
     load() {
