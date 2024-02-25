@@ -23,6 +23,7 @@
 
 ## Frontend Lifecycle
 - [x] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
+- [] Workspace management
 - [] Up Next board
 - [] Trash items
 - [] Empty trash
@@ -37,7 +38,7 @@
 - [] Persist views (per device)
 
 ## UI
-- [] Context menus should not go past edge of screen (flipped)
+- [x] Context menus should not go past edge of screen (flipped)
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc
 - Rich text https://docs.slatejs.org/ ?
@@ -61,21 +62,25 @@
 - [] Allow dropping items in nav bar list
 - [] Change list icons
 - [] Drag stack make it nice
-- [] Context menu for one item
+- [x] Context menu for one item
 - [] Context menu for many items
 - [] Timeline index (GL?)
 - [] Add now playing list, allow dragging items to now playing list
 - [] Drag divider to change view size
 - [] Focus mode
-- [] Nice empty list states
+- [x] Nice empty list states
 - [] Export data markdown, json, csv
 - [] Import markdown, json
 - [] Keyboard only, accessibility
 
 ## Stickers
-- [] Sticker system
+- [x] Sticker system
+- [] First full sticker set
+- [] Dynamic storage
+- [] Custom stickers
 
 ## Sync/Data structure
+- [] Auth, consider https://next-auth.js.org/
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Undo/redo... in general, save granular outcomes & apply them (consider a changelog or something visible, otherwise just console)
 - [] Client-side encrypted sync server
@@ -83,7 +88,6 @@
 - [] CRDT: How will sorting work
 - [] CRDT: Define all data structures
 - [] Update strategy (anticipate changes)
-- [] Auth, consider https://next-auth.js.org/
 
 ## Predeploy, meta app
 - [] Help item type for new users - how to pin in Safari on IOS and same with android
