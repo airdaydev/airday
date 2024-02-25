@@ -1,5 +1,5 @@
 import { IDBPObjectStore } from 'idb';
-import { BordeIDB, dbNotReadyMessage } from './main';
+import { BordeIDB } from './main';
 
 /**
  * Item model

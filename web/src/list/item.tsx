@@ -164,17 +164,14 @@ export function Item(props: ItemProps) {
         }
     })
     const onClick = (event: MouseEvent) => {
-      console.log('wtf')
       event.preventDefault(); // prevents selection on Safari
       // if (event.button === 2) {
       //   openContextMenu(event);
       // }; // context click behaviour
-      console.log('onclick')
       if (event.metaKey) {
           props.selection.toggleKey(item.id);
           return;
       }
-      console.log('onclick2')
       if (!event.shiftKey) {
           const origin: [number, number] = [event.clientX, event.clientY];
           const mouseMove = (mouseUpEvent: MouseEvent) => {
@@ -207,7 +204,6 @@ export function Item(props: ItemProps) {
           props.selection.selectOne(item.id)
           return;
       }
-      console.log('onclick3')
       // TODO: Shift key but nothing selected
       if (event.shiftKey && props.selection.keys.size) {
           event.preventDefault();
@@ -299,7 +295,7 @@ export function Item(props: ItemProps) {
                             item={props.item}
                           />
                         )}
-                        <span>Updated {elapsedString(item.tsCreated)}</span>
+                        <span>{elapsedString(item.tsCreated)}</span>
                       </div>
                     </div>
                   </div>

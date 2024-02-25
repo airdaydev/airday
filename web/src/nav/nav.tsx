@@ -135,7 +135,10 @@ export function BordeNav() {
           Dev
         </h2>
         <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
-          <button onClick={store.reset}>
+          <button onClick={async () => {
+            await store.reset();
+            store.dummyData();
+          }}>
             Refresh db
           </button>
         </div>

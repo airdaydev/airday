@@ -76,7 +76,6 @@ export function List(props: ListProps) {
       const afterIndex = Math.min(dl.length, ltIndex + 1);
       const beforeId = dl[beforeIndex] ? dl[beforeIndex] : null;
       const afterId = dl[afterIndex] ? dl[afterIndex] : null;
-      console.log('before,after', beforeId, afterId)
       fastList?.moveItems(dragOriginSelection.keys, dragOriginList, [beforeId || null, afterId || null]);
       if (dragOriginSelection !== selection) {
         selection.clear();

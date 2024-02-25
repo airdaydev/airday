@@ -1,3 +1,5 @@
+import { store } from './main';
+
 interface Workspace {
   id: string;
   localOnly: boolean;
@@ -11,12 +13,16 @@ class SessionStore {
   // TODO: An actual auth mechanism
   user: string = 'anonymous';
   workspaces = new Map<string, Workspace>();
+  // TODO: This potentially belongs elsewhere
   activeWorkspace?: string;
+  activePanes: string[] = [];
   constructor() {
     this.init();
   }
   init() {
     const activeWorkspace = localStorage.getItem('activeWorkspace');
+    store.reset();
+    store.connect('activeWorkspace');
     // Attempt to create new idb connection to active workspace
     // If it doesn't exist, attempt to authenticate
     // If offline
