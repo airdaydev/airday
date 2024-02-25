@@ -9,7 +9,7 @@ interface Workspace {
 // This is a local storage based API that deals with sessions
 // and controls which workspace is active
 // It is serialised in localstorage
-class SessionStore {
+export class SessionStore {
   // TODO: An actual auth mechanism
   user: string = 'anonymous';
   workspaces = new Map<string, Workspace>();
@@ -21,11 +21,19 @@ class SessionStore {
   }
   init() {
     const activeWorkspace = localStorage.getItem('activeWorkspace');
-    store.reset();
-    store.connect('activeWorkspace');
+    if (!activeWorkspace) {
+      console.log('no active workspace found');
+      // store.reset();
+      // store.connect(activeWorkspace);
+    }
+    // store.reset();
+    // store.connect(activeWorkspace);
     // Attempt to create new idb connection to active workspace
     // If it doesn't exist, attempt to authenticate
     // If offline
+  }
+  sync() {
+    // Syncs workspace for authenticated user
   }
   authenticate() {
     // authenticate
@@ -45,6 +53,3 @@ class SessionStore {
     this.changeWorkspace('anonymous');
   }
 }
-
-// Instantiate as singleton
-export const sessionStore = new SessionStore();

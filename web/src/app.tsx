@@ -1,4 +1,4 @@
-import { For } from 'solid-js';
+import { For, createContext } from 'solid-js';
 import { BordeNav } from './nav/nav';
 import { List } from './list/list';
 import styles from './app.module.css';
@@ -7,7 +7,6 @@ import { viewState } from './view-state';
 import { View } from './view';
 import { Header } from './nav/header';
 
-// TODO: Session & Workspace storage
 
 // TODO: Switch workspace
 export function App() {
