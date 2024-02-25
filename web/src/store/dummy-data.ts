@@ -1,6 +1,5 @@
 import { nanoid } from 'nanoid';
 import { generateNKeysBetween } from 'fractional-indexing';
-import { store } from './main.js';;
 
 export const bordeItems = [
     'Borde',

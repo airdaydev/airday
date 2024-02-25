@@ -18,8 +18,8 @@ export const AddListButton = () => {
         if (save) {
             const id = nanoid();
             store.containerModel.insert({
-                id,
-                name: inputRef?.value || 'New board',
+              id,
+              name: inputRef?.value || 'New board',
             });
             viewState.openContainerView(id);
         }

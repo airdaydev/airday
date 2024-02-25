@@ -1,13 +1,12 @@
 import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
-  Accessor,
 } from 'solid-js';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from './item';
 import { store } from '../store/main';
-import { FastList, dragOriginList, openFastList } from '../store/fast-list.js';
+import { dragOriginList, openFastList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { ListHeader } from './list-header.jsx';

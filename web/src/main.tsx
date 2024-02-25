@@ -2,7 +2,6 @@
 import { render } from 'solid-js/web';
 import { App } from './app';
 import './main.css';
-import { store } from './store/main';
 
 // TODO: Render while store is alive (i.e. Allow models to run without db layer)
 

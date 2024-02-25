@@ -1,5 +1,5 @@
 import { Accessor, createSignal, Setter, Signal } from 'solid-js';
-import { store, BordeIDB, dbNotReadyMessage } from './main';
+import { BordeIDB } from './main';
 
 export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 

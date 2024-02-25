@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { createSignal, Accessor, Setter, Signal } from 'solid-js';
+import { createSignal, Signal } from 'solid-js';
 import { store } from './main.js';
 
 // https://github.com/solidjs/solid/discussions/1524
