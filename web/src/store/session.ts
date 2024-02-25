@@ -16,6 +16,7 @@ export class SessionStore {
   // TODO: This potentially belongs elsewhere
   activeWorkspace?: string;
   activePanes: string[] = [];
+  store = store;
   constructor() {
     this.init();
   }

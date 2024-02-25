@@ -1,11 +1,11 @@
 import {
   on, createSignal, For, onCleanup, onMount,
   createEffect,
+  useContext,
 } from 'solid-js';
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from './item';
-import { store } from '../store/main';
 import { dragOriginList, openFastList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
@@ -13,6 +13,7 @@ import { ListHeader } from './list-header.jsx';
 import { viewState } from '../view-state';
 import { Placeholder } from './placeholder';
 import { DragStack } from './drag-stack';
+import { sessionContext } from '../store/context.js';
 
 interface ListProps {
   view: BordeView;
@@ -29,9 +30,10 @@ type DisplayList = (string | { type: 'placeholder' })[];
  * @returns 
  */
 export function List(props: ListProps) {
+  const session = useContext(sessionContext);
   let scrollRef: HTMLDivElement;
   let fastList = openFastList(props.view);
-  const container = store.containerModel.index.get(props.view.containerId);
+  const container = session.store.containerModel.index.get(props.view.containerId);
   if (!fastList) {
     return <div>{props.view.type}</div>
   }

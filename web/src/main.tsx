@@ -2,7 +2,7 @@
 import { render } from 'solid-js/web';
 import { App } from './app';
 import './main.css';
-import { SessionContext } from './store/context';
+import { sessionContext } from './store/context';
 import { SessionStore } from './store/session';
 
 // Setup app state
@@ -16,7 +16,7 @@ if (!(root instanceof HTMLElement)) {
 }
 
 render(() => (
-  <SessionContext.Provider value={sessionStore}>
+  <sessionContext.Provider value={sessionStore}>
     <App />
-  </SessionContext.Provider>
+  </sessionContext.Provider>
 ), root);

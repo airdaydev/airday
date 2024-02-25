@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
-import { createSignal, createEffect, on } from 'solid-js';
+import { createSignal, createEffect, on, useContext } from 'solid-js';
 import { keyboardShortcuts } from '../keyboard';
-import { store } from '../store/main';
+import { sessionContext } from '../store/context.js';
 import { viewState } from '../view-state';
 import styles from './nav.module.css';
 
@@ -11,13 +11,14 @@ import styles from './nav.module.css';
  * 2. Finish input on enter
  */
 export const AddListButton = () => {
+  const session = useContext(sessionContext);
     let inputRef: HTMLInputElement | undefined = undefined;
     const [editing, setEditing] = createSignal<boolean>(false);
     const leaveEditMode = (save: boolean) => {
         keyboardShortcuts.enable();
         if (save) {
             const id = nanoid();
-            store.containerModel.insert({
+            session.store.containerModel.insert({
               id,
               name: inputRef?.value || 'New board',
             });

@@ -1,3 +1,4 @@
 import { createContext } from 'solid-js';
+import { SessionStore } from './session';
 
-export const SessionContext = createContext();
+export const sessionContext = createContext<SessionStore>();

@@ -25,7 +25,7 @@ const containerStoreName = 'container';
 // Primary local persistence layer for a workspace
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
-class AcmeWorkspaceStore {
+export class AcmeWorkspaceStore {
   db: BordeIDB | null = null;
   itemModel = new ItemModel();
   containerModel = new ContainerModel();

@@ -1,4 +1,4 @@
-import { For, createSignal, Accessor } from 'solid-js';
+import { For, createSignal, Accessor, useContext } from 'solid-js';
 import { Stickers } from './stickers';
 import styles from './nav.module.css';
 import { viewState } from '../view-state';
@@ -7,7 +7,7 @@ import CheckSVG from '../icons/check.svg';
 import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
 import { ContextMenu } from '../context-menu/context-menu';
-import { store } from '../store/main';
+import { sessionContext } from '../store/context.js';
 import { AddListButton } from './add-list';
 
 interface NavItemContextMenuProps {
@@ -78,6 +78,7 @@ export function NavListItem(props: NavListItemProps) {
 }
 
 export function BordeNav() {
+  const session = useContext(sessionContext);
   const [ sidebarVisible ] = viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined = undefined;
   const getMargin = () => sidebarVisible() ? '0' : `-${ref ? ref.getBoundingClientRect().width : 0}px`;
@@ -111,7 +112,7 @@ export function BordeNav() {
         Boards
       </h2>
       <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
-        <For each={store.containerModel.ol()}>
+        <For each={session.store.containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
         </For>
         <AddListButton />
@@ -136,8 +137,8 @@ export function BordeNav() {
         </h2>
         <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
           <button onClick={async () => {
-            await store.reset();
-            store.dummyData();
+            await session.store.reset();
+            session.store.dummyData();
           }}>
             Refresh db
           </button>
