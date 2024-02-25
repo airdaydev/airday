@@ -23,6 +23,7 @@
 
 ## Frontend Lifecycle
 - [x] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
+- [] Don't allow two of the same bordes open at the same time
 - [] Workspace management
 - [] Up Next board
 - [] Trash items
