@@ -1,4 +1,5 @@
-import { Accessor } from 'solid-js';
+import { useContext } from 'solid-js';
+import { sessionContext } from '../store/context.js';
 import { ContextMenu } from '../context-menu/context-menu';
 import { viewState } from '../view-state';
 
@@ -38,27 +39,33 @@ interface WorkspaceContextMenuProps {
 }
 
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
+  const session = useContext(sessionContext);
   return (
     <ContextMenu
       close={props.close}
       offset={props.offset}
     >
-      <button disabled>
-        <span>My workspace</span>
-      </button>
+      <div>
+        {Array.from(session.map.values()).map((workspace) => (
+          <button disabled>
+            <div>{workspace.name}</div>
+            <div>{workspace.id}</div>
+          </button>
+        ))}
+      </div>
       <hr />
       <button disabled>
         <span>Workspace settings</span>
       </button>
       <button disabled>
-        <span>Import</span>
-      </button>
-      <button disabled>
-        <span>Export</span>
+        <span>Export Workspace</span>
       </button>
       <hr />
       <button disabled>
         <span>Create new workspace</span>
+      </button>
+      <button disabled>
+        <span>Import Workspace</span>
       </button>
     </ContextMenu>
   )
