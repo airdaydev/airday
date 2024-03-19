@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { createSignal, Signal } from 'solid-js';
-import { store } from './main.js';
+import { AcmeWorkspaceStore } from './main';
 
 // https://github.com/solidjs/solid/discussions/1524
 // https://www.reddit.com/r/solidjs/comments/ilebtl/efficient_state_updates_to_arrays/
@@ -28,7 +28,9 @@ export abstract class FastList {
     sortable: boolean = false;
     signal: Signal<string[]>; // just the id
     index: Record<string, Signal<BordeItem>> = {};
-    constructor() {
+    store: AcmeWorkspaceStore;
+    constructor(store: AcmeWorkspaceStore) {
+      this.store = store;
         this.signal = createSignal<string[]>([]);
         // this.store.subscribe(listId, onUpdate);
     }
@@ -39,7 +41,7 @@ export abstract class FastList {
         dragOriginList = listId;
     }
     new(item: BordeItemInsertion) {
-        store.itemModel.insert({
+        this.store.itemModel.insert({
           id: nanoid(),
           ...item,
           tsCreated: new Date(),
@@ -51,7 +53,7 @@ export abstract class FastList {
     moveItems(ids: Set<string>, sourceListId: string, between: [string | null, string | null]) {
         // Filter ids from list
         const itemsToMove: BordeItem[] = [];
-        const sourceList = openLists.get(`c#${sourceListId}`);
+        const sourceList = this.store.openLists.get(`c#${sourceListId}`);
         if (!sourceList) return; // Should not happen (TODO: Log validation error)
         // TODO: Sort memory leak! (redundant/garbage id-indexes)
         const updatedList = sourceList.signal[0]().filter((id) => {
@@ -86,7 +88,7 @@ export abstract class FastList {
         if (!itemSignal) return console.error('updateItemContents() index not found');
         itemSignal[1]((val) => Object.assign({}, val, attrs));
         // TODO: Abstract as action & persist as queue
-        store.itemModel.update(id, attrs).then(() => {});
+        this.store.itemModel.update(id, attrs).then(() => {});
         // TODO: Update idb
     }
     completeItem(id: string, tsCompleted: Date | null ) {
@@ -173,8 +175,8 @@ export class UpNextFL extends FastList {
     sortable = true;
     // - All items are by reference only
     // - New items go to index
-    constructor() {
-        super();
+    constructor(store: AcmeWorkspaceStore) {
+      super(store);
     }
 }
 
@@ -184,15 +186,15 @@ export class ContainerFL extends FastList {
     listId: string;
     createItems = true;
     sortable = true;
-    constructor(listId: string) {
-        super();
+    constructor(store: AcmeWorkspaceStore, listId: string) {
+        super(store);
         this.listId = listId;
         this.load();
     }
     async initList() {
     }
     async load() {
-        const list = await store.itemModel.getItemsByList(this.listId);
+        const list = await this.store.itemModel.getItemsByList(this.listId);
         // id index must be populated first
         list.map((item) => {
           this.index[item.id] = createSignal(item);
@@ -206,8 +208,8 @@ export class TrashFL extends FastList {
     type: FastListType = 'trash';
     createItems = false;
     sortable = false;
-    constructor() {
-        super();
+    constructor(store: AcmeWorkspaceStore) {
+      super(store);
     }
 }
 
@@ -218,12 +220,12 @@ export class DoneFL extends FastList {
     type: FastListType = 'done';
     createItems = true;
     sortable = false;
-    constructor() {
-        super();
-        this.load();
+    constructor(store: AcmeWorkspaceStore) {
+      super(store);
+      this.load();
     }
     async load() {
-        const list = await store.itemModel.getCompletedItems(new Date());
+        const list = await this.store.itemModel.getCompletedItems(new Date());
         // id index must be populated first
         list.map((item) => {
           this.index[item.id] = createSignal(item);
@@ -232,29 +234,4 @@ export class DoneFL extends FastList {
     }
     // Completing an item moves it to its original list, or inbox if not found
     // Dropping drops on top of the list (generally, due to time deleted)
-}
-
-export const openLists = new Map<string, FastList>();
-
-export function openFastList(view: BordeView): FastList {
-    let identifier = null;
-    let fastList = null;
-    if (view.type === 'container') {
-        identifier = `c#${view.containerId}`;
-        fastList = openLists.get(identifier);
-        if (!fastList) {
-            fastList = new ContainerFL(view.containerId);
-            openLists.set(identifier, fastList);
-        }
-    }
-    if (view.type === 'done') {
-        identifier = 'done';
-        fastList = openLists.get(identifier);
-        if (!fastList) {
-            fastList = new DoneFL();
-            openLists.set(identifier, fastList);
-        }
-    }
-    if (!fastList) throw new Error('Cannot determine list from view');
-    return fastList;
 }

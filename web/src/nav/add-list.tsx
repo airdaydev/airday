@@ -18,7 +18,7 @@ export const AddListButton = () => {
         keyboardShortcuts.enable();
         if (save) {
             const id = nanoid();
-            session.store.containerModel.insert({
+            session.workspace.containerModel.insert({
               id,
               name: inputRef?.value || 'New board',
             });

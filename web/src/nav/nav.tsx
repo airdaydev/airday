@@ -112,7 +112,7 @@ export function BordeNav() {
         Boards
       </h2>
       <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
-        <For each={session.store.containerModel.ol()}>
+        <For each={session.workspace.containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
         </For>
         <AddListButton />
@@ -137,8 +137,8 @@ export function BordeNav() {
         </h2>
         <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
           <button onClick={async () => {
-            await session.store.reset();
-            session.store.dummyData();
+            await session.workspace.reset();
+            session.workspace.dummyData();
           }}>
             Refresh db
           </button>

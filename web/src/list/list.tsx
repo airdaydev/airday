@@ -6,7 +6,7 @@ import {
 import { AcmeReactiveSelection, dragOriginSelection, globalLastDisplayIndex } from '../list/selection.js';
 import styles from './list.module.css';
 import { Item } from './item';
-import { dragOriginList, openFastList } from '../store/fast-list.js';
+import { dragOriginList } from '../store/fast-list.js';
 import { keyboardShortcuts } from '../keyboard.js';
 import { getListKeyboardHandler } from './keyboard-handler.js';
 import { ListHeader } from './list-header.jsx';
@@ -32,8 +32,8 @@ type DisplayList = (string | { type: 'placeholder' })[];
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
   let scrollRef: HTMLDivElement;
-  let fastList = openFastList(props.view);
-  const container = session.store.containerModel.index.get(props.view.containerId);
+  let fastList = session.workspace.openFastList(props.view);
+  const container = session.workspace.containerModel.index.get(props.view.containerId);
   if (!fastList) {
     return <div>{props.view.type}</div>
   }

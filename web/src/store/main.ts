@@ -4,7 +4,9 @@ import {
 import { ItemModel } from './item';
 import { ContainerModel } from './container';
 import { genTestData, bordeItems, inboxItems } from './dummy-data';
-import { openLists } from './fast-list';
+import { ContainerFL, DoneFL, FastList } from './fast-list';
+import { v, compile } from 'suretype';
+import { createUniqueId } from 'solid-js';
 
 const schemaVersion = 1;
 
@@ -22,6 +24,76 @@ const doneStoreName = 'done';
 const containerStoreName = 'container';
 // Remote Config store per browser (but could do local storage)
 
+const workspaceCache = v.object({
+  activeWorkspace: v.string(),
+  workspaces: v.array(v.object({
+    id: v.string().required(),
+    name: v.string().required(),
+  })),
+});
+
+/**
+ * Session & workspace store
+ */
+export class SessionStore {
+  userId: string = 'anonymous';
+  map = new Map<string, AcmeWorkspaceStore>;
+  workspace = new AcmeWorkspaceStore();
+  constructor() {
+    window.session = this;
+  }
+  get cacheKey() { return `user_${this.userId}:cache`; }
+  loadWorkspaceCache() {
+    const raw = localStorage.getItem(this.cacheKey);
+    let parsed;
+    if (raw) {
+      try { parsed = JSON.parse(raw); } catch (err) {
+        console.log('Invalid object found in cache');
+      }
+    }
+    if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
+      parsed.workspaces?.forEach((workspace) => this.map.set(workspace.id, new AcmeWorkspaceStore(workspace)));
+      if (parsed.activeWorkspace) {
+        this.open(parsed.activeWorkspace);
+      } else if (this.map.size > 1) {
+        // Assign active workspace & load
+        const firstEntry = this.map.entries().next();
+        this.open(firstEntry.value[0]);
+      } else {
+        this.open(createUniqueId());
+      }
+    } else {
+      this.open(createUniqueId());
+    }
+  }
+  serialise() {
+    localStorage.setItem(this.cacheKey, JSON.stringify({
+      activeWorkspace: this.workspace?.id,
+      workspaces: Array.from(this.map.values()),
+    }));
+  }
+  open(workspaceId: string) {
+    const workspace = this.map.get(workspaceId);
+    if (workspace) {
+      this.workspace = workspace;
+    } else {
+      this.workspace = new AcmeWorkspaceStore({
+        id: createUniqueId(),
+        name: 'Offline workspace',
+      });
+      this.map.set(this.workspace.id, this.workspace);
+    }
+    this.workspace.connect()
+    this.serialise();
+  }
+  remove() {
+
+  }
+  clear() {
+    this.map = new Map();
+  }
+}
+
 // Primary local persistence layer for a workspace
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
@@ -29,19 +101,28 @@ export class AcmeWorkspaceStore {
   db: BordeIDB | null = null;
   itemModel = new ItemModel();
   containerModel = new ContainerModel();
-  name?: string;
+  id: string = createUniqueId();
+  name: string = 'Uninitialised';
+  localOnly: boolean = true;
+  openLists = new Map<string, FastList>();
   get ref () {
-    return `idb://${this.name}@${schemaVersion}`;
+    return `idb://${this.id}@${schemaVersion}`;
+  }
+  constructor(workspace?: { id: string, name: string }) {
+    if (workspace) {
+      this.id = workspace.id;
+      this.name = workspace.name;
+    }
   }
   /**
    * Creates connection to existing database, alters schema where version changes
    * TODO: Loading screen while db is not ready
    */
-  connect = async (name: string) => {
+  connect = async () => {
     // TODO: Check if items etc exist
     console.debug(`Connecting to ${this.ref}`);
     const self = this;
-    const db = await openDB<DBTypes>(name, schemaVersion, {
+    const db = await openDB<DBTypes>(this.id, schemaVersion, {
       // TODO: Get upgrades as static methods from classes
       async upgrade(db) {
         console.debug(`Running upgrade`);
@@ -57,6 +138,7 @@ export class AcmeWorkspaceStore {
     this.itemModel.init(db);
     console.debug(`Connected to ${this.ref}`);
     this.db = db;
+    this.containerModel.load();
     return db;
   }
   /**
@@ -65,10 +147,10 @@ export class AcmeWorkspaceStore {
   reset = async () => {
     console.log('Resetting database');
     await this.db?.close();
-    await deleteDB(this.name)
+    await deleteDB(this.id)
       .catch((err) => console.log(err));
     console.log('Deleted DB');
-    openLists.clear();
+    this.openLists.clear();
     await this.connect();
   }
   dummyData = async () => {
@@ -76,8 +158,8 @@ export class AcmeWorkspaceStore {
       ...genTestData('bordelist', bordeItems),
       ...genTestData('inbox', inboxItems),
     ];
-    await store.itemModel.insert(items);
-    await store.containerModel.insert([
+    await this.itemModel.insert(items);
+    await this.containerModel.insert([
       {
         id: 'inbox',
         name: 'Inbox',
@@ -98,8 +180,27 @@ export class AcmeWorkspaceStore {
       },
     ]);
   }
+  openFastList(view: BordeView): FastList {
+    let identifier = null;
+    let fastList = null;
+    if (view.type === 'container') {
+        identifier = `c#${view.containerId}`;
+        fastList = this.openLists.get(identifier);
+        if (!fastList) {
+            fastList = new ContainerFL(this, view.containerId);
+            this.openLists.set(identifier, fastList);
+        }
+    }
+    if (view.type === 'done') {
+        identifier = 'done';
+        fastList = this.openLists.get(identifier);
+        if (!fastList) {
+            fastList = new DoneFL(this);
+            this.openLists.set(identifier, fastList);
+        }
+    }
+    if (!fastList) throw new Error('Cannot determine list from view');
+    return fastList;
 }
 
-export const store = new AcmeWorkspaceStore();
-await store.connect();
-await store.containerModel.load();
+}
