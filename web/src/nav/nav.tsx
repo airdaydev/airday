@@ -3,6 +3,7 @@ import { Stickers } from './stickers';
 import styles from './nav.module.css';
 import { viewState } from '../view-state';
 import CornerDownRightSVG from '../icons/corner-down-right.svg';
+import CalendarSVG from '../icons/calendar.svg';
 import CheckSVG from '../icons/check.svg';
 import TrashSVG from '../icons/trash.svg';
 import { ListIcon } from '../list/list-icon';
@@ -92,11 +93,15 @@ export function BordeNav() {
     >
       <div
         class={`${styles['nav-list']} ${styles['nav-text']}`}
-        style="border-top: 1px solid var(--border); padding-top: 0.5em;"
+        style="padding-top: 0.5em;"
       >
         <button>
           <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
           <span>Up Next</span>
+        </button>
+        <button>
+          <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Scheduled</span>
         </button>
         <button onClick={viewState.openDoneView}>
           <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
@@ -108,9 +113,6 @@ export function BordeNav() {
         </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-        Boards
-      </h2>
       <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
         <For each={session.workspace.containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
@@ -119,31 +121,6 @@ export function BordeNav() {
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <section class={`${styles['nav-list']} ${styles['nav-text']}`}>
-        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-          Filters
-        </h2>
-        <div>
-          <button>
-            Most neglected
-          </button>
-        </div>
-      </section>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <section>
-        <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-          Dev
-        </h2>
-        <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
-          <button onClick={async () => {
-            await session.workspace.reset();
-            session.workspace.dummyData();
-          }}>
-            Refresh db
-          </button>
-        </div>
-      </section>
     </nav>
   );
 }

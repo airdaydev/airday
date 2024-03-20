@@ -21,6 +21,6 @@ export const ListIcon = (props: ListIconProps) => {
   const Icon = icon || TodoSVG;
   return (
     <Icon
-      style={`display: block;flex-shrink: 0;height: 1.75rem;width: 1.75rem;`}
+      style={`display: block;flex-shrink: 0;height: 1.5rem;width: 1.5rem;`}
     />)
 }

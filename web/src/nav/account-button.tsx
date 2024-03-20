@@ -18,7 +18,10 @@ export const AccountButton = () => {
   return (
     <button
     class={`${styles['workspace-button']} ${styles['nav-button']}`}
-    onClick={openContextMenu}
+    onClick={(event) => {
+      console.log('onclick button')
+      openContextMenu(event)
+    }}
     ref={buttonRef}
     >
       {ctxOpen() && (

@@ -2,9 +2,6 @@ import { Signal } from 'solid-js';
 import { viewState } from '../view-state';
 import { EditableListTitle } from './list-title';
 import styles from './list.module.css';
-import TodoSVG from '../icons/nb-todo.svg';
-import PlusSVG from '../icons/plus.svg';
-import MoreSVG from '../icons/more-horizontal.svg';
 import XSVG from '../icons/x.svg';
 import { ListIcon } from './list-icon';
 
@@ -14,27 +11,24 @@ interface ListHeaderProps {
 }
 
 export const ListHeader = (props: ListHeaderProps) => {
+  const [list] = viewState.list;
     return (
         <div class={styles['list-header']}>
             <div class={styles['list-header-internal']}>
-            <div style={`display: flex; align-items: center;`}>
+            <div style={`display: flex; align-items: center; padding: 0.5em;`}>
               <ListIcon container={props.container[0]()} />
               <EditableListTitle container={props.container} />
             </div>
-            <div>
-                <button class={styles['list-button']}>
-                <MoreSVG />
-                </button>
-                <button class={styles['list-button']}>
-                <PlusSVG />
-                </button>
-                <button
-                class={styles['list-button']}
-                onClick={() => viewState.closeView(props.tabId)}
-                >
-                <XSVG />
-                </button>
-            </div>
+            {list().length > 1 && (
+              <div>
+                  <button
+                    class={styles['list-button']}
+                    onClick={() => viewState.closeView(props.tabId)}
+                  >
+                  <XSVG />
+                  </button>
+              </div>
+            )}
             </div>
         </div>
     )

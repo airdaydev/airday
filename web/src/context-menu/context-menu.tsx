@@ -14,6 +14,7 @@ export function ContextMenu(props: ContextMenuProps) {
   const style = createSignal('opacity: 0;');
   const contextMenuDiv = document.getElementById('context-menu');
   const clickOutside = (event: MouseEvent) => {
+    console.log('on click outside')
     if (!containerRef?.contains(event.target)) {
       props.close();
     }

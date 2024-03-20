@@ -44,6 +44,10 @@
     color: #888;
 }
 
+.sticker-nav {
+  padding: 0.5em 0.25em;
+}
+
 .sticker-nav button {
     background: none;
     border: none;

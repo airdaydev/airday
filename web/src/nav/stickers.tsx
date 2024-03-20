@@ -6,9 +6,6 @@ import styles from './nav.module.css';
 
 export const Stickers = () => (
   <section class={`${styles['nav-list']} ${styles['sticker-nav']}`}>
-    <h2 style='font-size: 1rem; font-weight: 600; padding: 0 0.5em;'>
-      Stickers
-    </h2>
     <div>
       <button>
         <Smiley />

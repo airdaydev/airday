@@ -1,4 +1,5 @@
-import { createSignal } from 'solid-js';
+import { sessionContext } from '../store/context.js';
+import { createSignal, useContext } from 'solid-js';
 import CloudOffSVG from '../icons/cloud-off.svg';
 import SearchSVG from '../icons/search.svg';
 import styles from './header.module.css';
@@ -10,6 +11,7 @@ type ContextMenu = 'main' | 'workspace';
 
 export const Header = () => {
   // ContextMenu
+  const session = useContext(sessionContext);
   const [ctxOpen, setCtxOpen] = createSignal<ContextMenu | boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   function openContextMenu(event: MouseEvent, menu: ContextMenu) {
@@ -52,7 +54,7 @@ export const Header = () => {
             if (ctxOpen()) openContextMenu(event, 'workspace')
           }}
         >
-          Workspace 1
+          {session.workspace.name}
         </button>
       </div>
       <div class={styles['nav-section']}>

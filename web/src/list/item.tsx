@@ -288,15 +288,16 @@ export function Item(props: ItemProps) {
                       <div style={`white-space: pre-line; max-width: 48em;`}>
                         {props.item[0]().text}
                       </div>
-                      <div class={styles['meta-line']}>
-                        {props.item[0]().sticker && (
-                          <Sticker
-                            set="baseline"
-                            item={props.item}
-                          />
-                        )}
-                        <span>{elapsedString(item.tsCreated)}</span>
-                      </div>
+                      {props.item[0]().sticker && (
+                        <div class={styles['meta-line']}>
+                          {props.item[0]().sticker && (
+                            <Sticker
+                              set="baseline"
+                              item={props.item}
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

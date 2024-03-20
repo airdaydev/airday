@@ -60,6 +60,12 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
       <button disabled>
         <span>Export Workspace</span>
       </button>
+      <button onClick={async () => {
+        await session.workspace.reset();
+        session.workspace.dummyData();
+      }}>
+        DEV DB RESET
+      </button>
       <hr />
       <button disabled>
         <span>Create new workspace</span>
