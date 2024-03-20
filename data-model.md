@@ -112,3 +112,30 @@ tombstones are cheap (id) but grow indefinitely
 
 Simpler illustration
 Server deletes all record incl. action, so can't pass action to client UNTIL subscribed client updated to that point
+
+
+# Sync 2
+Model 1: Workspace contained, not accessible unless published
+Model 2: list can be shared, password protected
+Model 3: list can be shared to the public
+
+# Model 1:
+- Entire workspace encrypted keys, no container delimiting
+- Items all pulled from same container
+- Only have to track items, lists not item-list-relation
+- Done pile to be loaded separately
+
+# Model 2:
+- Encrypted keys with public lists
+- Moving an item from a public list means encrypting & pushing back to list
+- It means subscribing individually to a specific list & also presisting item removals i.e. list tracking rather than item tracking, model 1 all items always have a server-side record, whereas they are hidden in container list
+- Advantage is if you scaled this, you would have a truly partitioned system - meaning immediately loading in smaller chunks
+- Alternative architecture - public list items are always clones, moving an item is akin to deleting it.
+
+TL;DR: Model 1
+
+Up next: per user list of reference+sort (clear?)
+Scheduled: Computed
+Done: Computed (but cached on server under done+date, to load slowly)
+Lists: Computed
+Undo/Redo with counter-actions
