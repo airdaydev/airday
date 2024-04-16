@@ -2,22 +2,29 @@
 import { render } from 'solid-js/web';
 import { Tree } from './tree';
 import { dummyTree } from './dummy';
+import { RootNode } from './state';
 
 const root = document.getElementById('root');
 
-const dummyItems = dummyTree();
-console.log(dummyItems.children)
-// const dummyItems2 = dummyTree();
+const rootA = new RootNode();
+rootA.load(dummyTree());
 
-// render(() => (
-//   <div style={`top: 0; left: 0; position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`}>
-//     <div>
-//       <h2>List A ({dummyItems} items)</h2>
-//       <Tree items={dummyItems} />
-//     </div>
-//     <div>
-//       <h2>List B ({dummyItems2} items)</h2>
-//       <Tree items={dummyItems2} />
-//     </div>
-//   </div>
-// ), root!)
+const rootB = new RootNode();
+rootB.load(dummyTree());
+
+render(() => (
+  <div style={`top: 0; left: 0; position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`}>
+    <div>
+      <h2>List A ({rootA.count()} items)</h2>
+      <Tree
+        items={rootA}
+      />
+    </div>
+    <div>
+      <h2>List B ({rootB.count()} items)</h2>
+      <Tree
+        items={rootB}
+      />
+    </div>
+  </div>
+), root!);

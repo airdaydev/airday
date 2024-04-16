@@ -7,6 +7,7 @@ A tree component for SolidJS written for borde.app. Drag & drop, multi-levels, o
 - Virtualised (or not)
 - Drag & Drop
 - Items can have variable height in non-virtual mode.
+- Searching & filters
 
 ## Development
 ```bash

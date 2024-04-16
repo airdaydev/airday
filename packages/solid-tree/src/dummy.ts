@@ -8,11 +8,11 @@ interface DummyTreeOpts {
 const defaults: DummyTreeOpts = {
   idFunction: (path) => path.join('.'),
   maxDepth: 3,
-  maxChildren: 100,
+  maxChildren: 50,
   _path: [],
 }
 
-export function dummyTree(opts: Partial<DummyTreeOpts>) {
+export function dummyTree(opts?: Partial<DummyTreeOpts>) {
   let internalOpts: DummyTreeOpts = {
     ...defaults,
     ...opts,

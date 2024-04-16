@@ -1,13 +1,17 @@
+import { mergeProps } from 'solid-js';
 import styles from './main.module.css';
 
-const TreeItem = (props: any) => {
+const Node = (props: any) => {
+  const merged = mergeProps({ depth: 0 }, props);
   return (
-    <div class={styles['tree-item']}>
-      {props.item.id}
+    <>
+      <div class={styles['tree-item']} aria-level={merged.depth} onClick={() => console.log(props.item)}>
+        {props.item.id}
+      </div>
       {props.item.children?.map((child) => (
-        <TreeItem item={child} />
+        <Node item={child} depth={merged.depth+1} />
       ))}
-    </div>
+    </>
   )
 };
 
@@ -21,7 +25,7 @@ export const Tree = (props) => {
     overflow-y: scroll;
     `}>
       {props.items.children.map((item) => (
-        <TreeItem item={item} />
+        <Node item={item} />
       ))}
     </div>
   );

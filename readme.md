@@ -6,6 +6,7 @@ Borde early days monorepo
 - SolidJS (templating, reactivity)
 - idb (indexed-db clone, maintaining local state)
 - flexsearch
+- Good enough encryption^TM or self-host
 
 ## Notes:
 Done = statically ordered list
