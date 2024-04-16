@@ -1,6 +1,6 @@
 # solidjs-tree
 
-A tree component for SolidJS written for borde.app. Drag & drop, multi-levels, optionally virtualised or variable height (can be determined by function).
+A tree and list component for SolidJS written for borde.app. Drag & drop, multi-levels, optionally virtualised or variable height (can be determined by function).
 
 ## Features
 - Window expands to fill minimum size.
