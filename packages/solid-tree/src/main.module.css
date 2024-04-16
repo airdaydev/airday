@@ -1,0 +1,16 @@
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tree-item {
+  background: white;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.tree-item:hover {
+  background: #ccc;
+}
