@@ -1,18 +1,49 @@
-import { createUniqueId } from 'solid-js';
+import { Signal, createSignal, createUniqueId } from 'solid-js';
 
 interface GenericNode<T extends GenericNode<any | undefined>> {
   children?: T[];
 }
 
+export interface NodeSignalProps {
+  id: string;
+  isSelected: boolean;
+}
+
 export class Node {
   id: string;
   children?: Node[] = [];
-  isRoot: boolean = false;
+  isRoot = false;
+  isSelected= false;
   depth = 0; // cached
   expanded = true;
   parent?: Node;
+  root?: RootNode;
+  signal?: Signal<NodeSignalProps> | undefined;
+  signalSubscriptions = 0;
   constructor(id?: string) {
     this.id = id || createUniqueId();
+  }
+  getSignal() {
+    if (!this.signal) this.signal = createSignal(this.toJSON());
+    this.signalSubscriptions++;
+    return this.signal[0];
+  }
+  unsubscribe() {
+
+  }
+  toJSON() {
+    return {
+      id: this.id,
+      isSelected: this.isSelected,
+    }
+  }
+  select(recursive?: boolean) {
+    this.isSelected = true;
+    this.signal?.[1](() => this.toJSON());
+  }
+  deselect() {
+    this.isSelected = false;
+    this.signal?.[1](() => this.toJSON());
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -40,6 +71,7 @@ export class RootNode extends Node {
   isRoot = true;
   children: Node[] = [];
   idMap = new Map<string, Node>;
+  selection = new Set<Node>;
   constructor(id?: string) {
     super(id);
   }
@@ -48,6 +80,7 @@ export class RootNode extends Node {
       rawNodes,
       (rawNode, parent) => {
         const node = new Node(rawNode.id);
+        node.root = this;
         node.parent = parent;
         this.idMap.set(node.id, node);
         return node;

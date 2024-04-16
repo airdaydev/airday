@@ -14,3 +14,7 @@
 .tree-item:hover {
   background: #ccc;
 }
+
+.tree-item[aria-selected='true'] {
+  background: #999;
+}
