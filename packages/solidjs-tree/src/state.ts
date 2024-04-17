@@ -87,18 +87,19 @@ export class RootNode extends Node {
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
     // But the block cannot factor into the window calculation, the window is the end result
-    const visibleChildren = [];
+    const visibleChildren = []; // get expanded, visible children, add contiguous, disappearing blocks for dragged items, add placeholder
+    // calculate & cache heights, filtering out contiguous blocks removed
+    // if scrolloffset > total height, move scroll loc to Math.min(0, scrollOffset - containerHeight)
+    // otherwise first index = scrolloffset - totalHeight/rowHeight
+    // pull front padding + content (windows size should be bigger than needed in both directions if possible) + end padding
+    // listen for scroll & resize events on container
+    // Cache if possible to optimise
     if (!this.rootSignal) {
       this.rootSignal = createSignal(this.children);
     }
     return this.rootSignal[0];
-    // Removes selected items
-    // Only shows filtered items if filtered
-    // Calculates index of top element, via offset
-    // Calculates index of bottom element, via offset
-    // Grab range (consider buffering)
   }
-  // For cases where you don't want a window
+  // For cases where you don't want a window (TBC)
   flatSignal() {
     // Removes selected, only shows filtered items
     // Grab all
