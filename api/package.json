@@ -10,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "fastify": "^4.26.0"
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.43.0"
   }
 }

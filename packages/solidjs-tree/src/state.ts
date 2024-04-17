@@ -86,6 +86,7 @@ export class RootNode extends Node {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
+    // Deleting items???????
     // But the block cannot factor into the window calculation, the window is the end result
     const visibleChildren = []; // get expanded, visible children, add contiguous, disappearing blocks for dragged items, add placeholder
     // calculate & cache heights, filtering out contiguous blocks removed
@@ -97,6 +98,13 @@ export class RootNode extends Node {
     if (!this.rootSignal) {
       this.rootSignal = createSignal(this.children);
     }
+    // Animation notes:
+    // We don't make the placeholder a genuine item
+    // Every item has the possibility of becoming a placeholder
+    // If the item is dragged below the current item on another item, that item is translated up
+    // If the item is dragged above the current item on another item, that item is translated down
+    // This has a small effect on the window that may need to be taken into account
+    // i.e. is the placeholder present & where is it
     return this.rootSignal[0];
   }
   // For cases where you don't want a window (TBC)
