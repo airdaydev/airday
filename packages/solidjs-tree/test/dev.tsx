@@ -1,7 +1,9 @@
 /* @refresh reload */
-import { Tree, RootNode } from '../src/index';
+import { Tree, RootNode, NodeComponent } from '../src/index';
 import { render } from 'solid-js/web';
 import { dummyTree } from './dummy';
+import styles from './main.module.css';
+
 
 const root = document.getElementById('root');
 
@@ -14,6 +16,18 @@ rootA.load(dummyTree());
 
 const rootB = new RootNode();
 rootB.load(dummyTree());
+
+const Node: NodeComponent = (props) => {
+  return (
+    <div
+      aria-selected={props.ariaSelected}
+      class={styles['tree-item']}
+      onMouseDown={props.onMouseDown}
+    >
+      {props.node.id}
+    </div>
+  )
+}
 
 const containerStyle = `
 top: 0;
@@ -29,17 +43,21 @@ render(() => (
   <div style={containerStyle}>
     <div>
       <h2>List A ({rootA.count()} items)</h2>
+      <input type="text" placeholder="filter text" />
       <Tree
         rootNode={rootA}
-        virtual
+        NodeComponent={Node}
         draggable
         multiselect
-        filter={() => null}
+        // filter={(node: Node) => {
+        //   node.
+        // }}
         height={(node) => {}} // Node height calculation function or number
       />
     </div>
     <div>
       <h2>List B ({rootB.count()} items)</h2>
+      <input type="text" placeholder="filter text" />
       <Tree
         rootNode={rootB}
       />

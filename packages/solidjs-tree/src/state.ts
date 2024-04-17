@@ -1,4 +1,6 @@
-import { Signal, createSignal, createUniqueId } from 'solid-js';
+import {
+  Signal, createSignal, createUniqueId, createMemo,
+} from 'solid-js';
 
 interface GenericNode<T extends GenericNode<any | undefined>> {
   children?: T[];
@@ -13,13 +15,14 @@ export class Node {
   id: string;
   children?: Node[] = [];
   isRoot = false;
-  isSelected= false;
+  isSelected = false;
   depth = 0; // cached
   expanded = true;
   parent?: Node;
   root?: RootNode;
   signal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
+  raw: any;
   constructor(id?: string) {
     this.id = id || createUniqueId();
   }
@@ -43,10 +46,12 @@ export class Node {
   select(recursive?: boolean) {
     this.isSelected = true;
     this.signal?.[1](() => this.toJSON());
+    this.root?.selection.add(this);
   }
   deselect() {
     this.isSelected = false;
     this.signal?.[1](() => this.toJSON());
+    this.root?.selection.delete(this);
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -73,56 +78,76 @@ export class Node {
 export class RootNode extends Node {
   isRoot = true;
   children: Node[] = [];
+  childrenSignal = createSignal<Node[]>([]);
   idMap = new Map<string, Node>;
   selection = new Set<Node>;
-  isDragging = false;
+  signalIsDragging = createSignal(false);
+  maxDepth = 10;
+  expanded = true;
   animationMs = 50; // Set to 0 for no animation
-  rootSignal?: Signal<Node[]>
   constructor(id?: string) {
     super(id);
   }
   // TODO: Params e.g. start index, container height etc
-  windowedSignal() {
+  // Per instance, downstream signal
+  getWindowedSignal(element: HTMLElement) {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
     // Deleting items???????
     // But the block cannot factor into the window calculation, the window is the end result
-    const visibleChildren = []; // get expanded, visible children, add contiguous, disappearing blocks for dragged items, add placeholder
+    
+    // const totalHeight = visibleChildren.length * 22.2;
     // calculate & cache heights, filtering out contiguous blocks removed
     // if scrolloffset > total height, move scroll loc to Math.min(0, scrollOffset - containerHeight)
     // otherwise first index = scrolloffset - totalHeight/rowHeight
     // pull front padding + content (windows size should be bigger than needed in both directions if possible) + end padding
     // listen for scroll & resize events on container
     // Cache if possible to optimise
-    if (!this.rootSignal) {
-      this.rootSignal = createSignal(this.children);
-    }
+    return createMemo(() => {
+      const visibleChildren: Node[] = [];
+      let n = new Node()
+      n.isRoot = true;
+      n.children = this.childrenSignal[0]();
+      walk<Node, Node>(n, (node) => {
+        if (!node.isRoot && !(this.signalIsDragging[0]() && !node.isSelected)) {
+          visibleChildren.push(node);
+        }
+        if (!node.expanded) return true;
+      });
+      let window = visibleChildren.slice(0, 100);
+      return window;
+    }, []);
     // Animation notes:
     // We don't make the placeholder a genuine item
-    // Every item has the possibility of becoming a placeholder
+    // Maybe: Every item has the possibility of becoming a placeholder
+    // Or: We insert the placeholder as needed (hmm?)
     // If the item is dragged below the current item on another item, that item is translated up
     // If the item is dragged above the current item on another item, that item is translated down
     // This has a small effect on the window that may need to be taken into account
     // i.e. is the placeholder present & where is it
-    return this.rootSignal[0];
   }
-  // For cases where you don't want a window (TBC)
-  flatSignal() {
-    // Removes selected, only shows filtered items
-    // Grab all
+  delete(set: Set<Node>) {
+    const filtered = filter<any>(this, (node) => {
+      return !set.has(node);
+    }).children;
+    set.forEach((node) => this.selection.delete(node));
+    this.childrenSignal[1](() => filtered);
   }
   load(rawNodes: GenericNode<any>) {
     this.children = map<any, any>(
       rawNodes,
       (rawNode, parent) => {
         const node = new Node(rawNode.id);
+        node.raw = rawNode;
         node.root = this;
         node.parent = parent;
+        // TODO: calc depth or level for display purposes
         this.idMap.set(node.id, node);
         return node;
       },
       this).children;
+    this.childrenSignal[1](() => this.children);
   }
 }
 
@@ -138,7 +163,17 @@ export function map<T extends GenericNode<any>, O extends GenericNode<any>>(
 export function walk<T extends GenericNode<any>, O extends GenericNode<any>>(
   node: T, func: (node: T, parent?: O) => boolean | void, parent?: O,
 ) {
-  const stop = func(node, parent);
-  if (stop) return;
+  const skipChildren = func(node, parent);
+  if (skipChildren) return;
   node.children?.map((child) => walk(child, func, parent));
+}
+
+export function filter<T extends GenericNode<any>>(node: T, filterFunc: (tree: T) => boolean): T {
+  if (node.children) {
+    const filtered = node.children.filter(filterFunc);
+    const filterRecursive = filtered.map((child) => filter(child, filterFunc));
+    node.children = filterRecursive;
+    return node;
+  }
+  return node;
 }

@@ -5,6 +5,12 @@ interface DummyTreeOpts {
   _path: number[];
 }
 
+const frutas = ['manzana','plátano','naranja','fresa','sandía','piña','mango','papaya','kiwi','pera','durazno','cereza','uva','melón','frambuesa','mora','arándano','guayaba','maracuyá','coco'];
+function elegirFruta() {
+  const seed = Math.floor(Math.random() * frutas.length);
+  return frutas[seed];
+}
+
 const defaults: DummyTreeOpts = {
   idFunction: (path) => path.join('.'),
   maxDepth: 3,
@@ -18,7 +24,11 @@ export function dummyTree(opts?: Partial<DummyTreeOpts>) {
     ...opts,
   }
   let seed = Math.random();
-  const node = { id: internalOpts.idFunction(internalOpts._path) || 'root', children: [] };
+  const node = {
+    id: internalOpts.idFunction(internalOpts._path) || 'root',
+    content: elegirFruta(),
+    children: []
+  };
   if (internalOpts.maxDepth > 0) {
     for (let i = 0; i < seed * internalOpts.maxChildren; i++) {
       let path = [...internalOpts._path, i];

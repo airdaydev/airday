@@ -1,2 +1,2 @@
-export { Tree } from './tree';
+export { Tree, type NodeComponent } from './tree';
 export { RootNode } from './state';

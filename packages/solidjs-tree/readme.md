@@ -4,7 +4,7 @@ A composable tree and list component for SolidJS written for borde.app. Drag & d
 
 ## Features
 - Window expands to fill minimum size.
-- Virtualised (or not)
+- Virtualised window
 - Drag & Drop with custom components
 - Items can have variable height in non-virtual mode.
 - Searching & filters
