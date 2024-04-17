@@ -66,7 +66,6 @@ interface TreeComponentProps {
   NodeComponent?: NodeComponent,
 }
 
-// TODO: Virtualise this
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
   const kbHandler = (event: KeyboardEvent) => {
