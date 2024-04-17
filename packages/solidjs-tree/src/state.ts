@@ -23,13 +23,16 @@ export class Node {
   constructor(id?: string) {
     this.id = id || createUniqueId();
   }
-  getSignal() {
+  getNodeSignal() {
     if (!this.signal) this.signal = createSignal(this.toJSON());
     this.signalSubscriptions++;
     return this.signal[0];
   }
   unsubscribe() {
-
+    this.signalSubscriptions--;
+    if (this.signalSubscriptions === 0) {
+      delete this.signal;
+    }
   }
   toJSON() {
     return {
@@ -72,8 +75,33 @@ export class RootNode extends Node {
   children: Node[] = [];
   idMap = new Map<string, Node>;
   selection = new Set<Node>;
+  isDragging = false;
+  animationMs = 50; // Set to 0 for no animation
+  rootSignal?: Signal<Node[]>
   constructor(id?: string) {
     super(id);
+  }
+  // TODO: Params e.g. start index, container height etc
+  windowedSignal() {
+    // scrolloffset * heights, so we need a cached count of all items or filtered items,
+    // - dragged items - collapsed items
+    // Dragged items are replaced with a diminishing block,
+    // But the block cannot factor into the window calculation, the window is the end result
+    const visibleChildren = [];
+    if (!this.rootSignal) {
+      this.rootSignal = createSignal(this.children);
+    }
+    return this.rootSignal[0];
+    // Removes selected items
+    // Only shows filtered items if filtered
+    // Calculates index of top element, via offset
+    // Calculates index of bottom element, via offset
+    // Grab range (consider buffering)
+  }
+  // For cases where you don't want a window
+  flatSignal() {
+    // Removes selected, only shows filtered items
+    // Grab all
   }
   load(rawNodes: GenericNode<any>) {
     this.children = map<any, any>(

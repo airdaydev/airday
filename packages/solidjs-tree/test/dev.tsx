@@ -30,7 +30,7 @@ render(() => (
     <div>
       <h2>List A ({rootA.count()} items)</h2>
       <Tree
-        items={rootA}
+        rootNode={rootA}
         virtual
         draggable
         multiselect
@@ -41,7 +41,7 @@ render(() => (
     <div>
       <h2>List B ({rootB.count()} items)</h2>
       <Tree
-        items={rootB}
+        rootNode={rootB}
       />
     </div>
   </div>

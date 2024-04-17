@@ -1,9 +1,15 @@
-import { mergeProps } from 'solid-js';
+import { For, mergeProps, onCleanup } from 'solid-js';
 import styles from './main.module.css';
+import { Node, RootNode } from './state';
 
-const Node = (props: any) => {
+interface NodeComponentProps {
+  node: Node;
+}
+
+const NodeComponent = (props: NodeComponentProps) => {
   const merged = mergeProps({ depth: 0 }, props);
-  const signal = props.node.getSignal();
+  const signal = props.node.getNodeSignal();
+  onCleanup(() => props.node.unsubscribe());
   return (
     <>
       <div
@@ -21,14 +27,14 @@ const Node = (props: any) => {
         {props.node.id}
       </div>
       {props.node.children?.map((child) => (
-        <Node node={child} depth={merged.depth+1} />
+        <NodeComponent node={child} depth={merged.depth+1} />
       ))}
     </>
-  )
+  );
 };
 
 // TODO: Virtualise this
-export const Tree = (props) => {
+export const Tree = (props: { rootNode: RootNode }) => {
   return (
     <div style={`
     background: yellow;
@@ -37,9 +43,11 @@ export const Tree = (props) => {
     height: 25em;
     overflow-y: scroll;
     `}>
-      {props.items.children.map((node) => (
-        <Node node={node} />
-      ))}
+      <For each={props.rootNode.windowedSignal()()}>
+        {(node, index) => (
+          <NodeComponent node={node} />
+        )}
+      </For>
     </div>
   );
 };
