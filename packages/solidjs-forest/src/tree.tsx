@@ -2,6 +2,7 @@ import { For, onCleanup } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { GenericNode, RootNode } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
+import { Dragged } from './dragged';
 
 interface TreeComponentProps {
   rootNode: RootNode,
@@ -26,26 +27,30 @@ export const Tree = (props: TreeComponentProps) => {
     document.removeEventListener('keydown', kbHandler)
   });
   return (
-    <div
-      ref={containerRef}
-      style={`
-        color: black;
-        width: 18em;
-        height: 25em;
-        overflow-y: scroll;
-      `}
-      >
-      <TransitionGroup name="fade">
-        <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
-          {(node, index) => (
-            <NodeContainer
-              treeIndex={index}
-              node={node}
-              Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-            />
-          )}
-        </For>
-      </TransitionGroup>
-    </div>
+    <>
+      {props.rootNode.dragSignal[0]() && <Dragged size={props.rootNode.selection.size} />}
+      <div
+        ref={containerRef}
+        style={`
+          position: relative;
+          color: black;
+          width: 18em;
+          height: 25em;
+          overflow-y: scroll;
+        `}
+        >
+        <TransitionGroup name="fade">
+          <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
+            {(node, index) => (
+              <NodeContainer
+                treeIndex={index}
+                node={node}
+                Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+              />
+            )}
+          </For>
+        </TransitionGroup>
+      </div>
+    </>
   );
 };
