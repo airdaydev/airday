@@ -5,7 +5,7 @@
   flex-direction: column;
   background: var(--background);
   border-radius: 3px;
-  box-shadow: 1px 1px 2px #0000002e;
+  box-shadow: 1px 1px 4px #0000002e;
   padding: 0.25em;
   user-select: none;
 }

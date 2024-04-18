@@ -9,10 +9,10 @@ export const bordeItems = [
 ]
 
 export const inboxItems = [
-    'Munro (Get other car key from home)',
-    'Research Stable Diffusion',
-    'Seguir viendo la casa de papel temporada 3',
-    'more regular incline press from 22kg',
+    'Banana',
+    'FastAI Course',
+    'Seguir viendo la casa de papel desde temporada 4',
+    'Bug',
 ]
 
 export function genTestData(listId: string, tasks: string[]): BordeItem[] {

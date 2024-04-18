@@ -77,7 +77,6 @@
     align-items: center;
     padding: 0.125em 0;
     border-bottom: 1px solid var(--border);
-    background: var(--ultra-light-shade);
 }
 
 /* [data-theme="dark"] .list-header-internal {
@@ -89,7 +88,7 @@
 } */
 
 .active .list-header-internal {
-  background: none;
+  background: var(--tint-shade);
 }
 
 /* [data-theme="dark"] .active .list-header-internal {
