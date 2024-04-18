@@ -56,7 +56,7 @@ const TextNodeComponent: NodeComponentType = (props) => {
       {node().id} - {node().content}
     </div>
   )
-}
+};
 
 const rootNode = new RootNode({
   loader,

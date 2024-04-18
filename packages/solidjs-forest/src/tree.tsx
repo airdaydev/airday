@@ -5,7 +5,8 @@ import { GenericNode, Node, RootNode } from './state';
 
 interface NodeContainerProps {
   node: Node;
-  Component: NodeComponentType,
+  Component: NodeComponentType;
+  treeIndex: number;
 }
 
 const NodeContainer = (props: NodeContainerProps) => {
@@ -90,6 +91,7 @@ export const Tree = (props: TreeComponentProps) => {
       <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
         {(node, index) => (
           <NodeContainer
+            treeIndex={index}
             node={node}
             Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
           />
