@@ -1,8 +1,9 @@
 import {
-  Signal, createSignal, createUniqueId, createMemo,
+  Signal, createSignal, createUniqueId, createMemo, Accessor,
 } from 'solid-js';
+import { qperf } from './utils';
 
-interface GenericNode<T extends GenericNode<any | undefined>> {
+export interface GenericNode<T extends GenericNode<any | undefined>> {
   children?: T[];
 }
 
@@ -22,7 +23,6 @@ export class Node {
   root?: RootNode;
   signal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
-  raw: any;
   constructor(id?: string) {
     this.id = id || createUniqueId();
   }
@@ -47,11 +47,13 @@ export class Node {
     this.isSelected = true;
     this.signal?.[1](() => this.toJSON());
     this.root?.selection.add(this);
+    this.root?.onSelect(this.root.selection);
   }
   deselect() {
     this.isSelected = false;
     this.signal?.[1](() => this.toJSON());
     this.root?.selection.delete(this);
+    this.root?.onSelect(this.root.selection);
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -75,18 +77,31 @@ export class Node {
   }
 }
 
+interface RootNodeOpts {
+  mutate?: boolean;
+  onSelect?: (node: Set<Node>) => void;
+}
+
+// Combined tree -> Window tree (UI)
 export class RootNode extends Node {
   isRoot = true;
-  children: Node[] = [];
   childrenSignal = createSignal<Node[]>([]);
   idMap = new Map<string, Node>;
+  mutate = false;
   selection = new Set<Node>;
   signalIsDragging = createSignal(false);
   maxDepth = 10;
   expanded = true;
   animationMs = 50; // Set to 0 for no animation
-  constructor(id?: string) {
-    super(id);
+  onSelect?: (node: Set<Node>) => void;
+  constructor(opts: RootNodeOpts = {}) {
+    super(createUniqueId());
+    this.onSelect = opts.onSelect;
+  }
+  derivativeSet() {
+    return createMemo(() => {
+
+    });  
   }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
@@ -106,18 +121,20 @@ export class RootNode extends Node {
     // Cache if possible to optimise
     return createMemo(() => {
       const visibleChildren: Node[] = [];
-      let n = new Node()
+      let n = new Node();
       n.isRoot = true;
       n.children = this.childrenSignal[0]();
+      const end = qperf('memo');
       walk<Node, Node>(n, (node) => {
         if (!node.isRoot && !(this.signalIsDragging[0]() && !node.isSelected)) {
           visibleChildren.push(node);
         }
         if (!node.expanded) return true;
       });
+      end();
       let window = visibleChildren.slice(0, 100);
       return window;
-    }, []);
+    });
     // Animation notes:
     // We don't make the placeholder a genuine item
     // Maybe: Every item has the possibility of becoming a placeholder
@@ -128,18 +145,24 @@ export class RootNode extends Node {
     // i.e. is the placeholder present & where is it
   }
   delete(set: Set<Node>) {
-    const filtered = filter<any>(this, (node) => {
-      return !set.has(node);
-    }).children;
-    set.forEach((node) => this.selection.delete(node));
-    this.childrenSignal[1](() => filtered);
+    if (!set.size) return;
+    if (this.mutate === false) {
+      const filtered = filter<any>(this, (node) => {
+        return !set.has(node);
+      }).children;
+      this.childrenSignal[1](() => filtered);
+    }
+    set.forEach((node) => {
+      this.selection.delete(node);
+      node.deselect();
+    });
   }
-  load(rawNodes: GenericNode<any>) {
+  load(tree: GenericNode<any>) {
+    const q = qperf('load');
     this.children = map<any, any>(
-      rawNodes,
+      tree,
       (rawNode, parent) => {
         const node = new Node(rawNode.id);
-        node.raw = rawNode;
         node.root = this;
         node.parent = parent;
         // TODO: calc depth or level for display purposes
@@ -148,6 +171,7 @@ export class RootNode extends Node {
       },
       this).children;
     this.childrenSignal[1](() => this.children);
+    q();
   }
 }
 

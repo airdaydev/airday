@@ -1,11 +1,11 @@
 import { For, onCleanup, Component } from 'solid-js';
 import { distance } from './utils';
 import styles from './main.module.css';
-import { Node, RootNode } from './state';
+import { GenericNode, Node, RootNode } from './state';
 
 interface NodeContainerProps {
   node: Node;
-  Component: NodeComponent,
+  Component: NodeComponentType,
 }
 
 const NodeContainer = (props: NodeContainerProps) => {
@@ -43,13 +43,13 @@ const NodeContainer = (props: NodeContainerProps) => {
   );
 };
 
-export type NodeComponent = Component<{
+export type NodeComponentType = Component<{
   node: Node,
   ariaSelected: boolean,
   onMouseDown: (event: MouseEvent) => void,
 }>;
 
-export const DefaultNodeComponent: NodeComponent = (props) => {
+export const DefaultNodeComponent: NodeComponentType = (props) => {
   return (
     <div
       aria-selected={props.ariaSelected}
@@ -63,7 +63,9 @@ export const DefaultNodeComponent: NodeComponent = (props) => {
 
 interface TreeComponentProps {
   rootNode: RootNode,
-  NodeComponent?: NodeComponent,
+  NodeComponent?: NodeComponentType,
+  uncontrolledData?: GenericNode<any>;
+  data: GenericNode<any>,
 }
 
 export const Tree = (props: TreeComponentProps) => {

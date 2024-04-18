@@ -1,6 +1,6 @@
 /* @refresh reload */
-import { Tree, RootNode, NodeComponent } from '../src/index';
 import { render } from 'solid-js/web';
+import { Tree, RootNode, NodeComponentType, Node } from '../src/index';
 import { dummyTree } from './dummy';
 import styles from './main.module.css';
 
@@ -11,13 +11,13 @@ const root = document.getElementById('root');
 // We'll use this between rootnodes to allow a shared selection state
 // const context = new Context();
 
-const rootA = new RootNode();
-rootA.load(dummyTree());
+class Group extends Node {
+  type = 'group';
+  allowChildren = true;
+  name?: string;
+}
 
-const rootB = new RootNode();
-rootB.load(dummyTree());
-
-const Node: NodeComponent = (props) => {
+const NodeComponent: NodeComponentType = (props) => {
   return (
     <div
       aria-selected={props.ariaSelected}
@@ -29,38 +29,33 @@ const Node: NodeComponent = (props) => {
   )
 }
 
-const containerStyle = `
-top: 0;
-left: 0;
-position: absolute;
-width: 100%;
-height: 100%;
-display: flex;
-justify-content: center;
-align-items: center;`;
+const rootNode = new RootNode({
+  onSelect: (nodeSet) => {
+    console.log('first node selected', nodeSet.values().next().value);
+  }
+});
+const data = dummyTree();
+rootNode.load(data);
 
 render(() => (
-  <div style={containerStyle}>
+  <div style={styles['container']}>
     <div>
-      <h2>List A ({rootA.count()} items)</h2>
+      <h2>Tree A ({rootNode.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
-        rootNode={rootA}
-        NodeComponent={Node}
+        rootNode={rootNode}
+        NodeComponent={NodeComponent}
         draggable
         multiselect
-        // filter={(node: Node) => {
-        //   node.
-        // }}
         height={(node) => {}} // Node height calculation function or number
       />
     </div>
-    <div>
+    {/* <div>
       <h2>List B ({rootB.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
         rootNode={rootB}
       />
-    </div>
+    </div> */}
   </div>
 ), root!);

@@ -1,0 +1,24 @@
+/**
+ *
+ * @param coordPairA [x: number, y: number]
+ * @param coordPairB [x: number, y: number]
+ * @returns distance between two coords (pythagora's theorem)
+ */
+export function distance(coordPairA: [number, number], coordPairB: [number, number]) {
+  return Math.sqrt(Math.pow(coordPairB[0] - coordPairA[0], 2) + Math.pow(coordPairB[1] - coordPairA[1], 2));
+}
+
+/**
+ * Quickly check performance with this timer based on performance.now()
+ * @param label An optional label that is display in the text
+ * @returns a function to end the timer
+ */
+export function qperf(label?: string) {
+  const start = performance.now();
+  return () => {
+    const end = performance.now();
+    let str = `exec time: ${end-start}ms`;
+    if (label) str += ` (${label})`;
+    console.log(str);
+  }
+}
