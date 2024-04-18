@@ -48,6 +48,8 @@ const TextNodeComponent: NodeComponentType = (props) => {
         props.onMouseDown(event)
       }}
       onDblClick={(event) => {
+        event.preventDefault();
+        props.node.select();
         props.node.updateContent('gogogoo')
       }}
     >

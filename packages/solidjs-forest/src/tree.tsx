@@ -13,11 +13,7 @@ const NodeContainer = (props: NodeContainerProps) => {
   onCleanup(() => props.node.unsubscribe());
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
-    if (props.node.isSelected) {
-      props.node.deselect();
-    } else {
-      props.node.select();
-    }
+    props.node.select();
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseUpEvent: MouseEvent) => {
         event.preventDefault();

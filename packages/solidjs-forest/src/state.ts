@@ -16,7 +16,6 @@ export class Node {
   id: string;
   children?: Node[] = [];
   isRoot = false;
-  isSelected = false;
   depth = 0; // cached
   expanded = true;
   parent?: Node;
@@ -47,17 +46,14 @@ export class Node {
   triggerUpdate() {
     this.uiSignal?.[1](() => this.toJSON());
   }
-  select(recursive?: boolean) {
-    this.isSelected = true;
-    this.triggerUpdate();
-    this.root?.selection.add(this);
-    if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
+  get isSelected() {
+    return this.root?.selection.has(this);
+  }
+  select(recursive?: boolean, additive?: boolean) {
+    this.root.selectOne(this);
   }
   deselect() {
-    this.isSelected = false;
-    this.triggerUpdate();
-    this.root?.selection.delete(this);
-    if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
+    this.root.deselect(this);
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -68,17 +64,6 @@ export class Node {
       });
     }
   }
-  // TODO: memoise
-  // TODO: cache for each node
-  count(expandedOnly?: boolean) {
-    let count = 0;
-    walk(this, (node) => {
-      count++;
-      if (expandedOnly && !node.expanded) return true;
-      return false;
-    }, undefined);
-    return count;
-  }
 }
 
 interface RootNodeOpts {
@@ -88,7 +73,8 @@ interface RootNodeOpts {
 }
 
 // Combined tree -> Window tree (UI)
-export class RootNode extends Node {
+export class RootNode {
+  id: string;
   isRoot = true;
   childrenSignal = createSignal<Node[]>([]);
   idMap = new Map<string, Node>;
@@ -101,9 +87,12 @@ export class RootNode extends Node {
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: RootNodeOpts = {}) {
-    super(createUniqueId());
+    this.id = createUniqueId();
     this.onSelectionChange = opts.onSelectionChange;
     this.loader = opts.loader;
+  }
+  get mutableRoot() {
+    return { isRoot: true, children: this.childrenSignal[0]() }
   }
   derivativeSet() {
     return createMemo(() => {
@@ -154,7 +143,7 @@ export class RootNode extends Node {
   delete(set: Set<Node>) {
     if (!set.size) return;
     if (this.mutate === false) {
-      const filtered = filter<any>(this, (node) => {
+      const filtered = filter<any>(this.mutableRoot, (node) => {
         return !set.has(node);
       }).children;
       this.childrenSignal[1](() => filtered);
@@ -164,9 +153,26 @@ export class RootNode extends Node {
       node.deselect();
     });
   }
+  selectOne(node: Node) {
+    this.selection.forEach((node) => {
+      this.selection.delete(node);
+      node.triggerUpdate();
+    });
+    this.selection.add(node);
+    node.triggerUpdate();
+    if (this.onSelectionChange) this.onSelectionChange(this.selection);
+  }
+  deselect(node: Node) {
+    // deselect
+    if (this.onSelectionChange) this.onSelectionChange(this.selection);
+  }
+  deselectAll() {
+    this.selection.forEach((node) => node.deselect());
+    this.selection.clear();
+  }
   load(tree: GenericNode<any>) {
     const q = qperf('load');
-    this.children = map<any, any>(
+    const children = map<any, any>(
       tree,
       (rawNode, parent) => {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
@@ -177,8 +183,19 @@ export class RootNode extends Node {
         return node;
       },
       this).children;
-    this.childrenSignal[1](() => this.children);
+    this.childrenSignal[1](() => children);
     q();
+  }
+  // TODO: memoise
+  // TODO: cache for each node
+  count(expandedOnly?: boolean) {
+    let count = 0;
+    walk(this, (node) => {
+      count++;
+      if (expandedOnly && !node.expanded) return true;
+      return false;
+    }, undefined);
+    return count;
   }
 }
 
