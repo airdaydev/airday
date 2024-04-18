@@ -63,7 +63,7 @@ export const DefaultNodeComponent: NodeComponentType = (props) => {
 
 interface TreeComponentProps {
   rootNode: RootNode,
-  NodeComponent?: NodeComponentType,
+  defaultNodeComponent?: NodeComponentType,
   uncontrolledData?: GenericNode<any>;
   data: GenericNode<any>,
 }
@@ -93,7 +93,10 @@ export const Tree = (props: TreeComponentProps) => {
       >
       <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
         {(node, index) => (
-          <NodeContainer node={node} Component={props.NodeComponent || DefaultNodeComponent} />
+          <NodeContainer
+            node={node}
+            Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+          />
         )}
       </For>
     </div>

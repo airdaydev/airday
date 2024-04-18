@@ -15,6 +15,7 @@ class TextNode extends Node {
   type = 'text';
   allowChildren = true;
   content?: string;
+  component = NodeComponent;
   constructor(node) {
     super(node);
     this.content = node.content;
@@ -22,7 +23,10 @@ class TextNode extends Node {
 }
 
 function loader(node: GenericNode<any>) {
-  return new TextNode({ id: node.id, content: node.content });
+  return new TextNode({
+    id: node.id,
+    content: node.content,
+  });
 }
 
 const NodeComponent: NodeComponentType = (props) => {
@@ -32,7 +36,8 @@ const NodeComponent: NodeComponentType = (props) => {
       class={styles['tree-item']}
       onMouseDown={props.onMouseDown}
     >
-      {props.node.id}
+      {props.node.id} - 
+      {props.node.content}
     </div>
   )
 }
@@ -53,7 +58,6 @@ render(() => (
       <input type="text" placeholder="filter text" />
       <Tree
         rootNode={rootNode}
-        NodeComponent={NodeComponent}
         draggable
         multiselect
         height={(node) => {}} // Node height calculation function or number

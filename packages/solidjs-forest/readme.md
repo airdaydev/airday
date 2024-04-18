@@ -35,14 +35,12 @@ class Country extends Node {
 
 function loader(node: GenericNode) {
   if (rawNode.type === 'group') {
-    // Validation step can go here
     return new Group({ name: node.name });
   }
   if (rawNode.type === 'country') {
-    // Validation step can go here
     return new Country({ name: node.name });
   } 
-  return undefined;
+  return false;
 }
 
 const treeState = new TreeState<ListItemType>({
@@ -69,3 +67,8 @@ treeState.loadChildren([
 pnpm install
 pnpm run dev
 ```
+
+## Roadmap
+- Prevent infinite recursion
+- Variable heights
+- Dynamically retrieved, variable heights
