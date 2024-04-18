@@ -1,62 +1,7 @@
-import { For, onCleanup, Component } from 'solid-js';
-import { distance } from './utils';
-import styles from './main.module.css';
-import { GenericNode, Node, RootNode } from './state';
-
-interface NodeContainerProps {
-  node: Node;
-  Component: NodeComponentType;
-  treeIndex: number;
-}
-
-const NodeContainer = (props: NodeContainerProps) => {
-  const signal = props.node.accessor;
-  onCleanup(() => props.node.unsubscribe());
-  const onMouseDown = (event: MouseEvent) => {
-    event.preventDefault(); // prevents selection on Safari
-    props.node.select();
-    const origin: [number, number] = [event.clientX, event.clientY];
-    const mouseMove = (mouseUpEvent: MouseEvent) => {
-        event.preventDefault();
-        // Make moving a little more effort to avoid slips
-        if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
-          props.node.root.isDragging = true;
-        }
-        window.addEventListener('mouseup', () => {
-          props.node.root.isDragging = false;
-          window.removeEventListener('mousemove', mouseMove);
-        }, { once: true })
-    };
-    window.addEventListener('mousemove', mouseMove);
-  };
-  return (
-    <>
-      <props.Component
-        onMouseDown={onMouseDown}
-        node={props.node}
-        ariaSelected={signal().isSelected}
-      />
-    </>
-  );
-};
-
-export type NodeComponentType = Component<{
-  node: Node,
-  ariaSelected: boolean,
-  onMouseDown: (event: MouseEvent) => void,
-}>;
-
-export const DefaultNodeComponent: NodeComponentType = (props) => {
-  return (
-    <div
-      aria-selected={props.ariaSelected}
-      class={styles['tree-item']}
-      onMouseDown={props.onMouseDown}
-    >
-      {props.node.id}
-    </div>
-  )
-}
+import { For, onCleanup } from 'solid-js';
+import { TransitionGroup } from 'solid-transition-group';
+import { GenericNode, RootNode } from './state';
+import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
 
 interface TreeComponentProps {
   rootNode: RootNode,
@@ -64,6 +9,9 @@ interface TreeComponentProps {
   uncontrolledData?: GenericNode<any>;
   data: GenericNode<any>,
 }
+
+// Probably an important read
+// https://github.com/solidjs/solid/discussions/366
 
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
@@ -81,22 +29,23 @@ export const Tree = (props: TreeComponentProps) => {
     <div
       ref={containerRef}
       style={`
-        background: yellow;
         color: black;
         width: 18em;
         height: 25em;
         overflow-y: scroll;
       `}
       >
-      <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
-        {(node, index) => (
-          <NodeContainer
-            treeIndex={index}
-            node={node}
-            Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-          />
-        )}
-      </For>
+      <TransitionGroup name="fade">
+        <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
+          {(node, index) => (
+            <NodeContainer
+              treeIndex={index}
+              node={node}
+              Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+            />
+          )}
+        </For>
+      </TransitionGroup>
     </div>
   );
 };

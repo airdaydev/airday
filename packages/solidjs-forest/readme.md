@@ -9,6 +9,7 @@ An opinionated tree system including store & UI component for SolidJS written fo
 - Items can have variable height in non-virtual mode.
 - Searching & filters.
 - Animated transitions & dragging.
+- Granular updates on individual items applied without looping over list.
 
 TODO: include webm vid
 

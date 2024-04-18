@@ -5,7 +5,12 @@ interface DummyTreeOpts {
   _path: number[];
 }
 
-const frutas = ['manzana','plátano','naranja','fresa','sandía','piña','mango','papaya','kiwi','pera','durazno','cereza','uva','melón','frambuesa','mora','arándano','guayaba','maracuyá','coco'];
+const frutas = [
+  'manzana','plátano','naranja','fresa','sandía','piña','mango',
+  'papaya','kiwi','pera','durazno','cereza','uva','melón','frambuesa',
+  'mora','arándano','guayaba','maracuyá','coco',
+];
+
 function elegirFruta() {
   const seed = Math.floor(Math.random() * frutas.length);
   return frutas[seed];

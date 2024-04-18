@@ -80,7 +80,7 @@ export class RootNode {
   idMap = new Map<string, Node>;
   mutate = false;
   selection = new Set<Node>;
-  signalIsDragging = createSignal(false);
+  dragSignal = createSignal(false);
   maxDepth = 10;
   expanded = true;
   animationMs = 50; // Set to 0 for no animation
@@ -122,7 +122,7 @@ export class RootNode {
       n.children = this.childrenSignal[0]();
       const end = qperf('memo');
       walk<Node, Node>(n, (node) => {
-        if (!node.isRoot && !(this.signalIsDragging[0]() && !node.isSelected)) {
+        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected)) {
           visibleChildren.push(node);
         }
         if (!node.expanded) return true;
@@ -190,12 +190,20 @@ export class RootNode {
   // TODO: cache for each node
   count(expandedOnly?: boolean) {
     let count = 0;
-    walk(this, (node) => {
+    walk(this.mutableRoot, (node) => {
       count++;
       if (expandedOnly && !node.expanded) return true;
       return false;
     }, undefined);
     return count;
+  }
+  startDrag() {
+    console.log('start drag');
+    this.dragSignal[1](true);
+  }
+  stopDrag() {
+    console.log('stop');
+    this.dragSignal[1](false);
   }
 }
 

@@ -1,0 +1,15 @@
+.item {
+  height: 20px;
+}
+.item.fade-enter-active,
+.item.fade-exit-active {
+  transition: height 80ms;
+}
+.item.fade-enter,
+.item.fade-exit-to {
+  height: 0px;
+  opacity: 0;
+}
+.item.fade-enter {
+  height: 20px;
+}
