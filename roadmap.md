@@ -21,19 +21,22 @@
 - [x] Allow dropping items between open lists directly
 - [x] Highlight active list in nav
 
+## solidjs-tree
+- []
+
 ## Frontend Lifecycle
 - [x] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
-- [] Don't allow two of the same bordes open at the same time
+- [] Don't allow two of the same boards open at the same time
 - [] Workspace management
 - [] Up Next board
 - [] Trash items
 - [] Empty trash
 - [] Delete containers
+- [] Resort containers
+- [] Multi-select containers
 - [] Add new item adds saves item into store
 - [] Habit items = set target + smiley
 - [] Filter for habit tracking with sorting (worst/best)
-- [] Resort containers
-- [] Multi-select containers
 - [] When dragging while holding down command, duplicate
 - [] Add search
 - [] Persist views (per device)
@@ -81,19 +84,20 @@
 - [] Custom stickers
 
 ## Sync/Data structure
+- [] E2EE - consider https://github.com/porridgewithraisins/e2ee.js/
+- [] E2EE study - https://cronokirby.com/posts/2021/06/e2e_in_the_browser/
 - [] Auth, consider https://next-auth.js.org/
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Undo/redo... in general, save granular outcomes & apply them (consider a changelog or something visible, otherwise just console)
 - [] Client-side encrypted sync server
 - [] Persistence strategy (Clickhouse...? Something easier to scale, partitioning should be simple)
-- [] CRDT: How will sorting work
+- [] CRDT: How will sorting work (see LSEQ - or automerge's implementation)
 - [] CRDT: Define all data structures
 - [] Update strategy (anticipate changes)
 
 ## Predeploy, meta app
 - [] Help item type for new users - how to pin in Safari on IOS and same with android
 - [] Friends alpha and testing
-- [] Mobile web strategy (PWA)
 - [] PWA update strategy
 - [] Automated testing story
 - [] Paid web service with introductory prices
@@ -112,12 +116,18 @@
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
 
+## Mobile strategy
+- [] Launch - PWA
+- [] See https://capacitorjs.com/
+- [] iOS Ionic Capacitor app POC
+- [] Android Ionic Capacitor app POC
+- [] iOS release
+
 ## Stretch goals
 - [] Markdown descriptions, with TODO sublists
 - [] Desktop app https://github.com/tauri-apps/tauri
 - [] Optional encrypted server
 - [] Lock
-- [] Mobile native app strategy
 - [] Kanban board
 - [] Secrets
 - [] Code snippets
