@@ -23,8 +23,8 @@ export class Node {
   root?: RootNode;
   signal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
-  constructor(id?: string) {
-    this.id = id || createUniqueId();
+  constructor(node?: GenericNode<any>) {
+    this.id = node?.id || createUniqueId();
   }
   getNodeSignal() {
     if (!this.signal) this.signal = createSignal(this.toJSON());
@@ -47,13 +47,13 @@ export class Node {
     this.isSelected = true;
     this.signal?.[1](() => this.toJSON());
     this.root?.selection.add(this);
-    this.root?.onSelect(this.root.selection);
+    if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
   }
   deselect() {
     this.isSelected = false;
     this.signal?.[1](() => this.toJSON());
     this.root?.selection.delete(this);
-    this.root?.onSelect(this.root.selection);
+    if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -79,7 +79,8 @@ export class Node {
 
 interface RootNodeOpts {
   mutate?: boolean;
-  onSelect?: (node: Set<Node>) => void;
+  onSelectionChange?: (node: Set<Node>) => void;
+  loader?: (node: GenericNode<any>) => Node;
 }
 
 // Combined tree -> Window tree (UI)
@@ -93,10 +94,12 @@ export class RootNode extends Node {
   maxDepth = 10;
   expanded = true;
   animationMs = 50; // Set to 0 for no animation
-  onSelect?: (node: Set<Node>) => void;
+  loader?: (node: GenericNode<any>) => Node;
+  onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: RootNodeOpts = {}) {
     super(createUniqueId());
-    this.onSelect = opts.onSelect;
+    this.onSelectionChange = opts.onSelectionChange;
+    this.loader = opts.loader;
   }
   derivativeSet() {
     return createMemo(() => {
@@ -162,7 +165,7 @@ export class RootNode extends Node {
     this.children = map<any, any>(
       tree,
       (rawNode, parent) => {
-        const node = new Node(rawNode.id);
+        const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
         node.root = this;
         node.parent = parent;
         // TODO: calc depth or level for display purposes

@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
-import { Tree, RootNode, NodeComponentType, Node } from '../src/index';
+import { Tree, RootNode, NodeComponentType, Node, GenericNode } from '../src/index';
 import { dummyTree } from './dummy';
 import styles from './main.module.css';
 
@@ -11,10 +11,18 @@ const root = document.getElementById('root');
 // We'll use this between rootnodes to allow a shared selection state
 // const context = new Context();
 
-class Group extends Node {
-  type = 'group';
+class TextNode extends Node {
+  type = 'text';
   allowChildren = true;
-  name?: string;
+  content?: string;
+  constructor(node) {
+    super(node);
+    this.content = node.content;
+  }
+}
+
+function loader(node: GenericNode<any>) {
+  return new TextNode({ id: node.id, content: node.content });
 }
 
 const NodeComponent: NodeComponentType = (props) => {
@@ -30,8 +38,9 @@ const NodeComponent: NodeComponentType = (props) => {
 }
 
 const rootNode = new RootNode({
-  onSelect: (nodeSet) => {
-    console.log('first node selected', nodeSet.values().next().value);
+  loader,
+  onSelectionChange: (nodeSet) => {
+    console.log('selectionChange', nodeSet.values().next().value);
   }
 });
 const data = dummyTree();
