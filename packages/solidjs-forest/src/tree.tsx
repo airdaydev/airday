@@ -9,7 +9,7 @@ interface NodeContainerProps {
 }
 
 const NodeContainer = (props: NodeContainerProps) => {
-  const signal = props.node.getNodeSignal();
+  const signal = props.node.accessor;
   onCleanup(() => props.node.unsubscribe());
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari

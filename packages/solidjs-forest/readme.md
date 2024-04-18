@@ -12,11 +12,6 @@ An opinionated tree system including store & UI component for SolidJS written fo
 
 TODO: include webm vid
 
-## A typical example
-```typescript
-
-```
-
 ## An typical example
 ```typescript
 import { TreeState, Tree, Node, type GenericNode } from '@solidjs-forest';

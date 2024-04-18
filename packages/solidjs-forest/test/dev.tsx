@@ -15,10 +15,19 @@ class TextNode extends Node {
   type = 'text';
   allowChildren = true;
   content?: string;
-  component = NodeComponent;
+  component = TextNodeComponent;
   constructor(node) {
     super(node);
     this.content = node.content;
+  }
+  serialise() {
+    return {
+      content: this.content,
+    };
+  }
+  updateContent(newText: string) {
+    this.content = newText;
+    this.triggerUpdate();
   }
 }
 
@@ -29,15 +38,20 @@ function loader(node: GenericNode<any>) {
   });
 }
 
-const NodeComponent: NodeComponentType = (props) => {
+const TextNodeComponent: NodeComponentType = (props) => {
+  const node = props.node.accessor;
   return (
     <div
       aria-selected={props.ariaSelected}
       class={styles['tree-item']}
-      onMouseDown={props.onMouseDown}
+      onMouseDown={(event) => {
+        props.onMouseDown(event)
+      }}
+      onDblClick={(event) => {
+        props.node.updateContent('gogogoo')
+      }}
     >
-      {props.node.id} - 
-      {props.node.content}
+      {node().id} - {node().content}
     </div>
   )
 }
@@ -45,7 +59,7 @@ const NodeComponent: NodeComponentType = (props) => {
 const rootNode = new RootNode({
   loader,
   onSelectionChange: (nodeSet) => {
-    console.log('selectionChange', nodeSet.values().next().value);
+    // console.log('selectionChange', nodeSet.values().next().value);
   }
 });
 const data = dummyTree();

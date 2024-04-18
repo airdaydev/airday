@@ -21,37 +21,41 @@ export class Node {
   expanded = true;
   parent?: Node;
   root?: RootNode;
-  signal?: Signal<NodeSignalProps> | undefined;
+  uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
   }
-  getNodeSignal() {
-    if (!this.signal) this.signal = createSignal(this.toJSON());
+  get accessor() {
+    if (!this.uiSignal) this.uiSignal = createSignal(this.toJSON());
     this.signalSubscriptions++;
-    return this.signal[0];
+    return this.uiSignal[0];
   }
   unsubscribe() {
     this.signalSubscriptions--;
     if (this.signalSubscriptions === 0) {
-      delete this.signal;
+      delete this.uiSignal;
     }
   }
   toJSON() {
     return {
+      ...(this.serialise && this.serialise()),
       id: this.id,
       isSelected: this.isSelected,
     }
   }
+  triggerUpdate() {
+    this.uiSignal?.[1](() => this.toJSON());
+  }
   select(recursive?: boolean) {
     this.isSelected = true;
-    this.signal?.[1](() => this.toJSON());
+    this.triggerUpdate();
     this.root?.selection.add(this);
     if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
   }
   deselect() {
     this.isSelected = false;
-    this.signal?.[1](() => this.toJSON());
+    this.triggerUpdate();
     this.root?.selection.delete(this);
     if (this.root?.onSelectionChange) this.root.onSelectionChange(this.root.selection);
   }
