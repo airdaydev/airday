@@ -1,5 +1,5 @@
 .item {
-  height: 20px;
+  height: 18px;
 }
 .item.fade-enter-active,
 .item.fade-exit-active {
@@ -11,5 +11,5 @@
   opacity: 0;
 }
 .item.fade-enter {
-  height: 20px;
+  height: 18px;
 }

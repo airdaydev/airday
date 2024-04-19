@@ -10,6 +10,7 @@ export interface GenericNode<T extends GenericNode<any | undefined>> {
 export interface NodeSignalProps {
   id: string;
   isSelected: boolean;
+  dragOriginNode: boolean;
 }
 
 export class Node {
@@ -22,6 +23,7 @@ export class Node {
   root?: RootNode;
   uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
+  dragOriginNode = false;
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
   }
@@ -41,6 +43,7 @@ export class Node {
       ...(this.serialise && this.serialise()),
       id: this.id,
       isSelected: this.isSelected,
+      dragOriginNode: this.dragOriginNode,
     }
   }
   triggerUpdate() {
@@ -48,6 +51,10 @@ export class Node {
   }
   get isSelected() {
     return this.root?.selection.has(this);
+  }
+  setDragOriginState(isOrigin = true) {
+    this.dragOriginNode = isOrigin;
+    this.triggerUpdate();
   }
   select(recursive?: boolean, additive?: boolean) {
     this.root.selectOne(this);
@@ -73,6 +80,7 @@ interface RootNodeOpts {
 }
 
 // Combined tree -> Window tree (UI)
+// TODO: Rename this as Store, considering it has no children object therefore is not a root node
 export class RootNode {
   id: string;
   isRoot = true;
@@ -83,6 +91,7 @@ export class RootNode {
   dragSignal = createSignal(false);
   maxDepth = 10;
   expanded = true;
+  dragOriginNode: Node | undefined; // The actual node that the user clicked on
   animationMs = 50; // Set to 0 for no animation
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
@@ -122,7 +131,8 @@ export class RootNode {
       n.children = this.childrenSignal[0]();
       const end = qperf('memo');
       walk<Node, Node>(n, (node) => {
-        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected)) {
+        // Keeping the node that user actually dragged in place
+        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected && node !== this.dragOriginNode)) {
           visibleChildren.push(node);
         }
         if (!node.expanded) return true;
@@ -197,12 +207,14 @@ export class RootNode {
     }, undefined);
     return count;
   }
-  startDrag() {
-    console.log('start drag');
+  startDrag(dragOriginNode: Node) {
+    this.dragOriginNode = dragOriginNode;
+    dragOriginNode.setDragOriginState(true)
     this.dragSignal[1](true);
   }
   stopDrag() {
-    console.log('stop');
+    this.dragOriginNode?.setDragOriginState(false)
+    this.dragOriginNode = undefined;
     this.dragSignal[1](false);
   }
 }

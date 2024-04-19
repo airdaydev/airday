@@ -21,7 +21,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         event.preventDefault();
         // Make moving a little more effort to avoid slips
         if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
-          props.node.root?.startDrag();
+          props.node.root?.startDrag(props.node);
         }
         window.addEventListener('mouseup', () => {
           props.node.root?.stopDrag();
@@ -29,14 +29,18 @@ export const NodeContainer = (props: NodeContainerProps) => {
         }, { once: true })
     };
     window.addEventListener('mousemove', mouseMove);
+    window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
   return (
     <div class="item">
-      <props.Component
-        onMouseDown={onMouseDown}
-        node={props.node}
-        ariaSelected={signal().isSelected}
-      />
+      {signal().dragOriginNode && (<div style={'background: #ccc; height: 100%;'} />)}
+      {!signal().dragOriginNode && (
+        <props.Component
+          onMouseDown={onMouseDown}
+          node={props.node}
+          ariaSelected={signal().isSelected}
+        />
+      )}
     </div>
   );
 };
