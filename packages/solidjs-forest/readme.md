@@ -5,7 +5,7 @@ An opinionated tree system including store & UI component for SolidJS written fo
 ## Features
 - Window expands to fill minimum size.
 - Virtualised window.
-- Drag & Drop with custom components.
+- Drag & drop in same list or to other lists.
 - Items can have variable height in non-virtual mode.
 - Searching & filters.
 - Animated transitions & dragging.
@@ -13,22 +13,25 @@ An opinionated tree system including store & UI component for SolidJS written fo
 
 TODO: include webm vid
 
+## A minimal example
+
 ## An typical example
 ```typescript
 import { TreeState, Tree, Node, type GenericNode } from '@solidjs-forest';
 
 class Group extends Node {
   type = 'group';
-  allowChildren = true;
+  allowDrop = true;
   name?: text;
 }
 
 class Country extends Node {
   type = 'country';
-  allowChildren = false;
+  allowDrop = false;
   name?: text;
 }
 
+// Constructs tree from JSON (for example)
 function loader(node: GenericNode) {
   if (rawNode.type === 'group') {
     return new Group({ name: node.name });
@@ -36,7 +39,7 @@ function loader(node: GenericNode) {
   if (rawNode.type === 'country') {
     return new Country({ name: node.name });
   } 
-  return false;
+  return false; // Skips item
 }
 
 const treeState = new TreeState<ListItemType>({

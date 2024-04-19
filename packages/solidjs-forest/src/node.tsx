@@ -33,7 +33,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   };
   return (
     <div class="item">
-      {signal().dragOriginNode && (<div style={'background: #ccc; height: 100%;'} />)}
+      {signal().dragOriginNode && (<div class={styles.dragOriginPlaceholder} />)}
       {!signal().dragOriginNode && (
         <props.Component
           onMouseDown={onMouseDown}
