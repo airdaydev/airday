@@ -26,13 +26,19 @@ export const NodeContainer = (props: NodeContainerProps) => {
         window.addEventListener('mouseup', () => {
           props.node.root?.stopDrag();
           window.removeEventListener('mousemove', mouseMove);
-        }, { once: true })
+        }, { once: true });
     };
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
   return (
-    <div class="item">
+    <div
+      class="item"
+      onMouseOver={() => {
+        // props.node.root?.dragLastTouched = props.treeIndex();
+        // if(props.node.root?.dragOriginNodeIndex > )  < props.treeIndex();
+      }}
+    >
       {signal().dragOriginNode && (<div class={styles.dragOriginPlaceholder} />)}
       {!signal().dragOriginNode && (
         <props.Component

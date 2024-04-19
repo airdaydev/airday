@@ -92,6 +92,7 @@ export class RootNode {
   maxDepth = 10;
   expanded = true;
   dragOriginNode: Node | undefined; // The actual node that the user clicked on
+  dragOriginNodeIndex: number | undefined;
   animationMs = 50; // Set to 0 for no animation
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
@@ -130,9 +131,16 @@ export class RootNode {
       n.isRoot = true;
       n.children = this.childrenSignal[0]();
       const end = qperf('memo');
+      let index = 0;
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
-        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected && node !== this.dragOriginNode)) {
+        const dragOriginNode = node === this.dragOriginNode;
+        if (dragOriginNode) { // unset on drag end...?
+          this.dragOriginNodeIndex = index;
+          index++; 
+        }
+        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected && !dragOriginNode)) {
+          index++;
           visibleChildren.push(node);
         }
         if (!node.expanded) return true;

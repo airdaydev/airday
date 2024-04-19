@@ -9,10 +9,11 @@
   background: white;
   border: 1px solid #ccc;
   cursor: pointer;
+  height: 100%;
 }
 
 .tree-item[aria-selected='true'] {
-  background: #999;
+  background: #eee;
 }
 
 .container {

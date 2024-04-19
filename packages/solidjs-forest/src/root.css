@@ -1,9 +1,9 @@
 .item {
-  height: 18px;
+  height: 26px;
 }
 .item.fade-enter-active,
 .item.fade-exit-active {
-  transition: height 80ms;
+  transition: height 120ms;
 }
 .item.fade-enter,
 .item.fade-exit-to {
@@ -11,5 +11,5 @@
   opacity: 0;
 }
 .item.fade-enter {
-  height: 18px;
+  height: 26px;
 }
