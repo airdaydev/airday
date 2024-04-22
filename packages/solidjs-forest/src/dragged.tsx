@@ -12,7 +12,7 @@ const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([do
 const onResize = () => requestAnimationFrame(() =>
         setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
-export const Dragged = ({ size }: DragStackProps) => {
+export const Dragged = ({ size, component, offset }: DragStackProps) => {
     let stackRef: HTMLDivElement | undefined = undefined;
     const onMouseMove = (event: MouseEvent) => {
         requestAnimationFrame(() => {
@@ -29,6 +29,8 @@ export const Dragged = ({ size }: DragStackProps) => {
         // without adding scrollbars. Scroll flash can be seen when using
         // keyboard to go fullscreen while dragging (NBD for now)
         // TODO: Safari: turn on user-select: none; for entire page!
+        console.log(component)
+        stackRef.appendChild(component)
         window.addEventListener('resize', onResize);
         window.addEventListener('mousemove', onMouseMove);
         onResize();
@@ -54,18 +56,14 @@ export const Dragged = ({ size }: DragStackProps) => {
                 ref={stackRef}
                 style={`
                     position: relative;
-                    background: red;
-                    width: 12em;
-                    height: 4em;
                     z-index: 100;
                     top: -100%;
                     left: -100%;
                     box-shadow: 1px 1px 2px #0000002e;
-                    border-radius: 2px;
-                    transform: rotateZ(2deg);
+                    max-width: 16em;
+                    height: 26px;
                 `}
             >
-                {`${size} cards`}
             </div>
         </div>
     );

@@ -1,4 +1,4 @@
-import { onCleanup, Component, Accessor } from 'solid-js';
+import { onCleanup, Component, Accessor, on, createEffect, createSignal } from 'solid-js';
 import { Node } from './state';
 import { distance } from './utils';
 import styles from './main.module.css';
@@ -10,9 +10,17 @@ export interface NodeContainerProps {
   treeIndex: Accessor<number>;
 }
 
+const defaultStyle = {
+  item_when: (height = '26px') => {
+
+  }
+}
+
 export const NodeContainer = (props: NodeContainerProps) => {
+  let ref: HTMLElement;
   const signal = props.node.accessor;
   onCleanup(() => props.node.unsubscribe());
+  const draggedOn = createSignal(0);
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     props.node.select();
@@ -21,7 +29,8 @@ export const NodeContainer = (props: NodeContainerProps) => {
         event.preventDefault();
         // Make moving a little more effort to avoid slips
         if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
-          props.node.root?.startDrag(props.node);
+          props.node.root?.startDrag(props.node, ref);
+          window.removeEventListener('mousemove', mouseMove);
         }
         window.addEventListener('mouseup', () => {
           props.node.root?.stopDrag();
@@ -31,21 +40,58 @@ export const NodeContainer = (props: NodeContainerProps) => {
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
+  createEffect(on(() => props.node.root?.dragLastTouched[0](), (lastTouchedIndex) => {
+    const index = props.treeIndex();
+    const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
+    // Drag origin is before node
+    // last touched index 
+    if (dragOriginNodeIndex < index && lastTouchedIndex >= index) {
+      // is below
+      draggedOn[1](1);
+      return;
+    } else if (dragOriginNodeIndex > index && lastTouchedIndex <= index) {
+      draggedOn[1](-1);
+      return;
+    } else {
+      draggedOn[1](0);
+    }
+    // if ((props.node.root?.dragOriginNodeIndex > lastTouchedIndex)) {
+      //   draggedOn[1](index > lastTouchedIndex ? -1 : 0);
+      //   console.log('above')
+      // }
+  }));
   return (
     <div
       class="item"
-      onMouseOver={() => {
-        // props.node.root?.dragLastTouched = props.treeIndex();
-        // if(props.node.root?.dragOriginNodeIndex > )  < props.treeIndex();
-      }}
     >
+      {draggedOn[0]() === -1 && (
+        <div class='placeholder' />
+      )}
       {signal().dragOriginNode && (<div class={styles.dragOriginPlaceholder} />)}
       {!signal().dragOriginNode && (
-        <props.Component
-          onMouseDown={onMouseDown}
-          node={props.node}
-          ariaSelected={signal().isSelected}
-        />
+        <div
+          classList={{
+            item_internal: true,
+            above: draggedOn[0]() === 1,
+            below: draggedOn[0]() === -1,
+          }}
+          onMouseEnter={() => {
+            if (props.node.root?.dragSignal[0]()) {
+              const draggingOver = props.treeIndex();
+              props.node.root.dragLastTouched[1](draggingOver - draggedOn[0]());
+            }
+          }}
+        >
+          <props.Component
+            onMouseDown={onMouseDown}
+            node={props.node}
+            ariaSelected={signal().isSelected}
+            ref={ref}
+          />
+          </div>
+      )}
+      {draggedOn[0]() === 1 && (
+        <div class='placeholder' />
       )}
     </div>
   );

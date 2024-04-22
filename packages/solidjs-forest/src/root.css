@@ -1,4 +1,6 @@
 .item {
+  position: relative;
+  width: 100%;
   height: 26px;
 }
 .item.fade-enter-active,
@@ -12,4 +14,34 @@
 }
 .item.fade-enter {
   height: 26px;
+}
+.item_internal {
+  position: absolute;
+  width: 100%;
+  height: 26px;
+  z-index: 2;
+}
+.item_internal {
+  top: 0px;
+  transition: top 80ms;
+}
+.item_internal.below {
+  /* transform: translateY(-26px); */
+  top: 26px;
+}
+.item_internal.above {
+  top: -26px;
+  /* transform: translateY(26px); */
+}
+
+.placeholder {
+  width: 100%;
+  height: 26px;
+  z-index: 0;
+  background: white;
+  transition: background 80ms;
+}
+
+.placeholder:hover {
+  background: #eee;
 }

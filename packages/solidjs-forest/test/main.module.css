@@ -6,6 +6,8 @@
 }
 
 .tree-item {
+  display: flex;
+  align-items: center;
   background: white;
   border: 1px solid #ccc;
   cursor: pointer;

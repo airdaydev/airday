@@ -52,6 +52,7 @@ const TextNodeComponent: NodeComponentType = (props) => {
         props.node.select();
         props.node.updateContent('gogogoo')
       }}
+      ref={props.ref}
     >
       {node().id} - {node().content}
     </div>
