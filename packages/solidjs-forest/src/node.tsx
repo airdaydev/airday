@@ -23,6 +23,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   const draggedOn = createSignal(0);
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
+    if (event.button === 2) return; // prevent context menu
     props.node.select();
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseUpEvent: MouseEvent) => {
