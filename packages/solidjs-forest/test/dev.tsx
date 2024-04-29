@@ -27,7 +27,7 @@ treeStateB.load(dummyTree());
 
 render(() => (
   <div class={styles['container']}>
-    {dndContext.activeTreeContainer[0]() && (
+    {dndContext.isDragging[0]() && (
       <Dragged dndContext={dndContext} />
     )}
     <div>

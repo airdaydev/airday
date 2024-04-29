@@ -8,6 +8,7 @@ export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   treeIndex: Accessor<number>;
+  containerRef: HTMLElement;
 }
 
 const defaultStyle = {
@@ -44,7 +45,15 @@ export const NodeContainer = (props: NodeContainerProps) => {
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
+  // TODO: Can we only run this when active...? (derivative signal??)
   createEffect(on(() => props.node.root?.dndContext.lastTouchedIndex[0](), (lastTouchedIndex) => {
+    // console.log(props.containerRef)
+    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeTreeContainer[0]();
+    if (!isInActiveContainer) {
+      draggedOn[1](0);
+      return;
+    }
+    // console.log('isInActiveContainer', isInActiveContainer);
     const index = props.treeIndex();
     const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
     // Drag origin is before node
@@ -80,7 +89,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             below: draggedOn[0]() === -1,
           }}
           onMouseEnter={() => {
-            if (props.node.root?.dndContext.activeTreeContainer[0]()) {
+            if (props.node.root?.dndContext.isDragging[0]()) {
               const draggingOver = props.treeIndex();
               props.node.root.dndContext.lastTouchedIndex[1](draggingOver - draggedOn[0]());
             }

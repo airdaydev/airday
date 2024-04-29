@@ -4,7 +4,8 @@ import { TreeState, type Node as ForestNode } from './state';
 // There is only one drag context, but there can be multiple select contexts
 // This mostly controls the dragged item
 export class DndContext {
-  originState = createSignal<TreeState | null>(null);
+  isDragging = createSignal(false);
+  originState = createSignal<TreeState | null>(null); // also euphanism for is dragging (todo: separate for clarity?)
   activeTreeContainer = createSignal<HTMLElement | null>(null);
   // targetState = createSignal<TreeState | null>(null);
   draggedEl: HTMLElement | Node | undefined;
