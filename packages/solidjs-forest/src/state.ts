@@ -90,8 +90,6 @@ export class TreeState {
   idMap = new Map<string, Node>;
   mutate = false;
   selection = new Set<Node>;
-  dragSignal = createSignal(false);
-  dragEl: HTMLElement | undefined;
   maxDepth = 10;
   expanded = true;
   dndContext: DndContext;
@@ -111,7 +109,7 @@ export class TreeState {
   }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
-  getWindowedSignal(element: HTMLElement) {
+  getWindowedSignal(containerEl: HTMLElement) {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
@@ -137,9 +135,9 @@ export class TreeState {
         const dragOriginNode = node === this.dndContext.originNode;
         if (dragOriginNode) {
           this.dragOriginNodeIndex = index;
-          index++; 
+          index++;
         }
-        if (!node.isRoot && !(this.dragSignal[0]() && node.isSelected && !dragOriginNode)) {
+        if (!node.isRoot && !(this.dndContext.activeTreeContainer[0]() && node.isSelected && !dragOriginNode)) {
           index++;
           visibleChildren.push(node);
         }
@@ -220,14 +218,14 @@ export class TreeState {
     this.dndContext.draggedEl = ref.cloneNode(true);
     this.dndContext.originNode = dragOriginNode;
     dragOriginNode.setDragOriginState(true)
-    this.dragSignal[1](true);
+    this.dndContext.activeTreeContainer[1](true);
   }
   stopDrag() {
     this.dndContext.elClickOffset = [0, 0];
     this.dndContext.setLastTouchedIndex(undefined);
     this.dndContext.originNode?.setDragOriginState(false)
     this.dndContext.originNode = undefined;
-    this.dragSignal[1](false);
+    this.dndContext.activeTreeContainer[1](false);
   }
 }
 

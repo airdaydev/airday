@@ -2,12 +2,13 @@ import { For, onCleanup } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { GenericNode, TreeState } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
-import { Dragged } from './dragged';
+import { DndContext } from './dnd-context';
 
 interface TreeComponentProps {
   state: TreeState,
   defaultNodeComponent?: NodeComponentType,
   uncontrolledData?: GenericNode<any>;
+  dndContext: DndContext;
   data: GenericNode<any>,
 }
 
@@ -28,13 +29,6 @@ export const Tree = (props: TreeComponentProps) => {
   });
   return (
     <>
-      {props.state.dragSignal[0]() && (
-        <Dragged
-          size={props.state.selection.size}
-          component={props.state.dndContext.draggedEl}
-          dragClickOffset={props.state.dndContext.elClickOffset}
-        />
-      )}
       <div
         ref={containerRef}
         style={`

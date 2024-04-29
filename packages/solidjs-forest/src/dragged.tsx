@@ -1,11 +1,12 @@
 import { createSignal, onCleanup, onMount } from 'solid-js';
+import { DndContext } from './dnd-context';
 
 // TODO: Drag physics?
 // TODO: Move back to original place if drop cancelled!
 // https://greensock.com/forums/topic/16928-physics-while-dragging/
 
-interface DragStackProps {
-    size: number;
+interface DraggedProps {
+    dndContext: DndContext;
 }
 
 const defaultComponent = () => <div>Unset drag component</div>;
@@ -14,14 +15,15 @@ const defaultComponent = () => <div>Unset drag component</div>;
 // const onResize = () => requestAnimationFrame(() =>
 //         setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
-export const Dragged = ({ size, component, dragClickOffset }: DragStackProps) => {
+export const Dragged = ({ dndContext }: DraggedProps) => {
+    let component = dndContext.draggedEl;
     if (!component) component = defaultComponent();
     let stackRef: HTMLDivElement | undefined = undefined;
     const onMouseMove = (event: MouseEvent) => {
         requestAnimationFrame(() => {
             if (stackRef) {
-                stackRef.style.left = `${window.scrollX + event.x - dragClickOffset[0]}px`;
-                stackRef.style.top = `${window.scrollY + event.y - dragClickOffset[1]}px`;
+                stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
+                stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
             }
         })
     };

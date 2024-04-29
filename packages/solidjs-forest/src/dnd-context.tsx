@@ -5,8 +5,9 @@ import { TreeState, type Node as ForestNode } from './state';
 // This mostly controls the dragged item
 export class DndContext {
   originState = createSignal<TreeState | null>(null);
-  targetState = createSignal<TreeState | null>(null);
-  draggedEl: HTMLElement | Node | undefined; // prev, dragEl
+  activeTreeContainer = createSignal<HTMLElement | null>(null);
+  // targetState = createSignal<TreeState | null>(null);
+  draggedEl: HTMLElement | Node | undefined;
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on
   lastTouchedIndex = createSignal<number | undefined>(); // prev, dragLastTouched

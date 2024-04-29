@@ -1,7 +1,7 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
 import {
-  Tree, TreeState, DndContext,
+  Tree, TreeState, DndContext, Dragged,
 } from '../src/index';
 import { loader } from './nodes';
 import { dummyTree } from './dummy';
@@ -27,6 +27,9 @@ treeStateB.load(dummyTree());
 
 render(() => (
   <div class={styles['container']}>
+    {dndContext.activeTreeContainer[0]() && (
+      <Dragged dndContext={dndContext} />
+    )}
     <div>
       <h2>Tree A ({treeStateA.count()} items)</h2>
       <input type="text" placeholder="filter text" />

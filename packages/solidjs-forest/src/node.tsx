@@ -80,7 +80,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             below: draggedOn[0]() === -1,
           }}
           onMouseEnter={() => {
-            if (props.node.root?.dragSignal[0]()) {
+            if (props.node.root?.dndContext.activeTreeContainer[0]()) {
               const draggingOver = props.treeIndex();
               props.node.root.dndContext.lastTouchedIndex[1](draggingOver - draggedOn[0]());
             }
