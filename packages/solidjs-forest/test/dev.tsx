@@ -4,7 +4,6 @@ import { Tree, TreeState, NodeComponentType, Node, GenericNode } from '../src/in
 import { dummyTree } from './dummy';
 import styles from './main.module.css';
 
-
 const root = document.getElementById('root');
 
 // TODO: Allow file drag & drop via https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API
@@ -61,31 +60,33 @@ const TextNodeComponent: NodeComponentType = (props) => {
 
 const treeStateA = new TreeState({
   loader,
-  onSelectionChange: (nodeSet) => {
+  // onSelectionChange: (nodeSet) => {
     // console.log('selectionChange', nodeSet.values().next().value);
-  }
+  // }
 });
-const data = dummyTree();
-treeStateA.load(data);
+treeStateA.load(dummyTree());
+
+const treeStateB = new TreeState({ loader });
+treeStateB.load(dummyTree());
 
 render(() => (
-  <div style={styles['container']}>
+  <div class={styles['container']}>
     <div>
       <h2>Tree A ({treeStateA.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
         state={treeStateA}
-        draggable
-        multiselect
-        height={(node) => {}} // Node height calculation function or number
+        // draggable
+        // multiselect
+        // height={(node) => {}} // Node height calculation function or number
       />
     </div>
-    {/* <div>
-      <h2>List B ({rootB.count()} items)</h2>
+    <div>
+      <h2>List B ({treeStateB.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
-        state={rootB}
+        state={treeStateB}
       />
-    </div> */}
+    </div>
   </div>
 ), root!);
