@@ -8,11 +8,14 @@ interface DragStackProps {
     size: number;
 }
 
-const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([document.body.scrollWidth, document.body.scrollHeight]);
-const onResize = () => requestAnimationFrame(() =>
-        setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
+const defaultComponent = () => <div>Unset drag component</div>;
+// Maybe delete this implemenation, but possible it was done for a reason
+// const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([document.body.scrollWidth, document.body.scrollHeight]);
+// const onResize = () => requestAnimationFrame(() =>
+//         setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
 export const Dragged = ({ size, component, dragClickOffset }: DragStackProps) => {
+    if (!component) component = defaultComponent();
     let stackRef: HTMLDivElement | undefined = undefined;
     const onMouseMove = (event: MouseEvent) => {
         requestAnimationFrame(() => {
@@ -29,14 +32,13 @@ export const Dragged = ({ size, component, dragClickOffset }: DragStackProps) =>
         // without adding scrollbars. Scroll flash can be seen when using
         // keyboard to go fullscreen while dragging (NBD for now)
         // TODO: Safari: turn on user-select: none; for entire page!
-        console.log(component)
         stackRef.appendChild(component)
-        window.addEventListener('resize', onResize);
+        // window.addEventListener('resize', onResize);
         window.addEventListener('mousemove', onMouseMove);
-        onResize();
+        // onResize();
     })
     onCleanup(() => {
-        window.removeEventListener('resize', onResize)
+        // window.removeEventListener('resize', onResize)
         window.removeEventListener('mousemove', onMouseMove)
     });
     return (
@@ -47,8 +49,8 @@ export const Dragged = ({ size, component, dragClickOffset }: DragStackProps) =>
             z-index: 10;
             top: 0;
             left: 0;
-            width: ${boardDimensions()[0]}px;
-            height: ${boardDimensions()[1]}px;
+            width: 100vw;
+            height: 100vh;
             overflow: hidden;
         `}
         >

@@ -11,4 +11,5 @@
 .dragOriginPlaceholder {
   background: #eee;
   height: 100%;
+  border: 1px solid #eee;
 }
