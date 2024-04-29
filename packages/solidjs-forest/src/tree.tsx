@@ -28,7 +28,13 @@ export const Tree = (props: TreeComponentProps) => {
   });
   return (
     <>
-      {props.rootNode.dragSignal[0]() && <Dragged size={props.rootNode.selection.size} component={props.rootNode.dragEl} />}
+      {props.rootNode.dragSignal[0]() && (
+        <Dragged
+          size={props.rootNode.selection.size}
+          component={props.rootNode.dragEl}
+          dragClickOffset={props.rootNode.dragClickOffset}
+        />
+      )}
       <div
         ref={containerRef}
         style={`

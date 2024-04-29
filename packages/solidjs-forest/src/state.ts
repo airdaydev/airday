@@ -96,6 +96,7 @@ export class RootNode {
   dragOriginNodeIndex: number | undefined;
   dragLastTouched = createSignal<number | undefined>();
   animationMs = 50; // Set to 0 for no animation
+  dragClickOffset = [0, 0];
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: RootNodeOpts = {}) {
@@ -220,13 +221,15 @@ export class RootNode {
   setDragLastTouchedIndex(nodeIndex: number | undefined) {
     this.dragLastTouched[1](nodeIndex);
   }
-  startDrag(dragOriginNode: Node, ref: HTMLElement) {
+  startDrag(dragOriginNode: Node, ref: HTMLElement, dragClickOffset: [number, number] = [0, 0]) {
+    this.dragClickOffset = dragClickOffset;
     this.dragEl = ref.cloneNode(true);
     this.dragOriginNode = dragOriginNode;
     dragOriginNode.setDragOriginState(true)
     this.dragSignal[1](true);
   }
   stopDrag() {
+    this.dragClickOffset = [0, 0];
     this.setDragLastTouchedIndex(undefined);
     this.dragOriginNode?.setDragOriginState(false)
     this.dragOriginNode = undefined;

@@ -12,13 +12,13 @@ const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([do
 const onResize = () => requestAnimationFrame(() =>
         setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
-export const Dragged = ({ size, component, offset }: DragStackProps) => {
+export const Dragged = ({ size, component, dragClickOffset }: DragStackProps) => {
     let stackRef: HTMLDivElement | undefined = undefined;
     const onMouseMove = (event: MouseEvent) => {
         requestAnimationFrame(() => {
             if (stackRef) {
-                stackRef.style.left = `${window.scrollX + event.x}px`;
-                stackRef.style.top = `${window.scrollY + event.y}px`;
+                stackRef.style.left = `${window.scrollX + event.x - dragClickOffset[0]}px`;
+                stackRef.style.top = `${window.scrollY + event.y - dragClickOffset[1]}px`;
             }
         })
     };

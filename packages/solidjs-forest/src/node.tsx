@@ -26,11 +26,14 @@ export const NodeContainer = (props: NodeContainerProps) => {
     if (event.button === 2) return; // prevent context menu
     props.node.select();
     const origin: [number, number] = [event.clientX, event.clientY];
-    const mouseMove = (mouseUpEvent: MouseEvent) => {
+    const mouseMove = (mouseMoveEvent: MouseEvent) => {
         event.preventDefault();
         // Make moving a little more effort to avoid slips
-        if (distance(origin, [mouseUpEvent.clientX, mouseUpEvent.clientY]) > 3) {
-          props.node.root?.startDrag(props.node, ref);
+        if (distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3) {
+          const targetBounding = event.target.getBoundingClientRect();
+          const targetOffset = [event.clientX - targetBounding.x, event.clientY - targetBounding.y] as [number, number];
+          // mouseUpEvent.
+          props.node.root?.startDrag(props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
         }
         window.addEventListener('mouseup', () => {
