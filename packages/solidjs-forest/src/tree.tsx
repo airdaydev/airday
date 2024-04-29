@@ -1,11 +1,11 @@
 import { For, onCleanup } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
-import { GenericNode, RootNode } from './state';
+import { GenericNode, TreeState } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
 import { Dragged } from './dragged';
 
 interface TreeComponentProps {
-  rootNode: RootNode,
+  state: TreeState,
   defaultNodeComponent?: NodeComponentType,
   uncontrolledData?: GenericNode<any>;
   data: GenericNode<any>,
@@ -19,7 +19,7 @@ export const Tree = (props: TreeComponentProps) => {
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
-      props.rootNode.delete(props.rootNode.selection);
+      props.state.delete(props.state.selection);
     }
   };
   document.addEventListener('keyup', kbHandler)
@@ -28,11 +28,11 @@ export const Tree = (props: TreeComponentProps) => {
   });
   return (
     <>
-      {props.rootNode.dragSignal[0]() && (
+      {props.state.dragSignal[0]() && (
         <Dragged
-          size={props.rootNode.selection.size}
-          component={props.rootNode.dragEl}
-          dragClickOffset={props.rootNode.dragClickOffset}
+          size={props.state.selection.size}
+          component={props.state.dragEl}
+          dragClickOffset={props.state.dragClickOffset}
         />
       )}
       <div
@@ -46,7 +46,7 @@ export const Tree = (props: TreeComponentProps) => {
         `}
         >
         <TransitionGroup name="fade">
-          <For each={props.rootNode.getWindowedSignal(containerRef!)()}>
+          <For each={props.state.getWindowedSignal(containerRef!)()}>
             {(node, index) => (
               <NodeContainer
                 treeIndex={index}

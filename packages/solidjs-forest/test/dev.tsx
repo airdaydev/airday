@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
-import { Tree, RootNode, NodeComponentType, Node, GenericNode } from '../src/index';
+import { Tree, TreeState, NodeComponentType, Node, GenericNode } from '../src/index';
 import { dummyTree } from './dummy';
 import styles from './main.module.css';
 
@@ -8,7 +8,7 @@ import styles from './main.module.css';
 const root = document.getElementById('root');
 
 // TODO: Allow file drag & drop via https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API
-// We'll use this between rootnodes to allow a shared selection state
+// We'll use this between TreeState to allow a shared selection state
 // const context = new Context();
 
 class TextNode extends Node {
@@ -59,22 +59,22 @@ const TextNodeComponent: NodeComponentType = (props) => {
   )
 };
 
-const rootNode = new RootNode({
+const treeStateA = new TreeState({
   loader,
   onSelectionChange: (nodeSet) => {
     // console.log('selectionChange', nodeSet.values().next().value);
   }
 });
 const data = dummyTree();
-rootNode.load(data);
+treeStateA.load(data);
 
 render(() => (
   <div style={styles['container']}>
     <div>
-      <h2>Tree A ({rootNode.count()} items)</h2>
+      <h2>Tree A ({treeStateA.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
-        rootNode={rootNode}
+        state={treeStateA}
         draggable
         multiselect
         height={(node) => {}} // Node height calculation function or number
@@ -84,7 +84,7 @@ render(() => (
       <h2>List B ({rootB.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
-        rootNode={rootB}
+        state={rootB}
       />
     </div> */}
   </div>

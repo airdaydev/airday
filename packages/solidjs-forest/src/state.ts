@@ -20,7 +20,7 @@ export class Node {
   depth = 0; // cached
   expanded = true;
   parent?: Node;
-  root?: RootNode;
+  root?: TreeState;
   uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
   dragOriginNode = false;
@@ -73,7 +73,7 @@ export class Node {
   }
 }
 
-interface RootNodeOpts {
+interface TreeStateOpts {
   mutate?: boolean;
   onSelectionChange?: (node: Set<Node>) => void;
   loader?: (node: GenericNode<any>) => Node;
@@ -81,7 +81,7 @@ interface RootNodeOpts {
 
 // Combined tree -> Window tree (UI)
 // TODO: Rename this as Store, considering it has no children object therefore is not a root node
-export class RootNode {
+export class TreeState {
   id: string;
   isRoot = true;
   childrenSignal = createSignal<Node[]>([]);
@@ -99,7 +99,7 @@ export class RootNode {
   dragClickOffset = [0, 0];
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
-  constructor(opts: RootNodeOpts = {}) {
+  constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
     this.onSelectionChange = opts.onSelectionChange;
     this.loader = opts.loader;
