@@ -10,11 +10,9 @@ interface DraggedProps {
 }
 
 const defaultComponent = () => <div>Unset drag component</div>;
-// Maybe delete this implemenation, but possible it was done for a reason
-// const [boardDimensions, setBoardDimensions] = createSignal<[number, number]>([document.body.scrollWidth, document.body.scrollHeight]);
-// const onResize = () => requestAnimationFrame(() =>
-//         setBoardDimensions([document.body.clientWidth, document.body.clientHeight]));
 
+// TODO: This container could be replaced with DnD native API
+// TODO: Advantage - automatical scroll when dragging
 export const Dragged = ({ dndContext }: DraggedProps) => {
     let component = dndContext.draggedEl;
     if (!component) component = defaultComponent();
@@ -49,7 +47,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
             pointer-events: none;
             position: absolute;
             z-index: 10;
-            top: 0;
+            top: ${`${window.scrollY.toString()}px` || '0'};
             left: 0;
             width: 100vw;
             height: 100vh;

@@ -31,7 +31,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         // Make moving a little more effort to avoid slips
         if (distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3) {
           const targetBounding = event.target.getBoundingClientRect();
-          const targetOffset = [event.clientX - targetBounding.x, event.clientY - targetBounding.y] as [number, number];
+          const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // mouseUpEvent.
           props.node.root?.startDrag(props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
