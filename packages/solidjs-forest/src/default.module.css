@@ -7,9 +7,3 @@
 .tree-item[aria-selected='true'] {
   background: #999;
 }
-
-.dragOriginPlaceholder {
-  background: #eee;
-  height: 100%;
-  border: 1px solid #eee;
-}

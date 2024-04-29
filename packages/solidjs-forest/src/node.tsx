@@ -1,7 +1,7 @@
 import { onCleanup, Component, Accessor, on, createEffect, createSignal } from 'solid-js';
 import { Node } from './state';
 import { distance } from './utils';
-import styles from './main.module.css';
+import styles from './default.module.css';
 import './root.css';
 
 export interface NodeContainerProps {
@@ -71,7 +71,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
       )}
-      {signal().dragOriginNode && (<div class={styles.dragOriginPlaceholder} />)}
+      {signal().dragOriginNode && (<div class={'placeholder'} />)}
       {!signal().dragOriginNode && (
         <div
           classList={{

@@ -2,7 +2,7 @@
 import { render } from 'solid-js/web';
 import { Tree, TreeState, NodeComponentType, Node, GenericNode } from '../src/index';
 import { dummyTree } from './dummy';
-import styles from './main.module.css';
+import styles from './dev.module.css';
 
 const root = document.getElementById('root');
 

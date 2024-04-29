@@ -1,10 +1,10 @@
 import { createSignal } from 'solid-js';
 import { TreeState, type Node as ForestNode } from './state';
 
+// There is only one drag context, but there can be multiple select contexts
 export class DndContext {
   activeOrigin = createSignal<TreeState | null>(null);
   activeTarget = createSignal<TreeState | null>(null);
-  selection = new Set<ForestNode>;
   draggedEl: HTMLElement | Node | undefined; // prev, dragEl
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on

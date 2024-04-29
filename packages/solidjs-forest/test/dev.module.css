@@ -3,19 +3,22 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: black;
+  color: whitesmoke;
 }
 
 .tree-item {
   display: flex;
   align-items: center;
-  background: white;
-  border: 1px solid #ccc;
+  background: black;
+  color: whitesmoke;
+  border: 1px solid #333;
   cursor: pointer;
   height: 100%;
 }
 
 .tree-item[aria-selected='true'] {
-  background: #eee;
+  background: darkblue;
 }
 
 .container {

@@ -38,10 +38,10 @@
   width: 100%;
   height: 26px;
   z-index: 0;
-  background: white;
+  background: #333;
   transition: background 80ms;
 }
 
 .placeholder:hover {
-  background: #eee;
+  background: #333;
 }
