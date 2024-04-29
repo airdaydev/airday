@@ -5,35 +5,34 @@ import { TreeState, type Node as ForestNode } from './state';
 // This mostly controls the dragged item
 export class DndContext {
   isDragging = createSignal(false);
-  originState = createSignal<TreeState | null>(null); // also euphanism for is dragging (todo: separate for clarity?)
-  activeTreeContainer = createSignal<HTMLElement | null>(null);
+  originContainer: HTMLElement | null = null;
+  activeContainer: HTMLElement | null = null;
   // targetState = createSignal<TreeState | null>(null);
   draggedEl: HTMLElement | Node | undefined;
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on
   lastTouchedIndex = createSignal<number | undefined>(); // prev, dragLastTouched
   dragOriginNodeIndex: number | undefined;
-  constructor() {
-
+  constructor() { }
+  setActiveContainer(container: HTMLElement) {
+    console.log('setting active container', container)
+    this.activeContainer = container;
   }
   setLastTouchedIndex(nodeIndex: number | undefined) {
     this.lastTouchedIndex[1](nodeIndex);
   }
-  startDrag(originNode: ForestNode, ref: HTMLElement | Node, dragClickOffset: [number, number] = [0, 0]) {
-    this.elClickOffset = dragClickOffset;
+  startDrag(dragOriginNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0], containerRef: HTMLElement) {
+    this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
-    this.originNode = originNode;
-    this.targetState[1](this.originNode.root);
-    originNode.setDragOriginState(true)
-  }
-  setActiveDropTarget(target: TreeState | null) {
-    this.targetState[1](target);
+    this.originNode = dragOriginNode;
+    dragOriginNode.setDragOriginState(true)
+    this.isDragging[1](true);
   }
   stopDrag() {
     this.elClickOffset = [0, 0];
     this.setLastTouchedIndex(undefined);
     this.originNode?.setDragOriginState(false)
     this.originNode = undefined;
-    this.targetState[1](null);
+    this.isDragging[1](false);
   }
 }

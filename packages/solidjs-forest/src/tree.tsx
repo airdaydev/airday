@@ -38,8 +38,7 @@ export const Tree = (props: TreeComponentProps) => {
           height: 25em;
           overflow-y: scroll;
         `}
-        onMouseLeave={() => props.state.dndContext.activeTreeContainer[1](null)}
-        onMouseEnter={() => props.state.dndContext.activeTreeContainer[1](containerRef)}
+        onMouseLeave={() => props.state.dndContext.setActiveContainer(null)}
         >
         <TransitionGroup name="fade">
           <For each={props.state.getWindowedSignal(containerRef!)()}>

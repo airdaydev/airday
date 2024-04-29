@@ -131,7 +131,7 @@ export class TreeState {
       const end = qperf('memo');
       let index = 0;
       const isDragging = this.dndContext.isDragging[0]();
-      const isActiveContainer = containerEl === this.dndContext.activeTreeContainer[0]();
+      const isActiveContainer = containerEl === this.dndContext.activeContainer;
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
@@ -141,7 +141,8 @@ export class TreeState {
           index++;
         }
         // Skip root & other selected items
-        if (!node.isRoot && !(isDragging && node.isSelected && !dragOriginNode && isActiveContainer)) {
+        const skip = node.isRoot || (isDragging && node.isSelected && isActiveContainer);
+        if (!skip) {
           index++;
           visibleChildren.push(node);
         }
@@ -217,23 +218,6 @@ export class TreeState {
       return false;
     }, undefined);
     return count;
-  }
-  startDrag(dragOriginNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0], containerRef: HTMLElement) {
-    this.dndContext.elClickOffset = elClickOffset;
-    this.dndContext.draggedEl = ref.cloneNode(true);
-    this.dndContext.originNode = dragOriginNode;
-    dragOriginNode.setDragOriginState(true)
-    this.dndContext.activeTreeContainer[1](containerRef);
-    this.dndContext.isDragging[1](true);
-  }
-  stopDrag() {
-    this.dndContext.elClickOffset = [0, 0];
-    this.dndContext.setLastTouchedIndex(undefined);
-    this.dndContext.originNode?.setDragOriginState(false)
-    this.dndContext.originNode = undefined;
-    this.dndContext.activeTreeContainer[1](null);
-    this.dndContext.originState[1](null);
-    this.dndContext.isDragging[1](false);
   }
 }
 

@@ -34,11 +34,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // mouseUpEvent.
-          props.node.root?.startDrag(props.node, ref, targetOffset);
+          props.node.root?.dndContext.startDrag(props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
         }
         window.addEventListener('mouseup', () => {
-          props.node.root?.stopDrag();
+          props.node.root?.dndContext.stopDrag();
           window.removeEventListener('mousemove', mouseMove);
         }, { once: true });
     };
@@ -48,12 +48,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // TODO: Can we only run this when active...? (derivative signal??)
   createEffect(on(() => props.node.root?.dndContext.lastTouchedIndex[0](), (lastTouchedIndex) => {
     // console.log(props.containerRef)
-    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeTreeContainer[0]();
+    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeContainer;
     if (!isInActiveContainer) {
       draggedOn[1](0);
       return;
     }
-    // console.log('isInActiveContainer', isInActiveContainer);
     const index = props.treeIndex();
     const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
     // Drag origin is before node
@@ -89,6 +88,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
             below: draggedOn[0]() === -1,
           }}
           onMouseEnter={() => {
+            // On dragging over an item, if the container is a remote container &
+            // does not match the current active container, set this item as the pseudo item.
+            if (props.containerRef !== props.node.root?.dndContext.activeContainer) {
+              props.node.root.dndContext.setActiveContainer(props.containerRef);
+            }
             if (props.node.root?.dndContext.isDragging[0]()) {
               const draggingOver = props.treeIndex();
               props.node.root.dndContext.lastTouchedIndex[1](draggingOver - draggedOn[0]());
