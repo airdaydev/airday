@@ -107,11 +107,6 @@ export class TreeState {
   get mutableRoot() {
     return { isRoot: true, children: this.childrenSignal[0]() }
   }
-  derivativeSet() {
-    return createMemo(() => {
-
-    });  
-  }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
   getWindowedSignal(element: HTMLElement) {
@@ -138,7 +133,7 @@ export class TreeState {
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
         const dragOriginNode = node === this.dragOriginNode;
-        if (dragOriginNode) { // unset on drag end...?
+        if (dragOriginNode) {
           this.dragOriginNodeIndex = index;
           index++; 
         }

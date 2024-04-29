@@ -82,7 +82,7 @@ render(() => (
       />
     </div>
     <div>
-      <h2>List B ({treeStateB.count()} items)</h2>
+      <h2>Tree B ({treeStateB.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
         state={treeStateB}
