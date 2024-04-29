@@ -11,7 +11,7 @@ export interface GenericNode<T extends GenericNode<any | undefined>> {
 export interface NodeSignalProps {
   id: string;
   isSelected: boolean;
-  dragOriginNode: boolean;
+  isDragOrigin: boolean;
 }
 
 export class Node {
@@ -24,7 +24,7 @@ export class Node {
   root?: TreeState;
   uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
-  dragOriginNode = false;
+  isDragOrigin = false;
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
   }
@@ -44,7 +44,7 @@ export class Node {
       ...(this.serialise && this.serialise()),
       id: this.id,
       isSelected: this.isSelected,
-      dragOriginNode: this.dragOriginNode,
+      isDragOrigin: this.isDragOrigin,
     }
   }
   triggerUpdate() {
@@ -54,7 +54,7 @@ export class Node {
     return this.root?.selection.has(this);
   }
   setDragOriginState(isOrigin = true) {
-    this.dragOriginNode = isOrigin;
+    this.isDragOrigin = isOrigin;
     this.triggerUpdate();
   }
   select(recursive?: boolean, additive?: boolean) {
@@ -95,11 +95,8 @@ export class TreeState {
   maxDepth = 10;
   expanded = true;
   dndContext: DndContext;
-  dragOriginNode: Node | undefined; // The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
-  dragLastTouched = createSignal<number | undefined>();
   animationMs = 50; // Set to 0 for no animation
-  dragClickOffset = [0, 0];
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: TreeStateOpts = {}) {
@@ -137,7 +134,7 @@ export class TreeState {
       let index = 0;
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === this.dragOriginNode;
+        const dragOriginNode = node === this.dndContext.originNode;
         if (dragOriginNode) {
           this.dragOriginNodeIndex = index;
           index++; 
@@ -218,21 +215,18 @@ export class TreeState {
     }, undefined);
     return count;
   }
-  setDragLastTouchedIndex(nodeIndex: number | undefined) {
-    this.dragLastTouched[1](nodeIndex);
-  }
-  startDrag(dragOriginNode: Node, ref: HTMLElement, dragClickOffset: [number, number] = [0, 0]) {
-    this.dragClickOffset = dragClickOffset;
-    this.dragEl = ref.cloneNode(true);
-    this.dragOriginNode = dragOriginNode;
+  startDrag(dragOriginNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+    this.dndContext.elClickOffset = elClickOffset;
+    this.dndContext.draggedEl = ref.cloneNode(true);
+    this.dndContext.originNode = dragOriginNode;
     dragOriginNode.setDragOriginState(true)
     this.dragSignal[1](true);
   }
   stopDrag() {
-    this.dragClickOffset = [0, 0];
-    this.setDragLastTouchedIndex(undefined);
-    this.dragOriginNode?.setDragOriginState(false)
-    this.dragOriginNode = undefined;
+    this.dndContext.elClickOffset = [0, 0];
+    this.dndContext.setLastTouchedIndex(undefined);
+    this.dndContext.originNode?.setDragOriginState(false)
+    this.dndContext.originNode = undefined;
     this.dragSignal[1](false);
   }
 }

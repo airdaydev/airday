@@ -31,8 +31,8 @@ export const Tree = (props: TreeComponentProps) => {
       {props.state.dragSignal[0]() && (
         <Dragged
           size={props.state.selection.size}
-          component={props.state.dragEl}
-          dragClickOffset={props.state.dragClickOffset}
+          component={props.state.dndContext.draggedEl}
+          dragClickOffset={props.state.dndContext.elClickOffset}
         />
       )}
       <div

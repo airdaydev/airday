@@ -10,8 +10,9 @@ export class DndContext {
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on
   lastTouchedIndex = createSignal<number | undefined>(); // prev, dragLastTouched
+  dragOriginNodeIndex: number | undefined;
   constructor() {
-    
+
   }
   setLastTouchedIndex(nodeIndex: number | undefined) {
     this.lastTouchedIndex[1](nodeIndex);

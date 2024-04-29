@@ -44,7 +44,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
-  createEffect(on(() => props.node.root?.dragLastTouched[0](), (lastTouchedIndex) => {
+  createEffect(on(() => props.node.root?.dndContext.lastTouchedIndex[0](), (lastTouchedIndex) => {
     const index = props.treeIndex();
     const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
     // Drag origin is before node
@@ -71,8 +71,8 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
       )}
-      {signal().dragOriginNode && (<div class={'placeholder'} />)}
-      {!signal().dragOriginNode && (
+      {signal().isDragOrigin && (<div class={'placeholder'} />)}
+      {!signal().isDragOrigin && (
         <div
           classList={{
             item_internal: true,
@@ -82,7 +82,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           onMouseEnter={() => {
             if (props.node.root?.dragSignal[0]()) {
               const draggingOver = props.treeIndex();
-              props.node.root.dragLastTouched[1](draggingOver - draggedOn[0]());
+              props.node.root.dndContext.lastTouchedIndex[1](draggingOver - draggedOn[0]());
             }
           }}
         >
