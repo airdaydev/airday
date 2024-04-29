@@ -2,13 +2,17 @@ import { createSignal } from 'solid-js';
 import { TreeState, type Node as ForestNode } from './state';
 
 // There is only one drag context, but there can be multiple select contexts
+// This mostly controls the dragged item
 export class DndContext {
-  activeOrigin = createSignal<TreeState | null>(null);
-  activeTarget = createSignal<TreeState | null>(null);
+  originState = createSignal<TreeState | null>(null);
+  targetState = createSignal<TreeState | null>(null);
   draggedEl: HTMLElement | Node | undefined; // prev, dragEl
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on
   lastTouchedIndex = createSignal<number | undefined>(); // prev, dragLastTouched
+  constructor() {
+    
+  }
   setLastTouchedIndex(nodeIndex: number | undefined) {
     this.lastTouchedIndex[1](nodeIndex);
   }
@@ -16,14 +20,17 @@ export class DndContext {
     this.elClickOffset = dragClickOffset;
     this.draggedEl = ref.cloneNode(true);
     this.originNode = originNode;
+    this.targetState[1](this.originNode.root);
     originNode.setDragOriginState(true)
-    this.active[1](true);
+  }
+  setActiveDropTarget(target: TreeState | null) {
+    this.targetState[1](target);
   }
   stopDrag() {
     this.elClickOffset = [0, 0];
     this.setLastTouchedIndex(undefined);
     this.originNode?.setDragOriginState(false)
     this.originNode = undefined;
-    this.active[1](false);
+    this.targetState[1](null);
   }
 }

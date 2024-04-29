@@ -1,6 +1,9 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
-import { Tree, TreeState, NodeComponentType, Node, GenericNode } from '../src/index';
+import {
+  Tree, TreeState, NodeComponentType, Node, GenericNode,
+  DndContext,
+} from '../src/index';
 import { dummyTree } from './dummy';
 import styles from './dev.module.css';
 
@@ -8,7 +11,7 @@ const root = document.getElementById('root');
 
 // TODO: Allow file drag & drop via https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API
 // We'll use this between TreeState to allow a shared selection state
-// const context = new Context();
+const dndContext = new DndContext();
 
 class TextNode extends Node {
   type = 'text';
@@ -60,13 +63,14 @@ const TextNodeComponent: NodeComponentType = (props) => {
 
 const treeStateA = new TreeState({
   loader,
+  dndContext,
   // onSelectionChange: (nodeSet) => {
     // console.log('selectionChange', nodeSet.values().next().value);
   // }
 });
 treeStateA.load(dummyTree());
 
-const treeStateB = new TreeState({ loader });
+const treeStateB = new TreeState({ loader, dndContext });
 treeStateB.load(dummyTree());
 
 render(() => (

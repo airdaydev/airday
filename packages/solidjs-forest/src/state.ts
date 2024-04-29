@@ -2,6 +2,7 @@ import {
   Signal, createSignal, createUniqueId, createMemo, Accessor,
 } from 'solid-js';
 import { qperf } from './utils';
+import { DndContext } from './dnd-context';
 
 export interface GenericNode<T extends GenericNode<any | undefined>> {
   children?: T[];
@@ -77,6 +78,7 @@ interface TreeStateOpts {
   mutate?: boolean;
   onSelectionChange?: (node: Set<Node>) => void;
   loader?: (node: GenericNode<any>) => Node;
+  dndContext?: DndContext;
 }
 
 // Combined tree -> Window tree (UI)
@@ -92,6 +94,7 @@ export class TreeState {
   dragEl: HTMLElement | undefined;
   maxDepth = 10;
   expanded = true;
+  dndContext: DndContext;
   dragOriginNode: Node | undefined; // The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
   dragLastTouched = createSignal<number | undefined>();
@@ -103,6 +106,8 @@ export class TreeState {
     this.id = createUniqueId();
     this.onSelectionChange = opts.onSelectionChange;
     this.loader = opts.loader;
+    if (opts.dndContext) this.dndContext = opts.dndContext;
+    else this.dndContext = new DndContext();
   }
   get mutableRoot() {
     return { isRoot: true, children: this.childrenSignal[0]() }
