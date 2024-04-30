@@ -34,7 +34,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // mouseUpEvent.
-          props.node.root?.dndContext.startDrag(props.node, ref, targetOffset);
+          props.node.root?.dndContext.startDrag(props.node, ref, targetOffset, props.containerRef);
           window.removeEventListener('mousemove', mouseMove);
         }
         window.addEventListener('mouseup', () => {
@@ -48,7 +48,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // TODO: Can we only run this when active...? (derivative signal??)
   createEffect(on(() => props.node.root?.dndContext.lastTouchedIndex[0](), (lastTouchedIndex) => {
     // console.log(props.containerRef)
-    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeContainer;
+    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeContainer[0]();
     if (!isInActiveContainer) {
       draggedOn[1](0);
       return;
@@ -57,6 +57,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
     const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
     // Drag origin is before node
     // last touched index 
+    if (!lastTouchedIndex) {
+      draggedOn[1](0);
+      return;
+    }
     if (dragOriginNodeIndex < index && lastTouchedIndex >= index) {
       // is below
       draggedOn[1](1);
@@ -72,26 +76,42 @@ export const NodeContainer = (props: NodeContainerProps) => {
       //   console.log('above')
       // }
   }));
+  const isActiveContainer = () => {
+    return props.containerRef === props.node.root?.dndContext.activeContainer[0]();
+  }
+  /**
+   * Hiding the placeholder:
+   * We have 3 placeholders (up/down & origin)
+   * Hide neutral when container is not actively being dragged over
+   * Hide up when container is not actively being dragged over
+   * Hide down when container is not actively being dragged over
+   * Need to revert as if there's no above/below classes!
+   */
   return (
     <div
       class="item"
+      style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
     >
-      {draggedOn[0]() === -1 && (
+      {draggedOn[0]() === -1 && isActiveContainer() && (
         <div class='placeholder' />
       )}
-      {signal().isDragOrigin && (<div class={'placeholder'} />)}
+      {signal().isDragOrigin && isActiveContainer() && (<div class={'placeholder'} />)}
       {!signal().isDragOrigin && (
         <div
           classList={{
             item_internal: true,
-            above: draggedOn[0]() === 1,
-            below: draggedOn[0]() === -1,
+            above: draggedOn[0]() === 1 && isActiveContainer(),
+            below: draggedOn[0]() === -1 && isActiveContainer(),
+            // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={() => {
             // On dragging over an item, if the container is a remote container &
             // does not match the current active container, set this item as the pseudo item.
-            if (props.containerRef !== props.node.root?.dndContext.activeContainer) {
+            if (!isActiveContainer()) {
               props.node.root.dndContext.setActiveContainer(props.containerRef);
+              // TODO: Set remote initial!!
+              // if ()
+              // props.node.root.dndContext.remoteInitial = 
             }
             if (props.node.root?.dndContext.isDragging[0]()) {
               const draggingOver = props.treeIndex();
@@ -107,7 +127,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           />
           </div>
       )}
-      {draggedOn[0]() === 1 && (
+      {draggedOn[0]() === 1 && isActiveContainer() && (
         <div class='placeholder' />
       )}
     </div>

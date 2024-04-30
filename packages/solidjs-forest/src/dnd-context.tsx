@@ -6,22 +6,25 @@ import { TreeState, type Node as ForestNode } from './state';
 export class DndContext {
   isDragging = createSignal(false);
   originContainer: HTMLElement | null = null;
-  activeContainer: HTMLElement | null = null;
+  activeContainer = createSignal<HTMLElement | null>(null);
   // targetState = createSignal<TreeState | null>(null);
   draggedEl: HTMLElement | Node | undefined;
   elClickOffset = [0, 0]; // prev, dragClickOffset
   originNode: ForestNode | undefined; // prev, dragOriginNode The actual node that the user clicked on
   lastTouchedIndex = createSignal<number | undefined>(); // prev, dragLastTouched
   dragOriginNodeIndex: number | undefined;
+  remoteInitialIndex: number; // This is the first item touched while dragging to a new list
   constructor() { }
   setActiveContainer(container: HTMLElement) {
     console.log('setting active container', container)
-    this.activeContainer = container;
+    this.activeContainer[1](container);
   }
   setLastTouchedIndex(nodeIndex: number | undefined) {
     this.lastTouchedIndex[1](nodeIndex);
   }
   startDrag(dragOriginNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0], containerRef: HTMLElement) {
+    console.log('starting drag');
+    this.originContainer = containerRef;
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
     this.originNode = dragOriginNode;

@@ -128,7 +128,7 @@ export class TreeState {
       let n = new Node();
       n.isRoot = true;
       n.children = this.childrenSignal[0]();
-      const end = qperf('memo');
+      // const end = qperf('memo');
       let index = 0;
       const isDragging = this.dndContext.isDragging[0]();
       const isActiveContainer = containerEl === this.dndContext.activeContainer;
@@ -141,14 +141,14 @@ export class TreeState {
           index++;
         }
         // Skip root & other selected items
-        const skip = node.isRoot || (isDragging && node.isSelected && isActiveContainer);
+        const skip = node.isRoot || (isDragging && node.isSelected && !dragOriginNode && isActiveContainer);
         if (!skip) {
           index++;
           visibleChildren.push(node);
         }
         if (!node.expanded) return true;
       });
-      end();
+      // end();
       // TODO: memo code here
       let window = visibleChildren.slice(0, 100);
       return window;
