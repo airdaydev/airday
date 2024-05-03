@@ -92,24 +92,20 @@ export class TreeState {
   selection = new Set<Node>;
   maxDepth = 10;
   expanded = true;
-  dndContext: DndContext;
   dragOriginNodeIndex: number | undefined;
-  animationMs = 50; // Set to 0 for no animation
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
     this.onSelectionChange = opts.onSelectionChange;
     this.loader = opts.loader;
-    if (opts.dndContext) this.dndContext = opts.dndContext;
-    else this.dndContext = new DndContext();
   }
   get mutableRoot() {
     return { isRoot: true, children: this.childrenSignal[0]() }
   }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
-  getWindowedSignal(containerEl: HTMLElement) {
+  getWindowedSignal(containerEl: HTMLElement, dndContext: DndContext) {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
@@ -130,12 +126,12 @@ export class TreeState {
       n.children = this.childrenSignal[0]();
       // const end = qperf('memo');
       let index = 0;
-      const isDragging = this.dndContext.isDragging[0]();
-      const isActiveContainer = containerEl === this.dndContext.activeContainer;
+      const isDragging = dndContext.isDragging[0]();
+      const isActiveContainer = containerEl === dndContext.activeContainer;
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === this.dndContext.originNode;
+        const dragOriginNode = node === dndContext.originNode;
         if (dragOriginNode) {
           this.dragOriginNodeIndex = index;
           index++;

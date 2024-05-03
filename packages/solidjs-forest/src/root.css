@@ -22,8 +22,8 @@
   z-index: 2;
 }
 .item_internal {
+  transition: top 400ms;
   top: 0px;
-  transition: top 80ms;
 }
 .item_internal.below {
   /* transform: translateY(-26px); */

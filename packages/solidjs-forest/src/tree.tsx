@@ -1,8 +1,8 @@
-import { For, onCleanup } from 'solid-js';
+import { For, createUniqueId, onCleanup } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { GenericNode, TreeState } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
-import { DndContext } from './dnd-context';
+import { DndContext, ListDragContext } from './dnd-context';
 
 interface TreeComponentProps {
   state: TreeState,
@@ -17,6 +17,7 @@ interface TreeComponentProps {
 
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
+  let listDragContext = new ListDragContext();
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
@@ -31,6 +32,7 @@ export const Tree = (props: TreeComponentProps) => {
     <>
       <div
         ref={containerRef}
+        x-forest-id={createUniqueId()}
         style={`
           position: relative;
           color: black;
@@ -39,18 +41,20 @@ export const Tree = (props: TreeComponentProps) => {
           overflow-y: scroll;
         `}
         onMouseLeave={() => {
-          props.state.dndContext.setActiveContainer(null)
-          props.state.dndContext.lastTouchedIndex[1](null);
+          // props.dndContext.setActiveContainer(null)
         }}
         >
         <TransitionGroup name="fade">
-          <For each={props.state.getWindowedSignal(containerRef!)()}>
+          <For each={props.state.getWindowedSignal(containerRef!, props.dndContext)()}>
             {(node, index) => (
+              // TODO: Consider using context here instead
               <NodeContainer
                 treeIndex={index}
                 node={node}
+                dndContext={props.dndContext}
                 Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
                 containerRef={containerRef}
+                listDragContext={listDragContext}
               />
             )}
           </For>

@@ -15,7 +15,6 @@ const dndContext = new DndContext();
 
 const treeStateA = new TreeState({
   loader,
-  dndContext,
   // onSelectionChange: (nodeSet) => {
     // console.log('selectionChange', nodeSet.values().next().value);
   // }
@@ -34,6 +33,7 @@ render(() => (
       <h2>Tree A ({treeStateA.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
+        dndContext={dndContext}
         state={treeStateA}
         // draggable
         // multiselect
@@ -44,6 +44,7 @@ render(() => (
       <h2>Tree B ({treeStateB.count()} items)</h2>
       <input type="text" placeholder="filter text" />
       <Tree
+        dndContext={dndContext}
         state={treeStateB}
       />
     </div>

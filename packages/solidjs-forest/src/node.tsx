@@ -3,12 +3,15 @@ import { Node } from './state';
 import { distance } from './utils';
 import styles from './default.module.css';
 import './root.css';
+import { DndContext, ListDragContext } from './dnd-context';
 
 export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   treeIndex: Accessor<number>;
   containerRef: HTMLElement;
+  dndContext: DndContext;
+  listDragContext: ListDragContext;
 }
 
 const defaultStyle = {
@@ -33,51 +36,53 @@ export const NodeContainer = (props: NodeContainerProps) => {
         if (distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3) {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
-          // mouseUpEvent.
-          props.node.root?.dndContext.startDrag(props.node, ref, targetOffset, props.containerRef);
+          // Start dragging
+          props.dndContext.startDrag(props.node, ref, targetOffset, props.containerRef);
           window.removeEventListener('mousemove', mouseMove);
+          window.addEventListener('mouseup', () => {
+            props.listDragContext.reset();
+            props.dndContext.stopDrag();
+            window.removeEventListener('mousemove', mouseMove);
+          }, { once: true });
         }
-        window.addEventListener('mouseup', () => {
-          props.node.root?.dndContext.stopDrag();
-          window.removeEventListener('mousemove', mouseMove);
-        }, { once: true });
     };
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
-  // TODO: Can we only run this when active...? (derivative signal??)
-  createEffect(on(() => props.node.root?.dndContext.lastTouchedIndex[0](), (lastTouchedIndex) => {
-    // console.log(props.containerRef)
-    const isInActiveContainer = props.containerRef === props.node.root?.dndContext.activeContainer[0]();
-    if (!isInActiveContainer) {
-      draggedOn[1](0);
-      return;
-    }
-    const index = props.treeIndex();
-    const dragOriginNodeIndex = props.node.root?.dragOriginNodeIndex;
-    // Drag origin is before node
-    // last touched index 
-    if (!lastTouchedIndex) {
-      draggedOn[1](0);
-      return;
-    }
-    if (dragOriginNodeIndex < index && lastTouchedIndex >= index) {
-      // is below
-      draggedOn[1](1);
-      return;
-    } else if (dragOriginNodeIndex > index && lastTouchedIndex <= index) {
-      draggedOn[1](-1);
-      return;
-    } else {
-      draggedOn[1](0);
-    }
-    // if ((props.node.root?.dragOriginNodeIndex > lastTouchedIndex)) {
-      //   draggedOn[1](index > lastTouchedIndex ? -1 : 0);
-      //   console.log('above')
-      // }
+  // Determines how the node reacts as a list item (typically, shifting up and down)
+  createEffect(
+    // TODO: only observer individual list is dragging!!
+    on(() => [props.listDragContext.lastTouchedIndexSignal[0](), props.dndContext.isDragging[0]()],
+    ([lastTouchedIndex, isDragging]) => {
+      console.log('useEffect:isDragging', isDragging);
+      if (!isDragging) {
+        draggedOn[1](0);
+        return;
+      }
+      const index = props.treeIndex();
+      const originIndex = props.listDragContext.originIndex as number;
+      // Drag origin is before node
+      // last touched index 
+      if (!lastTouchedIndex) {
+        draggedOn[1](0);
+        return;
+      }
+      if (originIndex < index && lastTouchedIndex >= index) {
+        // is below
+        console.log('below');
+        draggedOn[1](1);
+        return;
+      } else if (originIndex > index && lastTouchedIndex <= index) {
+        console.log('above');
+        draggedOn[1](-1);
+        return;
+      } else {
+        draggedOn[1](0);
+      }
   }));
   const isActiveContainer = () => {
-    return props.containerRef === props.node.root?.dndContext.activeContainer[0]();
+    // return props.containerRef === props.node.root?.dndContext.activeContainer[0]();
+    return true;
   }
   /**
    * Hiding the placeholder:
@@ -100,23 +105,22 @@ export const NodeContainer = (props: NodeContainerProps) => {
         <div
           classList={{
             item_internal: true,
-            above: draggedOn[0]() === 1 && isActiveContainer(),
-            below: draggedOn[0]() === -1 && isActiveContainer(),
+            above: draggedOn[0]() === 1,
+            below: draggedOn[0]() === -1,
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={() => {
+            if (!props.dndContext.isDragging[0]()) return;
             // On dragging over an item, if the container is a remote container &
             // does not match the current active container, set this item as the pseudo item.
-            if (!isActiveContainer()) {
-              props.node.root.dndContext.setActiveContainer(props.containerRef);
-              // TODO: Set remote initial!!
-              // if ()
-              // props.node.root.dndContext.remoteInitial = 
-            }
-            if (props.node.root?.dndContext.isDragging[0]()) {
-              const draggingOver = props.treeIndex();
-              props.node.root.dndContext.lastTouchedIndex[1](draggingOver - draggedOn[0]());
-            }
+            // if (!isActiveContainer()) {
+            //   props.node.root.dndContext.setActiveContainer(props.containerRef);
+            //   // TODO: Set remote initial!!
+            //   // if ()
+            //   // props.node.root.dndContext.remoteInitial = 
+            // }
+            const draggingOver = props.treeIndex();
+            props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
           }}
         >
           <props.Component
