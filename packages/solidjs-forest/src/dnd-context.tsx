@@ -3,10 +3,12 @@ import { Node, TreeState } from './state';
 import { walk } from './tree-utils';
 
 // Per list dnd context
+// TODO: Add selection stuff here too
 export class ListDragContext {
   id = createUniqueId();
   treeState: TreeState;
   container: HTMLElement | null = null;
+  selection = createSignal(new Set<Node>);
   originIndex: number | null = null; // TODO: This could move if other items are inserted
   isOrigin = false; // TODO: hmm
   active = false;
@@ -18,6 +20,20 @@ export class ListDragContext {
     this.treeState = treeState;
     this.dndContext = dndContext;
   }
+  isSelected(node: Node) {
+    return createMemo(() => {
+      const selection = this.selection[0]();
+      return selection.has(node);
+    })
+  }
+  enter() {
+    if (this.isOrigin) return;
+    console.log('entered list with foreign drag');
+  }
+  leave() {
+    if (this.isOrigin) return;
+    console.log('left list with foreign drag');
+  }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     this.originIndex = originIndex;
     this.isOrigin = true;
@@ -27,6 +43,11 @@ export class ListDragContext {
   stopDrag() {
     this.reset();
     this.dndContext.stopDrag();
+  }
+  selectOne(node: Node) {
+    const selection = new Set([node]);
+    this.selection[1](selection);
+    // if (this.onSelectionChange) this.onSelectionChange(this.selection);
   }
   setContainer(container: HTMLElement) {
     this.container = container;

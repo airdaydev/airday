@@ -38,20 +38,10 @@ export class Node {
     return {
       ...(this.serialise && this.serialise()),
       id: this.id,
-      isSelected: this.isSelected,
     }
   }
   triggerUpdate() {
     this.uiSignal?.[1](() => this.toJSON());
-  }
-  get isSelected() {
-    return this.root?.selection.has(this);
-  }
-  select(recursive?: boolean, additive?: boolean) {
-    this.root.selectOne(this);
-  }
-  deselect() {
-    this.root.deselect(this);
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -79,11 +69,11 @@ export class TreeState {
   childrenSignal = createSignal<Node[]>([]);
   idMap = new Map<string, Node>;
   mutate = false;
-  selection = new Set<Node>;
+  selection = new Set<Node>; // Deprecate!
+  onSelectionChange?: (node: Set<Node>) => void; // Deprecate!
   maxDepth = 10;
   expanded = true;
   loader?: (node: GenericNode<any>) => Node;
-  onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
     this.onSelectionChange = opts.onSelectionChange;
@@ -105,6 +95,7 @@ export class TreeState {
       node.deselect();
     });
   }
+  // DEPRECATE!:
   selectOne(node: Node) {
     this.selection.forEach((node) => {
       this.selection.delete(node);

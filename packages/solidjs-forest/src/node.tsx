@@ -20,13 +20,13 @@ const defaultStyle = {
 
 export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
-  const signal = props.node.accessor;
+  const isSelected = props.listDragContext.isSelected(props.node);
   onCleanup(() => props.node.unsubscribe());
   const draggedOn = createSignal(0);
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
-    props.node.select();
+    props.listDragContext.selectOne(props.node);
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
         event.preventDefault();
@@ -124,7 +124,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           <props.Component
             onMouseDown={onMouseDown}
             node={props.node}
-            ariaSelected={signal().isSelected}
+            ariaSelected={isSelected()}
             ref={ref}
           />
           </div>
