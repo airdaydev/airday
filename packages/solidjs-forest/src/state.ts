@@ -105,6 +105,7 @@ export class TreeState {
   }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
+  // TODO: Move to drag list context
   getWindowedSignal(listDragContext: ListDragContext) {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items

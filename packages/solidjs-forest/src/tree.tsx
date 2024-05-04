@@ -1,4 +1,4 @@
-import { For, createUniqueId, onCleanup, onMount } from 'solid-js';
+import { For, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { GenericNode, TreeState } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
@@ -33,7 +33,6 @@ export const Tree = (props: TreeComponentProps) => {
     <>
       <div
         ref={containerRef}
-        x-forest-id={createUniqueId()}
         style={`
           position: relative;
           color: black;

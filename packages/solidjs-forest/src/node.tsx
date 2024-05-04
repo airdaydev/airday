@@ -35,11 +35,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // Start dragging
-          props.listDragContext.dndContext.startDrag(props.node, ref, targetOffset, props.listDragContext.container);
+          props.listDragContext.startDrag(props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
           window.addEventListener('mouseup', () => {
-            props.listDragContext.reset();
-            props.listDragContext.dndContext.stopDrag();
+            props.listDragContext.stopDrag();
             window.removeEventListener('mousemove', mouseMove);
           }, { once: true });
         }
@@ -52,7 +51,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // TODO: only observer individual list is dragging!!
     on(() => [props.listDragContext.lastTouchedIndexSignal[0](), props.listDragContext.dndContext.isDragging[0]()],
     ([lastTouchedIndex, isDragging]) => {
-      console.log('useEffect:isDragging', isDragging);
       if (!isDragging) {
         draggedOn[1](0);
         return;
@@ -67,11 +65,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
       }
       if (originIndex < index && lastTouchedIndex >= index) {
         // is below
-        console.log('below');
         draggedOn[1](1);
         return;
       } else if (originIndex > index && lastTouchedIndex <= index) {
-        console.log('above');
         draggedOn[1](-1);
         return;
       } else {
@@ -93,7 +89,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
-      style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
+      // style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
     >
       {draggedOn[0]() === -1 && isActiveContainer() && (
         <div class='placeholder' />
