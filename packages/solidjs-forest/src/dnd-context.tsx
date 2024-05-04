@@ -6,7 +6,11 @@ export class ListDragContext {
   originIndex: number | null = null; // TODO: This could move if other items are inserted
   isOrigin = createSignal<boolean>(); // TODO: hmm
   lastTouchedIndexSignal = createSignal<number | undefined>();
-  constructor(container: HTMLElement) {
+  dndContext: DndContext;
+  constructor(dndContext: DndContext) {
+    this.dndContext = dndContext;
+  }
+  setContainer(container: HTMLElement) {
     this.container = container;
   }
   setLastTouchedIndex(index: number) {
@@ -32,13 +36,6 @@ export class DndContext {
   //   console.log('setting active container', container)
   //   this.activeContainer[1](container);
   // }
-  getContext(containerRef: HTMLElement) {
-    const forestId = containerRef.getAttribute('x-forest-id');
-    if (!forestId) throw new Error('Expecting x-forest-id set on list container');
-    const existingCtx = this.map.get(forestId);
-    if (existingCtx) return existingCtx;
-    throw new Error('Could not find ListDragContext');
-  }
   startDrag(dragOriginNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0], containerRef: HTMLElement) {
     const forestId = containerRef.getAttribute('x-forest-id');
     console.log('starting drag', forestId);

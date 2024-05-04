@@ -1,4 +1,4 @@
-import { For, createUniqueId, onCleanup } from 'solid-js';
+import { For, createUniqueId, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { GenericNode, TreeState } from './state';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
@@ -17,7 +17,8 @@ interface TreeComponentProps {
 
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
-  let listDragContext = new ListDragContext();
+  let listDragContext = new ListDragContext(props.dndContext);
+  onMount(() => listDragContext.setContainer(containerRef as HTMLDivElement));
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
@@ -45,15 +46,13 @@ export const Tree = (props: TreeComponentProps) => {
         }}
         >
         <TransitionGroup name="fade">
-          <For each={props.state.getWindowedSignal(containerRef!, props.dndContext)()}>
+          <For each={props.state.getWindowedSignal(listDragContext)()}>
             {(node, index) => (
               // TODO: Consider using context here instead
               <NodeContainer
                 treeIndex={index}
                 node={node}
-                dndContext={props.dndContext}
                 Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-                containerRef={containerRef}
                 listDragContext={listDragContext}
               />
             )}

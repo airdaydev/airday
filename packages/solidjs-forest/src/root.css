@@ -22,7 +22,7 @@
   z-index: 2;
 }
 .item_internal {
-  transition: top 400ms;
+  transition: top 120ms;
   top: 0px;
 }
 .item_internal.below {

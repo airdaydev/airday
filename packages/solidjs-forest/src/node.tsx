@@ -3,14 +3,12 @@ import { Node } from './state';
 import { distance } from './utils';
 import styles from './default.module.css';
 import './root.css';
-import { DndContext, ListDragContext } from './dnd-context';
+import { ListDragContext } from './dnd-context';
 
 export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   treeIndex: Accessor<number>;
-  containerRef: HTMLElement;
-  dndContext: DndContext;
   listDragContext: ListDragContext;
 }
 
@@ -37,11 +35,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // Start dragging
-          props.dndContext.startDrag(props.node, ref, targetOffset, props.containerRef);
+          props.listDragContext.dndContext.startDrag(props.node, ref, targetOffset, props.listDragContext.container);
           window.removeEventListener('mousemove', mouseMove);
           window.addEventListener('mouseup', () => {
             props.listDragContext.reset();
-            props.dndContext.stopDrag();
+            props.listDragContext.dndContext.stopDrag();
             window.removeEventListener('mousemove', mouseMove);
           }, { once: true });
         }
@@ -52,7 +50,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Determines how the node reacts as a list item (typically, shifting up and down)
   createEffect(
     // TODO: only observer individual list is dragging!!
-    on(() => [props.listDragContext.lastTouchedIndexSignal[0](), props.dndContext.isDragging[0]()],
+    on(() => [props.listDragContext.lastTouchedIndexSignal[0](), props.listDragContext.dndContext.isDragging[0]()],
     ([lastTouchedIndex, isDragging]) => {
       console.log('useEffect:isDragging', isDragging);
       if (!isDragging) {
@@ -100,7 +98,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && isActiveContainer() && (
         <div class='placeholder' />
       )}
-      {signal().isDragOrigin && isActiveContainer() && (<div class={'placeholder'} />)}
+      {signal().isDragOrigin && (<div class={'placeholder'} />)}
       {!signal().isDragOrigin && (
         <div
           classList={{
@@ -110,7 +108,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={() => {
-            if (!props.dndContext.isDragging[0]()) return;
+            if (!props.listDragContext.dndContext.isDragging[0]()) return;
             // On dragging over an item, if the container is a remote container &
             // does not match the current active container, set this item as the pseudo item.
             // if (!isActiveContainer()) {

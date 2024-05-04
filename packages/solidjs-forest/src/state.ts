@@ -2,7 +2,7 @@ import {
   Signal, createSignal, createUniqueId, createMemo, Accessor,
 } from 'solid-js';
 import { qperf } from './utils';
-import { DndContext } from './dnd-context';
+import { DndContext, ListDragContext } from './dnd-context';
 
 export interface GenericNode<T extends GenericNode<any | undefined>> {
   children?: T[];
@@ -105,7 +105,7 @@ export class TreeState {
   }
   // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
-  getWindowedSignal(containerEl: HTMLElement, dndContext: DndContext) {
+  getWindowedSignal(listDragContext: ListDragContext) {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
@@ -126,12 +126,13 @@ export class TreeState {
       n.children = this.childrenSignal[0]();
       // const end = qperf('memo');
       let index = 0;
-      const isDragging = dndContext.isDragging[0]();
-      const isActiveContainer = containerEl === dndContext.activeContainer;
+      const isDragging = listDragContext.dndContext.isDragging[0]();
+      // TODO: Fix
+      const isActiveContainer = listDragContext.container === listDragContext.dndContext.activeContainer;
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === dndContext.originNode;
+        const dragOriginNode = node === listDragContext.dndContext.originNode;
         if (dragOriginNode) {
           this.dragOriginNodeIndex = index;
           index++;
