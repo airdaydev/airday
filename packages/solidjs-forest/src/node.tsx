@@ -63,7 +63,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       const originIndex = props.listDragContext.originIndex as number;
       // Drag origin is before node
       // last touched index 
-      if (!lastTouchedIndex) {
+      if (lastTouchedIndex === null) {
         draggedOn[1](0);
         return;
       }
