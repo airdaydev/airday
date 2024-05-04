@@ -8,7 +8,8 @@ export class ListDragContext {
   treeState: TreeState;
   container: HTMLElement | null = null;
   originIndex: number | null = null; // TODO: This could move if other items are inserted
-  isOrigin = createSignal<boolean>(); // TODO: hmm
+  isOrigin = false; // TODO: hmm
+  active = false;
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
   originNode: Node | undefined; // prev, dragOriginNode The actual node that the user clicked on
@@ -18,6 +19,7 @@ export class ListDragContext {
     this.dndContext = dndContext;
   }
   startDrag(originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+    this.isOrigin = true;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
   }
@@ -34,7 +36,7 @@ export class ListDragContext {
     // TODO: Params e.g. start index, container height etc
   // Per instance, downstream signal
   // TODO: Move to drag list context
-  getWindowedSignal(treeState: TreeState) {
+  getWindowedSignal() {
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
@@ -56,8 +58,6 @@ export class ListDragContext {
       // const end = qperf('memo');
       let index = 0;
       const isDragging = this.dndContext.isDragging[0]();
-      // TODO: Fix
-      const isActiveContainer = this.container === this.dndContext.activeContainer;
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
@@ -67,7 +67,7 @@ export class ListDragContext {
           index++;
         }
         // Skip root & other selected items
-        const skip = node.isRoot || (isDragging && node.isSelected && !dragOriginNode && isActiveContainer);
+        const skip = node.isRoot || (isDragging && node.isSelected && !dragOriginNode && this.isOrigin);
         if (!skip) {
           index++;
           visibleChildren.push(node);
@@ -83,6 +83,7 @@ export class ListDragContext {
   reset() {
     this.setLastTouchedIndex(0);
     this.originIndex = null;
+    this.isOrigin = false;
   }
 }
 

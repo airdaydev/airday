@@ -42,6 +42,7 @@ export const Tree = (props: TreeComponentProps) => {
           overflow-y: scroll;
         `}
         onMouseLeave={() => {
+          listDragContext.active = false;
           // props.dndContext.setActiveContainer(null)
         }}
         >
