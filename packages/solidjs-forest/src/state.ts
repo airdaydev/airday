@@ -1,12 +1,9 @@
 import {
-  Signal, createSignal, createUniqueId, createMemo, Accessor,
+  Signal, createSignal, createUniqueId,
 } from 'solid-js';
 import { qperf } from './utils';
-import { DndContext, ListDragContext } from './dnd-context';
-
-export interface GenericNode<T extends GenericNode<any | undefined>> {
-  children?: T[];
-}
+import { DndContext } from './dnd-context';
+import { GenericNode, map, walk, filter } from './tree-utils';
 
 export interface NodeSignalProps {
   id: string;
@@ -103,63 +100,6 @@ export class TreeState {
   get mutableRoot() {
     return { isRoot: true, children: this.childrenSignal[0]() }
   }
-  // TODO: Params e.g. start index, container height etc
-  // Per instance, downstream signal
-  // TODO: Move to drag list context
-  getWindowedSignal(listDragContext: ListDragContext) {
-    // scrolloffset * heights, so we need a cached count of all items or filtered items,
-    // - dragged items - collapsed items
-    // Dragged items are replaced with a diminishing block,
-    // Deleting items???????
-    // But the block cannot factor into the window calculation, the window is the end result
-    
-    // const totalHeight = visibleChildren.length * 22.2;
-    // calculate & cache heights, filtering out contiguous blocks removed
-    // if scrolloffset > total height, move scroll loc to Math.min(0, scrollOffset - containerHeight)
-    // otherwise first index = scrolloffset - totalHeight/rowHeight
-    // pull front padding + content (windows size should be bigger than needed in both directions if possible) + end padding
-    // listen for scroll & resize events on container
-    // Cache if possible to optimise
-    return createMemo(() => {
-      const visibleChildren: Node[] = [];
-      let n = new Node();
-      n.isRoot = true;
-      n.children = this.childrenSignal[0]();
-      // const end = qperf('memo');
-      let index = 0;
-      const isDragging = listDragContext.dndContext.isDragging[0]();
-      // TODO: Fix
-      const isActiveContainer = listDragContext.container === listDragContext.dndContext.activeContainer;
-      // Flattens the tree
-      walk<Node, Node>(n, (node) => {
-        // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === listDragContext.dndContext.originNode;
-        if (dragOriginNode) {
-          this.dragOriginNodeIndex = index;
-          index++;
-        }
-        // Skip root & other selected items
-        const skip = node.isRoot || (isDragging && node.isSelected && !dragOriginNode && isActiveContainer);
-        if (!skip) {
-          index++;
-          visibleChildren.push(node);
-        }
-        if (!node.expanded) return true;
-      });
-      // end();
-      // TODO: memo code here
-      let window = visibleChildren.slice(0, 100);
-      return window;
-    });
-    // Animation notes:
-    // We don't make the placeholder a genuine item
-    // Maybe: Every item has the possibility of becoming a placeholder
-    // Or: We insert the placeholder as needed (hmm?)
-    // If the item is dragged below the current item on another item, that item is translated up
-    // If the item is dragged above the current item on another item, that item is translated down
-    // This has a small effect on the window that may need to be taken into account
-    // i.e. is the placeholder present & where is it
-  }
   delete(set: Set<Node>) {
     if (!set.size) return;
     if (this.mutate === false) {
@@ -217,31 +157,4 @@ export class TreeState {
     }, undefined);
     return count;
   }
-}
-
-export function map<T extends GenericNode<any>, O extends GenericNode<any>>(
-  node: T, func: (node: T, parent?: O) => O, parent?: O,
-) {
-  const modified = func(node, parent);
-  modified.children = node.children?.map((child) =>
-    map(child, func, modified));
-  return modified;
-}
-
-export function walk<T extends GenericNode<any>, O extends GenericNode<any>>(
-  node: T, func: (node: T, parent?: O) => boolean | void, parent?: O,
-) {
-  const skipChildren = func(node, parent);
-  if (skipChildren) return;
-  node.children?.map((child) => walk(child, func, parent));
-}
-
-export function filter<T extends GenericNode<any>>(node: T, filterFunc: (tree: T) => boolean): T {
-  if (node.children) {
-    const filtered = node.children.filter(filterFunc);
-    const filterRecursive = filtered.map((child) => filter(child, filterFunc));
-    node.children = filterRecursive;
-    return node;
-  }
-  return node;
 }

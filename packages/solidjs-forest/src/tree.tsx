@@ -1,6 +1,7 @@
 import { For, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
-import { GenericNode, TreeState } from './state';
+import { TreeState } from './state';
+import { GenericNode } from './tree-utils';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
 import { DndContext, ListDragContext } from './dnd-context';
 
@@ -17,7 +18,7 @@ interface TreeComponentProps {
 
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
-  let listDragContext = new ListDragContext(props.dndContext);
+  let listDragContext = new ListDragContext(props.state, props.dndContext);
   onMount(() => listDragContext.setContainer(containerRef as HTMLDivElement));
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
@@ -45,7 +46,7 @@ export const Tree = (props: TreeComponentProps) => {
         }}
         >
         <TransitionGroup name="fade">
-          <For each={props.state.getWindowedSignal(listDragContext)()}>
+          <For each={listDragContext.getWindowedSignal()()}>
             {(node, index) => (
               // TODO: Consider using context here instead
               <NodeContainer
