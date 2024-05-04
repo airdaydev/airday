@@ -1,4 +1,4 @@
-import { onCleanup, Component, Accessor, on, createEffect, createSignal } from 'solid-js';
+import { onCleanup, Component, Accessor, on, createEffect, createSignal, createMemo } from 'solid-js';
 import { Node } from './state';
 import { distance } from './utils';
 import styles from './default.module.css';
@@ -35,7 +35,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // Start dragging
-          props.listDragContext.startDrag(props.node, ref, targetOffset);
+          props.listDragContext.startDrag(props.treeIndex(), props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
           window.addEventListener('mouseup', () => {
             props.listDragContext.stopDrag();
@@ -46,6 +46,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
   };
+  const isDragOrigin = createMemo(() => {
+    const trigger = props.listDragContext.dndContext.isDragging[0]();
+    return props.node === props.listDragContext.originNode;
+  });
   // Determines how the node reacts as a list item (typically, shifting up and down)
   createEffect(
     // TODO: only observer individual list is dragging!!
@@ -94,8 +98,8 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && isActiveContainer() && (
         <div class='placeholder' />
       )}
-      {signal().isDragOrigin && (<div class={'placeholder'} />)}
-      {!signal().isDragOrigin && (
+      {isDragOrigin() && (<div class={'placeholder'} />)}
+      {!isDragOrigin() && (
         <div
           classList={{
             item_internal: true,

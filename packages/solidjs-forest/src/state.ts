@@ -8,7 +8,6 @@ import { GenericNode, map, walk, filter } from './tree-utils';
 export interface NodeSignalProps {
   id: string;
   isSelected: boolean;
-  isDragOrigin: boolean;
 }
 
 export class Node {
@@ -21,7 +20,6 @@ export class Node {
   root?: TreeState;
   uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
-  isDragOrigin = false;
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
   }
@@ -41,7 +39,6 @@ export class Node {
       ...(this.serialise && this.serialise()),
       id: this.id,
       isSelected: this.isSelected,
-      isDragOrigin: this.isDragOrigin,
     }
   }
   triggerUpdate() {
@@ -49,10 +46,6 @@ export class Node {
   }
   get isSelected() {
     return this.root?.selection.has(this);
-  }
-  setDragOriginState(isOrigin = true) {
-    this.isDragOrigin = isOrigin;
-    this.triggerUpdate();
   }
   select(recursive?: boolean, additive?: boolean) {
     this.root.selectOne(this);
@@ -89,7 +82,6 @@ export class TreeState {
   selection = new Set<Node>;
   maxDepth = 10;
   expanded = true;
-  dragOriginNodeIndex: number | undefined;
   loader?: (node: GenericNode<any>) => Node;
   onSelectionChange?: (node: Set<Node>) => void;
   constructor(opts: TreeStateOpts = {}) {

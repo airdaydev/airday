@@ -12,13 +12,14 @@ export class ListDragContext {
   active = false;
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
-  originNode: Node | undefined; // prev, dragOriginNode The actual node that the user clicked on
+  originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
   constructor(treeState: TreeState, dndContext: DndContext) {
     this.treeState = treeState;
     this.dndContext = dndContext;
   }
-  startDrag(originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+  startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+    this.originIndex = originIndex;
     this.isOrigin = true;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
@@ -33,10 +34,8 @@ export class ListDragContext {
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
-    // TODO: Params e.g. start index, container height etc
-  // Per instance, downstream signal
-  // TODO: Move to drag list context
   getWindowedSignal() {
+    // Window notes:
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
     // Dragged items are replaced with a diminishing block,
@@ -81,6 +80,7 @@ export class ListDragContext {
     });
   }
   reset() {
+    this.originNode = null;
     this.setLastTouchedIndex(0);
     this.originIndex = null;
     this.isOrigin = false;
