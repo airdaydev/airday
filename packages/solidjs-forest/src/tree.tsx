@@ -41,10 +41,7 @@ export const Tree = (props: TreeComponentProps) => {
           height: 25em;
           overflow-y: scroll;
         `}
-        onMouseLeave={() => {
-          listDragContext.active = false;
-          // props.dndContext.setActiveContainer(null)
-        }}
+        onMouseLeave={() => listDragContext.leave()}
         >
         <TransitionGroup name="fade">
           <For each={listDragContext.getWindowedSignal()()}>

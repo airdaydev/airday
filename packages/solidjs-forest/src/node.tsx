@@ -117,6 +117,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             //   // if ()
             //   // props.node.root.dndContext.remoteInitial = 
             // }
+            props.listDragContext.enter();
             const draggingOver = props.treeIndex();
             props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
           }}
