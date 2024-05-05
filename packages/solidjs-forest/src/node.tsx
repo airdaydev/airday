@@ -78,10 +78,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
         draggedOn[1](0);
       }
   }));
-  const isActiveContainer = () => {
-    // return props.containerRef === props.node.root?.dndContext.activeContainer[0]();
-    return true;
-  }
   /**
    * Hiding the placeholder:
    * We have 3 placeholders (up/down & origin)
@@ -95,7 +91,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       class="item"
       // style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
     >
-      {draggedOn[0]() === -1 && isActiveContainer() && (
+      {draggedOn[0]() === -1 && (
         <div class='placeholder' />
       )}
       {isDragOrigin() && (<div class={'placeholder'} />)}
@@ -113,14 +109,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
             const draggingOver = props.treeIndex();
             props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
             if (!props.listDragContext.dndContext.isDragging[0]()) return;
-            // On dragging over an item, if the container is a remote container &
-            // does not match the current active container, set this item as the pseudo item.
-            // if (!isActiveContainer()) {
-            //   props.node.root.dndContext.setActiveContainer(props.containerRef);
-            //   // TODO: Set remote initial!!
-            //   // if ()
-            //   // props.node.root.dndContext.remoteInitial = 
-            // }
             props.listDragContext.enter();
           }}
         >
@@ -133,7 +121,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           />
           </div>
       )}
-      {draggedOn[0]() === 1 && isActiveContainer() && (
+      {draggedOn[0]() === 1 && (
         <div class='placeholder' />
       )}
     </div>
