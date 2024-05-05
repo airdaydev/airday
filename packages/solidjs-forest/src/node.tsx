@@ -108,6 +108,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={() => {
+            // Ensures last touched index is ready
+            // TODO: Potential performance optimisation if moved after (but needs careful thought or can cause flicker)
+            const draggingOver = props.treeIndex();
+            props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
             if (!props.listDragContext.dndContext.isDragging[0]()) return;
             // On dragging over an item, if the container is a remote container &
             // does not match the current active container, set this item as the pseudo item.
@@ -118,8 +122,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
             //   // props.node.root.dndContext.remoteInitial = 
             // }
             props.listDragContext.enter();
-            const draggingOver = props.treeIndex();
-            props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
           }}
         >
           <props.Component

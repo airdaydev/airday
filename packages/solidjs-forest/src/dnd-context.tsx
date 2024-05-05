@@ -35,14 +35,21 @@ export class ListDragContext {
     this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
-    this.originIndex = originIndex;
     this.isOrigin = true;
+    this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
   }
   stopDrag() {
     this.reset();
     this.dndContext.stopDrag();
+  }
+  reset() {
+    this.isOrigin = false;
+    this.originIndex = null;
+    this.originNode = null;
+    console.log('zeroing last touch index');
+    this.setLastTouchedIndex(0); // TODO: think about carefully, causes slight bug
   }
   selectOne(node: Node) {
     const selection = new Set([node]);
@@ -99,12 +106,6 @@ export class ListDragContext {
       let window = visibleChildren.slice(0, 100);
       return window;
     });
-  }
-  reset() {
-    this.originNode = null;
-    this.setLastTouchedIndex(0);
-    this.originIndex = null;
-    this.isOrigin = false;
   }
 }
 
