@@ -90,11 +90,11 @@ export class ListDragContext {
         // Keeping the node that user actually dragged in place
         const dragOriginNode = node === this.originNode;
         if (dragOriginNode) {
-          this.dragOriginNodeIndex = index;
+          this.originIndex = index;
           index++;
         }
         // Skip root & other selected items
-        const skip = node.isRoot || (isDragging && node.isSelected && !dragOriginNode && this.isOrigin);
+        const skip = node.isRoot || (isDragging && this.selection[0]().has(node) && !dragOriginNode && this.isOrigin);
         if (!skip) {
           index++;
           visibleChildren.push(node);
