@@ -90,28 +90,7 @@ export class TreeState {
       }).children;
       this.childrenSignal[1](() => filtered);
     }
-    set.forEach((node) => {
-      this.selection.delete(node);
-      node.deselect();
-    });
-  }
-  // DEPRECATE!:
-  selectOne(node: Node) {
-    this.selection.forEach((node) => {
-      this.selection.delete(node);
-      node.triggerUpdate();
-    });
-    this.selection.add(node);
-    node.triggerUpdate();
-    if (this.onSelectionChange) this.onSelectionChange(this.selection);
-  }
-  deselect(node: Node) {
-    // deselect
-    if (this.onSelectionChange) this.onSelectionChange(this.selection);
-  }
-  deselectAll() {
-    this.selection.forEach((node) => node.deselect());
-    this.selection.clear();
+    // TODO: return deselected?
   }
   load(tree: GenericNode<any>) {
     const q = qperf('load');

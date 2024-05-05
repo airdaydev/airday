@@ -9,9 +9,9 @@ export class ListDragContext {
   treeState: TreeState;
   container: HTMLElement | null = null;
   selection = createSignal(new Set<Node>);
-  originIndex: number | null = null; // TODO: This could move if other items are inserted
-  isOrigin = false; // TODO: hmm
-  active = false;
+  originIndex: number | null = null; // TODO: This could move if other items are inserted...
+  isOrigin = false; // Is this the list where the user has dragged from?
+  dragOver = false; // Is the user currently dragging over this list
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
@@ -32,7 +32,7 @@ export class ListDragContext {
   }
   leave() {
     if (this.isOrigin) return;
-    console.log('left list with foreign drag');
+    this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     this.originIndex = originIndex;

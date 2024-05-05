@@ -41,7 +41,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
       }}
       onDblClick={(event) => {
         event.preventDefault();
-        props.node.select();
+        props.select();
         props.node.updateContent('gogogoo')
       }}
       ref={props.ref}

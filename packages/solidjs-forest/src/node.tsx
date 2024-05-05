@@ -126,6 +126,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             onMouseDown={onMouseDown}
             node={props.node}
             ariaSelected={isSelected()}
+            select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}
           />
           </div>
@@ -141,6 +142,7 @@ export type NodeComponentType = Component<{
   node: Node,
   ariaSelected: boolean,
   onMouseDown: (event: MouseEvent) => void,
+  select: () => void,
 }>;
 
 export const DefaultNodeComponent: NodeComponentType = (props) => {

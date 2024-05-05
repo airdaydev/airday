@@ -1,7 +1,6 @@
 .tree-item {
   background: white;
   border: 1px solid #eee;
-  cursor: pointer;
 }
 
 .tree-item[aria-selected='true'] {

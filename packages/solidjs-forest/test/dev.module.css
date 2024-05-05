@@ -13,7 +13,7 @@
   background: black;
   color: whitesmoke;
   border: 1px solid #333;
-  cursor: pointer;
+  cursor: default;
   height: 100%;
 }
 
