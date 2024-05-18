@@ -113,6 +113,7 @@
 - [] Consider https://codeberg.org/explore/repos
 - [] Consider https://github.com/Linen-dev/linen.dev
 - [] Consider https://motion.dev/
+- [] Videos: https://www.screen.studio/
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
 
