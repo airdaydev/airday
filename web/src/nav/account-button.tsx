@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js';
 import { AccountContextMenu } from './context-menus';
 import styles from './header.module.css';
-import Caret from '../icons/caret.svg';
+import Caret from '../icons/caret.svg?component-solid';
 
 export const AccountButton = () => {
   let buttonRef: HTMLButtonElement | undefined;

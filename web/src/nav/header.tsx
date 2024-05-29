@@ -1,7 +1,7 @@
 import { sessionContext } from '../store/context.js';
 import { createSignal, useContext } from 'solid-js';
-import CloudOffSVG from '../icons/cloud-off.svg';
-import SearchSVG from '../icons/search.svg';
+import CloudOffSVG from '../icons/cloud-off.svg?component-solid';
+import SearchSVG from '../icons/search.svg?component-solid';
 import styles from './header.module.css';
 import { ThemeToggle } from '../theme/theme';
 import { BordeContextMenu, WorkspaceContextMenu } from './context-menus';

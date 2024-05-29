@@ -11,9 +11,9 @@ import { distance, moveCaretToPosition } from './utils';
 import { Checkbox } from './checkbox';
 import { ContextMenu } from '../context-menu/context-menu';
 import { Sticker } from '../stickers/main';
-import Triangle from '../stickers/baseline/triangle.svg';
-import CircleTeal from '../stickers/baseline/circle-teal.svg';
-import Smiley from '../stickers/baseline/smiley.svg';
+import Triangle from '../stickers/baseline/triangle.svg?component-solid';
+import CircleAqua from '../stickers/baseline/circle-aqua.svg?component-solid';
+import Smiley from '../stickers/baseline/smiley.svg?component-solid';
 import { elapsedString } from '../generic/date';
 
 interface ItemContextMenuProps {
@@ -55,8 +55,8 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         <button  onClick={() => props.updateSticker('triangle')}>
           <Triangle />
         </button>
-        <button onClick={() => props.updateSticker('circleTeal')}>
-          <CircleTeal />
+        <button onClick={() => props.updateSticker('circleAqua')}>
+          <CircleAqua />
         </button>
         <button onClick={() => props.updateSticker(null)}>X</button>
       </div>

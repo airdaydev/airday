@@ -1,39 +1,37 @@
-<svg width="16px" height="20px" viewBox="0 0 16 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>notepads</title>
+<svg width="39px" height="48px" viewBox="0 0 39 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>48x48@1x</title>
     <defs>
-        <rect id="path-1" x="0" y="0" width="13" height="17" rx="0.5"></rect>
-        <filter x="-7.7%" y="-5.9%" width="130.8%" height="123.5%" filterUnits="objectBoundingBox" id="filter-2">
+        <rect id="path-1" x="1" y="1" width="33.6470588" height="44" rx="2"></rect>
+        <filter x="-3.0%" y="-2.3%" width="111.9%" height="109.1%" filterUnits="objectBoundingBox" id="filter-2">
             <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
             <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
             <feColorMatrix values="0 0 0 0 0.25537817   0 0 0 0 0.25537817   0 0 0 0 0.25537817  0 0 0 0.440013112 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
         </filter>
-        <rect id="path-3" x="0" y="1.36" width="10.9473684" height="15.64" rx="0.5"></rect>
-        <filter x="-9.1%" y="-6.4%" width="136.5%" height="125.6%" filterUnits="objectBoundingBox" id="filter-4">
+        <rect id="path-3" x="1" y="4.52" width="28.3343653" height="40.48" rx="2"></rect>
+        <filter x="-3.5%" y="-2.5%" width="114.1%" height="109.9%" filterUnits="objectBoundingBox" id="filter-4">
             <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
             <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
             <feColorMatrix values="0 0 0 0 0.25537817   0 0 0 0 0.25537817   0 0 0 0 0.25537817  0 0 0 0.440013112 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
         </filter>
-        <rect id="path-5" x="0" y="4.08" width="8.55263158" height="12.92" rx="0.5"></rect>
-        <filter x="-11.7%" y="-7.7%" width="146.8%" height="131.0%" filterUnits="objectBoundingBox" id="filter-6">
+        <rect id="path-5" x="1" y="11.56" width="22.1362229" height="33.44" rx="2"></rect>
+        <filter x="-4.5%" y="-3.0%" width="118.1%" height="112.0%" filterUnits="objectBoundingBox" id="filter-6">
             <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
             <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
             <feColorMatrix values="0 0 0 0 0.25537817   0 0 0 0 0.25537817   0 0 0 0 0.25537817  0 0 0 0.440013112 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
         </filter>
     </defs>
-    <g id="notepads" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="Group" transform="translate(1, 1)">
-            <g id="Rectangle">
-                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
-                <use fill="#57AA6F" fill-rule="evenodd" xlink:href="#path-1"></use>
-            </g>
-            <g id="Rectangle">
-                <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
-                <use fill="#AABAE8" fill-rule="evenodd" xlink:href="#path-3"></use>
-            </g>
-            <g id="Rectangle">
-                <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
-                <use fill="#F2CFF2" fill-rule="evenodd" xlink:href="#path-5"></use>
-            </g>
+    <g id="48x48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Rectangle">
+            <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+            <use fill="#57AA6F" fill-rule="evenodd" xlink:href="#path-1"></use>
+        </g>
+        <g id="Rectangle">
+            <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
+            <use fill="#AABAE8" fill-rule="evenodd" xlink:href="#path-3"></use>
+        </g>
+        <g id="Rectangle">
+            <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
+            <use fill="#F2CFF2" fill-rule="evenodd" xlink:href="#path-5"></use>
         </g>
     </g>
 </svg>

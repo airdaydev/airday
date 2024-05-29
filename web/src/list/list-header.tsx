@@ -2,7 +2,7 @@ import { Signal } from 'solid-js';
 import { viewState } from '../view-state';
 import { EditableListTitle } from './list-title';
 import styles from './list.module.css';
-import XSVG from '../icons/x.svg';
+import XSVG from '../icons/x.svg?component-solid';
 import { ListIcon } from './list-icon';
 
 interface ListHeaderProps {

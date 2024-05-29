@@ -4,9 +4,10 @@ import solidSvg from 'vite-plugin-solid-svg';
 
 export default defineConfig({
   plugins: [solidPlugin(), solidSvg({
+    defaultAsComponent: false,
     svgo: {
       svgoConfig: {
-        removeDimensions: true,
+        enabled: false,
       }
     }
   })],

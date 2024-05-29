@@ -1,40 +1,22 @@
-<svg width="15px" height="21px" viewBox="0 0 15 21" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>inbox</title>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="39px" height="48px" viewBox="0 0 39 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>48x48@1x</title>
     <defs>
-        <path d="M0.5,0 L12.5,0 C12.7761424,-5.07265313e-17 13,0.223857625 13,0.5 L13,18.5 C13,18.7761424 12.7761424,19 12.5,19 L10.4152397,19 L10.4152397,19 C9.98323951,18.3214817 9.444569,17.9822225 8.79922818,17.9822225 C7.83121693,17.9822225 5.17842243,17.9752286 4.42574028,17.9752286 C4.20187042,17.9752286 3.69554642,18.3027618 2.9067683,18.957828 L1.886523,18.9466727 L0.490061811,18.9189106 C0.217846643,18.9134989 2.55387936e-16,18.6912783 2.22044605e-16,18.4190094 L0,0.5 C-3.38176876e-17,0.223857625 0.223857625,3.38176876e-17 0.5,0 Z" id="path-1"></path>
-        <filter x="-0.4%" y="-0.3%" width="101.5%" height="101.1%" filterUnits="objectBoundingBox" id="filter-2">
-            <feOffset dx="0.1" dy="0.1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
-            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowOffsetOuter1"></feColorMatrix>
-        </filter>
-        <rect id="path-3" x="2" y="2.47142857" width="11" height="16.0285714" rx="0.5"></rect>
-        <filter x="-0.5%" y="-0.3%" width="101.8%" height="101.2%" filterUnits="objectBoundingBox" id="filter-4">
-            <feOffset dx="0.1" dy="0.1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
-            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowOffsetOuter1"></feColorMatrix>
-        </filter>
-        <rect id="path-5" x="2" y="1.5" width="11" height="16.0285714" rx="0.5"></rect>
-        <filter x="-0.5%" y="-0.3%" width="101.8%" height="101.2%" filterUnits="objectBoundingBox" id="filter-6">
-            <feOffset dx="0.1" dy="0.1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
-            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowOffsetOuter1"></feColorMatrix>
+        <path d="M4,0 L30,0 C32.209139,-4.05812251e-16 34,1.790861 34,4 L34,40 C34,42.209139 32.209139,44 30,44 L4,44 C1.790861,44 1.3527075e-16,42.209139 0,40 L0,4 C-2.705415e-16,1.790861 1.790861,2.705415e-16 4,0 Z" id="path-1"></path>
+        <filter x="-2.9%" y="-2.3%" width="111.8%" height="109.1%" filterUnits="objectBoundingBox" id="filter-2">
+            <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0.25537817   0 0 0 0 0.25537817   0 0 0 0 0.25537817  0 0 0 0.440013112 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
         </filter>
     </defs>
-    <g id="inbox" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <rect id="Rectangle" fill="#81745E" x="3" y="17" width="9" height="3"></rect>
-        <g id="Rectangle" transform="translate(1, 1)">
-            <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
-            <use fill="#D0BC98" fill-rule="evenodd" xlink:href="#path-1"></use>
+    <g id="48x48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="inbox-icon" transform="translate(0, 1)">
+            <g id="Rectangle">
+                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                <use fill="#FFFFFF" fill-rule="evenodd" xlink:href="#path-1"></use>
+            </g>
+            <polyline id="Path" stroke="#5D5890" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="10 25 16.0310895 31 22 25"></polyline>
+            <line x1="16" y1="29" x2="16" y2="11" id="Line" stroke="#5D5890" stroke-width="2" stroke-linecap="round"></line>
         </g>
-        <g id="Rectangle">
-            <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
-            <use fill="#F2F7F8" fill-rule="evenodd" xlink:href="#path-3"></use>
-        </g>
-        <g id="Rectangle">
-            <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
-            <use fill="#F2F7F8" fill-rule="evenodd" xlink:href="#path-5"></use>
-        </g>
-        <line x1="4" y1="12" x2="11" y2="12" id="Line-16" stroke="#4B4B54" stroke-width="0.5" stroke-linecap="square"></line>
-        <line x1="4" y1="14.5" x2="11" y2="14.5" id="Line-16" stroke="#4B4B54" stroke-width="0.5" stroke-linecap="square"></line>
-        <line x1="4" y1="9.5" x2="11" y2="9.5" id="Line-16" stroke="#4B4B54" stroke-width="0.5" stroke-linecap="square"></line>
-        <line x1="4" y1="4.5" x2="9.5" y2="4.5" id="Line-16" stroke="#4B4B54" stroke-width="0.5" stroke-linecap="square"></line>
-        <line x1="4" y1="7" x2="11" y2="7" id="Line-16" stroke="#4B4B54" stroke-width="0.5" stroke-linecap="square"></line>
     </g>
 </svg>

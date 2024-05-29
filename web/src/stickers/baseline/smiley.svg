@@ -1,11 +1,11 @@
 <svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>smiley@1x</title>
-    <g id="smiley" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="Group-6" transform="translate(1, 1)">
-            <circle id="Oval" stroke="#000000" fill="#FED268" cx="11" cy="11" r="10.5"></circle>
-            <path d="M8.2798088,13.0557038 C9.46220306,14.6004356 10.3846924,15.0557038 11.2421532,15.0557038 C12.210327,15.0557038 13.2798088,14.6942403 14.2798088,13.0557038" id="Path-13" stroke="#303030" stroke-linecap="round"></path>
-            <path d="M6.2798088,7.05570382 C6.87100593,7.82806971 7.33225059,8.05570382 7.76098099,8.05570382 C8.24506788,8.05570382 8.59633626,7.92095148 9.2798088,7.05570382" id="Path-13" stroke="#303030" stroke-linecap="round" transform="translate(7.7798, 7.5557) rotate(180) translate(-7.7798, -7.5557)"></path>
-            <path d="M13.2798088,7.05570382 C13.8710059,7.82806971 14.3322506,8.05570382 14.760981,8.05570382 C15.2450679,8.05570382 15.5963363,7.92095148 16.2798088,7.05570382" id="Path-13" stroke="#303030" stroke-linecap="round" transform="translate(14.7798, 7.5557) rotate(180) translate(-14.7798, -7.5557)"></path>
+    <title>48x48 copy@1x</title>
+    <g id="48x48-copy" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-6">
+            <circle id="Oval" fill="#FED268" cx="12" cy="12" r="12"></circle>
+            <path d="M8,16 C9.57652568,17.5447318 10.8065114,18 11.9497925,18 C13.2406909,18 14.6666667,17.6385365 16,16" id="Path-13" stroke="#6F5D20" stroke-width="1.5" stroke-linecap="round"></path>
+            <path d="M6.05781878,8 C6.79681519,9.54473178 7.30579129,9.64964397 7.84170429,9.64964397 C8.44681291,9.64964397 8.99078543,9.22886452 9.68242027,8" id="Path-13" stroke="#6F5D20" stroke-width="1.5" stroke-linecap="round" transform="translate(7.8701, 8.8248) rotate(180) translate(-7.8701, -8.8248)"></path>
+            <path d="M14.0578188,8 C14.7968152,9.54473178 15.3057913,9.64964397 15.8417043,9.64964397 C16.4468129,9.64964397 16.9907854,9.22886452 17.6824203,8" id="Path-13" stroke="#6F5D20" stroke-width="1.5" stroke-linecap="round" transform="translate(15.8701, 8.8248) rotate(180) translate(-15.8701, -8.8248)"></path>
         </g>
     </g>
 </svg>
