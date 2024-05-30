@@ -85,12 +85,12 @@
 } */
 
 .list-header input {
-    color: #81777F;
+  font-style: italic;
+  color: #81777F;
 }
 
 .active .list-header input {
     color: var(--body);
-    font-style: italic;
 }
 .list-header img {
   opacity: 0.5;
