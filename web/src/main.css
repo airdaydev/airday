@@ -2,7 +2,8 @@
   --background: hsl(180, 4.8%, 97%);
   --border: #e1e1e1;
   --shade: #E8D9E4;
-  --light-shade: #F4E9F2;
+  --light-shade: #f3f3f3;
+  --mid-shade: #e5e5e5;
   --ultra-light-shade: #f6f6f6;
   --tint-shade: #e7ecff;
   --glass: #FAF7FFE0;
@@ -21,6 +22,7 @@
   --border: #28282C;
   --shade: #28282C;
   --light-shade: #313135;
+  --mid-shade: #313135;
   --ultra-light-shade: #3e3e44;
   --tint-shade: #262632;
   --glass: #1E1E1EE5;
