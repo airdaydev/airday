@@ -1,10 +1,10 @@
 :root {
-  --background: #FAF7FF;
+  --background: #FFFFFF;
   --border: #e1e1e1;
   --shade: #E8D9E4;
   --light-shade: #F4E9F2;
-  --ultra-light-shade: #F2EBF1;
-  --tint-shade: #d6d6ff;
+  --ultra-light-shade: #f6f6f6;
+  --tint-shade: #ffe8cd;
   --glass: #FAF7FFE0;
   --body: black;
   --body-font: 'diatype-trial', sans-serif;

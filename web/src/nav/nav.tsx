@@ -91,25 +91,18 @@ export function BordeNav() {
         'margin-left': getMargin(),
       }}
     >
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
       <div
         class={`${styles['nav-list']} ${styles['nav-text']}`}
         style="padding-top: 0.5em;"
       >
         <button>
-          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Up Next</span>
+          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.5px;" />
+          <span>Next</span>
         </button>
         <button>
-          <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Scheduled</span>
-        </button>
-        <button onClick={viewState.openDoneView}>
-          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Done</span>
-        </button>
-        <button onClick={viewState.openDoneView}>
-          <TrashSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Trash</span>
+          <CheckSVG style="width: 1.25em; stroke-width: 1.5px;" />
+          <span>Habits</span>
         </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
@@ -121,6 +114,34 @@ export function BordeNav() {
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
+      <div>Add stickers</div>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      <div
+        class={`${styles['nav-list']} ${styles['nav-text']}`}
+        style="padding-top: 0.5em;"
+      >
+        <button onClick={viewState.openDoneView}>
+          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Done</span>
+        </button>
+        <button>
+          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Files</span>
+        </button>
+        <button>
+          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Secret</span>
+        </button>
+      </div>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      {/* <button>
+        <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
+        <span>Scheduled</span>
+      </button>
+      <button onClick={viewState.openDoneView}>
+        <TrashSVG style="width: 1.25em; stroke-width: 1.25px;" />
+        <span>Trash</span>
+      </button> */}
     </nav>
   );
 }

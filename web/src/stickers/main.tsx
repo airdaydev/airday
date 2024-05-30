@@ -27,7 +27,7 @@ export const Sticker = (props: StickerProps) => {
   return (
     <span class={styles['sticker']}>
       {props.item[0]() && map[props.item[0]().sticker]}
-      {props.item[0]() && props.item[0]().sticker}
+      {/* {props.item[0]() && props.item[0]().sticker} */}
     </span>
   );
 }

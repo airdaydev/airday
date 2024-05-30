@@ -2,10 +2,11 @@
     display: flex;
     flex-direction: column;
     width: 16em;
-    padding: 0 4px 4px 4px;
-    border-right: 1px solid var(--border);
+    padding: 0 0.25em 0.25em 4px;
+    /* border-right: 1px solid var(--border); */
     transition: margin 0.1s;
     overflow-y: scroll;
+    background: var(--ultra-light-shade);
 }
 
 .nav-text button {
