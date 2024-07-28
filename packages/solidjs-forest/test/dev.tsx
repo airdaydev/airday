@@ -22,7 +22,7 @@ const treeStateA = new TreeState({
 treeStateA.load(dummyTree());
 
 const treeStateB = new TreeState({ loader, dndContext });
-treeStateB.load(dummyTree());
+treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 5 }));
 
 render(() => (
   <div class={styles['container']}>

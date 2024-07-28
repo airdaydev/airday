@@ -26,18 +26,9 @@ export class ListDragContext {
       return selection.has(node);
     })
   }
-  enter() {
-    if (this.dndContext.isDragging) this.dragOver[1](true)
-    if (this.isOrigin) {
-      console.log('enter origin');
-      return;
-    }
-    console.log('entered list with foreign drag');
-  }
   leave() {
     if (this.dndContext.isDragging) this.dragOver[1](false)
     if (this.isOrigin) {
-      console.log('leave origin');
       return;
     }
     this.reset();
@@ -56,7 +47,6 @@ export class ListDragContext {
     this.isOrigin = false;
     this.originIndex = null;
     this.originNode = null;
-    console.log('zeroing last touch index');
     this.setLastTouchedIndex(0); // TODO: think about carefully, causes slight bug
   }
   selectOne(node: Node) {
@@ -130,14 +120,12 @@ export class DndContext {
   //   this.activeContainer[1](container);
   // }
   startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
-    console.log('start drag');
     // Set up dragged element
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
     this.isDragging[1](true);
   }
   stopDrag() {
-    console.log('stop drag');
     this.elClickOffset = [0, 0];
     this.draggedEl = null;
     this.isDragging[1](false);

@@ -64,6 +64,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
         return;
       }
       const index = props.treeIndex();
+      if (props.node.id === '0') {
+        // console.log('node0', index, lastTouchedIndex, isDragging, dragOver, draggedOn[0]());
+      }
       const originIndex = props.listDragContext.originIndex as number;
       // When dragging & leaving the origin list, the placeholder needs to disappear.
       // The placeholder could be part of the origin object, or covered by other objects
@@ -71,6 +74,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       // Strategy: Everything below the origin object needs to have “above” class appended,
       // and no “below” classes need to be appended, when the list is not being hovered over.
       if (!dragOver) {
+        if (!props.listDragContext.isOrigin) return;
         let result = 0;
         if (originIndex < index) result = 1;
         if (originIndex > index) result = 0;
@@ -124,7 +128,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // Ensures last touched index is ready
             // TODO: Potential performance optimisation if moved after (but needs careful thought or can cause flicker)
             const draggingOver = props.treeIndex();
-            props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
+            const newIndex = draggingOver - draggedOn[0]();
+            props.listDragContext.setLastTouchedIndex(newIndex);
+            props.listDragContext.dragOver[1](true);
             if (!props.listDragContext.dndContext.isDragging[0]()) return;
           }}
         >
@@ -137,7 +143,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           />
           </div>
       )}
-      {draggedOn[0]() === 1 && (
+      {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
         <div class='placeholder' />
       )}
     </div>

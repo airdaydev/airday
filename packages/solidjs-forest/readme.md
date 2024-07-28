@@ -79,3 +79,11 @@ pnpm run dev
 - Prevent infinite recursion
 - Variable heights
 - Dynamically retrieved, variable heights
+
+# Others
+- [Draggable](https://shopify.github.io/draggable/examples/sort-animation.html)
+- [Sortable](https://sortablejs.github.io/Sortable/#simple-list)
+- [Muuri](https://muuri.dev/)
+- [Pragmatic Drag & Drop](https://atlassian.design/components/pragmatic-drag-and-drop/about)
+- [Dragula](https://bevacqua.github.io/dragula/)
+- [DNDKit](https://master--5fc05e08a4a65d0021ae0bf2.chromatic.com/?path=/story/presets-sortable-multiple-containers--basic-setup)
