@@ -41,6 +41,7 @@ export const Tree = (props: TreeComponentProps) => {
           height: 25em;
           overflow-y: scroll;
         `}
+        onMouseEnter={() => listDragContext.enter()}
         onMouseLeave={() => listDragContext.leave()}
         >
         <TransitionGroup name="fade">

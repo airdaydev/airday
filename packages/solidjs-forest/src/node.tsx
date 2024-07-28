@@ -53,16 +53,33 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Determines how the node reacts as a list item (typically, shifting up and down)
   createEffect(
     // TODO: only observer individual list is dragging!!
-    on(() => [props.listDragContext.lastTouchedIndexSignal[0](), props.listDragContext.dndContext.isDragging[0]()],
-    ([lastTouchedIndex, isDragging]) => {
+    on(() => [
+      props.listDragContext.lastTouchedIndexSignal[0](),
+      props.listDragContext.dndContext.isDragging[0](),
+      props.listDragContext.dragOver[0](),
+    ],
+    ([lastTouchedIndex, isDragging, dragOver]) => {
       if (!isDragging) {
         draggedOn[1](0);
         return;
       }
       const index = props.treeIndex();
       const originIndex = props.listDragContext.originIndex as number;
-      // Drag origin is before node
-      // last touched index 
+      // When dragging & leaving the origin list, the placeholder needs to disappear.
+      // The placeholder could be part of the origin object, or covered by other objects
+      // when the mouse is moved below or above.
+      // Strategy: Everything below the origin object needs to have “above” class appended,
+      // and no “below” classes need to be appended, when the list is not being hovered over.
+      if (!dragOver) {
+        let result = 0;
+        if (originIndex < index) result = 1;
+        if (originIndex > index) result = 0;
+        draggedOn[1](result);
+        return;  
+      }
+      // Drag origin (o) replaced with placeholder on initial drag.
+      // Moving up, pushes o-1 down, exposing its placeholder.
+      // Moving down, pushes o+1 up, exposing its placeholder.
       if (lastTouchedIndex === null) {
         draggedOn[1](0);
         return;
@@ -109,7 +126,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
             const draggingOver = props.treeIndex();
             props.listDragContext.setLastTouchedIndex(draggingOver - draggedOn[0]());
             if (!props.listDragContext.dndContext.isDragging[0]()) return;
-            props.listDragContext.enter();
           }}
         >
           <props.Component

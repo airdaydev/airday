@@ -27,13 +27,19 @@ export class ListDragContext {
     })
   }
   enter() {
-    if (this.isOrigin) return;
     if (this.dndContext.isDragging) this.dragOver[1](true)
+    if (this.isOrigin) {
+      console.log('enter origin');
+      return;
+    }
     console.log('entered list with foreign drag');
   }
   leave() {
-    if (this.isOrigin) return;
-    this.dragOver[1](false);
+    if (this.dndContext.isDragging) this.dragOver[1](false)
+    if (this.isOrigin) {
+      console.log('leave origin');
+      return;
+    }
     this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
