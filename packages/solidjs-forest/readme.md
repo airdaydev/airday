@@ -68,6 +68,14 @@ pnpm run dev
 ```
 
 ## Roadmap
+- Virtual window works
+- Autoscroll down
+- Escape to deselect
+- Automatically deselect on blur
+- shift to select range
+- option to add to selection
+- option + arrow to move up / down
+- command + down/up to jump to top/bottom of list
 - Prevent infinite recursion
 - Variable heights
 - Dynamically retrieved, variable heights
