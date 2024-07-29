@@ -68,6 +68,8 @@ pnpm run dev
 ```
 
 ## Roadmap
+- Bug fix: moving last item shows placeholder beneath!
+- Bug fix: moving item to foreign list last item no placeholder!
 - Virtual window works
 - Autoscroll down
 - Escape to deselect

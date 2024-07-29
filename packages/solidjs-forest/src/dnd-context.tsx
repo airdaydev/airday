@@ -63,8 +63,6 @@ export class ListDragContext {
     // Window notes:
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
-    // Dragged items are replaced with a diminishing block,
-    // Deleting items???????
     // But the block cannot factor into the window calculation, the window is the end result
     
     // const totalHeight = visibleChildren.length * 22.2;
