@@ -43,19 +43,19 @@ export const Tree = (props: TreeComponentProps) => {
         `}
         onMouseLeave={() => listDragContext.leave()}
         >
-        <TransitionGroup name="fade">
-          <For each={listDragContext.getWindowedSignal()()}>
-            {(node, index) => (
-              // TODO: Consider using context here instead
-              <NodeContainer
-                treeIndex={index}
-                node={node}
-                Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-                listDragContext={listDragContext}
-              />
-            )}
-          </For>
-        </TransitionGroup>
+          <TransitionGroup name="fade">
+            <For each={listDragContext.getWindowedSignal()()}>
+              {(node, index) => (
+                // TODO: Consider using context here instead
+                <NodeContainer
+                  treeIndex={index}
+                  node={node}
+                  Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+                  listDragContext={listDragContext}
+                />
+              )}
+            </For>
+          </TransitionGroup>
       </div>
     </>
   );

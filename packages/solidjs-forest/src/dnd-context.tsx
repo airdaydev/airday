@@ -8,7 +8,7 @@ export class ListDragContext {
   treeState: TreeState;
   container: HTMLElement | null = null;
   selection = createSignal(new Set<Node>);
-  originIndex: number | null = null; // TODO: This could move if other items are inserted...
+  originIndex: number | null = 0; // TODO: This could move if other items are inserted...
   isOrigin = false; // true = this is the list where the user has dragged from
   dragOver = createSignal(false); // Is the user currently dragging over this list
   lastTouchedIndexSignal = createSignal<number | undefined>();
@@ -33,7 +33,6 @@ export class ListDragContext {
     this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
-    this.setLastTouchedIndex(originIndex);
     this.isOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
@@ -44,7 +43,6 @@ export class ListDragContext {
     this.dndContext.stopDrag();
   }
   reset() {
-    console.log('reset');
     this.isOrigin = false;
     this.originIndex = null;
     this.originNode = null;
