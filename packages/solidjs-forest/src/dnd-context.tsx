@@ -3,14 +3,13 @@ import { Node, TreeState } from './state';
 import { walk } from './tree-utils';
 
 // Per list dnd context
-// TODO: Add selection stuff here too
 export class ListDragContext {
   id = createUniqueId();
   treeState: TreeState;
   container: HTMLElement | null = null;
   selection = createSignal(new Set<Node>);
   originIndex: number | null = null; // TODO: This could move if other items are inserted...
-  isOrigin = false; // Is this the list where the user has dragged from?
+  isOrigin = false; // true = this is the list where the user has dragged from
   dragOver = createSignal(false); // Is the user currently dragging over this list
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
@@ -34,6 +33,7 @@ export class ListDragContext {
     this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+    this.setLastTouchedIndex(originIndex);
     this.isOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
@@ -44,6 +44,7 @@ export class ListDragContext {
     this.dndContext.stopDrag();
   }
   reset() {
+    console.log('reset');
     this.isOrigin = false;
     this.originIndex = null;
     this.originNode = null;

@@ -59,14 +59,17 @@ export const NodeContainer = (props: NodeContainerProps) => {
       props.listDragContext.dragOver[0](),
     ],
     ([lastTouchedIndex, isDragging, dragOver]) => {
+      // if (!props.listDragContext.isOrigin && dragOver) {
+      //   // console.log(props.listDragContext.isOrigin)
+      //   // Foreign list (target behaviour)
+      //   console.log('foreign?')
+      //   return;
+      // }
       if (!isDragging) {
         draggedOn[1](0);
         return;
       }
       const index = props.treeIndex();
-      if (props.node.id === '0') {
-        // console.log('node0', index, lastTouchedIndex, isDragging, dragOver, draggedOn[0]());
-      }
       const originIndex = props.listDragContext.originIndex as number;
       // When dragging & leaving the origin list, the placeholder needs to disappear.
       // The placeholder could be part of the origin object, or covered by other objects
@@ -74,7 +77,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
       // Strategy: Everything below the origin object needs to have “above” class appended,
       // and no “below” classes need to be appended, when the list is not being hovered over.
       if (!dragOver) {
-        if (!props.listDragContext.isOrigin) return;
         let result = 0;
         if (originIndex < index) result = 1;
         if (originIndex > index) result = 0;
@@ -125,13 +127,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={() => {
-            // Ensures last touched index is ready
-            // TODO: Potential performance optimisation if moved after (but needs careful thought or can cause flicker)
+            // This looks at where the previous draggedOn index was, as its final position
+            // is determined by whether the user drags up or down onto it.
+            if (!props.listDragContext.dndContext.isDragging[0]()) return;
             const draggingOver = props.treeIndex();
             const newIndex = draggingOver - draggedOn[0]();
             props.listDragContext.setLastTouchedIndex(newIndex);
             props.listDragContext.dragOver[1](true);
-            if (!props.listDragContext.dndContext.isDragging[0]()) return;
           }}
         >
           <props.Component
