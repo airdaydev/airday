@@ -56,7 +56,6 @@ export class Node {
 
 interface TreeStateOpts {
   mutate?: boolean;
-  onSelectionChange?: (node: Set<Node>) => void;
   loader?: (node: GenericNode<any>) => Node;
   dndContext?: DndContext;
 }
@@ -69,14 +68,11 @@ export class TreeState {
   childrenSignal = createSignal<Node[]>([]);
   idMap = new Map<string, Node>;
   mutate = false;
-  selection = new Set<Node>; // Deprecate!
-  onSelectionChange?: (node: Set<Node>) => void; // Deprecate!
   maxDepth = 10;
   expanded = true;
   loader?: (node: GenericNode<any>) => Node;
   constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
-    this.onSelectionChange = opts.onSelectionChange;
     this.loader = opts.loader;
   }
   get mutableRoot() {

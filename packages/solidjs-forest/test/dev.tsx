@@ -15,9 +15,6 @@ const dndContext = new DndContext();
 
 const treeStateA = new TreeState({
   loader,
-  // onSelectionChange: (nodeSet) => {
-    // console.log('selectionChange', nodeSet.values().next().value);
-  // }
 });
 treeStateA.load(dummyTree());
 
