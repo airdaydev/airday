@@ -30,6 +30,7 @@ export const Tree = (props: TreeComponentProps) => {
   onCleanup(() => {
     document.removeEventListener('keydown', kbHandler)
   });
+  const signal = listDragContext.getWindowedSignal()();
   return (
     <>
       <div
@@ -47,7 +48,7 @@ export const Tree = (props: TreeComponentProps) => {
         onMouseLeave={() => listDragContext.leave()}
         >
           <TransitionGroup name="fade">
-            <For each={listDragContext.getWindowedSignal()()}>
+            <For each={signal}>
               {(node, index) => (
                 // TODO: Consider using context here instead
                 <NodeContainer
@@ -63,10 +64,15 @@ export const Tree = (props: TreeComponentProps) => {
           {/* End spacer can be used to house foreign placeholder */}
           <div
             class='list-backdrop'
-            onMouseOver={() => {
-              console.log('list-backdrop');
-              if (listDragContext.dragOver[0]()) {
-                console.log('isOrigin', listDragContext.isOrigin);
+            onMouseEnter={() => {
+              if (listDragContext.dndContext.isDragging) {
+                if (listDragContext.isOrigin) {
+                  // TODO: This COULD fuck up in the case of a window... but maybe not because the window
+                  // should overextend.
+                  listDragContext.setLastTouchedIndex(signal.length);
+                  listDragContext.dragOver[1](true);
+                } else {
+                }
               }
             }}
           />

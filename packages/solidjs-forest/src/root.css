@@ -49,16 +49,16 @@
 
 .placeholder.origin {
   opacity: 0;
+  transition: opacity 80ms;
 }
 
 .placeholder.origin.visible {
   opacity: 1;
 }
 
-
-/* .placeholder.fade-enter-active,
+.placeholder.fade-enter-active,
 .placeholder.fade-exit-active {
-  transition: opacity 120ms;
+  transition: opacity 80ms;
 }
 .placeholder.fade-exit-to {
   opacity: 0;
@@ -73,4 +73,4 @@
   flex-grow: 1;
   min-height: 12px;
   background: yellow;
-} */
+}

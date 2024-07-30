@@ -133,9 +133,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
       )}
-      {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
-        <div class='placeholder' />
-      )}
+      <TransitionGroup name="fade">
+        {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
+          <div class='placeholder' />
+        )}
+      </TransitionGroup>
       {/* Origin placeholder shown on same list hover, disappears visually when not dragged over */}
       {/* {} */}
       {isDragOrigin() && (<div

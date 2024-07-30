@@ -69,7 +69,6 @@ pnpm run dev
 
 ## Roadmap
 - Bug fix: moving item to foreign list last item no placeholder!
-- Bug fix: Taking item into empty bottom space doesn't display placeholder
 - Bug fix: Taking foreign item into empty bottom space doesn't display placeholder
 - Bug fix: Taking foreign item down into last item doesn't display placeholder
 - Virtual window works
