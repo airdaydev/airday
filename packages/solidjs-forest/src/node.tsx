@@ -134,12 +134,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
         <div class='placeholder' />
       )}
       <TransitionGroup name="fade">
-        {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
+        {/* Second condition resolves edge case where dragging onto own list
+        from outside own list, last item momentarily doesn't cover last item placeholder. */}
+        {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]()
+          && props.treeIndex() - Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) < 1 && (
           <div class='placeholder' />
         )}
       </TransitionGroup>
-      {/* Origin placeholder shown on same list hover, disappears visually when not dragged over */}
-      {/* {} */}
       {isDragOrigin() && (<div
         classList={{
           'placeholder': true,

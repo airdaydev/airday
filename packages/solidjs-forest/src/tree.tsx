@@ -1,4 +1,4 @@
-import { For, onCleanup, onMount } from 'solid-js';
+import { createEffect, For, on, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { TreeState } from './state';
 import { GenericNode } from './tree-utils';
