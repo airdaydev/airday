@@ -1,5 +1,6 @@
 .item {
   position: relative;
+  flex-shrink: 0;
   width: 100%;
   height: 26px;
 }
@@ -45,3 +46,31 @@
 .placeholder:hover {
   background: #333;
 }
+
+.placeholder.origin {
+  opacity: 0;
+}
+
+.placeholder.origin.visible {
+  opacity: 1;
+}
+
+
+/* .placeholder.fade-enter-active,
+.placeholder.fade-exit-active {
+  transition: opacity 120ms;
+}
+.placeholder.fade-exit-to {
+  opacity: 0;
+}
+.placeholder.fade-enter {
+  opacity: 1;
+}
+
+.list-backdrop {
+  z-index: 0;
+  width: 100%;
+  flex-grow: 1;
+  min-height: 12px;
+  background: yellow;
+} */

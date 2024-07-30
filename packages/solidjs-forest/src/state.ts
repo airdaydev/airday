@@ -117,7 +117,7 @@ export class TreeState {
       if (expandedOnly && !node.expanded) return true;
       return false;
     }, undefined);
-    return count;
+    return count - 1; // accounts for root node
   }
 }
 

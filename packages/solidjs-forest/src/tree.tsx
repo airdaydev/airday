@@ -35,10 +35,13 @@ export const Tree = (props: TreeComponentProps) => {
       <div
         ref={containerRef}
         style={`
+          display: flex;
+          flex-direction: column;
           position: relative;
-          color: black;
           width: 18em;
           height: 25em;
+          z-index: 2;
+          color: black;
           overflow-y: scroll;
         `}
         onMouseLeave={() => listDragContext.leave()}
@@ -56,7 +59,18 @@ export const Tree = (props: TreeComponentProps) => {
               )}
             </For>
           </TransitionGroup>
-      </div>
+          {/* TODO: Possibly only necessary on foreign dragover */}
+          {/* End spacer can be used to house foreign placeholder */}
+          <div
+            class='list-backdrop'
+            onMouseOver={() => {
+              console.log('list-backdrop');
+              if (listDragContext.dragOver[0]()) {
+                console.log('isOrigin', listDragContext.isOrigin);
+              }
+            }}
+          />
+        </div>
     </>
   );
 };

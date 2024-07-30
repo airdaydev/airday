@@ -1,4 +1,4 @@
-# solidjs-forest
+# @solid-borde/list
 
 An opinionated tree system including store & UI component for SolidJS written for borde.app. Drag & drop, multi-levels, optionally virtualised or variable height (can be determined by function).
 
@@ -68,8 +68,10 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Bug fix: moving last item shows placeholder beneath!
 - Bug fix: moving item to foreign list last item no placeholder!
+- Bug fix: Taking item into empty bottom space doesn't display placeholder
+- Bug fix: Taking foreign item into empty bottom space doesn't display placeholder
+- Bug fix: Taking foreign item down into last item doesn't display placeholder
 - Virtual window works
 - Autoscroll down
 - Escape to deselect

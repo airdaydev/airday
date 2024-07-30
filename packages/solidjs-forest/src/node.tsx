@@ -1,4 +1,5 @@
 import { onCleanup, Component, Accessor, on, createEffect, createSignal, createMemo } from 'solid-js';
+import { TransitionGroup } from 'solid-transition-group';
 import { Node } from './state';
 import { distance } from './utils';
 import styles from './default.module.css';
@@ -106,6 +107,16 @@ export const NodeContainer = (props: NodeContainerProps) => {
         draggedOn[1](0);
       }
   }));
+  const onMouseEnter = () => {
+    // This looks at where the previous draggedOn index was, as its final position
+    // is determined by whether the user drags up or down onto it.
+    // N.b. the sequence here prevents a flicker on drag start.
+    const draggingOver = props.treeIndex();
+    const newIndex = draggingOver - draggedOn[0]();
+    props.listDragContext.setLastTouchedIndex(newIndex);
+    props.listDragContext.dragOver[1](true);
+    if (!props.listDragContext.dndContext.isDragging[0]()) return;
+  };
   /**
    * Hiding the placeholder:
    * We have 3 placeholders (up/down & origin)
@@ -122,7 +133,19 @@ export const NodeContainer = (props: NodeContainerProps) => {
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
       )}
-      {isDragOrigin() && (<div class={'placeholder'} />)}
+      {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
+        <div class='placeholder' />
+      )}
+      {/* Origin placeholder shown on same list hover, disappears visually when not dragged over */}
+      {/* {} */}
+      {isDragOrigin() && (<div
+        classList={{
+          'placeholder': true,
+          'origin': true,
+          'visible': props.listDragContext.dragOver[0](),
+        }}
+        onMouseEnter={onMouseEnter}
+      />)}
       {!isDragOrigin() && (
         <div
           classList={{
@@ -131,16 +154,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             below: draggedOn[0]() === -1,
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
-          onMouseEnter={() => {
-            // This looks at where the previous draggedOn index was, as its final position
-            // is determined by whether the user drags up or down onto it.
-            // N.b. the sequence here prevents a flicker on drag start.
-            const draggingOver = props.treeIndex();
-            const newIndex = draggingOver - draggedOn[0]();
-            props.listDragContext.setLastTouchedIndex(newIndex);
-            props.listDragContext.dragOver[1](true);
-            if (!props.listDragContext.dndContext.isDragging[0]()) return;
-          }}
+          onMouseEnter={onMouseEnter}
         >
           <props.Component
             onMouseDown={onMouseDown}
@@ -149,11 +163,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
             select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}
           />
-          </div>
+        </div>
       )}
-      {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]() && (
-        <div class='placeholder' />
-      )}
+      {/* Foreign drop at the very end of a list goes here! */}
     </div>
   );
 };
