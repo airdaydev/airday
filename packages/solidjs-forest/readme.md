@@ -70,7 +70,7 @@ pnpm run dev
 ```
 
 ## Roadmap
-- command to add to selection
+- drag multiple to select
 - Virtual window works
 - Autoscroll down
 - Escape to deselect

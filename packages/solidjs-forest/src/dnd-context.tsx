@@ -52,6 +52,15 @@ export class ListDragContext {
     const selection = new Set([node]);
     this.selection[1](selection);
   }
+  addToSelection(node: Node) {
+    const selection = new Set(this.selection[0]())
+    if (selection.has(node)) {
+      selection.delete(node);
+    } else {
+      selection.add(node);
+    }
+    this.selection[1](selection);
+  }
   setContainer(container: HTMLElement) {
     this.container = container;
   }

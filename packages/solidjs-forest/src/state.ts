@@ -7,7 +7,6 @@ import { GenericNode, map, walk, filter } from './tree-utils';
 
 export interface NodeSignalProps {
   id: string;
-  isSelected: boolean;
 }
 
 export class Node {
@@ -86,7 +85,6 @@ export class TreeState {
       }).children;
       this.childrenSignal[1](() => filtered);
     }
-    // TODO: return deselected?
   }
   load(tree: GenericNode<any>) {
     const q = qperf('load');
