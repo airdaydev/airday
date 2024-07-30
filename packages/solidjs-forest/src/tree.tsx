@@ -77,7 +77,7 @@ export const Tree = (props: TreeComponentProps) => {
             }}
           >
             <TransitionGroup name="fade">
-              {listDragContext.lastTouchedIndexSignal[0]() === signal.length &&
+              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal.length &&
                 !listDragContext.isOrigin && (
                 <div class="placeholder" />
               )}
