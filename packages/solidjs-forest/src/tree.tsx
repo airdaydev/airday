@@ -60,22 +60,29 @@ export const Tree = (props: TreeComponentProps) => {
               )}
             </For>
           </TransitionGroup>
-          {/* TODO: Possibly only necessary on foreign dragover */}
-          {/* End spacer can be used to house foreign placeholder */}
           <div
             class='list-backdrop'
             onMouseEnter={() => {
-              if (listDragContext.dndContext.isDragging) {
+              if (listDragContext.dndContext.isDragging[0]()) {
                 if (listDragContext.isOrigin) {
                   // TODO: This COULD fuck up in the case of a window... but maybe not because the window
                   // should overextend.
                   listDragContext.setLastTouchedIndex(signal.length);
                   listDragContext.dragOver[1](true);
                 } else {
+                  listDragContext.dragOver[1](true);
+                  listDragContext.setLastTouchedIndex(signal.length);
                 }
               }
             }}
-          />
+          >
+            <TransitionGroup name="fade">
+              {listDragContext.lastTouchedIndexSignal[0]() === signal.length &&
+                !listDragContext.isOrigin && (
+                <div class="placeholder" />
+              )}
+            </TransitionGroup>
+          </div>
         </div>
     </>
   );

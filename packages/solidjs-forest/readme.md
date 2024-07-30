@@ -1,6 +1,8 @@
 # @solid-borde/list
 
-An opinionated tree system including store & UI component for SolidJS written for borde.app. Drag & drop, multi-levels, optionally virtualised or variable height (can be determined by function).
+A very opinionated interactive list system including store & UI component for SolidJS written for borde.app. Drag & drop, optionally virtualised or variable height (can be determined by function).
+
+The architecture has lead to a few marked special cases, dealing with many subtle difference between dragging locally & dragging to a foreign list, as well as differences in the placeholders beneath the originally dragged item & other items and special cases for the final placeholder in remote and local drags.
 
 ## Features
 - Window expands to fill minimum size.
@@ -68,9 +70,6 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Bug fix: moving item to foreign list last item no placeholder!
-- Bug fix: Taking foreign item into empty bottom space doesn't display placeholder
-- Bug fix: Taking foreign item down into last item doesn't display placeholder
 - Virtual window works
 - Autoscroll down
 - Escape to deselect
@@ -82,8 +81,9 @@ pnpm run dev
 - Prevent infinite recursion
 - Variable heights
 - Dynamically retrieved, variable heights
+- Tree
 
-# Others
+# Other options:
 - [Draggable](https://shopify.github.io/draggable/examples/sort-animation.html)
 - [Sortable](https://sortablejs.github.io/Sortable/#multi-drag)
 - [Muuri](https://muuri.dev/)
