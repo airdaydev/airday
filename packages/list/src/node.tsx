@@ -9,6 +9,7 @@ export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   treeIndex: Accessor<number>;
+  treeOffset: Accessor<number>;
   listDragContext: ListDragContext;
 }
 
@@ -131,7 +132,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
-      style={`top: ${props.treeIndex() * 28}px;`}
+      style={`top: ${props.treeOffset() + props.treeIndex() * 28}px;`}
     >
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />

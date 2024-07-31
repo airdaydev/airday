@@ -1,4 +1,4 @@
-import { For, onCleanup, onMount } from 'solid-js';
+import { createSignal, For, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { TreeState } from './state';
 import { GenericNode } from './tree-utils';
@@ -18,6 +18,7 @@ interface TreeComponentProps {
 
 export const Tree = (props: TreeComponentProps) => {
   let containerRef: HTMLDivElement | undefined;
+  let scrollContainerRef: HTMLDivElement | undefined;
   let listDragContext = new ListDragContext(props.state, props.dndContext);
   onMount(() => listDragContext.setContainer(containerRef as HTMLDivElement));
   const kbHandler = (event: KeyboardEvent) => {
@@ -31,6 +32,9 @@ export const Tree = (props: TreeComponentProps) => {
     document.removeEventListener('keydown', kbHandler)
   });
   const signal = listDragContext.getWindowedSignal();
+  onMount(() => {
+    if (scrollContainerRef) listDragContext.setContainer(scrollContainerRef);
+  })
   return (
     <>
       <div
@@ -47,11 +51,13 @@ export const Tree = (props: TreeComponentProps) => {
         `}
         onMouseLeave={() => listDragContext.leave()}
         >
-          <div style={`position: relative;
-            top: 0;
-            left: 0;
-            width: 100%;
-            min-height: ${listDragContext.presentCount()() * 28}px;`}
+          <div
+            ref={scrollContainerRef}
+            style={`position: relative;
+              top: 0;
+              left: 0;
+              width: 100%;
+              min-height: ${listDragContext.presentCount()() * 28}px;`}
           >
             <TransitionGroup name="fade">
               <For each={signal()}>
@@ -59,6 +65,7 @@ export const Tree = (props: TreeComponentProps) => {
                   // TODO: Consider using context here instead
                   <NodeContainer
                     treeIndex={index}
+                    treeOffset={createSignal(0)[0]}
                     node={node}
                     Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
                     listDragContext={listDragContext}
