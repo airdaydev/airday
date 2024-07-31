@@ -82,6 +82,7 @@ pnpm run dev
 - Variable heights
 - Dynamically retrieved, variable heights
 - Tree
+- Rare bug - take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
 
 # Other options:
 - [Draggable](https://shopify.github.io/draggable/examples/sort-animation.html)
