@@ -201,7 +201,7 @@ export function Item(props: ItemProps) {
               // on mouse up, unselect if no drag
               return;
           }
-          props.selection.selectOne(item.id)
+          props.selection.selectOne(item.id);
           return;
       }
       // TODO: Shift key but nothing selected

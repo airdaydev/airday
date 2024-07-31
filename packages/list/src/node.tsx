@@ -28,11 +28,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
     if (event.metaKey) {
-      console.log('meta key lesgo');
       props.listDragContext.addToSelection(props.node);
       return;
     }
-    props.listDragContext.selectOne(props.node);
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
         event.preventDefault();
@@ -51,6 +49,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     };
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
+    if (!isSelected()) props.listDragContext.selectOne(props.node);
   };
   const isDragOrigin = createMemo(() => {
     const trigger = props.listDragContext.dndContext.isDragging[0]();

@@ -1,4 +1,4 @@
-import { createEffect, For, on, onCleanup, onMount } from 'solid-js';
+import { For, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { TreeState } from './state';
 import { GenericNode } from './tree-utils';
@@ -30,7 +30,7 @@ export const Tree = (props: TreeComponentProps) => {
   onCleanup(() => {
     document.removeEventListener('keydown', kbHandler)
   });
-  const signal = listDragContext.getWindowedSignal()();
+  const signal = listDragContext.getWindowedSignal();
   return (
     <>
       <div
@@ -48,7 +48,7 @@ export const Tree = (props: TreeComponentProps) => {
         onMouseLeave={() => listDragContext.leave()}
         >
           <TransitionGroup name="fade">
-            <For each={signal}>
+            <For each={signal()}>
               {(node, index) => (
                 // TODO: Consider using context here instead
                 <NodeContainer
@@ -67,11 +67,11 @@ export const Tree = (props: TreeComponentProps) => {
                 if (listDragContext.isOrigin) {
                   // TODO: This COULD fuck up in the case of a window... but maybe not because the window
                   // should overextend.
-                  listDragContext.setLastTouchedIndex(signal.length);
+                  listDragContext.setLastTouchedIndex(signal().length);
                   listDragContext.dragOver[1](true);
                 } else {
                   listDragContext.dragOver[1](true);
-                  listDragContext.setLastTouchedIndex(signal.length);
+                  listDragContext.setLastTouchedIndex(signal().length);
                 }
               }
             }}
