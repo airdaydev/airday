@@ -1,5 +1,5 @@
 import {
-  Signal, createEffect, createMemo, createSignal, createUniqueId,
+  Signal, createMemo, createSignal, createUniqueId,
 } from 'solid-js';
 import { qperf } from './utils';
 import { DndContext } from './dnd-context';

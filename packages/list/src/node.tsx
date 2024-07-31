@@ -13,12 +13,6 @@ export interface NodeContainerProps {
   listDragContext: ListDragContext;
 }
 
-const defaultStyle = {
-  item_when: (height = '26px') => {
-
-  }
-}
-
 export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
   const isSelected = props.listDragContext.isSelected(props.node);
