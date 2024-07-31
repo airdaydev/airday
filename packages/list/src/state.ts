@@ -103,6 +103,7 @@ export class TreeState {
     q();
   }
   // TODO: memoise
+  // TODO: signal
   // TODO: cache for each node
   count(expandedOnly?: boolean) {
     let count = 0;
