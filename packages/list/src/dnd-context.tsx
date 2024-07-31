@@ -110,6 +110,19 @@ export class ListDragContext {
       return window;
     });
   }
+  /**
+   * This count includes total item count minus the selected items (excluding origin) when dragging
+   * or total count generally
+   */
+  presentCount() {
+    return createMemo(() => {
+      if (this.dndContext.isDragging[0]() && this.isOrigin) {
+        return this.treeState.count()() - this.selection[0]().size;
+      } else {
+        return this.treeState.count()();
+      }
+    })
+  }
 }
 
 // There is only one drag context, but there can be multiple select contexts

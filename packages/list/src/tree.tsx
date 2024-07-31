@@ -51,7 +51,7 @@ export const Tree = (props: TreeComponentProps) => {
             top: 0;
             left: 0;
             width: 100%;
-            min-height: ${listDragContext.treeState.count() * 28}px;`}
+            min-height: ${listDragContext.presentCount()() * 28}px;`}
           >
             <TransitionGroup name="fade">
               <For each={signal()}>

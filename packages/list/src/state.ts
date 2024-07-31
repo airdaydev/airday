@@ -1,5 +1,5 @@
 import {
-  Signal, createSignal, createUniqueId,
+  Signal, createEffect, createMemo, createSignal, createUniqueId,
 } from 'solid-js';
 import { qperf } from './utils';
 import { DndContext } from './dnd-context';
@@ -106,13 +106,15 @@ export class TreeState {
   // TODO: signal
   // TODO: cache for each node
   count(expandedOnly?: boolean) {
-    let count = 0;
-    walk(this.mutableRoot, (node) => {
-      count++;
-      if (expandedOnly && !node.expanded) return true;
-      return false;
-    }, undefined);
-    return count - 1; // accounts for root node
+    return createMemo(() => {
+      let count = 0;
+      walk({ isRoot: true, children: this.childrenSignal[0]() }, (node) => {
+        count++;
+        if (expandedOnly && !node.expanded) return true;
+        return false;
+      }, undefined);
+      return count - 1; // accounts for root node
+    });
   }
 }
 
