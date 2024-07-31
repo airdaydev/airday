@@ -68,6 +68,7 @@ export class ListDragContext {
     return this.lastTouchedIndexSignal[1](index);
   }
   getWindowedSignal() {
+    const offset = createSignal(0);
     // Window notes:
     // scrolloffset * heights, so we need a cached count of all items or filtered items,
     // - dragged items - collapsed items
@@ -85,7 +86,6 @@ export class ListDragContext {
       let n = new Node();
       n.isRoot = true;
       n.children = this.treeState.childrenSignal[0]();
-      // const end = qperf('memo');
       let index = 0;
       const isDragging = this.dndContext.isDragging[0]();
       // Flattens the tree
@@ -104,8 +104,6 @@ export class ListDragContext {
         }
         if (!node.expanded) return true;
       });
-      // end();
-      // TODO: memo code here
       let window = visibleChildren.slice(0, 100);
       return window;
     });
@@ -133,10 +131,6 @@ export class DndContext {
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
   constructor() { }
-  // setActiveContainer(container: HTMLElement) {
-  //   console.log('setting active container', container)
-  //   this.activeContainer[1](container);
-  // }
   startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
