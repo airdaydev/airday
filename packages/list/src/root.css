@@ -2,7 +2,7 @@
   position: absolute;
   flex-shrink: 0;
   width: 100%;
-  height: 26px;
+  height: 28px;
 }
 .item.fade-enter-active,
 .item.fade-exit-active {
@@ -14,12 +14,12 @@
   opacity: 0;
 }
 .item.fade-enter {
-  height: 26px;
+  height: 28px;
 }
 .item_internal {
   position: absolute;
   width: 100%;
-  height: 26px;
+  height: 28px;
   z-index: 2;
 }
 .item_internal {
