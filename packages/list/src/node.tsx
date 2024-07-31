@@ -132,6 +132,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
+      style={`top: ${props.treeIndex() * 28}px;`}
       // style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
     >
       {draggedOn[0]() === -1 && (

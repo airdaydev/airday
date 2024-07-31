@@ -47,19 +47,26 @@ export const Tree = (props: TreeComponentProps) => {
         `}
         onMouseLeave={() => listDragContext.leave()}
         >
-          <TransitionGroup name="fade">
-            <For each={signal()}>
-              {(node, index) => (
-                // TODO: Consider using context here instead
-                <NodeContainer
-                  treeIndex={index}
-                  node={node}
-                  Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-                  listDragContext={listDragContext}
-                />
-              )}
-            </For>
-          </TransitionGroup>
+          <div style={`position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            min-height: ${listDragContext.treeState.count() * 28}px;`}
+          >
+            <TransitionGroup name="fade">
+              <For each={signal()}>
+                {(node, index) => (
+                  // TODO: Consider using context here instead
+                  <NodeContainer
+                    treeIndex={index}
+                    node={node}
+                    Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+                    listDragContext={listDragContext}
+                  />
+                )}
+              </For>
+            </TransitionGroup>
+          </div>
           <div
             class='list-backdrop'
             onMouseEnter={() => {
