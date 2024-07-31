@@ -2,7 +2,6 @@ import { onCleanup, Component, Accessor, on, createEffect, createSignal, createM
 import { TransitionGroup } from 'solid-transition-group';
 import { Node } from './state';
 import { distance } from './utils';
-import styles from './default.module.css';
 import './root.css';
 import { ListDragContext } from './dnd-context';
 
@@ -133,7 +132,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
     <div
       class="item"
       style={`top: ${props.treeIndex() * 28}px;`}
-      // style={{ height: signal().isDragOrigin && !isActiveContainer() ? '0': '26px' }}
     >
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />

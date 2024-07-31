@@ -1,8 +1,0 @@
-.tree-item {
-  background: white;
-  border: 1px solid #eee;
-}
-
-.tree-item[aria-selected='true'] {
-  background: #999;
-}
