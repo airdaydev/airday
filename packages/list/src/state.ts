@@ -59,8 +59,6 @@ interface TreeStateOpts {
   dndContext?: DndContext;
 }
 
-// Combined tree -> Window tree (UI)
-// TODO: Rename this as Store, considering it has no children object therefore is not a root node
 export class TreeState {
   id: string;
   isRoot = true;
@@ -102,9 +100,6 @@ export class TreeState {
     this.childrenSignal[1](() => children);
     q();
   }
-  // TODO: memoise
-  // TODO: signal
-  // TODO: cache for each node
   count(expandedOnly?: boolean) {
     return createMemo(() => {
       let count = 0;
