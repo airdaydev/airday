@@ -1,12 +1,15 @@
-import { createMemo, createSignal, createUniqueId } from 'solid-js';
+import {
+  Accessor,
+  createMemo, createSignal, createUniqueId,
+} from 'solid-js';
 import { Node, TreeState } from './state';
 import { walk } from './tree-utils';
+import { ContainerVector } from './tree';
 
 // Per list dnd context
 export class ListDragContext {
   id = createUniqueId();
   treeState: TreeState;
-  container: HTMLElement | null = null;
   selection = createSignal(new Set<Node>);
   originIndex: number | null = 0; // TODO: This could move if other items are inserted...
   isOrigin = false; // true = this is the list where the user has dragged from
@@ -61,26 +64,11 @@ export class ListDragContext {
     }
     this.selection[1](selection);
   }
-  setContainer(container: HTMLElement) {
-    this.container = container;
-  }
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
-  getWindowedSignal() {
+  getWindowedSignal(containerVector: Accessor<ContainerVector>) {
     const offset = createSignal(0);
-    // Window notes:
-    // scrolloffset * heights, so we need a cached count of all items or filtered items,
-    // - dragged items - collapsed items
-    // But the block cannot factor into the window calculation, the window is the end result
-    
-    // const totalHeight = visibleChildren.length * 22.2;
-    // calculate & cache heights, filtering out contiguous blocks removed
-    // if scrolloffset > total height, move scroll loc to Math.min(0, scrollOffset - containerHeight)
-    // otherwise first index = scrolloffset - totalHeight/rowHeight
-    // pull front padding + content (windows size should be bigger than needed in both directions if possible) + end padding
-    // listen for scroll & resize events on container
-    // Cache if possible to optimise
     return createMemo(() => {
       const visibleChildren: Node[] = [];
       let n = new Node();

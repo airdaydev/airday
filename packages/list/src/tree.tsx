@@ -1,9 +1,10 @@
-import { createSignal, For, onCleanup, onMount } from 'solid-js';
+import { createMemo, createSignal, For, onCleanup, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { TreeState } from './state';
 import { GenericNode } from './tree-utils';
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from './node';
 import { DndContext, ListDragContext } from './dnd-context';
+import { observeHeight } from './utils';
 
 interface TreeComponentProps {
   state: TreeState,
@@ -13,14 +14,25 @@ interface TreeComponentProps {
   data: GenericNode<any>,
 }
 
+export type ContainerVector = [scrollHeight: number, scrollTop: number];
+
 // Probably an important read
 // https://github.com/solidjs/solid/discussions/366
-
 export const Tree = (props: TreeComponentProps) => {
-  let containerRef: HTMLDivElement | undefined;
   let scrollContainerRef: HTMLDivElement | undefined;
-  let listDragContext = new ListDragContext(props.state, props.dndContext);
-  onMount(() => listDragContext.setContainer(containerRef as HTMLDivElement));
+  const heightSignal = createSignal<number>(500); // Scroll container height
+  const scrollSignal = createSignal<number>(0); // Scroll position
+  const containerVector = createMemo<ContainerVector>(() => {
+    return [heightSignal[0](), scrollSignal[0]()];
+  });
+  let listDragContext = new ListDragContext(
+    props.state, props.dndContext,
+  );
+  onMount(() => {
+    if (!scrollContainerRef) return;
+    observeHeight(scrollContainerRef, heightSignal);
+  });
+  
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
@@ -31,14 +43,12 @@ export const Tree = (props: TreeComponentProps) => {
   onCleanup(() => {
     document.removeEventListener('keydown', kbHandler)
   });
-  const signal = listDragContext.getWindowedSignal();
-  onMount(() => {
-    if (scrollContainerRef) listDragContext.setContainer(scrollContainerRef);
-  })
+  // TODO: If nothing but height needed, only pass height from event. Too much
+  // UI code bleeding into state file
+  const signal = listDragContext.getWindowedSignal(containerVector);
   return (
     <>
       <div
-        ref={containerRef}
         style={`
           display: flex;
           flex-direction: column;
@@ -49,10 +59,14 @@ export const Tree = (props: TreeComponentProps) => {
           color: black;
           overflow-y: scroll;
         `}
+        ref={scrollContainerRef}
+        onScroll={(event) => {
+          requestAnimationFrame(() =>
+            scrollSignal[1](event.target.scrollTop))
+        }}
         onMouseLeave={() => listDragContext.leave()}
         >
           <div
-            ref={scrollContainerRef}
             style={`position: relative;
               top: 0;
               left: 0;

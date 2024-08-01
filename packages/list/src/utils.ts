@@ -1,3 +1,5 @@
+import { Signal } from 'solid-js';
+
 /**
  *
  * @param coordPairA [x: number, y: number]
@@ -22,3 +24,35 @@ export function qperf(label?: string) {
     console.log(str);
   }
 }
+
+/**
+ * Publishes live container height to signal
+ * @param targetEl element
+ * @param signal Signal<number> that publishes to
+ * @returns observer (for clean up)
+ */
+export function observeHeight(targetEl: HTMLElement, signal: Signal<number>) {
+  let previousHeight = targetEl.offsetHeight;
+
+  function checkHeight() {
+    const currentHeight = targetEl.offsetHeight;
+    if (currentHeight !== previousHeight) {
+      previousHeight = currentHeight;
+      signal[1](currentHeight);
+    }
+  }
+
+  const observer = new MutationObserver(checkHeight);
+  
+  observer.observe(targetEl, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  checkHeight();
+
+  return observer;
+}
+
