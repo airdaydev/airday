@@ -73,6 +73,7 @@ export class ListDragContext {
     return this.lastTouchedIndexSignal[1](index);
   }
   getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
+    // TODO: Request animation frame
     return createMemo(() => {
       const visibleChildren: Node[] = [];
       let n = new Node();
@@ -99,10 +100,10 @@ export class ListDragContext {
       // Virtualisation
       const rowHeight = 28;
       const [containerHeight, offset] = containerVector();
-      const buffer = 50;
+      const buffer = 50; // TODO: Buffer should be linked to scroll change required to update
       const excess = (offset % rowHeight);
-      const start = Math.max(0, (offset - excess) - buffer * rowHeight) / rowHeight;
-      const renderCount = Math.floor(containerHeight / rowHeight) + buffer;
+      const start = Math.max(0, (offset - excess) - (buffer * rowHeight)) / rowHeight;
+      const renderCount = Math.floor(containerHeight / rowHeight) + (buffer * 2);
       let window = visibleChildren.slice(start, start + renderCount);
       return {
         window,
