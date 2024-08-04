@@ -74,12 +74,13 @@ export const Tree = (props: TreeComponentProps) => {
               min-height: ${listDragContext.presentCount()() * 28}px;`}
           >
             <TransitionGroup name="fade">
-              <For each={signal()}>
+              <For each={signal().window}>
                 {(node, index) => (
                   // TODO: Consider using context here instead
                   <NodeContainer
-                    treeIndex={index}
-                    treeOffset={createSignal(0)[0]}
+                    windowIndex={index}
+                    treeIndex={createMemo(() => signal().start + index())}
+                    virtualisedList={signal}
                     node={node}
                     Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
                     listDragContext={listDragContext}
@@ -95,17 +96,17 @@ export const Tree = (props: TreeComponentProps) => {
                 if (listDragContext.isOrigin) {
                   // TODO: This COULD fuck up in the case of a window... but maybe not because the window
                   // should overextend.
-                  listDragContext.setLastTouchedIndex(signal().length);
+                  listDragContext.setLastTouchedIndex(signal().window.length);
                   listDragContext.dragOver[1](true);
                 } else {
                   listDragContext.dragOver[1](true);
-                  listDragContext.setLastTouchedIndex(signal().length);
+                  listDragContext.setLastTouchedIndex(signal().window.length);
                 }
               }
             }}
           >
             <TransitionGroup name="fade">
-              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal().length &&
+              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal().window.length &&
                 !listDragContext.isOrigin && (
                 <div class="placeholder" />
               )}

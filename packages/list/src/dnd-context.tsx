@@ -6,6 +6,11 @@ import { Node, TreeState } from './state';
 import { walk } from './tree-utils';
 import { ContainerVector } from './tree';
 
+export type VirtualisedList = Accessor<{
+  window: Node[];
+  start: number;
+}>;
+
 // Per list dnd context
 export class ListDragContext {
   id = createUniqueId();
@@ -67,8 +72,7 @@ export class ListDragContext {
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
-  getWindowedSignal(containerVector: Accessor<ContainerVector>) {
-    const offset = createSignal(0);
+  getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
     return createMemo(() => {
       const visibleChildren: Node[] = [];
       let n = new Node();
@@ -92,8 +96,18 @@ export class ListDragContext {
         }
         if (!node.expanded) return true;
       });
-      let window = visibleChildren.slice(0, 100);
-      return window;
+      // Virtualisation
+      const rowHeight = 28;
+      const [containerHeight, offset] = containerVector();
+      const buffer = 50;
+      const excess = (offset % rowHeight);
+      const start = Math.max(0, (offset - excess) - buffer * rowHeight) / rowHeight;
+      const renderCount = Math.floor(containerHeight / rowHeight) + buffer;
+      let window = visibleChildren.slice(start, start + renderCount);
+      return {
+        window,
+        start,
+      };
     });
   }
   /**

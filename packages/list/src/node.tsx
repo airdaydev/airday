@@ -3,13 +3,13 @@ import { TransitionGroup } from 'solid-transition-group';
 import { Node } from './state';
 import { distance } from './utils';
 import './root.css';
-import { ListDragContext } from './dnd-context';
+import { ListDragContext, VirtualisedList } from './dnd-context';
 
 export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   treeIndex: Accessor<number>;
-  treeOffset: Accessor<number>;
+  virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
 }
 
@@ -126,7 +126,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
-      style={`top: ${props.treeOffset() + props.treeIndex() * 28}px;`}
+      style={`top: ${props.treeIndex() * 28}px;`}
     >
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
