@@ -66,6 +66,27 @@ export const Tree = (props: TreeComponentProps) => {
               scrollSignal[1](event.target.scrollTop))
           }
         }}
+        onMouseOver={(event) => {
+          if (!listDragContext.dragOver) return;
+          const driftRegion = 28*3;
+          const bottom = driftRegion;
+          const top = event.target.scrollHeight - driftRegion;
+          // if reached top or bottom, do nothing, otherwise:
+          // const curve = (y: number) => 0.00107 * y ** 2 + 0.0214 * y + 1;
+          requestAnimationFrame(() => {
+            if (top - driftRegion) {
+              
+            }
+            if (bottom - driftRegion) {
+
+            }
+            event.target.scrollTo()
+          })
+          // if dragging, animated scroll up
+          // .scrollTo(0, 1100)
+          // (quadratic approx mapping to 1,3,9x over 84px) - todo: generate this
+          // f(x) = 0.00107x² + 0.0214x + 1
+        }}
         onMouseLeave={() => listDragContext.leave()}
         >
           <div
@@ -107,7 +128,8 @@ export const Tree = (props: TreeComponentProps) => {
             }}
           >
             <TransitionGroup name="fade">
-              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal().window.length + signal().start &&
+              {listDragContext.dndContext.isDragging[0]() &&
+                (listDragContext.lastTouchedIndexSignal[0]() === (signal().window.length + signal().start)) &&
                 !listDragContext.isOrigin && (
                 <div class="placeholder" />
               )}

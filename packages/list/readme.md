@@ -70,17 +70,19 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Virtual window works
 - Autoscroll down
 - Escape to deselect
 - Automatically deselect on blur
 - shift to select range
 - option + arrow to move up / down
 - command + down/up to jump to top/bottom of list
-- Prevent infinite recursion
+- Mobile controls
+
+## Stretch goals
 - Variable heights
 - Dynamically retrieved, variable heights
 - Tree
+- Prevent infinite recursion in tree
 - Rare bug - take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
 
 # Other options:
