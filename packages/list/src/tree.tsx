@@ -54,7 +54,7 @@ export const Tree = (props: TreeComponentProps) => {
           flex-direction: column;
           position: relative;
           width: 18em;
-          height: 25em;
+          height: 100%;
           z-index: 2;
           color: black;
           overflow-y: scroll;

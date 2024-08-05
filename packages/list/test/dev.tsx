@@ -26,7 +26,7 @@ render(() => (
     {dndContext.isDragging[0]() && (
       <Dragged dndContext={dndContext} />
     )}
-    <div>
+    <div style={`display: flex; flex-direction: column; height: 100%;`}>
       <h3>Tree A ({treeStateA.count()} items)</h3>
       <input type="text" placeholder="filter text" />
       <Tree
@@ -37,7 +37,7 @@ render(() => (
         // height={(node) => {}} // Node height calculation function or number
       />
     </div>
-    <div>
+    <div style={`display: flex; flex-direction: column; height: 100%;`}>
       <h3>Tree B ({treeStateB.count()} items)</h3>
       <input type="text" placeholder="filter text" />
       <Tree
