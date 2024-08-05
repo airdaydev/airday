@@ -101,7 +101,6 @@ export const Tree = (props: TreeComponentProps) => {
                   listDragContext.dragOver[1](true);
                 } else {
                   listDragContext.dragOver[1](true);
-                  console.log('foreign hit', signal().window.length + signal().start)
                   listDragContext.setLastTouchedIndex(signal().window.length + signal().start);
                 }
               }
