@@ -16,13 +16,13 @@ const dndContext = new DndContext();
 const treeStateA = new TreeState({
   loader,
 });
-treeStateA.load(dummyTree());
+treeStateA.load(dummyTree({ maxDepth: 2, maxChildren: 5 }));
 
 const treeStateB = new TreeState({ loader, dndContext });
 treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 25 }));
 
 const treeStateC = new TreeState({ loader, dndContext });
-treeStateC.load(dummyTree({ maxDepth: 2, maxChildren: 5 }));
+treeStateC.load(dummyTree());
 
 render(() => (
   <div class={styles['container']}>

@@ -96,18 +96,19 @@ export const Tree = (props: TreeComponentProps) => {
               if (listDragContext.dndContext.isDragging[0]()) {
                 if (listDragContext.isOrigin) {
                   // TODO: This COULD fuck up in the case of a window... but maybe not because the window
-                  // should overextend.
-                  listDragContext.setLastTouchedIndex(signal().window.length);
+                  // should overextend. Yes, this needs to be the
+                  listDragContext.setLastTouchedIndex(signal().window.length + signal().start);
                   listDragContext.dragOver[1](true);
                 } else {
                   listDragContext.dragOver[1](true);
-                  listDragContext.setLastTouchedIndex(signal().window.length);
+                  console.log('foreign hit', signal().window.length + signal().start)
+                  listDragContext.setLastTouchedIndex(signal().window.length + signal().start);
                 }
               }
             }}
           >
             <TransitionGroup name="fade">
-              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal().window.length &&
+              {listDragContext.dndContext.isDragging[0]() && listDragContext.lastTouchedIndexSignal[0]() === signal().window.length + signal().start &&
                 !listDragContext.isOrigin && (
                 <div class="placeholder" />
               )}
