@@ -62,7 +62,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
                     top: -100%;
                     left: -100%;
                     box-shadow: 1px 1px 2px #0000002e;
-                    max-width: 16em;
+                    max-width: 18em;
                     height: 26px;
                     // scale: 1;
                 `}

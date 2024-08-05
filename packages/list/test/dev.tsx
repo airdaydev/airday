@@ -19,7 +19,10 @@ const treeStateA = new TreeState({
 treeStateA.load(dummyTree());
 
 const treeStateB = new TreeState({ loader, dndContext });
-treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 5 }));
+treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 25 }));
+
+const treeStateC = new TreeState({ loader, dndContext });
+treeStateC.load(dummyTree({ maxDepth: 2, maxChildren: 5 }));
 
 render(() => (
   <div class={styles['container']}>
@@ -43,6 +46,14 @@ render(() => (
       <Tree
         dndContext={dndContext}
         state={treeStateB}
+      />
+    </div>
+    <div style={`display: flex; flex-direction: column; height: 100%;`}>
+      <h3>Tree C ({treeStateC.count()} items)</h3>
+      <input type="text" placeholder="filter text" />
+      <Tree
+        dndContext={dndContext}
+        state={treeStateC}
       />
     </div>
   </div>

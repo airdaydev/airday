@@ -1,3 +1,7 @@
+body {
+  font-family: monospace;
+}
+
 :root {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
