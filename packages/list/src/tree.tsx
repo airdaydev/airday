@@ -80,8 +80,7 @@ export const Tree = (props: TreeComponentProps) => {
                 {(node, index) => (
                   // TODO: Consider using context here instead
                   <NodeContainer
-                    windowIndex={index}
-                    treeIndex={createMemo(() => signal().start + index())}
+                    index={index}
                     virtualisedList={signal}
                     node={node}
                     Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}

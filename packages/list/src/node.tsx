@@ -8,7 +8,7 @@ import { ListDragContext, VirtualisedList } from './dnd-context';
 export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
-  treeIndex: Accessor<number>;
+  index: Accessor<number>;
   virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
 }
@@ -18,6 +18,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   const isSelected = props.listDragContext.isSelected(props.node);
   onCleanup(() => props.node.unsubscribe());
   const draggedOn = createSignal(0);
+  const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
@@ -33,7 +34,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           const targetBounding = event.target.getBoundingClientRect();
           const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
           // Start dragging
-          props.listDragContext.startDrag(props.treeIndex(), props.node, ref, targetOffset);
+          props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
           window.addEventListener('mouseup', () => {
             props.listDragContext.stopDrag();
@@ -65,7 +66,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         draggedOn[1](0);
         return;
       }
-      const index = props.treeIndex();
+      const index = treeIndex();
       const originIndex = props.listDragContext.originIndex as number;
       if (!props.listDragContext.isOrigin && dragOver) {
         if (index >= lastTouchedIndex) {
@@ -109,7 +110,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // This looks at where the previous draggedOn index was, as its final position
     // is determined by whether the user drags up or down onto it.
     // N.b. the sequence here prevents a flicker on drag start.
-    const draggingOver = props.treeIndex();
+    const draggingOver = treeIndex();
     const newIndex = draggingOver - draggedOn[0]();
     props.listDragContext.setLastTouchedIndex(newIndex);
     props.listDragContext.dragOver[1](true);
@@ -126,7 +127,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
-      style={`top: ${props.treeIndex() * 28}px;`}
+      style={`top: ${treeIndex() * 28}px;`}
     >
       {draggedOn[0]() === -1 && (
         <div class='placeholder' />
@@ -135,7 +136,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         {/* Second condition resolves edge case where dragging onto own list
         from outside own list, last item momentarily doesn't cover last item placeholder. */}
         {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]()
-          && props.treeIndex() - Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) < 1 && (
+          && treeIndex() - Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) < 1 && (
           <div class='placeholder' />
         )}
       </TransitionGroup>
