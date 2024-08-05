@@ -100,7 +100,7 @@ export class ListDragContext {
       // Virtualisation
       const rowHeight = 28;
       const [containerHeight, offset] = containerVector();
-      const buffer = 50; // TODO: Buffer should be linked to scroll change required to update
+      const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
       const excess = (offset % rowHeight);
       const start = Math.max(0, (offset - excess) - (buffer * rowHeight)) / rowHeight;
       const renderCount = Math.floor(containerHeight / rowHeight) + (buffer * 2);

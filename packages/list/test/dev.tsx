@@ -27,7 +27,7 @@ render(() => (
       <Dragged dndContext={dndContext} />
     )}
     <div>
-      <h2>Tree A ({treeStateA.count()} items)</h2>
+      <h3>Tree A ({treeStateA.count()} items)</h3>
       <input type="text" placeholder="filter text" />
       <Tree
         dndContext={dndContext}
@@ -38,7 +38,7 @@ render(() => (
       />
     </div>
     <div>
-      <h2>Tree B ({treeStateB.count()} items)</h2>
+      <h3>Tree B ({treeStateB.count()} items)</h3>
       <input type="text" placeholder="filter text" />
       <Tree
         dndContext={dndContext}
