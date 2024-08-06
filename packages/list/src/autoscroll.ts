@@ -8,11 +8,12 @@ export class AutoscrollController {
   scrollContainer?: HTMLElement;
   controlRangePx = 84;
   clientY = 0;
-  // start when dragover === true
-  curve = (y: number) => 18 * y ** 2 -7 * y + 1;
+  curve = (y: number) => (12 * y ** 2) * (-7 * y) + 1;
   start() {
+    console.log('starting');
     if (!this.scrollContainer) return;
     this.enabled = true;
+    // TODO: Stop when inactive!
     this.scrollContainer.addEventListener('mousemove', (event) => {
       this.clientY = event.clientY;
     });
@@ -22,19 +23,31 @@ export class AutoscrollController {
       if (!this.scrollContainer) return;
       const rect = this.scrollContainer.getBoundingClientRect();
       const mouseY = this.clientY - rect.top;
-      const d = this.curve((this.controlRangePx - mouseY) / this.controlRangePx);
-      if (mouseY > rect.height - this.controlRangePx) {
-        this.scrollContainer.scrollTo(0, this.scrollContainer.scrollTop + Math.ceil(d / (timestamp - lastFrame)));
-      }
+      console.log('mouseY', mouseY);
+      const speed = this.curve((this.controlRangePx - mouseY) / this.controlRangePx);
+      // Go up
       if (mouseY < this.controlRangePx) {
-        this.scrollContainer.scrollTo(0, this.scrollContainer.scrollTop + Math.ceil(d / (timestamp - lastFrame)));
+        if (this.scrollContainer.scrollTop !== 0) {
+          console.log('going up', speed);
+          const d = (this.scrollContainer.scrollTop - speed) / (timestamp - lastFrame);
+          this.scrollContainer.scrollTo(0, d);
+        }
+      }
+      // Go down
+      if (mouseY > (rect.height - this.controlRangePx)) {
+        if (this.scrollContainer.scrollTop !== this.scrollContainer.scrollHeight) {
+          console.log('go down', (speed / (timestamp - lastFrame)));
+          const d = (this.scrollContainer.scrollTop + speed) / (timestamp - lastFrame);
+          this.scrollContainer.scrollTo(0, d);
+        }
       }
       lastFrame = timestamp;
       if (this.enabled) nextFrame();
     });
+    nextFrame();
   }
-  // stop when dragover === false
   stop() {
+    console.log('stopping');
     this.enabled = false;
   }
 }
