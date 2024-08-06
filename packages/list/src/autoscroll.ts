@@ -1,6 +1,8 @@
 /**
  * Class for controlling autoscroll as the user drags towards the bottom of a scroll container
  * TODO: Add linear easing function over initial .5s-.1s
+ * https://www.desmos.com/calculator/zukjgk9iry
+ * y=ax^{3}+bx+c
  */
 export class AutoscrollController {
   enabled = false;
