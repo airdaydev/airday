@@ -72,6 +72,7 @@ export class ListDragContext {
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
+  // TODO: Optimisation: Faster list loading by caching walk!
   getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
     // TODO: Request animation frame
     return createMemo(() => {

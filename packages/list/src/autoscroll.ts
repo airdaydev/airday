@@ -10,7 +10,6 @@ export class AutoscrollController {
   clientY = 0;
   curve = (x: number) => 0.95 * x ** 2;
   start() {
-    console.log('starting');
     if (!this.scrollContainer) return;
     this.enabled = true;
     // TODO: Stop when inactive!
@@ -28,7 +27,6 @@ export class AutoscrollController {
         if (this.scrollContainer.scrollTop !== 0) {
           const lever = Math.abs(this.controlRangePx - mouseY) / this.controlRangePx;
           const speed = this.curve(lever) * this.controlRangePx ** 1.5;
-          console.log(lever);
           const d = (this.scrollContainer.scrollTop) - speed / (timestamp - lastFrame);
           this.scrollContainer.scrollTo(0, d);
         }
@@ -48,7 +46,6 @@ export class AutoscrollController {
     nextFrame();
   }
   stop() {
-    console.log('stopping');
     this.enabled = false;
   }
 }
