@@ -26,6 +26,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
       props.listDragContext.addToSelection(props.node);
       return;
     }
+    if (event.shiftKey) {
+      const first = props.listDragContext.getFirstIndexSelected();
+      console.log(first || 0, treeIndex());
+      props.listDragContext.selectNodesInRange(first || 0, treeIndex())
+    }
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
         event.preventDefault();

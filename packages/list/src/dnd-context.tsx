@@ -20,12 +20,14 @@ export class ListDragContext {
   isOrigin = false; // true = this is the list where the user has dragged from
   dragOver = createSignal(false); // Is the user currently dragging over this list
   lastTouchedIndexSignal = createSignal<number | undefined>();
+  projection: Accessor<Node[]>;
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
   constructor(treeState: TreeState, dndContext: DndContext) {
     this.treeState = treeState;
     this.dndContext = dndContext;
+    this.projection = this.initProjection();
   }
   isSelected(node: Node) {
     return createMemo(() => {
@@ -69,13 +71,25 @@ export class ListDragContext {
     }
     this.selection[1](selection);
   }
+  getFirstIndexSelected() {
+    // TODO: We could collect all sortkeys through an up-to-date hashmap
+    const projection = this.projection();
+    for (let i = 0; i < projection.length; i++) {
+        if (this.selection[0]().has(projection[i])) return i;
+    }
+    return false;
+}
+  selectNodesInRange(start: number, end: number) {
+    const newSelection = this.projection().slice(start, end + 1);
+    console.log(newSelection);
+    const selection = new Set(newSelection);
+    this.selection[1](selection);
+  }
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
-  // TODO: Optimisation: Faster list loading by caching walk!
-  getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
-    // TODO: Request animation frame
-    return createMemo(() => {
+  initProjection() {
+    return createMemo<Node[]>(() => {
       const visibleChildren: Node[] = [];
       let n = new Node();
       n.isRoot = true;
@@ -98,19 +112,25 @@ export class ListDragContext {
         }
         if (!node.expanded) return true;
       });
-      // Virtualisation
+      return visibleChildren;
+    });
+  }
+  // Projection of list i.e. visible children, often filtered by dragged items
+  getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
+    // Virtualisation
+    return createMemo(() => {
       const rowHeight = 28;
       const [containerHeight, offset] = containerVector();
       const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
       const excess = (offset % rowHeight);
       const start = Math.max(0, (offset - excess) - (buffer * rowHeight)) / rowHeight;
       const renderCount = Math.floor(containerHeight / rowHeight) + (buffer * 2);
-      let window = visibleChildren.slice(start, start + renderCount);
+      let window = this.projection().slice(start, start + renderCount);
       return {
         window,
         start,
-      };
-    });
+      }
+    })
   }
   /**
    * This count includes total item count minus the selected items (excluding origin) when dragging

@@ -75,9 +75,9 @@ export const Tree = (props: TreeComponentProps) => {
         `}
         ref={scrollContainerRef}
         onScroll={(event) => {
+          // TODO: This should match the projection buffer
           if (Math.abs(scrollSignal[0]() - event.target.scrollTop) > (28 * 10)) {
-            requestAnimationFrame(() =>
-              scrollSignal[1](event.target.scrollTop))
+            scrollSignal[1](event.target.scrollTop)
           }
         }}
         onMouseLeave={() => listDragContext.leave()}

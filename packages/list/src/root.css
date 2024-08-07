@@ -71,3 +71,12 @@
   flex-grow: 1;
   min-height: 56px;
 }
+
+@keyframes scaleUp {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}

@@ -58,13 +58,14 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
         ref={stackRef}
         style={`
           position: relative;
+          opacity: 0.9;
           z-index: 100;
           top: -100%;
           left: -100%;
           box-shadow: 1px 1px 2px #0000002e;
           max-width: 18em;
           height: 26px;
-          // scale: 1;
+          animation: scaleUp 0.1s ease-in-out forwards;
         `}
       >
       </div>
