@@ -11,15 +11,13 @@ export class AutoscrollController {
   controlRangePx = 84;
   clientY = 0;
   curve = (x: number) => 0.95 * x ** 2;
+  updateMouse = (event: MouseEvent) => { this.clientY = event.clientY }
   start() {
     if (!this.scrollContainer) return;
     this.enabled = true;
-    // TODO: Stop when inactive!
-    this.scrollContainer.addEventListener('mousemove', (event) => {
-      this.clientY = event.clientY;
-    });
+    this.scrollContainer.addEventListener('mousemove', this.updateMouse);
     let lastFrame = performance.now();
-    // TODO: Do nothing when reached bottom
+    // TODO: Introduce acceleration
     const nextFrame = () => requestAnimationFrame((timestamp) => {
       if (!this.scrollContainer) return;
       const rect = this.scrollContainer.getBoundingClientRect();
@@ -27,19 +25,20 @@ export class AutoscrollController {
       // Go up
       if (mouseY < this.controlRangePx) {
         if (this.scrollContainer.scrollTop !== 0) {
-          const lever = Math.abs(this.controlRangePx - mouseY) / this.controlRangePx;
-          const speed = this.curve(lever) * this.controlRangePx ** 1.5;
-          const d = (this.scrollContainer.scrollTop) - speed / (timestamp - lastFrame);
-          this.scrollContainer.scrollTo(0, d);
+          // TODO: Introduce acceleration
+          const throttle = Math.abs(this.controlRangePx - mouseY) / this.controlRangePx;
+          const velocity = this.curve(throttle) * this.controlRangePx ** 1.5;
+          const y = (this.scrollContainer.scrollTop) - velocity / (timestamp - lastFrame);
+          this.scrollContainer.scrollTo(0, y);
         }
       }
       // Go down
       if (mouseY > (rect.height - this.controlRangePx)) {
         if (this.scrollContainer.scrollTop !== this.scrollContainer.scrollHeight) {
-          const lever = Math.abs(rect.height - mouseY - this.controlRangePx) / this.controlRangePx;
-          const speed = this.curve(lever) * this.controlRangePx ** 1.5;
-          const d = (this.scrollContainer.scrollTop) + speed / (timestamp - lastFrame);
-          this.scrollContainer.scrollTo(0, d);
+          const throttle = Math.abs(rect.height - mouseY - this.controlRangePx) / this.controlRangePx;
+          const velocity = this.curve(throttle) * this.controlRangePx ** 1.5;
+          const y = (this.scrollContainer.scrollTop) + velocity / (timestamp - lastFrame);
+          this.scrollContainer.scrollTo(0, y);
         }
       }
       lastFrame = timestamp;
@@ -49,5 +48,6 @@ export class AutoscrollController {
   }
   stop() {
     this.enabled = false;
+    this.scrollContainer?.removeEventListener('mousemove', this.updateMouse);
   }
 }
