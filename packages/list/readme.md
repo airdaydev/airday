@@ -74,6 +74,8 @@ pnpm run dev
 - Escape to deselect
 - Automatically deselect on blur
 - option + arrow to move up / down
+- gg/G = top/bottom of list
+- double click to open item for editing / quick editing?
 - command + down/up to jump to top/bottom of list
 - Mobile controls
 

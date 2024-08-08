@@ -91,7 +91,6 @@ export class ListDragContext {
   }
   selectNodesInRange(start: number, end: number) {
     const newSelection = this.projection().slice(start, end + 1);
-    console.log(newSelection);
     const selection = new Set(newSelection);
     this.selection[1](selection);
   }
