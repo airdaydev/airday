@@ -2,7 +2,6 @@
   position: absolute;
   flex-shrink: 0;
   width: 100%;
-  height: 28px;
 }
 .item.fade-enter-active,
 .item.fade-exit-active {
@@ -10,16 +9,12 @@
 }
 .item.fade-enter,
 .item.fade-exit-to {
-  height: 0px;
   opacity: 0;
-}
-.item.fade-enter {
-  height: 28px;
 }
 .item_internal {
   position: absolute;
   width: 100%;
-  height: 28px;
+  height: 100%;
   z-index: 2;
 }
 .item_internal {
@@ -27,15 +22,15 @@
   top: 0px;
 }
 .item_internal.below {
-  top: 28px;
+  top: 100%;
 }
 .item_internal.above {
-  top: -28px;
+  top: -100%;
 }
 
 .placeholder {
   width: 100%;
-  height: 28px;
+  height: 100%;
   z-index: 0;
   background: #151515;
   transition: background 80ms;

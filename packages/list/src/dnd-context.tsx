@@ -24,10 +24,12 @@ export class ListDragContext {
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
-  constructor(treeState: TreeState, dndContext: DndContext) {
+  itemHeight: number;
+  constructor(treeState: TreeState, dndContext: DndContext, itemHeight: number) {
     this.treeState = treeState;
     this.dndContext = dndContext;
     this.projection = this.initProjection();
+    this.itemHeight = itemHeight;
   }
   isSelected(node: Node) {
     return createMemo(() => {
@@ -127,7 +129,7 @@ export class ListDragContext {
   getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
     // Virtualisation
     return createMemo(() => {
-      const rowHeight = 28;
+      const rowHeight = this.itemHeight;
       const [containerHeight, offset] = containerVector();
       const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
       const excess = (offset % rowHeight);

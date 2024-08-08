@@ -13,6 +13,7 @@ interface TreeComponentProps {
   uncontrolledData?: GenericNode<any>;
   dndContext: DndContext;
   data: GenericNode<any>,
+  itemHeight: number;
 }
 
 export type ContainerVector = [scrollHeight: number, scrollTop: number];
@@ -28,7 +29,7 @@ export const Tree = (props: TreeComponentProps) => {
     return [heightSignal[0](), scrollSignal[0]()];
   });
   let listDragContext = new ListDragContext(
-    props.state, props.dndContext,
+    props.state, props.dndContext, props.itemHeight,
   );
   onMount(() => {
     if (!scrollContainerRef) return;
@@ -76,7 +77,7 @@ export const Tree = (props: TreeComponentProps) => {
         ref={scrollContainerRef}
         onScroll={(event) => {
           // TODO: This should match the projection buffer
-          if (Math.abs(scrollSignal[0]() - event.target.scrollTop) > (28 * 10)) {
+          if (Math.abs(scrollSignal[0]() - event.target.scrollTop) > (props.itemHeight * 10)) {
             scrollSignal[1](event.target.scrollTop)
           }
         }}
@@ -87,7 +88,7 @@ export const Tree = (props: TreeComponentProps) => {
               top: 0;
               left: 0;
               width: 100%;
-              min-height: ${listDragContext.presentCount()() * 28}px;`}
+              min-height: ${listDragContext.presentCount()() * props.itemHeight}px;`}
           >
             <TransitionGroup name="fade">
               <For each={signal().window}>
@@ -97,6 +98,7 @@ export const Tree = (props: TreeComponentProps) => {
                     index={index}
                     virtualisedList={signal}
                     node={node}
+                    itemHeight={props.itemHeight}
                     Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
                     listDragContext={listDragContext}
                   />
@@ -124,7 +126,7 @@ export const Tree = (props: TreeComponentProps) => {
               {listDragContext.dndContext.isDragging[0]() &&
                 (listDragContext.lastTouchedIndexSignal[0]() === (signal().window.length + signal().start)) &&
                 !listDragContext.isOrigin && (
-                <div class="placeholder" />
+                <div class="placeholder" style={`max-height: ${props.itemHeight}px`} />
               )}
             </TransitionGroup>
           </div>

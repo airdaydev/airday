@@ -35,6 +35,7 @@ render(() => (
       <Tree
         dndContext={dndContext}
         state={treeStateA}
+        itemHeight={28}
         // draggable
         // multiselect
         // height={(node) => {}} // Node height calculation function or number
@@ -46,6 +47,7 @@ render(() => (
       <Tree
         dndContext={dndContext}
         state={treeStateB}
+        itemHeight={28}
       />
     </div>
     <div style={`display: flex; flex-direction: column; height: 100%;`}>
@@ -54,6 +56,7 @@ render(() => (
       <Tree
         dndContext={dndContext}
         state={treeStateC}
+        itemHeight={28}
       />
     </div>
   </div>
