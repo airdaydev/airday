@@ -39,6 +39,9 @@ export const TextNodeComponent: NodeComponentType = (props) => {
       onMouseDown={(event) => {
         props.onMouseDown(event)
       }}
+      onTouchStart={(event) => {
+        props.onTouchStart(event)
+      }}
       onDblClick={(event) => {
         event.preventDefault();
         props.select();

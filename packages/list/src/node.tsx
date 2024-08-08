@@ -20,6 +20,12 @@ export const NodeContainer = (props: NodeContainerProps) => {
   onCleanup(() => props.node.unsubscribe());
   const draggedOn = createSignal(0);
   const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
+  const onTouchStart = (event: TouchEvent) => {
+    // TODO: add user-select:noselect; to document on start, remove on stop.
+    event.preventDefault();
+    // After .5s of holding (use gradient?), lift item for dragging, otherwise ignore
+    console.log(event);
+  }
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
@@ -177,6 +183,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         >
           <props.Component
             onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
             node={props.node}
             ariaSelected={isSelected()}
             select={() => props.listDragContext.selectOne(props.node)}
@@ -193,6 +200,7 @@ export type NodeComponentType = Component<{
   node: Node,
   ariaSelected: boolean,
   onMouseDown: (event: MouseEvent) => void,
+  onTouchStart: (event: TouchEvent) => void,
   select: () => void,
 }>;
 
@@ -202,6 +210,7 @@ export const DefaultNodeComponent: NodeComponentType = (props) => {
       aria-selected={props.ariaSelected}
       class={styles['tree-item']}
       onMouseDown={props.onMouseDown}
+      onTouchStart={props.onTouchStart}
     >
       {props.node.id}
     </div>
