@@ -26,10 +26,21 @@ export const NodeContainer = (props: NodeContainerProps) => {
       props.listDragContext.addToSelection(props.node);
       return;
     }
-    if (event.shiftKey) {
+    // Shift key = range selection
+    // TODO: Define shift key but nothing selected behaviour?
+    if (event.shiftKey && props.listDragContext.selection[0]().size) {
       const first = props.listDragContext.getFirstIndexSelected();
-      console.log(first || 0, treeIndex());
-      props.listDragContext.selectNodesInRange(first || 0, treeIndex())
+      if (first === false) return; // no items found, TODO: how could this be the case?
+      if (treeIndex() < first) {
+        // shift up
+        const last = props.listDragContext.getLastIndexSelected();
+        if (!last) return;
+        props.listDragContext.selectNodesInRange(treeIndex(), last);
+      } else {
+        // shift down
+        props.listDragContext.selectNodesInRange(first, treeIndex());
+      }
+      return;
     }
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {

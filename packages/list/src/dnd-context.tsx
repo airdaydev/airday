@@ -78,7 +78,15 @@ export class ListDragContext {
         if (this.selection[0]().has(projection[i])) return i;
     }
     return false;
-}
+  }
+  getLastIndexSelected() {
+    // TODO: We could collect all sortkeys through an up-to-date hashmap
+    const projection = this.projection();
+    for (let i = projection.length - 1; i >= 0 ; i--) {
+        if (this.selection[0]().has(projection[i])) return i;
+    }
+    return false;
+  }
   selectNodesInRange(start: number, end: number) {
     const newSelection = this.projection().slice(start, end + 1);
     console.log(newSelection);
