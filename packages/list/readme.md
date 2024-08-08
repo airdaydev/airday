@@ -83,6 +83,7 @@ pnpm run dev
 - Dynamically retrieved, variable heights
 - Tree
 - Prevent infinite recursion in tree
+- Bug - on refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
 - Rare bug - take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
 
 # Other options:
