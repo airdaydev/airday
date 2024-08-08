@@ -70,10 +70,9 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Autoscroll down
+- Which list is in focus? / keyboard controller
 - Escape to deselect
 - Automatically deselect on blur
-- shift to select range
 - option + arrow to move up / down
 - command + down/up to jump to top/bottom of list
 - Mobile controls
@@ -83,8 +82,11 @@ pnpm run dev
 - Dynamically retrieved, variable heights
 - Tree
 - Prevent infinite recursion in tree
-- Bug - on refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
-- Rare bug - take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
+
+## Bugs
+- On refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
+- When dragging directly down to the end of list with overflow-y, the list jumps up and back down again! I suspect it is a value not resetting in the autoscroll controller after leaving and rejoining.
+- Rare: take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
 
 # Other options:
 - [Draggable](https://shopify.github.io/draggable/examples/sort-animation.html)
