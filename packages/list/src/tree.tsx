@@ -97,6 +97,7 @@ export const Tree = (props: TreeComponentProps) => {
                   // TODO: Consider using context here instead
                   <NodeContainer
                     index={index}
+                    autoscroller={autoscroller}
                     virtualisedList={signal}
                     node={node}
                     itemHeight={props.itemHeight}

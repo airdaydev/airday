@@ -12,6 +12,7 @@ export class AutoscrollController {
   clientY = 0;
   curve = (x: number) => 0.95 * x ** 2;
   updateMouse = (event: MouseEvent) => { this.clientY = event.clientY }
+  updateTouch = (event: TouchEvent) => { this.clientY = event.touches[0].clientY }
   start() {
     if (!this.scrollContainer) return;
     this.enabled = true;
