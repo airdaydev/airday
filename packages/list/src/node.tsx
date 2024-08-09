@@ -1,9 +1,10 @@
-import { onCleanup, Component, Accessor, on, createEffect, createSignal, createMemo } from 'solid-js';
+import { onCleanup, Component, Accessor, on, createEffect, createSignal, createMemo, onMount } from 'solid-js';
 import { TransitionGroup } from 'solid-transition-group';
 import { Node } from './state';
 import { distance } from './utils';
 import './root.css';
 import { ListDragContext, VirtualisedList } from './dnd-context';
+import { touchBandaid } from './touch-bandaid';
 
 export interface NodeContainerProps {
   node: Node;
@@ -21,6 +22,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
   const draggedOn = createSignal(0);
   const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
   // Touch interactions
+  onMount(() => {
+    console.log('mounting!!');
+    touchBandaid.onTouchEnter(ref, onUIEnter);
+  })
   const onTouchStart = (event: TouchEvent) => {
     event.preventDefault();
     props.listDragContext.setLastTouchedIndex(treeIndex());
@@ -41,12 +46,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
       ref.addEventListener('touchmove', (moveEvent) => {
         props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         const el = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        if (el) touchBandaid.call(el)
         // TODO: This could quickly become problematic given nested elements, may have to traverse ancestors
-        const index = el?.getAttribute('data-index');
-        if (!index) return;
-        const newIndex = Number(index) - draggedOn[0]();
-        props.listDragContext.setLastTouchedIndex(newIndex);
-        props.listDragContext.dragOver[1](true);
+        // const index = el?.getAttribute('data-index');
+        // if (!index) return;
+        // const newIndex = Number(index) - draggedOn[0]();
+        // props.listDragContext.setLastTouchedIndex(newIndex);
+        // props.listDragContext.dragOver[1](true);
       })
       startDrag();
     }, 250)
@@ -160,7 +166,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         draggedOn[1](0);
       }
   }));
-  const onMouseEnter = () => {
+  const onUIEnter = () => {
     // This looks at where the previous draggedOn index was, as its final position
     // is determined by whether the user drags up or down onto it.
     // N.b. the sequence here prevents a flicker on drag start.
@@ -209,7 +215,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             below: draggedOn[0]() === -1,
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
-          onMouseEnter={onMouseEnter}
+          onMouseEnter={onUIEnter}
         >
           <props.Component
             onMouseDown={onMouseDown}
