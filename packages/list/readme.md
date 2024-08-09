@@ -70,6 +70,7 @@ pnpm run dev
 ```
 
 ## Roadmap
+- Get autoscroller touch version working with other lists
 - Which list is in focus? / keyboard controller
 - Escape to deselect
 - Automatically deselect on blur
@@ -77,6 +78,8 @@ pnpm run dev
 - gg/G = top/bottom of list
 - double click to open item for editing / quick editing?
 - command + down/up to jump to top/bottom of list
+- Disable placeholder when autoscrolling (coz it's jaaanky)
+- vim key toggle (but maybe on the actual app itself depending on controller state)
 
 ## Stretch goals
 - Variable heights

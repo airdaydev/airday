@@ -48,7 +48,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       props.listDragContext.dndContext.moveDragCoords(event.touches[0].clientX, event.touches[0].clientY); // prevents flash
       let el: Element | null = null;
       ref.addEventListener('touchmove', (moveEvent) => {
-        props.autoscroller.updateTouch(moveEvent);
+        props.autoscroller.updateTouch(moveEvent); // TODO: Get it working with other lists
         props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         const nextEl = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         if (nextEl === el) return;
