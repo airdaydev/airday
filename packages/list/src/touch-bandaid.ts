@@ -5,9 +5,9 @@
  */
 
 class TouchBandaid {
-  map = new Map<HTMLElement, () => void>();
+  map = new Map<Element, () => void>();
   constructor() {}
-  onTouchEnter(node: HTMLElement, func: () => void): () => void {
+  onTouchEnter(node: Element, func: () => void): () => void {
     const cb = this.map.get(node);
     if (cb) {
       console.warn('Attempted to overwrite TouchBandaid record');
@@ -16,7 +16,7 @@ class TouchBandaid {
     this.map.set(node, func);
     return () => this.map.delete(node);
   }
-  call(node: HTMLElement) {
+  call(node: Element) {
     const cb = this.map.get(node);
     if (cb) cb();
   }

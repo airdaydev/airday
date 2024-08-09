@@ -41,9 +41,7 @@ export class ListDragContext {
   }
   leave() {
     if (this.dndContext.isDragging) this.dragOver[1](false)
-    if (this.isOrigin) {
-      return;
-    }
+    if (this.isOrigin) { return; } // Keeps origin in place for origin list
     this.reset();
   }
   startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {

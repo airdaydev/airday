@@ -18,16 +18,20 @@ export interface NodeContainerProps {
 export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
   const isSelected = props.listDragContext.isSelected(props.node);
-  onCleanup(() => props.node.unsubscribe());
   const draggedOn = createSignal(0);
   const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
   // Touch interactions
+  let touchBandaidUnsub: () => void;
   onMount(() => {
-    console.log('mounting!!');
-    touchBandaid.onTouchEnter(ref, onUIEnter);
-  })
+    touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
+  });
+  onCleanup(() => {
+    props.node.unsubscribe()
+    if (touchBandaidUnsub) touchBandaidUnsub();
+});
   const onTouchStart = (event: TouchEvent) => {
     event.preventDefault();
+    document.body.classList.add('touch-no-select'); // Prevent context menu
     props.listDragContext.setLastTouchedIndex(treeIndex());
     ref.addEventListener('touchend', () => {
       props.listDragContext.stopDrag();
@@ -38,21 +42,17 @@ export const NodeContainer = (props: NodeContainerProps) => {
       // Start dragging
       props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
     };
-    document.body.classList.add('touch-no-select'); // Prevent context menu
     const pullUpTimeout = setTimeout(() => {
       // TODO: add touching to classList (animated)
       props.listDragContext.selectOne(props.node);
       props.listDragContext.dndContext.moveDragCoords(event.touches[0].clientX, event.touches[0].clientY); // prevents flash
+      let el: Element | null = null;
       ref.addEventListener('touchmove', (moveEvent) => {
         props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
-        const el = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        const nextEl = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        if (nextEl === el) return;
+        el = nextEl;
         if (el) touchBandaid.call(el)
-        // TODO: This could quickly become problematic given nested elements, may have to traverse ancestors
-        // const index = el?.getAttribute('data-index');
-        // if (!index) return;
-        // const newIndex = Number(index) - draggedOn[0]();
-        // props.listDragContext.setLastTouchedIndex(newIndex);
-        // props.listDragContext.dragOver[1](true);
       })
       startDrag();
     }, 250)

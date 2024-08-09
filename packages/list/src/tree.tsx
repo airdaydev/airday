@@ -64,16 +64,16 @@ export const Tree = (props: TreeComponentProps) => {
   return (
     <>
       <div
-        style={`
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          width: 18em;
-          height: 100%;
-          z-index: 2;
-          color: black;
-          overflow-y: hidden;
-        `}
+        style={{
+          display: 'flex',
+          'flex-direction': 'column',
+          position: 'relative',
+          width: '18em',
+          height: '100%',
+          'z-index': 2,
+          color: 'black',
+          'overflow-y': props.dndContext.isDragging[0]() ? 'hidden' : 'scroll',
+        }}
         ref={scrollContainerRef}
         onScroll={(event) => {
           // TODO: This should match the projection buffer
