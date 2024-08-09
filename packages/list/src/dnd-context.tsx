@@ -165,7 +165,7 @@ export class DndContext {
   activeContext = createSignal<string | null>(null);
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
-  dragMove = createSignal<[number, number]>([0, 0]);
+  dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   constructor() { }
   startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     // Set up dragged element
