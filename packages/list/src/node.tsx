@@ -41,9 +41,8 @@ export const NodeContainer = (props: NodeContainerProps) => {
       ref.addEventListener('touchmove', (moveEvent) => {
         props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         const el = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
-        // TODO: This could quickly become problematic
+        // TODO: This could quickly become problematic given nested elements, may have to traverse ancestors
         const index = el?.getAttribute('data-index');
-        console.log(index);
         if (!index) return;
         const newIndex = Number(index) - draggedOn[0]();
         props.listDragContext.setLastTouchedIndex(newIndex);
