@@ -1,6 +1,8 @@
 import {
   Accessor,
+  createEffect,
   createMemo, createSignal, createUniqueId,
+  on,
 } from 'solid-js';
 import { Node, TreeState } from './state';
 import { walk } from './tree-utils';
@@ -163,12 +165,22 @@ export class DndContext {
   activeContext = createSignal<string | null>(null);
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
+  dragMove = createSignal<[number, number]>([0, 0]);
   constructor() { }
   startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
     this.isDragging[1](true);
+  }
+  /** mouse or touch coords */
+  moveDragCoords(x: number, y: number) {
+    this.dragMove[1]([x, y]);
+  }
+  onDragMove(callback: (coords: [number, number]) => void) {
+    return createEffect(() => {
+      callback(this.dragMove[0]())
+    });
   }
   stopDrag() {
     this.elClickOffset = [0, 0];

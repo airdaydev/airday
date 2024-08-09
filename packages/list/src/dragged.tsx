@@ -25,7 +25,14 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
         }
     })
   };
-  // const [mousePos, setMousePos] = useState<[number, number]>([0, 0]);
+  dndContext.onDragMove((coords) => {
+    requestAnimationFrame(() => {
+      if (stackRef) {
+          stackRef.style.left = `${window.scrollX + coords[0] - dndContext.elClickOffset[0]}px`;
+          stackRef.style.top = `${window.scrollY + coords[1] - dndContext.elClickOffset[1]}px`;
+      }
+    })
+  });
   onMount(() => {
     // Luckily, resize events should be very rare while dragging
     // This function allows draggable area to cover the entire document

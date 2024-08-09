@@ -23,19 +23,24 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Touch interactions
   const onTouchStart = (event: TouchEvent) => {
     event.preventDefault();
+    ref.addEventListener('touchend', () => {
+      props.listDragContext.stopDrag();
+    }, { once: true });
     const startDrag = () => {
       const targetBounding = event.target.getBoundingClientRect();
       const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
       // Start dragging
       props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
-      window.addEventListener('touchend', () => {
-        console.log('touchend!')
-        props.listDragContext.stopDrag();
-      }, { once: true });
     };
     document.body.classList.add('touch-no-select'); // Prevent context menu
     const pullUpTimeout = setTimeout(() => {
       // TODO: add touching to classList (animated)
+      props.listDragContext.dndContext.moveDragCoords(event.touches[0].clientX, event.touches[0].clientY); // prevents flash
+      ref.addEventListener('touchmove', (moveEvent) => {
+        props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        const el = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        el?.getAttribute('index');
+      })
       startDrag();
     }, 250)
     event.preventDefault();
@@ -169,6 +174,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   return (
     <div
       class="item"
+      data-type="node"
       style={`top: ${treeIndex() * props.itemHeight}px; height: ${props.itemHeight}px;`}
     >
       {draggedOn[0]() === -1 && (
@@ -204,6 +210,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
             node={props.node}
+            index={treeIndex()}
             ariaSelected={isSelected()}
             select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}
