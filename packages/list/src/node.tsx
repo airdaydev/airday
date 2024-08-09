@@ -23,6 +23,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Touch interactions
   const onTouchStart = (event: TouchEvent) => {
     event.preventDefault();
+    props.listDragContext.setLastTouchedIndex(treeIndex());
     ref.addEventListener('touchend', () => {
       props.listDragContext.stopDrag();
     }, { once: true });
@@ -35,11 +36,18 @@ export const NodeContainer = (props: NodeContainerProps) => {
     document.body.classList.add('touch-no-select'); // Prevent context menu
     const pullUpTimeout = setTimeout(() => {
       // TODO: add touching to classList (animated)
+      props.listDragContext.selectOne(props.node);
       props.listDragContext.dndContext.moveDragCoords(event.touches[0].clientX, event.touches[0].clientY); // prevents flash
       ref.addEventListener('touchmove', (moveEvent) => {
         props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         const el = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
-        el?.getAttribute('index');
+        // TODO: This could quickly become problematic
+        const index = el?.getAttribute('data-index');
+        console.log(index);
+        if (!index) return;
+        const newIndex = Number(index) - draggedOn[0]();
+        props.listDragContext.setLastTouchedIndex(newIndex);
+        props.listDragContext.dragOver[1](true);
       })
       startDrag();
     }, 250)
@@ -94,7 +102,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     if (!isSelected()) props.listDragContext.selectOne(props.node);
   };
   const isDragOrigin = createMemo(() => {
-    const trigger = props.listDragContext.dndContext.isDragging[0]();
+    props.listDragContext.dndContext.isDragging[0](); // trigger
     return props.node === props.listDragContext.originNode;
   });
   // Determines how the node reacts as a list item (typically, shifting up and down)
@@ -157,11 +165,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // This looks at where the previous draggedOn index was, as its final position
     // is determined by whether the user drags up or down onto it.
     // N.b. the sequence here prevents a flicker on drag start.
-    const draggingOver = treeIndex();
-    const newIndex = draggingOver - draggedOn[0]();
+    const newIndex = treeIndex() - draggedOn[0]();
     props.listDragContext.setLastTouchedIndex(newIndex);
     props.listDragContext.dragOver[1](true);
-    if (!props.listDragContext.dndContext.isDragging[0]()) return;
   };
   /**
    * Hiding the placeholder:
@@ -189,12 +195,12 @@ export const NodeContainer = (props: NodeContainerProps) => {
         )}
       </TransitionGroup>
       {isDragOrigin() && (<div
+        data-index={treeIndex()}
         classList={{
           'placeholder': true,
           'origin': true,
           'visible': props.listDragContext.dragOver[0](),
         }}
-        onMouseEnter={onMouseEnter}
       />)}
       {!isDragOrigin() && (
         <div

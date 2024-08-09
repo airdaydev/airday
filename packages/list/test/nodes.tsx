@@ -47,6 +47,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
         props.select();
         props.node.updateContent('gogogoo')
       }}
+      data-index={props.index}
       ref={props.ref}
     >
       {node().id} - {node().content}
