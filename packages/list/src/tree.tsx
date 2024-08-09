@@ -72,7 +72,7 @@ export const Tree = (props: TreeComponentProps) => {
           height: 100%;
           z-index: 2;
           color: black;
-          overflow-y: scroll;
+          overflow-y: hidden;
         `}
         ref={scrollContainerRef}
         onScroll={(event) => {

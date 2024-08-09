@@ -1,5 +1,8 @@
 body {
   font-family: monospace;
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
 }
 
 :root {

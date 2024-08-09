@@ -20,12 +20,31 @@ export const NodeContainer = (props: NodeContainerProps) => {
   onCleanup(() => props.node.unsubscribe());
   const draggedOn = createSignal(0);
   const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
+  // Touch interactions
   const onTouchStart = (event: TouchEvent) => {
-    // TODO: add user-select:noselect; to document on start, remove on stop.
     event.preventDefault();
-    // After .5s of holding (use gradient?), lift item for dragging, otherwise ignore
-    console.log(event);
+    const startDrag = () => {
+      const targetBounding = event.target.getBoundingClientRect();
+      const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
+      // Start dragging
+      props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
+      window.addEventListener('touchend', () => {
+        console.log('touchend!')
+        props.listDragContext.stopDrag();
+      }, { once: true });
+    };
+    document.body.classList.add('touch-no-select'); // Prevent context menu
+    const pullUpTimeout = setTimeout(() => {
+      // TODO: add touching to classList (animated)
+      startDrag();
+    }, 250)
+    event.preventDefault();
+    document.addEventListener('touchend', () => {
+      clearTimeout(pullUpTimeout);
+      document.body.classList.remove('touch-no-select');
+    })
   }
+  // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
