@@ -35,6 +35,7 @@ export const Tree = (props: TreeComponentProps) => {
     if (!scrollContainerRef) return;
     observeHeight(scrollContainerRef, heightSignal);
     autoscroller.scrollContainer = scrollContainerRef;
+    listDragContext.scrollContainerRef = scrollContainerRef;
   });
 
   createEffect(on(() => [

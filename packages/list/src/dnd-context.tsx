@@ -27,9 +27,11 @@ export class ListDragContext {
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
   itemHeight: number;
+  scrollContainerRef?: HTMLElement;
   constructor(treeState: TreeState, dndContext: DndContext, itemHeight: number) {
     this.treeState = treeState;
     this.dndContext = dndContext;
+    dndContext.listContexts.add(this);
     this.projection = this.initProjection();
     this.itemHeight = itemHeight;
   }
@@ -160,7 +162,8 @@ export class ListDragContext {
 // This mostly controls the dragged item
 export class DndContext {
   isDragging = createSignal(false);
-  activeContext = createSignal<string | null>(null);
+  activeContext = createSignal<string | null>(null); // TODO: Use
+  listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
@@ -170,6 +173,14 @@ export class DndContext {
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
     this.isDragging[1](true);
+  }
+  checkLeave(el: Element) {
+    this.listContexts.forEach((ctx) => {
+      if (ctx.dragOver[0]()) {
+        const contains = ctx.scrollContainerRef?.contains(el);
+        if (!contains) ctx.leave();
+      }
+    })
   }
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {

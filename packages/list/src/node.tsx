@@ -52,7 +52,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
         const nextEl = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
         if (nextEl === el) return;
         el = nextEl;
-        if (el) touchBandaid.call(el)
+        if (el) {
+          touchBandaid.call(el); // This simulates onEnter
+          props.listDragContext.dndContext.checkLeave(el); // This simulates onLeaveList
+        }
       })
       startDrag();
     }, 250)

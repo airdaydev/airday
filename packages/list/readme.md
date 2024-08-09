@@ -77,7 +77,6 @@ pnpm run dev
 - gg/G = top/bottom of list
 - double click to open item for editing / quick editing?
 - command + down/up to jump to top/bottom of list
-- Mobile controls
 
 ## Stretch goals
 - Variable heights
@@ -86,6 +85,7 @@ pnpm run dev
 - Prevent infinite recursion in tree
 
 ## Bugs
+- Touch drag - when moving back and forth between foreign lists a few times, the simulated touch enter stuff doesn't always work (state bug?)
 - On refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
 - When dragging directly down to the end of list with overflow-y, the list jumps up and back down again! I suspect it is a value not resetting in the autoscroll controller after leaving and rejoining.
 - Rare: take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
