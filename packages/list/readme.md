@@ -70,16 +70,21 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Get autoscroller touch version working with other lists
+- TODO: Make tree state truly mutable, ensuring all state actions manually update signal.
+- Bug: Main transition group failing to remove items (obvious in deleting!)
+- Bug: Deleting from the bottom to the top of the list - shows a possible miscalculation of index - perhaps - all the nodes are gone! even unselected.
 - Which list is in focus? / keyboard controller
+- Get autoscroller touch version working with other lists
 - Escape to deselect
 - Automatically deselect on blur
 - option + arrow to move up / down
+- ctrl+a to select all
 - gg/G = top/bottom of list
 - double click to open item for editing / quick editing?
 - command + down/up to jump to top/bottom of list
 - Disable placeholder when autoscrolling (coz it's jaaanky)
 - vim key toggle (but maybe on the actual app itself depending on controller state)
+- State change needs to trigger a list resize! e.g. important in the case of deleting items
 
 ## Stretch goals
 - Variable heights

@@ -76,11 +76,15 @@ export class TreeState {
     return { isRoot: true, children: this.childrenSignal[0]() }
   }
   delete(set: Set<Node>) {
-    if (!set.size) return;
+    if (!set || !set.size) {
+      console.warn('Attempted to delete empty set of items');
+      return;
+    }
     if (this.mutate === false) {
       const filtered = filter<any>(this.mutableRoot, (node) => {
         return !set.has(node);
       }).children;
+      console.log(filtered, 'nodes that are left!!');
       this.childrenSignal[1](() => filtered);
     }
   }
@@ -108,6 +112,7 @@ export class TreeState {
         if (expandedOnly && !node.expanded) return true;
         return false;
       }, undefined);
+      console.log('new count', count -1);
       return count - 1; // accounts for root node
     });
   }

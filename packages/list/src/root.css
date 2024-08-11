@@ -11,11 +11,15 @@
 }
 .item.fade-enter-active,
 .item.fade-exit-active {
-  transition: height 120ms;
+  transition: height 1000ms;
 }
 .item.fade-enter,
 .item.fade-exit-to {
+  /* height: 0; */
   opacity: 0;
+}
+.slide-fade-enter {
+  opacity: 1;
 }
 .item_internal {
   position: absolute;

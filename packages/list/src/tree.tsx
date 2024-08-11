@@ -52,7 +52,8 @@ export const Tree = (props: TreeComponentProps) => {
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
-      props.state.delete(props.state.selection);
+      console.log('huhhh');
+      props.state.delete(listDragContext.selection[0]());
     }
   };
   document.addEventListener('keyup', kbHandler)
