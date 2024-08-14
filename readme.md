@@ -15,6 +15,8 @@ Trash = statically ordered list
 ## References
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
 - https://tauri.app/
+- https://keystatic.com/docs/installation-astro
+- https://klim.co.nz/buy/soehne/
 
 ## Cases for tagging & colours:
 - E.g. Cross domain or unsorted things between multiple diff locations that do not need their own category e.g. Several items that need to be done at location #1, others at location #2

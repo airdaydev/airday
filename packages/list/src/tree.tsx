@@ -92,7 +92,7 @@ export const Tree = (props: TreeComponentProps) => {
               width: 100%;
               min-height: ${listDragContext.presentCount()() * props.itemHeight}px;`}
           >
-            <TransitionGroup name="fade">
+            {/* <TransitionGroup name="fade"> */}
               <For each={signal().window}>
                 {(node, index) => (
                   // TODO: Consider using context here instead
@@ -107,7 +107,7 @@ export const Tree = (props: TreeComponentProps) => {
                   />
                 )}
               </For>
-            </TransitionGroup>
+            {/* </TransitionGroup> */}
           </div>
           <div
             class='list-backdrop'
