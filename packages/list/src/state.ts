@@ -12,7 +12,7 @@ export interface NodeSignalProps {
 export class Node {
   id: string;
   children?: Node[] = [];
-  isRoot = false;
+  isRoot: boolean = false;
   depth = 0; // cached
   expanded = true;
   parent?: Node;
@@ -53,6 +53,11 @@ export class Node {
   }
 }
 
+export class RootNode extends Node {
+  isRoot = true;
+  children: Node[] = [];
+}
+
 interface TreeStateOpts {
   mutate?: boolean;
   loader?: (node: GenericNode<any>) => Node;
@@ -72,8 +77,11 @@ export class TreeState {
     this.id = createUniqueId();
     this.loader = opts.loader;
   }
-  get mutableRoot() {
-    return { isRoot: true, children: this.childrenSignal[0]() }
+  get mutableRoot(): RootNode {
+    const root = new RootNode();
+    root.children = this.childrenSignal[0]();
+    root.isRoot = true;
+    return root;
   }
   delete(set: Set<Node>) {
     if (!set || !set.size) {
@@ -113,6 +121,33 @@ export class TreeState {
       }, undefined);
       return count - 1; // accounts for root node
     });
+  }
+  // TODO: Moving layers between trees (might be better to do a 2 parter - add & remove)
+  moveLayersWithinTree(nodes: Node[], newNode: Node | null, newPosition: number) {
+    // TODO: Filter out immovable nodes
+    const containerChildren = newNode === null ? this.mutableRoot.children : newNode.children;
+    const newPositionOffset = containerChildren ? containerChildren.reduce((acc, node, index) => {
+      if (index < newPosition && nodes.includes(node)) return acc + 1;
+      return acc;
+    }, 0) : 0;
+    // Remove collected layers
+    const filteredTree = filter<RootNode>(this.mutableRoot, (node) => {
+      return !nodes.includes(node);
+    });
+    if (!newNode) {
+      filteredTree.children.splice(newPosition - newPositionOffset, 0, ...nodes);
+    }
+    // Add back layers
+    if (newNode) {
+      map<RootNode, any>(filteredTree, (node) => {
+        if (node === newNode) {
+          node.children.splice(newPosition - newPositionOffset, 0, ...nodes);
+          return node;
+        }
+        return node;
+      });
+    }
+    this.childrenSignal[1](filteredTree.children);
   }
 }
 

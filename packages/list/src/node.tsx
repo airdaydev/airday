@@ -101,6 +101,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
           props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
           window.removeEventListener('mousemove', mouseMove);
           window.addEventListener('mouseup', () => {
+            console.log('drop time');
+            // TODO: Perhaps wrap this within the context
+            props.listDragContext.treeState.moveLayersWithinTree(
+              Array.from(props.listDragContext.selection[0]()),
+              null,
+              props.listDragContext.lastTouchedIndexSignal[0]() + 1 || 0,
+            );
             props.listDragContext.stopDrag();
             window.removeEventListener('mousemove', mouseMove);
           }, { once: true });
