@@ -8,18 +8,7 @@
   position: absolute;
   flex-shrink: 0;
   width: 100%;
-}
-.item.fade-enter-active,
-.item.fade-exit-active {
-  transition: height 1000ms;
-}
-.item.fade-enter,
-.item.fade-exit-to {
-  /* height: 0; */
-  opacity: 0;
-}
-.slide-fade-enter {
-  opacity: 1;
+  height: 28px !important;
 }
 .item_internal {
   position: absolute;

@@ -52,7 +52,6 @@ export const Tree = (props: TreeComponentProps) => {
   const kbHandler = (event: KeyboardEvent) => {
     // only if focused on this ref!
     if (event.key === 'Backspace') {
-      console.log('huhhh');
       props.state.delete(listDragContext.selection[0]());
     }
   };
@@ -92,22 +91,20 @@ export const Tree = (props: TreeComponentProps) => {
               width: 100%;
               min-height: ${listDragContext.presentCount()() * props.itemHeight}px;`}
           >
-            {/* <TransitionGroup name="fade"> */}
-              <For each={signal().window}>
-                {(node, index) => (
-                  // TODO: Consider using context here instead
-                  <NodeContainer
-                    index={index}
-                    autoscroller={autoscroller}
-                    virtualisedList={signal}
-                    node={node}
-                    itemHeight={props.itemHeight}
-                    Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
-                    listDragContext={listDragContext}
-                  />
-                )}
-              </For>
-            {/* </TransitionGroup> */}
+            <For each={signal().window}>
+              {(node, index) => (
+                // TODO: Consider using context here instead
+                <NodeContainer
+                  index={index}
+                  autoscroller={autoscroller}
+                  virtualisedList={signal}
+                  node={node}
+                  itemHeight={props.itemHeight}
+                  Component={node.component || props.defaultNodeComponent || DefaultNodeComponent}
+                  listDragContext={listDragContext}
+                />
+              )}
+            </For>
           </div>
           <div
             class='list-backdrop'

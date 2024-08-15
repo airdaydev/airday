@@ -72,9 +72,6 @@ pnpm run dev
 ```
 
 ## Roadmap
-- TODO: Make tree state truly mutable, ensuring all state actions manually update signal.
-- Bug: Main transition group failing to remove items (obvious in deleting!)
-- Bug: Deleting from the bottom to the top of the list - shows a possible miscalculation of index - perhaps - all the nodes are gone! even unselected.
 - Which list is in focus? / keyboard controller
 - Get autoscroller touch version working with other lists
 - Escape to deselect
@@ -95,6 +92,7 @@ pnpm run dev
 - Prevent infinite recursion in tree
 
 ## Bugs
+- Implement transitions for deleting & adding items (previously removed this due to issues with animation not finishing)
 - Touch drag - when moving back and forth between foreign lists a few times, the simulated touch enter stuff doesn't always work (state bug?)
 - On refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
 - When dragging directly down to the end of list with overflow-y, the list jumps up and back down again! I suspect it is a value not resetting in the autoscroll controller after leaving and rejoining.
