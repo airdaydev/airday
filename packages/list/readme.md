@@ -2,6 +2,8 @@
 
 A very opinionated interactive list system including store & UI component for SolidJS written for borde.app. Drag & drop, optionally virtualised or variable height (can be determined by function).
 
+N.b. the original of this package is to become a tree, however only a 1 level tree i.e. 2D list is implemented at this point, but some tree code is present.
+
 The architecture has lead to a few marked special cases, dealing with many subtle difference between dragging locally & dragging to a foreign list, as well as differences in the placeholders beneath the originally dragged item & other items and special cases for the final placeholder in remote and local drags.
 
 ## Features

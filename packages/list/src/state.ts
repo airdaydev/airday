@@ -84,7 +84,6 @@ export class TreeState {
       const filtered = filter<any>(this.mutableRoot, (node) => {
         return !set.has(node);
       }).children;
-      console.log(filtered, 'nodes that are left!!');
       this.childrenSignal[1](() => filtered);
     }
   }
