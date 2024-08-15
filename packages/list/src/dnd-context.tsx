@@ -94,7 +94,6 @@ export class ListDragContext {
   selectNodesInRange(start: number, end: number) {
     const newSelection = this.projection().slice(start, end + 1);
     const selection = new Set(newSelection);
-    console.log('selection.size', selection.size);
     this.selection[1](selection);
   }
   setLastTouchedIndex(index: number) {
