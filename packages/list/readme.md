@@ -72,6 +72,7 @@ pnpm run dev
 ```
 
 ## Roadmap
+- Bug: on move, moved items may show extra transition.
 - Which list is in focus? / keyboard controller
 - Get autoscroller touch version working with other lists
 - Escape to deselect
