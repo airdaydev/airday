@@ -224,6 +224,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             item_internal: true,
             above: draggedOn[0]() === 1,
             below: draggedOn[0]() === -1,
+            animated: props.listDragContext.dndContext.isDragging[0](),
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={onUIEnter}

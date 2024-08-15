@@ -16,8 +16,10 @@
   height: 100%;
   z-index: 2;
 }
-.item_internal {
+.item_internal.animated {
   transition: top 120ms;
+}
+.item_internal {
   top: 0px;
 }
 .item_internal.below {
