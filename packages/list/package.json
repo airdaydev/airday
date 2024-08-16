@@ -5,14 +5,17 @@
   "type": "module",
   "scripts": {
     "start": "vite --host 0.0.0.0",
+    "test": "vitest",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "solid-js": "^1.8.15",
-    "solid-transition-group": "^0.2.3"
+    "solid-transition-group": "^0.2.3",
+    "vitest": "^2.0.5"
   },
   "devDependencies": {
+    "jsdom": "^24.1.1",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
     "vite-plugin-solid": "^2.10.2"

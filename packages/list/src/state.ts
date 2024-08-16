@@ -1,9 +1,7 @@
-import {
-  Signal, createMemo, createSignal, createUniqueId,
-} from 'solid-js';
-import { qperf } from './utils';
-import { DndContext } from './dnd-context';
-import { GenericNode, map, walk, filter } from './tree-utils';
+import { Signal, createMemo, createSignal, createUniqueId } from "solid-js";
+import { qperf } from "./utils";
+import { DndContext } from "./dnd-context";
+import { GenericNode, map, walk, filter } from "./tree-utils";
 
 export interface NodeSignalProps {
   id: string;
@@ -11,7 +9,7 @@ export interface NodeSignalProps {
 
 export class Node {
   id: string;
-  children?: Node[] = [];
+  children: Node[] = [];
   isRoot: boolean = false;
   depth = 0; // cached
   expanded = true;
@@ -37,7 +35,7 @@ export class Node {
     return {
       ...(this.serialise && this.serialise()),
       id: this.id,
-    }
+    };
   }
   triggerUpdate() {
     this.uiSignal?.[1](() => this.toJSON());
@@ -68,7 +66,7 @@ export class TreeState {
   id: string;
   isRoot = true;
   childrenSignal = createSignal<Node[]>([]);
-  idMap = new Map<string, Node>;
+  idMap = new Map<string, Node>(); // Not currently used
   mutate = false;
   maxDepth = 10;
   expanded = true;
@@ -85,18 +83,16 @@ export class TreeState {
   }
   delete(set: Set<Node>) {
     if (!set || !set.size) {
-      console.warn('Attempted to delete empty set of items');
+      console.warn("Attempted to delete empty set of items");
       return;
     }
-    if (this.mutate === false) {
-      const filtered = filter<any>(this.mutableRoot, (node) => {
-        return !set.has(node);
-      }).children;
-      this.childrenSignal[1](() => filtered);
-    }
+    const filtered = filter<any>(this.mutableRoot, (node) => {
+      return !set.has(node);
+    }).children;
+    this.childrenSignal[1](() => filtered);
   }
   load(tree: GenericNode<any>) {
-    const q = qperf('load');
+    const q = qperf("load");
     const children = map<any, any>(
       tree,
       (rawNode, parent) => {
@@ -107,41 +103,46 @@ export class TreeState {
         this.idMap.set(node.id, node);
         return node;
       },
-      this).children;
+      this,
+    ).children;
     this.childrenSignal[1](() => children);
     q();
   }
   count(expandedOnly?: boolean) {
     return createMemo(() => {
       let count = 0;
-      walk({ isRoot: true, children: this.childrenSignal[0]() }, (node) => {
-        count++;
-        if (expandedOnly && !node.expanded) return true;
-        return false;
-      }, undefined);
+      walk(
+        { isRoot: true, children: this.childrenSignal[0]() },
+        (node) => {
+          count++;
+          if (expandedOnly && !node.expanded) return true;
+          return false;
+        },
+        undefined,
+      );
       return count - 1; // accounts for root node
     });
   }
   // TODO: Moving layers between trees (might be better to do a 2 parter - add & remove)
-  moveLayersWithinTree(nodes: Node[], newNode: Node | null, newPosition: number) {
+  moveItems(nodes: Node[], parentNode: Node | null, newPosition: number) {
     // TODO: Filter out immovable nodes
-    const containerChildren = newNode === null ? this.mutableRoot.children : newNode.children;
-    const newPositionOffset = containerChildren ? containerChildren.reduce((acc, node, index) => {
-      if (index < newPosition && nodes.includes(node)) return acc + 1;
-      return acc;
-    }, 0) : 0;
+    const container = parentNode === null ? this.mutableRoot : parentNode;
+    // const newPositionOffset = containerChildren ? containerChildren.reduce((acc, node, index) => {
+    //   if (index < newPosition && nodes.includes(node)) return acc + 1;
+    //   return acc;
+    // }, 0) : 0;
     // Remove collected layers
-    const filteredTree = filter<RootNode>(this.mutableRoot, (node) => {
+    const filteredTree = filter<Node>(container, (node) => {
       return !nodes.includes(node);
     });
-    if (!newNode) {
-      filteredTree.children.splice(newPosition - newPositionOffset, 0, ...nodes);
+    if (!parentNode) {
+      filteredTree.children.splice(newPosition, 0, ...nodes);
     }
     // Add back layers
-    if (newNode) {
+    if (parentNode) {
       map<RootNode, any>(filteredTree, (node) => {
-        if (node === newNode) {
-          node.children.splice(newPosition - newPositionOffset, 0, ...nodes);
+        if (node === parentNode) {
+          node.children.splice(newPosition, 0, ...nodes);
           return node;
         }
         return node;
@@ -150,4 +151,3 @@ export class TreeState {
     this.childrenSignal[1](filteredTree.children);
   }
 }
-

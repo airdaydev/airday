@@ -1,12 +1,14 @@
 import {
   Accessor,
   createEffect,
-  createMemo, createSignal, createUniqueId,
+  createMemo,
+  createSignal,
+  createUniqueId,
   on,
-} from 'solid-js';
-import { Node, TreeState } from './state';
-import { walk } from './tree-utils';
-import { ContainerVector } from './tree';
+} from "solid-js";
+import { Node, TreeState } from "./state";
+import { walk } from "./tree-utils";
+import { ContainerVector } from "./tree";
 
 export type VirtualisedList = Accessor<{
   window: Node[];
@@ -17,7 +19,7 @@ export type VirtualisedList = Accessor<{
 export class ListDragContext {
   id = createUniqueId();
   treeState: TreeState;
-  selection = createSignal(new Set<Node>);
+  selection = createSignal(new Set<Node>());
   originIndex: number | null = 0; // TODO: This could move if other items are inserted...
   isOrigin = false; // true = this is the list where the user has dragged from
   dragOver = createSignal(false); // Is the user currently dragging over this list
@@ -28,7 +30,11 @@ export class ListDragContext {
   dragOriginNodeIndex: number | undefined;
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
-  constructor(treeState: TreeState, dndContext: DndContext, itemHeight: number) {
+  constructor(
+    treeState: TreeState,
+    dndContext: DndContext,
+    itemHeight: number,
+  ) {
     this.treeState = treeState;
     this.dndContext = dndContext;
     dndContext.listContexts.add(this);
@@ -39,14 +45,21 @@ export class ListDragContext {
     return createMemo(() => {
       const selection = this.selection[0]();
       return selection.has(node);
-    })
+    });
   }
   leave() {
-    if (this.dndContext.isDragging) this.dragOver[1](false)
-    if (this.isOrigin) { return; } // Keeps origin in place for origin list
+    if (this.dndContext.isDragging) this.dragOver[1](false);
+    if (this.isOrigin) {
+      return;
+    } // Keeps origin in place for origin list
     this.reset();
   }
-  startDrag(originIndex: number, originNode: Node, ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+  startDrag(
+    originIndex: number,
+    originNode: Node,
+    ref: HTMLElement,
+    elClickOffset: [number, number] = [0, 0],
+  ) {
     this.isOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
@@ -67,7 +80,7 @@ export class ListDragContext {
     this.selection[1](selection);
   }
   addToSelection(node: Node) {
-    const selection = new Set(this.selection[0]())
+    const selection = new Set(this.selection[0]());
     if (selection.has(node)) {
       selection.delete(node);
     } else {
@@ -79,15 +92,15 @@ export class ListDragContext {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
     const projection = this.projection();
     for (let i = 0; i < projection.length; i++) {
-        if (this.selection[0]().has(projection[i])) return i;
+      if (this.selection[0]().has(projection[i])) return i;
     }
     return false;
   }
   getLastIndexSelected() {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
     const projection = this.projection();
-    for (let i = projection.length - 1; i >= 0 ; i--) {
-        if (this.selection[0]().has(projection[i])) return i;
+    for (let i = projection.length - 1; i >= 0; i--) {
+      if (this.selection[0]().has(projection[i])) return i;
     }
     return false;
   }
@@ -116,7 +129,12 @@ export class ListDragContext {
           index++;
         }
         // Skip root & other selected items
-        const skip = node.isRoot || (isDragging && this.selection[0]().has(node) && !dragOriginNode && this.isOrigin);
+        const skip =
+          node.isRoot ||
+          (isDragging &&
+            this.selection[0]().has(node) &&
+            !dragOriginNode &&
+            this.isOrigin);
         if (!skip) {
           index++;
           visibleChildren.push(node);
@@ -127,21 +145,24 @@ export class ListDragContext {
     });
   }
   // Projection of list i.e. visible children, often filtered by dragged items
-  getWindowedSignal(containerVector: Accessor<ContainerVector>): VirtualisedList {
+  getWindowedSignal(
+    containerVector: Accessor<ContainerVector>,
+  ): VirtualisedList {
     // Virtualisation
     return createMemo(() => {
       const rowHeight = this.itemHeight;
       const [containerHeight, offset] = containerVector();
       const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
-      const excess = (offset % rowHeight);
-      const start = Math.max(0, (offset - excess) - (buffer * rowHeight)) / rowHeight;
-      const renderCount = Math.floor(containerHeight / rowHeight) + (buffer * 2);
+      const excess = offset % rowHeight;
+      const start =
+        Math.max(0, offset - excess - buffer * rowHeight) / rowHeight;
+      const renderCount = Math.floor(containerHeight / rowHeight) + buffer * 2;
       let window = this.projection().slice(start, start + renderCount);
       return {
         window,
         start,
-      }
-    })
+      };
+    });
   }
   /**
    * This count includes total item count minus the selected items (excluding origin) when dragging
@@ -154,7 +175,7 @@ export class ListDragContext {
       } else {
         return this.treeState.count()();
       }
-    })
+    });
   }
 }
 
@@ -167,7 +188,7 @@ export class DndContext {
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
-  constructor() { }
+  constructor() {}
   startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
@@ -180,7 +201,7 @@ export class DndContext {
         const contains = ctx.scrollContainerRef?.contains(el);
         if (!contains) ctx.leave();
       }
-    })
+    });
   }
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
@@ -188,7 +209,7 @@ export class DndContext {
   }
   onDragMove(callback: (coords: [number, number]) => void) {
     return createEffect(() => {
-      callback(this.dragMove[0]())
+      callback(this.dragMove[0]());
     });
   }
   stopDrag() {

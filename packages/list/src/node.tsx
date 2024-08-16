@@ -1,10 +1,19 @@
-import { onCleanup, Component, Accessor, on, createEffect, createSignal, createMemo, onMount } from 'solid-js';
-import { TransitionGroup } from 'solid-transition-group';
-import { Node } from './state';
-import { distance } from './utils';
-import './root.css';
-import { ListDragContext, VirtualisedList } from './dnd-context';
-import { touchBandaid } from './touch-bandaid';
+import {
+  onCleanup,
+  Component,
+  Accessor,
+  on,
+  createEffect,
+  createSignal,
+  createMemo,
+  onMount,
+} from "solid-js";
+import { TransitionGroup } from "solid-transition-group";
+import { Node } from "./state";
+import { distance } from "./utils";
+import "./root.css";
+import { ListDragContext, VirtualisedList } from "./dnd-context";
+import { touchBandaid } from "./touch-bandaid";
 
 export interface NodeContainerProps {
   node: Node;
@@ -19,53 +28,76 @@ export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
   const isSelected = props.listDragContext.isSelected(props.node);
   const draggedOn = createSignal(0);
-  const treeIndex = createMemo(() => props.virtualisedList().start + props.index());
+  const treeIndex = createMemo(
+    () => props.virtualisedList().start + props.index(),
+  );
   // Touch interactions
   let touchBandaidUnsub: () => void;
   onMount(() => {
     touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
   });
   onCleanup(() => {
-    props.node.unsubscribe()
+    props.node.unsubscribe();
     if (touchBandaidUnsub) touchBandaidUnsub();
-});
+  });
   const onTouchStart = (event: TouchEvent) => {
     event.preventDefault();
-    document.body.classList.add('touch-no-select'); // Prevent context menu
+    document.body.classList.add("touch-no-select"); // Prevent context menu
     props.listDragContext.setLastTouchedIndex(treeIndex());
-    ref.addEventListener('touchend', () => {
-      props.listDragContext.stopDrag();
-    }, { once: true });
+    ref.addEventListener(
+      "touchend",
+      () => {
+        props.listDragContext.stopDrag();
+      },
+      { once: true },
+    );
     const startDrag = () => {
       const targetBounding = event.target.getBoundingClientRect();
-      const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
+      const targetOffset = [
+        event.pageX - targetBounding.x,
+        event.pageY - targetBounding.y,
+      ] as [number, number];
       // Start dragging
-      props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
+      props.listDragContext.startDrag(
+        treeIndex(),
+        props.node,
+        ref,
+        targetOffset,
+      );
     };
     const pullUpTimeout = setTimeout(() => {
       // TODO: add touching to classList (animated)
       props.listDragContext.selectOne(props.node);
-      props.listDragContext.dndContext.moveDragCoords(event.touches[0].clientX, event.touches[0].clientY); // prevents flash
+      props.listDragContext.dndContext.moveDragCoords(
+        event.touches[0].clientX,
+        event.touches[0].clientY,
+      ); // prevents flash
       let el: Element | null = null;
-      ref.addEventListener('touchmove', (moveEvent) => {
+      ref.addEventListener("touchmove", (moveEvent) => {
         props.autoscroller.updateTouch(moveEvent); // TODO: Get it working with other lists
-        props.listDragContext.dndContext.moveDragCoords(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
-        const nextEl = document.elementFromPoint(moveEvent.touches[0].clientX, moveEvent.touches[0].clientY);
+        props.listDragContext.dndContext.moveDragCoords(
+          moveEvent.touches[0].clientX,
+          moveEvent.touches[0].clientY,
+        );
+        const nextEl = document.elementFromPoint(
+          moveEvent.touches[0].clientX,
+          moveEvent.touches[0].clientY,
+        );
         if (nextEl === el) return;
         el = nextEl;
         if (el) {
           touchBandaid.call(el); // This simulates onEnter
           props.listDragContext.dndContext.checkLeave(el); // This simulates onLeaveList
         }
-      })
+      });
       startDrag();
-    }, 250)
+    }, 250);
     event.preventDefault();
-    document.addEventListener('touchend', () => {
+    document.addEventListener("touchend", () => {
       clearTimeout(pullUpTimeout);
-      document.body.classList.remove('touch-no-select');
-    })
-  }
+      document.body.classList.remove("touch-no-select");
+    });
+  };
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
@@ -92,29 +124,44 @@ export const NodeContainer = (props: NodeContainerProps) => {
     }
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
-        event.preventDefault();
-        // Make moving a little more effort to avoid slips
-        if (distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3) {
-          const targetBounding = event.target.getBoundingClientRect();
-          const targetOffset = [event.pageX - targetBounding.x, event.pageY - targetBounding.y] as [number, number];
-          // Start dragging
-          props.listDragContext.startDrag(treeIndex(), props.node, ref, targetOffset);
-          window.removeEventListener('mousemove', mouseMove);
-          window.addEventListener('mouseup', () => {
-            console.log('drop time');
+      event.preventDefault();
+      // Make moving a little more effort to avoid slips
+      if (
+        distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
+      ) {
+        const targetBounding = event.target.getBoundingClientRect();
+        const targetOffset = [
+          event.pageX - targetBounding.x,
+          event.pageY - targetBounding.y,
+        ] as [number, number];
+        // Start dragging
+        props.listDragContext.startDrag(
+          treeIndex(),
+          props.node,
+          ref,
+          targetOffset,
+        );
+        window.removeEventListener("mousemove", mouseMove);
+        window.addEventListener(
+          "mouseup",
+          () => {
             // TODO: Perhaps wrap this within the context
-            props.listDragContext.treeState.moveLayersWithinTree(
+            props.listDragContext.treeState.moveItems(
               Array.from(props.listDragContext.selection[0]()),
               null,
-              props.listDragContext.lastTouchedIndexSignal[0]() + 1 || 0,
+              props.listDragContext.lastTouchedIndexSignal[0]() || 0,
             );
             props.listDragContext.stopDrag();
-            window.removeEventListener('mousemove', mouseMove);
-          }, { once: true });
-        }
+            window.removeEventListener("mousemove", mouseMove);
+          },
+          { once: true },
+        );
+      }
     };
-    window.addEventListener('mousemove', mouseMove);
-    window.addEventListener('mouseup', () => window.removeEventListener('mousemove', mouseMove));
+    window.addEventListener("mousemove", mouseMove);
+    window.addEventListener("mouseup", () =>
+      window.removeEventListener("mousemove", mouseMove),
+    );
     if (!isSelected()) props.listDragContext.selectOne(props.node);
   };
   const isDragOrigin = createMemo(() => {
@@ -127,56 +174,59 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // lastTouchedIndex: last hit by user
   createEffect(
     // TODO: only observer individual list is dragging!!
-    on(() => [
-      props.listDragContext.lastTouchedIndexSignal[0](),
-      props.listDragContext.dndContext.isDragging[0](),
-      props.listDragContext.dragOver[0](),
-    ],
-    ([lastTouchedIndex, isDragging, dragOver]) => {
-      if (!isDragging) {
-        draggedOn[1](0);
-        return;
-      }
-      const index = treeIndex();
-      const originIndex = props.listDragContext.originIndex as number;
-      if (!props.listDragContext.isOrigin && dragOver) {
-        if (index >= lastTouchedIndex) {
+    on(
+      () => [
+        props.listDragContext.lastTouchedIndexSignal[0](),
+        props.listDragContext.dndContext.isDragging[0](),
+        props.listDragContext.dragOver[0](),
+      ],
+      ([lastTouchedIndex, isDragging, dragOver]) => {
+        if (!isDragging) {
+          draggedOn[1](0);
+          return;
+        }
+        const index = treeIndex();
+        const originIndex = props.listDragContext.originIndex as number;
+        if (!props.listDragContext.isOrigin && dragOver) {
+          if (index >= lastTouchedIndex) {
+            draggedOn[1](-1);
+          } else {
+            draggedOn[1](0);
+          }
+          return;
+        }
+        // When dragging & leaving the origin list, the placeholder needs to disappear.
+        // The placeholder could be part of the origin object, or covered by other objects
+        // when the mouse is moved below or above.
+        // Strategy: Everything below the origin object needs to have “above” class appended,
+        // and no “below” classes need to be appended, when the list is not being hovered over.
+        if (!dragOver && props.listDragContext.isOrigin) {
+          let result = 0;
+          if (originIndex < index) result = 1;
+          if (originIndex > index) result = 0;
+          draggedOn[1](result);
+          return;
+        }
+        // Drag origin (o) replaced with placeholder on initial drag.
+        // Moving up, pushes o-1 down, exposing its placeholder.
+        // Moving down, pushes o+1 up, exposing its placeholder.
+        if (lastTouchedIndex === null) {
+          draggedOn[1](0);
+          return;
+        }
+        if (originIndex < index && lastTouchedIndex >= index) {
+          // is below
+          draggedOn[1](1);
+          return;
+        } else if (originIndex > index && lastTouchedIndex <= index) {
           draggedOn[1](-1);
+          return;
         } else {
           draggedOn[1](0);
         }
-        return;
-      }
-      // When dragging & leaving the origin list, the placeholder needs to disappear.
-      // The placeholder could be part of the origin object, or covered by other objects
-      // when the mouse is moved below or above.
-      // Strategy: Everything below the origin object needs to have “above” class appended,
-      // and no “below” classes need to be appended, when the list is not being hovered over.
-      if (!dragOver && props.listDragContext.isOrigin) {
-        let result = 0;
-        if (originIndex < index) result = 1;
-        if (originIndex > index) result = 0;
-        draggedOn[1](result);
-        return;  
-      }
-      // Drag origin (o) replaced with placeholder on initial drag.
-      // Moving up, pushes o-1 down, exposing its placeholder.
-      // Moving down, pushes o+1 up, exposing its placeholder.
-      if (lastTouchedIndex === null) {
-        draggedOn[1](0);
-        return;
-      }
-      if (originIndex < index && lastTouchedIndex >= index) {
-        // is below
-        draggedOn[1](1);
-        return;
-      } else if (originIndex > index && lastTouchedIndex <= index) {
-        draggedOn[1](-1);
-        return;
-      } else {
-        draggedOn[1](0);
-      }
-  }));
+      },
+    ),
+  );
   const onUIEnter = () => {
     // This looks at where the previous draggedOn index was, as its final position
     // is determined by whether the user drags up or down onto it.
@@ -199,25 +249,26 @@ export const NodeContainer = (props: NodeContainerProps) => {
       data-type="node"
       style={`top: ${treeIndex() * props.itemHeight}px; height: ${props.itemHeight}px;`}
     >
-      {draggedOn[0]() === -1 && (
-        <div class='placeholder' />
-      )}
+      {draggedOn[0]() === -1 && <div class="placeholder" />}
       <TransitionGroup name="fade">
         {/* Second condition resolves edge case where dragging onto own list
         from outside own list, last item momentarily doesn't cover last item placeholder. */}
-        {draggedOn[0]() === 1 && props.listDragContext.dragOver[0]()
-          && treeIndex() - Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) < 1 && (
-          <div class='placeholder' />
-        )}
+        {draggedOn[0]() === 1 &&
+          props.listDragContext.dragOver[0]() &&
+          treeIndex() -
+            Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
+            1 && <div class="placeholder" />}
       </TransitionGroup>
-      {isDragOrigin() && (<div
-        data-index={treeIndex()}
-        classList={{
-          'placeholder': true,
-          'origin': true,
-          'visible': props.listDragContext.dragOver[0](),
-        }}
-      />)}
+      {isDragOrigin() && (
+        <div
+          data-index={treeIndex()}
+          classList={{
+            placeholder: true,
+            origin: true,
+            visible: props.listDragContext.dragOver[0](),
+          }}
+        />
+      )}
       {!isDragOrigin() && (
         <div
           classList={{
@@ -246,22 +297,22 @@ export const NodeContainer = (props: NodeContainerProps) => {
 };
 
 export type NodeComponentType = Component<{
-  node: Node,
-  ariaSelected: boolean,
-  onMouseDown: (event: MouseEvent) => void,
-  onTouchStart: (event: TouchEvent) => void,
-  select: () => void,
+  node: Node;
+  ariaSelected: boolean;
+  onMouseDown: (event: MouseEvent) => void;
+  onTouchStart: (event: TouchEvent) => void;
+  select: () => void;
 }>;
 
 export const DefaultNodeComponent: NodeComponentType = (props) => {
   return (
     <div
       aria-selected={props.ariaSelected}
-      class={styles['tree-item']}
+      class={styles["tree-item"]}
       onMouseDown={props.onMouseDown}
       onTouchStart={props.onTouchStart}
     >
       {props.node.id}
     </div>
-  )
-}
+  );
+};
