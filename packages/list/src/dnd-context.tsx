@@ -4,7 +4,6 @@ import {
   createMemo,
   createSignal,
   createUniqueId,
-  on,
 } from "solid-js";
 import { Node, TreeState } from "./state";
 import { walk } from "./tree-utils";
@@ -41,6 +40,9 @@ export class ListDragContext {
     this.projection = this.initProjection();
     this.itemHeight = itemHeight;
   }
+  clearSelection() {
+    this.selection[1](new Set([]));
+  }
   isSelected(node: Node) {
     return createMemo(() => {
       const selection = this.selection[0]();
@@ -48,6 +50,7 @@ export class ListDragContext {
     });
   }
   leave() {
+    this.dndContext.activeContext[1](null);
     if (this.dndContext.isDragging) this.dragOver[1](false);
     if (this.isOrigin) {
       return;
@@ -183,7 +186,7 @@ export class ListDragContext {
 // This mostly controls the dragged item
 export class DndContext {
   isDragging = createSignal(false);
-  activeContext = createSignal<string | null>(null); // TODO: Use
+  activeContext = createSignal<ListDragContext | null>(null); // TODO: Use
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
@@ -195,11 +198,14 @@ export class DndContext {
     this.draggedEl = ref.cloneNode(true);
     this.isDragging[1](true);
   }
+  // For touch
   checkLeave(el: Element) {
     this.listContexts.forEach((ctx) => {
       if (ctx.dragOver[0]()) {
         const contains = ctx.scrollContainerRef?.contains(el);
-        if (!contains) ctx.leave();
+        if (!contains) {
+          ctx.leave();
+        }
       }
     });
   }

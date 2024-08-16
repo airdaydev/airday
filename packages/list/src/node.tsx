@@ -146,11 +146,25 @@ export const NodeContainer = (props: NodeContainerProps) => {
           "mouseup",
           () => {
             // TODO: Perhaps wrap this within the context
-            props.listDragContext.treeState.moveItems(
-              Array.from(props.listDragContext.selection[0]()),
-              null,
-              props.listDragContext.lastTouchedIndexSignal[0]() || 0,
-            );
+            const activeContext =
+              props.listDragContext.dndContext.activeContext[0]();
+            if (activeContext) {
+              props.listDragContext.treeState.context.moveItems(
+                props.listDragContext.selection[0](),
+                props.listDragContext.treeState,
+                activeContext.treeState,
+                [null, activeContext.lastTouchedIndexSignal[0]()],
+              );
+              activeContext.selection[1](props.listDragContext.selection[0]());
+              if (props.listDragContext !== activeContext) {
+                props.listDragContext.clearSelection();
+              }
+            }
+            // props.listDragContext.treeState.moveItems(
+            //   props.listDragContext.selection[0](),
+            //   null,
+            //   props.listDragContext.lastTouchedIndexSignal[0]() || 0,
+            // );
             props.listDragContext.stopDrag();
             window.removeEventListener("mousemove", mouseMove);
           },
@@ -234,6 +248,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     const newIndex = treeIndex() - draggedOn[0]();
     props.listDragContext.setLastTouchedIndex(newIndex);
     props.listDragContext.dragOver[1](true);
+    props.listDragContext.dndContext.activeContext[1](props.listDragContext);
   };
   /**
    * Hiding the placeholder:

@@ -1,5 +1,5 @@
-import { onCleanup, onMount } from 'solid-js';
-import { DndContext } from './dnd-context';
+import { onCleanup, onMount } from "solid-js";
+import { DndContext } from "./dnd-context";
 
 // TODO: Drag physics?
 // TODO: Move back to original place if drop cancelled!
@@ -19,19 +19,19 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   let stackRef: HTMLDivElement | undefined = undefined;
   const onMouseMove = (event: MouseEvent) => {
     requestAnimationFrame(() => {
-        if (stackRef) {
-            stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
-            stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
-        }
-    })
+      if (stackRef) {
+        stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
+        stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
+      }
+    });
   };
   dndContext.onDragMove((coords) => {
     requestAnimationFrame(() => {
       if (stackRef) {
-          stackRef.style.left = `${window.scrollX + coords[0] - dndContext.elClickOffset[0]}px`;
-          stackRef.style.top = `${window.scrollY + coords[1] - dndContext.elClickOffset[1]}px`;
+        stackRef.style.left = `${window.scrollX + coords[0] - dndContext.elClickOffset[0]}px`;
+        stackRef.style.top = `${window.scrollY + coords[1] - dndContext.elClickOffset[1]}px`;
       }
-    })
+    });
   });
   onMount(() => {
     // Luckily, resize events should be very rare while dragging
@@ -39,14 +39,14 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     // without adding scrollbars. Scroll flash can be seen when using
     // keyboard to go fullscreen while dragging (NBD for now)
     // TODO: Safari: turn on user-select: none; for entire page!
-    stackRef.appendChild(component)
+    stackRef.appendChild(component);
     // window.addEventListener('resize', onResize);
-    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener("mousemove", onMouseMove);
     // onResize();
-  })
+  });
   onCleanup(() => {
     // window.removeEventListener('resize', onResize)
-    window.removeEventListener('mousemove', onMouseMove)
+    window.removeEventListener("mousemove", onMouseMove);
   });
   return (
     <div
@@ -54,7 +54,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
       pointer-events: none;
       position: absolute;
       z-index: 10;
-      top: ${`${window.scrollY.toString()}px` || '0'};
+      top: ${`${window.scrollY.toString()}px` || "0"};
       left: 0;
       width: 100vw;
       height: 100vh;
@@ -65,7 +65,6 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
         ref={stackRef}
         style={`
           position: relative;
-          opacity: 0.9;
           z-index: 100;
           top: -100%;
           left: -100%;
@@ -74,8 +73,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           height: 26px;
           animation: scaleUp 0.1s ease-in-out forwards;
         `}
-      >
-      </div>
+      ></div>
     </div>
   );
 };

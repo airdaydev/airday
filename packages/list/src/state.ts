@@ -56,10 +56,91 @@ export class RootNode extends Node {
   children: Node[] = [];
 }
 
+interface ListStateContextOpts {
+  onDelete?: (set: Set<Node>) => void;
+  onMove?: (
+    set: Set<Node>,
+    srcState: TreeState,
+    destState: TreeState,
+    dstPosition: [Node | null, Number],
+  ) => void;
+}
+
+export class ListStateContext {
+  trees = new Set<TreeState>();
+  onDelete?: (set: Set<Node>) => void;
+  onMove?: (
+    set: Set<Node>,
+    srcState: TreeState,
+    destState: TreeState,
+    dstPosition: [Node | null, Number],
+  ) => void;
+  constructor(opts: ListStateContextOpts = {}) {
+    this.onMove = opts.onMove;
+    this.onDelete = opts.onDelete;
+  }
+  createTree(opts: Omit<TreeStateOpts, "context"> = {}) {
+    const tree = new TreeState({ ...opts, context: this });
+    this.trees.add(tree);
+    return tree;
+  }
+  moveItems(
+    nodes: Set<Node>,
+    srcState: TreeState,
+    destState: TreeState,
+    dstPosition: [Node | null, number],
+  ) {
+    // Remove items from the source tree
+    const result = srcState.remove(nodes);
+    if (!result.removed) {
+      return;
+    }
+
+    // Update the source tree
+    srcState.childrenSignal[1](result.filtered);
+
+    // Add items to the destination tree
+    const [parentNode, newPosition] = dstPosition;
+    if (!parentNode) {
+      // Add to root level
+      const currentChildren = destState.childrenSignal[0]();
+      const updatedChildren = [
+        ...currentChildren.slice(0, newPosition),
+        ...Array.from(nodes),
+        ...currentChildren.slice(newPosition),
+      ];
+      destState.childrenSignal[1](updatedChildren);
+    } else {
+      // Add to a specific parent node
+      const updatedTree = destState.mutableRoot;
+      const updateNode = (node: Node) => {
+        if (node === parentNode) {
+          node.children = [
+            ...node.children.slice(0, newPosition),
+            ...Array.from(nodes),
+            ...node.children.slice(newPosition),
+          ];
+          return node;
+        }
+        node.children = node.children.map(updateNode);
+        return node;
+      };
+      const updatedChildren = updatedTree.children.map(updateNode);
+      destState.childrenSignal[1](updatedChildren);
+    }
+
+    // Call the onMove callback if it exists
+    if (this.onMove) {
+      this.onMove(nodes, srcState, destState, dstPosition);
+    }
+  }
+}
+
 interface TreeStateOpts {
   mutate?: boolean;
   loader?: (node: GenericNode<any>) => Node;
   dndContext?: DndContext;
+  context?: ListStateContext;
 }
 
 export class TreeState {
@@ -71,9 +152,13 @@ export class TreeState {
   maxDepth = 10;
   expanded = true;
   loader?: (node: GenericNode<any>) => Node;
+  onDelete?: (set: Set<Node>) => void;
+  context?: ListStateContext;
   constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
     this.loader = opts.loader;
+    this.onDelete = this.onDelete;
+    this.context = opts.context;
   }
   get mutableRoot(): RootNode {
     const root = new RootNode();
@@ -82,14 +167,21 @@ export class TreeState {
     return root;
   }
   delete(set: Set<Node>) {
+    const result = this.remove(set);
+    this.onDelete?.(set);
+    this.childrenSignal[1](() => result.filtered);
+  }
+  remove(set: Set<Node>) {
     if (!set || !set.size) {
-      console.warn("Attempted to delete empty set of items");
-      return;
+      console.warn("Attempted to remove empty set of items");
     }
     const filtered = filter<any>(this.mutableRoot, (node) => {
       return !set.has(node);
     }).children;
-    this.childrenSignal[1](() => filtered);
+    return {
+      removed: set,
+      filtered,
+    };
   }
   load(tree: GenericNode<any>) {
     const q = qperf("load");
@@ -123,24 +215,17 @@ export class TreeState {
       return count - 1; // accounts for root node
     });
   }
-  // TODO: Moving layers between trees (might be better to do a 2 parter - add & remove)
-  moveItems(nodes: Node[], parentNode: Node | null, newPosition: number) {
-    // TODO: Filter out immovable nodes
-    const container = parentNode === null ? this.mutableRoot : parentNode;
-    // const newPositionOffset = containerChildren ? containerChildren.reduce((acc, node, index) => {
-    //   if (index < newPosition && nodes.includes(node)) return acc + 1;
-    //   return acc;
-    // }, 0) : 0;
-    // Remove collected layers
-    const filteredTree = filter<Node>(container, (node) => {
-      return !nodes.includes(node);
-    });
+  moveItems(nodes: Set<Node>, parentNode: Node | null, newPosition: number) {
+    const result = this.remove(nodes);
+    if (!result.removed) {
+      return;
+    }
     if (!parentNode) {
-      filteredTree.children.splice(newPosition, 0, ...nodes);
+      result.filtered.splice(newPosition, 0, ...nodes);
     }
     // Add back layers
     if (parentNode) {
-      map<RootNode, any>(filteredTree, (node) => {
+      map<RootNode, any>(result.filtered, (node) => {
         if (node === parentNode) {
           node.children.splice(newPosition, 0, ...nodes);
           return node;
@@ -148,6 +233,6 @@ export class TreeState {
         return node;
       });
     }
-    this.childrenSignal[1](filteredTree.children);
+    this.childrenSignal[1](result.filtered);
   }
 }
