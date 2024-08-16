@@ -88,6 +88,7 @@ export const Tree = (props: TreeComponentProps) => {
           height: "100%",
           "z-index": 2,
           color: "black",
+          // TODO: Only hide this on touch drag
           "overflow-y": props.dndContext.isDragging[0]() ? "hidden" : "scroll",
         }}
         ref={scrollContainerRef}
@@ -132,6 +133,7 @@ export const Tree = (props: TreeComponentProps) => {
           class="list-backdrop"
           onMouseEnter={() => {
             if (listDragContext.dndContext.isDragging[0]()) {
+              listDragContext.dndContext.activeContext[1](listDragContext);
               if (listDragContext.isOrigin) {
                 // TODO: This COULD fuck up in the case of a window... but maybe not because the window
                 // should overextend. Yes, this needs to be the
