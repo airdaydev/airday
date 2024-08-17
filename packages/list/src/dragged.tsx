@@ -20,7 +20,6 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   const onMouseMove = (event: MouseEvent) => {
     requestAnimationFrame(() => {
       if (stackRef) {
-        console.log(event.x, dndContext.elClickOffset[0]);
         stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
         stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
       }
