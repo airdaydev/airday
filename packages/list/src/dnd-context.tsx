@@ -182,12 +182,12 @@ export class ListDragContext {
   }
 }
 
-type dragType = "touch" | "mouse" | null;
+type dragMode = "touch" | "mouse" | null;
 
 // There is only one drag context, but there can be multiple select contexts
 // This mostly controls the dragged item
 export class DndContext {
-  dragType = createSignal<dragType>();
+  dragMode = createSignal<dragMode>();
   activeContext = createSignal<ListDragContext | null>(null);
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
@@ -197,12 +197,12 @@ export class DndContext {
   startDrag(
     ref: HTMLElement,
     elClickOffset: [number, number] = [0, 0],
-    dragType: dragType = "mouse",
+    dragMode: dragMode = "mouse",
   ) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
-    this.dragType[1](dragType);
+    this.dragMode[1](dragMode);
   }
   // For touch
   checkLeave(el: Element) {
@@ -215,7 +215,7 @@ export class DndContext {
       }
     });
   }
-  isDragging = createMemo(() => !!this.dragType[0]());
+  isDragging = createMemo(() => !!this.dragMode[0]());
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);
@@ -228,6 +228,6 @@ export class DndContext {
   stopDrag() {
     this.elClickOffset = [0, 0];
     this.draggedEl = null;
-    this.dragType[1](null);
+    this.dragMode[1](null);
   }
 }
