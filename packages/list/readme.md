@@ -93,7 +93,6 @@ pnpm run dev
 - Prevent infinite recursion in tree
 
 ## Bugs
-- Tiny bug: on desktop (esp), when turning back on overflow on a list, on mac, the scrollbar activates
 - Implement transitions for deleting & adding items (previously removed this due to issues with animation not finishing)
 - Touch drag - when moving back and forth between foreign lists a few times, the simulated touch enter stuff doesn't always work (state bug?)
 - On refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)

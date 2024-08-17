@@ -93,8 +93,8 @@ export const Tree = (props: TreeComponentProps) => {
           height: "100%",
           "z-index": 2,
           color: "black",
-          // TODO: Only hide this on touch drag
-          "overflow-y": props.dndContext.isDragging() ? "hidden" : "scroll",
+          "overflow-y":
+            props.dndContext.dragMode[0]() === "touch" ? "hidden" : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
         }}
         ref={scrollContainerRef}
         onScroll={(event) => {
