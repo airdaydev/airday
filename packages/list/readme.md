@@ -75,7 +75,6 @@ pnpm run dev
 - keyboard controller
 - Get autoscroller touch version working with other lists
 - Escape to deselect
-- Automatically deselect on blur
 - option + arrow to move up / down
 - ctrl+a to select all
 - gg/G = top/bottom of list
