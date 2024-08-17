@@ -179,7 +179,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     if (!isSelected()) props.listDragContext.selectOne(props.node);
   };
   const isDragOrigin = createMemo(() => {
-    props.listDragContext.dndContext.isDragging[0](); // trigger
+    props.listDragContext.dndContext.isDragging(); // trigger
     return props.node === props.listDragContext.originNode;
   });
   // Determines how the node reacts as a list item (typically, shifting up and down)
@@ -191,7 +191,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     on(
       () => [
         props.listDragContext.lastTouchedIndexSignal[0](),
-        props.listDragContext.dndContext.isDragging[0](),
+        props.listDragContext.dndContext.isDragging(),
         props.listDragContext.dragOver[0](),
       ],
       ([lastTouchedIndex, isDragging, dragOver]) => {
@@ -290,7 +290,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             item_internal: true,
             above: draggedOn[0]() === 1,
             below: draggedOn[0]() === -1,
-            animated: props.listDragContext.dndContext.isDragging[0](),
+            animated: props.listDragContext.dndContext.isDragging(),
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={onUIEnter}

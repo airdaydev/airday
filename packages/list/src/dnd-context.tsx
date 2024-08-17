@@ -51,7 +51,7 @@ export class ListDragContext {
   }
   leave() {
     this.dndContext.activeContext[1](null);
-    if (this.dndContext.isDragging) this.dragOver[1](false);
+    if (this.dndContext.isDragging()) this.dragOver[1](false);
     if (this.isOrigin) {
       return;
     } // Keeps origin in place for origin list
@@ -122,7 +122,7 @@ export class ListDragContext {
       n.isRoot = true;
       n.children = this.treeState.childrenSignal[0]();
       let index = 0;
-      const isDragging = this.dndContext.isDragging[0]();
+      const isDragging = this.dndContext.isDragging();
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
         // Keeping the node that user actually dragged in place
@@ -173,7 +173,7 @@ export class ListDragContext {
    */
   presentCount() {
     return createMemo(() => {
-      if (this.dndContext.isDragging[0]() && this.isOrigin) {
+      if (this.dndContext.isDragging() && this.isOrigin) {
         return this.treeState.count()() - this.selection[0]().size + 1;
       } else {
         return this.treeState.count()();
@@ -182,21 +182,27 @@ export class ListDragContext {
   }
 }
 
+type dragType = "touch" | "mouse" | null;
+
 // There is only one drag context, but there can be multiple select contexts
 // This mostly controls the dragged item
 export class DndContext {
-  isDragging = createSignal(false);
-  activeContext = createSignal<ListDragContext | null>(null); // TODO: Use
+  dragType = createSignal<dragType>();
+  activeContext = createSignal<ListDragContext | null>(null);
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   constructor() {}
-  startDrag(ref: HTMLElement, elClickOffset: [number, number] = [0, 0]) {
+  startDrag(
+    ref: HTMLElement,
+    elClickOffset: [number, number] = [0, 0],
+    dragType: dragType = "mouse",
+  ) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
     this.draggedEl = ref.cloneNode(true);
-    this.isDragging[1](true);
+    this.dragType[1](dragType);
   }
   // For touch
   checkLeave(el: Element) {
@@ -209,6 +215,7 @@ export class DndContext {
       }
     });
   }
+  isDragging = createMemo(() => !!this.dragType[0]());
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);
@@ -221,6 +228,6 @@ export class DndContext {
   stopDrag() {
     this.elClickOffset = [0, 0];
     this.draggedEl = null;
-    this.isDragging[1](false);
+    this.dragType[1](null);
   }
 }

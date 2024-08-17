@@ -52,7 +52,7 @@ export const Tree = (props: TreeComponentProps) => {
     on(
       () => [
         listDragContext.dragOver[0](),
-        listDragContext.dndContext.isDragging[0](),
+        listDragContext.dndContext.isDragging(),
       ],
       (val) => {
         if (val[0] && val[1]) {
@@ -80,6 +80,11 @@ export const Tree = (props: TreeComponentProps) => {
   return (
     <>
       <div
+        classList={
+          {
+            // active: props.dndContext.activeContext[0]() === listDragContext, TODO: Do better
+          }
+        }
         style={{
           display: "flex",
           "flex-direction": "column",
@@ -89,7 +94,7 @@ export const Tree = (props: TreeComponentProps) => {
           "z-index": 2,
           color: "black",
           // TODO: Only hide this on touch drag
-          "overflow-y": props.dndContext.isDragging[0]() ? "hidden" : "scroll",
+          "overflow-y": props.dndContext.isDragging() ? "hidden" : "scroll",
         }}
         ref={scrollContainerRef}
         onScroll={(event) => {
@@ -132,7 +137,7 @@ export const Tree = (props: TreeComponentProps) => {
         <div
           class="list-backdrop"
           onMouseEnter={() => {
-            if (listDragContext.dndContext.isDragging[0]()) {
+            if (listDragContext.dndContext.isDragging()) {
               listDragContext.dndContext.activeContext[1](listDragContext);
               if (listDragContext.isOrigin) {
                 // TODO: This COULD fuck up in the case of a window... but maybe not because the window
@@ -151,7 +156,7 @@ export const Tree = (props: TreeComponentProps) => {
           }}
         >
           <TransitionGroup name="fade">
-            {listDragContext.dndContext.isDragging[0]() &&
+            {listDragContext.dndContext.isDragging() &&
               listDragContext.lastTouchedIndexSignal[0]() ===
                 signal().window.length + signal().start &&
               !listDragContext.isOrigin && (
