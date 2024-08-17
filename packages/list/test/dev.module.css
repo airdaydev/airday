@@ -26,6 +26,10 @@ body {
 }
 
 .tree-item[aria-selected="true"] {
+    background: #1b1b1b;
+}
+
+.focus .tree-item[aria-selected="true"] {
     background: #2d2d35;
 }
 

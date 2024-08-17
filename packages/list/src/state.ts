@@ -1,6 +1,5 @@
 import { Signal, createMemo, createSignal, createUniqueId } from "solid-js";
 import { qperf } from "./utils";
-import { DndContext } from "./dnd-context";
 import { GenericNode, map, walk, filter } from "./tree-utils";
 
 export interface NodeSignalProps {
@@ -139,7 +138,6 @@ export class ListStateContext {
 interface TreeStateOpts {
   mutate?: boolean;
   loader?: (node: GenericNode<any>) => Node;
-  dndContext?: DndContext;
   context?: ListStateContext;
 }
 

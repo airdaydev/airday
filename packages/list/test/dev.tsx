@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { Tree, TreeState, DndContext, Dragged } from "../src/index";
+import { Tree, DndContext, Dragged } from "../src/index";
 import { loader } from "./nodes";
 import { dummyTree } from "./dummy";
 import styles from "./dev.module.css";
@@ -21,15 +21,13 @@ const listStateContext = new ListStateContext({
   },
 });
 
-const treeStateA = listStateContext.createTree({
-  loader,
-});
+const treeStateA = listStateContext.createTree({ loader });
 treeStateA.load(dummyTree({ maxDepth: 1, maxChildren: 5 }));
 
-const treeStateB = listStateContext.createTree({ loader, dndContext });
+const treeStateB = listStateContext.createTree({ loader });
 treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 25 }));
 
-const treeStateC = listStateContext.createTree({ loader, dndContext });
+const treeStateC = listStateContext.createTree({ loader });
 treeStateC.load(dummyTree({ maxDepth: 1, maxChildren: 30000 }));
 
 render(

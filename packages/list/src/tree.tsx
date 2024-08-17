@@ -51,7 +51,7 @@ export const Tree = (props: TreeComponentProps) => {
   createEffect(
     on(
       () => [
-        listDragContext.dragOver[0](),
+        listDragContext.isDraggingOver(),
         listDragContext.dndContext.isDragging(),
       ],
       (val) => {
@@ -80,11 +80,9 @@ export const Tree = (props: TreeComponentProps) => {
   return (
     <>
       <div
-        classList={
-          {
-            // active: props.dndContext.activeContext[0]() === listDragContext, TODO: Do better
-          }
-        }
+        classList={{
+          focus: listDragContext.isFocused(), // TODO: Do better
+        }}
         style={{
           display: "flex",
           "flex-direction": "column",
@@ -138,16 +136,16 @@ export const Tree = (props: TreeComponentProps) => {
           class="list-backdrop"
           onMouseEnter={() => {
             if (listDragContext.dndContext.isDragging()) {
-              listDragContext.dndContext.activeContext[1](listDragContext);
+              listDragContext.setDragOver();
               if (listDragContext.isOrigin) {
                 // TODO: This COULD fuck up in the case of a window... but maybe not because the window
                 // should overextend. Yes, this needs to be the
                 listDragContext.setLastTouchedIndex(
                   signal().window.length + signal().start,
                 );
-                listDragContext.dragOver[1](true);
+                listDragContext.setDragOver();
               } else {
-                listDragContext.dragOver[1](true);
+                listDragContext.setDragOver();
                 listDragContext.setLastTouchedIndex(
                   signal().window.length + signal().start,
                 );

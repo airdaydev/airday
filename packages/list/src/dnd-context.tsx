@@ -21,7 +21,6 @@ export class ListDragContext {
   selection = createSignal(new Set<Node>());
   originIndex: number | null = 0; // TODO: This could move if other items are inserted...
   isOrigin = false; // true = this is the list where the user has dragged from
-  dragOver = createSignal(false); // Is the user currently dragging over this list
   lastTouchedIndexSignal = createSignal<number | undefined>();
   projection: Accessor<Node[]>;
   dndContext: DndContext;
@@ -40,6 +39,18 @@ export class ListDragContext {
     this.projection = this.initProjection();
     this.itemHeight = itemHeight;
   }
+  isFocused() {
+    return this.dndContext.focusContext[0]() === this;
+  }
+  setFocus() {
+    this.dndContext.focusContext[1](() => this);
+  }
+  isDraggingOver() {
+    return this.dndContext.dragContext[0]() === this;
+  }
+  setDragOver() {
+    this.dndContext.dragContext[1](() => this);
+  }
   clearSelection() {
     this.selection[1](new Set([]));
   }
@@ -50,8 +61,7 @@ export class ListDragContext {
     });
   }
   leave() {
-    this.dndContext.activeContext[1](null);
-    if (this.dndContext.isDragging()) this.dragOver[1](false);
+    if (this.dndContext.isDragging()) this.dndContext.dragContext[1](null);
     if (this.isOrigin) {
       return;
     } // Keeps origin in place for origin list
@@ -67,6 +77,7 @@ export class ListDragContext {
     this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
+    this.setDragOver();
   }
   stopDrag() {
     this.reset();
@@ -188,7 +199,8 @@ type dragMode = "touch" | "mouse" | null;
 // This mostly controls the dragged item
 export class DndContext {
   dragMode = createSignal<dragMode>();
-  activeContext = createSignal<ListDragContext | null>(null);
+  focusContext = createSignal<ListDragContext | null>(null);
+  dragContext = createSignal<ListDragContext | null>(null);
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
@@ -207,7 +219,7 @@ export class DndContext {
   // For touch
   checkLeave(el: Element) {
     this.listContexts.forEach((ctx) => {
-      if (ctx.dragOver[0]()) {
+      if (ctx.isDraggingOver()) {
         const contains = ctx.scrollContainerRef?.contains(el);
         if (!contains) {
           ctx.leave();
@@ -229,5 +241,6 @@ export class DndContext {
     this.elClickOffset = [0, 0];
     this.draggedEl = null;
     this.dragMode[1](null);
+    this.dragContext[1](null);
   }
 }

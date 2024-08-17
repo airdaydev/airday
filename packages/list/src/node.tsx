@@ -102,6 +102,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
     if (event.button === 2) return; // prevent context menu
+    props.listDragContext.setFocus();
     if (event.metaKey) {
       props.listDragContext.addToSelection(props.node);
       return;
@@ -147,7 +148,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           () => {
             // TODO: Perhaps wrap this within the context
             const activeContext =
-              props.listDragContext.dndContext.activeContext[0]();
+              props.listDragContext.dndContext.dragContext[0]();
             if (activeContext) {
               props.listDragContext.treeState.context.moveItems(
                 props.listDragContext.selection[0](),
@@ -192,7 +193,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       () => [
         props.listDragContext.lastTouchedIndexSignal[0](),
         props.listDragContext.dndContext.isDragging(),
-        props.listDragContext.dragOver[0](),
+        props.listDragContext.isDraggingOver(),
       ],
       ([lastTouchedIndex, isDragging, dragOver]) => {
         if (!isDragging) {
@@ -247,8 +248,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // N.b. the sequence here prevents a flicker on drag start.
     const newIndex = treeIndex() - draggedOn[0]();
     props.listDragContext.setLastTouchedIndex(newIndex);
-    props.listDragContext.dragOver[1](true);
-    props.listDragContext.dndContext.activeContext[1](props.listDragContext);
+    props.listDragContext.setDragOver();
   };
   /**
    * Hiding the placeholder:
@@ -269,7 +269,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
         {/* Second condition resolves edge case where dragging onto own list
         from outside own list, last item momentarily doesn't cover last item placeholder. */}
         {draggedOn[0]() === 1 &&
-          props.listDragContext.dragOver[0]() &&
+          props.listDragContext.isDraggingOver() &&
           treeIndex() -
             Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
             1 && <div class="placeholder" />}
@@ -280,7 +280,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           classList={{
             placeholder: true,
             origin: true,
-            visible: props.listDragContext.dragOver[0](),
+            visible: props.listDragContext.isDraggingOver(),
           }}
         />
       )}
