@@ -84,7 +84,7 @@ export const Tree = (props: TreeComponentProps) => {
           display: "flex",
           "flex-direction": "column",
           position: "relative",
-          width: "18em",
+          width: "100%",
           height: "100%",
           "z-index": 2,
           color: "black",

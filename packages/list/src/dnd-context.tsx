@@ -206,6 +206,7 @@ export class DndContext {
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
+  elWidthPx: number = 200;
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   constructor() {}
   startDrag(
@@ -215,6 +216,7 @@ export class DndContext {
   ) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
+    this.elWidthPx = ref.getBoundingClientRect().width;
     this.draggedEl = ref.cloneNode(true);
     this.dragMode[1](dragMode);
   }

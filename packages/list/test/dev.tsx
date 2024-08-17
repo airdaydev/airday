@@ -51,35 +51,37 @@ const ctxC = new ListDragContext({
 
 render(
   () => (
-    <div class={styles["container"]}>
+    <div class={styles["app"]}>
       {dndContext.isDragging() && <Dragged dndContext={dndContext} />}
-      <SolidListContext.Provider value={ctxA}>
-        <div
-          style={`display: flex; flex-direction: column; height: 100%;`}
-          classList={{ [styles["focus"]]: ctxA.isFocused() }}
-        >
-          <h3>Tree A ({treeStateA.count()} items)</h3>
-          <Tree />
-        </div>
-      </SolidListContext.Provider>
-      <SolidListContext.Provider value={ctxB}>
-        <div
-          style={`display: flex; flex-direction: column; height: 100%;`}
-          classList={{ [styles["focus"]]: ctxB.isFocused() }}
-        >
-          <h3>Tree A ({treeStateB.count()} items)</h3>
-          <Tree />
-        </div>
-      </SolidListContext.Provider>
-      <SolidListContext.Provider value={ctxC}>
-        <div
-          style={`display: flex; flex-direction: column; height: 100%;`}
-          classList={{ [styles["focus"]]: ctxC.isFocused() }}
-        >
-          <h3>Tree A ({treeStateC.count()} items)</h3>
-          <Tree />
-        </div>
-      </SolidListContext.Provider>
+      <div class={styles["container"]}>
+        <SolidListContext.Provider value={ctxA}>
+          <div
+            style={`display: flex; flex-direction: column; height: 100%; width: 33.3%;`}
+            classList={{ [styles["focus"]]: ctxA.isFocused() }}
+          >
+            <h3>Tree A ({treeStateA.count()} items)</h3>
+            <Tree />
+          </div>
+        </SolidListContext.Provider>
+        <SolidListContext.Provider value={ctxB}>
+          <div
+            style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
+            classList={{ [styles["focus"]]: ctxB.isFocused() }}
+          >
+            <h3>Tree A ({treeStateB.count()} items)</h3>
+            <Tree />
+          </div>
+        </SolidListContext.Provider>
+        <SolidListContext.Provider value={ctxC}>
+          <div
+            style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
+            classList={{ [styles["focus"]]: ctxC.isFocused() }}
+          >
+            <h3>Tree A ({treeStateC.count()} items)</h3>
+            <Tree />
+          </div>
+        </SolidListContext.Provider>
+      </div>
     </div>
   ),
   root!,

@@ -20,6 +20,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   const onMouseMove = (event: MouseEvent) => {
     requestAnimationFrame(() => {
       if (stackRef) {
+        console.log(event.x, dndContext.elClickOffset[0]);
         stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
         stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
       }
@@ -69,7 +70,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           top: -100%;
           left: -100%;
           box-shadow: 1px 1px 2px #0000002e;
-          max-width: 18em;
+          max-width: ${dndContext.elWidthPx}px;
           height: 26px;
           animation: scaleUp 0.1s ease-in-out forwards;
         `}
