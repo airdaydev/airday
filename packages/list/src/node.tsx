@@ -21,7 +21,6 @@ export interface NodeContainerProps {
   index: Accessor<number>;
   virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
-  itemHeight: number;
 }
 
 export const NodeContainer = (props: NodeContainerProps) => {
@@ -156,6 +155,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
                 activeContext.treeState,
                 [null, activeContext.lastTouchedIndexSignal[0]()],
               );
+              activeContext.setFocus();
               activeContext.selection[1](props.listDragContext.selection[0]());
               if (props.listDragContext !== activeContext) {
                 props.listDragContext.clearSelection();
@@ -262,7 +262,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     <div
       class="item"
       data-type="node"
-      style={`top: ${treeIndex() * props.itemHeight}px; height: ${props.itemHeight}px;`}
+      style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px;`}
     >
       {draggedOn[0]() === -1 && <div class="placeholder" />}
       <TransitionGroup name="fade">

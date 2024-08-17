@@ -1,5 +1,7 @@
 import {
   Accessor,
+  Context,
+  createContext,
   createEffect,
   createMemo,
   createSignal,
@@ -28,16 +30,16 @@ export class ListDragContext {
   dragOriginNodeIndex: number | undefined;
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
-  constructor(
-    treeState: TreeState,
-    dndContext: DndContext,
-    itemHeight: number,
-  ) {
-    this.treeState = treeState;
-    this.dndContext = dndContext;
-    dndContext.listContexts.add(this);
+  constructor(opts: {
+    treeState: TreeState;
+    dndContext: DndContext;
+    itemHeight: number;
+  }) {
+    this.treeState = opts.treeState;
+    this.dndContext = opts.dndContext;
+    opts.dndContext.listContexts.add(this);
     this.projection = this.initProjection();
-    this.itemHeight = itemHeight;
+    this.itemHeight = opts.itemHeight;
   }
   isFocused() {
     return this.dndContext.focusContext[0]() === this;
@@ -244,3 +246,5 @@ export class DndContext {
     this.dragContext[1](null);
   }
 }
+
+export const SolidListContext = createContext<ListDragContext | null>(null);

@@ -5,6 +5,7 @@ import { loader } from "./nodes";
 import { dummyTree } from "./dummy";
 import styles from "./dev.module.css";
 import { ListStateContext } from "../src/state";
+import { ListDragContext, SolidListContext } from "../src/dnd-context";
 
 const root = document.getElementById("root");
 
@@ -30,29 +31,55 @@ treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 25 }));
 const treeStateC = listStateContext.createTree({ loader });
 treeStateC.load(dummyTree({ maxDepth: 1, maxChildren: 30000 }));
 
+const ctxA = new ListDragContext({
+  treeState: treeStateA,
+  dndContext: dndContext,
+  itemHeight: 28,
+});
+
+const ctxB = new ListDragContext({
+  treeState: treeStateB,
+  dndContext: dndContext,
+  itemHeight: 28,
+});
+
+const ctxC = new ListDragContext({
+  treeState: treeStateC,
+  dndContext: dndContext,
+  itemHeight: 28,
+});
+
 render(
   () => (
     <div class={styles["container"]}>
       {dndContext.isDragging() && <Dragged dndContext={dndContext} />}
-      <div style={`display: flex; flex-direction: column; height: 100%;`}>
-        <h3>Tree A ({treeStateA.count()} items)</h3>
-        <Tree
-          dndContext={dndContext}
-          state={treeStateA}
-          itemHeight={28}
-          // draggable
-          // multiselect
-          // height={(node) => {}} // Node height calculation function or number
-        />
-      </div>
-      <div style={`display: flex; flex-direction: column; height: 100%;`}>
-        <h3>Tree B ({treeStateB.count()} items)</h3>
-        <Tree dndContext={dndContext} state={treeStateB} itemHeight={28} />
-      </div>
-      <div style={`display: flex; flex-direction: column; height: 100%;`}>
-        <h3>Tree C ({treeStateC.count()} items)</h3>
-        <Tree dndContext={dndContext} state={treeStateC} itemHeight={28} />
-      </div>
+      <SolidListContext.Provider value={ctxA}>
+        <div
+          style={`display: flex; flex-direction: column; height: 100%;`}
+          classList={{ [styles["focus"]]: ctxA.isFocused() }}
+        >
+          <h3>Tree A ({treeStateA.count()} items)</h3>
+          <Tree />
+        </div>
+      </SolidListContext.Provider>
+      <SolidListContext.Provider value={ctxB}>
+        <div
+          style={`display: flex; flex-direction: column; height: 100%;`}
+          classList={{ [styles["focus"]]: ctxB.isFocused() }}
+        >
+          <h3>Tree A ({treeStateB.count()} items)</h3>
+          <Tree />
+        </div>
+      </SolidListContext.Provider>
+      <SolidListContext.Provider value={ctxC}>
+        <div
+          style={`display: flex; flex-direction: column; height: 100%;`}
+          classList={{ [styles["focus"]]: ctxC.isFocused() }}
+        >
+          <h3>Tree A ({treeStateC.count()} items)</h3>
+          <Tree />
+        </div>
+      </SolidListContext.Provider>
     </div>
   ),
   root!,

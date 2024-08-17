@@ -6,12 +6,13 @@ import {
   on,
   onCleanup,
   onMount,
+  useContext,
 } from "solid-js";
 import { TransitionGroup } from "solid-transition-group";
 import { TreeState } from "./state";
 import { GenericNode } from "./tree-utils";
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from "./node";
-import { DndContext, ListDragContext } from "./dnd-context";
+import { DndContext, ListDragContext, SolidListContext } from "./dnd-context";
 import { observeHeight } from "./utils";
 import { AutoscrollController } from "./autoscroll";
 
@@ -36,11 +37,7 @@ export const Tree = (props: TreeComponentProps) => {
   const containerVector = createMemo<ContainerVector>(() => {
     return [heightSignal[0](), scrollSignal[0]()];
   });
-  let listDragContext = new ListDragContext(
-    props.state,
-    props.dndContext,
-    props.itemHeight,
-  );
+  const listDragContext = useContext<ListDragContext>(SolidListContext);
   onMount(() => {
     if (!scrollContainerRef) return;
     observeHeight(scrollContainerRef, heightSignal);
@@ -92,14 +89,16 @@ export const Tree = (props: TreeComponentProps) => {
           "z-index": 2,
           color: "black",
           "overflow-y":
-            props.dndContext.dragMode[0]() === "touch" ? "hidden" : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
+            listDragContext.dndContext.dragMode[0]() === "touch"
+              ? "hidden"
+              : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
         }}
         ref={scrollContainerRef}
         onScroll={(event) => {
           // TODO: This should match the projection buffer
           if (
             Math.abs(scrollSignal[0]() - event.target.scrollTop) >
-            props.itemHeight * 10
+            listDragContext.itemHeight * 10
           ) {
             scrollSignal[1](event.target.scrollTop);
           }
@@ -111,7 +110,7 @@ export const Tree = (props: TreeComponentProps) => {
               top: 0;
               left: 0;
               width: 100%;
-              min-height: ${listDragContext.presentCount()() * props.itemHeight}px;`}
+              min-height: ${listDragContext.presentCount()() * listDragContext.itemHeight}px;`}
         >
           <For each={signal().window}>
             {(node, index) => (
@@ -121,7 +120,6 @@ export const Tree = (props: TreeComponentProps) => {
                 autoscroller={autoscroller}
                 virtualisedList={signal}
                 node={node}
-                itemHeight={props.itemHeight}
                 Component={
                   node.component ||
                   props.defaultNodeComponent ||
@@ -160,7 +158,7 @@ export const Tree = (props: TreeComponentProps) => {
               !listDragContext.isOrigin && (
                 <div
                   class="placeholder"
-                  style={`max-height: ${props.itemHeight}px`}
+                  style={`max-height: ${listDragContext.itemHeight}px`}
                 />
               )}
           </TransitionGroup>

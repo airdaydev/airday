@@ -72,7 +72,6 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Which list is in focus?
 - keyboard controller
 - Get autoscroller touch version working with other lists
 - Escape to deselect
