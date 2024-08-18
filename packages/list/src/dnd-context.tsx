@@ -194,15 +194,13 @@ export class ListDragContext {
    * This count includes total item count minus the selected items (excluding origin) when dragging
    * or total count generally
    */
-  presentCount() {
-    return createMemo(() => {
-      if (this.dndContext.isDragging() && this.isOrigin) {
-        return this.treeState.count() - this.selection[0]().size + 1;
-      } else {
-        return this.treeState.count();
-      }
-    });
-  }
+  presentCount = () => {
+    if (this.dndContext.isDragging() && this.isOrigin) {
+      return this.treeState.count() - this.selection[0]().size + 1;
+    } else {
+      return this.treeState.count();
+    }
+  };
 }
 
 type dragMode = "touch" | "mouse" | null;
