@@ -245,7 +245,7 @@ export class DndContext {
       }
     });
   }
-  isDragging = createMemo(() => !!this.dragMode[0]());
+  isDragging = () => !!this.dragMode[0]();
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);
