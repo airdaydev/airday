@@ -1,43 +1,58 @@
-import { ListDragContext } from './dnd-context';
+import { DndContext } from "./dnd-context";
 
-export class ListShortcuts {
+export class DndContextKeyboardEvents {
   enabled = false;
-  dndContext: ListDragContext;
-  constructor(dndContext: ListDragContext) {
+  vimKeys = true;
+  dndContext: DndContext;
+  constructor(dndContext: DndContext) {
     this.dndContext = dndContext;
+    window.addEventListener("keydown", (event) => this.listen(event));
   }
   listen(event: KeyboardEvent) {
-    if (event.key === 'ArrowUp' || event.key === 'K') {
-      // Up movement from selection or bottom
+    const focused = this.dndContext.focusedContext();
+    if (!focused) return;
+    if (event.key === "ArrowUp" || event.key === "K") {
       if (event.metaKey) {
         // jump to & select top of list
       }
       if (event.shiftKey) {
         // Add to selection up
+        // TODO: This requires looking from origin
+        const prev = focused?.getPrevious();
+        if (prev) focused?.addToSelection(prev);
+        return;
       }
       if (event.altKey) {
         // Move item up
       }
+      // Up movement from selection or bottom
+      const prev = focused?.getPrevious();
+      if (prev) focused?.selectOne(prev);
     }
-    if (event.key === 'ArrowDown' || event.key === 'J') {
-      // Up movement from selection or top
+    if (event.key === "ArrowDown" || event.key === "J") {
       if (event.metaKey) {
         // jump to & select bottom of list
       }
       if (event.shiftKey) {
         // Add to selection down
+        const next = focused?.getNext();
+        if (next) focused?.addToSelection(next);
+        return;
       }
       if (event.altKey) {
         // Move item down
       }
+      // Up movement from selection or top
+      const next = focused?.getNext();
+      if (next) focused?.selectOne(next);
     }
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       // Clear selection
     }
-    if (event.key === 'gg') {
+    if (event.key === "gg") {
       // jump to & select top of list
     }
-    if (event.key === 'G') {
+    if (event.key === "G") {
       // jump to & select bottom of list
     }
   }

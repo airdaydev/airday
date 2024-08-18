@@ -1,6 +1,5 @@
 import {
   Accessor,
-  Context,
   createContext,
   createEffect,
   createMemo,
@@ -10,6 +9,7 @@ import {
 import { Node, TreeState } from "./state";
 import { walk } from "./tree-utils";
 import { ContainerVector } from "./tree";
+import { DndContextKeyboardEvents } from "./keyboard";
 
 export type VirtualisedList = Accessor<{
   window: Node[];
@@ -112,6 +112,16 @@ export class ListDragContext {
     }
     return false;
   }
+  getPrevious() {
+    const first = this.getFirstIndexSelected();
+    if (!first) return this.projection()[0];
+    return this.projection()[first - 1];
+  }
+  getNext() {
+    const last = this.getLastIndexSelected();
+    if (last === false) return this.projection()[this.projection().length - 1];
+    return this.projection()[last + 1];
+  }
   getLastIndexSelected() {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
     const projection = this.projection();
@@ -208,7 +218,10 @@ export class DndContext {
   elClickOffset = [0, 0];
   elWidthPx: number = 200;
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
-  constructor() {}
+  keyboard: DndContextKeyboardEvents;
+  constructor() {
+    this.keyboard = new DndContextKeyboardEvents(this);
+  }
   startDrag(
     ref: HTMLElement,
     elClickOffset: [number, number] = [0, 0],
@@ -219,6 +232,9 @@ export class DndContext {
     this.elWidthPx = ref.getBoundingClientRect().width;
     this.draggedEl = ref.cloneNode(true);
     this.dragMode[1](dragMode);
+  }
+  focusedContext() {
+    return this.focusContext[0]();
   }
   // For touch
   checkLeave(el: Element) {
