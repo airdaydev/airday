@@ -197,9 +197,9 @@ export class ListDragContext {
   presentCount() {
     return createMemo(() => {
       if (this.dndContext.isDragging() && this.isOrigin) {
-        return this.treeState.count()() - this.selection[0]().size + 1;
+        return this.treeState.count() - this.selection[0]().size + 1;
       } else {
-        return this.treeState.count()();
+        return this.treeState.count();
       }
     });
   }

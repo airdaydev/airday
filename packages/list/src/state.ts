@@ -198,21 +198,19 @@ export class TreeState {
     this.childrenSignal[1](() => children);
     q();
   }
-  count(expandedOnly?: boolean) {
-    return createMemo(() => {
-      let count = 0;
-      walk(
-        { isRoot: true, children: this.childrenSignal[0]() },
-        (node) => {
-          count++;
-          if (expandedOnly && !node.expanded) return true;
-          return false;
-        },
-        undefined,
-      );
-      return count - 1; // accounts for root node
-    });
-  }
+  count = createMemo(() => {
+    let count = 0;
+    walk(
+      { isRoot: true, children: this.childrenSignal[0]() },
+      (node) => {
+        count++;
+        // if (expandedOnly && !node.expanded) return true;
+        return false;
+      },
+      undefined,
+    );
+    return count - 1; // accounts for root node
+  });
   moveItems(nodes: Set<Node>, parentNode: Node | null, newPosition: number) {
     const result = this.remove(nodes);
     if (!result.removed) {
