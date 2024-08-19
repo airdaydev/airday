@@ -21,9 +21,11 @@ export class Node {
   }
   // TODO: Consider maintaining an index
   getIndex() {
-    return (
-      this.root?.childrenSignal[0]().findIndex((node) => node === this) ?? false
+    if (!this.root) throw new Error("node root not found");
+    const index = this.root.childrenSignal[0]().findIndex(
+      (node) => node === this,
     );
+    return index < 0 ? 0 : index;
   }
   get accessor() {
     if (!this.uiSignal) this.uiSignal = createSignal(this.toJSON());
@@ -101,17 +103,23 @@ export class ListStateContext {
       return;
     }
 
+    const transformNodes = Array.from(nodes).map((node) => {
+      node.root = destState;
+      return node;
+    });
+
     // Update the source tree
     srcState.childrenSignal[1](result.filtered);
 
     // Add items to the destination tree
+    // TODO: We should probably clone these...
     const [parentNode, newPosition] = dstPosition;
     if (!parentNode) {
       // Add to root level
       const currentChildren = destState.childrenSignal[0]();
       const updatedChildren = [
         ...currentChildren.slice(0, newPosition),
-        ...Array.from(nodes),
+        ...Array.from(transformNodes),
         ...currentChildren.slice(newPosition),
       ];
       destState.childrenSignal[1](updatedChildren);
@@ -122,7 +130,7 @@ export class ListStateContext {
         if (node === parentNode) {
           node.children = [
             ...node.children.slice(0, newPosition),
-            ...Array.from(nodes),
+            ...Array.from(transformNodes),
             ...node.children.slice(newPosition),
           ];
           return node;
