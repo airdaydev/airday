@@ -111,11 +111,16 @@ export class ListDragContext {
     const selection = new Set(this.selection[0]());
     if (selection.has(node)) {
       selection.delete(node);
+      this.selection[1](selection);
+      const first = this.getFirstIndexSelected();
+      if (setOrigin && first) {
+        this.originNode = this.treeState.childrenSignal[0]()[first];
+      }
     } else {
       selection.add(node);
+      this.selection[1](selection);
       if (setOrigin) this.originNode = node;
     }
-    this.selection[1](selection);
   }
   getFirstIndexSelected() {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
