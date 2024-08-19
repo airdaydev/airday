@@ -25,7 +25,7 @@ export interface NodeContainerProps {
 
 export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
-  const isSelected = props.listDragContext.isSelected(props.node);
+  const isSelected = () => props.listDragContext.isSelected(props.node);
   const draggedOn = createSignal(0);
   const treeIndex = createMemo(
     () => props.virtualisedList().start + props.index(),

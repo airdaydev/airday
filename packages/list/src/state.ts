@@ -1,4 +1,4 @@
-import { Signal, createMemo, createSignal, createUniqueId } from "solid-js";
+import { Signal, createSignal, createUniqueId } from "solid-js";
 import { qperf } from "./utils";
 import { GenericNode, map, walk, filter } from "./tree-utils";
 

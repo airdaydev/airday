@@ -55,10 +55,8 @@ export class ListDragContext {
     this.selection[1](new Set([]));
   }
   isSelected(node: Node) {
-    return createMemo(() => {
-      const selection = this.selection[0]();
-      return selection.has(node);
-    });
+    const selection = this.selection[0]();
+    return selection.has(node);
   }
   leave() {
     if (this.dndContext.isDragging()) this.dndContext.dragContext[1](null);
