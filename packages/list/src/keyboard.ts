@@ -12,6 +12,7 @@ export class DndContextKeyboardEvents {
     const ctx = this.dndContext.focusedContext();
     if (!ctx) return;
     if (event.key === "ArrowUp" || event.key === "K") {
+      event.preventDefault();
       if (event.metaKey) {
         // jump to & select top of list
       }
@@ -26,8 +27,9 @@ export class DndContextKeyboardEvents {
           );
           return;
         }
-        const prev = ctx?.getPrevious();
-        if (prev) ctx?.toggleSelection(prev);
+        const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
+        const node = ctx.getNodeByIndex(prevIndex);
+        if (prevIndex) ctx?.toggleSelection(node);
         return;
       }
       if (event.altKey) {
@@ -52,8 +54,9 @@ export class DndContextKeyboardEvents {
           );
           return;
         }
-        const next = ctx?.getNext();
-        if (next) ctx?.toggleSelection(next);
+        const nextIndex = ctx?.getNextDeselectedFromOrigin();
+        const node = ctx.getNodeByIndex(nextIndex);
+        if (nextIndex) ctx?.toggleSelection(node);
         return;
       }
       if (event.altKey) {
