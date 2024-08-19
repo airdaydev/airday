@@ -24,7 +24,6 @@ export class ListDragContext {
   originIndex: number | null = 0; // TODO: This could move if other items are inserted...
   isOrigin = false; // true = this is the list where the user has dragged from
   lastTouchedIndexSignal = createSignal<number | undefined>();
-  projection: Accessor<Node[]>;
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
   dragOriginNodeIndex: number | undefined;
@@ -38,7 +37,6 @@ export class ListDragContext {
     this.treeState = opts.treeState;
     this.dndContext = opts.dndContext;
     opts.dndContext.listContexts.add(this);
-    this.projection = this.initProjection();
     this.itemHeight = opts.itemHeight;
   }
   isFocused() {
@@ -138,37 +136,35 @@ export class ListDragContext {
   setLastTouchedIndex(index: number) {
     return this.lastTouchedIndexSignal[1](index);
   }
-  initProjection() {
-    return createMemo<Node[]>(() => {
-      const visibleChildren: Node[] = [];
-      let n = new Node();
-      n.isRoot = true;
-      n.children = this.treeState.childrenSignal[0]();
-      let index = 0;
-      const isDragging = this.dndContext.isDragging();
-      // Flattens the tree
-      walk<Node, Node>(n, (node) => {
-        // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === this.originNode;
-        if (dragOriginNode) {
-          this.originIndex = index;
-          index++;
-        }
-        // Skip root & other selected items
-        const skip =
-          node.isRoot ||
-          (isDragging &&
-            this.selection[0]().has(node) &&
-            !dragOriginNode &&
-            this.isOrigin);
-        if (!skip) {
-          index++;
-          visibleChildren.push(node);
-        }
-        if (!node.expanded) return true;
-      });
-      return visibleChildren;
+  projection() {
+    const visibleChildren: Node[] = [];
+    let n = new Node();
+    n.isRoot = true;
+    n.children = this.treeState.childrenSignal[0]();
+    let index = 0;
+    const isDragging = this.dndContext.isDragging();
+    // Flattens the tree
+    walk<Node, Node>(n, (node) => {
+      // Keeping the node that user actually dragged in place
+      const dragOriginNode = node === this.originNode;
+      if (dragOriginNode) {
+        this.originIndex = index;
+        index++;
+      }
+      // Skip root & other selected items
+      const skip =
+        node.isRoot ||
+        (isDragging &&
+          this.selection[0]().has(node) &&
+          !dragOriginNode &&
+          this.isOrigin);
+      if (!skip) {
+        index++;
+        visibleChildren.push(node);
+      }
+      if (!node.expanded) return true;
     });
+    return visibleChildren;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(
