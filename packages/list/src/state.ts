@@ -19,6 +19,10 @@ export class Node {
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
   }
+  // TODO: Consider maintaining an index
+  getIndex() {
+    return this.root?.childrenSignal[0]().findIndex((node) => node === this);
+  }
   get accessor() {
     if (!this.uiSignal) this.uiSignal = createSignal(this.toJSON());
     this.signalSubscriptions++;

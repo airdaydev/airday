@@ -9,42 +9,59 @@ export class DndContextKeyboardEvents {
     window.addEventListener("keydown", (event) => this.listen(event));
   }
   listen(event: KeyboardEvent) {
-    const focused = this.dndContext.focusedContext();
-    if (!focused) return;
+    const ctx = this.dndContext.focusedContext();
+    if (!ctx) return;
     if (event.key === "ArrowUp" || event.key === "K") {
       if (event.metaKey) {
         // jump to & select top of list
       }
-      if (event.shiftKey) {
-        // Add to selection up
-        // TODO: This requires looking from origin
-        const prev = focused?.getPrevious();
-        if (prev) focused?.addToSelection(prev);
+      // selection.rangeOrigin && event.shiftKey
+      if (event.shiftKey && ctx.originNode) {
+        // Add to selection down
+        const originIndex = ctx.originNode.getIndex();
+        const nextDeselected = ctx.getNextDeselectedFromOrigin("next");
+        if (nextDeselected && nextDeselected > originIndex + 1) {
+          ctx.toggleSelection(
+            ctx.treeState.childrenSignal[0]()[nextDeselected - 1],
+          );
+          return;
+        }
+        const prev = ctx?.getPrevious();
+        if (prev) ctx?.toggleSelection(prev);
         return;
       }
       if (event.altKey) {
         // Move item up
       }
       // Up movement from selection or bottom
-      const prev = focused?.getPrevious();
-      if (prev) focused?.selectOne(prev);
+      const prev = ctx?.getPrevious();
+      if (prev) ctx?.selectOne(prev);
     }
     if (event.key === "ArrowDown" || event.key === "J") {
       if (event.metaKey) {
         // jump to & select bottom of list
       }
-      if (event.shiftKey) {
-        // Add to selection down
-        const next = focused?.getNext();
-        if (next) focused?.addToSelection(next);
+      // Shift down/up selects objects between most extreme node contiguous to origin
+      if (event.shiftKey && ctx.originNode) {
+        // Add to selection up
+        const originIndex = ctx.originNode.getIndex();
+        const prevDeselected = ctx.getNextDeselectedFromOrigin("prev");
+        if (prevDeselected && prevDeselected < originIndex - 1) {
+          ctx.toggleSelection(
+            ctx.treeState.childrenSignal[0]()[prevDeselected + 1],
+          );
+          return;
+        }
+        const next = ctx?.getNext();
+        if (next) ctx?.toggleSelection(next);
         return;
       }
       if (event.altKey) {
         // Move item down
       }
       // Up movement from selection or top
-      const next = focused?.getNext();
-      if (next) focused?.selectOne(next);
+      const next = ctx?.getNext();
+      if (next) ctx?.selectOne(next);
     }
     if (event.key === "Escape") {
       // Clear selection

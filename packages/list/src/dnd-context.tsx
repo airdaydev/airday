@@ -26,7 +26,7 @@ export class ListDragContext {
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
-  dragOriginNodeIndex: number | undefined;
+  dragOriginNodeIndex: number | undefined; // TODO: Use & memoised w respect to treestate
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
   constructor(opts: {
@@ -89,12 +89,13 @@ export class ListDragContext {
   }
   selectOne(node: Node) {
     const selection = new Set([node]);
+    this.originNode = node;
     this.selection[1](selection);
   }
-  addToSelection(node: Node) {
+  toggleSelection(node: Node) {
     const selection = new Set(this.selection[0]());
     if (selection.has(node)) {
-      selection.delete(node);
+      selection.delete(node); // TODO: huh? toggle?
     } else {
       selection.add(node);
     }
@@ -104,6 +105,14 @@ export class ListDragContext {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
     const projection = this.projection();
     for (let i = 0; i < projection.length; i++) {
+      if (this.selection[0]().has(projection[i])) return i;
+    }
+    return false;
+  }
+  getLastIndexSelected() {
+    // TODO: We could collect all sortkeys through an up-to-date hashmap
+    const projection = this.projection();
+    for (let i = projection.length - 1; i >= 0; i--) {
       if (this.selection[0]().has(projection[i])) return i;
     }
     return false;
@@ -118,11 +127,19 @@ export class ListDragContext {
     if (last === false) return this.projection()[this.projection().length - 1];
     return this.projection()[last + 1];
   }
-  getLastIndexSelected() {
-    // TODO: We could collect all sortkeys through an up-to-date hashmap
-    const projection = this.projection();
-    for (let i = projection.length - 1; i >= 0; i--) {
-      if (this.selection[0]().has(projection[i])) return i;
+  getNextDeselectedFromOrigin(direction: "next" | "prev" = "next") {
+    const list = this.treeState.childrenSignal[0]();
+    let rangeEnded = false;
+    let i = this.originNode?.getIndex();
+    if (!i) return false;
+    while (!rangeEnded) {
+      const next = list[i];
+      if (!next) return false;
+      if (this.selection[0]().has(next)) {
+        direction === "next" ? i++ : i--;
+      } else {
+        return i;
+      }
     }
     return false;
   }

@@ -43,9 +43,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Touch interactions
   let touchBandaidUnsub: () => void;
   onMount(() => {
-    // if (isTouchDevice())
-    // on mounting the saaaame container!!
-    if (ref) touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
+    if (isTouchDevice()) {
+      if (ref) touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
+    }
   });
   onCleanup(() => {
     props.node.unsubscribe();
@@ -115,7 +115,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     if (event.button === 2) return; // prevent context menu
     props.listDragContext.setFocus();
     if (event.metaKey) {
-      props.listDragContext.addToSelection(props.node);
+      props.listDragContext.toggleSelection(props.node);
       return;
     }
     // Shift key = range selection
