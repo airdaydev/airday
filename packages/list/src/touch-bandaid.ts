@@ -10,11 +10,13 @@ class TouchBandaid {
   onTouchEnter(node: Element, func: () => void): () => void {
     const cb = this.map.get(node);
     if (cb) {
-      console.warn('Attempted to overwrite TouchBandaid record');
-      return () => null;
+      console.warn("Attempted to overwrite TouchBandaid record");
+      return () => this.map.delete(node);
     }
     this.map.set(node, func);
-    return () => this.map.delete(node);
+    return () => {
+      this.map.delete(node);
+    };
   }
   call(node: Element) {
     const cb = this.map.get(node);

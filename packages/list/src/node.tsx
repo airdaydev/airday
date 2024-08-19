@@ -23,6 +23,16 @@ export interface NodeContainerProps {
   listDragContext: ListDragContext;
 }
 
+// TODO: Validate this approach
+// https://stackoverflow.com/questions/4817029/whats-an-optimal-or-efficient-way-to-detect-a-touch-screen-device-using-javas
+function isTouchDevice() {
+  return (
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator?.msMaxTouchPoints > 0
+  );
+}
+
 export const NodeContainer = (props: NodeContainerProps) => {
   let ref: HTMLElement;
   const isSelected = () => props.listDragContext.isSelected(props.node);
@@ -33,7 +43,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Touch interactions
   let touchBandaidUnsub: () => void;
   onMount(() => {
-    touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
+    // if (isTouchDevice())
+    // on mounting the saaaame container!!
+    if (ref) touchBandaidUnsub = touchBandaid.onTouchEnter(ref, onUIEnter);
   });
   onCleanup(() => {
     props.node.unsubscribe();
