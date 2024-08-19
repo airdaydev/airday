@@ -13,6 +13,9 @@ export class DndContextKeyboardEvents {
     if (!ctx) return;
     if (event.key === "ArrowUp" || event.key === "K") {
       event.preventDefault();
+      if (event.metaKey && event.shiftKey) {
+        // select from origin to top of list
+      }
       if (event.metaKey) {
         // jump to & select top of list
         ctx.selectOne(ctx.getNodeByIndex(0));
@@ -52,6 +55,9 @@ export class DndContextKeyboardEvents {
       ctx.jumpScrollToIndex(next[0]);
     }
     if (event.key === "ArrowDown" || event.key === "J") {
+      if (event.metaKey && event.shiftKey) {
+        // select from origin to bottom of list
+      }
       if (event.metaKey) {
         // jump to & select bottom of list
         ctx.selectOne(ctx.getNodeByIndex(ctx.treeState.count()));

@@ -72,14 +72,15 @@ pnpm run dev
 ```
 
 ## Roadmap
+- meta + shift -> select from origin to top/bottom of list
 - Get autoscroller touch version working with other lists
 - Escape to deselect
-- option + arrow to move up / down
-- ctrl+a to select all
+- option + arrow to move selection up / down
+- cmd+a to select all
+- vim key toggle (but maybe on the actual app itself depending on controller state)
 - gg/G = top/bottom of list
 - double click to open item for editing / quick editing?
 - Disable placeholder when autoscrolling (coz it's jaaanky)
-- vim key toggle (but maybe on the actual app itself depending on controller state)
 - State change needs to trigger a list resize! e.g. important in the case of deleting items
 
 ## Stretch goals
