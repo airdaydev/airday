@@ -21,7 +21,9 @@ export class Node {
   }
   // TODO: Consider maintaining an index
   getIndex() {
-    return this.root?.childrenSignal[0]().findIndex((node) => node === this);
+    return (
+      this.root?.childrenSignal[0]().findIndex((node) => node === this) ?? false
+    );
   }
   get accessor() {
     if (!this.uiSignal) this.uiSignal = createSignal(this.toJSON());

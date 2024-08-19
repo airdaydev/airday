@@ -296,7 +296,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           }}
         />
       )}
-      {!isDragOrigin() && (
+      {(!isDragOrigin() || !props.listDragContext.dndContext.isDragging()) && (
         <div
           classList={{
             item_internal: true,

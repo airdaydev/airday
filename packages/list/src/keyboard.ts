@@ -24,7 +24,7 @@ export class DndContextKeyboardEvents {
         const nextDeselected = ctx.getNextDeselectedFromOrigin("next");
         if (
           nextDeselected === originIndex + 1 ||
-          originIndex === ctx.treeState.count()
+          originIndex === ctx.treeState.count() - 1
         ) {
           // select up
           const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
@@ -37,7 +37,7 @@ export class DndContextKeyboardEvents {
             ctx.treeState.childrenSignal[0]()[
               nextDeselected !== false
                 ? nextDeselected - 1
-                : ctx.treeState.count()
+                : ctx.treeState.count() - 1
             ],
           );
           return;
@@ -46,9 +46,10 @@ export class DndContextKeyboardEvents {
       if (event.altKey) {
         // Move item up
       }
-      // Down movement from selection or top
+      // Up movement from selection or top
       const next = ctx?.getPrevious();
-      if (next) ctx?.selectOne(next);
+      if (next[1]) ctx?.selectOne(next[1]);
+      ctx.jumpScrollToIndex(next[0]);
     }
     if (event.key === "ArrowDown" || event.key === "J") {
       if (event.metaKey) {
@@ -79,9 +80,12 @@ export class DndContextKeyboardEvents {
       if (event.altKey) {
         // Move item down
       }
-      // Up movement from selection or top
+      // Down movement from selection or top
       const next = ctx?.getNext();
-      if (next) ctx?.selectOne(next);
+      if (next[1]) {
+        ctx?.selectOne(next[1]);
+        ctx.jumpScrollToIndex(next[0]);
+      }
     }
     if (event.key === "Escape") {
       // Clear selection

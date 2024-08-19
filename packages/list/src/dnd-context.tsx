@@ -58,6 +58,21 @@ export class ListDragContext {
     const selection = this.selection[0]();
     return selection.has(node);
   }
+  // TODO: Experiment with fast smooth scroll
+  jumpScrollToIndex(index: number) {
+    if (!this.scrollContainerRef) return; // should never happen
+    const itemOffset = index * this.itemHeight;
+    const scrollBounds = this.scrollContainerRef.getBoundingClientRect();
+    if (itemOffset < this.scrollContainerRef.scrollTop) {
+      this.scrollContainerRef.scrollTo(0, itemOffset);
+    }
+    if (itemOffset > this.scrollContainerRef.scrollTop + scrollBounds.height) {
+      this.scrollContainerRef.scrollTo(
+        0,
+        itemOffset + this.itemHeight - scrollBounds.height,
+      );
+    }
+  }
   leave() {
     if (this.dndContext.isDragging()) this.dndContext.dragContext[1](null);
     if (this.isOrigin) {
@@ -92,10 +107,10 @@ export class ListDragContext {
     this.originNode = node;
     this.selection[1](selection);
   }
-  toggleSelection(node: Node, setOrigin: boolean) {
+  toggleSelection(node: Node, setOrigin: boolean = false) {
     const selection = new Set(this.selection[0]());
     if (selection.has(node)) {
-      selection.delete(node); // TODO: huh? toggle?
+      selection.delete(node);
     } else {
       selection.add(node);
       if (setOrigin) this.originNode = node;
@@ -118,15 +133,22 @@ export class ListDragContext {
     }
     return false;
   }
-  getPrevious() {
+  getPrevious(): [number, Node] {
     const first = this.getFirstIndexSelected();
-    if (!first) return this.projection()[0];
-    return this.projection()[first - 1];
+    if (!first) {
+      return [0, this.projection()[0]];
+    }
+    const index = first - 1;
+    return [index, this.projection()[index]];
   }
-  getNext() {
+  getNext(): [number, Node] {
     const last = this.getLastIndexSelected();
-    if (last === false) return this.projection()[this.projection().length - 1];
-    return this.projection()[last + 1];
+    if (last === false) {
+      const index = this.projection().length - 1;
+      return [index, this.projection()[index]];
+    }
+    const index = last + 1;
+    return [index, this.projection()[index]];
   }
   getNodeByIndex(index: number) {
     return this.treeState.childrenSignal[0]()[index];
@@ -135,7 +157,7 @@ export class ListDragContext {
     const list = this.treeState.childrenSignal[0]();
     let rangeEnded = false;
     let i = this.originNode?.getIndex();
-    if (!i) return false;
+    if (i === false) return false;
     while (!rangeEnded) {
       const next = list[i];
       if (!next) return false;
