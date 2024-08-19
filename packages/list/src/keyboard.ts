@@ -15,6 +15,7 @@ export class DndContextKeyboardEvents {
       event.preventDefault();
       if (event.metaKey) {
         // jump to & select top of list
+        ctx.selectOne(ctx.getNodeByIndex(0));
       }
       // selection.rangeOrigin && event.shiftKey
       if (event.shiftKey && ctx.originNode) {
@@ -52,6 +53,7 @@ export class DndContextKeyboardEvents {
     if (event.key === "ArrowDown" || event.key === "J") {
       if (event.metaKey) {
         // jump to & select bottom of list
+        ctx.selectOne(ctx.getNodeByIndex(ctx.treeState.count()));
       }
       // Shift down/up selects objects between most extreme node contiguous to origin
       if (event.shiftKey && ctx.originNode) {
