@@ -92,12 +92,13 @@ export class ListDragContext {
     this.originNode = node;
     this.selection[1](selection);
   }
-  toggleSelection(node: Node) {
+  toggleSelection(node: Node, setOrigin: boolean) {
     const selection = new Set(this.selection[0]());
     if (selection.has(node)) {
       selection.delete(node); // TODO: huh? toggle?
     } else {
       selection.add(node);
+      if (setOrigin) this.originNode = node;
     }
     this.selection[1](selection);
   }

@@ -21,23 +21,33 @@ export class DndContextKeyboardEvents {
         // Add to selection down
         const originIndex = ctx.originNode.getIndex();
         const nextDeselected = ctx.getNextDeselectedFromOrigin("next");
-        if (nextDeselected && nextDeselected > originIndex + 1) {
+        if (
+          nextDeselected === originIndex + 1 ||
+          originIndex === ctx.treeState.count()
+        ) {
+          // select up
+          const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
+          const node = ctx.getNodeByIndex(prevIndex);
+          if (prevIndex !== false) ctx?.toggleSelection(node);
+          return;
+        } else {
+          // deselect up
           ctx.toggleSelection(
-            ctx.treeState.childrenSignal[0]()[nextDeselected - 1],
+            ctx.treeState.childrenSignal[0]()[
+              nextDeselected !== false
+                ? nextDeselected - 1
+                : ctx.treeState.count()
+            ],
           );
           return;
         }
-        const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
-        const node = ctx.getNodeByIndex(prevIndex);
-        if (prevIndex) ctx?.toggleSelection(node);
-        return;
       }
       if (event.altKey) {
         // Move item up
       }
-      // Up movement from selection or bottom
-      const prev = ctx?.getPrevious();
-      if (prev) ctx?.selectOne(prev);
+      // Down movement from selection or top
+      const next = ctx?.getPrevious();
+      if (next) ctx?.selectOne(next);
     }
     if (event.key === "ArrowDown" || event.key === "J") {
       if (event.metaKey) {
@@ -45,19 +55,24 @@ export class DndContextKeyboardEvents {
       }
       // Shift down/up selects objects between most extreme node contiguous to origin
       if (event.shiftKey && ctx.originNode) {
-        // Add to selection up
+        // Remove from selection (selection extends above origin)
         const originIndex = ctx.originNode.getIndex();
         const prevDeselected = ctx.getNextDeselectedFromOrigin("prev");
-        if (prevDeselected && prevDeselected < originIndex - 1) {
+        if (prevDeselected === originIndex - 1 || originIndex === 0) {
+          // select down
+          const nextIndex = ctx?.getNextDeselectedFromOrigin();
+          const node = ctx.getNodeByIndex(nextIndex);
+          if (nextIndex !== false) ctx?.toggleSelection(node);
+          return;
+        } else {
+          // Deselect down
           ctx.toggleSelection(
-            ctx.treeState.childrenSignal[0]()[prevDeselected + 1],
+            ctx.treeState.childrenSignal[0]()[
+              prevDeselected !== false ? prevDeselected + 1 : 0
+            ],
           );
           return;
         }
-        const nextIndex = ctx?.getNextDeselectedFromOrigin();
-        const node = ctx.getNodeByIndex(nextIndex);
-        if (nextIndex) ctx?.toggleSelection(node);
-        return;
       }
       if (event.altKey) {
         // Move item down

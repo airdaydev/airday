@@ -115,7 +115,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     if (event.button === 2) return; // prevent context menu
     props.listDragContext.setFocus();
     if (event.metaKey) {
-      props.listDragContext.toggleSelection(props.node);
+      props.listDragContext.toggleSelection(props.node, true);
       return;
     }
     // Shift key = range selection
