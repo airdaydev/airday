@@ -34,8 +34,10 @@ export class DndContextKeyboardEvents {
     if (this.vimKeys) {
       const vimFunc = vimMapping.get(encoded);
       if (vimFunc) {
-        vimFunc(ctx);
+        event.preventDefault();
+        return vimFunc(ctx);
       }
     }
+    console.log("no keyboard shortcut found");
   };
 }

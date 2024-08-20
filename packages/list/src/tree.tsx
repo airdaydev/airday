@@ -94,7 +94,11 @@ export const Tree = (props: TreeComponentProps) => {
               : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
         }}
         ref={scrollContainerRef}
-        onKeyDown={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            event.preventDefault();
+          }
+        }}
         onScroll={(event) => {
           // TODO: This should match the projection buffer
           if (
@@ -104,6 +108,7 @@ export const Tree = (props: TreeComponentProps) => {
             scrollSignal[1](event.target.scrollTop);
           }
         }}
+        onFocus={() => listDragContext.setFocus()}
         onMouseLeave={() => listDragContext.leave()}
       >
         <div
