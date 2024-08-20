@@ -39,11 +39,6 @@ export class ListDragContext {
     opts.dndContext.listContexts.add(this);
     this.itemHeight = opts.itemHeight;
   }
-  sortedSelection() {
-    return Array.from(this.selection[0]()).sort((nodeA, nodeB) => {
-      return nodeA.getIndex() - nodeB.getIndex();
-    });
-  }
   isFocused() {
     return this.dndContext.focusContext[0]() === this;
   }
