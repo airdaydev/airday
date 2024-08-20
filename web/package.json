@@ -15,6 +15,7 @@
     "vite-plugin-solid-svg": "^0.8.0"
   },
   "dependencies": {
+    "@borde/list": "workspace:^",
     "fractional-indexing": "^3.2.0",
     "idb": "^7.1.1",
     "nanoid": "^5.0.3",

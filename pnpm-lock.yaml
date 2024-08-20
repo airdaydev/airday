@@ -52,59 +52,11 @@ importers:
         specifier: ^4.9.5
         version: 4.9.5
 
-  packages/solid-tree:
-    dependencies:
-      solid-js:
-        specifier: ^1.8.15
-        version: 1.8.16
-    devDependencies:
-      typescript:
-        specifier: ^5.2.2
-        version: 5.4.5
-      vite:
-        specifier: ^5.2.0
-        version: 5.2.9
-      vite-plugin-solid:
-        specifier: ^2.10.2
-        version: 2.10.2(solid-js@1.8.16)(vite@5.2.9)
-
-  packages/solidjs-forest:
-    dependencies:
-      solid-js:
-        specifier: ^1.8.15
-        version: 1.8.16
-      solid-transition-group:
-        specifier: ^0.2.3
-        version: 0.2.3(solid-js@1.8.16)
-    devDependencies:
-      typescript:
-        specifier: ^5.2.2
-        version: 5.4.5
-      vite:
-        specifier: ^5.2.0
-        version: 5.2.9
-      vite-plugin-solid:
-        specifier: ^2.10.2
-        version: 2.10.2(solid-js@1.8.16)(vite@5.2.9)
-
-  packages/solidjs-tree:
-    dependencies:
-      solid-js:
-        specifier: ^1.8.15
-        version: 1.8.16
-    devDependencies:
-      typescript:
-        specifier: ^5.2.2
-        version: 5.4.5
-      vite:
-        specifier: ^5.2.0
-        version: 5.2.9
-      vite-plugin-solid:
-        specifier: ^2.10.2
-        version: 2.10.2(solid-js@1.8.16)(vite@5.2.9)
-
   web:
     dependencies:
+      '@borde/list':
+        specifier: workspace:^
+        version: link:../packages/list
       fractional-indexing:
         specifier: ^3.2.0
         version: 3.2.0
