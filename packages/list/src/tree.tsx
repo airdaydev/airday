@@ -94,6 +94,7 @@ export const Tree = (props: TreeComponentProps) => {
               : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
         }}
         ref={scrollContainerRef}
+        onKeyDown={(event) => event.preventDefault()}
         onScroll={(event) => {
           // TODO: This should match the projection buffer
           if (

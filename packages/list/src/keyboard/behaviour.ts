@@ -1,0 +1,85 @@
+import { ListDragContext } from "../dnd-context";
+
+export function moveDown(ctx: ListDragContext) {
+  // Down movement from selection or top
+  const next = ctx?.getNext();
+  if (next[1]) {
+    ctx?.selectOne(next[1]);
+    ctx.jumpScrollToIndex(next[0]);
+  }
+}
+
+export function moveUp(ctx: ListDragContext) {
+  const next = ctx?.getPrevious();
+  if (next[1]) ctx?.selectOne(next[1]);
+  ctx.jumpScrollToIndex(next[0]);
+}
+
+export function selectOriginToTop(ctx: ListDragContext) {}
+
+export function selectOriginToBottom(ctx: ListDragContext) {}
+
+// jump to & select top of list
+export function jumpToTop(ctx: ListDragContext) {
+  ctx.selectOne(ctx.getNodeByIndex(0));
+  ctx.jumpScrollToIndex(0);
+}
+
+// jump to & select bottom of list
+export function jumpToBottom(ctx: ListDragContext) {
+  const bottomIndex = ctx.treeState.count() - 1;
+  const bottomNode = ctx.getNodeByIndex(bottomIndex);
+  ctx.selectOne(bottomNode);
+  ctx.jumpScrollToIndex(bottomIndex);
+}
+
+// Selects or deselects depending on contiguous selected nodes from origin (shift + up/down)
+export function selectFromOriginUp(ctx: ListDragContext) {
+  if (!ctx.originNode) return; // TODO: Start from top?
+  // Add to selection down
+  const originIndex = ctx.originNode.getIndex();
+  const nextDeselected = ctx.getNextDeselectedFromOrigin("next");
+  if (
+    nextDeselected === originIndex + 1 ||
+    originIndex === ctx.treeState.count() - 1
+  ) {
+    // select up
+    const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
+    const node = ctx.getNodeByIndex(prevIndex);
+    if (prevIndex !== false) ctx?.toggleSelection(node);
+    return;
+  } else {
+    // deselect up
+    ctx.toggleSelection(
+      ctx.treeState.childrenSignal[0]()[
+        nextDeselected !== false
+          ? nextDeselected - 1
+          : ctx.treeState.count() - 1
+      ],
+    );
+    return;
+  }
+}
+
+export function selectFromOriginDown(ctx: ListDragContext) {
+  // Shift down/up selects objects between most extreme node contiguous to origin
+  if (!ctx.originNode) return; // TODO:
+  // Remove from selection (selection extends above origin)
+  const originIndex = ctx.originNode.getIndex();
+  const prevDeselected = ctx.getNextDeselectedFromOrigin("prev");
+  if (prevDeselected === originIndex - 1 || originIndex === 0) {
+    // select down
+    const nextIndex = ctx?.getNextDeselectedFromOrigin();
+    const node = ctx.getNodeByIndex(nextIndex);
+    if (nextIndex !== false) ctx?.toggleSelection(node);
+    return;
+  } else {
+    // Deselect down
+    ctx.toggleSelection(
+      ctx.treeState.childrenSignal[0]()[
+        prevDeselected !== false ? prevDeselected + 1 : 0
+      ],
+    );
+    return;
+  }
+}

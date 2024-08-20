@@ -9,7 +9,7 @@ import {
 import { Node, TreeState } from "./state";
 import { walk } from "./tree-utils";
 import { ContainerVector } from "./tree";
-import { DndContextKeyboardEvents } from "./keyboard";
+import { DndContextKeyboardEvents } from "./keyboard/index";
 
 export type VirtualisedList = Accessor<{
   window: Node[];
