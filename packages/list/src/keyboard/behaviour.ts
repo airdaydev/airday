@@ -15,9 +15,17 @@ export function moveUp(ctx: ListDragContext) {
   ctx.jumpScrollToIndex(next[0]);
 }
 
-export function selectOriginToTop(ctx: ListDragContext) {}
-
-export function selectOriginToBottom(ctx: ListDragContext) {}
+export function selectOriginToTop(ctx: ListDragContext) {
+  if (!ctx.originNode) return; // TODO: Start from top?
+  ctx.selectNodesInRange(0, ctx.originNode.getIndex());
+  ctx.jumpScrollToIndex(0);
+}
+export function selectOriginToBottom(ctx: ListDragContext) {
+  if (!ctx.originNode) return; // TODO: Start from bottom?
+  const end = ctx.presentCount() - 1;
+  ctx.selectNodesInRange(ctx.originNode.getIndex(), end);
+  ctx.jumpScrollToIndex(end);
+}
 
 // jump to & select top of list
 export function jumpToTop(ctx: ListDragContext) {
