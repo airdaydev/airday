@@ -104,3 +104,36 @@ export function selectFromOriginDown(ctx: ListDragContext) {
 export function clearSelection(ctx: ListDragContext) {
   ctx.clearSelection();
 }
+
+export function moveSelectionUp(ctx: ListDragContext) {
+  const selection = ctx.selection[0]();
+  if (selection.size === 0) return;
+  let newPosition = null;
+  if (selection.size === 1) {
+    const only = selection.values().next().value;
+    newPosition = Math.max(0, only.getIndex() - 1);
+    console.log(newPosition!!);
+  } else {
+    newPosition = ctx.getFirstIndexSelected();
+    if (typeof newPosition === "number") newPosition -= 1;
+  }
+  if (newPosition !== null) {
+    ctx.treeState.moveItems(selection, null, newPosition);
+  }
+}
+
+export function moveSelectionDown(ctx: ListDragContext) {
+  const selection = ctx.selection[0]();
+  if (selection.size === 0) return;
+  let newPosition = null;
+  if (selection.size === 1) {
+    const only = selection.values().next().value;
+    newPosition = only.getIndex() + 1;
+  } else {
+    newPosition = ctx.getLastIndexSelected();
+    if (typeof newPosition === "number") newPosition += 1;
+  }
+  if (newPosition !== null && newPosition < ctx.treeState.count()) {
+    ctx.treeState.moveItems(selection, null, newPosition);
+  }
+}

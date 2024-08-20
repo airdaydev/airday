@@ -9,6 +9,8 @@ import {
   selectOriginToBottom,
   selectAll,
   clearSelection,
+  moveSelectionUp,
+  moveSelectionDown,
 } from "./behaviour";
 import { ShortcutFunction, encodeShortcut } from "./encoding";
 
@@ -16,6 +18,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   [encodeShortcut({ key: "ArrowUp" }), selectAboveOrigin],
   [encodeShortcut({ key: "ArrowUp", metaKey: true }), jumpToTop],
   [encodeShortcut({ key: "ArrowUp", shiftKey: true }), selectFromOriginUp],
+  [encodeShortcut({ key: "ArrowUp", altKey: true }), moveSelectionUp],
   [
     encodeShortcut({ key: "ArrowUp", metaKey: true, shiftKey: true }),
     selectOriginToTop,
@@ -27,6 +30,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
     selectOriginToBottom,
   ],
   [encodeShortcut({ key: "ArrowDown", shiftKey: true }), selectFromOriginDown],
+  [encodeShortcut({ key: "ArrowDown", altKey: true }), moveSelectionDown],
   [encodeShortcut({ key: "a", metaKey: true }), selectAll],
   [encodeShortcut({ key: "Escape" }), clearSelection],
 ]);
