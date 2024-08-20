@@ -31,9 +31,11 @@ export class DndContextKeyboardEvents {
       event.preventDefault();
       return func(ctx);
     }
-    const vimFunc = vimMapping.get(encoded);
-    if (vimFunc) {
-      vimFunc(ctx);
+    if (this.vimKeys) {
+      const vimFunc = vimMapping.get(encoded);
+      if (vimFunc) {
+        vimFunc(ctx);
+      }
     }
   };
 }
