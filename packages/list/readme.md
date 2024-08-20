@@ -72,7 +72,8 @@ pnpm run dev
 ```
 
 ## Roadmap
-- Get autoscroller touch version working with other lists
+- predict doubles to display in vim mode.
+- Get autoscroller touch version working with other lists on mobile.
 - cmd+d to duplicate
 - Disable placeholder when autoscrolling (coz it's a little janky)
 
