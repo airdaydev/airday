@@ -73,10 +73,7 @@ pnpm run dev
 
 ## Roadmap
 - Get autoscroller touch version working with other lists
-- option + arrow to move selection up / down
 - cmd+d to duplicate
-- cmd+l/r cycle through open tabs
-- vim key toggle (but maybe on the actual app itself depending on controller state)
 - gg/G = top/bottom of list
 - double click to open item for editing / quick editing?
 - Disable placeholder when autoscrolling (coz it's jaaanky)

@@ -5,7 +5,7 @@ import { defaultMapping, vimMapping } from "./mapping";
 export class DndContextKeyboardEvents {
   enabled = false;
   vimKeys = true;
-  buffer = [];
+  buffer: string[] = [];
   mode = null; // gg = sequence
   dndContext: DndContext;
   constructor(dndContext: DndContext) {
@@ -21,23 +21,36 @@ export class DndContextKeyboardEvents {
     // TODO: Remove listener
     this.enabled = false;
   }
+  addToBuffer(encodedKey: string) {
+    if (this.buffer.length > 1) {
+      this.buffer.shift();
+    }
+    this.buffer.push(encodedKey);
+  }
+  clearBuffer() {
+    this.buffer = [];
+  }
   listen = (event: KeyboardEvent) => {
-    console.log(event.key);
     const ctx = this.dndContext.focusedContext();
     if (!ctx) return;
-    const encoded = encodeShortcut(event);
-    const func = defaultMapping.get(encoded);
+    const encodedEvent = encodeShortcut(event);
+    const func = defaultMapping.get(encodedEvent);
     if (func) {
+      this.clearBuffer();
       event.preventDefault();
       return func(ctx);
     }
     if (this.vimKeys) {
-      const vimFunc = vimMapping.get(encoded);
+      const vimFunc = vimMapping.get(encodedEvent);
       if (vimFunc) {
         event.preventDefault();
+        this.clearBuffer();
         return vimFunc(ctx);
       }
     }
-    console.log("no keyboard shortcut found");
+    // TODO: Support key sequences for non-vim?
+    this.addToBuffer(encodedEvent);
+    const funct = vimMapping.get(this.buffer.join(","));
+    if (funct) funct(ctx);
   };
 }

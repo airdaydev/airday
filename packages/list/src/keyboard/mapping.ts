@@ -38,4 +38,6 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
 export const vimMapping = new Map<string, ShortcutFunction>([
   [encodeShortcut({ key: "k" }), selectAboveOrigin],
   [encodeShortcut({ key: "j" }), selectBelowOrigin],
+  [encodeShortcut({ key: "G", shiftKey: true }), jumpToBottom],
+  [encodeShortcut([{ key: "g" }, { key: "g" }]), jumpToTop],
 ]);
