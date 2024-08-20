@@ -74,10 +74,7 @@ pnpm run dev
 ## Roadmap
 - Get autoscroller touch version working with other lists
 - cmd+d to duplicate
-- gg/G = top/bottom of list
-- double click to open item for editing / quick editing?
-- Disable placeholder when autoscrolling (coz it's jaaanky)
-- State change needs to trigger a list resize! e.g. important in the case of deleting items
+- Disable placeholder when autoscrolling (coz it's a little janky)
 
 ## Stretch goals
 - Variable heights
