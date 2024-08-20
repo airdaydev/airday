@@ -72,8 +72,6 @@ pnpm run dev
 ```
 
 ## Roadmap
-- after adding items into a list, clicking these new items returns a -1, attempting to shift down starts from the top but toggles
-- meta + shift -> select from origin to top/bottom of list
 - Get autoscroller touch version working with other lists
 - Escape to deselect
 - option + arrow to move selection up / down
