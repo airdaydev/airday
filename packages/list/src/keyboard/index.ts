@@ -1,6 +1,6 @@
 import { encodeShortcut } from "./encoding";
 import { DndContext } from "../dnd-context";
-import { defaultMapping } from "./mapping";
+import { defaultMapping, vimMapping } from "./mapping";
 
 export class DndContextKeyboardEvents {
   enabled = false;
@@ -29,7 +29,11 @@ export class DndContextKeyboardEvents {
     const func = defaultMapping.get(encoded);
     if (func) {
       event.preventDefault();
-      func(ctx);
+      return func(ctx);
+    }
+    const vimFunc = vimMapping.get(encoded);
+    if (vimFunc) {
+      vimFunc(ctx);
     }
   };
 }

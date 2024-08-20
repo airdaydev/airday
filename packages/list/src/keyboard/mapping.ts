@@ -31,4 +31,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   [encodeShortcut({ key: "Escape" }), clearSelection],
 ]);
 
-export const vimMapping = new Map<string, ShortcutFunction>([]);
+export const vimMapping = new Map<string, ShortcutFunction>([
+  [encodeShortcut({ key: "k" }), selectAboveOrigin],
+  [encodeShortcut({ key: "j" }), selectBelowOrigin],
+]);
