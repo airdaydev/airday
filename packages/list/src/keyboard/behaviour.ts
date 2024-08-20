@@ -112,10 +112,11 @@ export function moveSelectionUp(ctx: ListDragContext) {
   if (selection.size === 1) {
     const only = selection.values().next().value;
     newPosition = Math.max(0, only.getIndex() - 1);
-    console.log(newPosition!!);
   } else {
     newPosition = ctx.getFirstIndexSelected();
-    if (typeof newPosition === "number") newPosition -= 1;
+    if (typeof newPosition === "number") {
+      newPosition = Math.max(0, (newPosition -= 1));
+    }
   }
   if (newPosition !== null) {
     ctx.treeState.moveItems(selection, null, newPosition);
@@ -130,7 +131,7 @@ export function moveSelectionDown(ctx: ListDragContext) {
     const only = selection.values().next().value;
     newPosition = only.getIndex() + 1;
   } else {
-    newPosition = ctx.getLastIndexSelected();
+    newPosition = ctx.getFirstIndexSelected();
     if (typeof newPosition === "number") newPosition += 1;
   }
   if (newPosition !== null && newPosition < ctx.treeState.count()) {

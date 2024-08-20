@@ -226,18 +226,21 @@ export class TreeState {
     return count - 1; // accounts for root node
   };
   moveItems(nodes: Set<Node>, parentNode: Node | null, newPosition: number) {
+    const sortedNodes = Array.from(nodes).sort((nodeA, nodeB) => {
+      return nodeA.getIndex() - nodeB.getIndex();
+    });
     const result = this.remove(nodes);
     if (!result.removed) {
       return;
     }
     if (!parentNode) {
-      result.filtered.splice(newPosition, 0, ...nodes);
+      result.filtered.splice(newPosition, 0, ...sortedNodes);
     }
     // Add back layers
     if (parentNode) {
       map<RootNode, any>(result.filtered, (node) => {
         if (node === parentNode) {
-          node.children.splice(newPosition, 0, ...nodes);
+          node.children.splice(newPosition, 0, ...sortedNodes);
           return node;
         }
         return node;
