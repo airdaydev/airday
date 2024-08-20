@@ -1,18 +1,23 @@
 import { ListDragContext } from "../dnd-context";
 
-export function moveDown(ctx: ListDragContext) {
+export function selectBelowOrigin(ctx: ListDragContext) {
   // Down movement from selection or top
-  const next = ctx?.getNext();
-  if (next[1]) {
-    ctx?.selectOne(next[1]);
-    ctx.jumpScrollToIndex(next[0]);
+  const origin = ctx?.originNode;
+  if (origin) {
+    const sibling = ctx.getSibling(origin, "next");
+    ctx?.selectOne(sibling[1]);
+    ctx.jumpScrollToIndex(sibling[0]);
   }
 }
 
-export function moveUp(ctx: ListDragContext) {
-  const next = ctx?.getPrevious();
-  if (next[1]) ctx?.selectOne(next[1]);
-  ctx.jumpScrollToIndex(next[0]);
+export function selectAboveOrigin(ctx: ListDragContext) {
+  // Up movement from selection
+  const origin = ctx?.originNode;
+  if (origin) {
+    const sibling = ctx.getSibling(origin, "prev");
+    ctx?.selectOne(sibling[1]);
+    ctx.jumpScrollToIndex(sibling[0]);
+  }
 }
 
 export function selectOriginToTop(ctx: ListDragContext) {
@@ -31,6 +36,10 @@ export function selectOriginToBottom(ctx: ListDragContext) {
 export function jumpToTop(ctx: ListDragContext) {
   ctx.selectOne(ctx.getNodeByIndex(0));
   ctx.jumpScrollToIndex(0);
+}
+
+export function selectAll(ctx: ListDragContext) {
+  ctx.selectAllNodes();
 }
 
 // jump to & select bottom of list
@@ -90,4 +99,8 @@ export function selectFromOriginDown(ctx: ListDragContext) {
     );
     return;
   }
+}
+
+export function clearSelection(ctx: ListDragContext) {
+  ctx.clearSelection();
 }

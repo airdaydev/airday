@@ -138,7 +138,23 @@ export class ListDragContext {
     }
     return false;
   }
-  getPrevious(): [number, Node] {
+  getSibling(node: Node, direction: "next" | "prev"): [number, Node] {
+    const index = node.getIndex();
+    const projection = this.projection();
+    const lastIndex = projection.length - 1;
+
+    if (index === lastIndex && direction === "next") {
+      return [index, node];
+    }
+
+    if (index === 0 && direction === "prev") {
+      return [index, node];
+    }
+
+    const siblingIndex = direction === "next" ? index + 1 : index - 1;
+    return [siblingIndex, projection[siblingIndex]];
+  }
+  getPreviousSelected(): [number, Node] {
     const first = this.getFirstIndexSelected();
     if (!first) {
       return [0, this.projection()[0]];
@@ -146,7 +162,7 @@ export class ListDragContext {
     const index = first - 1;
     return [index, this.projection()[index]];
   }
-  getNext(): [number, Node] {
+  getNextSelected(): [number, Node] {
     const last = this.getLastIndexSelected();
     if (last === false) {
       const index = this.projection().length - 1;
@@ -176,6 +192,11 @@ export class ListDragContext {
   }
   selectNodesInRange(start: number, end: number) {
     const newSelection = this.projection().slice(start, end + 1);
+    const selection = new Set(newSelection);
+    this.selection[1](selection);
+  }
+  selectAllNodes() {
+    const newSelection = this.projection().slice(0, this.presentCount() + 1);
     const selection = new Set(newSelection);
     this.selection[1](selection);
   }

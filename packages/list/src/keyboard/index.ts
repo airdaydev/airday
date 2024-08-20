@@ -22,10 +22,14 @@ export class DndContextKeyboardEvents {
     this.enabled = false;
   }
   listen = (event: KeyboardEvent) => {
+    console.log(event.key);
     const ctx = this.dndContext.focusedContext();
     if (!ctx) return;
     const encoded = encodeShortcut(event);
     const func = defaultMapping.get(encoded);
-    if (func) func(ctx);
+    if (func) {
+      event.preventDefault();
+      func(ctx);
+    }
   };
 }
