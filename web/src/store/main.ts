@@ -4,7 +4,8 @@ import { ContainerModel } from "./container";
 import { genTestData, bordeItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
-import { ListDragContext } from "@borde/list";
+import { DndContext, ListDragContext, ListStateContext } from "@borde/list";
+import { loader } from "./loader";
 
 const schemaVersion = 1;
 
@@ -74,13 +75,14 @@ export class SessionStore {
     }
   }
   serialise() {
-    localStorage.setItem(
-      this.cacheKey,
-      JSON.stringify({
-        activeWorkspace: this.workspace?.id,
-        workspaces: Array.from(this.map.values()),
-      }),
-    );
+    // return console.log(Array.from(this.map.values()));
+    // localStorage.setItem(
+    //   this.cacheKey,
+    //   JSON.stringify({
+    //     activeWorkspace: this.workspace?.id,
+    //     workspaces: Array.from(this.map.values()),
+    //   }),
+    // );
   }
   open(workspaceId: string) {
     // TODO: Separate open/new workspace
@@ -114,6 +116,8 @@ export class AcmeWorkspaceStore {
   name: string = "Uninitialised";
   localOnly: boolean = true;
   openLists = new Map<string, ListDragContext>();
+  listStateContext = new ListStateContext();
+  dndContext = new DndContext();
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
   }
@@ -188,26 +192,34 @@ export class AcmeWorkspaceStore {
       },
     ]);
   };
-  openFastList(view: BordeView): FastList {
+  // Creates or loads new in-memory list
+  openList(view: BordeView): ListDragContext {
     let identifier = null;
-    let fastList = null;
+    let list = null;
     if (view.type === "container") {
+      console.log("opening", view);
       identifier = `c#${view.containerId}`;
-      fastList = this.openLists.get(identifier);
-      if (!fastList) {
-        fastList = new ContainerFL(this, view.containerId);
-        this.openLists.set(identifier, fastList);
+      list = this.openLists.get(identifier);
+      if (!list) {
+        const state = this.listStateContext.createTree({ loader });
+        const ctx = new ListDragContext({
+          treeState: state,
+          dndContext: this.dndContext,
+          itemHeight: 32,
+        });
+        this.openLists.set(identifier, ctx);
+        return ctx;
       }
     }
-    if (view.type === "done") {
-      identifier = "done";
-      fastList = this.openLists.get(identifier);
-      if (!fastList) {
-        fastList = new DoneFL(this);
-        this.openLists.set(identifier, fastList);
-      }
-    }
-    if (!fastList) throw new Error("Cannot determine list from view");
-    return fastList;
+    // if (view.type === "done") {
+    //   identifier = "done";
+    //   fastList = this.openLists.get(identifier);
+    //   if (!fastList) {
+    //     fastList = new DoneFL(this);
+    //     this.openLists.set(identifier, fastList);
+    //   }
+    // }
+    if (!list) throw new Error("Cannot determine list from view");
+    return list;
   }
 }
