@@ -21,12 +21,10 @@ export function List(props: ListProps) {
   const ctx = session.workspace.openList(props.view);
   return (
     <section
-      classList={
-        {
-          // [styles.list]: true,
-          // [styles.active]: viewState.activeViewId() === props.view.id,
-        }
-      }
+      classList={{
+        [styles.list]: true,
+        [styles.active]: viewState.activeViewId() === props.view.id,
+      }}
       tabIndex={props.tabId}
       onFocus={() => {
         viewState.setActiveViewId(props.view.id);
@@ -35,7 +33,7 @@ export function List(props: ListProps) {
         viewState.setActiveViewId(props.view.id);
       }}
     >
-      Placeholder for {props.view.id}
+      Placeholder for {ctx.id}
       <div class={styles["list"]}>
         <SolidListContext.Provider value={ctx}>
           <div

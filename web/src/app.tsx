@@ -12,13 +12,13 @@ export function App() {
   // if focus mode
   return (
     <div class={styles.app}>
-      <Bar />
       <div class={styles.main}>
         <BordeNav />
         <For each={viewState.list[0]()} fallback={<div>fallback</div>}>
           {(view, index) => <View view={view[0]()} tabId={index()} />}
         </For>
       </div>
+      <Header />
     </div>
   );
 }

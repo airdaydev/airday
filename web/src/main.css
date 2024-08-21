@@ -1,72 +1,74 @@
 :root {
-  --background: hsl(180, 4.8%, 97%);
-  --border: #e1e1e1;
-  --shade: #E8D9E4;
-  --light-shade: #f3f3f3;
-  --mid-shade: #e5e5e5;
-  --ultra-light-shade: #f6f6f6;
-  --tint-shade: #e7ecff;
-  --glass: #FAF7FFE0;
-  --body: black;
-  --body-font: 'diatype-trial', sans-serif;
+    --background: hsl(180, 4.8%, 97%);
+    --border: #e1e1e1;
+    --shade: #e8d9e4;
+    --light-shade: #f3f3f3;
+    --mid-shade: #e5e5e5;
+    --ultra-light-shade: #f6f6f6;
+    --tint-shade: #e7ecff;
+    --glass: #faf7ffe0;
+    --body: black;
+    --body-font: "Test Söhne", sans-serif;
 }
 
 #root {
-  /* z-index: 0; */
-  position: relative;
+    /* z-index: 0; */
+    position: relative;
 }
 
 [data-theme="dark"] {
-  --dank: #1A1A1A;
-  --background: #1E1E1E;
-  --border: #28282C;
-  --shade: #28282C;
-  --light-shade: #313135;
-  --mid-shade: #313135;
-  --ultra-light-shade: #3e3e44;
-  --tint-shade: #262632;
-  --glass: #1E1E1EE5;
-  --body: white;
+    --dank: #1a1a1a;
+    --background: #1e1e1e;
+    --border: #28282c;
+    --shade: #28282c;
+    --light-shade: #313135;
+    --mid-shade: #313135;
+    --ultra-light-shade: #3e3e44;
+    --tint-shade: #262632;
+    --glass: #1e1e1ee5;
+    --body: white;
 }
 
 @font-face {
-  font-family: 'diatype-trial';
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+000-5FF;
-  src: url('src/assets/diatype-regular.woff2') format('woff2'), url('src/assets/diatype-regular.woff2') format('woff');
+    font-family: "diatype-trial";
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+000-5FF;
+    src:
+        url("src/assets/diatype-regular.woff2") format("woff2"),
+        url("src/assets/diatype-regular.woff2") format("woff");
 }
 
 html,
 body {
-  height: 100%;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-  font-family: var(--body-font);
-  font-size: 14px;
-  font-weight: 400;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background);
-  color: var(--body);
+    height: 100%;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    font-family: var(--body-font);
+    font-size: 14px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--background);
+    color: var(--body);
 }
 
 button {
-  color: inherit;
+    color: inherit;
 }
 
 input {
-  color: inherit;
+    color: inherit;
 }
 
 #context-menu {
-  width: 100vw;
-  height: 100vh;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-  visibility: hidden;
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    visibility: hidden;
 }

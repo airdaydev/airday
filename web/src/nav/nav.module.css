@@ -6,7 +6,7 @@
     /* border-right: 1px solid var(--border); */
     transition: margin 0.1s;
     overflow-y: scroll;
-    background: var(--light-shade);
+    background: var(--background);
 }
 
 .nav-text button {
@@ -46,7 +46,7 @@
 }
 
 .sticker-nav {
-  padding: 0.5em 0.25em;
+    padding: 0.5em 0.25em;
 }
 
 .sticker-nav button {

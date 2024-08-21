@@ -195,12 +195,11 @@ export class AcmeWorkspaceStore {
   // Creates or loads new in-memory list
   openList(view: BordeView): ListDragContext {
     let identifier = null;
-    let list = null;
+    let ctx = null;
     if (view.type === "container") {
-      console.log("opening", view);
       identifier = `c#${view.containerId}`;
-      list = this.openLists.get(identifier);
-      if (!list) {
+      ctx = this.openLists.get(identifier);
+      if (!ctx) {
         const state = this.listStateContext.createTree({ loader });
         const ctx = new ListDragContext({
           treeState: state,
@@ -219,7 +218,7 @@ export class AcmeWorkspaceStore {
     //     this.openLists.set(identifier, fastList);
     //   }
     // }
-    if (!list) throw new Error("Cannot determine list from view");
-    return list;
+    if (!ctx) throw new Error("Cannot determine list from view");
+    return ctx;
   }
 }
