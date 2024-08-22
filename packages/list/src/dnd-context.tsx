@@ -29,6 +29,7 @@ export class ListDragContext {
   dragOriginNodeIndex: number | undefined; // TODO: Use & memoised w respect to treestate
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
+  placeholderStyle?: string;
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;

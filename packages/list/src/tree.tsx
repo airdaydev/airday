@@ -164,7 +164,12 @@ export const Tree = (props: TreeComponentProps) => {
                 signal().window.length + signal().start &&
               !listDragContext.isOrigin && (
                 <div
-                  class="placeholder"
+                  classList={{
+                    placeholder: true,
+                    ...(listDragContext.placeholderStyle && {
+                      [listDragContext.placeholderStyle]: true,
+                    }),
+                  }}
                   style={`max-height: ${listDragContext.itemHeight}px`}
                 />
               )}
