@@ -8,7 +8,6 @@
     position: absolute;
     flex-shrink: 0;
     width: 100%;
-    height: 28px !important;
 }
 .item_internal {
     position: absolute;

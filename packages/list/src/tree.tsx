@@ -138,6 +138,7 @@ export const Tree = (props: TreeComponentProps) => {
         </div>
         <div
           class="list-backdrop"
+          style={{ height: `${listDragContext.itemHeight}px` }}
           onMouseEnter={() => {
             if (listDragContext.dndContext.isDragging()) {
               listDragContext.setDragOver();

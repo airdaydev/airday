@@ -274,7 +274,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     <div
       class="item"
       data-type="node"
-      style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px;`}
+      style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px !important;`}
     >
       {draggedOn[0]() === -1 && <div class="placeholder" />}
       <TransitionGroup name="fade">
