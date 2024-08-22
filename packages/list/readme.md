@@ -72,6 +72,8 @@ pnpm run dev
 ```
 
 ## Roadmap
+- Smoother down scrolling when moving off list item
+- move down via line numbers (vim)
 - predict doubles to display in vim mode.
 - Get autoscroller touch version working with other lists on mobile.
 - cmd+d to duplicate
@@ -84,6 +86,8 @@ pnpm run dev
 - Prevent infinite recursion in tree
 
 ## Bugs
+- [] Shifting up/down and deselecting doesn't move viewport when deselecting
+- [] Implement keyboard undefined behaviour - deselecting origin and trying to shift!!
 - Dragging to another list then using keyboard controls not working
 - Implement transitions for deleting & adding items (previously removed this due to issues with animation not finishing)
 - Touch drag - when moving back and forth between foreign lists a few times, the simulated touch enter stuff doesn't always work (state bug?)
