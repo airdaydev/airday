@@ -1,4 +1,5 @@
 import { NodeComponentType, Node, GenericNode } from "@borde/list";
+import styles from "./item.module.css";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
@@ -41,11 +42,9 @@ export function loader(data: any) {
   if (data.type === "generic") {
     const validated = GenericItem.validate(data);
     console.log(validated);
-    if (!validated) return false;
-    return false;
-    // return new GenericItem(validated);
+    return data;
   }
-  return false;
+  return new GenericItem(data);
 }
 
 export const GenericComponent: NodeComponentType = (props) => {
@@ -53,7 +52,7 @@ export const GenericComponent: NodeComponentType = (props) => {
   return (
     <div
       aria-selected={props.ariaSelected}
-      // class={styles["tree-item"]}
+      class={styles["tree-item"]}
       onMouseDown={(event) => {
         props.onMouseDown(event);
       }}

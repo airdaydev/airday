@@ -1,17 +1,20 @@
-import { For, createContext } from "solid-js";
+import { For, useContext } from "solid-js";
 import { BordeNav } from "./nav/nav";
-import { List } from "./list/list";
 import styles from "./app.module.css";
 import { viewState } from "./view-state";
-import { Bar } from "./bar/bar";
 import { View } from "./view";
 import { Header } from "./nav/header";
+import { Dragged } from "@borde/list";
+import { sessionContext } from "./store/context.js";
 
 // TODO: Switch workspace
 export function App() {
-  // if focus mode
+  const session = useContext(sessionContext);
   return (
     <div class={styles.app}>
+      {session.workspace.dndContext.isDragging() && (
+        <Dragged dndContext={session.workspace.dndContext} />
+      )}
       <div class={styles.main}>
         <BordeNav />
         <For each={viewState.list[0]()} fallback={<div>fallback</div>}>

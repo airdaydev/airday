@@ -206,6 +206,11 @@ export class AcmeWorkspaceStore {
           dndContext: this.dndContext,
           itemHeight: 32,
         });
+        const list = this.itemModel
+          .getItemsByList(view.containerId)
+          .then((items) => {
+            ctx.treeState.load({ id: "root", children: items });
+          });
         this.openLists.set(identifier, ctx);
         return ctx;
       }

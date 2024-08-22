@@ -1,7 +1,7 @@
-import { createSignal } from 'solid-js';
-import { AccountContextMenu } from './context-menus';
-import styles from './header.module.css';
-import Caret from '../icons/caret.svg?component-solid';
+import { createSignal } from "solid-js";
+import { AccountContextMenu } from "./context-menus";
+import styles from "./header.module.css";
+import Caret from "../icons/caret.svg?component-solid";
 
 export const AccountButton = () => {
   let buttonRef: HTMLButtonElement | undefined;
@@ -17,12 +17,11 @@ export const AccountButton = () => {
   }
   return (
     <button
-    class={`${styles['workspace-button']} ${styles['nav-button']}`}
-    onClick={(event) => {
-      console.log('onclick button')
-      openContextMenu(event)
-    }}
-    ref={buttonRef}
+      class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
+      onClick={(event) => {
+        openContextMenu(event);
+      }}
+      ref={buttonRef}
     >
       {ctxOpen() && (
         <AccountContextMenu
@@ -34,4 +33,4 @@ export const AccountButton = () => {
       <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
     </button>
   );
-}
+};

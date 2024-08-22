@@ -59,7 +59,7 @@
 - [] Toast notification whenever an item disappears from current context e.g. moves to done, or inbox
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Autoscroll when dragging items at bottom/top of list
-- [] Ensure selection is cleared on edit 
+- [] Ensure selection is cleared on edit
 - [] Edit selected items via 'enter' key
 - [] Clear selection on 'esc' key
 - [] Command+up/down keyboard resorts
@@ -117,22 +117,21 @@
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
 
+## Desktop strategy
+- [] Desktop app https://github.com/tauri-apps/tauri
+
 ## Mobile strategy
 - [] Launch - PWA
-- [] See https://capacitorjs.com/
-- [] iOS Ionic Capacitor app POC
-- [] Android Ionic Capacitor app POC
+- [] See https://capacitorjs.com/ and Tauri
+- [] iOS Ionic Capacitor/Tauri app POC
+- [] Android Ionic Capacitor/Tauri app POC
 - [] iOS release
 
 ## Stretch goals
 - [] Markdown descriptions, with TODO sublists
-- [] Desktop app https://github.com/tauri-apps/tauri
-- [] Optional encrypted server
-- [] Lock
+- [] Pin Lock
 - [] Kanban board
 - [] Secrets
 - [] Code snippets
-- [] List animations
-- [] Board prototype (canvas/webgl)
-- [] Pins?
+- [x] List animations
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos

@@ -1,0 +1,41 @@
+.tree-item {
+    display: flex;
+    align-items: center;
+    background: var(--background);
+    border-bottom: 1px solid var(--shade);
+    cursor: default;
+    color: var(--body);
+    height: 100%;
+}
+
+.tree-item[aria-selected="true"] {
+    background: var(--shade);
+}
+
+.focus .tree-item[aria-selected="true"] {
+    background: var(--light-shade);
+}
+
+.app {
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    top: 0;
+    position: absolute;
+    padding: 0 2em;
+    max-width: 80em;
+    margin-left: auto;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+h3 {
+    font-family: Alte Haas Grotesk;
+    font-weight: 600;
+}

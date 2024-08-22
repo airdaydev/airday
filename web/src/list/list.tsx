@@ -33,11 +33,10 @@ export function List(props: ListProps) {
         viewState.setActiveViewId(props.view.id);
       }}
     >
-      Placeholder for {ctx.id}
       <div class={styles["list"]}>
         <SolidListContext.Provider value={ctx}>
           <div
-            style={`display: flex; flex-direction: column; height: 100%; width: 33.3%;`}
+            style={`display: flex; flex-direction: column; height: 100%;`}
             classList={{ [styles["focus"]]: ctx.isFocused() }}
           >
             <h3>Tree A ({ctx.treeState.count()} items)</h3>

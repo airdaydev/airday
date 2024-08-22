@@ -26,7 +26,7 @@
     --ultra-light-shade: #3e3e44;
     --tint-shade: #262632;
     --glass: #1e1e1ee5;
-    --body: white;
+    --body: rgb(227, 210, 210);
 }
 
 @font-face {

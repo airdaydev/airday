@@ -1,19 +1,19 @@
-import { For, createSignal, Accessor, useContext } from 'solid-js';
-import { Stickers } from './stickers';
-import styles from './nav.module.css';
-import { viewState } from '../view-state';
-import CornerDownRightSVG from '../icons/corner-down-right.svg?component-solid';
-import CalendarSVG from '../icons/calendar.svg?component-solid';
-import CheckSVG from '../icons/check.svg?component-solid';
-import TrashSVG from '../icons/trash.svg?component-solid';
-import { ListIcon } from '../list/list-icon';
-import { ContextMenu } from '../context-menu/context-menu';
-import { sessionContext } from '../store/context.js';
-import { AddListButton } from './add-list';
+import { For, createSignal, Accessor, useContext } from "solid-js";
+import { Stickers } from "./stickers";
+import styles from "./nav.module.css";
+import { viewState } from "../view-state";
+import CornerDownRightSVG from "../icons/corner-down-right.svg?component-solid";
+import CalendarSVG from "../icons/calendar.svg?component-solid";
+import CheckSVG from "../icons/check.svg?component-solid";
+import TrashSVG from "../icons/trash.svg?component-solid";
+import { ListIcon } from "../list/list-icon";
+import { ContextMenu } from "../context-menu/context-menu";
+import { sessionContext } from "../store/context.js";
+import { AddListButton } from "./add-list";
 
 interface NavItemContextMenuProps {
   close: () => void;
-  container: Accessor<BordeContainer>,
+  container: Accessor<BordeContainer>;
   offset: [number, number];
 }
 
@@ -24,10 +24,12 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
       container={props.container}
       offset={props.offset}
     >
-      <button onClick={() => {
-        viewState.addContainerView(props.container().id);
-        props.close();
-      }}>
+      <button
+        onClick={() => {
+          viewState.addContainerView(props.container().id);
+          props.close();
+        }}
+      >
         <span>Open in new view</span>
       </button>
       <button disabled>
@@ -37,11 +39,11 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
         <span>Delete</span>
       </button>
     </ContextMenu>
-  )
+  );
 }
 
 interface NavListItemProps {
-  container: Accessor<BordeContainer>,
+  container: Accessor<BordeContainer>;
 }
 
 // TODO: Turn off keyboard when context menu open
@@ -63,7 +65,7 @@ export function NavListItem(props: NavListItemProps) {
         }}
       >
         <ListIcon container={props.container()} />
-        <span style='overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;'>
+        <span style="overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;">
           {props.container() && props.container().name}
         </span>
       </button>
@@ -75,25 +77,28 @@ export function NavListItem(props: NavListItemProps) {
         />
       )}
     </div>
-  )
+  );
 }
 
 export function BordeNav() {
   const session = useContext(sessionContext);
-  const [ sidebarVisible ] = viewState.sidebarVisible;
+  const [sidebarVisible] = viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined = undefined;
-  const getMargin = () => sidebarVisible() ? '0' : `-${ref ? ref.getBoundingClientRect().width : 0}px`;
+  const getMargin = () =>
+    sidebarVisible()
+      ? "0"
+      : `-${ref ? ref.getBoundingClientRect().width : 0}px`;
   return (
     <nav
       class={styles.nav}
       ref={ref}
       style={{
-        'margin-left': getMargin(),
+        "margin-left": getMargin(),
       }}
     >
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
       <div
-        class={`${styles['nav-list']} ${styles['nav-text']}`}
+        class={`${styles["nav-list"]} ${styles["nav-text"]}`}
         style="padding-top: 0.5em;"
       >
         <button>
@@ -102,11 +107,11 @@ export function BordeNav() {
         </button>
         <button>
           <CheckSVG style="width: 1.25em; stroke-width: 1.5px;" />
-          <span>Habits</span>
+          <span>Performance</span>
         </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <div class={`${styles['nav-list']} ${styles['nav-text']}`}>
+      <div class={`${styles["nav-list"]} ${styles["nav-text"]}`}>
         <For each={session.workspace.containerModel.ol()}>
           {(container) => <NavListItem container={container} />}
         </For>
@@ -117,7 +122,7 @@ export function BordeNav() {
       <div>Add stickers</div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <div
-        class={`${styles['nav-list']} ${styles['nav-text']}`}
+        class={`${styles["nav-list"]} ${styles["nav-text"]}`}
         style="padding-top: 0.5em;"
       >
         <button onClick={viewState.openDoneView}>
