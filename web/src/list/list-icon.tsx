@@ -1,18 +1,19 @@
-import TodoSVG from '../icons/nb-todo.svg';
-import CuttingBoardSVG from '../icons/cutting-board.svg';
-import FolioSVG from '../icons/folio.svg';
-import InboxSVG from '../icons/inbox.svg';
-import NotepadsSVG from '../icons/notepads.svg';
+import TodoSVG from "../icons/list-icon-task.svg";
+import CraftSVG from "../icons/list-icon-craft.svg";
+import RedSVG from "../icons/list-icon-red.svg";
+import SunSVG from "../icons/list-icon-sun.svg";
+import ConcreteSVG from "../icons/list-icon-concrete.svg";
 
 const icons = new Map([
-  ['cutting-board', CuttingBoardSVG],
-  ['folio', FolioSVG],
-  ['notepads', NotepadsSVG],
-  ['inbox', InboxSVG],
+  ["craft", CraftSVG],
+  ["red", RedSVG],
+  ["sun", SunSVG],
+  ["concrete", ConcreteSVG],
+  ["task", TodoSVG],
 ]);
 
 interface ListIconProps {
-  container: BordeContainer,
+  container: BordeContainer;
 }
 
 export const ListIcon = (props: ListIconProps) => {
@@ -23,5 +24,6 @@ export const ListIcon = (props: ListIconProps) => {
     <img
       src={Icon}
       style={`display: block;flex-shrink: 0;height: 2rem;width: 1.5rem;`}
-    />)
-}
+    />
+  );
+};

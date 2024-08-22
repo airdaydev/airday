@@ -176,19 +176,19 @@ export class AcmeWorkspaceStore {
       {
         id: "inbox",
         name: "Inbox",
-        icon: "inbox",
+        icon: "task",
         sortKey: "a",
       },
       {
         id: "borde",
         name: "Borde",
-        icon: "cutting-board",
+        icon: "craft",
         sortKey: "b",
       },
       {
         id: "work",
         name: "a really really long named list",
-        icon: "notepads",
+        icon: "red",
         sortKey: "c",
       },
     ]);

@@ -2,7 +2,8 @@ import { For, createSignal, Accessor, useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
 import { viewState } from "../view-state";
-import CornerDownRightSVG from "../icons/corner-down-right.svg?component-solid";
+import NextSVG from "../icons/next.svg?component-solid";
+import PerformanceSVG from "../icons/activity.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import CheckSVG from "../icons/check.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
@@ -102,12 +103,22 @@ export function BordeNav() {
         style="padding-top: 0.5em;"
       >
         <button>
-          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.5px;" />
+          <NextSVG
+            style="width: 1.25em;
+            stroke-width: 0.75px;
+            left: 2px;
+            height: 1.5em;
+            position: relative;"
+          />
           <span>Next</span>
         </button>
         <button>
-          <CheckSVG style="width: 1.25em; stroke-width: 1.5px;" />
+          <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px;" />
           <span>Performance</span>
+        </button>
+        <button onClick={viewState.openDoneView}>
+          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <span>Done</span>
         </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
@@ -119,26 +130,7 @@ export function BordeNav() {
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
-      <div>Add stickers</div>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <div
-        class={`${styles["nav-list"]} ${styles["nav-text"]}`}
-        style="padding-top: 0.5em;"
-      >
-        <button onClick={viewState.openDoneView}>
-          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Done</span>
-        </button>
-        <button>
-          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Files</span>
-        </button>
-        <button>
-          <CornerDownRightSVG style="width: 1.25em; stroke-width: 1.25px;" />
-          <span>Secret</span>
-        </button>
-      </div>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      <div style="color: #888;">Add stickers</div>
       {/* <button>
         <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
         <span>Scheduled</span>
