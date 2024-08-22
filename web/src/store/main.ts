@@ -6,6 +6,7 @@ import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListDragContext, ListStateContext } from "@borde/list";
 import { loader } from "./loader";
+import styles from "../list/item.module.css";
 
 const schemaVersion = 1;
 
@@ -205,6 +206,7 @@ export class AcmeWorkspaceStore {
           treeState: state,
           dndContext: this.dndContext,
           itemHeight: 32,
+          placeholderStyle: styles["placeholder"],
         });
         const list = this.itemModel
           .getItemsByList(view.containerId)

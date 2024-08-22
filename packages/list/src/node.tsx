@@ -14,6 +14,7 @@ import { distance } from "./utils";
 import "./root.css";
 import { ListDragContext, VirtualisedList } from "./dnd-context";
 import { touchBandaid } from "./touch-bandaid";
+import { Placeholder } from "./placeholder";
 
 export interface NodeContainerProps {
   node: Node;
@@ -276,7 +277,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       data-type="node"
       style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px !important;`}
     >
-      {draggedOn[0]() === -1 && <div class="placeholder" />}
+      {draggedOn[0]() === -1 && <Placeholder />}
       <TransitionGroup name="fade">
         {/* Second condition resolves edge case where dragging onto own list
         from outside own list, last item momentarily doesn't cover last item placeholder. */}
@@ -284,18 +285,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
           props.listDragContext.isDraggingOver() &&
           treeIndex() -
             Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
-            1 && <div class="placeholder" />}
+            1 && <Placeholder />}
       </TransitionGroup>
-      {isDragOrigin() && (
-        <div
-          data-index={treeIndex()}
-          classList={{
-            placeholder: true,
-            origin: true,
-            visible: props.listDragContext.isDraggingOver(),
-          }}
-        />
-      )}
+      {isDragOrigin() && <Placeholder />}
       {(!isDragOrigin() || !props.listDragContext.dndContext.isDragging()) && (
         <div
           classList={{

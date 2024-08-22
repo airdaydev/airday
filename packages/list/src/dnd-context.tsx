@@ -34,11 +34,13 @@ export class ListDragContext {
     treeState: TreeState;
     dndContext: DndContext;
     itemHeight: number;
+    placeholderStyle?: string;
   }) {
     this.treeState = opts.treeState;
     this.dndContext = opts.dndContext;
     opts.dndContext.listContexts.add(this);
     this.itemHeight = opts.itemHeight;
+    this.placeholderStyle = opts.placeholderStyle;
   }
   isFocused() {
     return this.dndContext.focusContext[0]() === this;

@@ -15,6 +15,7 @@ import { NodeContainer, NodeComponentType, DefaultNodeComponent } from "./node";
 import { DndContext, ListDragContext, SolidListContext } from "./dnd-context";
 import { observeHeight } from "./utils";
 import { AutoscrollController } from "./autoscroll";
+import { Placeholder } from "./placeholder";
 
 interface TreeComponentProps {
   state: TreeState;
@@ -163,15 +164,7 @@ export const Tree = (props: TreeComponentProps) => {
               listDragContext.lastTouchedIndexSignal[0]() ===
                 signal().window.length + signal().start &&
               !listDragContext.isOrigin && (
-                <div
-                  classList={{
-                    placeholder: true,
-                    ...(listDragContext.placeholderStyle && {
-                      [listDragContext.placeholderStyle]: true,
-                    }),
-                  }}
-                  style={`max-height: ${listDragContext.itemHeight}px`}
-                />
+                <Placeholder listDragContext={listDragContext} />
               )}
           </TransitionGroup>
         </div>

@@ -34,6 +34,10 @@ body {
     background: #2d2d35;
 }
 
+.placeholder {
+    background: red;
+}
+
 .app {
     display: flex;
     justify-content: center;

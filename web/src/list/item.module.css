@@ -17,6 +17,10 @@
     background: var(--light-shade);
 }
 
+.placeholder {
+    background: var(--light-shade);
+}
+
 .app {
     display: flex;
     justify-content: center;

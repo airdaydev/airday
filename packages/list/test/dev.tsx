@@ -40,18 +40,21 @@ const ctxA = new ListDragContext({
   treeState: treeStateA,
   dndContext: dndContext,
   itemHeight: 28,
+  placeholderStyle: styles["placeholder"],
 });
 
 const ctxB = new ListDragContext({
   treeState: treeStateB,
   dndContext: dndContext,
   itemHeight: 28,
+  placeholderStyle: styles["placeholder"],
 });
 
 const ctxC = new ListDragContext({
   treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 28,
+  placeholderStyle: styles["placeholder"],
 });
 
 render(
