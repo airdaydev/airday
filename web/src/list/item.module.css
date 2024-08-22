@@ -6,6 +6,7 @@
     cursor: default;
     color: var(--body);
     height: 100%;
+    box-sizing: border-box;
 }
 
 .tree-item[aria-selected="true"] {
