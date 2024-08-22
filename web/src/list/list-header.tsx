@@ -16,9 +16,11 @@ export const ListHeader = (props: ListHeaderProps) => {
     <div class={styles["list-header"]}>
       <div class={styles["list-header-internal"]}>
         <div
-          style={`display: flex; align-items: center; padding: 0.25em 0.75em;`}
+          style={`display: flex; align-items: center; padding: 0.25em 0.25em;`}
         >
-          <ListIcon container={props.container[0]()} />
+          <span style="padding-right: 0.5em;">
+            <ListIcon container={props.container[0]()} />
+          </span>
           <EditableListTitle container={props.container} />
         </div>
         {list().length > 1 && (

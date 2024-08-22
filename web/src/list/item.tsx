@@ -16,12 +16,12 @@ export const GenericComponent: NodeComponentType = (props) => {
       onDblClick={(event) => {
         event.preventDefault();
         props.select();
-        // props.node.updateContent("gogogoo");
+        props.node.updateContent("gogogoo");
       }}
       data-index={props.index}
       ref={props.ref}
     >
-      {node().id} - {node().content}
+      {node().content}
     </div>
   );
 };

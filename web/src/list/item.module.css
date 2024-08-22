@@ -7,6 +7,8 @@
     color: var(--body);
     height: 100%;
     box-sizing: border-box;
+    white-space: nowrap;
+    overflow-x: hidden;
 }
 
 .tree-item[aria-selected="true"] {
