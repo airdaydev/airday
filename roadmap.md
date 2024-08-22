@@ -31,7 +31,7 @@
 - [x] Autoscroll when dragging items at bottom/top of list
 - [x] Command+up/down keyboard resorts
 - [x] Context menu for one item
-- [] Drag stack make it nice
+- [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc
 - Rich text https://docs.slatejs.org/ ?
@@ -43,6 +43,7 @@
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Ensure selection is cleared on edit
 - [] Edit selected items via 'enter' key (vim?)
+- [] List loading animation
 - [] Clear selection on 'esc' key (vim?)
 - [] Allow dropping items in nav bar list yessir
 - [] Change list icons!
