@@ -6,7 +6,7 @@
     border-right: 1px solid var(--border);
     transition: margin 0.1s;
     overflow-y: scroll;
-    background: var(--background);
+    background: var(--shade-bg);
 }
 
 .nav-text button {

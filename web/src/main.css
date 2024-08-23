@@ -1,14 +1,16 @@
 :root {
     --background: hsl(180, 4.8%, 97%);
-    --border: #e1e1e1;
-    --shade: #e8d9e4;
+    --border: #ddd;
+    /* --border: #eaeaea; */
+    --shade-bg: #f3f3f3;
+    --shade: #e1e1e1;
     --light-shade: #f3f3f3;
     --mid-shade: #e5e5e5;
     --ultra-light-shade: #f6f6f6;
     --tint-shade: #e7ecff;
     --glass: #faf7ffe0;
     --body: black;
-    --body-font: "Test Söhne", sans-serif;
+    --body-font: -apple-system, BlinkMacSystemFont, "Test Söhne", sans-serif;
 }
 
 #root {
@@ -19,6 +21,7 @@
 [data-theme="dark"] {
     --dank: #1a1a1a;
     --background: #1e1e1e;
+    --shade-bg: #1e1e1e;
     --border: #28282c;
     --shade: #28282c;
     --light-shade: #313135;
@@ -71,4 +74,8 @@ input {
     left: 0;
     z-index: 10;
     visibility: hidden;
+}
+
+button {
+    font-family: inherit;
 }

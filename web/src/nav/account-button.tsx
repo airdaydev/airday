@@ -30,7 +30,6 @@ export const AccountButton = () => {
         />
       )}
       <span style="padding-right: 0.25em;">Daniel</span>
-      <Caret style="stroke-width: 1.25px; width: 0.75em; height: 0.75em;" />
     </button>
   );
 };
