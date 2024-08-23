@@ -115,5 +115,6 @@
 - [] Kanban board
 - [] Secrets
 - [] Code snippets
+- [] Auto plan suggestions
 - [x] List animations
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
