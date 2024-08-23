@@ -3,7 +3,7 @@
     flex-direction: column;
     width: 15em;
     padding: 0 0.5em;
-    /* border-right: 1px solid var(--border); */
+    border-right: 1px solid var(--border);
     transition: margin 0.1s;
     overflow-y: scroll;
     background: var(--background);

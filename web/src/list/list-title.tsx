@@ -53,7 +53,7 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
       style={`
         font-family: inherit;
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 400;
         border: none;
         outline: none;
         background: none;

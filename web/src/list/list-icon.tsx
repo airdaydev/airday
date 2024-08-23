@@ -1,3 +1,4 @@
+import styles from "./list.module.css";
 import TodoSVG from "../icons/list-icon-task.svg";
 import CraftSVG from "../icons/list-icon-craft.svg";
 import RedSVG from "../icons/list-icon-red.svg";
@@ -20,10 +21,5 @@ export const ListIcon = (props: ListIconProps) => {
   const iconText = props.container.icon;
   const icon = iconText && icons.get(iconText);
   const Icon = icon || TodoSVG;
-  return (
-    <img
-      src={Icon}
-      style={`display: block;flex-shrink: 0;height: 2rem;width: 1.5rem;`}
-    />
-  );
+  return <img src={Icon} class={styles["list-icon"]} />;
 };

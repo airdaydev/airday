@@ -5,10 +5,11 @@
     justify-content: space-between;
     padding: 0 0.25em;
     background: var(--ultra-light-shade);
+    border-top: 1px solid var(--border);
 }
 
 [data-theme="dark"] .header {
-  background: var(--dank);
+    background: var(--dank);
 }
 
 .nav-section {
@@ -31,15 +32,15 @@
 }
 
 .nav-button {
-  z-index: 20;
-  padding: 0.5em;
-  background: none;
-  border: none;
-  cursor: pointer;
-  border-radius: 2px;
-  font-size: 1rem;
+    z-index: 20;
+    padding: 0.5em;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 1rem;
 }
 
 .nav-button:hover {
-  background: var(--shade);
+    background: var(--shade);
 }
