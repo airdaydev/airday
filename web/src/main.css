@@ -1,7 +1,6 @@
 :root {
     --background: hsl(180, 4.8%, 97%);
-    --border: #ddd;
-    /* --border: #eaeaea; */
+    --border: #eaeaea;
     --shade-bg: #f3f3f3;
     --shade: #e1e1e1;
     --light-shade: #f3f3f3;
@@ -9,6 +8,7 @@
     --ultra-light-shade: #f6f6f6;
     --tint-shade: #e7ecff;
     --glass: #faf7ffe0;
+    --body-tint: #5b5b5be5;
     --body: black;
     --body-font: -apple-system, BlinkMacSystemFont, "Test Söhne", sans-serif;
 }

@@ -2,14 +2,14 @@ import { sessionContext } from "../store/context.js";
 import { createSignal, useContext } from "solid-js";
 import CloudOffSVG from "../icons/cloud-off.svg?component-solid";
 import SearchSVG from "../icons/search.svg?component-solid";
-import styles from "./header.module.css";
+import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
 import { BordeContextMenu, WorkspaceContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 
 type ContextMenu = "main" | "workspace";
 
-export const Header = () => {
+export const Footer = () => {
   // ContextMenu
   const session = useContext(sessionContext);
   const [ctxOpen, setCtxOpen] = createSignal<ContextMenu | boolean>(false);
@@ -23,7 +23,7 @@ export const Header = () => {
     }
   }
   return (
-    <header class={styles.header}>
+    <footer class={styles.footer}>
       {ctxOpen() === "main" && (
         <BordeContextMenu
           close={() => setCtxOpen(false)}
@@ -45,7 +45,7 @@ export const Header = () => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
         >
-          Borde
+          Circa
         </button>
         <button
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
@@ -66,6 +66,6 @@ export const Header = () => {
           <CloudOffSVG />
         </button>
       </div>
-    </header>
+    </footer>
   );
 };

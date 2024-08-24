@@ -9,7 +9,7 @@
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-  }
+}
 
 .check span {
     position: absolute;
@@ -22,12 +22,12 @@
     width: 0.75em;
     height: 0.75em;
     margin-right: 0.5em;
-    border: 1px solid var(--shade);
+    border: 1px solid var(--light-shade);
 }
 
 .check:hover input ~ span {
-  background: var(--light-shade);
-  }
+    background: var(--light-shade);
+}
 
 .check:hover {
     background: var(--light-shade);
@@ -53,10 +53,10 @@
 
 /* Style the checkmark/indicator */
 .check input:checked ~ span::after {
-  position: relative;
-  left: 2px;
-  top: -6px;
-  width: 10px;
-  height: 10px;
-  content: url(../icons/check-hand.svg);
+    position: relative;
+    left: 2px;
+    top: -6px;
+    width: 10px;
+    height: 10px;
+    content: url(../icons/check-hand.svg);
 }

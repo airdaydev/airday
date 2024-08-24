@@ -1,4 +1,5 @@
 import { NodeComponentType } from "@borde/list";
+import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
 
 export const GenericComponent: NodeComponentType = (props) => {
@@ -21,7 +22,11 @@ export const GenericComponent: NodeComponentType = (props) => {
       data-index={props.index}
       ref={props.ref}
     >
-      {node().content}
+      <Checkbox
+        onChange={(event: InputEvent) => {}}
+        checked={!!node.tsCompleted}
+      />
+      <span>{node().content}</span>
     </div>
   );
 };

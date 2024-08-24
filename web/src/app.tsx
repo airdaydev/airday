@@ -3,7 +3,7 @@ import { BordeNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { viewState } from "./view-state";
 import { View } from "./view";
-import { Header } from "./nav/header";
+import { Footer } from "./nav/footer";
 import { Dragged } from "@borde/list";
 import { sessionContext } from "./store/context.js";
 
@@ -21,7 +21,7 @@ export function App() {
           {(view, index) => <View view={view[0]()} tabId={index()} />}
         </For>
       </div>
-      <Header />
+      <Footer />
     </div>
   );
 }

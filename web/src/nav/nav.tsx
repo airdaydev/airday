@@ -104,20 +104,21 @@ export function BordeNav() {
       >
         <button>
           <NextSVG
-            style="width: 1.25em;
+            style="position: relative;
+            width: 1.25em;
             stroke-width: 0.75px;
             left: 2px;
             height: 1.5em;
-            position: relative;"
+            color: var(--body-tint);"
           />
           <span>Next</span>
         </button>
         <button>
-          <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px;" />
+          <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
         </button>
         <button onClick={viewState.openDoneView}>
-          <CheckSVG style="width: 1.25em; stroke-width: 1.25px;" />
+          <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
           <span>Done</span>
         </button>
       </div>
@@ -130,7 +131,9 @@ export function BordeNav() {
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
-      <div style="color: #888;">Add stickers</div>
+      <div style="color: #81777f; border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;">
+        Add stickers
+      </div>
       {/* <button>
         <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
         <span>Scheduled</span>

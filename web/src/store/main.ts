@@ -93,7 +93,7 @@ export class SessionStore {
     } else {
       this.workspace = new AcmeWorkspaceStore({
         id: createUniqueId(),
-        name: "Offline workspace",
+        name: "Private",
       });
       this.map.set(this.workspace.id, this.workspace);
     }

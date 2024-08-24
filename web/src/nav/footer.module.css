@@ -1,14 +1,14 @@
-.header {
+.footer {
     display: flex;
     width: 100%;
     box-sizing: border-box;
     justify-content: space-between;
-    padding: 0 0.25em;
+    padding: 0.25em 0.5em;
     background: var(--ultra-light-shade);
     border-top: 1px solid var(--border);
 }
 
-[data-theme="dark"] .header {
+[data-theme="dark"] .footer {
     background: var(--dank);
 }
 
@@ -33,7 +33,7 @@
 
 .nav-button {
     z-index: 20;
-    padding: 0.5em;
+    padding: 0.25em;
     background: none;
     border: none;
     cursor: pointer;
