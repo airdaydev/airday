@@ -8,7 +8,6 @@ import {
   onMount,
   useContext,
 } from "solid-js";
-import { TransitionGroup } from "solid-transition-group";
 import { TreeState } from "./state";
 import { GenericNode } from "./tree-utils";
 import { NodeContainer, NodeComponentType, DefaultNodeComponent } from "./node";
@@ -45,6 +44,15 @@ export const Tree = (props: TreeComponentProps) => {
     autoscroller.scrollContainer = scrollContainerRef;
     listDragContext.scrollContainerRef = scrollContainerRef;
   });
+
+  const showBackdropPlaceholder = () => {
+    return (
+      listDragContext.isDraggingOver() &&
+      listDragContext.lastTouchedIndexSignal[0]() ===
+        signal().window.length + signal().start &&
+      !listDragContext.isOrigin
+    );
+  };
 
   createEffect(
     on(
@@ -159,14 +167,9 @@ export const Tree = (props: TreeComponentProps) => {
             }
           }}
         >
-          <TransitionGroup name="fade">
-            {listDragContext.dndContext.isDragging() &&
-              listDragContext.lastTouchedIndexSignal[0]() ===
-                signal().window.length + signal().start &&
-              !listDragContext.isOrigin && (
-                <Placeholder listDragContext={listDragContext} />
-              )}
-          </TransitionGroup>
+          {showBackdropPlaceholder() && (
+            <Placeholder listDragContext={listDragContext} backdrop={true} />
+          )}
         </div>
       </div>
     </>

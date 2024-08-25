@@ -21,7 +21,7 @@
     background: var(--light-shade);
 }
 
-.placeholder {
+.placeholder:hover {
     background: var(--light-shade);
 }
 

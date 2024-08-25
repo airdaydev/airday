@@ -280,7 +280,7 @@ export class DndContext {
   listContexts = new Set<ListDragContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
-  elWidthPx: number = 200;
+  elDimensionsPx: [number, number] = [200, 32];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
   constructor() {
@@ -293,7 +293,8 @@ export class DndContext {
   ) {
     // Set up dragged element
     this.elClickOffset = elClickOffset;
-    this.elWidthPx = ref.getBoundingClientRect().width;
+    const bounds = ref.getBoundingClientRect();
+    this.elDimensionsPx = [bounds.width, bounds.height];
     this.draggedEl = ref.cloneNode(true);
     this.dragMode[1](dragMode);
   }

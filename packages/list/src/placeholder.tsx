@@ -1,7 +1,7 @@
 import { useContext } from "solid-js";
 import { ListDragContext, SolidListContext } from "./dnd-context";
 
-export const Placeholder = () => {
+export const Placeholder = (props: { backdrop?: boolean }) => {
   const listDragContext = useContext<ListDragContext>(SolidListContext);
   return (
     <div
@@ -11,7 +11,9 @@ export const Placeholder = () => {
           [listDragContext.placeholderStyle]: true,
         }),
       }}
-      style={`max-height: ${listDragContext.itemHeight}px`}
+      style={{
+        "max-height": `${listDragContext.itemHeight}px`,
+      }}
     />
   );
 };

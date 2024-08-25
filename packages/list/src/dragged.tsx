@@ -68,10 +68,11 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           z-index: 100;
           top: -100%;
           left: -100%;
-          box-shadow: 1px 1px 2px #0000002e;
-          max-width: ${dndContext.elWidthPx}px;
-          height: 26px;
-          animation: scaleUp 0.1s ease-in-out forwards;
+          box-shadow: rgba(0, 0, 0, 0.25) 0px 14px 28px, rgba(0, 0, 0, 0.22) 0px 10px 10px;
+          max-width: ${dndContext.elDimensionsPx[0]}px;
+          height: ${dndContext.elDimensionsPx[1]}px;
+          animation: scaleUp 0.15s ease-in-out forwards;
+          opacity: 0.95;
         `}
       ></div>
     </div>
