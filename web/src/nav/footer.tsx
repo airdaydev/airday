@@ -58,6 +58,7 @@ export const Footer = () => {
         </button>
       </div>
       <div class={styles["nav-section"]}>
+        <span>0 items (0 selected)</span>
         <ThemeToggle class={styles["nav-button"]} />
         <button class={styles["nav-button"]}>
           <SearchSVG />

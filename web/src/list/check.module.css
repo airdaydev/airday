@@ -25,6 +25,10 @@
     border: 1px solid var(--light-shade);
 }
 
+[data-theme="light"] .check span {
+    border: 1px solid #ddd;
+}
+
 .check:hover input ~ span {
     background: var(--light-shade);
 }
