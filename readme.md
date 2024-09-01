@@ -17,6 +17,7 @@ Trash = statically ordered list
 - https://tauri.app/
 - https://keystatic.com/docs/installation-astro
 - https://klim.co.nz/buy/soehne/
+- https://alexharri.com/blog/clipboard
 
 ## Cases for tagging & colours:
 - E.g. Cross domain or unsorted things between multiple diff locations that do not need their own category e.g. Several items that need to be done at location #1, others at location #2
