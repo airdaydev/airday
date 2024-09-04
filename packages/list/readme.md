@@ -72,6 +72,7 @@ pnpm run dev
 ```
 
 ## Roadmap
+- consider triggering a [reflow](https://stackoverflow.com/questions/6268508/restart-animation-in-css3-any-better-way-than-removing-the-element) on last index change to show full fade animation
 - Smoother down scrolling when moving off list item
 - move down via line numbers (vim)
 - predict doubles to display in vim mode.
