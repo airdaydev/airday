@@ -1,5 +1,5 @@
 import { Node, GenericNode } from "@borde/list";
-import { GenericComponent } from "../list/item";
+import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";

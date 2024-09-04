@@ -6,7 +6,7 @@ import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListDragContext, ListStateContext } from "@borde/list";
 import { loader } from "./loader";
-import styles from "../list/item.module.css";
+import styles from "../item/item.module.css";
 
 const schemaVersion = 1;
 

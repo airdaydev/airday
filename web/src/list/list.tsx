@@ -17,7 +17,6 @@ export function List(props: ListProps) {
     on(
       () => [ctx.dndContext.focusedContext()],
       (a) => {
-        console.log("huh!", a);
         viewState.setActiveViewId(props.view.id);
       },
     ),
