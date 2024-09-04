@@ -23,6 +23,7 @@
 - [] When dragging while holding down command, duplicate
 - [] Add search
 - [] Persist views (per device)
+- [] Load 200 items at a time
 
 ## UI
 - [x] Context menus should not go past edge of screen (flipped)

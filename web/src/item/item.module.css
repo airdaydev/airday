@@ -13,12 +13,21 @@
 }
 
 .tree-item[aria-selected="true"] {
-    background: var(--shade);
-    border-bottom: 1px solid var(--shade);
+    /* TODO: This should be blue-tint-light */
+    background: var(--blue-tint);
+    border-bottom: 1px solid rgba(0, 0, 0, 0);
 }
 
 .focus .tree-item[aria-selected="true"] {
+    background: var(--blue-tint);
+}
+
+[data-theme="dark"] .focus .tree-item[aria-selected="true"] {
     background: var(--light-shade);
+}
+
+[data-theme="dark"] .tree-item[aria-selected="true"] {
+    background: var(--ultra-light-shade);
 }
 
 @keyframes fadeIn {

@@ -4,7 +4,7 @@
     box-sizing: border-box;
     justify-content: space-between;
     padding: 0.25em 0.5em;
-    background: var(--ultra-light-shade);
+    background: var(--shade-bg);
     border-top: 1px solid var(--border);
 }
 
