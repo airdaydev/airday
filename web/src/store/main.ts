@@ -168,7 +168,7 @@ export class AcmeWorkspaceStore {
   };
   dummyData = async () => {
     const items = [
-      ...genTestData("bordelist", bordeItems),
+      ...genTestData("borde", bordeItems),
       ...genTestData("inbox", inboxItems),
     ];
     await this.itemModel.insert(items);
@@ -180,13 +180,13 @@ export class AcmeWorkspaceStore {
         sortKey: "a",
       },
       {
-        id: "borde",
-        name: "Borde",
+        id: "work",
+        name: "Work",
         icon: "craft",
         sortKey: "b",
       },
       {
-        id: "work",
+        id: "long",
         name: "a really really long named list",
         icon: "red",
         sortKey: "c",
