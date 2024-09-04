@@ -21,8 +21,18 @@
     background: var(--light-shade);
 }
 
-.placeholder:hover {
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.placeholder {
     background: var(--mid-shade);
+    animation: fadeIn 0.15s linear forwards;
 }
 
 .app {

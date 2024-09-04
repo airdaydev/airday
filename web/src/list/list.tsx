@@ -1,14 +1,7 @@
-import { useContext } from "solid-js";
+import { createEffect, useContext, on } from "solid-js";
 import styles from "./list.module.css";
 import { viewState } from "../view-state";
-import {
-  Tree,
-  DndContext,
-  Dragged,
-  ListDragContext,
-  ListStateContext,
-  SolidListContext,
-} from "@borde/list";
+import { Tree, SolidListContext } from "@borde/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 
@@ -20,6 +13,15 @@ interface ListProps {
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
   const ctx = session.workspace.openList(props.view);
+  createEffect(
+    on(
+      () => [ctx.dndContext.focusedContext()],
+      (a) => {
+        console.log("huh!", a);
+        viewState.setActiveViewId(props.view.id);
+      },
+    ),
+  );
   const container = session.workspace.containerModel.index.get(
     props.view.containerId,
   );
