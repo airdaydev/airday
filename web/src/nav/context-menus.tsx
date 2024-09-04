@@ -1,7 +1,7 @@
-import { useContext } from 'solid-js';
-import { sessionContext } from '../store/context.js';
-import { ContextMenu } from '../context-menu/context-menu';
-import { viewState } from '../view-state';
+import { useContext } from "solid-js";
+import { sessionContext } from "../store/context.js";
+import { ContextMenu } from "../context-menu/context-menu";
+import { viewState } from "../view-state";
 
 interface BordeContextMenuProps {
   close: () => void;
@@ -10,17 +10,14 @@ interface BordeContextMenuProps {
 
 export function BordeContextMenu(props: BordeContextMenuProps) {
   return (
-    <ContextMenu
-      close={props.close}
-      offset={props.offset}
-    >
+    <ContextMenu close={props.close} offset={props.offset}>
       <button
         onClick={() => {
-          viewState.sidebarVisible[1]((prev) => !prev)
+          viewState.sidebarVisible[1]((prev) => !prev);
           props.close();
         }}
       >
-        <span>{viewState.sidebarVisible[0]() ? 'Hide' : 'Show'} Sidebar</span>
+        <span>{viewState.sidebarVisible[0]() ? "Hide" : "Show"} Sidebar</span>
       </button>
       <button disabled>
         <span>Settings</span>
@@ -30,7 +27,7 @@ export function BordeContextMenu(props: BordeContextMenuProps) {
         <span>About Borde</span>
       </button>
     </ContextMenu>
-  )
+  );
 }
 
 interface WorkspaceContextMenuProps {
@@ -41,10 +38,7 @@ interface WorkspaceContextMenuProps {
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
   const session = useContext(sessionContext);
   return (
-    <ContextMenu
-      close={props.close}
-      offset={props.offset}
-    >
+    <ContextMenu close={props.close} offset={props.offset}>
       <div>
         {Array.from(session.map.values()).map((workspace) => (
           <button disabled>
@@ -60,10 +54,12 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
       <button disabled>
         <span>Export Workspace</span>
       </button>
-      <button onClick={async () => {
-        await session.workspace.reset();
-        session.workspace.dummyData();
-      }}>
+      <button
+        onClick={async () => {
+          await session.workspace.reset();
+          session.workspace.dummyData();
+        }}
+      >
         DEV DB RESET
       </button>
       <hr />
@@ -74,7 +70,7 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
         <span>Import Workspace</span>
       </button>
     </ContextMenu>
-  )
+  );
 }
 
 interface AccountContextMenuProps {
@@ -84,10 +80,7 @@ interface AccountContextMenuProps {
 
 export function AccountContextMenu(props: AccountContextMenuProps) {
   return (
-    <ContextMenu
-      close={props.close}
-      offset={props.offset}
-    >
+    <ContextMenu close={props.close} offset={props.offset}>
       <button disabled>
         <span>Account</span>
       </button>
@@ -96,6 +89,36 @@ export function AccountContextMenu(props: AccountContextMenuProps) {
         <span>Sign out</span>
       </button>
     </ContextMenu>
-  )
+  );
 }
 
+interface NavItemContextMenuProps {
+  close: () => void;
+  container: Accessor<BordeContainer>;
+  offset: [number, number];
+}
+
+export function NavItemContextMenu(props: NavItemContextMenuProps) {
+  return (
+    <ContextMenu
+      close={props.close}
+      container={props.container}
+      offset={props.offset}
+    >
+      <button
+        onClick={() => {
+          viewState.addContainerView(props.container().id);
+          props.close();
+        }}
+      >
+        <span>Open in new view</span>
+      </button>
+      <button disabled>
+        <span>Export</span>
+      </button>
+      <button disabled>
+        <span>Delete</span>
+      </button>
+    </ContextMenu>
+  );
+}
