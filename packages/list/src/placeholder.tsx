@@ -7,6 +7,7 @@ export const Placeholder = (props: { backdrop?: boolean }) => {
     <div
       classList={{
         placeholder: true,
+        backdrop: props.backdrop,
         ...(listDragContext.placeholderStyle && {
           [listDragContext.placeholderStyle]: true,
         }),

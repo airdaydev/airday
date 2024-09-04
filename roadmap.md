@@ -37,7 +37,6 @@
 - Rich text https://docs.slatejs.org/ ?
 - [] Show date finished on completed items
 - [] Show completed item in og list for 5 seconds before disappearing
-- [] Natural looking cross outs? Consider tick seed, underline length
 - [] Rename container in sidenav
 - [] Toast notification whenever an item disappears from current context e.g. moves to done, or inbox (MAYBE)
 - [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
@@ -110,6 +109,7 @@
 - [] iOS release
 
 ## Stretch goals
+- [] Webgl/Canvas list
 - [] Markdown descriptions, with TODO sublists
 - [] Pin Lock
 - [] Kanban board
@@ -118,3 +118,4 @@
 - [] Auto plan suggestions
 - [x] List animations
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
+- [] Natural looking cross outs? Consider tick seed, underline length

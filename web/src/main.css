@@ -79,3 +79,7 @@ input {
 button {
     font-family: inherit;
 }
+
+.list-backdrop .placeholder {
+    background: var(--mid-shade);
+}

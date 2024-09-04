@@ -22,7 +22,7 @@
 }
 
 .placeholder:hover {
-    background: var(--light-shade);
+    background: var(--mid-shade);
 }
 
 .app {

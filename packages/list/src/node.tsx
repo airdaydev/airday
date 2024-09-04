@@ -174,11 +174,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
                 props.listDragContext.clearSelection();
               }
             }
-            // props.listDragContext.treeState.moveItems(
-            //   props.listDragContext.selection[0](),
-            //   null,
-            //   props.listDragContext.lastTouchedIndexSignal[0]() || 0,
-            // );
             props.listDragContext.stopDrag();
             window.removeEventListener("mousemove", mouseMove);
           },
