@@ -112,7 +112,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
-    if (event.button === 2) return; // prevent context menu
     props.listDragContext.setFocus();
     if (event.metaKey) {
       props.listDragContext.toggleSelection(props.node, true);
@@ -132,6 +131,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
         // shift down
         props.listDragContext.selectNodesInRange(first, treeIndex());
       }
+      return;
+    }
+    if (!isSelected()) props.listDragContext.selectOne(props.node);
+    if (event.button === 2) {
       return;
     }
     const origin: [number, number] = [event.clientX, event.clientY];
@@ -184,7 +187,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
     window.addEventListener("mouseup", () =>
       window.removeEventListener("mousemove", mouseMove),
     );
-    if (!isSelected()) props.listDragContext.selectOne(props.node);
   };
   const isDragOrigin = createMemo(() => {
     props.listDragContext.dndContext.isDragging(); // trigger
