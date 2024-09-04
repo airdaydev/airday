@@ -45,13 +45,18 @@ export const Tree = (props: TreeComponentProps) => {
     listDragContext.scrollContainerRef = scrollContainerRef;
   });
 
+  // Conditions:
+  // 1. Dragging over the parent list
+  // 2. The last item touched is the the last item in the signal????
+  // 3. The parent list is not the origin (the extra space at the bottom
+  // is only needed on foreign mouseovers!)
   const showBackdropPlaceholder = () => {
-    return (
+    const show =
       listDragContext.isDraggingOver() &&
       listDragContext.lastTouchedIndexSignal[0]() ===
         signal().window.length + signal().start &&
-      !listDragContext.isOrigin
-    );
+      !listDragContext.isOrigin;
+    return show;
   };
 
   createEffect(
@@ -147,7 +152,7 @@ export const Tree = (props: TreeComponentProps) => {
         </div>
         <div
           class="list-backdrop"
-          style={{ height: `${listDragContext.itemHeight}px` }}
+          style={{ "min-height": `${listDragContext.itemHeight * 2}px` }}
           onMouseEnter={() => {
             if (listDragContext.dndContext.isDragging()) {
               listDragContext.setDragOver();

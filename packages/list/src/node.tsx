@@ -8,7 +8,6 @@ import {
   createMemo,
   onMount,
 } from "solid-js";
-import { TransitionGroup } from "solid-transition-group";
 import { Node } from "./state";
 import { distance } from "./utils";
 import "./root.css";
@@ -273,16 +272,16 @@ export const NodeContainer = (props: NodeContainerProps) => {
       style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px !important;`}
     >
       {draggedOn[0]() === -1 && <Placeholder />}
-      <TransitionGroup name="fade">
-        {/* Second condition resolves edge case where dragging onto own list
+      {/* Second condition resolves edge case where dragging onto own list
         from outside own list, last item momentarily doesn't cover last item placeholder. */}
-        {draggedOn[0]() === 1 &&
-          props.listDragContext.isDraggingOver() &&
-          treeIndex() -
-            Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
-            1 && <Placeholder />}
-      </TransitionGroup>
-      {isDragOrigin() && <Placeholder />}
+      {draggedOn[0]() === 1 &&
+        props.listDragContext.isDraggingOver() &&
+        treeIndex() -
+          Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
+          1 && <Placeholder />}
+      {isDragOrigin() && props.listDragContext.isDraggingOver() && (
+        <Placeholder />
+      )}
       {(!isDragOrigin() || !props.listDragContext.dndContext.isDragging()) && (
         <div
           classList={{

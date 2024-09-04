@@ -34,8 +34,18 @@ body {
     background: #2d2d35;
 }
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
 .placeholder {
     background: red;
+    animation: fadeIn 0.15s ease-in forwards;
 }
 
 .app {
