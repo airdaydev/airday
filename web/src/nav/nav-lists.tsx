@@ -62,7 +62,7 @@ export const NavLists = () => {
   return (
     <div class={`${styles["nav-list"]} ${styles["nav-text"]}`}>
       <SolidListContext.Provider value={listDragContext}>
-        <Tree />
+        <Tree hideBackdrop />
       </SolidListContext.Provider>
     </div>
   );

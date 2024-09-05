@@ -23,6 +23,7 @@ interface TreeComponentProps {
   dndContext: DndContext;
   data: GenericNode<any>;
   itemHeight: number;
+  hideBackdrop?: boolean;
 }
 
 export type ContainerVector = [scrollHeight: number, scrollTop: number];
@@ -151,32 +152,34 @@ export const Tree = (props: TreeComponentProps) => {
             )}
           </For>
         </div>
-        <div
-          class="list-backdrop"
-          style={{ "min-height": `${listDragContext.itemHeight * 2}px` }}
-          onMouseEnter={() => {
-            if (listDragContext.dndContext.isDragging()) {
-              listDragContext.setDragOver();
-              if (listDragContext.isOrigin) {
-                // TODO: This COULD fuck up in the case of a window... but maybe not because the window
-                // should overextend. Yes, this needs to be the
-                listDragContext.setLastTouchedIndex(
-                  signal().window.length + signal().start,
-                );
+        {props.hideBackdrop || (
+          <div
+            class="list-backdrop"
+            style={{ "min-height": `${listDragContext.itemHeight * 2}px` }}
+            onMouseEnter={() => {
+              if (listDragContext.dndContext.isDragging()) {
                 listDragContext.setDragOver();
-              } else {
-                listDragContext.setDragOver();
-                listDragContext.setLastTouchedIndex(
-                  signal().window.length + signal().start,
-                );
+                if (listDragContext.isOrigin) {
+                  // TODO: This COULD fuck up in the case of a window... but maybe not because the window
+                  // should overextend. Yes, this needs to be the
+                  listDragContext.setLastTouchedIndex(
+                    signal().window.length + signal().start,
+                  );
+                  listDragContext.setDragOver();
+                } else {
+                  listDragContext.setDragOver();
+                  listDragContext.setLastTouchedIndex(
+                    signal().window.length + signal().start,
+                  );
+                }
               }
-            }
-          }}
-        >
-          {showBackdropPlaceholder() && (
-            <Placeholder listDragContext={listDragContext} backdrop={true} />
-          )}
-        </div>
+            }}
+          >
+            {showBackdropPlaceholder() && (
+              <Placeholder listDragContext={listDragContext} backdrop={true} />
+            )}
+          </div>
+        )}
       </div>
     </>
   );
