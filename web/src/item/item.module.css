@@ -39,6 +39,29 @@
     }
 }
 
+:global(.item)[aria-selected="false"]
+    + :global(.item)[aria-selected="true"]
+    .tree-item {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    overflow: hidden;
+}
+
+:global(.item)[aria-selected="true"]:has(
+        + :global(.item)[aria-selected="false"]
+    ) {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+    overflow: hidden;
+}
+
+:global(.item)[aria-selected="false"]:has(
+        + :global(.item)[aria-selected="true"]
+    )
+    .tree-item {
+    border-bottom: 1px solid transparent;
+}
+
 .placeholder {
     background: var(--mid-shade);
     animation: fadeIn 0.15s linear forwards;

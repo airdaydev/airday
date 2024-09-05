@@ -272,6 +272,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
       class="item"
       data-type="node"
       style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px !important;`}
+      aria-selected={isSelected()}
     >
       {draggedOn[0]() === -1 && <Placeholder />}
       {/* Second condition resolves edge case where dragging onto own list

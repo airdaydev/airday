@@ -34,6 +34,22 @@ body {
     background: #2d2d35;
 }
 
+:global(.item)[aria-selected="false"]
+    + :global(.item)[aria-selected="true"]
+    .tree-item {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    overflow: hidden;
+}
+
+:global(.item)[aria-selected="true"]:has(
+        + :global(.item)[aria-selected="false"]
+    ) {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+    overflow: hidden;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
