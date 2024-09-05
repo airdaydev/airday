@@ -1,17 +1,17 @@
 # Borde SolidJS Roadmap
 
 ## 2024 Q3
-- [] Bring back item view
-- [] Split view 4+ ways
-- [] New drag/drop list for list view
-- [] Resort containers
-- [] Multi-select containers
+- [x] Bring back item view
+- [x] New drag/drop list for list view
+- [] Clean up list dnd CSS
+- [] Clean up list dnd backdrop
+- [] Drag items into list nav
 - [] Drag items into other list headings
 - [] Begin back-end
 - [] Shared lists
 
 ## Frontend Lifecycle
-- [x] Add entire history of Done items chronology (abstract fastlist into flavours (done, up next etc, search))
+- [] Add entire history of Done items chronology
 - [] Don't allow two of the same boards open at the same time
 - [] Workspace management
 - [] Up Next board (naming?)
@@ -56,9 +56,16 @@
 - [] Export data markdown, json, csv
 - [] Import markdown, json, things 3 etc
 - [] Keyboard only, accessibility
+- [] Split view 4+ ways
+
+## Special types
+- [] Repetitive tasks (shuffle)
+- [] Repetitive tasks (in order)
+- [] Sequences (one offs, projects)
 
 ## Stickers
 - [x] Sticker system
+- [] Reinstate sticker system
 - [] First full sticker set
 - [] Dynamic storage
 - [] Custom stickers
