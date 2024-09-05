@@ -15,6 +15,9 @@ export function App() {
       {session.workspace.dndContext.isDragging() && (
         <Dragged dndContext={session.workspace.dndContext} />
       )}
+      {session.workspace.containerModel.dndContext.isDragging() && (
+        <Dragged dndContext={session.workspace.containerModel.dndContext} />
+      )}
       <div class={styles.main}>
         <BordeNav />
         <For each={viewState.list[0]()} fallback={<div>fallback</div>}>

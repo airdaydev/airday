@@ -1,5 +1,7 @@
 import { Accessor, createSignal, Setter, Signal } from "solid-js";
 import { BordeIDB } from "./main";
+import { DndContext, ListStateContext, TreeState } from "@borde/list";
+import { containerLoader } from "./container-loader";
 
 export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 
@@ -16,14 +18,12 @@ export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 export class ContainerModel {
   storeName = "container";
   acmedb: BordeIDB | null = null;
-  ol: Accessor<Accessor<BordeContainer>[]>;
-  setOl: Setter<Accessor<BordeContainer>[]>;
   index = new Map<string, Signal<BordeContainer>>();
-  map: Map<string, BordeContainer> = new Map();
+  listStateContext = new ListStateContext();
+  dndContext = new DndContext();
+  tree: TreeState;
   constructor() {
-    const signal = createSignal<Accessor<BordeContainer>[]>([]);
-    this.ol = signal[0];
-    this.setOl = signal[1];
+    this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
   init = async (db: BordeIDB) => {
     this.acmedb = db;
@@ -31,7 +31,6 @@ export class ContainerModel {
   };
   clearCache = async () => {
     this.index.clear();
-    this.setOl([]);
   };
   load = async () => {
     const items = await this.db.getAll(this.storeName);
@@ -61,20 +60,17 @@ export class ContainerModel {
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
     // Create signals
-    const newItems = src.map((item, index) => {
+    src.map((item, index) => {
       // TODO: Centralise queue
       if (persist) {
         dbPromises.push(store.add(item));
       }
-      const signal = createSignal(item);
-      this.index.set(item.id, signal);
-      return signal[0];
     });
     // TODO: Centralise queue
     Promise.all(dbPromises).catch((err) => console.log(err));
-    const newOl = [...this.ol(), ...newItems];
+    const newOl = { children: src };
     // Calc sortKeys
-    this.setOl(newOl);
+    this.tree.load(newOl);
   };
   updateName = (id: string, name: string) => {
     const item = this.index.get(id);

@@ -1,5 +1,5 @@
 import { Node, GenericNode } from "@borde/list";
-import { GenericComponent } from "../item/item";
+import { NavListItem } from "../nav/nav-lists";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
@@ -17,7 +17,7 @@ export class GenericList extends Node {
   type = "generic";
   tsCreated?: Date;
   sticker?: string;
-  component = GenericComponent;
+  component = NavListItem;
   static validate = compile(GenericListSchema, { simple: true });
   constructor(props: GenericListSchema) {
     super(props);
