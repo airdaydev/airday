@@ -18,7 +18,7 @@
     height: 32px;
     width: 100%;
     background: none;
-    border: 0;
+    border: 1px solid transparent;
     border-radius: 3px;
     padding: 0.25em 0.5em;
     cursor: pointer;
@@ -26,8 +26,12 @@
     line-height: 1em;
 }
 
-.nav-text button.active {
+.nav-text button[aria-selected="true"] {
     background: var(--shade);
+}
+
+.nav-text button.active {
+    border: 1px solid var(--blue-tint);
 }
 
 .nav-text button span {

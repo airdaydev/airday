@@ -34,6 +34,7 @@ export const NavListItem: NodeComponentType = (props) => {
         }}
         data-index={props.index}
         ref={props.ref}
+        aria-selected={props.ariaSelected}
       >
         <ListIcon container={node()} />
         <span style="overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;">
