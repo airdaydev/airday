@@ -128,3 +128,4 @@
 - [] Auto plan suggestions
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
 - [] Natural looking cross outs? Consider tick seed, underline length
+- [] Custom fields
