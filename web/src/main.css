@@ -85,3 +85,12 @@ button {
 .list-backdrop .placeholder {
     background: var(--mid-shade);
 }
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

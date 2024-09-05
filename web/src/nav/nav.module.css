@@ -15,9 +15,9 @@
     align-items: center;
     font-size: 1rem;
     font-weight: 400;
-    height: 32px;
+    height: 36px;
     width: 100%;
-    background: none;
+    background: var(--shade-bg);
     border: 1px solid transparent;
     border-radius: 3px;
     padding: 0.25em 0.5em;
@@ -39,7 +39,21 @@
 }
 
 .nav-text button:hover {
-    background: var(--shade);
+    background: var(--blue-tint-light);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.placeholder {
+    background: var(--mid-shade);
+    animation: fadeIn 0.15s linear forwards;
 }
 
 .add-list-button {
