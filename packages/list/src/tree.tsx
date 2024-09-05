@@ -103,7 +103,6 @@ export const Tree = (props: TreeComponentProps) => {
           width: "100%",
           height: "100%",
           "z-index": 2,
-          color: "black",
           "overflow-y":
             listDragContext.dndContext.dragMode[0]() === "touch"
               ? "hidden"
