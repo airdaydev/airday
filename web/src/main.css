@@ -34,17 +34,6 @@
     --body: rgb(227, 210, 210);
 }
 
-@font-face {
-    font-family: "diatype-trial";
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
-    unicode-range: U+000-5FF;
-    src:
-        url("src/assets/diatype-regular.woff2") format("woff2"),
-        url("src/assets/diatype-regular.woff2") format("woff");
-}
-
 html,
 body {
     height: 100%;
