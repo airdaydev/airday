@@ -2,6 +2,7 @@ import { ContextMenu } from "../context-menu/context-menu";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import Smiley from "../stickers/baseline/smiley.svg?component-solid";
+import { viewState } from "../view-state";
 
 interface ItemContextMenuProps {
   close: () => void;
@@ -17,7 +18,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Add to up next</span>
       </button>
-      <button disabled>
+      <button onClick={() => viewState.focusItem(props.item)}>
         <span>Focus</span>
       </button>
       <hr />
