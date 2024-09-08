@@ -29,7 +29,7 @@ export function BordeNav() {
         class={`${styles["nav-list"]} ${styles["nav-text"]}`}
         style="padding-top: 0.5em;"
       >
-        <button>
+        <button class={styles["nav-text-button"]}>
           <NextSVG
             style="position: relative;
             width: 1.25em;
@@ -38,13 +38,21 @@ export function BordeNav() {
             height: 1.5em;
             color: var(--body-tint);"
           />
-          <span>Next</span>
+          <span>Priority</span>
         </button>
-        <button>
+        <button class={styles["nav-text-button"]}>
+          <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+          <span>Calendar</span>
+        </button>
+        <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+        <button class={styles["nav-text-button"]}>
           <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
         </button>
-        <button onClick={viewState.openDoneView}>
+        <button
+          onClick={viewState.openDoneView}
+          class={styles["nav-text-button"]}
+        >
           <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
           <span>Done</span>
         </button>

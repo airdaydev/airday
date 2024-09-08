@@ -9,7 +9,7 @@
     background: var(--shade-bg);
 }
 
-.nav-text button {
+.nav-text-button {
     position: relative;
     display: flex;
     align-items: center;
@@ -26,20 +26,20 @@
     line-height: 1em;
 }
 
-.nav-text button[aria-selected="true"] {
+.nav-text-button[aria-selected="true"] {
     background: var(--shade);
 }
 
-.nav-text button.active {
+.nav-text-button.active {
     border: 1px solid var(--blue-tint);
 }
 
-.nav-text button span {
+.nav-text-button span {
     margin-left: 0.5em;
 }
 
-.nav-text button:hover {
-    background: var(--blue-tint-light);
+.nav-text-button:hover {
+    background: var(--mid-shade);
 }
 
 @keyframes fadeIn {

@@ -19,6 +19,7 @@ export const NavListItem: NodeComponentType = (props) => {
       <button
         classList={{
           [styles.active]: viewState.isContainerActive(node().id),
+          [styles["nav-text-button"]]: true,
         }}
         onClick={() => viewState.openContainerView(node().id)}
         onContextMenu={(event: MouseEvent) => {
