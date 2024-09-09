@@ -7,6 +7,7 @@ interface ContextMenuProps {
   children: any;
   anchorRef?: HTMLElement;
   offset?: [number, number];
+  anchor?: "bottom"; // default === 'top'
 }
 
 export function ContextMenu(props: ContextMenuProps) {
@@ -44,7 +45,9 @@ export function ContextMenu(props: ContextMenuProps) {
       } else {
         styleString += `left: ${props.offset[0]}px;`;
       }
-      if (
+      if (props.anchor === "bottom") {
+        styleString += `bottom: ${props.offset[1]}px;`;
+      } else if (
         props.offset[1] + containerRef?.getBoundingClientRect().height >
         document.body.scrollHeight
       ) {

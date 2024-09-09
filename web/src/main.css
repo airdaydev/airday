@@ -12,7 +12,8 @@
     --blue-tint: #d0deff;
     --blue-tint-light: #eef3ff;
     --body: black;
-    --body-font: -apple-system, BlinkMacSystemFont, "Test Söhne", sans-serif;
+    --body-font: "alte haas grotesk", -apple-system, BlinkMacSystemFont,
+        "Test Söhne", sans-serif;
 }
 
 #root {

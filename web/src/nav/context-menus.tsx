@@ -10,7 +10,7 @@ interface BordeContextMenuProps {
 
 export function BordeContextMenu(props: BordeContextMenuProps) {
   return (
-    <ContextMenu close={props.close} offset={props.offset}>
+    <ContextMenu close={props.close} offset={props.offset} anchor="bottom">
       <button
         onClick={() => {
           viewState.sidebarVisible[1]((prev) => !prev);
@@ -38,7 +38,7 @@ interface WorkspaceContextMenuProps {
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
   const session = useContext(sessionContext);
   return (
-    <ContextMenu close={props.close} offset={props.offset}>
+    <ContextMenu close={props.close} offset={props.offset} anchor="bottom">
       <div>
         {Array.from(session.map.values()).map((workspace) => (
           <button disabled>

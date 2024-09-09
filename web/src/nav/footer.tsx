@@ -18,7 +18,7 @@ export const Footer = () => {
     event.preventDefault();
     if (event.target) {
       const bounds = event.target.getBoundingClientRect();
-      setCtxOffset([bounds.left, bounds.bottom]);
+      setCtxOffset([bounds.left, document.body.clientHeight - bounds.top + 6]);
       setCtxOpen(menu);
     }
   }

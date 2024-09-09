@@ -205,7 +205,7 @@ export class AcmeWorkspaceStore {
         const ctx = new ListDragContext({
           treeState: state,
           dndContext: this.dndContext,
-          itemHeight: 36,
+          itemHeight: 28,
           placeholderStyle: styles["placeholder"],
         });
         const list = this.itemModel
