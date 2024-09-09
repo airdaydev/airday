@@ -304,6 +304,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             ariaSelected={isSelected()}
             select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}
+            ctx={props.listDragContext}
           />
         </div>
       )}
@@ -318,6 +319,7 @@ export type NodeComponentType = Component<{
   onMouseDown: (event: MouseEvent) => void;
   onTouchStart: (event: TouchEvent) => void;
   select: () => void;
+  ctx: ListDragContext;
 }>;
 
 export const DefaultNodeComponent: NodeComponentType = (props) => {

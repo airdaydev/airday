@@ -42,7 +42,7 @@ export function List(props: ListProps) {
       <SolidListContext.Provider value={ctx}>
         <div
           style={`display: flex; flex-direction: column; min-height: 0; max-height: 100%; flex-grow: 1;`}
-          classList={{ [styles["focus"]]: ctx.isFocused() }}
+          // classList={{ [styles["focus"]]: ctx.isFocused() }}
         >
           <Tree />
         </div>

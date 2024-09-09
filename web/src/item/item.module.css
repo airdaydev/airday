@@ -18,20 +18,20 @@
 
 .tree-item[aria-selected="true"] {
     /* TODO: This should be blue-tint-light */
-    background: var(--blue-tint);
+    background: var(--blue-tint-light);
     border-bottom: 1px solid rgba(0, 0, 0, 0);
 }
 
-.focus .tree-item[aria-selected="true"] {
+.focus.tree-item[aria-selected="true"] {
     background: var(--blue-tint);
 }
 
-[data-theme="dark"] .focus .tree-item[aria-selected="true"] {
-    background: var(--light-shade);
+[data-theme="dark"] .focus.tree-item[aria-selected="true"] {
+    background: var(--ultra-light-shade);
 }
 
 [data-theme="dark"] .tree-item[aria-selected="true"] {
-    background: var(--ultra-light-shade);
+    background: var(--light-shade);
 }
 
 @keyframes fadeIn {
@@ -43,6 +43,7 @@
     }
 }
 
+/* Rounding contiguous selection ranges: top corners */
 :global(.item)[aria-selected="false"]
     + :global(.item)[aria-selected="true"]
     .tree-item {
@@ -51,6 +52,21 @@
     overflow: hidden;
 }
 
+/* Rounding contiguous selection ranges: top corners */
+:global(.item)[aria-selected="false"]
+    + :global(.item)[aria-selected="true"]
+    .tree-item {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    overflow: hidden;
+}
+
+:global(.item)[aria-selected="true"]:first-child .tree-item {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+}
+
+/* Rounding contiguous selection ranges: bottom corners */
 :global(.item)[aria-selected="true"]:has(
         + :global(.item)[aria-selected="false"]
     ) {
@@ -59,6 +75,12 @@
     overflow: hidden;
 }
 
+:global(.item)[aria-selected="true"]:last-child .tree-item {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+/* Selected items: removing border */
 :global(.item)[aria-selected="false"]:has(
         + :global(.item)[aria-selected="true"]
     )

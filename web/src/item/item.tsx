@@ -22,7 +22,10 @@ export const GenericComponent: NodeComponentType = (props) => {
     <>
       <div
         aria-selected={props.ariaSelected}
-        class={styles["tree-item"]}
+        classList={{
+          [styles["tree-item"]]: true,
+          [styles["focus"]]: props.ctx.isFocused(),
+        }}
         onMouseDown={(event) => {
           props.onMouseDown(event);
         }}
