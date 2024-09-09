@@ -324,7 +324,6 @@ export const DefaultNodeComponent: NodeComponentType = (props) => {
   return (
     <div
       aria-selected={props.ariaSelected}
-      class={styles["tree-item"]}
       onMouseDown={props.onMouseDown}
       onTouchStart={props.onTouchStart}
     >

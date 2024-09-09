@@ -39,10 +39,11 @@ export class GenericItem extends Node {
 }
 
 export function loader(data: any) {
-  if (data.type === "generic") {
-    const validated = GenericItem.validate(data);
-    console.log(validated);
-    return data;
-  }
+  // if (data.type === "generic") {
+  const validated = GenericItem.validate(data);
+  if (!validated) return false;
   return new GenericItem(data);
+  // }
+  console.warn("invalid data in container loader");
+  return false;
 }

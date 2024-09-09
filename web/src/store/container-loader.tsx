@@ -39,6 +39,7 @@ export class GenericList extends Node {
 export function containerLoader(data: any) {
   if (data.type === "generic-list") {
     const validated = GenericList.validate(data);
+    if (!validated) return false;
     return new GenericList(data);
   }
   console.warn("invalid data in container loader");

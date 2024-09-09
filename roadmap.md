@@ -3,7 +3,7 @@
 ## 2024 Q3
 - [x] Bring back item view
 - [x] New drag/drop list for list view
-- [] Clean up list dnd CSS
+- [x] Clean up list dnd CSS
 - [] Clean up list dnd backdrop
 - [] Reinstate Done board
 - [] Next board
@@ -31,6 +31,7 @@
 - [] Add search
 - [] Persist views (per device)
 - [] Load 200 items at a time
+- [] Handle loader validation failure, types
 
 ## UI
 - [x] Context menus should not go past edge of screen (flipped)
