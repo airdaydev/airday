@@ -58,7 +58,6 @@
     .tree-item {
     border-top-left-radius: 3px;
     border-top-right-radius: 3px;
-    overflow: hidden;
 }
 
 :global(.item)[aria-selected="true"]:first-child .tree-item {
@@ -69,10 +68,10 @@
 /* Rounding contiguous selection ranges: bottom corners */
 :global(.item)[aria-selected="true"]:has(
         + :global(.item)[aria-selected="false"]
-    ) {
+    )
+    .tree-item {
     border-bottom-left-radius: 3px;
     border-bottom-right-radius: 3px;
-    overflow: hidden;
 }
 
 :global(.item)[aria-selected="true"]:last-child .tree-item {
@@ -89,6 +88,7 @@
 }
 
 .placeholder {
+    border-radius: 3px;
     background: var(--mid-shade);
     animation: fadeIn 0.15s linear forwards;
 }
