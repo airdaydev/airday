@@ -28,7 +28,7 @@ export function List(props: ListProps) {
     <section
       classList={{
         [styles.list]: true,
-        [styles.active]: viewState.activeViewId() === props.view.id,
+        [styles.focus]: viewState.activeViewId() === props.view.id,
       }}
       tabIndex={props.tabId}
       onFocus={() => {

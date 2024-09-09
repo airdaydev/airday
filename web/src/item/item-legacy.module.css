@@ -1,0 +1,53 @@
+.text-area {
+    position: absolute;
+    resize: none;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    outline-style: none;
+    margin: 0;
+    padding: 0.5em 0.5em 0.5em 2.5em;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: none;
+    border: none;
+    font-size: 1em;
+    font-family: inherit;
+    color: var(--body);
+    max-width: 48em;
+}
+
+.edit-container {
+    display: flex;
+    font-family: var(--body-font);
+    position: relative;
+    box-sizing: border-box;
+    padding: 0.5em;
+    border-radius: 3px;
+    background: var(--ultra-light-shade);
+}
+
+/* Mimics text-area but expands the physical space */
+.dummy-ref {
+    visibility: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 48em;
+    &::after {
+        content: "\A";
+    }
+}
+
+.meta-line {
+    display: flex;
+    align-items: center;
+    color: grey;
+    font-size: 0.9em;
+    padding: 0.5em 0;
+}
+
+.meta-line svg {
+    margin: 0 0.25em;
+}
