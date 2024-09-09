@@ -79,14 +79,12 @@
 /* List Header */
 
 .list-header {
-}
-
-.list-header-internal {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.125em 0;
     border-bottom: 1px solid var(--border);
+    height: 28px;
+    flex-shrink: 0;
 }
 
 /* [data-theme="dark"] .list-header-internal {
@@ -129,8 +127,8 @@
 }
 
 .list-button svg {
-    width: 1.25em;
-    stroke-width: 1.25px;
+    width: 1em;
+    stroke-width: 1.5px;
 }
 
 .blank-list {
