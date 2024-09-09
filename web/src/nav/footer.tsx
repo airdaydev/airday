@@ -39,7 +39,6 @@ export const Footer = () => {
       <div class={styles["nav-section"]}>
         <button
           class={styles["nav-button"]}
-          style={"font-weight: 400; font-family: 'alte haas grotesk';"}
           onClick={(event) => openContextMenu(event, "main")}
           onMouseOver={(event) => {
             if (ctxOpen()) openContextMenu(event, "main");

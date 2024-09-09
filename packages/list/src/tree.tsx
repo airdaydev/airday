@@ -151,35 +151,40 @@ export const Tree = (props: TreeComponentProps) => {
             )}
           </For>
         </div>
-        {props.hideBackdrop || (
-          <div
-            class="list-backdrop"
-            style={{ "min-height": `${listDragContext.itemHeight * 2}px` }}
-            onMouseDown={() => listDragContext.clearSelection()}
-            onMouseEnter={() => {
-              if (listDragContext.dndContext.isDragging()) {
+        <div
+          class="list-backdrop"
+          style={{
+            "min-height": `${listDragContext.itemHeight * 2}px`,
+            ...(props.hideBackdrop && {
+              bottom: 0,
+              position: "absolute",
+              "min-height": `${listDragContext.itemHeight}px`,
+            }),
+          }}
+          onMouseDown={() => listDragContext.clearSelection()}
+          onMouseEnter={() => {
+            if (listDragContext.dndContext.isDragging()) {
+              listDragContext.setDragOver();
+              if (listDragContext.isOrigin) {
+                // TODO: This COULD fuck up in the case of a window... but maybe not because the window
+                // should overextend. Yes, this needs to be the
+                listDragContext.setLastTouchedIndex(
+                  signal().window.length + signal().start,
+                );
                 listDragContext.setDragOver();
-                if (listDragContext.isOrigin) {
-                  // TODO: This COULD fuck up in the case of a window... but maybe not because the window
-                  // should overextend. Yes, this needs to be the
-                  listDragContext.setLastTouchedIndex(
-                    signal().window.length + signal().start,
-                  );
-                  listDragContext.setDragOver();
-                } else {
-                  listDragContext.setDragOver();
-                  listDragContext.setLastTouchedIndex(
-                    signal().window.length + signal().start,
-                  );
-                }
+              } else {
+                listDragContext.setDragOver();
+                listDragContext.setLastTouchedIndex(
+                  signal().window.length + signal().start,
+                );
               }
-            }}
-          >
-            {showBackdropPlaceholder() && (
-              <Placeholder listDragContext={listDragContext} backdrop={true} />
-            )}
-          </div>
-        )}
+            }
+          }}
+        >
+          {showBackdropPlaceholder() && (
+            <Placeholder listDragContext={listDragContext} backdrop={true} />
+          )}
+        </div>
       </div>
     </>
   );

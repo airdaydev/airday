@@ -4,7 +4,7 @@
 - [x] Bring back item view
 - [x] New drag/drop list for list view
 - [x] Clean up list dnd CSS
-- [] Clean up list dnd backdrop
+- [x] Clean up list dnd backdrop
 - [] Reinstate Done board
 - [] Next board
 - [] Drag items into list nav
@@ -13,6 +13,7 @@
 - [] Sequences (one offs, projects)
 - [] Performance board
 - [] Begin back-end
+- [] Themes incl. Departure Mono
 - [] Shared lists
 - [] Weekly view
 - [] Monthly view
