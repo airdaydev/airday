@@ -159,7 +159,7 @@ export class TreeState {
   id: string;
   isRoot = true;
   childrenSignal = createSignal<Node[]>([]);
-  idMap = new Map<string, Node>(); // Not currently used
+  idMap = new Map<string, Node>();
   mutate = false;
   maxDepth = 10;
   expanded = true;
@@ -181,6 +181,7 @@ export class TreeState {
   delete(set: Set<Node>) {
     const result = this.remove(set);
     this.onDelete?.(set);
+    set.forEach((node) => this.idMap.delete(node.id));
     this.childrenSignal[1](() => result.filtered);
   }
   remove(set: Set<Node>) {
@@ -201,6 +202,7 @@ export class TreeState {
       tree,
       (rawNode, parent) => {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
+        if (!node) return new Node({ type: "invalid" });
         node.root = this;
         node.parent = parent;
         // TODO: calc depth or level for display purposes

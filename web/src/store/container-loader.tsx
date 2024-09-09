@@ -14,7 +14,7 @@ type GenericListSchema = TypeOf<typeof GenericListSchema> & GenericNode<any>;
 export class GenericList extends Node {
   id: string;
   name: string;
-  type = "generic";
+  type = "generic-list";
   tsCreated?: Date;
   sticker?: string;
   component = NavListItem;
@@ -37,10 +37,10 @@ export class GenericList extends Node {
 }
 
 export function containerLoader(data: any) {
-  if (data.type === "generic") {
+  if (data.type === "generic-list") {
     const validated = GenericList.validate(data);
-    console.log(validated);
-    return data;
+    return new GenericList(data);
   }
-  return new GenericList(data);
+  console.warn("invalid data in container loader");
+  return false;
 }

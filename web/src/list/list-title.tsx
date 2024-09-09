@@ -41,7 +41,7 @@ export const EditableListTitle = (props: EditableListTitleProps) => {
       autocorrect="off"
       autocapitalize="off"
       spellcheck={false}
-      value={props.container[0]().name}
+      value={props.container.name}
       onChange={(event) =>
         props.container[1]((prev) => {
           return {

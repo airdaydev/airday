@@ -18,7 +18,6 @@ export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
 export class ContainerModel {
   storeName = "container";
   acmedb: BordeIDB | null = null;
-  index = new Map<string, Signal<BordeContainer>>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext();
   tree: TreeState;
@@ -27,10 +26,6 @@ export class ContainerModel {
   }
   init = async (db: BordeIDB) => {
     this.acmedb = db;
-    this.clearCache();
-  };
-  clearCache = async () => {
-    this.index.clear();
   };
   load = async () => {
     const items = await this.db.getAll(this.storeName);
@@ -71,15 +66,6 @@ export class ContainerModel {
     const newOl = { children: src };
     // Calc sortKeys
     this.tree.load(newOl);
-  };
-  updateName = (id: string, name: string) => {
-    const item = this.index.get(id);
-    if (item) {
-      item[1]((prev) => {
-        prev.name = name;
-        return prev;
-      });
-    }
   };
   idb_insert = async (data: BordeContainer | BordeContainer[]) => {
     const tx = this.db.transaction(this.storeName, "readwrite");

@@ -21,7 +21,7 @@ export function List(props: ListProps) {
       },
     ),
   );
-  const container = session.workspace.containerModel.index.get(
+  const container = session.workspace.containerModel.tree.idMap.get(
     props.view.containerId,
   );
   return (
