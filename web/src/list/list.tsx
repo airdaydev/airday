@@ -41,7 +41,7 @@ export function List(props: ListProps) {
       {container && <ListHeader tabId={props.tabId} container={container} />}
       <SolidListContext.Provider value={ctx}>
         <div
-          style={`display: flex; flex-direction: column; height: 100%;`}
+          style={`display: flex; flex-direction: column; min-height: 0; max-height: 100%;`}
           classList={{ [styles["focus"]]: ctx.isFocused() }}
         >
           <Tree />
