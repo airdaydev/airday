@@ -19,7 +19,7 @@ export const ListHeader = (props: ListHeaderProps) => {
           style={`display: flex; align-items: center; padding: 0.25em 0.25em;`}
         >
           <span style="padding-right: 0.5em;">
-            {/*<ListIcon container={props.container[0]()} />*/}
+            <ListIcon container={props.container} />
           </span>
           <EditableListTitle container={props.container} />
         </div>

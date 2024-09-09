@@ -63,6 +63,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     >
       <div
         ref={stackRef}
+        class="dragged"
         style={`
           position: relative;
           z-index: 100;
