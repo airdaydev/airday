@@ -18,7 +18,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         <span style="padding-right: 0.5em;">
           <ListIcon container={props.container} />
         </span>
-        <EditableListTitle container={props.container} />
+        <span class={styles["title-text"]}>{props.container.name}</span>
       </div>
       {list().length > 1 && (
         <div>

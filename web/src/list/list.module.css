@@ -9,7 +9,7 @@
     min-width: 0;
     height: 100%;
     border-right: 1px solid var(--border);
-    padding: 0 0.25em;
+    padding: 0.25em 0.5em;
 }
 
 .list-icon {
@@ -45,11 +45,11 @@
   background: var(--shade);
 } */
 
-.list-header input {
-    color: #81777f;
+.list-header .title-text {
+    color: var(--body-tint);
 }
 
-.focus .list-header input {
+.focus .list-header .title-text {
     color: var(--body);
 }
 .list-header img {
@@ -83,6 +83,7 @@
 .list-button svg {
     width: 1em;
     stroke-width: 1.5px;
+    color: var(--body-tint);
 }
 
 .blank-list {

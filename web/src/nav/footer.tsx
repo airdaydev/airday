@@ -12,6 +12,11 @@ type ContextMenu = "main" | "workspace";
 export const Footer = () => {
   // ContextMenu
   const session = useContext(sessionContext);
+  const stats = () => {
+    const focused = session.workspace.dndContext.focusContext[0]();
+    if (!focused) return ``;
+    return `${focused.treeState.count()} items (${focused.selection[0]().size} selected)`;
+  };
   const [ctxOpen, setCtxOpen] = createSignal<ContextMenu | boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   function openContextMenu(event: MouseEvent, menu: ContextMenu) {
@@ -57,7 +62,7 @@ export const Footer = () => {
         </button>
       </div>
       <div class={styles["nav-section"]}>
-        <span>0 items (0 selected)</span>
+        <span>{stats()}</span>
         <ThemeToggle class={styles["nav-button"]} />
         <button class={styles["nav-button"]}>
           <SearchSVG />

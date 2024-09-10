@@ -13,14 +13,6 @@ interface ListProps {
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
   const ctx = session.workspace.openList(props.view);
-  createEffect(
-    on(
-      () => [ctx.dndContext.focusedContext()],
-      (a) => {
-        viewState.setActiveViewId(props.view.id);
-      },
-    ),
-  );
   const container = session.workspace.containerModel.tree.idMap.get(
     props.view.containerId,
   );
