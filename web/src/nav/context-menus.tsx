@@ -1,7 +1,7 @@
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 
 interface BordeContextMenuProps {
   close: () => void;

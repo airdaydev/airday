@@ -1,8 +1,8 @@
 import { For, useContext, Switch, Match } from "solid-js";
 import { BordeNav } from "./nav/nav";
 import styles from "./app.module.css";
-import { viewState } from "./view-state";
-import { View } from "./view";
+import { viewState } from "./view/state";
+import { View } from "./view/view";
 import { Footer } from "./nav/footer";
 import { Dragged } from "@borde/list";
 import { sessionContext } from "./store/context.js";

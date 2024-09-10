@@ -1,6 +1,6 @@
 import { For, createSignal, Accessor, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 import { sessionContext } from "../store/context.js";
 import { AddListButton } from "./add-list";
 import { NavItemContextMenu } from "./context-menus";

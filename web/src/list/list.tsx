@@ -1,6 +1,6 @@
 import { createEffect, useContext, on } from "solid-js";
 import styles from "./list.module.css";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 import { Tree, SolidListContext } from "@borde/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";

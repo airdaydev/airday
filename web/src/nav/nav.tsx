@@ -1,7 +1,7 @@
 import { Accessor } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 import NextSVG from "../icons/next.svg?component-solid";
 import PerformanceSVG from "../icons/activity.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";

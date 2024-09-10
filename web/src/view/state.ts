@@ -4,6 +4,7 @@ import {
   Signal,
   Accessor,
   Setter,
+  createContext,
 } from "solid-js";
 import { GenericItem } from "./store/loader";
 
@@ -110,3 +111,4 @@ class ViewState {
 }
 
 export const viewState = new ViewState();
+export const viewContext = createContext<ViewState>(viewState);

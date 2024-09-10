@@ -1,6 +1,6 @@
 import styles from "./focus.module.css";
 import { GenericItem } from "../store/loader";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 
 interface FocusProps {
   item: GenericItem;

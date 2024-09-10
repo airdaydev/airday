@@ -2,7 +2,7 @@ import { ContextMenu } from "../context-menu/context-menu";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import Smiley from "../stickers/baseline/smiley.svg?component-solid";
-import { viewState } from "../view-state";
+import { viewState } from "../view/state";
 
 interface ItemContextMenuProps {
   close: () => void;
