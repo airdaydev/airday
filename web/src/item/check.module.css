@@ -23,11 +23,11 @@
     width: 0.75em;
     height: 0.75em;
     margin-right: 0.5em;
-    border: 1px solid var(--light-shade);
+    border: 1px solid var(--firefly);
 }
 
 [data-theme="light"] .check span {
-    border: 1px solid #ddd;
+    border: 1px solid var(--sunshade);
 }
 
 .check:hover input ~ span {
