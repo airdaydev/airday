@@ -58,7 +58,7 @@ export const Footer = () => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
         >
-          Circa
+          SunList
         </button>
         <button
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
@@ -90,7 +90,7 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style="background: #5937ff; color: white; line-height: 1.25rem;"
         >
-          Sync AUD$3 monthly
+          Sync AUD$4 monthly
         </button>
       </div>
     </footer>
