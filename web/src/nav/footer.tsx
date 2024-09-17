@@ -60,7 +60,7 @@ export const Footer = () => {
           }}
         >
           <SidebarSVG />
-          <span style={"margin-left: 0.25em;"}>SunList</span>
+          <span style={"margin-left: 0.25em; display: none;"}>SunList</span>
         </button>
         <button
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
