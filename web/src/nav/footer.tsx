@@ -82,6 +82,10 @@ export const Footer = () => {
             Focus
           </button>
         )}
+        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+          <span class={styles["key"]}>N</span>
+          New
+        </button>
         <ThemeToggle class={styles["nav-button"]} />
         <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
           <CloudOffSVG />
