@@ -1,7 +1,7 @@
 import { sessionContext } from "../store/context.js";
 import { createSignal, useContext } from "solid-js";
-import CloudOffSVG from "../icons/cloud-off.svg?component-solid";
-import SearchSVG from "../icons/search.svg?component-solid";
+import CloudOffSVG from "../icons/pixel-cloud-off.svg?component-solid";
+import SearchSVG from "../icons/pixel-search.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
 import { BordeContextMenu, WorkspaceContextMenu } from "./context-menus";
@@ -15,7 +15,10 @@ export const Footer = () => {
   const stats = () => {
     const focused = session.workspace.dndContext.focusContext[0]();
     if (!focused) return ``;
-    return `${focused.treeState.count()} items (${focused.selection[0]().size} selected)`;
+    const selectionSize = focused.selection[0]().size;
+    const count = focused.treeState.count();
+    if (selectionSize) return `${selectionSize}/${count}`;
+    return `${count}`;
   };
   const [ctxOpen, setCtxOpen] = createSignal<ContextMenu | boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
@@ -62,13 +65,19 @@ export const Footer = () => {
         </button>
       </div>
       <div class={styles["nav-section"]}>
-        <span>{stats()}</span>
+        <span class={styles["count"]}>{stats()}</span>
         <ThemeToggle class={styles["nav-button"]} />
-        <button class={styles["nav-button"]}>
+        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
           <SearchSVG />
         </button>
-        <button class={styles["nav-button"]}>
+        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
           <CloudOffSVG />
+        </button>
+        <button
+          class={styles["nav-button"]}
+          style="background: #5937ff; color: white; line-height: 1.25rem;"
+        >
+          Sync AUD$3 monthly
         </button>
       </div>
     </footer>
