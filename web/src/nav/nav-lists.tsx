@@ -58,7 +58,7 @@ export const NavLists = () => {
   const listDragContext = new ListDragContext({
     treeState: session.workspace.containerModel.tree,
     dndContext: session.workspace.containerModel.dndContext,
-    itemHeight: 28,
+    itemHeight: 32,
     placeholderStyle: styles["placeholder"],
   });
   return (
