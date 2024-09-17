@@ -15,7 +15,7 @@ export function BordeNav() {
   const getMargin = () =>
     sidebarVisible()
       ? "0"
-      : `-${ref ? ref.getBoundingClientRect().width : 0}px`;
+      : `-${ref ? ref.getBoundingClientRect().width - 10 : 0}px`;
   return (
     <nav
       class={styles.nav}

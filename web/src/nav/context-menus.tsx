@@ -24,6 +24,9 @@ export function BordeContextMenu(props: BordeContextMenuProps) {
       </button>
       <hr />
       <button disabled>
+        <span>Download apps</span>
+      </button>
+      <button disabled>
         <span>About SunList</span>
       </button>
     </ContextMenu>

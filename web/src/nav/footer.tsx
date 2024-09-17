@@ -2,6 +2,7 @@ import { sessionContext } from "../store/context.js";
 import { createSignal, useContext } from "solid-js";
 import CloudOffSVG from "../icons/cloud-off.svg?component-solid";
 import SearchSVG from "../icons/pixel-search.svg?component-solid";
+import SidebarSVG from "../icons/rainbow.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
 import { BordeContextMenu, WorkspaceContextMenu } from "./context-menus";
@@ -58,7 +59,8 @@ export const Footer = () => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
         >
-          SunList
+          <SidebarSVG />
+          <span style={"margin-left: 0.25em;"}>SunList</span>
         </button>
         <button
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
