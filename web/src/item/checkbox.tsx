@@ -1,4 +1,4 @@
-import checkStyles from './check.module.css';
+import checkStyles from "./check.module.css";
 
 interface CheckboxProps {
   checked: boolean;
@@ -7,18 +7,18 @@ interface CheckboxProps {
 
 export function Checkbox(props: CheckboxProps) {
   return (
-    <label class={checkStyles['check']}>
+    <label class={checkStyles["check"]}>
       <input
-          type="checkbox"
-          checked={!!props.checked}
-          onClick={(event) => {
-              
-          }}
-          onChange={props.onChange}
-          onDblClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-          }}
+        type="checkbox"
+        checked={!!props.checked}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+        onChange={props.onChange}
+        onDblClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
       ></input>
       <span></span>
     </label>

@@ -42,7 +42,9 @@ export const GenericComponent: NodeComponentType = (props) => {
         ref={props.ref}
       >
         <Checkbox
-          onChange={(event: InputEvent) => {}}
+          onChange={(event: InputEvent) => {
+            event.stopPropagation();
+          }}
           checked={!!node.tsCompleted}
         />
         <span>{node().content}</span>
