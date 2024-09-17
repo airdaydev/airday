@@ -85,6 +85,7 @@ export const Footer = () => {
           {session.workspace.name}
         </button>
         <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+          <span class={styles["key"]}>⌘</span>
           <span class={styles["key"]}>/</span>
           Cmd
         </button>
