@@ -13,6 +13,8 @@ type ContextMenu = "main" | "workspace";
 export const Footer = () => {
   // ContextMenu
   const session = useContext(sessionContext);
+  let appButtonRef;
+  let workspaceButtonRef;
   const stats = () => {
     const focused = session.workspace.dndContext.focusContext[0]();
     if (!focused) return ``;
@@ -29,10 +31,17 @@ export const Footer = () => {
   };
   const [ctxOpen, setCtxOpen] = createSignal<ContextMenu | boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
-  function openContextMenu(event: MouseEvent, menu: ContextMenu) {
+  function openContextMenu(
+    event: MouseEvent,
+    menu: ContextMenu,
+    target?: HTMLElement,
+  ) {
     event.preventDefault();
+    if (!event.target && !target) return;
     if (event.target) {
-      const bounds = event.target.getBoundingClientRect();
+      const bounds = target
+        ? target.getBoundingClientRect()
+        : event.target.getBoundingClientRect();
       setCtxOffset([bounds.left, document.body.clientHeight - bounds.top + 6]);
       setCtxOpen(menu);
     }
@@ -53,8 +62,9 @@ export const Footer = () => {
       )}
       <div class={styles["nav-section"]}>
         <button
+          ref={appButtonRef}
           class={styles["nav-button"]}
-          onClick={(event) => openContextMenu(event, "main")}
+          onClick={(event) => openContextMenu(event, "main", appButtonRef)}
           onMouseOver={(event) => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
@@ -63,8 +73,11 @@ export const Footer = () => {
           <span style={"margin-left: 0.25em; display: none;"}>SunList</span>
         </button>
         <button
+          ref={workspaceButtonRef}
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
-          onClick={(event) => openContextMenu(event, "workspace")}
+          onClick={(event) =>
+            openContextMenu(event, "workspace", workspaceButtonRef)
+          }
           onMouseOver={(event) => {
             if (ctxOpen()) openContextMenu(event, "workspace");
           }}
