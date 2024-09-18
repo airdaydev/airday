@@ -38,7 +38,7 @@ export function BordeNav() {
             height: 1.5em;
             color: var(--body-tint);"
           />
-          <span>Priority</span>
+          <span>Up next</span>
         </button>
         <button class={styles["nav-text-button"]}>
           <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
