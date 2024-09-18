@@ -1,4 +1,4 @@
-import { useContext } from "solid-js";
+import { onCleanup, onMount, useContext } from "solid-js";
 import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
 import { viewState } from "../view/state";
@@ -6,11 +6,17 @@ import { viewState } from "../view/state";
 interface BordeContextMenuProps {
   close: () => void;
   offset: [number, number];
+  containerZIndex: number;
 }
 
 export function BordeContextMenu(props: BordeContextMenuProps) {
   return (
-    <ContextMenu close={props.close} offset={props.offset} anchor="bottom">
+    <ContextMenu
+      close={props.close}
+      offset={props.offset}
+      anchor="bottom"
+      containerZIndex={10}
+    >
       <button
         onClick={() => {
           viewState.sidebarVisible[1]((prev) => !prev);
@@ -41,7 +47,12 @@ interface WorkspaceContextMenuProps {
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
   const session = useContext(sessionContext);
   return (
-    <ContextMenu close={props.close} offset={props.offset} anchor="bottom">
+    <ContextMenu
+      close={props.close}
+      offset={props.offset}
+      anchor="bottom"
+      containerZIndex={10}
+    >
       <div>
         {Array.from(session.map.values()).map((workspace) => (
           <button disabled>

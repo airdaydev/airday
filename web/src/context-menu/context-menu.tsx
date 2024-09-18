@@ -8,6 +8,7 @@ interface ContextMenuProps {
   anchorRef?: HTMLElement;
   offset?: [number, number];
   anchor?: "bottom"; // default === 'top'
+  containerZIndex?: number;
 }
 
 export function ContextMenu(props: ContextMenuProps) {
@@ -35,6 +36,12 @@ export function ContextMenu(props: ContextMenuProps) {
     // TODO: Hide context menu div
   });
   onMount(() => {
+    // Default is to jump above all items, sometimes z-index needs to be specified precisely
+    const contextMenuContainer = document.getElementById("context-menu");
+    if (contextMenuContainer && props.containerZIndex) {
+      contextMenuContainer.style.zIndex = props.containerZIndex.toString();
+    }
+    // Position of context menu
     if (props.offset && containerRef) {
       let styleString = "";
       if (
@@ -61,6 +68,10 @@ export function ContextMenu(props: ContextMenuProps) {
     contextMenuDiv.style.visibility = "visible";
   });
   onCleanup(() => {
+    const contextMenuContainer = document.getElementById("context-menu");
+    if (contextMenuContainer && props.containerZIndex) {
+      contextMenuContainer.style.removeProperty("z-index");
+    }
     window.removeEventListener("resize", props.close);
     contextMenuDiv.style.visibility = "hidden";
   });
