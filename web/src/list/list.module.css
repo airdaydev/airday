@@ -41,6 +41,21 @@
     flex-shrink: 0;
 }
 
+.list-head-button {
+    cursor: pointer;
+    margin: 0;
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    padding: 0.25em;
+    border-radius: 2px;
+}
+
+.list-head-button:hover {
+    background: var(--shade);
+}
+
 /* [data-theme="dark"] .list-header-internal {
   background: var(--shade);
 } */

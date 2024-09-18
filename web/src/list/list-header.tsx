@@ -14,12 +14,12 @@ export const ListHeader = (props: ListHeaderProps) => {
   const [list] = viewState.list;
   return (
     <div class={styles["list-header"]}>
-      <div style={`display: flex; align-items: center; padding: 0.25em;`}>
+      <button class={styles["list-head-button"]}>
         <span style="padding-right: 0.5em;">
           <ListIcon container={props.container} />
         </span>
         <span class={styles["title-text"]}>{props.container.name}</span>
-      </div>
+      </button>
       {list().length > 1 && (
         <div>
           <button
