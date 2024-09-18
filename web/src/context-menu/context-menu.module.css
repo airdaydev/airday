@@ -4,7 +4,7 @@
     display: flex;
     flex-direction: column;
     background: var(--background);
-    border-radius: 3px;
+    border-radius: 6px;
     box-shadow: 7px 7px 14px #0000002e;
     padding: 0.25em;
     user-select: none;
@@ -18,13 +18,14 @@
     border: 1px solid var(--sunshade);
 }
 
-.context-menu button {
+.context-menu > button {
     border: none;
     background: none;
     cursor: pointer;
     text-align: left;
     font-size: 1em;
-    padding: 0.5em 0.75em;
+    padding: 0 0.75em;
+    height: 32px;
 }
 
 .context-menu button:hover {

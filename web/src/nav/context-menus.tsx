@@ -117,6 +117,9 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
         <span>Open in new view</span>
       </button>
       <button disabled>
+        <span>Rename</span>
+      </button>
+      <button disabled>
         <span>Export</span>
       </button>
       <button disabled>
