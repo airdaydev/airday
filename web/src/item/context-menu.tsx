@@ -3,6 +3,7 @@ import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import Smiley from "../stickers/baseline/smiley.svg?component-solid";
 import { viewState } from "../view/state";
+import styles from "./item.module.css";
 
 interface ItemContextMenuProps {
   close: () => void;
@@ -32,7 +33,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         <span>Copy as Markdown</span>
       </button>
       <hr />
-      <div>
+      <div class={styles["sticker-container"]}>
         <button onClick={() => props.updateSticker("smiley")}>
           <Smiley />
         </button>

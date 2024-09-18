@@ -55,10 +55,10 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
     >
       <div>
         {Array.from(session.map.values()).map((workspace) => (
-          <button disabled>
+          <div style={"padding: 0.25em 0.5em;"}>
             <div>{workspace.name}</div>
-            <div>{workspace.id}</div>
-          </button>
+            <div style={"color: var(--body-tint);"}>{workspace.id}</div>
+          </div>
         ))}
       </div>
       <hr />
