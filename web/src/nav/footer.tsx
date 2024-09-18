@@ -102,6 +102,10 @@ export const Footer = () => {
           <span class={styles["key"]}>N</span>
           New
         </button>
+        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+          <span class={styles["key"]}>/</span>
+          Find
+        </button>
         <ThemeToggle class={styles["nav-button"]} />
         <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
           <CloudOffSVG />
