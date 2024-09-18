@@ -9,7 +9,12 @@ import {
 import { GenericItem } from "./store/loader";
 
 /**
- * Views, left to right
+ * Views
+ * pane 0 = sidebar
+ * pane 1...9+ = lists
+ * default = 1 pane: inbox
+ * ⌘+/ = command modal
+ * / = find modal
  * State should be saved in local storage, per workspace
  */
 class ViewState {
