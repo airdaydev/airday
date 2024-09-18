@@ -16,7 +16,7 @@ export const Focus = (props: FocusProps) => {
         <div>03:00 of 15:00 left</div>
         <button
           onClick={() => {
-            viewState.mode[1]("normal");
+            viewState.scene[1]("normal");
           }}
         >
           Back

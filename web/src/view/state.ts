@@ -6,7 +6,7 @@ import {
   Setter,
   createContext,
 } from "solid-js";
-import { GenericItem } from "./store/loader";
+import { GenericItem } from "../store/loader";
 
 /**
  * Views
@@ -22,7 +22,7 @@ class ViewState {
   setActiveViewId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
   list = createSignal<Signal<BordeView>[]>([]); // views, left to right
-  mode = createSignal<"normal" | "focus">("normal");
+  scene = createSignal<"normal" | "focus">("normal");
   focus?: GenericItem;
   constructor() {
     const activeView = createSignal<string>();
@@ -34,7 +34,7 @@ class ViewState {
   }
   focusItem(item: GenericItem) {
     this.focus = item;
-    this.mode[1]("focus");
+    this.scene[1]("focus");
   }
   get active() {
     const index = this.list[0]().findIndex(

@@ -13,7 +13,7 @@ export function App() {
   const session = useContext(sessionContext);
   return (
     <Switch fallback={<p>Fallback</p>}>
-      <Match when={viewState.mode[0]() == "normal"}>
+      <Match when={viewState.scene[0]() == "normal"}>
         <div class={styles.app}>
           {session.workspace.dndContext.isDragging() && (
             <Dragged dndContext={session.workspace.dndContext} />
@@ -30,7 +30,7 @@ export function App() {
           <Footer />
         </div>
       </Match>
-      <Match when={viewState.mode[0]() === "focus"}>
+      <Match when={viewState.scene[0]() === "focus"}>
         <Focus item={viewState.focus} />
       </Match>
     </Switch>
