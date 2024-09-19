@@ -20,14 +20,14 @@ export function List(props: ListProps) {
     <section
       classList={{
         [styles.list]: true,
-        [styles.focus]: viewState.activeViewId() === props.view.id,
+        [styles.focus]: viewState.activePaneId() === props.view.id,
       }}
       tabIndex={props.tabId}
       onFocus={() => {
-        viewState.setActiveContainerId(props.view.id);
+        viewState.setActivePaneId(props.view.id);
       }}
       onClick={() => {
-        viewState.setActiveContainerId(props.view.id);
+        viewState.setActivePaneId(props.view.id);
       }}
     >
       {container && <ListHeader tabId={props.tabId} container={container} />}

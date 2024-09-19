@@ -8,7 +8,8 @@ import {
 } from "solid-js";
 import { GenericItem } from "../store/loader";
 
-type ActivePaneTypes = "sidebar" | "container";
+type ActiveRegionTypes = "sidebar" | "container";
+type ModalTypes = "command" | "find" | undefined;
 
 /**
  * Views
@@ -20,25 +21,22 @@ type ActivePaneTypes = "sidebar" | "container";
  * State should be saved in local storage, per workspace
  */
 class ViewState {
-  activePane: Accessor<ActivePaneTypes>;
+  activeModal: Accessor<ModalTypes>;
+  activeRegion: Accessor<ActiveRegionTypes>;
   activePaneId: Accessor<string | undefined>;
-  activeViewId: Accessor<string | undefined>;
-  setActiveContainerId: Setter<string | undefined>;
+  setActivePaneId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
   list = createSignal<Signal<BordeView>[]>([]); // views, left to right
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   constructor() {
-    const activePane = createSignal<ActivePaneTypes>("sidebar");
-    this.activePane = activePane[0];
-    const activeView = createSignal<string>();
+    const activeRegion = createSignal<ActiveRegionTypes>("sidebar");
+    this.activeRegion = activeRegion[0];
+    const activeModal = createSignal<ModalTypes>();
+    this.activeModal = activeModal[0];
     const activePaneId = createSignal<string>();
     this.activePaneId = activePaneId[0];
-    this.activeViewId = activeView[0];
-    this.setActiveContainerId = activeView[1];
-    if (!this.list[0]().length) {
-      // this.addContainerView('inbox');
-    }
+    this.setActivePaneId = activePaneId[1];
   }
   focusItem(item: GenericItem) {
     this.focus = item;
@@ -46,7 +44,7 @@ class ViewState {
   }
   get active() {
     const index = this.list[0]().findIndex(
-      (view) => view[0]().id === this.activeViewId(),
+      (view) => view[0]().id === this.activePaneId(),
     );
     return {
       signal: this.list[0]()[index],
@@ -55,7 +53,7 @@ class ViewState {
   }
   isContainerActive(containerId: string) {
     const activeContainer = this.list[0]().find(
-      (view) => view[0]().id === this.activeViewId(),
+      (view) => view[0]().id === this.activePaneId(),
     );
     if (!activeContainer) return false;
     return activeContainer[0]().containerId === containerId;
@@ -92,7 +90,7 @@ class ViewState {
       next[index] = newView;
       return next;
     });
-    this.setActiveContainerId(view.id);
+    this.setActivePaneId(view.id);
   }
   closeView(index: number) {
     // TODO: if active view, remove active view (does it matter?)
@@ -115,7 +113,7 @@ class ViewState {
       containerId,
       projection: "list",
     });
-    this.setActiveContainerId(id);
+    this.setActivePaneId(id);
     const [list, setList] = this.list;
     return setList((prev) => {
       return [...prev, view];
