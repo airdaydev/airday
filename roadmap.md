@@ -5,6 +5,7 @@
 - [x] New drag/drop list for list view
 - [x] Clean up list dnd CSS
 - [x] Clean up list dnd backdrop
+- [] Loading pane
 - [] Reinstate Done board
 - [] Next board
 - [] Drag items into list nav

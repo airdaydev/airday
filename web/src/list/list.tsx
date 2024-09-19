@@ -24,10 +24,10 @@ export function List(props: ListProps) {
       }}
       tabIndex={props.tabId}
       onFocus={() => {
-        viewState.setActiveViewId(props.view.id);
+        viewState.setActiveContainerId(props.view.id);
       }}
       onClick={() => {
-        viewState.setActiveViewId(props.view.id);
+        viewState.setActiveContainerId(props.view.id);
       }}
     >
       {container && <ListHeader tabId={props.tabId} container={container} />}

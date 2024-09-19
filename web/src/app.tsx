@@ -12,8 +12,8 @@ import { Focus } from "./focus/focus";
 export function App() {
   const session = useContext(sessionContext);
   return (
-    <Switch fallback={<p>Fallback</p>}>
-      <Match when={viewState.scene[0]() == "normal"}>
+    <Switch fallback={<p>Scene '{viewState.scene[0]()}' does not exist</p>}>
+      <Match when={viewState.scene[0]() == "default"}>
         <div class={styles.app}>
           {session.workspace.dndContext.isDragging() && (
             <Dragged dndContext={session.workspace.dndContext} />
@@ -23,7 +23,10 @@ export function App() {
           )}
           <div class={styles.main}>
             <BordeNav />
-            <For each={viewState.list[0]()} fallback={<div>fallback</div>}>
+            <For
+              each={viewState.list[0]()}
+              fallback={<div>Loading ({`<For />`})</div>}
+            >
               {(view, index) => <View view={view[0]()} tabId={index()} />}
             </For>
           </div>

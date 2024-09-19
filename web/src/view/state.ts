@@ -8,6 +8,8 @@ import {
 } from "solid-js";
 import { GenericItem } from "../store/loader";
 
+type ActivePaneTypes = "sidebar" | "container";
+
 /**
  * Views
  * pane 0 = sidebar
@@ -18,16 +20,22 @@ import { GenericItem } from "../store/loader";
  * State should be saved in local storage, per workspace
  */
 class ViewState {
+  activePane: Accessor<ActivePaneTypes>;
+  activePaneId: Accessor<string | undefined>;
   activeViewId: Accessor<string | undefined>;
-  setActiveViewId: Setter<string | undefined>;
+  setActiveContainerId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
   list = createSignal<Signal<BordeView>[]>([]); // views, left to right
-  scene = createSignal<"normal" | "focus">("normal");
+  scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   constructor() {
+    const activePane = createSignal<ActivePaneTypes>("sidebar");
+    this.activePane = activePane[0];
     const activeView = createSignal<string>();
+    const activePaneId = createSignal<string>();
+    this.activePaneId = activePaneId[0];
     this.activeViewId = activeView[0];
-    this.setActiveViewId = activeView[1];
+    this.setActiveContainerId = activeView[1];
     if (!this.list[0]().length) {
       // this.addContainerView('inbox');
     }
@@ -57,12 +65,12 @@ class ViewState {
     this.replaceActiveView(view);
   }
   openDoneView = () => {
-    const id = createUniqueId();
-    const view: BordeDoneView = {
-      id,
-      type: "done",
-    };
-    this.replaceActiveView(view);
+    // const id = createUniqueId();
+    // const view: BordeDoneView = {
+    //   id,
+    //   type: "done",
+    // };
+    // this.replaceActiveView(view);
   };
   createContainerView(containerId: string): BordeView {
     const id = createUniqueId(); // TODO: How does uniqueness work here
@@ -84,7 +92,7 @@ class ViewState {
       next[index] = newView;
       return next;
     });
-    this.setActiveViewId(view.id);
+    this.setActiveContainerId(view.id);
   }
   closeView(index: number) {
     // TODO: if active view, remove active view (does it matter?)
@@ -107,7 +115,7 @@ class ViewState {
       containerId,
       projection: "list",
     });
-    this.setActiveViewId(id);
+    this.setActiveContainerId(id);
     const [list, setList] = this.list;
     return setList((prev) => {
       return [...prev, view];
