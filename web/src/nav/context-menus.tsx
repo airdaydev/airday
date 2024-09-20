@@ -125,7 +125,7 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
           props.close();
         }}
       >
-        <span>Open in new view</span>
+        <span>Open in new pane</span>
       </button>
       <button disabled>
         <span>Rename</span>

@@ -102,9 +102,10 @@
 
 ## Marketing, community
 - [] Website
-- [] Consider https://github.com/Linen-dev/linen.dev
-- [] Consider https://motion.dev/
-- [] Videos: https://www.screen.studio/
+- [] Consider https://github.com/Linen-dev/linen.dev (chat)
+- [] Consider Zulip (chat)
+- [] Consider https://motion.dev/ (Animation library)
+- [] Consider https://www.screen.studio/ (Screen recordings)
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
 
