@@ -106,6 +106,7 @@
 - [] Consider Zulip (chat)
 - [] Consider https://motion.dev/ (Animation library)
 - [] Consider https://www.screen.studio/ (Screen recordings)
+- [] Consider https://forwardemail.net/en/private-business-email?pricing=true#enhanced
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
 
