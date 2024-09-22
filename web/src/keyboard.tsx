@@ -55,3 +55,23 @@ export const keyboardShortcuts = new KeyboardShortcuts();
 
 // the key is one context at a time, but with a global context that can be turned on/off
 // falls back to first open context
+
+export const keyboardMarker = () => {
+  return (
+    <div
+      style="bottom: 1em;
+      right: 0.5em;
+      position: absolute;
+      width: 2em;
+      height: 2em;
+      z-index: 100;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 1px 1px 1px 0 rgba(104, 104, 104, 0.25);"
+    >
+      ⌘
+    </div>
+  );
+};
