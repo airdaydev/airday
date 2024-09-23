@@ -27,30 +27,21 @@ export function PaneRegion() {
   return (
     <div class={styles["pane-region"]}>
       <For each={viewState.tree.children[0]()} fallback={<div>View Tree</div>}>
-        {(column, colIndex) => (
+        {(view, index) => (
           <div class={styles.column}>
-            <For
-              each={viewState.tree.children[0]()}
-              fallback={<div>Col {colIndex}</div>}
-            >
-              {(view, rowIndex) => {
-                return (
-                  <div class={styles["view-cell"]}>
-                    {session.workspace.containerModel.dndContext.isDragging() && (
-                      <PaneDropGuide
-                        view={view}
-                        yikes={/*TODO: Clean Up Below */ true}
-                        container={session.workspace.containerModel.dndContext.listContexts
-                          .values()
-                          .next()
-                          .value.getFirstSelected()}
-                      />
-                    )}
-                    <View view={view} tabId={rowIndex()} />
-                  </div>
-                );
-              }}
-            </For>
+            <div class={styles["view-cell"]}>
+              {session.workspace.containerModel.dndContext.isDragging() && (
+                <PaneDropGuide
+                  view={view}
+                  yikes={/*TODO: Clean Up Below */ true}
+                  container={session.workspace.containerModel.dndContext.listContexts
+                    .values()
+                    .next()
+                    .value.getFirstSelected()}
+                />
+              )}
+              <View view={view} tabId={index()} />
+            </div>
           </div>
         )}
       </For>

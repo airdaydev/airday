@@ -11,9 +11,12 @@ import { walk } from "@borde/list";
 
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
+type SplitDirection = "vertical" | "horizontal";
 
 class ViewNode {
   id = createUniqueId();
+  isRoot = false;
+  direction: SplitDirection = "horizontal";
   children: Signal<ContainerView[]> = createSignal(new Array());
   parent?: ViewNode;
   addChild = (view: ContainerView, index?: number) => {
@@ -35,8 +38,16 @@ class ViewNode {
   };
 }
 
-class RootViewNode extends ViewNode {
-  type = "root";
+export class RootViewNode extends ViewNode {
+  isRoot = true;
+  splitDirection = "horizontal";
+}
+
+export class VerticalSplitNode extends ViewNode {
+  constructor() {
+    super();
+    this.direction = "vertical";
+  }
 }
 
 export class ContainerView extends ViewNode {
@@ -146,16 +157,14 @@ class ViewState {
   }
   addHorizontally(containerId: string, ViewIndex = [0, 0]) {
     const view = new ContainerView(containerId);
-    const [matrix] = this.matrix;
-    matrix()[0].addView(view);
+    this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
   addVertically(containerId: string, ViewIndex = [0, 0]) {
+    const column = new ColumnNode();
     const view = new ContainerView(containerId);
-    const [matrix, setMatrix] = this.matrix;
-    const col = new Column();
-    col.addView(view);
-    setMatrix((prev) => [...prev, col]);
+    column.addChild(view);
+    this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
   closeView(view: ContainerView) {
