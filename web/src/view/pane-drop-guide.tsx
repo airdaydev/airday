@@ -1,13 +1,16 @@
-import { createSignal, onMount } from "solid-js";
+import { createEffect, createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
+import { defaultMapping } from "@borde/list/src/keyboard/mapping";
 
 interface PaneDropDOMRect extends DOMRect {
   limitWidth: number;
   limitHeight: number;
 }
 
+type DropRegion = "all" | "left" | "right" | "top" | "bottom";
+
 export const PaneDropGuide = () => {
-  const dynamicStyle = createSignal<string>("");
+  const dropRegion = createSignal<DropRegion>("all");
   const limitFactor = 0.15;
   let rect: PaneDropDOMRect;
   let div: HTMLElement | undefined;
@@ -21,41 +24,51 @@ export const PaneDropGuide = () => {
       limitHeight,
     });
   });
+  const style = (dropRegion: DropRegion) => {
+    if (!rect) return;
+    switch (dropRegion) {
+      case "left":
+        return `position: absolute; top: 0; left: 0; width: ${rect.width / 2}px; height: 100%;`;
+      case "right":
+        return `position: absolute; top: 0; right: 0; width: ${rect.width / 2}px; height: 100%;`;
+      case "top":
+        return `position: absolute; top: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`;
+      case "bottom":
+        return `position: absolute; bottom: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`;
+      case "all":
+        return `position: absolute; top: 0; right: 0; width: 100%; height: 100%;`;
+      default:
+        return "";
+    }
+  };
   return (
     <div
       ref={div}
       onMouseMove={(event: MouseEvent) => {
         if (!rect) return;
         if (event.clientX < rect.x + rect.limitWidth) {
-          return dynamicStyle[1](
-            `position: absolute; top: 0; left: 0; width: ${rect.width / 2}px; height: 100%;`,
-          );
+          return dropRegion[1]("left");
         }
         if (event.clientX > rect.x + rect.width - rect.limitWidth) {
-          return dynamicStyle[1](
-            `position: absolute; top: 0; right: 0; width: ${rect.width / 2}px; height: 100%;`,
-          );
+          return dropRegion[1]("right");
         }
         if (event.clientY < rect.y + rect.limitHeight) {
-          return dynamicStyle[1](
-            `position: absolute; top: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`,
-          );
+          return dropRegion[1]("top");
         }
         if (event.clientY > rect.y + rect.height - rect.limitHeight) {
-          return dynamicStyle[1](
-            `position: absolute; bottom: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`,
-          );
+          return dropRegion[1]("bottom");
         }
-        return dynamicStyle[1](
-          `position: absolute; top: 0; right: 0; width: 100%; height: 100%;`,
-        );
+        return dropRegion[1]("all");
       }}
       onMouseLeave={() => {
-        dynamicStyle[1]("");
+        return dropRegion[1]("top");
       }}
       class={styles["pane-drop-guide-container"]}
     >
-      <div class={styles["pane-drop-guide"]} style={dynamicStyle[0]()}></div>
+      <div
+        class={styles["pane-drop-guide"]}
+        style={style(dropRegion[0]())}
+      ></div>
     </div>
   );
 };
