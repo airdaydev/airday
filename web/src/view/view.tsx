@@ -1,6 +1,9 @@
-// import { Done } from "./list/done";
+import { For, useContext } from "solid-js";
+import styles from "./view.module.css";
+import { sessionContext } from "../store/context.js";
 import { List } from "../list/list";
 import { viewContext, viewState } from "./state";
+import { PaneDropGuide } from "./pane-drop-guide";
 
 interface ViewProps {
   view: BordeView;
@@ -16,5 +19,38 @@ export function View(props: ViewProps) {
     <viewContext.Provider value={viewState}>
       <List view={props.view} tabId={props.tabId} />
     </viewContext.Provider>
+  );
+}
+
+export function ViewContainer() {
+  const session = useContext(sessionContext);
+  return (
+    <div class={styles["pane-region"]}>
+      <For each={viewState.matrix[0]()} fallback={<div>View Matrix</div>}>
+        {(column, colIndex) => (
+          <div class={styles.column}>
+            <For each={column.views[0]()} fallback={<div>Col {colIndex}</div>}>
+              {(view, rowIndex) => {
+                return (
+                  <>
+                    {session.workspace.containerModel.dndContext.isDragging() && (
+                      <PaneDropGuide
+                        view={view}
+                        yikes={/*TODO: Clean Up Below */ true}
+                        container={session.workspace.containerModel.dndContext.listContexts
+                          .values()
+                          .next()
+                          .value.getFirstSelected()}
+                      />
+                    )}
+                    <View view={view} tabId={rowIndex()} />
+                  </>
+                );
+              }}
+            </For>
+          </div>
+        )}
+      </For>
+    </div>
   );
 }

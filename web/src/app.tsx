@@ -1,13 +1,12 @@
-import { For, useContext, Switch, Match } from "solid-js";
+import { useContext, Switch, Match } from "solid-js";
 import { BordeNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { viewState } from "./view/state";
-import { View } from "./view/view";
+import { ViewContainer } from "./view/view";
 import { Footer } from "./nav/footer";
 import { Dragged } from "@borde/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
-import { PaneDropGuide } from "./view/pane-drop-guide";
 
 // TODO: Switch workspace
 export function App() {
@@ -24,39 +23,7 @@ export function App() {
           )}
           <div class={styles.main}>
             <BordeNav />
-            <div class={styles["pane-region"]}>
-              <For
-                each={viewState.matrix[0]()}
-                fallback={<div>View Matrix</div>}
-              >
-                {(column, colIndex) => (
-                  <div class={styles.column}>
-                    <For
-                      each={column.views[0]()}
-                      fallback={<div>Col {colIndex}</div>}
-                    >
-                      {(view, rowIndex) => {
-                        return (
-                          <>
-                            {session.workspace.containerModel.dndContext.isDragging() && (
-                              <PaneDropGuide
-                                view={view}
-                                yikes={/*TODO: Clean Up Below */ true}
-                                container={session.workspace.containerModel.dndContext.listContexts
-                                  .values()
-                                  .next()
-                                  .value.getFirstSelected()}
-                              />
-                            )}
-                            <View view={view} tabId={rowIndex()} />
-                          </>
-                        );
-                      }}
-                    </For>
-                  </div>
-                )}
-              </For>
-            </div>
+            <ViewContainer />
           </div>
           <Footer />
         </div>

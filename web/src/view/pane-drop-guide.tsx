@@ -9,7 +9,7 @@ interface PaneDropDOMRect extends DOMRect {
   limitHeight: number;
 }
 
-type DropRegion = "all" | "left" | "right" | "top" | "bottom";
+type DropRegion = "all" | "left" | "right" | "top" | "bottom" | "none";
 
 interface PaneDropGuideProps {
   view: ContainerView;
@@ -68,7 +68,7 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         return dropRegion[1]("all");
       }}
       onMouseLeave={() => {
-        return dropRegion[1]("top");
+        return dropRegion[1]("none");
       }}
       onMouseUp={() => {
         const region = dropRegion[0]();
