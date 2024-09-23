@@ -21,7 +21,6 @@ export class ContainerView implements BordeContainerView {
     this.containerId = containerId;
   }
   detach() {
-    console.log("huh");
     this.parent?.removeView(this);
   }
 }
@@ -158,23 +157,6 @@ class ViewState {
     //   return [...prev];
     // });
   }
-  addContainerView = (containerId: string, rowNumber: number = 0) => {
-    // TODO: Allow more lists
-    if (this.matrix[0]().length > 4) return;
-    const id = createUniqueId();
-    const view = createSignal<ContainerView>({
-      // TODO: Detect clash / or how does this lib work
-      id,
-      type: "container",
-      containerId,
-      projection: "list",
-    });
-    this.setActivePaneId(id);
-    const [list, setList] = this.matrix;
-    return setList((prev) => {
-      return [...prev, view];
-    });
-  };
 }
 
 export const viewState = new ViewState();
