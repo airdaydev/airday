@@ -1,7 +1,8 @@
 import { createEffect, createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
 import { defaultMapping } from "@borde/list/src/keyboard/mapping";
-import { viewState } from "./state";
+import { ContainerView, viewState } from "./state";
+import { ListDragContext, Node } from "@borde/list";
 
 interface PaneDropDOMRect extends DOMRect {
   limitWidth: number;
@@ -10,7 +11,12 @@ interface PaneDropDOMRect extends DOMRect {
 
 type DropRegion = "all" | "left" | "right" | "top" | "bottom";
 
-export const PaneDropGuide = () => {
+interface PaneDropGuideProps {
+  view: ContainerView;
+  container: ListDragContext;
+}
+
+export const PaneDropGuide = (props: PaneDropGuideProps) => {
   const dropRegion = createSignal<DropRegion>("all");
   const limitFactor = 0.15;
   let rect: PaneDropDOMRect;
@@ -67,7 +73,16 @@ export const PaneDropGuide = () => {
       onMouseUp={() => {
         const region = dropRegion[0]();
         if (region === "left") {
-          console.log("pane", "list", "left");
+          viewState.addHorizontally(props.container.id);
+        }
+        if (region === "right") {
+          viewState.addHorizontally(props.container.id);
+        }
+        if (region === "top") {
+          viewState.addVertically(props.container.id);
+        }
+        if (region === "bottom") {
+          viewState.addVertically(props.container.id);
         }
       }}
       class={styles["pane-drop-guide-container"]}

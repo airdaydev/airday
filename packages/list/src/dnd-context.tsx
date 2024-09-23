@@ -133,6 +133,14 @@ export class ListDragContext {
     }
     return false;
   }
+  getFirstSelected() {
+    const projection = this.projection();
+    for (let i = 0; i < projection.length; i++) {
+      if (this.selection[0]().has(projection[i])) return projection[i];
+    }
+    return false;
+  }
+
   getLastIndexSelected() {
     // TODO: We could collect all sortkeys through an up-to-date hashmap
     const projection = this.projection();

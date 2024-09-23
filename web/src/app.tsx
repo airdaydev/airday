@@ -31,15 +31,26 @@ export function App() {
               >
                 {(column, colIndex) => (
                   <div class={styles.column}>
-                    {session.workspace.containerModel.dndContext.isDragging() && (
-                      <PaneDropGuide />
-                    )}
                     <For
                       each={column.views[0]()}
                       fallback={<div>Col {colIndex}</div>}
                     >
                       {(view, rowIndex) => {
-                        return <View view={view} tabId={rowIndex()} />;
+                        return (
+                          <>
+                            {session.workspace.containerModel.dndContext.isDragging() && (
+                              <PaneDropGuide
+                                view={view}
+                                yikes={/*TODO: Clean Up Below */ true}
+                                container={session.workspace.containerModel.dndContext.listContexts
+                                  .values()
+                                  .next()
+                                  .value.getFirstSelected()}
+                              />
+                            )}
+                            <View view={view} tabId={rowIndex()} />
+                          </>
+                        );
                       }}
                     </For>
                   </div>
