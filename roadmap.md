@@ -34,6 +34,7 @@
 - [] Persist views (per device)
 - [] Load 200 items at a time
 - [] Handle loader validation failure, types
+- [] Remove SVGs from JS or at least include in diff bundle
 
 ## UI
 - [x] Context menus should not go past edge of screen (flipped)
