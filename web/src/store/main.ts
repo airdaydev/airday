@@ -4,9 +4,13 @@ import { ContainerModel } from "./container";
 import { genTestData, bordeItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
-import { DndContext, ListDragContext, ListStateContext } from "@borde/list";
+import {
+  DndContext,
+  ListDragContext,
+  ListStateContext,
+  TreeState,
+} from "@borde/list";
 import { loader } from "./loader";
-import styles from "../item/item.module.css";
 
 const schemaVersion = 1;
 
@@ -116,7 +120,7 @@ export class AcmeWorkspaceStore {
   id: string = createUniqueId();
   name: string = "Uninitialised";
   localOnly: boolean = true;
-  openLists = new Map<string, ListDragContext>();
+  openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext();
   get ref() {
@@ -196,28 +200,22 @@ export class AcmeWorkspaceStore {
       },
     ]);
   };
-  // Creates or loads new in-memory list
-  openList(view: BordeView): ListDragContext {
+  // Creates or loads new session-persistent state
+  openList(view: BordeView): TreeState {
     let identifier = null;
-    let ctx = null;
+    let state = null;
     if (view.type === "container") {
       identifier = `c#${view.containerId}`;
-      ctx = this.openLists.get(identifier);
-      if (!ctx) {
+      state = this.openLists.get(identifier);
+      if (!state) {
         const state = this.listStateContext.createTree({ loader });
-        const ctx = new ListDragContext({
-          treeState: state,
-          dndContext: this.dndContext,
-          itemHeight: 32,
-          placeholderStyle: styles["placeholder"],
-        });
         const list = this.itemModel
           .getItemsByList(view.containerId)
           .then((items) => {
-            ctx.treeState.load({ id: "root", children: items });
+            state.load({ id: "root", children: items });
           });
-        this.openLists.set(identifier, ctx);
-        return ctx;
+        this.openLists.set(identifier, state);
+        return state;
       }
     }
     // if (view.type === "done") {
@@ -228,7 +226,7 @@ export class AcmeWorkspaceStore {
     //     this.openLists.set(identifier, fastList);
     //   }
     // }
-    if (!ctx) throw new Error("Cannot determine list from view");
-    return ctx;
+    if (!state) throw new Error("Cannot determine list from view");
+    return state;
   }
 }

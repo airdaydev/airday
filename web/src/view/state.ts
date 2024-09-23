@@ -11,14 +11,26 @@ import { GenericItem } from "../store/loader";
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
 
+class ContainerView implements BordeContainerView {
+  id = createUniqueId();
+  containerId: string;
+  type: "container" = "container";
+  projection: "list" | "kanban" = "list";
+  parent?: Column;
+  constructor(containerId: string) {
+    this.containerId = containerId;
+  }
+}
+
 class Column {
   id = createUniqueId();
   type = "column";
-  views: Signal<BordeView[]> = createSignal(new Array());
-  addRow = (view: BordeView) => {
+  views: Signal<ContainerView[]> = createSignal(new Array());
+  addView = (view: ContainerView, index?: number) => {
+    view.parent = this;
     this.views[1]((prev) => [...prev, view]);
   };
-  replaceRow = (view: BordeView, index: number = 0) => {
+  replaceRow = (view: ContainerView, index: number = 0) => {
     this.views[1]((prev) => {
       const next = [...prev];
       next[index] = view;
@@ -63,7 +75,7 @@ class ViewState {
   // TODO: Review AI gen
   get active() {
     return false;
-    // let foundSignal: Signal<BordeView> | undefined;
+    // let foundSignal: Signal<ContainerView> | undefined;
     // let foundRow = -1;
     // let foundCol = -1;
 
@@ -95,7 +107,7 @@ class ViewState {
     return false;
   }
   openContainerView(containerId: string) {
-    const view = this.createContainerView(containerId);
+    const view = new ContainerView(containerId);
     this.replaceActiveView(view);
   }
   openDoneView = () => {
@@ -106,52 +118,43 @@ class ViewState {
     // };
     // this.replaceActiveView(view);
   };
-  createContainerView(containerId: string): BordeView {
-    const id = createUniqueId(); // TODO: How does uniqueness work here
-    return {
-      id,
-      type: "container",
-      containerId,
-      projection: "list",
-    };
-  }
-  replaceActiveView(view: BordeView) {
+  replaceActiveView(view: ContainerView) {
     this.replaceView(view, 0);
   }
-  replaceView(view: BordeView, ViewIndex = [0, 0]) {
+  replaceView(view: ContainerView, ViewIndex = [0, 0]) {
     const [matrix] = this.matrix;
     matrix()[0].replaceRow(view);
     this.setActivePaneId(view.id);
   }
   addHorizontally(containerId: string, ViewIndex = [0, 0]) {
-    const view = this.createContainerView(containerId);
+    const view = new ContainerView(containerId);
     const [matrix] = this.matrix;
-    matrix()[0].addRow(view);
+    matrix()[0].addView(view);
     this.setActivePaneId(view.id);
   }
   addVertically(containerId: string, ViewIndex = [0, 0]) {
-    const view = this.createContainerView(containerId);
+    const view = new ContainerView(containerId);
     const [matrix, setMatrix] = this.matrix;
     const col = new Column();
-    col.addRow(view);
+    col.addView(view);
     setMatrix((prev) => [...prev, col]);
     this.setActivePaneId(view.id);
   }
   closeView(index: number) {
-    // TODO: if active view, remove active view (does it matter?)
-    const [list, setList] = this.matrix;
-    const view = list()[index][0]().id;
-    if (!view) return;
-    return setList((prev) => {
-      prev.splice(index, 1);
-      return [...prev];
-    });
+    const [matrix, setMatrix] = this.matrix;
+    // const col = matrix[0]();
+    // const view = matrix()[index][0]().id;
+    // if (!view) return;
+    // return setMatrix((prev) => {
+    //   prev.splice(index, 1);
+    //   return [...prev];
+    // });
   }
   addContainerView = (containerId: string, rowNumber: number = 0) => {
     // TODO: Allow more lists
     if (this.matrix[0]().length > 4) return;
     const id = createUniqueId();
-    const view = createSignal<BordeView>({
+    const view = createSignal<ContainerView>({
       // TODO: Detect clash / or how does this lib work
       id,
       type: "container",

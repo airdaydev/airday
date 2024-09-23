@@ -26,3 +26,7 @@
     height: 100%;
     overflow: hidden;
 }
+
+.column:not(:first-child) {
+    border-top: 1px solid var(--shade);
+}
