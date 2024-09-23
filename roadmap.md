@@ -5,7 +5,6 @@
 - [x] New drag/drop list for list view
 - [x] Clean up list dnd CSS
 - [x] Clean up list dnd backdrop
-- [] Loading pane
 - [] Reinstate Done board
 - [] Next board
 - [] Drag items into list nav
@@ -18,6 +17,8 @@
 - [] Shared lists
 - [] Weekly view
 - [] Monthly view
+- [] Loading pane
+- [] Save views! (arrangements of panes)
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
