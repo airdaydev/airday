@@ -11,7 +11,7 @@ interface ListHeaderProps {
 }
 
 export const ListHeader = (props: ListHeaderProps) => {
-  const [list] = viewState.list;
+  const [matrix] = viewState.matrix;
   return (
     <div class={styles["list-header"]}>
       <button class={styles["list-head-button"]}>
@@ -20,7 +20,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         </span>
         <span class={styles["title-text"]}>{props.container.name}</span>
       </button>
-      {list().length > 1 && (
+      {matrix().length > 1 && (
         <div>
           <button
             class={styles["list-button"]}

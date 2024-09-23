@@ -26,7 +26,7 @@ class ViewState {
   activePaneId: Accessor<string | undefined>;
   setActivePaneId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
-  list = createSignal<Signal<BordeView>[]>([]); // views, left to right
+  matrix = createSignal<Signal<BordeView[][]>>([[]]); // views 2D matrix
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   constructor() {
@@ -42,21 +42,38 @@ class ViewState {
     this.focus = item;
     this.scene[1]("focus");
   }
+  // TODO: Review AI gen
   get active() {
-    const index = this.list[0]().findIndex(
-      (view) => view[0]().id === this.activePaneId(),
-    );
+    let foundSignal: Signal<BordeView> | undefined;
+    let foundRow = -1;
+    let foundCol = -1;
+
+    this.matrix[0]().some((row, rowIndex) => {
+      const colIndex = row.findIndex(
+        (view) => view[0]().id === this.activePaneId(),
+      );
+      if (colIndex !== -1) {
+        foundSignal = row[colIndex];
+        foundRow = rowIndex;
+        foundCol = colIndex;
+        return true;
+      }
+      return false;
+    });
+
     return {
-      signal: this.list[0]()[index],
-      index: index < 0 ? 0 : index,
+      signal: foundSignal,
+      row: foundRow,
+      col: foundCol,
     };
   }
   isContainerActive(containerId: string) {
-    const activeContainer = this.list[0]().find(
-      (view) => view[0]().id === this.activePaneId(),
-    );
-    if (!activeContainer) return false;
-    return activeContainer[0]().containerId === containerId;
+    // const activeContainer = this.list[0]().find(
+    //   (view) => view[0]().id === this.activePaneId(),
+    // );
+    // if (!activeContainer) return false;
+    // return activeContainer[0]().containerId === containerId;
+    return false;
   }
   openContainerView(containerId: string) {
     const view = this.createContainerView(containerId);
@@ -80,21 +97,22 @@ class ViewState {
     };
   }
   replaceActiveView(view: BordeView) {
-    this.replaceView(view, viewState.active.index || 0);
+    this.replaceView(view, 0);
   }
   replaceView(view: BordeView, index: number = 0) {
     const newView = createSignal<BordeView>(view);
-    const [list, setList] = this.list;
-    setList((prev) => {
-      const next = [...prev];
-      next[index] = newView;
-      return next;
+    const [matrix, setMatrix] = this.matrix;
+    setMatrix((prev) => {
+      const newMatrix = prev.map((row) => [...row]);
+      newMatrix[0][index] = newView;
+      console.log("setting new matrix", newMatrix);
+      return newMatrix;
     });
     this.setActivePaneId(view.id);
   }
   closeView(index: number) {
     // TODO: if active view, remove active view (does it matter?)
-    const [list, setList] = this.list;
+    const [list, setList] = this.matrix;
     const view = list()[index][0]().id;
     if (!view) return;
     return setList((prev) => {
@@ -104,7 +122,7 @@ class ViewState {
   }
   addContainerView = (containerId: string) => {
     // TODO: Allow more lists
-    if (this.list[0]().length > 8) return;
+    if (this.matrix[0]().length > 8) return;
     const id = createUniqueId();
     const view = createSignal<BordeView>({
       // TODO: Detect clash / or how does this lib work
@@ -114,7 +132,7 @@ class ViewState {
       projection: "list",
     });
     this.setActivePaneId(id);
-    const [list, setList] = this.list;
+    const [list, setList] = this.matrix;
     return setList((prev) => {
       return [...prev, view];
     });

@@ -24,10 +24,14 @@ export function App() {
           <div class={styles.main}>
             <BordeNav />
             <For
-              each={viewState.list[0]()}
+              each={viewState.matrix[0]()}
               fallback={<div>Loading ({`<For />`})</div>}
             >
-              {(view, index) => <View view={view[0]()} tabId={index()} />}
+              {(col, index) => (
+                <For each={col} fallback={<div>Fruck</div>}>
+                  {(view, index) => <View view={view[0]()} tabId={index()} />}
+                </For>
+              )}
             </For>
           </div>
           <Footer />
