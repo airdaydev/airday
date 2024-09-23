@@ -26,10 +26,16 @@ export function PaneRegion() {
   const session = useContext(sessionContext);
   return (
     <div class={styles["pane-region"]}>
-      <For each={viewState.matrix[0]()} fallback={<div>View Matrix</div>}>
+      <For
+        each={viewState.tree.children[0]()}
+        fallback={<div>View Matrix</div>}
+      >
         {(column, colIndex) => (
           <div class={styles.column}>
-            <For each={column.views[0]()} fallback={<div>Col {colIndex}</div>}>
+            <For
+              each={viewState.tree.children[0]()}
+              fallback={<div>Col {colIndex}</div>}
+            >
               {(view, rowIndex) => {
                 return (
                   <div class={styles["view-cell"]}>

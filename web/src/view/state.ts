@@ -7,42 +7,50 @@ import {
   createContext,
 } from "solid-js";
 import { GenericItem } from "../store/loader";
+import { walk } from "@borde/list";
 
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
 
-export class ContainerView implements BordeContainerView {
+class ViewNode {
   id = createUniqueId();
-  containerId: string;
-  type: "container" = "container";
-  projection: "list" | "kanban" = "list";
-  parent?: Column;
-  constructor(containerId: string) {
-    this.containerId = containerId;
-  }
-  detach() {
-    this.parent?.removeView(this);
-  }
-}
-
-class Column {
-  id = createUniqueId();
-  type = "column";
-  views: Signal<ContainerView[]> = createSignal(new Array());
-  addView = (view: ContainerView, index?: number) => {
+  children: Signal<ContainerView[]> = createSignal(new Array());
+  parent?: ViewNode;
+  addChild = (view: ContainerView, index?: number) => {
     view.parent = this;
-    this.views[1]((prev) => [...prev, view]);
+    this.children[1]((prev) => [...prev, view]);
   };
-  replaceView = (view: ContainerView, index: number = 0) => {
-    this.views[1]((prev) => {
+  replaceChild = (view: ContainerView, index: number = 0) => {
+    this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
       return next;
     });
   };
   removeView = (view: ContainerView) => {
-    this.views[1]((prev) => prev.filter((v) => v.id !== view.id));
+    this.children[1]((prev) => prev.filter((v) => v.id !== view.id));
   };
+  addSibling = (view: ContainerView) => {
+    this.parent?.addChild(view);
+  };
+}
+
+class RootViewNode extends ViewNode {
+  type = "root";
+}
+
+export class ContainerView extends ViewNode {
+  id = createUniqueId();
+  containerId: string;
+  type: "container" = "container";
+  projection: "list" | "kanban" = "list";
+  constructor(containerId: string) {
+    super();
+    this.containerId = containerId;
+  }
+  detach() {
+    this.parent?.removeView(this);
+  }
 }
 
 type ViewIndex = [number, number];
@@ -62,7 +70,7 @@ class ViewState {
   activePaneId: Accessor<string | undefined>;
   setActivePaneId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
-  matrix = createSignal<Column[]>([new Column()]); // views 2D matrix
+  tree = new RootViewNode();
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   constructor() {
@@ -73,6 +81,14 @@ class ViewState {
     const activePaneId = createSignal<string>();
     this.activePaneId = activePaneId[0];
     this.setActivePaneId = activePaneId[1];
+  }
+  count() {
+    // TODO: This needs to be a signal... so all registered views must be tracked.
+    let count = 0;
+    walk(this.tree, (node) => {
+      count++;
+    });
+    return count;
   }
   focusItem(item: GenericItem) {
     this.focus = item;
@@ -114,7 +130,7 @@ class ViewState {
   }
   openContainerView(containerId: string) {
     const view = new ContainerView(containerId);
-    this.replaceActiveView(view);
+    this.addViewToRoot(view);
   }
   openDoneView = () => {
     // const id = createUniqueId();
@@ -122,14 +138,10 @@ class ViewState {
     //   id,
     //   type: "done",
     // };
-    // this.replaceActiveView(view);
+    // this.addViewToRoot(view);
   };
-  replaceActiveView(view: ContainerView) {
-    this.replaceView(view, 0);
-  }
-  replaceView(view: ContainerView, ViewIndex = [0, 0]) {
-    const [matrix] = this.matrix;
-    matrix()[0].replaceView(view);
+  addViewToRoot(view: ContainerView, ViewIndex = [0, 0]) {
+    this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
   addHorizontally(containerId: string, ViewIndex = [0, 0]) {
