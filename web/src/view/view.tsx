@@ -1,35 +1,31 @@
-import { For, useContext } from "solid-js";
+import { createEffect, For, Match, Switch, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { sessionContext } from "../store/context.js";
 import { List } from "../list/list";
-import { viewContext, viewState } from "./state";
+import { viewContext, ViewNode, viewState } from "./state";
 import { PaneDropGuide } from "./pane-drop-guide";
 
 interface ViewProps {
-  view: BordeView;
-  tabId: number;
+  view: ViewNode;
 }
 
 /**
  * Unwraps view object and ensures corresponding view created
  */
 export function View(props: ViewProps) {
-  // Type checking
-  return (
-    <viewContext.Provider value={viewState}>
-      <List view={props.view} tabId={props.tabId} />
-    </viewContext.Provider>
-  );
-}
-
-export function PaneRegion() {
   const session = useContext(sessionContext);
   return (
-    <div class={styles["pane-region"]}>
-      <For each={viewState.tree.children[0]()} fallback={<div>View Tree</div>}>
-        {(view, index) => (
-          <div class={styles.column}>
-            <div class={styles["view-cell"]}>
+    <For each={props.view.children[0]()} fallback={<div>View Tree</div>}>
+      {(view, index) => (
+        <Switch>
+          <Match when={view.type === "data"}>
+            <List view={view} />
+          </Match>
+          <Match
+            when={view.type === "container" && view.direction === "horizontal"}
+          >
+            <div style={styles.column}>
+              <View view={view} />
               {session.workspace.containerModel.dndContext.isDragging() && (
                 <PaneDropGuide
                   view={view}
@@ -40,11 +36,25 @@ export function PaneRegion() {
                     .value.getFirstSelected()}
                 />
               )}
-              <View view={view} tabId={index()} />
             </div>
-          </div>
-        )}
-      </For>
-    </div>
+          </Match>
+          <Match
+            when={view.type === "container" && view.direction === "vertical"}
+          >
+            <View view={view} />
+          </Match>
+        </Switch>
+      )}
+    </For>
+  );
+}
+
+export function PaneRegion() {
+  return (
+    <viewContext.Provider value={viewState}>
+      <div class={styles["pane-region"]}>
+        <View view={viewState.tree} />
+      </div>
+    </viewContext.Provider>
   );
 }

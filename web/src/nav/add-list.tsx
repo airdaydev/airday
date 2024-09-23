@@ -1,9 +1,9 @@
-import { nanoid } from 'nanoid';
-import { createSignal, createEffect, on, useContext } from 'solid-js';
-import { keyboardShortcuts } from '../keyboard';
-import { sessionContext } from '../store/context.js';
-import { viewState } from '../view-state';
-import styles from './nav.module.css';
+import { nanoid } from "nanoid";
+import { createSignal, createEffect, on, useContext } from "solid-js";
+import { keyboardShortcuts } from "../keyboard";
+import { sessionContext } from "../store/context.js";
+import { viewState } from "../view-state";
+import styles from "./nav.module.css";
 
 /**
  * 2 stage add button
@@ -12,54 +12,58 @@ import styles from './nav.module.css';
  */
 export const AddListButton = () => {
   const session = useContext(sessionContext);
-    let inputRef: HTMLInputElement | undefined = undefined;
-    const [editing, setEditing] = createSignal<boolean>(false);
-    const leaveEditMode = (save: boolean) => {
-        keyboardShortcuts.enable();
-        if (save) {
-            const id = nanoid();
-            session.workspace.containerModel.insert({
-              id,
-              name: inputRef?.value || 'New board',
-            });
-            viewState.openContainerView(id);
-        }
-        setEditing(false);
+  let inputRef: HTMLInputElement | undefined = undefined;
+  const [editing, setEditing] = createSignal<boolean>(false);
+  const leaveEditMode = (save: boolean) => {
+    keyboardShortcuts.enable();
+    if (save) {
+      const id = nanoid();
+      session.workspace.containerModel.insert({
+        id,
+        name: inputRef?.value || "New board",
+      });
+      viewState.openDataView(id);
     }
-    const enterEditMode = () => {
-        keyboardShortcuts.disable();
-        setEditing(true);
+    setEditing(false);
+  };
+  const enterEditMode = () => {
+    keyboardShortcuts.disable();
+    setEditing(true);
+  };
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.code === "Enter") {
+      leaveEditMode(true);
     }
-    const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.code === 'Enter') {
-            leaveEditMode(true);
-        }
-        if (event.code === 'Escape') {
-            leaveEditMode(false);
-        }
+    if (event.code === "Escape") {
+      leaveEditMode(false);
     }
-    createEffect(on([editing], () => {
-        if (inputRef) { inputRef.focus(); }
-    }))
-    // TODO: handle outside click
-    return (
-        <>
-        {editing() ? (
-            <input
-                style='border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;'
-                type="text"
-                placeholder="New board"
-                ref={inputRef}
-                onKeyDown={handleKeyDown}
-            />
-            ) : (
-                <button
-                class={styles['add-list-button']}
-                onClick={() => enterEditMode()}
-              >
-                Add board
-              </button>
-            )}
-        </>
-    )
-}
+  };
+  createEffect(
+    on([editing], () => {
+      if (inputRef) {
+        inputRef.focus();
+      }
+    }),
+  );
+  // TODO: handle outside click
+  return (
+    <>
+      {editing() ? (
+        <input
+          style="border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;"
+          type="text"
+          placeholder="New board"
+          ref={inputRef}
+          onKeyDown={handleKeyDown}
+        />
+      ) : (
+        <button
+          class={styles["add-list-button"]}
+          onClick={() => enterEditMode()}
+        >
+          Add board
+        </button>
+      )}
+    </>
+  );
+};

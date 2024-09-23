@@ -11,6 +11,7 @@ import {
   TreeState,
 } from "@borde/list";
 import { loader } from "./loader";
+import { DataView } from "../view/state";
 
 const schemaVersion = 1;
 
@@ -201,10 +202,11 @@ export class AcmeWorkspaceStore {
     ]);
   };
   // Creates or loads new session-persistent state
-  openList(view: BordeView): TreeState {
+  openList(view: DataView): TreeState {
     let identifier = null;
     let state = null;
-    if (view.type === "container") {
+    console.log("opening list");
+    if (view.type === "data") {
       identifier = `c#${view.containerId}`;
       state = this.openLists.get(identifier);
       if (!state) {

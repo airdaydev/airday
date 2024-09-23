@@ -1,5 +1,5 @@
 import { Signal } from "solid-js";
-import { ContainerView, viewState } from "../view/state";
+import { DataView, viewState } from "../view/state";
 import { EditableListTitle } from "./list-title";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
@@ -8,7 +8,7 @@ import { ListIcon } from "./list-icon";
 interface ListHeaderProps {
   container: Signal<BordeContainer>;
   tabId: number;
-  view: ContainerView;
+  view: DataView;
 }
 
 export const ListHeader = (props: ListHeaderProps) => {

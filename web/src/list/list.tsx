@@ -1,18 +1,18 @@
-import { createEffect, useContext, on } from "solid-js";
+import { useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
-import { viewState } from "../view/state";
+import { DataView, viewState } from "../view/state";
 import { Tree, SolidListContext, ListDragContext } from "@borde/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 
 interface ListProps {
-  view: BordeView;
-  tabId: number;
+  view: DataView;
 }
 
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
+  console.log(props.view);
   const state = session.workspace.openList(props.view);
   const ctx = new ListDragContext({
     treeState: state,
@@ -29,7 +29,6 @@ export function List(props: ListProps) {
         [styles.list]: true,
         [styles.focus]: viewState.activePaneId() === props.view.id,
       }}
-      tabIndex={props.tabId}
       onFocus={() => {
         viewState.setActivePaneId(props.view.id);
       }}

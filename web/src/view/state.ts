@@ -12,28 +12,31 @@ import { walk } from "@borde/list";
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
 type SplitDirection = "vertical" | "horizontal";
+type ViewType = "container" | "data";
+type ViewIndex = [number, number];
 
-class ViewNode {
+export class ViewNode {
   id = createUniqueId();
   isRoot = false;
+  type: ViewType = "container";
   direction: SplitDirection = "horizontal";
-  children: Signal<ContainerView[]> = createSignal(new Array());
+  children: Signal<DataView[]> = createSignal(new Array());
   parent?: ViewNode;
-  addChild = (view: ContainerView, index?: number) => {
+  addChild = (view: DataView, index?: number) => {
     view.parent = this;
     this.children[1]((prev) => [...prev, view]);
   };
-  replaceChild = (view: ContainerView, index: number = 0) => {
+  replaceChild = (view: DataView, index: number = 0) => {
     this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
       return next;
     });
   };
-  removeView = (view: ContainerView) => {
+  removeView = (view: DataView) => {
     this.children[1]((prev) => prev.filter((v) => v.id !== view.id));
   };
-  addSibling = (view: ContainerView) => {
+  addSibling = (view: DataView) => {
     this.parent?.addChild(view);
   };
 }
@@ -46,14 +49,23 @@ export class RootViewNode extends ViewNode {
 export class VerticalSplitNode extends ViewNode {
   constructor() {
     super();
+    this.type = "container";
     this.direction = "vertical";
   }
 }
 
-export class ContainerView extends ViewNode {
+export class HorizontalSplitNode extends ViewNode {
+  constructor() {
+    super();
+    this.type = "container";
+    this.direction = "horizontal";
+  }
+}
+
+export class DataView extends ViewNode {
   id = createUniqueId();
   containerId: string;
-  type: "container" = "container";
+  type: ViewType = "data";
   projection: "list" | "kanban" = "list";
   constructor(containerId: string) {
     super();
@@ -63,8 +75,6 @@ export class ContainerView extends ViewNode {
     this.parent?.removeView(this);
   }
 }
-
-type ViewIndex = [number, number];
 
 /**
  * Views
@@ -108,7 +118,7 @@ class ViewState {
   // TODO: Review AI gen
   get active() {
     return false;
-    // let foundSignal: Signal<ContainerView> | undefined;
+    // let foundSignal: Signal<DataView> | undefined;
     // let foundRow = -1;
     // let foundCol = -1;
 
@@ -139,8 +149,8 @@ class ViewState {
     // return activeContainer[0]().containerId === containerId;
     return false;
   }
-  openContainerView(containerId: string) {
-    const view = new ContainerView(containerId);
+  openDataView(containerId: string) {
+    const view = new DataView(containerId);
     this.addViewToRoot(view);
   }
   openDoneView = () => {
@@ -151,23 +161,23 @@ class ViewState {
     // };
     // this.addViewToRoot(view);
   };
-  addViewToRoot(view: ContainerView, ViewIndex = [0, 0]) {
+  addViewToRoot(view: DataView, ViewIndex = [0, 0]) {
     this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
   addHorizontally(containerId: string, ViewIndex = [0, 0]) {
-    const view = new ContainerView(containerId);
+    const view = new DataView(containerId);
     this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
   addVertically(containerId: string, ViewIndex = [0, 0]) {
     const column = new ColumnNode();
-    const view = new ContainerView(containerId);
+    const view = new DataView(containerId);
     column.addChild(view);
     this.tree.addChild(view);
     this.setActivePaneId(view.id);
   }
-  closeView(view: ContainerView) {
+  closeView(view: DataView) {
     const [matrix, setMatrix] = this.matrix;
     view.detach();
     // const col = matrix[0]();

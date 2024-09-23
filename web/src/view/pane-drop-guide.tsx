@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
 import { defaultMapping } from "@borde/list/src/keyboard/mapping";
-import { ContainerView, viewState } from "./state";
+import { DataView, viewState } from "./state";
 import { ListDragContext, Node } from "@borde/list";
 
 interface PaneDropDOMRect extends DOMRect {
@@ -12,7 +12,7 @@ interface PaneDropDOMRect extends DOMRect {
 type DropRegion = "all" | "left" | "right" | "top" | "bottom" | "none";
 
 interface PaneDropGuideProps {
-  view: ContainerView;
+  view: DataView;
   container: ListDragContext;
 }
 
