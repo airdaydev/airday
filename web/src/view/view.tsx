@@ -22,7 +22,7 @@ export function View(props: ViewProps) {
   );
 }
 
-export function ViewContainer() {
+export function PaneRegion() {
   const session = useContext(sessionContext);
   return (
     <div class={styles["pane-region"]}>
@@ -32,7 +32,7 @@ export function ViewContainer() {
             <For each={column.views[0]()} fallback={<div>Col {colIndex}</div>}>
               {(view, rowIndex) => {
                 return (
-                  <>
+                  <div class={styles["view-cell"]}>
                     {session.workspace.containerModel.dndContext.isDragging() && (
                       <PaneDropGuide
                         view={view}
@@ -44,7 +44,7 @@ export function ViewContainer() {
                       />
                     )}
                     <View view={view} tabId={rowIndex()} />
-                  </>
+                  </div>
                 );
               }}
             </For>

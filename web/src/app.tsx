@@ -2,7 +2,7 @@ import { useContext, Switch, Match } from "solid-js";
 import { BordeNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { viewState } from "./view/state";
-import { ViewContainer } from "./view/view";
+import { PaneRegion } from "./view/view";
 import { Footer } from "./nav/footer";
 import { Dragged } from "@borde/list";
 import { sessionContext } from "./store/context.js";
@@ -23,7 +23,7 @@ export function App() {
           )}
           <div class={styles.main}>
             <BordeNav />
-            <ViewContainer />
+            <PaneRegion />
           </div>
           <Footer />
         </div>

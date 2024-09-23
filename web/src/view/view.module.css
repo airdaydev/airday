@@ -29,3 +29,8 @@
 .column:not(:first-child) {
     border-top: 1px solid var(--shade);
 }
+
+.view-cell {
+    position: relative;
+    width: 100%;
+}
