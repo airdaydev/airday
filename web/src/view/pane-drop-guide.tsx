@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
 import { defaultMapping } from "@borde/list/src/keyboard/mapping";
+import { viewState } from "./state";
 
 interface PaneDropDOMRect extends DOMRect {
   limitWidth: number;
@@ -62,6 +63,12 @@ export const PaneDropGuide = () => {
       }}
       onMouseLeave={() => {
         return dropRegion[1]("top");
+      }}
+      onMouseUp={() => {
+        const region = dropRegion[0]();
+        if (region === "left") {
+          console.log("pane", "list", "left");
+        }
       }}
       class={styles["pane-drop-guide-container"]}
     >

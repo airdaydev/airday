@@ -119,14 +119,6 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
       container={props.container}
       offset={props.offset}
     >
-      <button
-        onClick={() => {
-          viewState.addVertically(props.container().id);
-          props.close();
-        }}
-      >
-        <span>Open in new pane</span>
-      </button>
       <button disabled>
         <span>Rename</span>
       </button>
