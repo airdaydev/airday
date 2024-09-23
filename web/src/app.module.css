@@ -12,9 +12,15 @@
     overflow: hidden;
 }
 
-.column {
+.pane-region {
+    width: 100%;
     display: flex;
     flex-direction: column;
+}
+
+.column {
+    display: flex;
+    flex-direction: row;
     flex-shrink: 1;
     width: 100%;
     height: 100%;

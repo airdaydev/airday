@@ -11,6 +11,24 @@ import { GenericItem } from "../store/loader";
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
 
+class Column {
+  id = createUniqueId();
+  type = "column";
+  views: Signal<BordeView[]> = createSignal(new Array());
+  addRow = (view: BordeView) => {
+    this.views[1]((prev) => [...prev, view]);
+  };
+  replaceRow = (view: BordeView, index: number = 0) => {
+    this.views[1]((prev) => {
+      const next = [...prev];
+      next[index] = view;
+      return next;
+    });
+  };
+}
+
+type ViewIndex = [number, number];
+
 /**
  * Views
  * pane 0 = sidebar
@@ -26,7 +44,7 @@ class ViewState {
   activePaneId: Accessor<string | undefined>;
   setActivePaneId: Setter<string | undefined>;
   sidebarVisible = createSignal<boolean>(true);
-  matrix = createSignal<Signal<BordeView[][]>>([[]]); // views 2D matrix
+  matrix = createSignal<Column[]>([new Column()]); // views 2D matrix
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   constructor() {
@@ -44,28 +62,29 @@ class ViewState {
   }
   // TODO: Review AI gen
   get active() {
-    let foundSignal: Signal<BordeView> | undefined;
-    let foundRow = -1;
-    let foundCol = -1;
+    return false;
+    // let foundSignal: Signal<BordeView> | undefined;
+    // let foundRow = -1;
+    // let foundCol = -1;
 
-    this.matrix[0]().some((row, rowIndex) => {
-      const colIndex = row.findIndex(
-        (view) => view[0]().id === this.activePaneId(),
-      );
-      if (colIndex !== -1) {
-        foundSignal = row[colIndex];
-        foundRow = rowIndex;
-        foundCol = colIndex;
-        return true;
-      }
-      return false;
-    });
+    // this.matrix[0]().some((row, rowIndex) => {
+    //   const colIndex = row.findIndex(
+    //     (view) => view[0]().id === this.activePaneId(),
+    //   );
+    //   if (colIndex !== -1) {
+    //     foundSignal = row[colIndex];
+    //     foundRow = rowIndex;
+    //     foundCol = colIndex;
+    //     return true;
+    //   }
+    //   return false;
+    // });
 
-    return {
-      signal: foundSignal,
-      row: foundRow,
-      col: foundCol,
-    };
+    // return {
+    //   signal: foundSignal,
+    //   row: foundRow,
+    //   col: foundCol,
+    // };
   }
   isContainerActive(containerId: string) {
     // const activeContainer = this.list[0]().find(
@@ -99,15 +118,23 @@ class ViewState {
   replaceActiveView(view: BordeView) {
     this.replaceView(view, 0);
   }
-  replaceView(view: BordeView, index: number = 0) {
-    const newView = createSignal<BordeView>(view);
+  replaceView(view: BordeView, ViewIndex = [0, 0]) {
+    const [matrix] = this.matrix;
+    matrix()[0].replaceRow(view);
+    this.setActivePaneId(view.id);
+  }
+  addHorizontally(containerId: string, ViewIndex = [0, 0]) {
+    const view = this.createContainerView(containerId);
+    const [matrix] = this.matrix;
+    matrix()[0].addRow(view);
+    this.setActivePaneId(view.id);
+  }
+  addVertically(containerId: string, ViewIndex = [0, 0]) {
+    const view = this.createContainerView(containerId);
     const [matrix, setMatrix] = this.matrix;
-    setMatrix((prev) => {
-      const newMatrix = prev.map((row) => [...row]);
-      newMatrix[0][index] = newView;
-      console.log("setting new matrix", newMatrix);
-      return newMatrix;
-    });
+    const col = new Column();
+    col.addRow(view);
+    setMatrix((prev) => [...prev, col]);
     this.setActivePaneId(view.id);
   }
   closeView(index: number) {

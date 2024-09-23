@@ -121,7 +121,7 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
     >
       <button
         onClick={() => {
-          viewState.addContainerView(props.container().id);
+          viewState.addVertically(props.container().id);
           props.close();
         }}
       >

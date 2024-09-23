@@ -23,15 +23,25 @@ export function App() {
           )}
           <div class={styles.main}>
             <BordeNav />
-            <For each={viewState.matrix[0]()} fallback={<div>View Matrix</div>}>
-              {(col, index) => (
-                <div class={styles.column}>
-                  <For each={col} fallback={<div>Col {index}</div>}>
-                    {(view, index) => <View view={view[0]()} tabId={index()} />}
-                  </For>
-                </div>
-              )}
-            </For>
+            <div class={styles["pane-region"]}>
+              <For
+                each={viewState.matrix[0]()}
+                fallback={<div>View Matrix</div>}
+              >
+                {(column, colIndex) => (
+                  <div class={styles.column}>
+                    <For
+                      each={column.views[0]()}
+                      fallback={<div>Col {colIndex}</div>}
+                    >
+                      {(view, rowIndex) => {
+                        return <View view={view} tabId={rowIndex()} />;
+                      }}
+                    </For>
+                  </div>
+                )}
+              </For>
+            </div>
           </div>
           <Footer />
         </div>
