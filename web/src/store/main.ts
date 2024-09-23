@@ -205,7 +205,6 @@ export class AcmeWorkspaceStore {
   openList(view: DataView): TreeState {
     let identifier = null;
     let state = null;
-    console.log("opening list");
     if (view.type === "data") {
       identifier = `c#${view.containerId}`;
       state = this.openLists.get(identifier);

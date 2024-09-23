@@ -12,7 +12,6 @@ interface ListProps {
 
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
-  console.log(props.view);
   const state = session.workspace.openList(props.view);
   const ctx = new ListDragContext({
     treeState: state,

@@ -73,10 +73,10 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
       onMouseUp={() => {
         const region = dropRegion[0]();
         if (region === "left") {
-          viewState.addHorizontally(props.container.id);
+          viewState.openDataView(props.container.id);
         }
         if (region === "right") {
-          viewState.addHorizontally(props.container.id);
+          viewState.openDataView(props.container.id);
         }
         if (region === "top") {
           viewState.addVertically(props.container.id);

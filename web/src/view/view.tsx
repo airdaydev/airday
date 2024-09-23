@@ -19,13 +19,7 @@ export function View(props: ViewProps) {
       {(view, index) => (
         <Switch>
           <Match when={view.type === "data"}>
-            <List view={view} />
-          </Match>
-          <Match
-            when={view.type === "container" && view.direction === "horizontal"}
-          >
-            <div style={styles.column}>
-              <View view={view} />
+            <div class={styles["view-cell"]}>
               {session.workspace.containerModel.dndContext.isDragging() && (
                 <PaneDropGuide
                   view={view}
@@ -36,7 +30,13 @@ export function View(props: ViewProps) {
                     .value.getFirstSelected()}
                 />
               )}
+              <List view={view} />
             </div>
+          </Match>
+          <Match
+            when={view.type === "container" && view.direction === "horizontal"}
+          >
+            <View view={view} />
           </Match>
           <Match
             when={view.type === "container" && view.direction === "vertical"}
