@@ -120,9 +120,9 @@ class ViewState {
       return [...prev];
     });
   }
-  addContainerView = (containerId: string) => {
+  addContainerView = (containerId: string, rowNumber: number = 0) => {
     // TODO: Allow more lists
-    if (this.matrix[0]().length > 8) return;
+    if (this.matrix[0]().length > 4) return;
     const id = createUniqueId();
     const view = createSignal<BordeView>({
       // TODO: Detect clash / or how does this lib work

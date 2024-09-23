@@ -23,14 +23,13 @@ export function App() {
           )}
           <div class={styles.main}>
             <BordeNav />
-            <For
-              each={viewState.matrix[0]()}
-              fallback={<div>Loading ({`<For />`})</div>}
-            >
+            <For each={viewState.matrix[0]()} fallback={<div>View Matrix</div>}>
               {(col, index) => (
-                <For each={col} fallback={<div>Fruck</div>}>
-                  {(view, index) => <View view={view[0]()} tabId={index()} />}
-                </For>
+                <div class={styles.column}>
+                  <For each={col} fallback={<div>Col {index}</div>}>
+                    {(view, index) => <View view={view[0]()} tabId={index()} />}
+                  </For>
+                </div>
               )}
             </For>
           </div>
