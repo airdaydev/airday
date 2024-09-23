@@ -19,6 +19,7 @@
 }
 
 .column {
+    position: relative;
     display: flex;
     flex-direction: row;
     flex-shrink: 1;

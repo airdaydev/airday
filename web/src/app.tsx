@@ -7,6 +7,7 @@ import { Footer } from "./nav/footer";
 import { Dragged } from "@borde/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
+import { PaneDropGuide } from "./view/pane-drop-guide";
 
 // TODO: Switch workspace
 export function App() {
@@ -30,6 +31,9 @@ export function App() {
               >
                 {(column, colIndex) => (
                   <div class={styles.column}>
+                    {session.workspace.containerModel.dndContext.isDragging() && (
+                      <PaneDropGuide />
+                    )}
                     <For
                       each={column.views[0]()}
                       fallback={<div>Col {colIndex}</div>}
