@@ -11,7 +11,7 @@ import { GenericItem } from "../store/loader";
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | undefined;
 
-class ContainerView implements BordeContainerView {
+export class ContainerView implements BordeContainerView {
   id = createUniqueId();
   containerId: string;
   type: "container" = "container";
@@ -19,6 +19,10 @@ class ContainerView implements BordeContainerView {
   parent?: Column;
   constructor(containerId: string) {
     this.containerId = containerId;
+  }
+  detach() {
+    console.log("huh");
+    this.parent?.removeView(this);
   }
 }
 
@@ -30,12 +34,15 @@ class Column {
     view.parent = this;
     this.views[1]((prev) => [...prev, view]);
   };
-  replaceRow = (view: ContainerView, index: number = 0) => {
+  replaceView = (view: ContainerView, index: number = 0) => {
     this.views[1]((prev) => {
       const next = [...prev];
       next[index] = view;
       return next;
     });
+  };
+  removeView = (view: ContainerView) => {
+    this.views[1]((prev) => prev.filter((v) => v.id !== view.id));
   };
 }
 
@@ -123,7 +130,7 @@ class ViewState {
   }
   replaceView(view: ContainerView, ViewIndex = [0, 0]) {
     const [matrix] = this.matrix;
-    matrix()[0].replaceRow(view);
+    matrix()[0].replaceView(view);
     this.setActivePaneId(view.id);
   }
   addHorizontally(containerId: string, ViewIndex = [0, 0]) {
@@ -140,8 +147,9 @@ class ViewState {
     setMatrix((prev) => [...prev, col]);
     this.setActivePaneId(view.id);
   }
-  closeView(index: number) {
+  closeView(view: ContainerView) {
     const [matrix, setMatrix] = this.matrix;
+    view.detach();
     // const col = matrix[0]();
     // const view = matrix()[index][0]().id;
     // if (!view) return;

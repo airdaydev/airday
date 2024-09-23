@@ -1,5 +1,5 @@
 import { Signal } from "solid-js";
-import { viewState } from "../view/state";
+import { ContainerView, viewState } from "../view/state";
 import { EditableListTitle } from "./list-title";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
@@ -8,6 +8,7 @@ import { ListIcon } from "./list-icon";
 interface ListHeaderProps {
   container: Signal<BordeContainer>;
   tabId: number;
+  view: ContainerView;
 }
 
 export const ListHeader = (props: ListHeaderProps) => {
@@ -24,7 +25,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         <div>
           <button
             class={styles["list-button"]}
-            onClick={() => viewState.closeView(props.tabId)}
+            onClick={() => props.view.detach()}
           >
             <XSVG />
           </button>
