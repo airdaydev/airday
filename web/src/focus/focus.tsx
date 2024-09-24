@@ -1,6 +1,8 @@
 import styles from "./focus.module.css";
 import { GenericItem } from "../store/loader";
 import { viewState } from "../view/state";
+import { glSnow } from "./ai-gl";
+import { onMount } from "solid-js";
 
 interface FocusProps {
   item: GenericItem;
@@ -9,11 +11,13 @@ interface FocusProps {
 // Full screen view with Pomodoro timer
 // TODO: Change title of webpage to this
 export const Focus = (props: FocusProps) => {
+  let canvas: HTMLCanvasElement;
+  // onMount(() => glSnow(canvas));
   return (
     <div class={styles["container"]}>
-      <div>
-        <h2>{props.item.content}</h2>
-        <div>03:00 of 15:00 left</div>
+      <canvas ref={canvas} />
+      <div class={styles["content"]}>
+        <h1>{props.item.content}</h1>
         <button
           onClick={() => {
             viewState.scene[1]("default");

@@ -1,6 +1,7 @@
 :root {
     --background: hsl(180, 4.8%, 97%);
     --border: #eaeaea;
+    --border-heavy: hsl(0, 0%, 82%);
     --shade-bg: #f3f3f3;
     --shade: #e1e1e1;
     --light-shade: #f3f3f3;

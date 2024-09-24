@@ -9,3 +9,20 @@
     align-items: center;
     justify-content: center;
 }
+
+.container canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+.container h1 {
+    font-family: alte haas grotesk;
+    font-weight: 400;
+    font-size: 2em;
+    max-width: 48em;
+}
+
+.content {
+    position: relative;
+}
