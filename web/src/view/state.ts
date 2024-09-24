@@ -26,19 +26,27 @@ export class ViewNode {
     this.parent?.removeView(this);
   }
   replaceChild = (view: ViewNode, index: number = 0) => {
-    console.log("replacing child", view, index);
     this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
       return next;
     });
   };
+  // TODO: AI written; review
   removeView = (view: ViewNode) => {
-    this.children[1]((prev) => prev.filter((v) => v.id !== view.id));
+    this.children[1]((prev) => {
+      const next = prev.filter((v) => v.id !== view.id);
+      if (
+        next.length === 0 &&
+        this.parent &&
+        this.parent.type === "container"
+      ) {
+        this.parent.removeView(this);
+      }
+      return next;
+    });
   };
-
   addChild(view: ViewNode, index?: number) {
-    console.log("adding child", index);
     view.parent = this;
     this.children[1]((prev) => {
       const next = [...prev];
@@ -63,7 +71,6 @@ export class ViewNode {
       ogParent.replaceChild(horzSplit, thisIndex);
     }
   }
-
   addRight(view: ViewNode) {
     if (!this.parent) return;
     const ogParent = this.parent;
@@ -77,7 +84,6 @@ export class ViewNode {
       ogParent.replaceChild(horzSplit, thisIndex);
     }
   }
-
   addSibling(view: ViewNode, position: "before" | "after") {
     if (!this.parent) return;
     const ogParent = this.parent;
@@ -85,7 +91,6 @@ export class ViewNode {
     const newIndex = position === "before" ? thisIndex : thisIndex + 1;
     ogParent.addChild(view, newIndex);
   }
-
   addUp(view: ViewNode) {
     if (!this.parent) return;
     const ogParent = this.parent;
@@ -100,7 +105,6 @@ export class ViewNode {
       ogParent.replaceChild(vertSplit, thisIndex);
     }
   }
-
   addDown(view: ViewNode) {
     if (!this.parent) return;
     const ogParent = this.parent;
