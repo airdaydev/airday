@@ -14,9 +14,6 @@ interface ViewProps {
  */
 export function View(props: ViewProps) {
   const session = useContext(sessionContext);
-  createEffect(() => {
-    console.log("wot", viewState.tree.children[0]());
-  });
   return (
     <For each={props.view.children[0]()} fallback={<div>View Tree</div>}>
       {(view, index) => (

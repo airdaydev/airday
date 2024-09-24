@@ -38,7 +38,7 @@ export class ViewNode {
   };
 
   addChild(view: ViewNode, index?: number) {
-    console.log("adding child");
+    console.log("adding child", index);
     view.parent = this;
     this.children[1]((prev) => {
       const next = [...prev];
@@ -109,8 +109,8 @@ export class ViewNode {
       this.addSibling(view, "after");
     } else {
       const vertSplit = new VerticalSplitNode();
-      vertSplit.addChild(view);
       vertSplit.addChild(this);
+      vertSplit.addChild(view);
       ogParent.replaceChild(vertSplit, thisIndex);
     }
   }

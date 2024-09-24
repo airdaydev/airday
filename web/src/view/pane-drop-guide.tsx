@@ -73,21 +73,24 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
       onMouseUp={() => {
         const region = dropRegion[0]();
         if (region === "left") {
-          const dataView = new DataView(props.view.containerId);
+          const dataView = new DataView(props.container.id);
           props.view.addLeft(dataView);
         }
         if (region === "right") {
-          const dataView = new DataView(props.view.containerId);
+          const dataView = new DataView(props.container.id);
           props.view.addRight(dataView);
         }
         if (region === "top") {
-          const dataView = new DataView(props.view.containerId);
-          console.log("dropped up top:", dataView.containerId);
+          const dataView = new DataView(props.container.id);
           props.view.addUp(dataView);
         }
         if (region === "bottom") {
-          const dataView = new DataView(props.view.containerId);
+          const dataView = new DataView(props.container.id);
           props.view.addDown(dataView);
+        }
+        if (region === "all") {
+          const dataView = new DataView(props.container.id);
+          viewState.addViewToRoot(dataView);
         }
       }}
       class={styles["pane-drop-guide-container"]}
