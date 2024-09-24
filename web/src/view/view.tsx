@@ -14,6 +14,9 @@ interface ViewProps {
  */
 export function View(props: ViewProps) {
   const session = useContext(sessionContext);
+  createEffect(() => {
+    console.log("wot", viewState.tree.children[0]());
+  });
   return (
     <For each={props.view.children[0]()} fallback={<div>View Tree</div>}>
       {(view, index) => (
@@ -36,12 +39,16 @@ export function View(props: ViewProps) {
           <Match
             when={view.type === "container" && view.direction === "horizontal"}
           >
-            <View view={view} />
+            <div class={styles["horizontal-container"]}>
+              <View view={view} />
+            </div>
           </Match>
           <Match
             when={view.type === "container" && view.direction === "vertical"}
           >
-            <View view={view} />
+            <div class={styles["vertical-container"]}>
+              <View view={view} />
+            </div>
           </Match>
         </Switch>
       )}

@@ -20,25 +20,100 @@ export class ViewNode {
   isRoot = false;
   type: ViewType = "container";
   direction: SplitDirection = "horizontal";
-  children: Signal<DataView[]> = createSignal(new Array());
+  children?: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
   parent?: ViewNode;
-  addChild = (view: DataView, index?: number) => {
-    view.parent = this;
-    this.children[1]((prev) => [...prev, view]);
-  };
-  replaceChild = (view: DataView, index: number = 0) => {
+  detach() {
+    this.parent?.removeView(this);
+  }
+  replaceChild = (view: ViewNode, index: number = 0) => {
+    console.log("replacing child", view, index);
     this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
       return next;
     });
   };
-  removeView = (view: DataView) => {
+  removeView = (view: ViewNode) => {
     this.children[1]((prev) => prev.filter((v) => v.id !== view.id));
   };
-  addSibling = (view: DataView) => {
-    this.parent?.addChild(view);
-  };
+
+  addChild(view: ViewNode, index?: number) {
+    console.log("adding child");
+    view.parent = this;
+    this.children[1]((prev) => {
+      const next = [...prev];
+      if (index !== undefined) {
+        next.splice(index, 0, view);
+      } else {
+        next.push(view);
+      }
+      return next;
+    });
+  }
+  addLeft(view: ViewNode) {
+    if (!this.parent) return;
+    const ogParent = this.parent;
+    const thisIndex = ogParent.children[0]().indexOf(this);
+    if (this.parent.direction === "horizontal") {
+      this.addSibling(view, "before");
+    } else {
+      const horzSplit = new HorizontalSplitNode();
+      horzSplit.addChild(view);
+      horzSplit.addChild(this);
+      ogParent.replaceChild(horzSplit, thisIndex);
+    }
+  }
+
+  addRight(view: ViewNode) {
+    if (!this.parent) return;
+    const ogParent = this.parent;
+    const thisIndex = ogParent.children[0]().indexOf(this);
+    if (this.parent.direction === "horizontal") {
+      this.addSibling(view, "after");
+    } else {
+      const horzSplit = new HorizontalSplitNode();
+      horzSplit.addChild(this);
+      horzSplit.addChild(view);
+      ogParent.replaceChild(horzSplit, thisIndex);
+    }
+  }
+
+  addSibling(view: ViewNode, position: "before" | "after") {
+    if (!this.parent) return;
+    const ogParent = this.parent;
+    const thisIndex = ogParent.children[0]().indexOf(this);
+    const newIndex = position === "before" ? thisIndex : thisIndex + 1;
+    ogParent.addChild(view, newIndex);
+  }
+
+  addUp(view: ViewNode) {
+    if (!this.parent) return;
+    const ogParent = this.parent;
+    const thisIndex = ogParent.children[0]().indexOf(this);
+    if (this.parent.direction === "vertical") {
+      this.addSibling(view, "before");
+    } else {
+      const vertSplit = new VerticalSplitNode();
+      vertSplit.addChild(view);
+      vertSplit.addChild(this);
+      // TODO: Method this
+      ogParent.replaceChild(vertSplit, thisIndex);
+    }
+  }
+
+  addDown(view: ViewNode) {
+    if (!this.parent) return;
+    const ogParent = this.parent;
+    const thisIndex = ogParent.children[0]().indexOf(this);
+    if (this.parent.direction === "vertical") {
+      this.addSibling(view, "after");
+    } else {
+      const vertSplit = new VerticalSplitNode();
+      vertSplit.addChild(view);
+      vertSplit.addChild(this);
+      ogParent.replaceChild(vertSplit, thisIndex);
+    }
+  }
 }
 
 export class RootViewNode extends ViewNode {
@@ -71,9 +146,6 @@ export class DataView extends ViewNode {
     super();
     this.containerId = containerId;
   }
-  detach() {
-    this.parent?.removeView(this);
-  }
 }
 
 /**
@@ -103,6 +175,42 @@ class ViewState {
     this.activePaneId = activePaneId[0];
     this.setActivePaneId = activePaneId[1];
   }
+  findNodeById(id: string): ViewNode | null {
+    let result: ViewNode | null = null;
+    walk(this.tree, (node) => {
+      if (node.id === id) {
+        result = node;
+        return true; // Stop walking
+      }
+    });
+    return result;
+  }
+  addViewRelative(
+    containerId: string,
+    relativeTo: string,
+    position: "left" | "right" | "up" | "down",
+  ) {
+    const relativeNode = this.findNodeById(relativeTo);
+    if (!relativeNode) return;
+
+    const view = new DataView(containerId);
+    switch (position) {
+      case "left":
+        relativeNode.addLeft(view);
+        break;
+      case "right":
+        relativeNode.addRight(view);
+        break;
+      case "up":
+        relativeNode.addUp(view);
+        break;
+      case "down":
+        relativeNode.addDown(view);
+        break;
+    }
+    this.setActivePaneId(view.id);
+  }
+
   count() {
     // TODO: This needs to be a signal... so all registered views must be tracked.
     let count = 0;
@@ -163,30 +271,10 @@ class ViewState {
   };
   addViewToRoot(view: DataView, ViewIndex = [0, 0]) {
     this.tree.addChild(view);
-    this.setActivePaneId(view.id);
-  }
-  addHorizontally(containerId: string, ViewIndex = [0, 0]) {
-    const view = new DataView(containerId);
-    this.tree.addChild(view);
-    this.setActivePaneId(view.id);
-  }
-  addVertically(containerId: string, ViewIndex = [0, 0]) {
-    const column = new ColumnNode();
-    const view = new DataView(containerId);
-    column.addChild(view);
-    this.tree.addChild(view);
-    this.setActivePaneId(view.id);
+    // this.setActivePaneId(view.id);
   }
   closeView(view: DataView) {
-    const [matrix, setMatrix] = this.matrix;
     view.detach();
-    // const col = matrix[0]();
-    // const view = matrix()[index][0]().id;
-    // if (!view) return;
-    // return setMatrix((prev) => {
-    //   prev.splice(index, 1);
-    //   return [...prev];
-    // });
   }
 }
 
