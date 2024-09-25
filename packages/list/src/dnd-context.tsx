@@ -106,6 +106,7 @@ export class ListDragContext {
     this.setLastTouchedIndex(0); // TODO: think about carefully, causes slight bug
   }
   selectOne(node: Node) {
+    if (!node) return;
     const selection = new Set([node]);
     this.originNode = node;
     this.selection[1](selection);
