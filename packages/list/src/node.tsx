@@ -134,6 +134,9 @@ export const NodeContainer = (props: NodeContainerProps) => {
       return;
     }
     if (!isSelected()) props.listDragContext.selectOne(props.node);
+    else {
+      props.listDragContext.originNode = props.node;
+    }
     if (event.button === 2) {
       return;
     }

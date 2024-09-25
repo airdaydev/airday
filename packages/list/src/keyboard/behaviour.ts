@@ -2,7 +2,7 @@ import { ListDragContext } from "../dnd-context";
 
 export function selectBelowOrigin(ctx: ListDragContext) {
   // Down movement from selection or top
-  if (ctx.selection[0]().size === 0) {
+  if (ctx.selection[0]().size === 0 || !ctx.originNode) {
     const firstIndex = 0;
     const firstItem = ctx.treeState.childrenSignal[0]()[firstIndex];
     ctx.selectOne(firstItem);
@@ -22,15 +22,14 @@ export function selectBelowOrigin(ctx: ListDragContext) {
  */
 export function selectAboveOrigin(ctx: ListDragContext) {
   // Up movement from selectionA
-  if (ctx.selection[0]().size === 0) {
-    console.log("size0");
+  console.log(ctx.originNode);
+  if (ctx.selection[0]().size === 0 || !ctx.originNode) {
     const lastIndex = ctx.treeState.count();
     const lastItem = ctx.treeState.childrenSignal[0]()[lastIndex - 1];
     ctx.selectOne(lastItem);
     ctx.jumpScrollToIndex(lastIndex - 1);
     return;
   }
-  console.log("size not 0");
   const origin = ctx?.originNode;
   if (origin) {
     const sibling = ctx.getSibling(origin, "prev");
