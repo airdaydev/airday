@@ -19,6 +19,7 @@ export function Checkbox(props: CheckboxProps) {
           event.preventDefault();
           event.stopPropagation();
         }}
+        tabIndex={-1}
       ></input>
       <span></span>
     </label>
