@@ -16,7 +16,11 @@
 - [x] Columns prototype
 - [x] Drag to create new column/row (track to ensure limits)
 - [x] Recursive views to completion
-- [ ] Determine active view
+- [x] moving down with nothing selected should start at top of list
+- [x] moving up with nothing selected should start at bottom of list
+- [] opening changes active view
+- [] Dropping changes active view
+- [ ] Default view is inbox
 - [ ] Fix focus issues
 - [ ] Context click on list header
 - [ ] touch swipe gesture left /right to hide + show sidebar
