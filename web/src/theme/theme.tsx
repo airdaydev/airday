@@ -27,6 +27,7 @@ export const ThemeToggle = (props: ThemeToggleProps) => {
         theme[1](newTheme);
       }}
       style={"line-height: 0rem;"}
+      tabIndex={-1}
     >
       {theme[0]() === "dark" ? <MoonSVG /> : <SunSVG />}
     </button>

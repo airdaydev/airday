@@ -4,7 +4,6 @@ import { EditableListTitle } from "./list-title";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
-import { KeyboardMarker } from "./keyboard-marker";
 
 interface ListHeaderProps {
   container: Signal<BordeContainer>;
@@ -16,7 +15,7 @@ interface ListHeaderProps {
 export const ListHeader = (props: ListHeaderProps) => {
   return (
     <div class={styles["list-header"]}>
-      <button class={styles["list-head-button"]}>
+      <button class={styles["list-head-button"]} tabIndex={-1}>
         <span style="padding-right: 0.5em;">
           <ListIcon container={props.container} />
         </span>
@@ -33,6 +32,7 @@ export const ListHeader = (props: ListHeaderProps) => {
           <button
             class={styles["list-button"]}
             onClick={() => props.view.detach()}
+            tabIndex={-1}
           >
             <XSVG />
           </button>

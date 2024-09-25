@@ -62,6 +62,7 @@ export const Footer = () => {
       )}
       <div class={styles["nav-section"]}>
         <button
+          tabIndex={-1}
           ref={appButtonRef}
           class={styles["nav-button"]}
           onClick={(event) => openContextMenu(event, "main", appButtonRef)}
@@ -73,6 +74,7 @@ export const Footer = () => {
           <span style={"margin-left: 0.25em; display: none;"}>SunList</span>
         </button>
         <button
+          tabIndex={-1}
           ref={workspaceButtonRef}
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
           onClick={(event) =>
@@ -84,7 +86,11 @@ export const Footer = () => {
         >
           {session.workspace.name}
         </button>
-        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+        <button
+          tabIndex={-1}
+          class={styles["nav-button"]}
+          style={"line-height: 0rem;"}
+        >
           <span class={styles["key"]}>⌘</span>
           <span class={styles["key"]}>/</span>
           Cmd
@@ -93,26 +99,43 @@ export const Footer = () => {
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
         {selectedItems() && (
-          <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+          <button
+            tabIndex={-1}
+            class={styles["nav-button"]}
+            style={"line-height: 0rem;"}
+          >
             <span class={styles["key"]}>F</span>
             Focus
           </button>
         )}
-        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+        <button
+          tabIndex={-1}
+          class={styles["nav-button"]}
+          style={"line-height: 0rem;"}
+        >
           <span class={styles["key"]}>N</span>
           New
         </button>
-        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+        <button
+          tabIndex={-1}
+          class={styles["nav-button"]}
+          style={"line-height: 0rem;"}
+        >
           <span class={styles["key"]}>/</span>
           Find
         </button>
         <ThemeToggle class={styles["nav-button"]} />
-        <button class={styles["nav-button"]} style={"line-height: 0rem;"}>
+        <button
+          tabIndex={-1}
+          class={styles["nav-button"]}
+          style={"line-height: 0rem;"}
+        >
           <CloudOffSVG />
         </button>
         <button
           class={styles["nav-button"]}
           style="background: #5937ff; color: white; line-height: 1.25rem;"
+          tabIndex={-1}
         >
           Sync AUD$4 monthly
         </button>
