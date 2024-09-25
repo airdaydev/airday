@@ -19,9 +19,13 @@
 - [x] moving down with nothing selected should start at top of list
 - [x] moving up with nothing selected should start at bottom of list
 - [x] fix origin node clearing on selecting existing range bug
-- [] opening changes active view
-- [] Dropping changes active view
-- [ ] Fix focus issues
+- [x] Dropping changes active view
+- [x] opening changes active view
+- [ ] don't double up focus between sidebar and main panes
+- [ ] keyboard shortcut for closing a list
+- [ ] tree backed indexing system to move between panes with numbers
+- [ ] list switcher to switch between open files (opt+tab)
+- [ ] opening a list from sidebar replaces active view
 - [ ] Default view is inbox
 - [ ] Context click on list header
 - [ ] touch swipe gesture left /right to hide + show sidebar

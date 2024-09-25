@@ -1,11 +1,4 @@
-import {
-  createSignal,
-  createUniqueId,
-  Signal,
-  Accessor,
-  Setter,
-  createContext,
-} from "solid-js";
+import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
 import { walk } from "@borde/list";
 
