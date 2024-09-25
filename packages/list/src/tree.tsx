@@ -90,104 +90,103 @@ export const Tree = (props: TreeComponentProps) => {
   // UI code bleeding into state file
   const signal = listDragContext.getWindowedSignal(containerVector);
   return (
-    <>
+    <div
+      classList={{
+        focus: listDragContext.isFocused(), // TODO: Do better
+      }}
+      style={{
+        display: "flex",
+        "flex-direction": "column",
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        "z-index": 2,
+        "overflow-y":
+          listDragContext.dndContext.dragMode[0]() === "touch"
+            ? "hidden"
+            : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
+      }}
+      ref={scrollContainerRef}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+        }
+      }}
+      onScroll={(event) => {
+        // TODO: This should match the projection buffer
+        if (
+          Math.abs(scrollSignal[0]() - event.target.scrollTop) >
+          listDragContext.itemHeight * 10
+        ) {
+          scrollSignal[1](event.target.scrollTop);
+        }
+      }}
+      onFocus={() => listDragContext.setFocus()}
+      onMouseLeave={() => listDragContext.leave()}
+      tabIndex={-1}
+    >
       <div
-        classList={{
-          focus: listDragContext.isFocused(), // TODO: Do better
-        }}
-        style={{
-          display: "flex",
-          "flex-direction": "column",
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          "z-index": 2,
-          "overflow-y":
-            listDragContext.dndContext.dragMode[0]() === "touch"
-              ? "hidden"
-              : "scroll", // Only inactive for touch, so that scrollbar does not appear when toggling on Mac (possibly other OSs)
-        }}
-        ref={scrollContainerRef}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-            event.preventDefault();
-          }
-        }}
-        onScroll={(event) => {
-          // TODO: This should match the projection buffer
-          if (
-            Math.abs(scrollSignal[0]() - event.target.scrollTop) >
-            listDragContext.itemHeight * 10
-          ) {
-            scrollSignal[1](event.target.scrollTop);
-          }
-        }}
-        onFocus={() => listDragContext.setFocus()}
-        onMouseLeave={() => listDragContext.leave()}
-      >
-        <div
-          style={`position: relative;
+        style={`position: relative;
               top: 0;
               left: 0;
               width: 100%;
               min-height: ${listDragContext.presentCount() * listDragContext.itemHeight}px;`}
-        >
-          <For each={signal().window}>
-            {(node, index) => (
-              // TODO: Consider using context here instead
-              <NodeContainer
-                index={index}
-                autoscroller={autoscroller}
-                virtualisedList={signal}
-                node={node}
-                Component={
-                  node.component ||
-                  props.defaultNodeComponent ||
-                  DefaultNodeComponent
-                }
-                listDragContext={listDragContext}
-              />
-            )}
-          </For>
-        </div>
-        <div
-          class="list-backdrop"
-          style={{
-            "min-height": `${listDragContext.itemHeight * 2}px`,
-            ...(props.hideBackdrop && {
-              bottom: 0,
-              position: "absolute",
-              "min-height": `${listDragContext.itemHeight}px`,
-            }),
-          }}
-          onMouseDown={() => {
-            listDragContext.clearSelection();
-            listDragContext.setFocus();
-          }}
-          onMouseEnter={() => {
-            if (listDragContext.dndContext.isDragging()) {
-              listDragContext.setDragOver();
-              if (listDragContext.isOrigin) {
-                // TODO: This COULD fuck up in the case of a window... but maybe not because the window
-                // should overextend. Yes, this needs to be the
-                listDragContext.setLastTouchedIndex(
-                  signal().window.length + signal().start,
-                );
-                listDragContext.setDragOver();
-              } else {
-                listDragContext.setDragOver();
-                listDragContext.setLastTouchedIndex(
-                  signal().window.length + signal().start,
-                );
+      >
+        <For each={signal().window}>
+          {(node, index) => (
+            // TODO: Consider using context here instead
+            <NodeContainer
+              index={index}
+              autoscroller={autoscroller}
+              virtualisedList={signal}
+              node={node}
+              Component={
+                node.component ||
+                props.defaultNodeComponent ||
+                DefaultNodeComponent
               }
-            }
-          }}
-        >
-          {showBackdropPlaceholder() && (
-            <Placeholder listDragContext={listDragContext} backdrop={true} />
+              listDragContext={listDragContext}
+            />
           )}
-        </div>
+        </For>
       </div>
-    </>
+      <div
+        class="list-backdrop"
+        style={{
+          "min-height": `${listDragContext.itemHeight * 2}px`,
+          ...(props.hideBackdrop && {
+            bottom: 0,
+            position: "absolute",
+            "min-height": `${listDragContext.itemHeight}px`,
+          }),
+        }}
+        onMouseDown={() => {
+          listDragContext.clearSelection();
+          listDragContext.setFocus();
+        }}
+        onMouseEnter={() => {
+          if (listDragContext.dndContext.isDragging()) {
+            listDragContext.setDragOver();
+            if (listDragContext.isOrigin) {
+              // TODO: This COULD fuck up in the case of a window... but maybe not because the window
+              // should overextend. Yes, this needs to be the
+              listDragContext.setLastTouchedIndex(
+                signal().window.length + signal().start,
+              );
+              listDragContext.setDragOver();
+            } else {
+              listDragContext.setDragOver();
+              listDragContext.setLastTouchedIndex(
+                signal().window.length + signal().start,
+              );
+            }
+          }
+        }}
+      >
+        {showBackdropPlaceholder() && (
+          <Placeholder listDragContext={listDragContext} backdrop={true} />
+        )}
+      </div>
+    </div>
   );
 };
