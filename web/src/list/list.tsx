@@ -1,4 +1,4 @@
-import { createEffect, useContext } from "solid-js";
+import { createEffect, onMount, useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView, viewState } from "../view/state";
@@ -26,6 +26,9 @@ export function List(props: ListProps) {
     if (ctx.dndContext.focusContext[0]() === ctx) {
       viewState.activePaneId[1](props.view.id);
     }
+  });
+  onMount(() => {
+    ctx.setFocus();
   });
   return (
     <section
