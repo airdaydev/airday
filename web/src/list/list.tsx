@@ -1,4 +1,4 @@
-import { useContext } from "solid-js";
+import { createEffect, useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView, viewState } from "../view/state";
@@ -22,14 +22,16 @@ export function List(props: ListProps) {
   const container = session.workspace.containerModel.tree.idMap.get(
     props.view.containerId,
   );
+  createEffect(() => {
+    if (ctx.dndContext.focusContext[0]() === ctx) {
+      viewState.activePaneId[1](props.view.id);
+    }
+  });
   return (
     <section
       classList={{
         [styles.list]: true,
         [styles.focus]: viewState.activePaneId[0]() === props.view.id,
-      }}
-      onFocus={() => {
-        viewState.activePaneId[1](props.view.id);
       }}
       onClick={() => {
         viewState.activePaneId[1](props.view.id);

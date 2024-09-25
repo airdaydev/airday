@@ -21,8 +21,8 @@
 - [x] fix origin node clearing on selecting existing range bug
 - [] opening changes active view
 - [] Dropping changes active view
-- [ ] Default view is inbox
 - [ ] Fix focus issues
+- [ ] Default view is inbox
 - [ ] Context click on list header
 - [ ] touch swipe gesture left /right to hide + show sidebar
 - [ ] Test if drag limit is below or above diagonal line on hover!
