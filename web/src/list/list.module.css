@@ -122,3 +122,8 @@
     flex-grow: 1;
     padding: 0.25em 0.5em;
 }
+
+.keyboard-marker {
+    position: relative;
+    margin-left: 0.25em;
+}

@@ -21,6 +21,7 @@ export const NavListItem: NodeComponentType = (props) => {
           [styles.active]: viewState.isContainerActive(node().id),
           [styles["nav-text-button"]]: true,
         }}
+        tabindex="-1"
         onClick={() => viewState.openDataView(node().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();

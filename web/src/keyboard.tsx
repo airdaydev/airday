@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { viewState } from "./view-state";
+import { viewState } from "./view/state";
 
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
 
@@ -15,7 +15,7 @@ export class KeyboardShortcuts {
         const action = this.globalKeyboardHandler(event); // overrides
         if (action) return;
       }
-      const currentContext = viewState.activePaneId();
+      const currentContext = viewState.activePaneId[0]();
       if (currentContext) {
         const handler = this.handlerMap.get(keyName("keydown", currentContext));
         if (handler) handler(event);
@@ -47,31 +47,3 @@ export class KeyboardShortcuts {
 }
 
 export const keyboardShortcuts = new KeyboardShortcuts();
-
-// list gets its own context (open modal etc still works)
-// item gets its own context (open modal etc still works)
-// side nav gets its own context (open modal etc still works)
-// modal gets its own context (takes over completely)
-
-// the key is one context at a time, but with a global context that can be turned on/off
-// falls back to first open context
-
-export const keyboardMarker = () => {
-  return (
-    <div
-      style="bottom: 1em;
-      right: 0.5em;
-      position: absolute;
-      width: 2em;
-      height: 2em;
-      z-index: 100;
-      border-radius: 2px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 1px 1px 1px 0 rgba(104, 104, 104, 0.25);"
-    >
-      ⌘
-    </div>
-  );
-};

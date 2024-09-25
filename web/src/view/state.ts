@@ -10,7 +10,7 @@ import { GenericItem } from "../store/loader";
 import { walk } from "@borde/list";
 
 type ActiveRegionTypes = "sidebar" | "container";
-type ModalTypes = "command" | "find" | undefined;
+type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data";
 type ViewIndex = [number, number];
@@ -162,23 +162,15 @@ export class DataView extends ViewNode {
  * State should be saved in local storage, per workspace
  */
 class ViewState {
-  activeModal: Accessor<ModalTypes>;
-  activeRegion: Accessor<ActiveRegionTypes>;
-  activePaneId: Accessor<string | undefined>;
-  setActivePaneId: Setter<string | undefined>;
+  activeModal: Signal<ModalTypes> = createSignal<ModalTypes>(null);
+  activeRegion: Signal<ActiveRegionTypes> =
+    createSignal<ActiveRegionTypes>("container");
+  activePaneId = createSignal<string | undefined>();
   sidebarVisible = createSignal<boolean>(true);
   tree = new RootViewNode();
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
-  constructor() {
-    const activeRegion = createSignal<ActiveRegionTypes>("sidebar");
-    this.activeRegion = activeRegion[0];
-    const activeModal = createSignal<ModalTypes>();
-    this.activeModal = activeModal[0];
-    const activePaneId = createSignal<string>();
-    this.activePaneId = activePaneId[0];
-    this.setActivePaneId = activePaneId[1];
-  }
+  constructor() {}
   findNodeById(id: string): ViewNode | null {
     let result: ViewNode | null = null;
     walk(this.tree, (node) => {
@@ -212,7 +204,7 @@ class ViewState {
         relativeNode.addDown(view);
         break;
     }
-    this.setActivePaneId(view.id);
+    this.activePaneId[1](view.id);
   }
 
   count() {

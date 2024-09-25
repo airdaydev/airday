@@ -26,13 +26,13 @@ export function List(props: ListProps) {
     <section
       classList={{
         [styles.list]: true,
-        [styles.focus]: viewState.activePaneId() === props.view.id,
+        [styles.focus]: viewState.activePaneId[0]() === props.view.id,
       }}
       onFocus={() => {
-        viewState.setActivePaneId(props.view.id);
+        viewState.activePaneId[1](props.view.id);
       }}
       onClick={() => {
-        viewState.setActivePaneId(props.view.id);
+        viewState.activePaneId[1](props.view.id);
       }}
     >
       {container && (

@@ -4,6 +4,7 @@ import { EditableListTitle } from "./list-title";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
+import { KeyboardMarker } from "./keyboard-marker";
 
 interface ListHeaderProps {
   container: Signal<BordeContainer>;
@@ -11,6 +12,7 @@ interface ListHeaderProps {
   view: DataView;
 }
 
+// ⌨
 export const ListHeader = (props: ListHeaderProps) => {
   return (
     <div class={styles["list-header"]}>
@@ -19,6 +21,12 @@ export const ListHeader = (props: ListHeaderProps) => {
           <ListIcon container={props.container} />
         </span>
         <span class={styles["title-text"]}>{props.container.name}</span>
+        <div
+          class={styles["keyboard-marker"]}
+          style={`opacity: ${viewState.activePaneId[0]() == props.view.id ? "1" : "0"}`}
+        >
+          -
+        </div>
       </button>
       {viewState.count() > 1 && (
         <div>

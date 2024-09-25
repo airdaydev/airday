@@ -5,6 +5,34 @@
 - [x] New drag/drop list for list view
 - [x] Clean up list dnd CSS
 - [x] Clean up list dnd backdrop
+- [x] list nav dnd
+- [x] restore items
+- [x] restore list header (might need upstream push to list component!)
+- [x] center checkbox
+- [x] make dragged item have rounded corners
+- [x] fix bug - status bar sits ontop of lists!
+- [x] active list highlight differs from non-active
+- [x] accurate 0 items of x selected text
+- [x] Columns prototype
+- [x] Drag to create new column/row (track to ensure limits)
+- [x] Recursive views to completion
+- [ ] Determine active view
+- [ ] Fix focus issues
+- [ ] Context click on list header
+- [ ] touch swipe gesture left /right to hide + show sidebar
+- [ ] Test if drag limit is below or above diagonal line on hover!
+- [ ] on context click of nav item, select the list
+- [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
+- [ ] drag sidebar to resize
+- [ ] borde - experiment with sounds
+- [ ] store check information (done or not?)
+- [ ] open done list
+- [ ] add initial habit item
+- [ ] open performance list, add filters/configuration
+- [ ] open priority list (added by reference, no move!)
+- [ ] calendar view = simple week view
+- [ ] experiment with sounds
+- [ ] Limit open lists, ensure destruction
 - [] Reinstate Done board
 - [] Next board
 - [] Drag items into list nav
