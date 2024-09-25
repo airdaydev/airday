@@ -22,7 +22,6 @@ export function selectBelowOrigin(ctx: ListDragContext) {
  */
 export function selectAboveOrigin(ctx: ListDragContext) {
   // Up movement from selectionA
-  console.log(ctx.originNode);
   if (ctx.selection[0]().size === 0 || !ctx.originNode) {
     const lastIndex = ctx.treeState.count();
     const lastItem = ctx.treeState.childrenSignal[0]()[lastIndex - 1];
