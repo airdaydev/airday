@@ -160,7 +160,10 @@ export const Tree = (props: TreeComponentProps) => {
               "min-height": `${listDragContext.itemHeight}px`,
             }),
           }}
-          onMouseDown={() => listDragContext.clearSelection()}
+          onMouseDown={() => {
+            listDragContext.clearSelection();
+            listDragContext.setFocus();
+          }}
           onMouseEnter={() => {
             if (listDragContext.dndContext.isDragging()) {
               listDragContext.setDragOver();
