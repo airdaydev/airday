@@ -24,6 +24,7 @@
 - [ ] don't double up focus between sidebar and main panes
 - [ ] keyboard shortcut for closing a list
 - [ ] tree backed indexing system to move between panes with numbers
+- [ ] closing a list focuses on the previous
 - [ ] list switcher to switch between open files (opt+tab)
 - [ ] opening a list from sidebar replaces active view
 - [ ] Default view is inbox
