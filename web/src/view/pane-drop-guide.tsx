@@ -90,7 +90,7 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         }
         if (region === "all") {
           const dataView = new DataView(props.container.id);
-          viewState.addViewToRoot(dataView);
+          props.view.replace(dataView);
         }
       }}
       class={styles["pane-drop-guide-container"]}

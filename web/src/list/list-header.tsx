@@ -22,7 +22,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         <span class={styles["title-text"]}>{props.container.name}</span>
         <div
           class={styles["keyboard-marker"]}
-          style={`opacity: ${viewState.activePaneId[0]() == props.view.id ? "1" : "0"}`}
+          style={`opacity: ${viewState.activePane[0]() == props.view ? "1" : "0"}`}
         >
           -
         </div>

@@ -24,7 +24,7 @@ export function List(props: ListProps) {
   );
   createEffect(() => {
     if (ctx.dndContext.focusContext[0]() === ctx) {
-      viewState.activePaneId[1](props.view.id);
+      viewState.activePane[1](props.view);
     }
   });
   onMount(() => {
@@ -34,10 +34,10 @@ export function List(props: ListProps) {
     <section
       classList={{
         [styles.list]: true,
-        [styles.focus]: viewState.activePaneId[0]() === props.view.id,
+        [styles.focus]: viewState.activePane[0]() === props.view,
       }}
       onClick={() => {
-        viewState.activePaneId[1](props.view.id);
+        viewState.activePane[1](props.view);
       }}
     >
       {container && (

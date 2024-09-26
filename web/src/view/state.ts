@@ -18,6 +18,14 @@ export class ViewNode {
   detach() {
     this.parent?.removeView(this);
   }
+  getIndexShallow() {
+    if (!this.parent) return -1;
+    return this.parent.children[0]().findIndex((node) => node === this);
+  }
+  replace = (view: ViewNode) => {
+    const index = this.getIndexShallow();
+    this.parent?.replaceChild(view, index);
+  };
   replaceChild = (view: ViewNode, index: number = 0) => {
     view.parent = this;
     this.children[1]((prev) => {
@@ -153,7 +161,7 @@ class ViewState {
   activeModal: Signal<ModalTypes> = createSignal<ModalTypes>(null);
   activeRegion: Signal<ActiveRegionTypes> =
     createSignal<ActiveRegionTypes>("container");
-  activePaneId = createSignal<string | undefined>();
+  activePane = createSignal<ViewNode | undefined>();
   sidebarVisible = createSignal<boolean>(true);
   tree = new RootViewNode();
   scene = createSignal<"default" | "focus">("default");
@@ -192,7 +200,7 @@ class ViewState {
         relativeNode.addDown(view);
         break;
     }
-    this.activePaneId[1](view.id);
+    this.activePane[1](view.id);
   }
 
   count() {
@@ -243,7 +251,12 @@ class ViewState {
   }
   openDataView(containerId: string) {
     const view = new DataView(containerId);
-    this.addViewToRoot(view);
+    const activePane = this.activePane[0]();
+    if (activePane) {
+      activePane?.replace(view);
+    } else {
+      this.addViewToRoot(view);
+    }
   }
   openDoneView = () => {
     // const id = createUniqueId();
