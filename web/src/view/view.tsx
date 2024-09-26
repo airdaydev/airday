@@ -15,7 +15,14 @@ interface ViewProps {
 export function View(props: ViewProps) {
   const session = useContext(sessionContext);
   return (
-    <For each={props.view.children[0]()} fallback={<div>View Tree</div>}>
+    <For
+      each={props.view.children[0]()}
+      fallback={
+        <div>
+          Empty View {props.view.id} {props.view.type}
+        </div>
+      }
+    >
       {(view, index) => (
         <Switch>
           <Match when={view.type === "data"}>

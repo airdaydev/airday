@@ -21,12 +21,13 @@
 - [x] fix origin node clearing on selecting existing range bug
 - [x] Dropping changes active view
 - [x] opening changes active view
+- [x] Fix bug: splitting down, right, close creates an empty container view
+- [ ] opening a list from sidebar replaces active view
 - [ ] don't double up focus between sidebar and main panes
 - [ ] keyboard shortcut for closing a list
 - [ ] tree backed indexing system to move between panes with numbers
 - [ ] closing a list focuses on the previous
 - [ ] list switcher to switch between open files (opt+tab)
-- [ ] opening a list from sidebar replaces active view
 - [ ] empty list state nice
 - [ ] Default view is inbox
 - [ ] Context click on list header

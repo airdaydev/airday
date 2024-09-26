@@ -19,6 +19,7 @@ export class ViewNode {
     this.parent?.removeView(this);
   }
   replaceChild = (view: ViewNode, index: number = 0) => {
+    view.parent = this;
     this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
@@ -29,11 +30,7 @@ export class ViewNode {
   removeView = (view: ViewNode) => {
     this.children[1]((prev) => {
       const next = prev.filter((v) => v.id !== view.id);
-      if (
-        next.length === 0 &&
-        this.parent &&
-        this.parent.type === "container"
-      ) {
+      if (next.length === 0 && this.type === "container" && this.parent) {
         this.parent.removeView(this);
       }
       return next;
@@ -121,7 +118,6 @@ export class RootViewNode extends ViewNode {
 export class VerticalSplitNode extends ViewNode {
   constructor() {
     super();
-    this.type = "container";
     this.direction = "vertical";
   }
 }
@@ -129,7 +125,6 @@ export class VerticalSplitNode extends ViewNode {
 export class HorizontalSplitNode extends ViewNode {
   constructor() {
     super();
-    this.type = "container";
     this.direction = "horizontal";
   }
 }
