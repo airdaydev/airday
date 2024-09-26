@@ -1,6 +1,6 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
-import { walk } from "@borde/list";
+import { walk } from "@sunlist/list";
 
 type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;

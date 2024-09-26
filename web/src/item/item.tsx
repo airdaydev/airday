@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { NodeComponentType } from "@borde/list";
+import { NodeComponentType } from "@sunlist/list";
 import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
 import { ItemContextMenu } from "./context-menu";

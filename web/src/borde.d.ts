@@ -1,4 +1,4 @@
-interface BordeItem {
+interface Sunlist {
   id: string;
   text: string;
   tsCreated: Date;
@@ -8,7 +8,7 @@ interface BordeItem {
   listId: string;
 }
 
-interface BordeContainer {
+interface SunlistContainer {
   id: string;
   name: string;
   sortKey: string;
@@ -16,18 +16,18 @@ interface BordeContainer {
   // TODO: sortKey
 }
 
-type SelectItemMode = 'normal' | 'add' | 'addOne' | 'remove';
+type SelectItemMode = "normal" | "add" | "addOne" | "remove";
 
 interface SelectItemsOpts {
   mode: SelectItemMode;
-  setOrigin?: boolean,
+  setOrigin?: boolean;
 }
 
-type ListDirection = 'next' | 'prev';
+type ListDirection = "next" | "prev";
 
 type OrderedKey = [string, string, string];
 
-type FastListType = 'trash' | 'upNext' | 'container' | 'done';
+type FastListType = "trash" | "upNext" | "container" | "done";
 
 interface BordeViewBase {
   id: string;
@@ -35,14 +35,14 @@ interface BordeViewBase {
 }
 
 // TODO: Finish these, useful for type checking
-interface BordeContainerView extends BordeViewBase {
+interface SunlistContainerView extends BordeViewBase {
   containerId: string;
-  type: 'container';
-  projection: 'list' | 'kanban';
+  type: "container";
+  projection: "list" | "kanban";
 }
 
 interface BordeDoneView extends BordeViewBase {
-  type: 'done';
+  type: "done";
 }
 
-type BordeView = BordeContainerView | BordeDoneView;
+type BordeView = SunlistContainerView | BordeDoneView;

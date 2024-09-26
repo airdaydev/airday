@@ -1,6 +1,6 @@
-## solid-borde
+## sunlist
 
-Borde early days monorepo
+Sunlist monorepo
 
 ## Architecture
 - SolidJS (templating, reactivity)

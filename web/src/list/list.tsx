@@ -2,7 +2,7 @@ import { createEffect, onMount, useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView, viewState } from "../view/state";
-import { Tree, SolidListContext, ListDragContext } from "@borde/list";
+import { Tree, SolidListContext, ListDragContext } from "@sunlist/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 

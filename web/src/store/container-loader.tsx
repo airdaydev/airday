@@ -1,4 +1,4 @@
-import { Node, GenericNode } from "@borde/list";
+import { Node, GenericNode } from "@sunlist/list";
 import { NavListItem } from "../nav/nav-lists";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";

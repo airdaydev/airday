@@ -9,15 +9,15 @@ import {
   ListDragContext,
   ListStateContext,
   TreeState,
-} from "@borde/list";
+} from "@sunlist/list";
 import { loader } from "./loader";
 import { DataView } from "../view/state";
 
 const schemaVersion = 1;
 
 interface DBTypes {
-  items: BordeItem;
-  lists: BordeContainer;
+  items: Sunlist;
+  lists: SunlistContainer;
 }
 
 export type BordeIDB = IDBPDatabase<DBTypes>;

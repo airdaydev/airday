@@ -6,7 +6,7 @@ import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
 
 interface ListHeaderProps {
-  container: Signal<BordeContainer>;
+  container: Signal<SunlistContainer>;
   tabId: number;
   view: DataView;
 }

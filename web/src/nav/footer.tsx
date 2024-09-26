@@ -5,7 +5,7 @@ import SearchSVG from "../icons/pixel-search.svg?component-solid";
 import SidebarSVG from "../icons/rainbow.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
-import { BordeContextMenu, WorkspaceContextMenu } from "./context-menus";
+import { SunlistContextMenu, WorkspaceContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 
 type ContextMenu = "main" | "workspace";
@@ -49,7 +49,7 @@ export const Footer = () => {
   return (
     <footer class={styles.footer}>
       {ctxOpen() === "main" && (
-        <BordeContextMenu
+        <SunlistContextMenu
           close={() => setCtxOpen(false)}
           offset={ctxOffset()}
         />

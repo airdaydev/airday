@@ -3,13 +3,13 @@ import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
 import { viewState } from "../view/state";
 
-interface BordeContextMenuProps {
+interface SunlistContextMenuProps {
   close: () => void;
   offset: [number, number];
   containerZIndex: number;
 }
 
-export function BordeContextMenu(props: BordeContextMenuProps) {
+export function SunlistContextMenu(props: SunlistContextMenuProps) {
   return (
     <ContextMenu
       close={props.close}
@@ -108,7 +108,7 @@ export function AccountContextMenu(props: AccountContextMenuProps) {
 
 interface NavItemContextMenuProps {
   close: () => void;
-  container: Accessor<BordeContainer>;
+  container: Accessor<SunlistContainer>;
   offset: [number, number];
 }
 

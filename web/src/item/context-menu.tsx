@@ -7,7 +7,7 @@ import styles from "./item.module.css";
 
 interface ItemContextMenuProps {
   close: () => void;
-  item: Accessor<BordeItem>;
+  item: Accessor<Sunlist>;
   updateSticker: (sticker: string) => void;
   style: string;
   offset: [number, number];

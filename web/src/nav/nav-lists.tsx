@@ -4,9 +4,9 @@ import { viewState } from "../view/state";
 import { sessionContext } from "../store/context.js";
 import { AddListButton } from "./add-list";
 import { NavItemContextMenu } from "./context-menus";
-import { NodeComponentType } from "@borde/list";
+import { NodeComponentType } from "@sunlist/list";
 import styles from "./nav.module.css";
-import { ListDragContext, SolidListContext, Tree } from "@borde/list";
+import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
 
 // TODO: Turn off keyboard when context menu open
 export const NavListItem: NodeComponentType = (props) => {

@@ -1,4 +1,4 @@
-# Borde SolidJS Roadmap
+# Sunlist Roadmap
 
 ## 2024 Q3
 - [x] Bring back item view
@@ -38,7 +38,7 @@
 - [ ] on context click of nav item, select the list
 - [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
 - [ ] drag sidebar to resize
-- [ ] borde - experiment with sounds
+- [ ] sunlist - experiment with sounds
 - [ ] store check information (done or not?)
 - [ ] open done list
 - [ ] add initial habit item
@@ -137,7 +137,7 @@
 - [] PWA update strategy
 - [] Automated testing story
 - [] Paid web service with introductory prices
-- [] Opens immediately into application, landing page at about.borde.app
+- [] Opens immediately into application, landing page at about.sunlist.app
 - [] Consider license type for copyleft (reselling no)
 - [] Custom Themes / compact mode
 - [] Spanish (EU) localisation

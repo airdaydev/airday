@@ -1,9 +1,9 @@
 import { Accessor, createSignal, Setter, Signal } from "solid-js";
 import { BordeIDB } from "./main";
-import { DndContext, ListStateContext, TreeState } from "@borde/list";
+import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { containerLoader } from "./container-loader";
 
-export const [containers, setContainers] = createSignal<BordeContainer[]>([]);
+export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
 
 // Structure:
 // 1. signal(list of signal(items)) (sorted index)
@@ -44,7 +44,10 @@ export class ContainerModel {
     if (!this.acmedb) throw new Error("Item store uninitialised");
     return this.acmedb;
   }
-  insert = async (data: BordeContainer | BordeContainer[], persist = true) => {
+  insert = async (
+    data: SunlistContainer | SunlistContainer[],
+    persist = true,
+  ) => {
     // Convert to array
     const src = Array.isArray(data) ? data : [data];
     // Store in database (TODO: Optimisation: Immediately store in mem)
@@ -67,10 +70,10 @@ export class ContainerModel {
     // Calc sortKeys
     this.tree.load(newOl);
   };
-  idb_insert = async (data: BordeContainer | BordeContainer[]) => {
+  idb_insert = async (data: SunlistContainer | SunlistContainer[]) => {
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
-    const insert = async (item: BordeContainer) => {
+    const insert = async (item: SunlistContainer) => {
       const prev = await store.get(item.id);
       if (prev) throw new Error("Key already exists");
       const val = await store.add(item);
@@ -83,7 +86,7 @@ export class ContainerModel {
     }
     await tx.done;
   };
-  getLists = async (): Promise<BordeItem[]> => {
+  getLists = async (): Promise<Sunlist[]> => {
     const items = await this.db.getAll(this.storeName);
     return items;
   };

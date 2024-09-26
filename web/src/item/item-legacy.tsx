@@ -21,12 +21,12 @@ import { elapsedString } from "../generic/date";
 
 interface ItemProps {
   listIndex: number;
-  item: Signal<BordeItem>;
+  item: Signal<Sunlist>;
   selection: AcmeReactiveSelection;
   fastList: FastList;
   scrollRef: HTMLElement;
   keyboardShortcuts: KeyboardShortcuts;
-  displayList: Accessor<BordeItem[]>; // TODO: OR NULL
+  displayList: Accessor<Sunlist[]>; // TODO: OR NULL
 }
 
 export function Item(props: ItemProps) {

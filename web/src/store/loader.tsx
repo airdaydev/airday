@@ -1,4 +1,4 @@
-import { Node, GenericNode } from "@borde/list";
+import { Node, GenericNode } from "@sunlist/list";
 import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";

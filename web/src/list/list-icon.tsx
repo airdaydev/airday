@@ -14,7 +14,7 @@ const icons = new Map([
 ]);
 
 interface ListIconProps {
-  container: BordeContainer;
+  container: SunlistContainer;
 }
 
 export const ListIcon = (props: ListIconProps) => {

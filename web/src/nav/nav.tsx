@@ -9,7 +9,7 @@ import CheckSVG from "../icons/check.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
 
-export function BordeNav() {
+export function SunlistNav() {
   const [sidebarVisible] = viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined = undefined;
   const getMargin = () =>

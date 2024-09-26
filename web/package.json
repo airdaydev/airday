@@ -16,7 +16,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@borde/list": "workspace:^",
+    "@sunlist/list": "workspace:^",
     "fractional-indexing": "^3.2.0",
     "idb": "^7.1.1",
     "nanoid": "^5.0.3",

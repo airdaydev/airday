@@ -1,4 +1,4 @@
-# Borde API
+# Sunlist API
 
 ## Modules
 - Authentication & key management

@@ -1,10 +1,10 @@
 import { useContext, Switch, Match } from "solid-js";
-import { BordeNav } from "./nav/nav";
+import { SunlistNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { viewState } from "./view/state";
 import { PaneRegion } from "./view/view";
 import { Footer } from "./nav/footer";
-import { Dragged } from "@borde/list";
+import { Dragged } from "@sunlist/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
 
@@ -22,7 +22,7 @@ export function App() {
             <Dragged dndContext={session.workspace.containerModel.dndContext} />
           )}
           <div class={styles.main}>
-            <BordeNav />
+            <SunlistNav />
             <PaneRegion />
           </div>
           <Footer />
