@@ -1,7 +1,7 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
 import { walk } from "@sunlist/list";
-import { SunlistWorkspaceStore } from "../store/main";
+import { SunlistWorkspace } from "../store/main";
 
 type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
@@ -166,8 +166,8 @@ export class ViewState {
   tree = new RootViewNode();
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
-  workspace: SunlistWorkspaceStore;
-  constructor(workspace: SunlistWorkspaceStore) {
+  workspace: SunlistWorkspace;
+  constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
   }
   setActiveRegion(region: ActiveRegionType) {

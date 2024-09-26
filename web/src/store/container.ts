@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { SunlistIDB } from "./main";
+import { SunlistIDB, SunlistWorkspace } from "./main";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { containerLoader } from "./container-loader";
 
@@ -21,7 +21,9 @@ export class ContainerModel {
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
   tree: TreeState;
-  constructor() {
+  workspace: SunlistWorkspace;
+  constructor(workspace: SunlistWorkspace) {
+    this.workspace = workspace;
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
   init = async (db: SunlistIDB) => {
@@ -29,7 +31,11 @@ export class ContainerModel {
   };
   load = async () => {
     const items = await this.db.getAll(this.storeName);
+    const defaultContainer = items.find((c) => c.default === true);
     this.insert(items, false);
+    if (defaultContainer) {
+      this.workspace.app.viewState.openDataView(defaultContainer.id);
+    }
   };
   upgrade = (db: SunlistIDB) => {
     db.createObjectStore(this.storeName, {

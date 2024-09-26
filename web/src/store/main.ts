@@ -40,8 +40,8 @@ const workspaceCache = v.object({
  */
 export class SessionStore {
   userId: string = "anonymous";
-  map = new Map<string, SunlistWorkspaceStore>();
-  workspace = new SunlistWorkspaceStore();
+  map = new Map<string, SunlistWorkspace>();
+  workspace = new SunlistWorkspace(this);
   viewState = new ViewState(this.workspace);
   constructor() {
     window.session = this;
@@ -60,9 +60,10 @@ export class SessionStore {
       }
     }
     if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
-      parsed.workspaces?.forEach((workspace) =>
-        this.map.set(workspace.id, new SunlistWorkspaceStore(workspace)),
-      );
+      parsed.workspaces?.forEach((workspace) => {
+        console.log("yooo");
+        this.map.set(workspace.id, new SunlistWorkspace(this, workspace));
+      });
       if (parsed.activeWorkspace) {
         this.open(parsed.activeWorkspace);
       } else if (this.map.size > 1) {
@@ -92,7 +93,7 @@ export class SessionStore {
     if (workspace) {
       this.workspace = workspace;
     } else {
-      this.workspace = new SunlistWorkspaceStore({
+      this.workspace = new SunlistWorkspace(this, {
         id: createUniqueId(),
         name: "Private",
       });
@@ -110,20 +111,22 @@ export class SessionStore {
 // Primary local persistence layer for a workspace
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
-export class SunlistWorkspaceStore {
+export class SunlistWorkspace {
   db: SunlistIDB | null = null;
   itemModel = new ItemModel();
-  containerModel = new ContainerModel();
+  containerModel = new ContainerModel(this);
   id: string = createUniqueId();
   name: string = "Uninitialised";
   localOnly: boolean = true;
   openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext();
+  app: SessionStore;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
   }
-  constructor(workspace?: { id: string; name: string }) {
+  constructor(app: SessionStore, workspace?: { id: string; name: string }) {
+    this.app = app;
     if (workspace) {
       this.id = workspace.id;
       this.name = workspace.name;
@@ -180,6 +183,7 @@ export class SunlistWorkspaceStore {
         icon: "task",
         sortKey: "a",
         type: "generic-list",
+        default: true,
       },
       {
         id: "work",

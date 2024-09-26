@@ -40,13 +40,7 @@ export function List(props: ListProps) {
         session.viewState.activePane[1](props.view);
       }}
     >
-      {container && (
-        <ListHeader
-          tabId={props.tabId}
-          container={container}
-          view={props.view}
-        />
-      )}
+      <ListHeader tabId={props.tabId} container={container} view={props.view} />
       <SolidListContext.Provider value={ctx}>
         <div
           class={styles["tree-wrap"]}
