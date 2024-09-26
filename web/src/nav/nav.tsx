@@ -24,6 +24,7 @@ export function SunlistNav() {
       style={{
         "margin-left": getMargin(),
       }}
+      onClick={() => session.viewState.focusSidebar()}
     >
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
       <div

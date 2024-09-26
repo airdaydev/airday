@@ -1,4 +1,4 @@
-import { createContext } from 'solid-js';
-import { SessionStore } from './main';
+import { createContext } from "solid-js";
+import { SessionStore } from "./main";
 
-export const sessionContext = createContext<SessionStore>(new SessionStore());
+export const sessionContext = createContext<SessionStore>();

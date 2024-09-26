@@ -56,12 +56,12 @@ export class SessionStore {
       try {
         parsed = JSON.parse(raw);
       } catch (err) {
-        console.log("Invalid object found in cache");
+        console.log("Invalid workspace object found in cache");
       }
     }
     if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
+      console.log("found existing workspaces");
       parsed.workspaces?.forEach((workspace) => {
-        console.log("yooo");
         this.map.set(workspace.id, new SunlistWorkspace(this, workspace));
       });
       if (parsed.activeWorkspace) {
@@ -74,6 +74,7 @@ export class SessionStore {
         this.open(createUniqueId());
       }
     } else {
+      console.log("creating new workspace object");
       this.open(createUniqueId());
     }
   }
@@ -93,10 +94,10 @@ export class SessionStore {
     if (workspace) {
       this.workspace = workspace;
     } else {
-      this.workspace = new SunlistWorkspace(this, {
-        id: createUniqueId(),
-        name: "Private",
-      });
+      // new workspace
+      if (!this.workspace.initialised) {
+        this.workspace.name = "Private";
+      }
       this.map.set(this.workspace.id, this.workspace);
     }
     this.workspace.connect();
@@ -117,6 +118,7 @@ export class SunlistWorkspace {
   containerModel = new ContainerModel(this);
   id: string = createUniqueId();
   name: string = "Uninitialised";
+  initialised = false;
   localOnly: boolean = true;
   openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();

@@ -8,21 +8,31 @@ export class DndContextKeyboardEvents {
   buffer: string[] = [];
   mode = null; // gg = sequence
   dndContext: DndContext;
+  private boundListen: (event: KeyboardEvent) => void;
+
   constructor(dndContext: DndContext, enabled: boolean = true) {
     this.dndContext = dndContext;
     this.enabled = enabled;
+    this.boundListen = this.listen.bind(this);
     if (this.enabled) {
       this.enable();
     }
   }
+
   enable() {
-    // TODO: prevent multiple enables
-    this.enabled = true;
-    window.addEventListener("keydown", this.listen);
+    if (!this.enabled) {
+      this.enabled = true;
+      console.log("okkk lets go");
+      window.addEventListener("keydown", this.boundListen);
+    }
   }
+
   disable() {
-    this.enabled = false;
-    window.removeEventListener("keydown", this.listen);
+    console.log("disabling....");
+    if (this.enabled) {
+      this.enabled = false;
+      window.removeEventListener("keydown", this.boundListen);
+    }
   }
   addToBuffer(encodedKey: string) {
     if (this.buffer.length > 1) {

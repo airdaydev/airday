@@ -297,6 +297,7 @@ export class DndContext {
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
+    // console.trace("DnDContext");
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
   }
   startDrag(

@@ -170,6 +170,12 @@ export class ViewState {
   constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
   }
+  focusSidebar() {
+    this.workspace.dndContext.keyboard.disable();
+  }
+  focusContainer() {
+    this.workspace.dndContext.keyboard.enable();
+  }
   setActiveRegion(region: ActiveRegionType) {
     this.activeRegion[1](region);
     if (region === "container") {
