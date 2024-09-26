@@ -27,6 +27,7 @@
 - [ ] closing a list focuses on the previous
 - [ ] list switcher to switch between open files (opt+tab)
 - [ ] opening a list from sidebar replaces active view
+- [ ] empty list state nice
 - [ ] Default view is inbox
 - [ ] Context click on list header
 - [ ] touch swipe gesture left /right to hide + show sidebar
