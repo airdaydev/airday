@@ -2,8 +2,8 @@ import { nanoid } from "nanoid";
 import { generateNKeysBetween } from "fractional-indexing";
 import { GenericItem } from "./loader";
 
-export const bordeItems = [
-  "Borde",
+export const sunlistItems = [
+  "Sunlist",
   "Wrap handlebars with Cinelli wrap",
   "GET CAR SERVICED 02 xxxx xxxx",
   "https://openstax.org/details/books/precalculus-2e",
@@ -41,7 +41,7 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
 
 // export function simulateNetwork(listId: string) {
 //     const next = Math.random() * 10000;
-//     const index = Math.round(bordeItems.length * Math.random());
+//     const index = Math.round(sunlistItems.length * Math.random());
 //     setTimeout(() => store.insert({
 //         id: nanoid(),
 //         text: tasks[index],

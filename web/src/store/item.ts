@@ -1,5 +1,5 @@
 import { IDBPObjectStore } from "idb";
-import { BordeIDB } from "./main";
+import { SunlistIDB } from "./main";
 
 /**
  * Item model
@@ -9,9 +9,9 @@ import { BordeIDB } from "./main";
  */
 export class ItemModel {
   storeName = "item";
-  acmedb: BordeIDB | null = null;
+  acmedb: SunlistIDB | null = null;
   itemStore: IDBPObjectStore | null = null;
-  init = (db: BordeIDB) => {
+  init = (db: SunlistIDB) => {
     this.acmedb = db;
     // this.load();
     // load
@@ -19,7 +19,7 @@ export class ItemModel {
   // load = async () => {
   //     const items = await this.db.getAll(this.storeName);
   // }
-  upgrade = (db: BordeIDB) => {
+  upgrade = (db: SunlistIDB) => {
     const itemStore = db.createObjectStore(this.storeName, {
       keyPath: "id",
     });

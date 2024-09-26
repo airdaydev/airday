@@ -29,20 +29,20 @@ type OrderedKey = [string, string, string];
 
 type FastListType = "trash" | "upNext" | "container" | "done";
 
-interface BordeViewBase {
+interface SunlistViewBase {
   id: string;
   type: FastListType;
 }
 
 // TODO: Finish these, useful for type checking
-interface SunlistContainerView extends BordeViewBase {
+interface SunlistContainerView extends SunlistViewBase {
   containerId: string;
   type: "container";
   projection: "list" | "kanban";
 }
 
-interface BordeDoneView extends BordeViewBase {
+interface SunlistDoneView extends SunlistViewBase {
   type: "done";
 }
 
-type BordeView = SunlistContainerView | BordeDoneView;
+type SunlistView = SunlistContainerView | SunlistDoneView;

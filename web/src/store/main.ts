@@ -1,7 +1,7 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
 import { ItemModel } from "./item";
 import { ContainerModel } from "./container";
-import { genTestData, bordeItems, inboxItems } from "./dummy-data";
+import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import {
@@ -20,7 +20,7 @@ interface DBTypes {
   lists: SunlistContainer;
 }
 
-export type BordeIDB = IDBPDatabase<DBTypes>;
+export type SunlistIDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage =
   "DB not loaded, pre-load buffer not yet implemented";
 
@@ -115,7 +115,7 @@ export class SessionStore {
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
 export class AcmeWorkspaceStore {
-  db: BordeIDB | null = null;
+  db: SunlistIDB | null = null;
   itemModel = new ItemModel();
   containerModel = new ContainerModel();
   id: string = createUniqueId();
@@ -173,7 +173,7 @@ export class AcmeWorkspaceStore {
   };
   dummyData = async () => {
     const items = [
-      ...genTestData("borde", bordeItems),
+      ...genTestData("sunlist", sunlistItems),
       ...genTestData("inbox", inboxItems),
     ];
     await this.itemModel.insert(items);

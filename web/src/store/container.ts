@@ -1,5 +1,5 @@
-import { Accessor, createSignal, Setter, Signal } from "solid-js";
-import { BordeIDB } from "./main";
+import { createSignal } from "solid-js";
+import { SunlistIDB } from "./main";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { containerLoader } from "./container-loader";
 
@@ -17,21 +17,21 @@ export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
  */
 export class ContainerModel {
   storeName = "container";
-  acmedb: BordeIDB | null = null;
+  acmedb: SunlistIDB | null = null;
   listStateContext = new ListStateContext();
   dndContext = new DndContext();
   tree: TreeState;
   constructor() {
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
-  init = async (db: BordeIDB) => {
+  init = async (db: SunlistIDB) => {
     this.acmedb = db;
   };
   load = async () => {
     const items = await this.db.getAll(this.storeName);
     this.insert(items, false);
   };
-  upgrade = (db: BordeIDB) => {
+  upgrade = (db: SunlistIDB) => {
     db.createObjectStore(this.storeName, {
       keyPath: "id",
     });
