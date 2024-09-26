@@ -12,9 +12,8 @@ export class DndContextKeyboardEvents {
 
   constructor(dndContext: DndContext, enabled: boolean = true) {
     this.dndContext = dndContext;
-    this.enabled = enabled;
     this.boundListen = this.listen.bind(this);
-    if (this.enabled) {
+    if (enabled) {
       this.enable();
     }
   }
