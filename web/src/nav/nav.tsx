@@ -8,6 +8,7 @@ import CheckSVG from "../icons/check.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
+import { AddListButton } from "./add-list";
 
 export function SunlistNav() {
   const session = useContext(sessionContext);
@@ -62,6 +63,7 @@ export function SunlistNav() {
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <NavLists />
+      <AddListButton />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
       <div style="color: #81777f; border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;">

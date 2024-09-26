@@ -196,6 +196,7 @@ export class TreeState {
       filtered,
     };
   }
+
   load(tree: GenericNode<any>) {
     const q = qperf("load");
     const children = map<any, any>(

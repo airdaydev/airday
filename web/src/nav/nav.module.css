@@ -62,7 +62,9 @@
     background: none;
     cursor: pointer;
     padding: 0.5em;
-    color: #888;
+    color: #81777f;
+    font-size: 1rem;
+    text-align: left;
 }
 
 .sticker-nav {

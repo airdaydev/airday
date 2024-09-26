@@ -13,19 +13,22 @@ export const AddListButton = () => {
   let inputRef: HTMLInputElement | undefined = undefined;
   const [editing, setEditing] = createSignal<boolean>(false);
   const leaveEditMode = (save: boolean) => {
-    keyboardShortcuts.enable();
+    // keyboardShortcuts.enable();
     if (save) {
       const id = nanoid();
       session.workspace.containerModel.insert({
         id,
         name: inputRef?.value || "New board",
+        icon: "task",
+        sortKey: "f",
+        type: "generic-list",
       });
       session.viewState.openDataView(id);
     }
     setEditing(false);
   };
   const enterEditMode = () => {
-    keyboardShortcuts.disable();
+    // keyboardShortcuts.disable();
     setEditing(true);
   };
   const handleKeyDown = (event: KeyboardEvent) => {
