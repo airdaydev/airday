@@ -10,16 +10,16 @@ export class DndContextKeyboardEvents {
   dndContext: DndContext;
   constructor(dndContext: DndContext) {
     this.dndContext = dndContext;
-    window.addEventListener("keydown", (event) => this.listen(event));
+    window.addEventListener("keydown", this.listen);
   }
   enable() {
     // TODO: prevent multiple enables
-    window.addEventListener("keydown", (event) => this.listen(event));
     this.enabled = true;
+    window.addEventListener("keydown", this.listen);
   }
   disable() {
-    // TODO: Remove listener
     this.enabled = false;
+    window.removeEventListener("keydown", this.listen);
   }
   addToBuffer(encodedKey: string) {
     if (this.buffer.length > 1) {

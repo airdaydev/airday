@@ -4,12 +4,7 @@ import { ContainerModel } from "./container";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
-import {
-  DndContext,
-  ListDragContext,
-  ListStateContext,
-  TreeState,
-} from "@sunlist/list";
+import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { loader } from "./loader";
 import { DataView } from "../view/state";
 
