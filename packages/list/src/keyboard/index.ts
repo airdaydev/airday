@@ -8,9 +8,12 @@ export class DndContextKeyboardEvents {
   buffer: string[] = [];
   mode = null; // gg = sequence
   dndContext: DndContext;
-  constructor(dndContext: DndContext) {
+  constructor(dndContext: DndContext, enabled: boolean = true) {
     this.dndContext = dndContext;
-    window.addEventListener("keydown", this.listen);
+    this.enabled = enabled;
+    if (this.enabled) {
+      this.enable();
+    }
   }
   enable() {
     // TODO: prevent multiple enables

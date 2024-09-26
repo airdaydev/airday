@@ -17,15 +17,15 @@ export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
  */
 export class ContainerModel {
   storeName = "container";
-  acmedb: SunlistIDB | null = null;
+  sundb: SunlistIDB | null = null;
   listStateContext = new ListStateContext();
-  dndContext = new DndContext();
+  dndContext = new DndContext({ enableKeyboard: false });
   tree: TreeState;
   constructor() {
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
   init = async (db: SunlistIDB) => {
-    this.acmedb = db;
+    this.sundb = db;
   };
   load = async () => {
     const items = await this.db.getAll(this.storeName);
@@ -41,8 +41,8 @@ export class ContainerModel {
   }
   get db() {
     // TODO: This COULD be made redundant with proper queuing system
-    if (!this.acmedb) throw new Error("Item store uninitialised");
-    return this.acmedb;
+    if (!this.sundb) throw new Error("Item store uninitialised");
+    return this.sundb;
   }
   insert = async (
     data: SunlistContainer | SunlistContainer[],

@@ -1,6 +1,6 @@
 <svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <title>sun</title>
-    <g id="AcmeList" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+    <g id="Sunlist" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
         <g id="list-dual" transform="translate(-758, -9)" stroke="#000000" stroke-width="0.75">
             <g id="sun" transform="translate(759, 10)">
                 <circle id="Oval" fill="#FFE56A" cx="6" cy="6" r="3"></circle>

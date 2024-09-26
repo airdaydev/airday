@@ -280,6 +280,10 @@ export class ListDragContext {
 
 type dragMode = "touch" | "mouse" | null;
 
+interface DndContextInitArgs {
+  enableKeyboard: boolean;
+}
+
 // There is only one drag context, but there can be multiple select contexts
 // This mostly controls the dragged item
 export class DndContext {
@@ -292,8 +296,8 @@ export class DndContext {
   elDimensionsPx: [number, number] = [200, 32];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
-  constructor() {
-    this.keyboard = new DndContextKeyboardEvents(this);
+  constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
+    this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
   }
   startDrag(
     ref: HTMLElement,

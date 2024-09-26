@@ -6,7 +6,7 @@ import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { loader } from "./loader";
-import { DataView } from "../view/state";
+import { DataView, viewState } from "../view/state";
 
 const schemaVersion = 1;
 
@@ -40,8 +40,8 @@ const workspaceCache = v.object({
  */
 export class SessionStore {
   userId: string = "anonymous";
-  map = new Map<string, AcmeWorkspaceStore>();
-  workspace = new AcmeWorkspaceStore();
+  map = new Map<string, SunlistWorkspaceStore>();
+  workspace = new SunlistWorkspaceStore();
   constructor() {
     window.session = this;
   }
@@ -60,7 +60,7 @@ export class SessionStore {
     }
     if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
       parsed.workspaces?.forEach((workspace) =>
-        this.map.set(workspace.id, new AcmeWorkspaceStore(workspace)),
+        this.map.set(workspace.id, new SunlistWorkspaceStore(workspace)),
       );
       if (parsed.activeWorkspace) {
         this.open(parsed.activeWorkspace);
@@ -91,7 +91,7 @@ export class SessionStore {
     if (workspace) {
       this.workspace = workspace;
     } else {
-      this.workspace = new AcmeWorkspaceStore({
+      this.workspace = new SunlistWorkspaceStore({
         id: createUniqueId(),
         name: "Private",
       });
@@ -109,7 +109,7 @@ export class SessionStore {
 // Primary local persistence layer for a workspace
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
-export class AcmeWorkspaceStore {
+export class SunlistWorkspaceStore {
   db: SunlistIDB | null = null;
   itemModel = new ItemModel();
   containerModel = new ContainerModel();

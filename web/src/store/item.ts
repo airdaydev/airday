@@ -9,10 +9,10 @@ import { SunlistIDB } from "./main";
  */
 export class ItemModel {
   storeName = "item";
-  acmedb: SunlistIDB | null = null;
+  sundb: SunlistIDB | null = null;
   itemStore: IDBPObjectStore | null = null;
   init = (db: SunlistIDB) => {
-    this.acmedb = db;
+    this.sundb = db;
     // this.load();
     // load
   };
@@ -32,8 +32,8 @@ export class ItemModel {
     return !!this.db;
   }
   get db() {
-    if (!this.acmedb) throw new Error("Item store uninitialised");
-    return this.acmedb;
+    if (!this.sundb) throw new Error("Item store uninitialised");
+    return this.sundb;
   }
   /**
    * Insert new tasks, generating a new key

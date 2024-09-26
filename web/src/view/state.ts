@@ -1,8 +1,9 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
 import { walk } from "@sunlist/list";
+import { SunlistWorkspaceStore } from "../store/main";
 
-type ActiveRegionTypes = "sidebar" | "container";
+type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data";
@@ -158,14 +159,22 @@ export class DataView extends ViewNode {
  */
 class ViewState {
   activeModal: Signal<ModalTypes> = createSignal<ModalTypes>(null);
-  activeRegion: Signal<ActiveRegionTypes> =
-    createSignal<ActiveRegionTypes>("container");
+  activeRegion: Signal<ActiveRegionType> =
+    createSignal<ActiveRegionType>("container");
   activePane = createSignal<ViewNode | undefined>();
   sidebarVisible = createSignal<boolean>(true);
   tree = new RootViewNode();
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
-  constructor() {}
+  workspace: SunlistWorkspaceStore;
+  constructor(workspace: SunlistWorkspaceStore) {
+    this.workspace = workspace;
+  }
+  setActiveRegion(region: ActiveRegionType) {
+    this.activeRegion[1](region);
+    if (region === "container") {
+    }
+  }
   findNodeById(id: string): ViewNode | null {
     let result: ViewNode | null = null;
     walk(this.tree, (node) => {
