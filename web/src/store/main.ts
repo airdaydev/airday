@@ -168,7 +168,7 @@ export class AcmeWorkspaceStore {
   };
   dummyData = async () => {
     const items = [
-      ...genTestData("sunlist", sunlistItems),
+      ...genTestData("work", sunlistItems),
       ...genTestData("inbox", inboxItems),
     ];
     await this.itemModel.insert(items);
@@ -189,7 +189,7 @@ export class AcmeWorkspaceStore {
       },
       {
         id: "long",
-        name: "a really really long named list",
+        name: "Sunlist list with more characters",
         icon: "red",
         sortKey: "c",
         type: "generic-list",
