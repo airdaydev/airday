@@ -23,7 +23,9 @@
 - [x] opening changes active view
 - [x] Fix bug: splitting down, right, close creates an empty container view
 - [x] opening a list from sidebar replaces active view
+- [x] highlight open list in nav bar
 - [ ] don't double up focus between sidebar and main panes
+- [] Deselect nav bar items when leaving focus
 - [ ] keyboard shortcut for closing a list
 - [ ] tree backed indexing system to move between panes with numbers
 - [ ] closing a list focuses on the previous

@@ -18,7 +18,7 @@ export const NavListItem: NodeComponentType = (props) => {
     <div style={`position: relative;`}>
       <button
         classList={{
-          [styles.active]: viewState.isContainerActive(node().id),
+          [styles.active]: viewState.activePane[0]()?.containerId === node().id,
           [styles["nav-text-button"]]: true,
         }}
         tabindex="-1"

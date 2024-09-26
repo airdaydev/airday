@@ -215,40 +215,6 @@ class ViewState {
     this.focus = item;
     this.scene[1]("focus");
   }
-  // TODO: Review AI gen
-  get active() {
-    return false;
-    // let foundSignal: Signal<DataView> | undefined;
-    // let foundRow = -1;
-    // let foundCol = -1;
-
-    // this.matrix[0]().some((row, rowIndex) => {
-    //   const colIndex = row.findIndex(
-    //     (view) => view[0]().id === this.activePaneId(),
-    //   );
-    //   if (colIndex !== -1) {
-    //     foundSignal = row[colIndex];
-    //     foundRow = rowIndex;
-    //     foundCol = colIndex;
-    //     return true;
-    //   }
-    //   return false;
-    // });
-
-    // return {
-    //   signal: foundSignal,
-    //   row: foundRow,
-    //   col: foundCol,
-    // };
-  }
-  isContainerActive(containerId: string) {
-    // const activeContainer = this.list[0]().find(
-    //   (view) => view[0]().id === this.activePaneId(),
-    // );
-    // if (!activeContainer) return false;
-    // return activeContainer[0]().containerId === containerId;
-    return false;
-  }
   openDataView(containerId: string) {
     const view = new DataView(containerId);
     const activePane = this.activePane[0]();
@@ -258,17 +224,9 @@ class ViewState {
       this.addViewToRoot(view);
     }
   }
-  openDoneView = () => {
-    // const id = createUniqueId();
-    // const view: BordeDoneView = {
-    //   id,
-    //   type: "done",
-    // };
-    // this.addViewToRoot(view);
-  };
+  openDoneView = () => {};
   addViewToRoot(view: DataView, ViewIndex = [0, 0]) {
     this.tree.addChild(view);
-    // this.setActivePaneId(view.id);
   }
   closeView(view: DataView) {
     view.detach();
