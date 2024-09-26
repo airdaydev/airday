@@ -24,7 +24,7 @@ if (!(root instanceof HTMLElement)) {
 render(
   () => (
     <sessionContext.Provider value={sessionStore}>
-      {sessionStore.workspace && <App />}
+      <App />
     </sessionContext.Provider>
   ),
   root,
