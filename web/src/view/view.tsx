@@ -19,7 +19,7 @@ export function View(props: ViewProps) {
       each={props.view.children[0]()}
       fallback={
         <div>
-          Empty View {props.view.id} {props.view.type}
+          Empty View {props.view.id} {props.view.type} / loading
         </div>
       }
     >
