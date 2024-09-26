@@ -1,9 +1,9 @@
-import { Signal } from "solid-js";
-import { DataView, viewState } from "../view/state";
-import { EditableListTitle } from "./list-title";
+import { Signal, useContext } from "solid-js";
+import { DataView } from "../view/state";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
+import { sessionContext } from "../store/context";
 
 interface ListHeaderProps {
   container: Signal<SunlistContainer>;
@@ -13,6 +13,7 @@ interface ListHeaderProps {
 
 // ⌨
 export const ListHeader = (props: ListHeaderProps) => {
+  const session = useContext(sessionContext);
   return (
     <div class={styles["list-header"]}>
       <button class={styles["list-head-button"]} tabIndex={-1}>
@@ -22,12 +23,12 @@ export const ListHeader = (props: ListHeaderProps) => {
         <span class={styles["title-text"]}>{props.container.name}</span>
         <div
           class={styles["keyboard-marker"]}
-          style={`opacity: ${viewState.activePane[0]() == props.view ? "1" : "0"}`}
+          style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
         >
           -
         </div>
       </button>
-      {viewState.count() > 1 && (
+      {session.viewState.count() > 1 && (
         <div>
           <button
             class={styles["list-button"]}

@@ -1,16 +1,17 @@
-import { Accessor } from "solid-js";
+import { Accessor, useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import { viewState } from "../view/state";
 import NextSVG from "../icons/next.svg?component-solid";
 import PerformanceSVG from "../icons/activity.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import CheckSVG from "../icons/check.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
+import { sessionContext } from "../store/context";
 
 export function SunlistNav() {
-  const [sidebarVisible] = viewState.sidebarVisible;
+  const session = useContext(sessionContext);
+  const [sidebarVisible] = session.viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined = undefined;
   const getMargin = () =>
     sidebarVisible()
@@ -50,7 +51,7 @@ export function SunlistNav() {
           <span>Performance</span>
         </button>
         <button
-          onClick={viewState.openDoneView}
+          onClick={session.viewState.openDoneView}
           class={styles["nav-text-button"]}
           tabindex="-1"
         >
@@ -69,7 +70,7 @@ export function SunlistNav() {
         <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
         <span>Scheduled</span>
       </button>
-      <button onClick={viewState.openDoneView}>
+      <button onClick={session.viewState.openDoneView}>
         <TrashSVG style="width: 1.25em; stroke-width: 1.25px;" />
         <span>Trash</span>
       </button> */}

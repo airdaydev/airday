@@ -1,8 +1,6 @@
 import { nanoid } from "nanoid";
 import { createSignal, createEffect, on, useContext } from "solid-js";
-import { keyboardShortcuts } from "../keyboard";
 import { sessionContext } from "../store/context.js";
-import { viewState } from "../view-state";
 import styles from "./nav.module.css";
 
 /**
@@ -22,7 +20,7 @@ export const AddListButton = () => {
         id,
         name: inputRef?.value || "New board",
       });
-      viewState.openDataView(id);
+      session.viewState.openDataView(id);
     }
     setEditing(false);
   };

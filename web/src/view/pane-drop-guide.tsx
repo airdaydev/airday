@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
 import { defaultMapping } from "@sunlist/list/src/keyboard/mapping";
-import { DataView, viewState } from "./state";
+import { DataView } from "./state";
 import { ListDragContext, Node } from "@sunlist/list";
 
 interface PaneDropDOMRect extends DOMRect {

@@ -2,8 +2,9 @@ import { ContextMenu } from "../context-menu/context-menu";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import Smiley from "../stickers/baseline/smiley.svg?component-solid";
-import { viewState } from "../view/state";
 import styles from "./item.module.css";
+import { useContext } from "solid-js";
+import { sessionContext } from "../store/context";
 
 interface ItemContextMenuProps {
   close: () => void;
@@ -14,12 +15,13 @@ interface ItemContextMenuProps {
 }
 
 export function ItemContextMenu(props: ItemContextMenuProps) {
+  const session = useContext(sessionContext);
   return (
     <ContextMenu close={props.close} style={props.style} offset={props.offset}>
       <button disabled>
         <span>Add to up next</span>
       </button>
-      <button onClick={() => viewState.focusItem(props.item)}>
+      <button onClick={() => session.viewState.focusItem(props.item)}>
         <span>Focus</span>
       </button>
       <hr />

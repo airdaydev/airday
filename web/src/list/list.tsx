@@ -1,7 +1,7 @@
 import { createEffect, onMount, useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
-import { DataView, viewState } from "../view/state";
+import { DataView } from "../view/state";
 import { Tree, SolidListContext, ListDragContext } from "@sunlist/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
@@ -24,7 +24,7 @@ export function List(props: ListProps) {
   );
   createEffect(() => {
     if (ctx.dndContext.focusContext[0]() === ctx) {
-      viewState.activePane[1](props.view);
+      session.viewState.activePane[1](props.view);
     }
   });
   onMount(() => {
@@ -34,10 +34,10 @@ export function List(props: ListProps) {
     <section
       classList={{
         [styles.list]: true,
-        [styles.focus]: viewState.activePane[0]() === props.view,
+        [styles.focus]: session.viewState.activePane[0]() === props.view,
       }}
       onClick={() => {
-        viewState.activePane[1](props.view);
+        session.viewState.activePane[1](props.view);
       }}
     >
       {container && (

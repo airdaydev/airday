@@ -6,7 +6,7 @@ import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { loader } from "./loader";
-import { DataView, viewState } from "../view/state";
+import { DataView, ViewState } from "../view/state";
 
 const schemaVersion = 1;
 
@@ -42,6 +42,7 @@ export class SessionStore {
   userId: string = "anonymous";
   map = new Map<string, SunlistWorkspaceStore>();
   workspace = new SunlistWorkspaceStore();
+  viewState = new ViewState(this.workspace);
   constructor() {
     window.session = this;
   }

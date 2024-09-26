@@ -157,7 +157,7 @@ export class DataView extends ViewNode {
  * / = find modal
  * State should be saved in local storage, per workspace
  */
-class ViewState {
+export class ViewState {
   activeModal: Signal<ModalTypes> = createSignal<ModalTypes>(null);
   activeRegion: Signal<ActiveRegionType> =
     createSignal<ActiveRegionType>("container");
@@ -241,5 +241,4 @@ class ViewState {
   }
 }
 
-export const viewState = new ViewState();
-export const viewContext = createContext<ViewState>(viewState);
+export const viewContext = createContext<ViewState>();

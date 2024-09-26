@@ -2,7 +2,7 @@ import { For, Match, Switch, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { sessionContext } from "../store/context.js";
 import { List } from "../list/list";
-import { viewContext, ViewNode, viewState } from "./state";
+import { ViewNode } from "./state";
 import { PaneDropGuide } from "./pane-drop-guide";
 
 interface ViewProps {
@@ -60,12 +60,10 @@ export function View(props: ViewProps) {
   );
 }
 
-export function PaneRegion() {
+export function PaneRegion(props: { tree: ViewNode }) {
   return (
-    <viewContext.Provider value={viewState}>
-      <div class={styles["pane-region"]}>
-        <View view={viewState.tree} />
-      </div>
-    </viewContext.Provider>
+    <div class={styles["pane-region"]}>
+      <View view={props.tree} />
+    </div>
   );
 }

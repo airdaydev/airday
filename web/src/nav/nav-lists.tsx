@@ -1,6 +1,5 @@
-import { For, createSignal, Accessor, useContext } from "solid-js";
+import { createSignal, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
-import { viewState } from "../view/state";
 import { sessionContext } from "../store/context.js";
 import { AddListButton } from "./add-list";
 import { NavItemContextMenu } from "./context-menus";
@@ -10,6 +9,7 @@ import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
 
 // TODO: Turn off keyboard when context menu open
 export const NavListItem: NodeComponentType = (props) => {
+  const session = useContext(sessionContext);
   const node = props.node.accessor;
   let button: HTMLButtonElement | undefined;
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
@@ -18,11 +18,12 @@ export const NavListItem: NodeComponentType = (props) => {
     <div style={`position: relative;`}>
       <button
         classList={{
-          [styles.active]: viewState.activePane[0]()?.containerId === node().id,
+          [styles.active]:
+            session.viewState.activePane[0]()?.containerId === node().id,
           [styles["nav-text-button"]]: true,
         }}
         tabindex="-1"
-        onClick={() => viewState.openDataView(node().id)}
+        onClick={() => session.viewState.openDataView(node().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           setCtxOffset([event.clientX, event.clientY]);

@@ -1,7 +1,6 @@
-import { onCleanup, onMount, useContext } from "solid-js";
+import { Accessor, useContext } from "solid-js";
 import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
-import { viewState } from "../view/state";
 
 interface SunlistContextMenuProps {
   close: () => void;
@@ -10,6 +9,7 @@ interface SunlistContextMenuProps {
 }
 
 export function SunlistContextMenu(props: SunlistContextMenuProps) {
+  const session = useContext(sessionContext);
   return (
     <ContextMenu
       close={props.close}
@@ -19,11 +19,13 @@ export function SunlistContextMenu(props: SunlistContextMenuProps) {
     >
       <button
         onClick={() => {
-          viewState.sidebarVisible[1]((prev) => !prev);
+          session.viewState.sidebarVisible[1]((prev) => !prev);
           props.close();
         }}
       >
-        <span>{viewState.sidebarVisible[0]() ? "Hide" : "Show"} Sidebar</span>
+        <span>
+          {session.viewState.sidebarVisible[0]() ? "Hide" : "Show"} Sidebar
+        </span>
       </button>
       <button disabled>
         <span>Settings</span>

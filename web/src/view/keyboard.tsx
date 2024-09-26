@@ -1,5 +1,3 @@
-import { viewState } from "./state";
-
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
 
 export class KeyboardShortcuts {

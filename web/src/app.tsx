@@ -1,7 +1,6 @@
 import { useContext, Switch, Match } from "solid-js";
 import { SunlistNav } from "./nav/nav";
 import styles from "./app.module.css";
-import { viewState } from "./view/state";
 import { PaneRegion } from "./view/view";
 import { Footer } from "./nav/footer";
 import { Dragged } from "@sunlist/list";
@@ -12,8 +11,10 @@ import { Focus } from "./focus/focus";
 export function App() {
   const session = useContext(sessionContext);
   return (
-    <Switch fallback={<p>Scene '{viewState.scene[0]()}' does not exist</p>}>
-      <Match when={viewState.scene[0]() == "default"}>
+    <Switch
+      fallback={<p>Scene '{session.viewState.scene[0]()}' does not exist</p>}
+    >
+      <Match when={session.viewState.scene[0]() == "default"}>
         <div class={styles.app}>
           {session.workspace.dndContext.isDragging() && (
             <Dragged dndContext={session.workspace.dndContext} />
@@ -23,13 +24,13 @@ export function App() {
           )}
           <div class={styles.main}>
             <SunlistNav />
-            <PaneRegion />
+            <PaneRegion tree={session.viewState.tree} />
           </div>
           <Footer />
         </div>
       </Match>
-      <Match when={viewState.scene[0]() === "focus"}>
-        <Focus item={viewState.focus} />
+      <Match when={session.viewState.scene[0]() === "focus"}>
+        <Focus item={session.viewState.focus} />
       </Match>
     </Switch>
   );
