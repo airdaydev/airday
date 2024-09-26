@@ -1,7 +1,6 @@
 import { createSignal, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
 import { sessionContext } from "../store/context.js";
-import { AddListButton } from "./add-list";
 import { NavItemContextMenu } from "./context-menus";
 import { NodeComponentType } from "@sunlist/list";
 import styles from "./nav.module.css";
@@ -11,7 +10,6 @@ import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
 export const NavListItem: NodeComponentType = (props) => {
   const session = useContext(sessionContext);
   const node = props.node.accessor;
-  let button: HTMLButtonElement | undefined;
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
