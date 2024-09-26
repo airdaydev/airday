@@ -1,4 +1,4 @@
-import { createEffect, For, Match, Switch, useContext } from "solid-js";
+import { For, Match, Switch, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { sessionContext } from "../store/context.js";
 import { List } from "../list/list";

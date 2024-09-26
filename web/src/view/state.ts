@@ -6,7 +6,6 @@ type ActiveRegionTypes = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data";
-type ViewIndex = [number, number];
 
 export class ViewNode {
   id = createUniqueId();
