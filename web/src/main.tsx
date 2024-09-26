@@ -2,11 +2,11 @@
 import { render } from "solid-js/web";
 import { App } from "./app";
 import "./main.css";
-import { SessionStore } from "./store/main";
+import { SunlistSession } from "./store/main";
 import { sessionContext } from "./store/context";
 
 // Setup app state
-const sessionStore = new SessionStore();
+const sessionStore = new SunlistSession();
 sessionStore.loadWorkspaceCache();
 
 // Attach debug helpers to window

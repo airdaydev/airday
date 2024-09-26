@@ -1,4 +1,10 @@
+import { SunlistSession } from "../store/main";
+
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
+
+export function toggleSidebar(session: SunlistSession) {
+  session.viewState.toggleSidebar();
+}
 
 export class KeyboardShortcuts {
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();

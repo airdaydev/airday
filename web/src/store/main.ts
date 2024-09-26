@@ -38,7 +38,7 @@ const workspaceCache = v.object({
 /**
  * Session & workspace store
  */
-export class SessionStore {
+export class SunlistSession {
   userId: string = "anonymous";
   map = new Map<string, SunlistWorkspace>();
   workspace = new SunlistWorkspace(this);
@@ -123,11 +123,11 @@ export class SunlistWorkspace {
   openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext();
-  app: SessionStore;
+  app: SunlistSession;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
   }
-  constructor(app: SessionStore, workspace?: { id: string; name: string }) {
+  constructor(app: SunlistSession, workspace?: { id: string; name: string }) {
     this.app = app;
     if (workspace) {
       this.id = workspace.id;

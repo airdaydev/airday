@@ -1,5 +1,3 @@
-import { ListDragContext } from "../dnd-context";
-
 export interface KeyboardShortcut {
   key: KeyboardEvent["key"];
   metaKey?: boolean;
@@ -25,5 +23,3 @@ export function encodeShortcut(
     return encode(key);
   }
 }
-
-export type ShortcutFunction = (ctx: ListDragContext) => void;

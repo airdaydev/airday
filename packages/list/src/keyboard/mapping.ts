@@ -12,7 +12,10 @@ import {
   moveSelectionUp,
   moveSelectionDown,
 } from "./behaviour";
-import { ShortcutFunction, encodeShortcut } from "./encoding";
+import { ListDragContext } from "../dnd-context";
+import { encodeShortcut } from "@sunlist/keyboard";
+
+export type ShortcutFunction = (ctx: ListDragContext) => void;
 
 export const defaultMapping = new Map<string, ShortcutFunction>([
   [encodeShortcut({ key: "ArrowUp" }), selectAboveOrigin],

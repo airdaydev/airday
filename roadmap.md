@@ -24,10 +24,12 @@
 - [x] Fix bug: splitting down, right, close creates an empty container view
 - [x] opening a list from sidebar replaces active view
 - [x] highlight open list in nav bar
-- [ ] don't double up focus between sidebar and main panes
+- [x] don't double up focus between sidebar and main panes
+- [] indexing system for nav
+- [] tree backed indexing system to move between panes with numbers
+- [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
 - [] Deselect nav bar items when leaving focus
 - [ ] keyboard shortcut for closing a list
-- [ ] tree backed indexing system to move between panes with numbers
 - [ ] closing a list focuses on the previous
 - [ ] list switcher to switch between open files (opt+tab)
 - [ ] empty list state nice

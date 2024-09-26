@@ -1,6 +1,6 @@
 ## sunlist
 
-Sunlist monorepo
+Sunlist public monorepo
 
 ## Architecture
 - SolidJS (templating, reactivity)

@@ -1,4 +1,4 @@
-import { encodeShortcut } from "./encoding";
+import { encodeShortcut } from "@sunlist/keyboard";
 import { DndContext } from "../dnd-context";
 import { defaultMapping, vimMapping } from "./mapping";
 
@@ -22,13 +22,11 @@ export class DndContextKeyboardEvents {
   enable() {
     if (!this.enabled) {
       this.enabled = true;
-      console.log("okkk lets go");
       window.addEventListener("keydown", this.boundListen);
     }
   }
 
   disable() {
-    console.log("disabling....");
     if (this.enabled) {
       this.enabled = false;
       window.removeEventListener("keydown", this.boundListen);

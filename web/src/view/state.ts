@@ -170,6 +170,9 @@ export class ViewState {
   constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
   }
+  toggleSidebar() {
+    this.sidebarVisible[1]((prev) => !prev);
+  }
   focusSidebar() {
     this.workspace.dndContext.keyboard.disable();
   }
