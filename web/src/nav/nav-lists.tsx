@@ -24,6 +24,7 @@ export const NavListItem: NodeComponentType = (props) => {
         onClick={() => session.viewState.openDataView(node().id)}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
+          props.onMouseDown(event);
           setCtxOffset([event.clientX, event.clientY]);
           setCtxOpen(true);
         }}
