@@ -1,4 +1,4 @@
-import { Accessor, useContext } from "solid-js";
+import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
 import NextSVG from "../icons/next.svg?component-solid";

@@ -1,4 +1,5 @@
 import { createContext } from "solid-js";
 import { SunlistSession } from "./main";
 
-export const sessionContext = createContext<SunlistSession>();
+export const sunlistSession = new SunlistSession();
+export const sessionContext = createContext<SunlistSession>(sunlistSession);
