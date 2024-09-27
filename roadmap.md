@@ -25,8 +25,8 @@
 - [x] opening a list from sidebar replaces active view
 - [x] highlight open list in nav bar
 - [x] don't double up focus between sidebar and main panes
+- [x] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [] Bug: jumping into focus & out, then opening a list crashes!
-- [] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
