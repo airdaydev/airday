@@ -16,15 +16,16 @@ export const Focus = (props: FocusProps) => {
     <div class={styles["container"]}>
       <div class={styles["content"]}>
         <h1>{props.item.content}</h1>
-        <button
-          onClick={() => {
-            session.viewState.scene[1]("default");
-          }}
-        >
-          <Key key="Esc" />
-          <span>Close</span>
-        </button>
       </div>
+      <button
+        class={styles["focus-button"]}
+        onClick={() => {
+          session.viewState.scene[1]("default");
+        }}
+      >
+        <Key key="Esc" />
+        <span>Close</span>
+      </button>
     </div>
   );
 };
