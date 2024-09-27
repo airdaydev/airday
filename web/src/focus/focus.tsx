@@ -2,6 +2,7 @@ import styles from "./focus.module.css";
 import { GenericItem } from "../store/loader";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
+import { Key } from "../generic/key";
 
 interface FocusProps {
   item: GenericItem;
@@ -20,7 +21,8 @@ export const Focus = (props: FocusProps) => {
             session.viewState.scene[1]("default");
           }}
         >
-          Back
+          <Key key="Esc" />
+          <span>Close</span>
         </button>
       </div>
     </div>

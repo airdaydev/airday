@@ -71,20 +71,3 @@
     margin-right: 0.25em;
     font-size: 0.9rem;
 }
-
-.key {
-    font-size: 0.8rem;
-    width: 14px;
-    height: 14px;
-    line-height: 1rem;
-    border-radius: 1px;
-    margin-right: 3px;
-    font-family: alte haas grotesk;
-}
-
-[data-theme="light"] .key {
-    background: #e1e1e1;
-}
-[data-theme="dark"] .key {
-    background: #323232;
-}

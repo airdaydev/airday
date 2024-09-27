@@ -7,6 +7,7 @@ import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
 import { SunlistContextMenu, WorkspaceContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
+import { Key } from "../generic/key.jsx";
 
 type ContextMenu = "main" | "workspace";
 
@@ -91,8 +92,8 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <span class={styles["key"]}>⌘</span>
-          <span class={styles["key"]}>/</span>
+          <Key key="⌘" />
+          <Key key="/" />
           Cmd
         </button>
       </div>
@@ -104,7 +105,7 @@ export const Footer = () => {
             class={styles["nav-button"]}
             style={"line-height: 0rem;"}
           >
-            <span class={styles["key"]}>F</span>
+            <Key key="F" />
             Focus
           </button>
         )}
@@ -113,7 +114,7 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <span class={styles["key"]}>N</span>
+          <Key key="N" />
           New
         </button>
         <button
@@ -121,7 +122,7 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <span class={styles["key"]}>/</span>
+          <Key key="/" />
           Find
         </button>
         <ThemeToggle class={styles["nav-button"]} />

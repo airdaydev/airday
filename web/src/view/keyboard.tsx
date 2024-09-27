@@ -28,13 +28,29 @@ export class KeyboardShortcuts {
       if (this.viewState.activeRegion[0]() === "sidebar") {
         this.workspace.containerModel.dndContext.keyboard.listen(event);
       }
+      this.globalKeyboardHandler(event);
     });
   }
   globalKeyboardHandler(event: KeyboardEvent) {
     if (event.key === "s") {
-      this.viewState.sidebarVisible[1]((prev) => !prev);
+      this.viewState.toggleSidebar();
     }
-    return false;
+    if (event.key === "f") {
+      if (this.viewState.scene[0]() === "default") {
+        const item = this.workspace.dndContext
+          .focusedContext()
+          ?.selection[0]()
+          .values()
+          .next().value;
+        if (item) this.viewState.focusItem(item);
+        return;
+      }
+    }
+    if (event.key === "Escape") {
+      if (this.viewState.scene[0]() === "focus") {
+        this.viewState.scene[1]("default");
+      }
+    }
   }
   registerHandler(
     event: string,
