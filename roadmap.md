@@ -25,6 +25,7 @@
 - [x] opening a list from sidebar replaces active view
 - [x] highlight open list in nav bar
 - [x] don't double up focus between sidebar and main panes
+- [] Bug: jumping into focus & out, then opening a list crashes!
 - [] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
@@ -47,8 +48,6 @@
 - [ ] add initial habit item
 - [ ] open performance list, add filters/configuration
 - [ ] open priority list (added by reference, no move!)
-- [ ] calendar view = simple week view
-- [ ] experiment with sounds
 - [ ] Limit open lists, ensure destruction
 - [] Reinstate Done board
 - [] Next board
@@ -64,10 +63,10 @@
 - [] Monthly view
 - [] Loading pane
 - [] Save views! (arrangements of panes)
+- [ ] experiment with sounds
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
-- [] Don't allow two of the same boards open at the same time
 - [] Workspace management
 - [] Up Next board (naming?)
 - [] Trash items (yes & ability to remove)
