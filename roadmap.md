@@ -29,6 +29,7 @@
 - [] Bug: jumping into focus & out, then opening a list crashes!
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
+- [] attempt to reselect item when leaving focus mode
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
 - [] Deselect nav bar items when leaving focus
 - [ ] keyboard shortcut for closing a list
