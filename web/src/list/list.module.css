@@ -15,7 +15,7 @@
 .list-icon {
     display: block;
     flex-shrink: 0;
-    height: 1.25rem;
+    ()height: 1.25rem;
     width: 1.25rem;
     border-radius: 2px;
 }
@@ -64,6 +64,10 @@
 }
 
 .list-head-button:hover {
+    background: var(--shade);
+}
+
+.list-head-button[aria-expanded="true"] {
     background: var(--shade);
 }
 

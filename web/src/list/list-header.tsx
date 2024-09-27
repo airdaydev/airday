@@ -31,6 +31,7 @@ export const ListHeader = (props: ListHeaderProps) => {
         <button
           class={styles["list-head-button"]}
           tabIndex={-1}
+          aria-expanded={ctxOpen()}
           ref={ref}
           onContextMenu={(event: MouseEvent) => {
             event.preventDefault();
