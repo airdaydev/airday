@@ -171,18 +171,20 @@ export class ViewState {
   keyboard: KeyboardShortcuts;
   constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
-    this.keyboard = new KeyboardShortcuts(workspace);
+    this.keyboard = new KeyboardShortcuts(workspace, this);
   }
   toggleSidebar() {
     this.sidebarVisible[1]((prev) => !prev);
   }
   focusSidebar() {
-    // this.workspace.dndContext.keyboard.disable();
+    this.activeRegion[1]("sidebar");
   }
   focusContainer() {
-    // this.workspace.dndContext.keyboard.enable();
+    this.activeRegion[1]("container");
+    this.workspace.containerModel.getNavDnd().clearSelection();
   }
   setActivePane(view: ViewNode) {
+    this.focusContainer();
     this.activePane[1](view);
     // TODO: Activate keyboard listener
   }

@@ -1,4 +1,5 @@
 import { SunlistSession, SunlistWorkspace } from "../store/main";
+import { ViewState } from "./state";
 
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
 
@@ -8,28 +9,30 @@ export function toggleSidebar(session: SunlistSession) {
 
 export class KeyboardShortcuts {
   workspace: SunlistWorkspace;
+  viewState: ViewState;
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();
   globalHandlerActive = true;
   enabled: boolean = true; // for temporarily overriding for example when editing
-  constructor(workspace: SunlistWorkspace) {
+  constructor(workspace: SunlistWorkspace, viewState: ViewState) {
     this.workspace = workspace;
+    this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
-      // TODO: Make this actually work (competes with local listeners for now)
-      if (this.globalHandlerActive) {
-        const action = this.globalKeyboardHandler(event); // overrides
-        if (action) return;
+      if (this.viewState.activeModal[0]()) {
+        // Modal listener
+        return;
       }
-      const currentContext = viewState.activePane[0]();
-      if (currentContext) {
-        const handler = this.handlerMap.get(keyName("keydown", currentContext));
-        if (handler) handler(event);
+      if (this.viewState.activeRegion[0]() === "container") {
+        this.workspace.dndContext.keyboard.listen(event);
+      }
+      if (this.viewState.activeRegion[0]() === "sidebar") {
+        this.workspace.containerModel.dndContext.keyboard.listen(event);
       }
     });
   }
   globalKeyboardHandler(event: KeyboardEvent) {
     if (event.key === "s") {
-      viewState.sidebarVisible[1]((prev) => !prev);
+      this.viewState.sidebarVisible[1]((prev) => !prev);
     }
     return false;
   }
@@ -50,5 +53,3 @@ export class KeyboardShortcuts {
     this.enabled = true;
   }
 }
-
-export const keyboardShortcuts = new KeyboardShortcuts();

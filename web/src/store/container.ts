@@ -1,6 +1,11 @@
 import { createSignal } from "solid-js";
 import { SunlistIDB, SunlistWorkspace } from "./main";
-import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
+import {
+  DndContext,
+  ListDragContext,
+  ListStateContext,
+  TreeState,
+} from "@sunlist/list";
 import { containerLoader } from "./container-loader";
 
 export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
@@ -26,6 +31,10 @@ export class ContainerModel {
     this.workspace = workspace;
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
+  getNavDnd = () => {
+    return this.dndContext.listContexts.values().next()
+      .value as ListDragContext;
+  };
   init = async (db: SunlistIDB) => {
     this.sundb = db;
   };
