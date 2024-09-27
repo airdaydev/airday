@@ -1,7 +1,8 @@
 .key {
     display: inline-block;
     font-size: 0.8rem;
-    min-width: 14px;
+    padding: 0 2px;
+    min-width: 10px;
     height: 14px;
     line-height: 1rem;
     border-radius: 1px;
