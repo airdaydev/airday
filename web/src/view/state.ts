@@ -149,6 +149,8 @@ export class DataView extends ViewNode {
   }
 }
 
+type Scene = "default" | "focus";
+
 /**
  * Views
  * pane 0 = sidebar
@@ -165,7 +167,7 @@ export class ViewState {
   activePane = createSignal<ViewNode | undefined>();
   sidebarVisible = createSignal<boolean>(true);
   tree = new RootViewNode();
-  scene = createSignal<"default" | "focus">("default");
+  scene = createSignal<Scene>("default");
   focus?: GenericItem;
   workspace: SunlistWorkspace;
   keyboard: KeyboardShortcuts;
@@ -182,6 +184,9 @@ export class ViewState {
   focusContainer() {
     this.activeRegion[1]("container");
     this.workspace.containerModel.getNavDnd().clearSelection();
+  }
+  goToScene(scene: Scene) {
+    this.scene[1](scene);
   }
   setActivePane(view: ViewNode) {
     this.focusContainer();
@@ -239,7 +244,7 @@ export class ViewState {
   }
   focusItem(item: GenericItem) {
     this.focus = item;
-    this.scene[1]("focus");
+    this.goToScene("focus");
   }
   openDataView(containerId: string) {
     const view = new DataView(containerId);
