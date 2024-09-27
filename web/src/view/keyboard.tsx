@@ -46,11 +46,6 @@ export class KeyboardShortcuts {
         return;
       }
     }
-    if (event.key === "Escape") {
-      if (this.viewState.scene[0]() === "focus") {
-        this.viewState.scene[1]("default");
-      }
-    }
   }
   registerHandler(
     event: string,

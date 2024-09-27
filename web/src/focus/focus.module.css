@@ -3,6 +3,7 @@
     margin: 0;
     top: 0;
     position: absolute;
+    overflow: hidden;
     left: 0;
     width: 100vw;
     height: 100vh;
@@ -37,6 +38,31 @@
     line-height: 1rem; /* Inline SVG issue */
     border-radius: 2px;
     transition: 100ms transform;
+}
+
+.overlay-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.focus-button-alt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    padding: 0.5em;
+    width: fit-content;
+    color: white;
+    background-color: #5937ff;
+    z-index: 10;
+}
+
+.focus-button-alt :global(.key) {
+    background-color: #3917ff;
 }
 
 [data-theme="light"] .focus-button:active {

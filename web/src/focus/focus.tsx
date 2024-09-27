@@ -3,6 +3,7 @@ import { GenericItem } from "../store/loader";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { Key } from "../generic/key";
+import { ThrottleButton } from "./throttle-button";
 
 interface FocusProps {
   item: GenericItem;
@@ -17,15 +18,13 @@ export const Focus = (props: FocusProps) => {
       <div class={styles["content"]}>
         <h1>{props.item.content}</h1>
       </div>
-      <button
-        class={styles["focus-button"]}
-        onClick={() => {
-          session.viewState.scene[1]("default");
-        }}
+      <ThrottleButton
+        action={() => session.viewState.scene[1]("default")}
+        key={"Escape"}
       >
         <Key key="Esc" />
-        <span>Close</span>
-      </button>
+        <span>End</span>
+      </ThrottleButton>
     </div>
   );
 };

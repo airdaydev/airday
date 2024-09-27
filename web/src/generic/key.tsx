@@ -5,5 +5,14 @@ interface KeyProps {
 }
 
 export const Key = (props: KeyProps) => {
-  return <span class={styles["key"]}>{props.key}</span>;
+  return (
+    <span
+      classList={{
+        [styles["key"]]: true,
+        key: true,
+      }}
+    >
+      {props.key}
+    </span>
+  );
 };
