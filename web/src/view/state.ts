@@ -187,6 +187,9 @@ export class ViewState {
   }
   goToScene(scene: Scene) {
     this.scene[1](scene);
+    const t = this.workspace.dndContext.focusedContext();
+    // TODO: This will get overriden if escape key is being held down!
+    if (this.focus) t?.selectOne(this.focus);
   }
   setActivePane(view: ViewNode) {
     this.focusContainer();
