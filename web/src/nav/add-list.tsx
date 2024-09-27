@@ -18,7 +18,7 @@ export const AddListButton = () => {
       const id = nanoid();
       session.workspace.containerModel.insert({
         id,
-        name: inputRef?.value || "New board",
+        name: inputRef?.value || "New list",
         icon: "task",
         sortKey: "f",
         type: "generic-list",
@@ -53,7 +53,7 @@ export const AddListButton = () => {
         <input
           style="border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;"
           type="text"
-          placeholder="New board"
+          placeholder="New list"
           ref={inputRef}
           onKeyDown={handleKeyDown}
         />
@@ -61,8 +61,9 @@ export const AddListButton = () => {
         <button
           class={styles["add-list-button"]}
           onClick={() => enterEditMode()}
+          tabIndex={-1}
         >
-          Add board
+          Add list
         </button>
       )}
     </>

@@ -35,11 +35,21 @@
 /* List Header */
 .list-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 32px;
+    flex-direction: column;
     flex-shrink: 0;
     padding: 0.25em;
+}
+
+.primary {
+    height: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.description {
+    padding-left: 0.5em;
+    color: var(--body-tint);
 }
 
 .list-head-button {

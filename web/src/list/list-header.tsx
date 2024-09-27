@@ -20,45 +20,48 @@ export const ListHeader = (props: ListHeaderProps) => {
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
     <div class={styles["list-header"]}>
-      {ctxOpen() && (
-        <NavItemContextMenu
-          close={() => setCtxOpen(false)}
-          container={ref}
-          offset={ctxOffset()}
-        />
-      )}
-      <button
-        class={styles["list-head-button"]}
-        tabIndex={-1}
-        ref={ref}
-        onContextMenu={(event: MouseEvent) => {
-          event.preventDefault();
-          setCtxOffset([event.clientX, event.clientY]);
-          setCtxOpen(true);
-        }}
-      >
-        <span style="padding-right: 0.5em;">
-          <ListIcon container={props.container} />
-        </span>
-        <span class={styles["title-text"]}>{props.container.name}</span>
-        <div
-          class={styles["keyboard-marker"]}
-          style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
+      <div class={styles["primary"]}>
+        {ctxOpen() && (
+          <NavItemContextMenu
+            close={() => setCtxOpen(false)}
+            container={ref}
+            offset={ctxOffset()}
+          />
+        )}
+        <button
+          class={styles["list-head-button"]}
+          tabIndex={-1}
+          ref={ref}
+          onContextMenu={(event: MouseEvent) => {
+            event.preventDefault();
+            setCtxOffset([event.clientX, event.clientY]);
+            setCtxOpen(true);
+          }}
         >
-          -
-        </div>
-      </button>
-      {session.viewState.count() > 1 && (
-        <div>
-          <button
-            class={styles["list-button"]}
-            onClick={() => props.view.detach()}
-            tabIndex={-1}
+          <span style="padding-right: 0.5em;">
+            <ListIcon container={props.container} />
+          </span>
+          <span class={styles["title-text"]}>{props.container.name}</span>
+          <div
+            class={styles["keyboard-marker"]}
+            style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
           >
-            <XSVG />
-          </button>
-        </div>
-      )}
+            -
+          </div>
+        </button>
+        {session.viewState.count() > 1 && (
+          <div>
+            <button
+              class={styles["list-button"]}
+              onClick={() => props.view.detach()}
+              tabIndex={-1}
+            >
+              <XSVG />
+            </button>
+          </div>
+        )}
+      </div>
+      {/* <div class={styles["description"]}>Description</div> */}
     </div>
   );
 };
