@@ -2,6 +2,7 @@ import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
 import { walk } from "@sunlist/list";
 import { SunlistWorkspace } from "../store/main";
+import { KeyboardShortcuts } from "./keyboard";
 
 type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
@@ -167,17 +168,23 @@ export class ViewState {
   scene = createSignal<"default" | "focus">("default");
   focus?: GenericItem;
   workspace: SunlistWorkspace;
+  keyboard: KeyboardShortcuts;
   constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
+    this.keyboard = new KeyboardShortcuts(workspace);
   }
   toggleSidebar() {
     this.sidebarVisible[1]((prev) => !prev);
   }
   focusSidebar() {
-    this.workspace.dndContext.keyboard.disable();
+    // this.workspace.dndContext.keyboard.disable();
   }
   focusContainer() {
-    this.workspace.dndContext.keyboard.enable();
+    // this.workspace.dndContext.keyboard.enable();
+  }
+  setActivePane(view: ViewNode) {
+    this.activePane[1](view);
+    // TODO: Activate keyboard listener
   }
   setActiveRegion(region: ActiveRegionType) {
     this.activeRegion[1](region);

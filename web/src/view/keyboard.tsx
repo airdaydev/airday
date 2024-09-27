@@ -1,4 +1,4 @@
-import { SunlistSession } from "../store/main";
+import { SunlistSession, SunlistWorkspace } from "../store/main";
 
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
 
@@ -7,10 +7,12 @@ export function toggleSidebar(session: SunlistSession) {
 }
 
 export class KeyboardShortcuts {
+  workspace: SunlistWorkspace;
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();
   globalHandlerActive = true;
   enabled: boolean = true; // for temporarily overriding for example when editing
-  constructor() {
+  constructor(workspace: SunlistWorkspace) {
+    this.workspace = workspace;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
       // TODO: Make this actually work (competes with local listeners for now)

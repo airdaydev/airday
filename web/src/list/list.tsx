@@ -24,8 +24,8 @@ export function List(props: ListProps) {
   );
   createEffect(() => {
     if (ctx.dndContext.focusContext[0]() === ctx) {
-      session.viewState.activePane[1](props.view);
-      session.workspace.dndContext.keyboard.enable();
+      session.viewState.setActivePane(props.view);
+      // session.workspace.dndContext.keyboard.enable();
     }
   });
   onMount(() => {
@@ -38,8 +38,8 @@ export function List(props: ListProps) {
         [styles.focus]: session.viewState.activePane[0]() === props.view,
       }}
       onClick={() => {
-        session.viewState.activePane[1](props.view);
-        session.workspace.dndContext.keyboard.enable();
+        session.viewState.setActivePane(props.view);
+        // session.workspace.dndContext.keyboard.enable();
       }}
     >
       <ListHeader tabId={props.tabId} container={container} view={props.view} />

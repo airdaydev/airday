@@ -122,7 +122,7 @@ export class SunlistWorkspace {
   localOnly: boolean = true;
   openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();
-  dndContext = new DndContext();
+  dndContext = new DndContext({ enableKeyboard: false });
   app: SunlistSession;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
