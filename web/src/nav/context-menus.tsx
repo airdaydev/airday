@@ -1,6 +1,7 @@
 import { Accessor, useContext } from "solid-js";
 import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
+import { Key } from "../generic/key.jsx";
 
 interface SunlistContextMenuProps {
   close: () => void;
@@ -22,10 +23,18 @@ export function SunlistContextMenu(props: SunlistContextMenuProps) {
           session.viewState.sidebarVisible[1]((prev) => !prev);
           props.close();
         }}
+        style="display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 12em;"
       >
         <span>
           {session.viewState.sidebarVisible[0]() ? "Hide" : "Show"} Sidebar
         </span>
+        <div>
+          <Key key="⌥" />
+          <Key key="S" />
+        </div>
       </button>
       <button disabled>
         <span>Settings</span>

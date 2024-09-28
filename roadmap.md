@@ -27,6 +27,8 @@
 - [x] don't double up focus between sidebar and main panes
 - [x] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [x] Bug: jumping into focus & out, then opening a list crashes!
+- [ ] store check information (done or not?)
+- [] Reinstate Done board
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
 - [] attempt to reselect item when leaving focus mode
@@ -44,13 +46,10 @@
 - [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
 - [ ] drag sidebar to resize
 - [ ] sunlist - experiment with sounds
-- [ ] store check information (done or not?)
-- [ ] open done list
 - [ ] add initial habit item
 - [ ] open performance list, add filters/configuration
 - [ ] open priority list (added by reference, no move!)
 - [ ] Limit open lists, ensure destruction
-- [] Reinstate Done board
 - [] Next board
 - [] Drag items into list nav
 - [] Repetitive tasks (shuffle)
