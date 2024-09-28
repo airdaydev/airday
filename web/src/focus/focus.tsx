@@ -19,7 +19,7 @@ export const Focus = (props: FocusProps) => {
         <h1>{props.item.content}</h1>
       </div>
       <ThrottleButton
-        action={() => session.viewState.goToScene("default")}
+        action={() => session.viewState.openDefaultScene()}
         key={"Escape"}
       >
         <Key key="esc" />

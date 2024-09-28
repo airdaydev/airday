@@ -185,16 +185,17 @@ export class ViewState {
     this.activeRegion[1]("container");
     this.workspace.containerModel.getNavDnd().clearSelection();
   }
-  goToScene(scene: Scene) {
-    this.scene[1](scene);
+  openFocusScene() {
+    this.scene[1]("focus");
+  }
+  openDefaultScene() {
+    this.scene[1]("default");
     const t = this.workspace.dndContext.focusedContext();
     // TODO: This will get overriden if escape key is being held down!
     if (this.focus) t?.selectOne(this.focus);
   }
   setActivePane(view: ViewNode) {
-    this.focusContainer();
     this.activePane[1](view);
-    // TODO: Activate keyboard listener
   }
   setActiveRegion(region: ActiveRegionType) {
     this.activeRegion[1](region);
@@ -247,7 +248,7 @@ export class ViewState {
   }
   focusItem(item: GenericItem) {
     this.focus = item;
-    this.goToScene("focus");
+    this.openFocusScene();
   }
   openDataView(containerId: string) {
     const view = new DataView(containerId);

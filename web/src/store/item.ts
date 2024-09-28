@@ -61,6 +61,10 @@ export class ItemModel {
     // touchedLists.forEach((listId) => this.events.dispatchEvent(new Event(`list-update-${listId}`)));
   };
   getItemsByList = async (listId: string): Promise<Sunlist[]> => {
+    if (!listId) {
+      console.warn("attempted to getItemsByList with null listId");
+      return [];
+    }
     const range = IDBKeyRange.bound([listId, "A"], [listId, "zzzzzz"]);
     const items = await this.db.getAllFromIndex(
       this.storeName,

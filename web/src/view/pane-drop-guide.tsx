@@ -71,6 +71,7 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         return dropRegion[1]("none");
       }}
       onMouseUp={() => {
+        console.log("panedropguide", props);
         const region = dropRegion[0]();
         if (region === "left") {
           const dataView = new DataView(props.container.id);

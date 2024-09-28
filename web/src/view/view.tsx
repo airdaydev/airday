@@ -30,11 +30,9 @@ export function View(props: ViewProps) {
               {session.workspace.containerModel.dndContext.isDragging() && (
                 <PaneDropGuide
                   view={view}
-                  yikes={/*TODO: Clean Up Below */ true}
-                  container={session.workspace.containerModel.dndContext.listContexts
-                    .values()
-                    .next()
-                    .value.getFirstSelected()}
+                  container={session.workspace.containerModel
+                    .getNavDnd()
+                    .getFirstSelected()}
                 />
               )}
               <List view={view} />
