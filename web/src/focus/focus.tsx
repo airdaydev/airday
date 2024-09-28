@@ -22,7 +22,7 @@ export const Focus = (props: FocusProps) => {
         action={() => session.viewState.goToScene("default")}
         key={"Escape"}
       >
-        <Key key="ESC" />
+        <Key key="esc" />
         <span>End</span>
       </ThrottleButton>
     </div>
