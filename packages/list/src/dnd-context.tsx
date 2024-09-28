@@ -137,8 +137,6 @@ export class ListDragContext {
   }
   getFirstSelected() {
     const projection = this.projection();
-    console.log("projection", projection);
-    console.log("projection", this.selection[0]());
     for (let i = 0; i < projection.length; i++) {
       if (this.selection[0]().has(projection[i])) return projection[i];
     }

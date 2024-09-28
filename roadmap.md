@@ -26,7 +26,7 @@
 - [x] highlight open list in nav bar
 - [x] don't double up focus between sidebar and main panes
 - [x] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
-- [] Bug: jumping into focus & out, then opening a list crashes!
+- [x] Bug: jumping into focus & out, then opening a list crashes!
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
 - [] attempt to reselect item when leaving focus mode

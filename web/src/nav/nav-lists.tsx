@@ -1,4 +1,4 @@
-import { createSignal, useContext } from "solid-js";
+import { createSignal, onCleanup, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
 import { sessionContext } from "../store/context.js";
 import { NavItemContextMenu } from "./context-menus";
@@ -30,9 +30,6 @@ export const NavListItem: NodeComponentType = (props) => {
         }}
         onMouseDown={(event) => {
           props.onMouseDown(event);
-          console.log(
-            session.workspace.containerModel.getNavDnd().getFirstSelected(),
-          );
         }}
         onTouchStart={(event) => {
           props.onTouchStart(event);
@@ -64,6 +61,11 @@ export const NavLists = () => {
     dndContext: session.workspace.containerModel.dndContext,
     itemHeight: 32,
     placeholderStyle: styles["placeholder"],
+  });
+  onCleanup(() => {
+    session.workspace.containerModel.dndContext.listContexts.delete(
+      listDragContext,
+    );
   });
   return (
     <div class={`${styles["nav-list"]} ${styles["nav-text"]}`}>

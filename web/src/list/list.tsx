@@ -1,4 +1,4 @@
-import { createEffect, onMount, Show, useContext } from "solid-js";
+import { createEffect, onCleanup, onMount, Show, useContext } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView } from "../view/state";
@@ -23,6 +23,10 @@ export function List(props: ListProps) {
   const container = session.workspace.containerModel.tree.idMap.get(
     props.view.containerId,
   );
+
+  onCleanup(() => {
+    session.workspace.dndContext.listContexts.delete(ctx);
+  });
 
   createEffect(() => {
     if (ctx.dndContext.focusContext[0]() === ctx) {
