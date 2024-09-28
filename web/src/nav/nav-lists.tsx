@@ -30,6 +30,9 @@ export const NavListItem: NodeComponentType = (props) => {
         }}
         onMouseDown={(event) => {
           props.onMouseDown(event);
+          console.log(
+            session.workspace.containerModel.getNavDnd().getFirstSelected(),
+          );
         }}
         onTouchStart={(event) => {
           props.onTouchStart(event);

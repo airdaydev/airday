@@ -1,6 +1,5 @@
-import { createEffect, createSignal, onMount } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
-import { defaultMapping } from "@sunlist/list/src/keyboard/mapping";
 import { DataView } from "./state";
 import { ListDragContext, Node } from "@sunlist/list";
 
@@ -71,7 +70,9 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         return dropRegion[1]("none");
       }}
       onMouseUp={() => {
-        console.log("panedropguide", props);
+        if (!props.container) {
+          console.warn("props.container.id unset");
+        }
         const region = dropRegion[0]();
         if (region === "left") {
           const dataView = new DataView(props.container.id);

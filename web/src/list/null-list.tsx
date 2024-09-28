@@ -9,10 +9,10 @@ interface NullListProps {
 
 const NullList: Component<NullListProps> = (props) => {
   return (
-    <div class={styles["list-container"]}>
+    <div class={styles["list"]}>
       <div class={styles["list-header"]}>
         <div class={styles["primary"]}>
-          <div>Null List</div>
+          <div>⚠️ Error: Null List</div>
           <button
             class={styles["list-button"]}
             onClick={() => props.view.detach()}
