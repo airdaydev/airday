@@ -1,6 +1,6 @@
-import { nanoid } from "nanoid";
 import { generateNKeysBetween } from "fractional-indexing";
 import { GenericItem } from "./loader";
+import { createUniqueId } from "solid-js";
 
 export const sunlistItems = [
   "Sunlist",
@@ -27,7 +27,7 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
       sticker = "smiley";
     }
     dummyItems.push({
-      id: nanoid(),
+      id: createUniqueId(),
       content: tasks[index],
       sortKey: sortKeys[i],
       tsCreated: new Date(),

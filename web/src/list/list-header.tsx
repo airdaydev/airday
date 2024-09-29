@@ -47,7 +47,7 @@ export const ListHeader = (props: ListHeaderProps) => {
             class={styles["keyboard-marker"]}
             style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
           >
-            -
+            •
           </div>
         </button>
         {session.viewState.count() > 1 && (

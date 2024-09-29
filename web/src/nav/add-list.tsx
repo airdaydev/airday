@@ -1,5 +1,10 @@
-import { nanoid } from "nanoid";
-import { createSignal, createEffect, on, useContext } from "solid-js";
+import {
+  createSignal,
+  createEffect,
+  on,
+  useContext,
+  createUniqueId,
+} from "solid-js";
 import { sessionContext } from "../store/context.js";
 import styles from "./nav.module.css";
 
@@ -15,7 +20,7 @@ export const AddListButton = () => {
   const leaveEditMode = (save: boolean) => {
     // keyboardShortcuts.enable();
     if (save) {
-      const id = nanoid();
+      const id = createUniqueId();
       session.workspace.containerModel.insert({
         id,
         name: inputRef?.value || "New list",
