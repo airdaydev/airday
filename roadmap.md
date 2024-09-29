@@ -180,3 +180,10 @@
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
 - [] Natural looking cross outs? Consider tick seed, underline length
 - [] Custom fields
+- [] consider flexsearch
+
+## References/notes/things to try
+- https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
+- https://keystatic.com/docs/installation-astro
+- https://klim.co.nz/buy/soehne/
+- https://alexharri.com/blog/clipboard
