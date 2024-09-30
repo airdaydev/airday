@@ -1,5 +1,12 @@
-import { createSignal, onCleanup, onMount, ParentProps } from "solid-js";
+import {
+  createSignal,
+  onCleanup,
+  onMount,
+  ParentProps,
+  useContext,
+} from "solid-js";
 import styles from "./focus.module.css";
+import { sessionContext } from "../store/context";
 
 interface ThrottleButtonProps {
   children: ParentProps;
@@ -7,6 +14,7 @@ interface ThrottleButtonProps {
 }
 
 export const ThrottleButton = (props: ThrottleButtonProps) => {
+  const session = useContext(sessionContext);
   const [progress, setProgress] = createSignal(0);
   const [isHolding, setIsHolding] = createSignal(false);
   let intervalId;
@@ -36,11 +44,15 @@ export const ThrottleButton = (props: ThrottleButtonProps) => {
     }
   };
 
+  let isEscDown = true;
+
   const throttleQuit = (event: KeyboardEvent) => {
     if (event.type === "keydown" && event.key === "Escape") {
+      isEscDown = true;
       startHold();
     }
     if (event.type === "keyup" && event.key === "Escape") {
+      isEscDown = false;
       endHold();
     }
   };
@@ -53,6 +65,16 @@ export const ThrottleButton = (props: ThrottleButtonProps) => {
   onCleanup(() => {
     window.removeEventListener("keydown", throttleQuit);
     window.removeEventListener("keyup", throttleQuit);
+    if (isEscDown) {
+      session.viewState.keyboard.stopKeys.add("Escape");
+      window.addEventListener(
+        "keyup",
+        () => {
+          session.viewState.keyboard.stopKeys.delete("Escape");
+        },
+        { once: true },
+      );
+    }
   });
 
   return (

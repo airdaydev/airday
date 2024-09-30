@@ -13,11 +13,16 @@ export class KeyboardShortcuts {
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();
   globalHandlerActive = true;
   enabled: boolean = true; // for temporarily overriding for example when editing
+  stopKeys = new Set<KeyboardEvent["key"]>();
   constructor(workspace: SunlistWorkspace, viewState: ViewState) {
     this.workspace = workspace;
     this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
+      if (this.stopKeys.has(event.key)) {
+        event.preventDefault();
+        return;
+      }
       if (this.viewState.activeModal[0]()) {
         // Modal listener
         return;
