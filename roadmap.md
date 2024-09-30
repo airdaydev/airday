@@ -31,6 +31,7 @@
 - [x] Default view is inbox
 - [x] keyboard shortcut for closing a list
 - [x] attempt to reselect item when leaving focus mode
+- [] allow done items to hack into existing list dnd context
 - [] tooltip for closing a window that shows kb shortcut
 - [] Reinstate Done board
 - [] indexing system for nav

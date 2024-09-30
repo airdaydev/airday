@@ -40,7 +40,10 @@ export function View(props: ViewProps) {
             </div>
           </Match>
           <Match when={view.type === "done"}>
-            <Done />
+            <div class={styles["view-cell"]}>
+              {/* make a subtype for data instead */}
+              <Done />
+            </div>
           </Match>
           <Match
             when={view.type === "container" && view.direction === "horizontal"}
