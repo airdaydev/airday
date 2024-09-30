@@ -31,7 +31,6 @@ export function List(props: ListProps) {
   createEffect(() => {
     if (ctx.dndContext.focusContext[0]() === ctx) {
       session.viewState.setActivePane(props.view);
-      // session.workspace.dndContext.keyboard.enable();
     }
   });
   onMount(() => {
@@ -47,7 +46,6 @@ export function List(props: ListProps) {
           }}
           onClick={() => {
             session.viewState.setActivePane(props.view);
-            // session.workspace.dndContext.keyboard.enable();
           }}
         >
           <ListHeader
