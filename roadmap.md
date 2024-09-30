@@ -64,6 +64,7 @@
 - [] Loading pane
 - [] Save views! (arrangements of panes)
 - [ ] experiment with sounds
+- [] Print styles!!
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
