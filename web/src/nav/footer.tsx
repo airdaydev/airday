@@ -104,6 +104,15 @@ export const Footer = () => {
             tabIndex={-1}
             class={styles["nav-button"]}
             style={"line-height: 0rem;"}
+            onClick={() => {
+              const firstSelected = session.workspace.dndContext
+                .focusedContext()
+                ?.getFirstSelected();
+              if (firstSelected) {
+                session.viewState.focus = firstSelected;
+                session.viewState.openFocusScene();
+              }
+            }}
           >
             <Key key="⌥" />
             <Key key="F" />
