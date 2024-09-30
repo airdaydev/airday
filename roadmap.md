@@ -28,17 +28,17 @@
 - [x] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [x] Bug: jumping into focus & out, then opening a list crashes!
 - [x] store check information (done or not?)
+- [x] Default view is inbox
+- [x] keyboard shortcut for closing a list
+- [x] attempt to reselect item when leaving focus mode
 - [] Reinstate Done board
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers
-- [] attempt to reselect item when leaving focus mode
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
 - [] Deselect nav bar items when leaving focus
-- [ ] keyboard shortcut for closing a list
-- [ ] closing a list focuses on the previous
+- [ ] closing a list focuses on the previous list item
 - [ ] list switcher to switch between open files (opt+tab)
 - [ ] empty list state nice
-- [ ] Default view is inbox
 - [ ] Context click on list header
 - [ ] touch swipe gesture left /right to hide + show sidebar
 - [ ] Test if drag limit is below or above diagonal line on hover!

@@ -27,6 +27,7 @@ export class KeyboardShortcuts {
         event.preventDefault();
         return;
       }
+      console.log(event);
       if (this.viewState.activeRegion[0]() === "container") {
         let action = this.workspace.dndContext.keyboard.listen(event);
         if (action) return;

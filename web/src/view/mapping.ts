@@ -28,4 +28,11 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
       }
     },
   ],
+  [
+    encodeShortcut({ key: "∑", altKey: true }),
+    (ctx) => {
+      const view = ctx.viewState.activePane[0]();
+      if (view) ctx.viewState.closeView(view);
+    },
+  ],
 ]);
