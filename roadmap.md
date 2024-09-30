@@ -113,7 +113,6 @@
 - [] Nice empty list states
 - [] Export data markdown, json, csv
 - [] Import markdown, json, things 3 etc
-- [] Keyboard only, accessibility
 - [] Split view 4+ ways
 
 ## Stickers
@@ -138,6 +137,7 @@
 - [] Add new item adds saves item into store
 
 ## Predeploy, meta app
+- [] Verify keyboard only, accessibility
 - [] Friends alpha and testing
 - [] PWA update strategy
 - [] Automated testing story
