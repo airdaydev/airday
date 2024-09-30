@@ -42,25 +42,31 @@ export class DndContextKeyboardEvents {
   }
   listen = (event: KeyboardEvent) => {
     const ctx = this.dndContext.focusedContext();
-    if (!ctx) return;
+    if (!ctx) return false;
     const encodedEvent = encodeShortcut(event);
     const func = defaultMapping.get(encodedEvent);
     if (func) {
       this.clearBuffer();
       event.preventDefault();
-      return func(ctx);
+      func(ctx);
+      return true;
     }
     if (this.vimKeys) {
       const vimFunc = vimMapping.get(encodedEvent);
       if (vimFunc) {
         event.preventDefault();
         this.clearBuffer();
-        return vimFunc(ctx);
+        vimFunc(ctx);
+        return true;
       }
     }
     // TODO: Support key sequences for non-vim?
     this.addToBuffer(encodedEvent);
     const funct = vimMapping.get(this.buffer.join(","));
-    if (funct) funct(ctx);
+    if (funct) {
+      funct(ctx);
+      return true;
+    }
+    return false;
   };
 }

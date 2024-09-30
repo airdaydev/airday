@@ -1,5 +1,7 @@
+import { encodeShortcut } from "@sunlist/keyboard";
 import { SunlistSession, SunlistWorkspace } from "../store/main";
 import { ViewState } from "./state";
+import { defaultMapping } from "./mapping";
 
 const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
 
@@ -14,6 +16,8 @@ export class KeyboardShortcuts {
   globalHandlerActive = true;
   enabled: boolean = true; // for temporarily overriding for example when editing
   stopKeys = new Set<KeyboardEvent["key"]>();
+  buffer: string[] = [];
+  vimKeys = true;
   constructor(workspace: SunlistWorkspace, viewState: ViewState) {
     this.workspace = workspace;
     this.viewState = viewState;
@@ -23,44 +27,41 @@ export class KeyboardShortcuts {
         event.preventDefault();
         return;
       }
+      if (this.viewState.activeRegion[0]() === "container") {
+        let action = this.workspace.dndContext.keyboard.listen(event);
+        if (action) return;
+      }
+      if (this.viewState.activeRegion[0]() === "sidebar") {
+        let action =
+          this.workspace.containerModel.dndContext.keyboard.listen(event);
+        if (action) return;
+      }
+      const encodedEvent = encodeShortcut(event);
       if (this.viewState.activeModal[0]()) {
         // Modal listener
         return;
       }
-      if (this.viewState.activeRegion[0]() === "container") {
-        this.workspace.dndContext.keyboard.listen(event);
+      const func = defaultMapping.get(encodedEvent);
+      console.log(event);
+      if (func) {
+        func({ workspace: this.workspace, viewState: this.viewState });
+        this.clearBuffer();
       }
-      if (this.viewState.activeRegion[0]() === "sidebar") {
-        this.workspace.containerModel.dndContext.keyboard.listen(event);
+      const funcMulti = defaultMapping.get(this.buffer.join(","));
+      if (funcMulti) {
+        funcMulti({ workspace: this.workspace, viewState: this.viewState });
+        this.clearBuffer();
       }
-      this.globalKeyboardHandler(event);
     });
   }
-  globalKeyboardHandler(event: KeyboardEvent) {
-    if (event.key === "s") {
-      this.viewState.toggleSidebar();
+  addToBuffer(encodedKey: string) {
+    if (this.buffer.length > 1) {
+      this.buffer.shift();
     }
-    if (event.key === "f") {
-      if (this.viewState.scene[0]() === "default") {
-        const item = this.workspace.dndContext
-          .focusedContext()
-          ?.selection[0]()
-          .values()
-          .next().value;
-        if (item) this.viewState.focusItem(item);
-        return;
-      }
-    }
+    this.buffer.push(encodedKey);
   }
-  registerHandler(
-    event: string,
-    contextId: string,
-    handler: (event: KeyboardEvent) => void,
-  ) {
-    this.handlerMap.set(keyName(event, contextId), handler);
-  }
-  unregisterHandler(event: string, contextId: string) {
-    this.handlerMap.delete(keyName(event, contextId));
+  clearBuffer() {
+    this.buffer = [];
   }
   disable() {
     this.enabled = false;
