@@ -195,6 +195,7 @@ export class ViewState {
     if (this.focus) t?.selectOne(this.focus);
   }
   setActivePane(view: ViewNode) {
+    this.focusContainer();
     this.activePane[1](view);
   }
   setActiveRegion(region: ActiveRegionType) {
