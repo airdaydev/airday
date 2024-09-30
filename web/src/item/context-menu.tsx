@@ -5,6 +5,7 @@ import Smiley from "../stickers/baseline/smiley.svg?component-solid";
 import styles from "./item.module.css";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
+import { Key } from "../generic/key";
 
 interface ItemContextMenuProps {
   close: () => void;
@@ -21,18 +22,24 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Add to up next</span>
       </button>
-      <button onClick={() => session.viewState.focusItem(props.item)}>
+      <button
+        onClick={() => session.viewState.focusItem(props.item)}
+        style="display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 12em;"
+      >
         <span>Focus</span>
+        <div>
+          <Key key="F" />
+        </div>
       </button>
       <hr />
       <button disabled>
-        <span>Copy text</span>
+        <span>Copy</span>
       </button>
       <button disabled>
-        <span>Copy as JSON</span>
-      </button>
-      <button disabled>
-        <span>Copy as Markdown</span>
+        <span>Copy special</span>
       </button>
       <hr />
       <div class={styles["sticker-container"]}>
@@ -45,8 +52,8 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         <button onClick={() => props.updateSticker("circleAqua")}>
           <CircleAqua />
         </button>
-        <button onClick={() => props.updateSticker(null)}>X</button>
       </div>
+      <button onClick={() => props.updateSticker(null)}>Remove sticker</button>
       <hr />
       <button disabled>
         <span>Duplicate</span>
