@@ -6,10 +6,13 @@
  * Can select many, can drag to other lists but can't drag in own list
  */
 
+import { useContext } from "solid-js";
+import { sessionContext } from "../store/context";
+
 export const Done = () => {
-    return (
-        <div>
-            Historical items
-        </div>
-    )
-}
+  const session = useContext(sessionContext);
+  const items = session.workspace.itemStore
+    .getCompletedItems()
+    .then((d) => console.log(d));
+  return <div>Historical items here</div>;
+};

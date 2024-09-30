@@ -4,6 +4,7 @@ import { sessionContext } from "../store/context.js";
 import { List } from "../list/list";
 import { ViewNode } from "./state";
 import { PaneDropGuide } from "./pane-drop-guide";
+import { Done } from "../list/done";
 
 interface ViewProps {
   view: ViewNode;
@@ -37,6 +38,9 @@ export function View(props: ViewProps) {
               )}
               <List view={view} />
             </div>
+          </Match>
+          <Match when={view.type === "done"}>
+            <Done />
           </Match>
           <Match
             when={view.type === "container" && view.direction === "horizontal"}

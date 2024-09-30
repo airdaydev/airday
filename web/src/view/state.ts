@@ -7,7 +7,7 @@ import { KeyboardShortcuts } from "./keyboard";
 type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
-type ViewType = "container" | "data";
+type ViewType = "container" | "data" | "done";
 
 export class ViewNode {
   id = createUniqueId();
@@ -128,6 +128,13 @@ export class VerticalSplitNode extends ViewNode {
   constructor() {
     super();
     this.direction = "vertical";
+  }
+}
+
+export class DoneView extends ViewNode {
+  constructor() {
+    super();
+    this.type = "done";
   }
 }
 
@@ -263,8 +270,16 @@ export class ViewState {
       this.addViewToRoot(view);
     }
   }
-  openDoneView = () => {};
-  addViewToRoot(view: DataView, ViewIndex = [0, 0]) {
+  openDoneView = () => {
+    const view = new DoneView();
+    const activePane = this.activePane[0]();
+    if (activePane) {
+      activePane?.replace(view);
+    } else {
+      this.addViewToRoot(view);
+    }
+  };
+  addViewToRoot(view: ViewNode, ViewIndex = [0, 0]) {
     this.tree.addChild(view);
   }
   closeView(view: DataView) {
