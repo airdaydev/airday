@@ -31,6 +31,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       >
         <span>Focus</span>
         <div>
+          <Key key="⌥" />
           <Key key="F" />
         </div>
       </button>

@@ -27,7 +27,7 @@
 - [x] don't double up focus between sidebar and main panes
 - [x] Focus exit is like a gauge that fills up; you have to hold it for 2 seconds!
 - [x] Bug: jumping into focus & out, then opening a list crashes!
-- [ ] store check information (done or not?)
+- [x] store check information (done or not?)
 - [] Reinstate Done board
 - [] indexing system for nav
 - [] tree backed indexing system to move between panes with numbers

@@ -183,7 +183,10 @@ export class ViewState {
   }
   focusContainer() {
     this.activeRegion[1]("container");
-    this.workspace.containerStore.getNavDnd().clearSelection();
+    // TODO: Consider investigating for smell
+    // the dnd isn't ready when list is prepared
+    const dnd = this.workspace.containerStore.getNavDnd();
+    if (dnd) dnd.clearSelection();
   }
   openFocusScene() {
     this.scene[1]("focus");

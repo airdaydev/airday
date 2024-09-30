@@ -30,10 +30,19 @@ export class GenericItem extends Node {
     return {
       id: this.id,
       content: this.content,
+      tsCompleted: this.tsCompleted,
     };
   }
   updateContent(newText: string) {
     this.content = newText;
+    this.triggerUpdate();
+  }
+  toggleComplete() {
+    if (!this.tsCompleted) {
+      this.tsCompleted = new Date();
+    } else {
+      this.tsCompleted = null;
+    }
     this.triggerUpdate();
   }
 }

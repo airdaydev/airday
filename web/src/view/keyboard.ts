@@ -42,7 +42,6 @@ export class KeyboardShortcuts {
         return;
       }
       const func = defaultMapping.get(encodedEvent);
-      console.log(event);
       if (func) {
         func({ workspace: this.workspace, viewState: this.viewState });
         this.clearBuffer();

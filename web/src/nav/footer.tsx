@@ -105,6 +105,7 @@ export const Footer = () => {
             class={styles["nav-button"]}
             style={"line-height: 0rem;"}
           >
+            <Key key="⌥" />
             <Key key="F" />
             Focus
           </button>
