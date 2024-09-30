@@ -1,6 +1,6 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
-import { ItemModel } from "./item";
-import { ContainerModel } from "./container";
+import { ItemStore } from "./item";
+import { ContainerStore } from "./container";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
@@ -114,8 +114,8 @@ export class SunlistSession {
 // Each workspace has a separate idb connection
 export class SunlistWorkspace {
   db: SunlistIDB | null = null;
-  itemModel = new ItemModel();
-  containerModel = new ContainerModel(this);
+  itemStore = new ItemStore();
+  containerStore = new ContainerStore(this);
   id: string = createUniqueId();
   name: string = "Uninitialised";
   initialised = false;
@@ -146,19 +146,19 @@ export class SunlistWorkspace {
       // TODO: Get upgrades as static methods from classes
       async upgrade(db) {
         console.debug(`Running upgrade`);
-        await self.itemModel.upgrade(db);
-        await self.containerModel.upgrade(db);
+        await self.itemStore.upgrade(db);
+        await self.containerStore.upgrade(db);
         console.log("Completed upgrade");
         // const doneStore = db.createObjectStore(doneStoreName, {
         //     keyPath: 'id',
         // });
       },
     });
-    this.containerModel.init(db);
-    this.itemModel.init(db);
+    this.containerStore.init(db);
+    this.itemStore.init(db);
     console.debug(`Connected to ${this.ref}`);
     this.db = db;
-    this.containerModel.load();
+    this.containerStore.load();
     return db;
   };
   /**
@@ -177,8 +177,8 @@ export class SunlistWorkspace {
       ...genTestData("work", sunlistItems),
       ...genTestData("inbox", inboxItems),
     ];
-    await this.itemModel.insert(items);
-    await this.containerModel.insert([
+    await this.itemStore.insert(items);
+    await this.containerStore.insert([
       {
         id: "inbox",
         name: "Inbox",
@@ -212,7 +212,7 @@ export class SunlistWorkspace {
       state = this.openLists.get(identifier);
       if (!state) {
         const state = this.listStateContext.createTree({ loader });
-        const list = this.itemModel
+        const list = this.itemStore
           .getItemsByList(view.containerId)
           .then((items) => {
             state.load({ id: "root", children: items });

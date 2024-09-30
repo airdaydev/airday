@@ -33,7 +33,7 @@ export class KeyboardShortcuts {
       }
       if (this.viewState.activeRegion[0]() === "sidebar") {
         let action =
-          this.workspace.containerModel.dndContext.keyboard.listen(event);
+          this.workspace.containerStore.dndContext.keyboard.listen(event);
         if (action) return;
       }
       const encodedEvent = encodeShortcut(event);

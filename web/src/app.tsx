@@ -19,8 +19,8 @@ export function App() {
           {session.workspace.dndContext.isDragging() && (
             <Dragged dndContext={session.workspace.dndContext} />
           )}
-          {session.workspace.containerModel.dndContext.isDragging() && (
-            <Dragged dndContext={session.workspace.containerModel.dndContext} />
+          {session.workspace.containerStore.dndContext.isDragging() && (
+            <Dragged dndContext={session.workspace.containerStore.dndContext} />
           )}
           <div class={styles.main}>
             <SunlistNav />

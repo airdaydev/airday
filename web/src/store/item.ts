@@ -7,7 +7,7 @@ import { SunlistIDB } from "./main";
  * Note: Fast-list provides in-memory layer
  * TODO: Put DB functions in a base class
  */
-export class ItemModel {
+export class ItemStore {
   storeName = "item";
   sundb: SunlistIDB | null = null;
   itemStore: IDBPObjectStore | null = null;

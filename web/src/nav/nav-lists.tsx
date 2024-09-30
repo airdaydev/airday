@@ -57,13 +57,13 @@ export const NavListItem: NodeComponentType = (props) => {
 export const NavLists = () => {
   const session = useContext(sessionContext);
   const listDragContext = new ListDragContext({
-    treeState: session.workspace.containerModel.tree,
-    dndContext: session.workspace.containerModel.dndContext,
+    treeState: session.workspace.containerStore.tree,
+    dndContext: session.workspace.containerStore.dndContext,
     itemHeight: 32,
     placeholderStyle: styles["placeholder"],
   });
   onCleanup(() => {
-    session.workspace.containerModel.dndContext.listContexts.delete(
+    session.workspace.containerStore.dndContext.listContexts.delete(
       listDragContext,
     );
   });

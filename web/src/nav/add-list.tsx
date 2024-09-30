@@ -21,7 +21,7 @@ export const AddListButton = () => {
     // keyboardShortcuts.enable();
     if (save) {
       const id = createUniqueId();
-      session.workspace.containerModel.insert({
+      session.workspace.containerStore.insert({
         id,
         name: inputRef?.value || "New list",
         icon: "task",

@@ -20,7 +20,7 @@ export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
  * Provides fast in memory store, idb persistence layer & websocket interface
  * TODO: Put DB functions in a base class
  */
-export class ContainerModel {
+export class ContainerStore {
   storeName = "container";
   sundb: SunlistIDB | null = null;
   listStateContext = new ListStateContext();

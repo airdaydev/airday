@@ -27,10 +27,10 @@ export function View(props: ViewProps) {
         <Switch>
           <Match when={view.type === "data"}>
             <div class={styles["view-cell"]}>
-              {session.workspace.containerModel.dndContext.isDragging() && (
+              {session.workspace.containerStore.dndContext.isDragging() && (
                 <PaneDropGuide
                   view={view}
-                  container={session.workspace.containerModel
+                  container={session.workspace.containerStore
                     .getNavDnd()
                     .getFirstSelected()}
                 />

@@ -183,7 +183,7 @@ export class ViewState {
   }
   focusContainer() {
     this.activeRegion[1]("container");
-    this.workspace.containerModel.getNavDnd().clearSelection();
+    this.workspace.containerStore.getNavDnd().clearSelection();
   }
   openFocusScene() {
     this.scene[1]("focus");

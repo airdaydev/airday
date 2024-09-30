@@ -20,7 +20,7 @@ export function List(props: ListProps) {
     itemHeight: 32,
     placeholderStyle: itemStyles["placeholder"],
   });
-  const container = session.workspace.containerModel.tree.idMap.get(
+  const container = session.workspace.containerStore.tree.idMap.get(
     props.view.containerId,
   );
 
