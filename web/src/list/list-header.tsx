@@ -5,6 +5,7 @@ import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
 import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
+import CheckSVG from "../icons/check.svg?component-solid";
 
 interface ListHeaderProps {
   container: SunlistContainer;
@@ -81,6 +82,25 @@ export const ListHeader = (props: ListHeaderProps) => {
     <div class={styles["list-header"]}>
       <div class={styles["primary"]}>
         <ListHeaderButton container={props.container} view={props.view} />
+        <CloseViewButton view={props.view} />
+      </div>
+      {/* <div class={styles["description"]}>Description</div> */}
+    </div>
+  );
+};
+
+export const DoneListHeader = (props: ListHeaderProps) => {
+  return (
+    <div class={styles["list-header"]}>
+      <div class={styles["primary"]}>
+        <button class={styles["list-head-button"]}>
+          <CheckSVG
+            style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint); position: relative;
+            left: -3px;"
+          />
+          <span>Done</span>
+        </button>
+        <KeyboardMarker view={props.view} />
         <CloseViewButton view={props.view} />
       </div>
       {/* <div class={styles["description"]}>Description</div> */}

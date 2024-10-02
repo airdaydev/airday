@@ -8,13 +8,15 @@
 
 import { For, useContext } from "solid-js";
 import { sessionContext } from "../store/context";
+import { DoneListHeader } from "./list-header";
+import { DataView } from "../view/state";
 
-export const Done = () => {
+export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
   const items = session.workspace.historical.items[0]();
   return (
     <div>
-      <h1>Done</h1>
+      <DoneListHeader view={props.view} />
       <For each={items}>{(item, index) => <div>{item.content}</div>}</For>
     </div>
   );
