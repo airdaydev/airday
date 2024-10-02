@@ -5,7 +5,7 @@ import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
-import { loader } from "./loader";
+import { itemLoader, loader } from "./loader";
 import { DataView, ViewState } from "../view/state";
 
 const schemaVersion = 1;
@@ -211,7 +211,9 @@ export class SunlistWorkspace {
       identifier = `c#${view.containerId}`;
       state = this.openLists.get(identifier);
       if (!state) {
-        const state = this.listStateContext.createTree({ loader });
+        const state = this.listStateContext.createTree({
+          loader: itemLoader(this),
+        });
         const list = this.itemStore
           .getItemsByList(view.containerId)
           .then((items) => {

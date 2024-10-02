@@ -1,36 +1,4 @@
-import {
-  createSignal,
-  createEffect,
-  onCleanup,
-  on,
-  Accessor,
-  onMount,
-  Signal,
-} from "solid-js";
-import { AcmeReactiveSelection } from "./selection";
-import { KeyboardShortcuts } from "../keyboard";
-import { FastList } from "../store/fast-list";
-import styles from "./list.module.css";
-import { distance, moveCaretToPosition } from "../utils";
-import { Checkbox } from "./checkbox";
-import { Sticker } from "../stickers/main";
-import Triangle from "../stickers/baseline/triangle.svg?component-solid";
-import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
-import Smiley from "../stickers/baseline/smiley.svg?component-solid";
-import { elapsedString } from "../generic/date";
-
-interface ItemProps {
-  listIndex: number;
-  item: Signal<Sunlist>;
-  selection: AcmeReactiveSelection;
-  fastList: FastList;
-  scrollRef: HTMLElement;
-  keyboardShortcuts: KeyboardShortcuts;
-  displayList: Accessor<Sunlist[]>; // TODO: OR NULL
-}
-
 export function Item(props: ItemProps) {
-  let editContainer: HTMLDivElement | undefined;
   let containerRef: HTMLDivElement | undefined;
   let dummyRef: HTMLDivElement | undefined;
   let textAreaRef: HTMLInputElement | undefined;
