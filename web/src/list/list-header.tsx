@@ -12,7 +12,6 @@ interface ListHeaderProps {
   view: DataView;
 }
 
-// ⌨
 export const ListHeader = (props: ListHeaderProps) => {
   const session = useContext(sessionContext);
   let ref;

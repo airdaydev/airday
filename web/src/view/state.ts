@@ -1,6 +1,5 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/loader";
-import { walk } from "@sunlist/list";
 import { SunlistWorkspace } from "../store/main";
 import { KeyboardShortcuts } from "./keyboard";
 
@@ -8,6 +7,23 @@ type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data" | "done";
+
+export interface SignalNode<T extends SignalNode<any | undefined>> {
+  children?: Signal<T[]>;
+}
+
+/**
+ * Walks through nodes with children signal
+ */
+export function signalWalk<
+  T extends SignalNode<any>,
+  O extends SignalNode<any>,
+>(node: T, func: (node: T, parent?: O) => boolean | void, parent?: O) {
+  const skipChildren = func(node, parent);
+  if (skipChildren) return;
+  if (node.children)
+    node.children[0]().forEach((child) => signalWalk(child, func, parent));
+}
 
 export class ViewNode {
   id = createUniqueId();
@@ -201,7 +217,6 @@ export class ViewState {
   openDefaultScene() {
     this.scene[1]("default");
     const t = this.workspace.dndContext.focusedContext();
-    // TODO: This will get overriden if escape key is being held down!
     if (this.focus) t?.selectOne(this.focus);
   }
   setActivePane(view: ViewNode) {
@@ -215,10 +230,10 @@ export class ViewState {
   }
   findNodeById(id: string): ViewNode | null {
     let result: ViewNode | null = null;
-    walk(this.tree, (node) => {
+    signalWalk(this.tree, (node) => {
       if (node.id === id) {
         result = node;
-        return true; // Stop walking
+        return true; // Stop signalWalking
       }
     });
     return result;
@@ -250,10 +265,9 @@ export class ViewState {
   }
 
   count() {
-    // TODO: This needs to be a signal... so all registered views must be tracked.
     let count = 0;
-    walk(this.tree, (node) => {
-      count++;
+    signalWalk(this.tree, (node) => {
+      if (node.type !== "container") count++;
     });
     return count;
   }
