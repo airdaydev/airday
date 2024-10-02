@@ -60,11 +60,7 @@ export function SunlistNav() {
           <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
           <span>Done</span>
         </button>
-        <button
-          onClick={session.viewState.openDoneView}
-          class={styles["nav-text-button"]}
-          tabindex="-1"
-        >
+        <button class={styles["nav-text-button"]} tabindex="-1">
           <TrashSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
           <span>Trash</span>
         </button>
