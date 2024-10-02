@@ -6,7 +6,8 @@ import { KeyboardShortcuts } from "./keyboard";
 type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
-type ViewType = "container" | "data" | "done";
+type ViewType = "container" | "data";
+type DataViewType = "list" | "done";
 
 export interface SignalNode<T extends SignalNode<any | undefined>> {
   children?: Signal<T[]>;
@@ -148,9 +149,10 @@ export class VerticalSplitNode extends ViewNode {
 }
 
 export class DoneView extends ViewNode {
+  type: ViewType = "data";
+  dataType: DataViewType = "done";
   constructor() {
     super();
-    this.type = "done";
   }
 }
 
@@ -165,6 +167,7 @@ export class DataView extends ViewNode {
   id = createUniqueId();
   containerId: string;
   type: ViewType = "data";
+  dataType: DataViewType = "list";
   projection: "list" | "kanban" = "list";
   constructor(containerId: string) {
     super();
