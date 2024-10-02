@@ -7,8 +7,7 @@ import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
 
 interface ListHeaderProps {
-  container: Signal<SunlistContainer>;
-  tabId: number;
+  container: SunlistContainer;
   view: DataView;
 }
 
@@ -24,49 +23,65 @@ const KeyboardMarker = (props: { view: DataView }) => {
   );
 };
 
-export const ListHeader = (props: ListHeaderProps) => {
-  const session = useContext(sessionContext);
+export const ListHeaderButton = (props: ListHeaderProps) => {
   let ref;
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
+    <>
+      {ctxOpen() && (
+        <NavItemContextMenu
+          close={() => setCtxOpen(false)}
+          container={ref}
+          offset={ctxOffset()}
+        />
+      )}
+      <button
+        class={styles["list-head-button"]}
+        tabIndex={-1}
+        aria-expanded={ctxOpen()}
+        ref={ref}
+        onContextMenu={(event: MouseEvent) => {
+          event.preventDefault();
+          setCtxOffset([event.clientX, event.clientY]);
+          setCtxOpen(true);
+        }}
+      >
+        <span style="padding-right: 0.5em;">
+          <ListIcon container={props.container} />
+        </span>
+        <span class={styles["title-text"]}>{props.container.name}</span>
+        <KeyboardMarker view={props.view} />
+      </button>
+    </>
+  );
+};
+
+const CloseViewButton = (props: { view: DataView }) => {
+  const session = useContext(sessionContext);
+  return (
+    <>
+      {session.viewState.count() > 1 && (
+        <div>
+          <button
+            class={styles["list-button"]}
+            onClick={() => props.view.detach()}
+            tabIndex={-1}
+          >
+            <XSVG />
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
+
+export const ListHeader = (props: ListHeaderProps) => {
+  return (
     <div class={styles["list-header"]}>
       <div class={styles["primary"]}>
-        {ctxOpen() && (
-          <NavItemContextMenu
-            close={() => setCtxOpen(false)}
-            container={ref}
-            offset={ctxOffset()}
-          />
-        )}
-        <button
-          class={styles["list-head-button"]}
-          tabIndex={-1}
-          aria-expanded={ctxOpen()}
-          ref={ref}
-          onContextMenu={(event: MouseEvent) => {
-            event.preventDefault();
-            setCtxOffset([event.clientX, event.clientY]);
-            setCtxOpen(true);
-          }}
-        >
-          <span style="padding-right: 0.5em;">
-            <ListIcon container={props.container} />
-          </span>
-          <span class={styles["title-text"]}>{props.container.name}</span>
-          <KeyboardMarker view={props.view} />
-        </button>
-        {session.viewState.count() > 1 && (
-          <div>
-            <button
-              class={styles["list-button"]}
-              onClick={() => props.view.detach()}
-              tabIndex={-1}
-            >
-              <XSVG />
-            </button>
-          </div>
-        )}
+        <ListHeaderButton container={props.container} view={props.view} />
+        <CloseViewButton view={props.view} />
       </div>
       {/* <div class={styles["description"]}>Description</div> */}
     </div>
