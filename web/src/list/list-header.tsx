@@ -12,6 +12,18 @@ interface ListHeaderProps {
   view: DataView;
 }
 
+const KeyboardMarker = (props: { view: DataView }) => {
+  const session = useContext(sessionContext);
+  return (
+    <div
+      class={styles["keyboard-marker"]}
+      style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
+    >
+      •
+    </div>
+  );
+};
+
 export const ListHeader = (props: ListHeaderProps) => {
   const session = useContext(sessionContext);
   let ref;
@@ -42,12 +54,7 @@ export const ListHeader = (props: ListHeaderProps) => {
             <ListIcon container={props.container} />
           </span>
           <span class={styles["title-text"]}>{props.container.name}</span>
-          <div
-            class={styles["keyboard-marker"]}
-            style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
-          >
-            •
-          </div>
+          <KeyboardMarker view={props.view} />
         </button>
         {session.viewState.count() > 1 && (
           <div>
