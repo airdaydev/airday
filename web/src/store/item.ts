@@ -1,5 +1,6 @@
 import { IDBPObjectStore } from "idb";
 import { SunlistIDB } from "./main";
+import { createSignal } from "solid-js";
 
 /**
  * Item model
@@ -73,7 +74,7 @@ export class ItemStore {
     );
     return items;
   };
-  getCompletedItems = async (fromDate: Date): Promise<Sunlist[]> => {
+  loadCompletedItems = async (fromDate?: Date): Promise<Sunlist[]> => {
     if (!this.db) {
       throw new Error("Item store not initialised.");
     }

@@ -3,10 +3,11 @@ import { ItemStore } from "./item";
 import { ContainerStore } from "./container";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
-import { createUniqueId } from "solid-js";
+import { createSignal, createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { itemLoader, loader } from "./loader";
 import { DataView, ViewState } from "../view/state";
+import { HistoricalItems } from "./historical";
 
 const schemaVersion = 1;
 
@@ -123,6 +124,7 @@ export class SunlistWorkspace {
   openLists = new Map<string, TreeState>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
+  historical: HistoricalItems;
   app: SunlistSession;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
@@ -133,6 +135,7 @@ export class SunlistWorkspace {
       this.id = workspace.id;
       this.name = workspace.name;
     }
+    this.historical = new HistoricalItems(this.itemStore, this);
   }
   /**
    * Creates connection to existing database, alters schema where version changes
@@ -159,6 +162,7 @@ export class SunlistWorkspace {
     console.debug(`Connected to ${this.ref}`);
     this.db = db;
     this.containerStore.load();
+    this.historical.load();
     return db;
   };
   /**
