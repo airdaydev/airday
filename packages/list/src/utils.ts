@@ -61,3 +61,13 @@ export function observeHeight(targetEl: HTMLElement, signal: Signal<number>) {
 
   return observer;
 }
+
+// TODO: Validate this approach
+// https://stackoverflow.com/questions/4817029/whats-an-optimal-or-efficient-way-to-detect-a-touch-screen-device-using-javas
+export function isTouchDevice() {
+  return (
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator?.msMaxTouchPoints > 0
+  );
+}

@@ -9,7 +9,7 @@ import {
   onMount,
 } from "solid-js";
 import { Node } from "./state";
-import { distance } from "./utils";
+import { distance, isTouchDevice } from "./utils";
 import "./root.css";
 import { ListDragContext, VirtualisedList } from "./dnd-context";
 import { touchBandaid } from "./touch-bandaid";
@@ -21,16 +21,6 @@ export interface NodeContainerProps {
   index: Accessor<number>;
   virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
-}
-
-// TODO: Validate this approach
-// https://stackoverflow.com/questions/4817029/whats-an-optimal-or-efficient-way-to-detect-a-touch-screen-device-using-javas
-function isTouchDevice() {
-  return (
-    "ontouchstart" in window ||
-    navigator.maxTouchPoints > 0 ||
-    navigator?.msMaxTouchPoints > 0
-  );
 }
 
 export const NodeContainer = (props: NodeContainerProps) => {

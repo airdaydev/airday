@@ -7,6 +7,7 @@ import {
   ListDragContext,
   ListStateContext,
   SolidListContext,
+  SoloNode,
 } from "../src/index";
 import { loader } from "./nodes";
 import { dummyTree } from "./dummy";
@@ -89,6 +90,21 @@ render(
             <Tree />
           </div>
         </SolidListContext.Provider>
+        <div>
+          <h3>A lone item outside of a list</h3>
+          <SoloNode
+            dndContext={dndContext}
+            Component={(props) => (
+              <div
+                onMouseDown={props.onMouseDown}
+                ref={props.ref}
+                selected={props.selected}
+              >
+                Drag
+              </div>
+            )}
+          />
+        </div>
       </div>
     </div>
   ),
