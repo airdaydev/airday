@@ -31,11 +31,13 @@
 - [x] Default view is inbox
 - [x] keyboard shortcut for closing a list
 - [x] attempt to reselect item when leaving focus mode
-- [] Done item: Don't allow movement within or to a particular list
-- [] allow done items to hack into existing list dnd context
-- [] tooltip for closing a window that shows kb shortcut
-- [] Reinstate Done board
+- [x] Done item: Don't allow movement within or to a particular list
+- [x] allow done items to hack into existing list dnd context
+- [x] Reinstate Done board
+- [] Done board month headings
+- [] Done board chronological index
 - [] indexing system for nav
+- [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
 - [] Deselect nav bar items when leaving focus
