@@ -198,7 +198,6 @@ export class TreeState {
   }
 
   load(tree: GenericNode<any>) {
-    const q = qperf("load");
     const children = map<any, any>(
       tree,
       (rawNode, parent) => {
@@ -213,7 +212,6 @@ export class TreeState {
       this,
     ).children;
     this.childrenSignal[1](() => children);
-    q();
   }
   count = (expandedOnly?: boolean) => {
     let count = 0;

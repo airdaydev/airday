@@ -6,18 +6,43 @@
  * Can select many, can drag to other lists but can't drag in own list
  */
 
-import { For, useContext } from "solid-js";
+import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { DoneListHeader } from "./list-header";
 import { DataView } from "../view/state";
+import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
+import itemStyles from "../item/item.module.css";
+import styles from "./list.module.css";
 
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
-  const items = session.workspace.historical.items[0]();
+  const tree = session.workspace.historical.tree;
+  const ctx = new ListDragContext({
+    treeState: tree,
+    dndContext: session.workspace.dndContext,
+    itemHeight: 28,
+    placeholderStyle: itemStyles["placeholder"],
+    allowInternalMovement: false,
+  });
   return (
-    <div>
+    <section
+      classList={{
+        [styles.list]: true,
+        [styles.focus]: session.viewState.activePane[0]() === props.view,
+      }}
+      onClick={() => {
+        session.viewState.setActivePane(props.view);
+      }}
+    >
       <DoneListHeader view={props.view} />
-      <For each={items}>{(item, index) => <div>{item.content}</div>}</For>
-    </div>
+      <SolidListContext.Provider value={ctx}>
+        <div
+          class={styles["tree-wrap"]}
+          // classList={{ [styles["focus"]]: ctx.isFocused() }}
+        >
+          <Tree />
+        </div>
+      </SolidListContext.Provider>
+    </section>
   );
 };

@@ -99,8 +99,8 @@ export const DoneListHeader = (props: ListHeaderProps) => {
             left: -3px;"
           />
           <span>Done</span>
+          <KeyboardMarker view={props.view} />
         </button>
-        <KeyboardMarker view={props.view} />
         <CloseViewButton view={props.view} />
       </div>
       {/* <div class={styles["description"]}>Description</div> */}

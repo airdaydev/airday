@@ -42,6 +42,7 @@ const ctxA = new ListDragContext({
   dndContext: dndContext,
   itemHeight: 28,
   placeholderStyle: styles["placeholder"],
+  allowInternalMovement: false,
 });
 
 const ctxB = new ListDragContext({
@@ -68,7 +69,7 @@ render(
             style={`display: flex; flex-direction: column; height: 100%; width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxA.isFocused() }}
           >
-            <h3>Tree A ({treeStateA.count()} items)</h3>
+            <h3>Tree A ({treeStateA.count()} items) - no drop allowed</h3>
             <Tree />
           </div>
         </SolidListContext.Provider>

@@ -30,17 +30,20 @@ export class ListDragContext {
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
   placeholderStyle?: string;
+  allowInternalMovement = true;
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
     itemHeight: number;
     placeholderStyle?: string;
+    allowInternalMovement?: boolean;
   }) {
     this.treeState = opts.treeState;
     this.dndContext = opts.dndContext;
     opts.dndContext.listContexts.add(this);
     this.itemHeight = opts.itemHeight;
     this.placeholderStyle = opts.placeholderStyle;
+    this.allowInternalMovement = opts.allowInternalMovement ?? true;
   }
   isFocused() {
     return this.dndContext.focusContext[0]() === this;
@@ -213,6 +216,7 @@ export class ListDragContext {
     this.selection[1](selection);
   }
   setLastTouchedIndex(index: number) {
+    if (!this.allowInternalMovement) return;
     return this.lastTouchedIndexSignal[1](index);
   }
   projection() {

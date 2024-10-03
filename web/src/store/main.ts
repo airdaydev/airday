@@ -3,9 +3,9 @@ import { ItemStore } from "./item";
 import { ContainerStore } from "./container";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
-import { createSignal, createUniqueId } from "solid-js";
+import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
-import { itemLoader, loader } from "./loader";
+import { itemLoader } from "./loader";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 
@@ -227,14 +227,6 @@ export class SunlistWorkspace {
         return state;
       }
     }
-    // if (view.type === "done") {
-    //   identifier = "done";
-    //   fastList = this.openLists.get(identifier);
-    //   if (!fastList) {
-    //     fastList = new DoneFL(this);
-    //     this.openLists.set(identifier, fastList);
-    //   }
-    // }
     if (!state) throw new Error("Cannot determine list from view");
     return state;
   }
