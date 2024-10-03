@@ -34,6 +34,9 @@
 - [x] Done item: Don't allow movement within or to a particular list
 - [x] allow done items to hack into existing list dnd context
 - [x] Reinstate Done board
+- [] Dragging out of Done should undo its done start
+- [] Done items should be removed from normal lists
+- [] Done items should appear immediately in done list
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
@@ -55,7 +58,8 @@
 - [ ] open performance list, add filters/configuration
 - [ ] open priority list (added by reference, no move!)
 - [ ] Limit open lists, ensure destruction
-- [] Next board
+- [] Drag list headers to drag & drop open views (closing the existing view in favour!)
+- [] Up Next board
 - [] Drag items into list nav
 - [] Repetitive tasks (shuffle)
 - [] Repetitive tasks (in order)
@@ -175,14 +179,14 @@
 
 ## Stretch goals
 - [x] List animations (v1)
+- [] Kanban board
 - [] Canvas list
 - [] Webgl list
 - [] Markdown descriptions
 - [] Pin Lock
-- [] Kanban board
 - [] Secrets
 - [] Code snippets... maybe just ` and ```
-- [] Auto plan suggestions
+- [] Auto plan suggestions/AI story
 - [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
 - [] Natural looking cross outs? Consider tick seed, underline length
 - [] Custom fields
