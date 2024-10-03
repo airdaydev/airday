@@ -1,6 +1,6 @@
 import { IDBPObjectStore } from "idb";
 import { SunlistIDB } from "./main";
-import { createSignal } from "solid-js";
+import { Queue } from "./queue";
 
 /**
  * Item model
@@ -12,6 +12,7 @@ export class ItemStore {
   storeName = "item";
   sundb: SunlistIDB | null = null;
   itemStore: IDBPObjectStore | null = null;
+  queue = new Queue();
   init = (db: SunlistIDB) => {
     this.sundb = db;
     // this.load();
@@ -86,8 +87,9 @@ export class ItemStore {
   };
   update = async (id: string, attributes: Partial<Sunlist>) => {
     const item = await this.db.get(this.storeName, id);
-    const update = { ...item, ...attributes };
-    await this.db.put(this.storeName, update).catch((err) => console.log(err));
+    const updated = { ...item, ...attributes };
+    this.queue.enqueue({ type: "update", item: updated });
+    await this.db.put(this.storeName, updated).catch((err) => console.log(err));
   };
   move = async (id: string, attributes: Partial<Sunlist>) => {};
   remove = async (id: string, attributes: Partial<Sunlist>) => {};

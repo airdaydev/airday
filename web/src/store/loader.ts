@@ -51,7 +51,6 @@ export class GenericItem extends Node {
       this.tsCompleted = null;
     }
     this.triggerUpdate();
-    console.log({ tsCompleted: this.tsCompleted });
     this.workspace.itemStore.update(this.id, { tsCompleted: this.tsCompleted });
   }
 }

@@ -57,9 +57,7 @@ export const GenericComponent: NodeComponentType = (props) => {
           }}
           checked={!!props.node.tsCompleted}
         />
-        <span style="font-family: var(--mono-font); font-size: 0.9em; margin-right: 0.5em;">
-          {formatDate(node().tsCompleted)}
-        </span>
+        <span class={styles["date-col"]}>{formatDate(node().tsCompleted)}</span>
         <span>{node().content}</span>
       </div>
       {ctxOpen() && (

@@ -6,6 +6,7 @@ import { Tree, SolidListContext, ListDragContext } from "@sunlist/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 import NullList from "./null-list";
+import { ListColumnHeaders } from "./list-col-head";
 
 interface ListProps {
   view: DataView;

@@ -1,7 +1,8 @@
 .check {
     display: block;
     position: relative;
-    padding-left: 1.25em;
+    width: 2rem;
+    flex-shrink: 0;
     margin-bottom: 1em;
     cursor: pointer;
     top: 2px;

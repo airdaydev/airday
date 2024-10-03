@@ -13,6 +13,7 @@ import { DataView } from "../view/state";
 import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
 import itemStyles from "../item/item.module.css";
 import styles from "./list.module.css";
+import { ListColumnHeaders } from "./list-col-head";
 
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
@@ -20,7 +21,7 @@ export const Done = (props: { view: DataView }) => {
   const ctx = new ListDragContext({
     treeState: tree,
     dndContext: session.workspace.dndContext,
-    itemHeight: 28,
+    itemHeight: 32,
     placeholderStyle: itemStyles["placeholder"],
     allowInternalMovement: false,
   });
@@ -35,6 +36,7 @@ export const Done = (props: { view: DataView }) => {
       }}
     >
       <DoneListHeader view={props.view} />
+      <ListColumnHeaders />
       <SolidListContext.Provider value={ctx}>
         <div
           class={styles["tree-wrap"]}

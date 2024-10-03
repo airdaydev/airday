@@ -179,10 +179,21 @@ export class TreeState {
     return root;
   }
   delete(set: Set<Node>) {
+    console.log("delete", set);
     const result = this.remove(set);
     this.onDelete?.(set);
     set.forEach((node) => this.idMap.delete(node.id));
     this.childrenSignal[1](() => result.filtered);
+  }
+  getNodesByIds(ids: Set<string>) {
+    const nodeSet = new Set<Node>();
+    for (const id of ids) {
+      const node = this.idMap.get(id);
+      if (node) {
+        nodeSet.add(node);
+      }
+    }
+    return nodeSet;
   }
   remove(set: Set<Node>) {
     if (!set || !set.size) {
