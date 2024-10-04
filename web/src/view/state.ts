@@ -292,6 +292,7 @@ export class ViewState {
     const activePane = this.activePane[0]();
     if (activePane) {
       activePane?.replace(view);
+      this.activePane[1](view);
     } else {
       this.addViewToRoot(view);
     }

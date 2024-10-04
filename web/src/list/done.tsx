@@ -14,6 +14,7 @@ import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
 import itemStyles from "../item/item.module.css";
 import styles from "./list.module.css";
 import { ListColumnHeaders } from "./list-col-head";
+import { listOptions, ListOptionsContext } from "./list-options";
 
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
@@ -25,26 +26,32 @@ export const Done = (props: { view: DataView }) => {
     placeholderStyle: itemStyles["placeholder"],
     allowInternalMovement: false,
   });
+  const opts = listOptions({
+    columnHeaders: true,
+    columns: ["check", "date", "content"],
+  });
   return (
-    <section
-      classList={{
-        [styles.list]: true,
-        [styles.focus]: session.viewState.activePane[0]() === props.view,
-      }}
-      onClick={() => {
-        session.viewState.setActivePane(props.view);
-      }}
-    >
-      <DoneListHeader view={props.view} />
-      <ListColumnHeaders />
-      <SolidListContext.Provider value={ctx}>
-        <div
-          class={styles["tree-wrap"]}
-          // classList={{ [styles["focus"]]: ctx.isFocused() }}
-        >
-          <Tree />
-        </div>
-      </SolidListContext.Provider>
-    </section>
+    <ListOptionsContext.Provider value={opts}>
+      <section
+        classList={{
+          [styles.list]: true,
+          [styles.focus]: session.viewState.activePane[0]() === props.view,
+        }}
+        onClick={() => {
+          session.viewState.setActivePane(props.view);
+        }}
+      >
+        <DoneListHeader view={props.view} />
+        {opts.columnHeaders[0]() && <ListColumnHeaders />}
+        <SolidListContext.Provider value={ctx}>
+          <div
+            class={styles["tree-wrap"]}
+            // classList={{ [styles["focus"]]: ctx.isFocused() }}
+          >
+            <Tree />
+          </div>
+        </SolidListContext.Provider>
+      </section>
+    </ListOptionsContext.Provider>
   );
 };
