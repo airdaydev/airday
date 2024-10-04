@@ -19,6 +19,7 @@ const GenericItemCheckbox: Component<{
   node: GenericItem;
   options: ListOptions;
 }> = (props) => {
+  console.log(props.options);
   return (
     <Checkbox
       onChange={(event: InputEvent) => {
@@ -99,7 +100,7 @@ export const GenericComponent: NodeComponentType = (props) => {
           {(col) => {
             const Col = colMap.get(col);
             if (Col) {
-              return <Col node={props.node} />;
+              return <Col node={props.node} options={options} />;
             }
             return false;
           }}

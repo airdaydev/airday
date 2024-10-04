@@ -21,6 +21,7 @@ export const listOptions = (opts: Partial<ListOptions> = {}) => {
   return {
     columnHeaders: createSignal(resolvedOpts.columnHeaders),
     columns: createSignal(resolvedOpts.columns),
+    historical: opts.historical,
   };
 };
 

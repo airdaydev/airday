@@ -54,6 +54,7 @@ export class GenericItem extends Node {
   // at the place of construction
   // if it occurs from the doneList, the interaction is much simpler
   async toggleComplete(historical = false) {
+    console.log("toggleComplete:historical:", historical);
     if (!this.tsCompleted) {
       this.tsCompleted = new Date();
       const updatedItem = await this.workspace.itemStore.check(
