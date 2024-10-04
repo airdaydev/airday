@@ -144,5 +144,6 @@ h3 {
 }
 
 .just-checked {
-    color: #ccc;
+    color: #7b7b7b;
+    text-decoration: line-through;
 }
