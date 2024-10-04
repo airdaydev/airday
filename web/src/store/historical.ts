@@ -16,7 +16,14 @@ export class HistoricalItems {
   }
   onTransaction(trx) {
     if (trx.type === "check") {
-      this.tree.insertNode(new GenericItem(trx.item, this.workspace), null, 0);
+      const item = this.tree.idMap.get(trx.item.id);
+      if (!item) {
+        this.tree.insertNode(
+          new GenericItem(trx.item, this.workspace),
+          null,
+          0,
+        );
+      }
     }
     // if (node) {
     //   if (trx.item.tsCompleted === null) {
