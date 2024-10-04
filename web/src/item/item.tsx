@@ -3,7 +3,7 @@ import { NodeComponentType } from "@sunlist/list";
 import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
 import { ItemContextMenu } from "./context-menu";
-import { ListOptionsContext } from "../list/list-options";
+import { ListOptions, ListOptionsContext } from "../list/list-options";
 import { GenericItem } from "../store/item";
 
 function formatDate(date: Date | undefined): string {
@@ -15,11 +15,14 @@ function formatDate(date: Date | undefined): string {
   return date.toLocaleDateString("en-US", options);
 }
 
-const GenericItemCheckbox: Component<{ node: GenericItem }> = (props) => {
+const GenericItemCheckbox: Component<{
+  node: GenericItem;
+  options: ListOptions;
+}> = (props) => {
   return (
     <Checkbox
       onChange={(event: InputEvent) => {
-        props.node.toggleComplete();
+        props.node.toggleComplete(props.options.historical);
         event.stopPropagation();
       }}
       checked={!!props.node.tsCompleted}

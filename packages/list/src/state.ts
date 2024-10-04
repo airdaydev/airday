@@ -163,7 +163,7 @@ export class TreeState {
   mutate = false;
   maxDepth = 10;
   expanded = true;
-  loader?: (node: GenericNode<any>) => Node;
+  loader?: (node: GenericNode<any>) => Node | false;
   onDelete?: (set: Set<Node>) => void;
   context?: ListStateContext;
   constructor(opts: TreeStateOpts = {}) {

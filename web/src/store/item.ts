@@ -51,21 +51,24 @@ export class GenericItem extends Node {
   // deleting from memory list & moving to done memory list (having 2 items simultaneously may be confusing)
   // the state update, however, should take place immediately
   // because of the specificity of the transaction, it's better we create actions with specific instructions
-  // at the place of construction``
-  async toggleComplete() {
+  // at the place of construction
+  // if it occurs from the doneList, the interaction is much simpler
+  async toggleComplete(historical = false) {
     if (!this.tsCompleted) {
       this.tsCompleted = new Date();
       const updatedItem = await this.workspace.itemStore.check(
         this.id,
         this.tsCompleted,
       );
-      this.justChecked = true;
-      this.justCheckedTimer = setTimeout(() => {
-        this.workspace.itemStore.queue.enqueue({
-          type: "check",
-          item: updatedItem,
-        });
-      }, 1500);
+      if (!historical) {
+        this.justChecked = true;
+        this.justCheckedTimer = setTimeout(() => {
+          this.workspace.itemStore.queue.enqueue({
+            type: "check",
+            item: updatedItem,
+          });
+        }, 1500);
+      }
     } else {
       this.tsCompleted = null;
       this.workspace.itemStore.check(this.id, this.tsCompleted);

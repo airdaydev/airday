@@ -1,6 +1,7 @@
 import { IDBPObjectStore } from "idb";
 import { SunlistIDB } from "./main";
 import { Queue } from "./queue";
+import { Trx } from "./trx";
 
 /**
  * Item model provides idb persistence layer & websocket interface
@@ -9,7 +10,7 @@ export class ItemStore {
   storeName = "item";
   sundb: SunlistIDB | null = null;
   itemStore: IDBPObjectStore | null = null;
-  queue = new Queue();
+  queue = new Queue<Trx>();
   init = (db: SunlistIDB) => {
     this.sundb = db;
   };

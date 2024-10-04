@@ -7,11 +7,13 @@ interface ListCtx {
 const defaultListOptions = {
   columnHeaders: false,
   columns: ["check", "content"],
+  historical: false,
 };
 
-interface ListOptions {
+export interface ListOptions {
   columnHeaders: boolean;
   columns: string[];
+  historical: boolean;
 }
 
 export const listOptions = (opts: Partial<ListOptions> = {}) => {

@@ -29,6 +29,7 @@ export const Done = (props: { view: DataView }) => {
   const opts = listOptions({
     columnHeaders: true,
     columns: ["check", "date", "content"],
+    historical: true,
   });
   return (
     <ListOptionsContext.Provider value={opts}>

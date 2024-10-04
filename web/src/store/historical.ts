@@ -2,6 +2,7 @@ import { ItemStore } from "./item-store";
 import { GenericItem, itemLoader } from "./item";
 import { SunlistWorkspace } from "./main";
 import { TreeState } from "@sunlist/list";
+import { Trx } from "./trx";
 
 export class HistoricalItems {
   store: ItemStore;
@@ -14,7 +15,7 @@ export class HistoricalItems {
     this.tree.context = this.workspace.listStateContext;
     this.store.queue.subscribe(this.onTransaction.bind(this));
   }
-  onTransaction(trx) {
+  onTransaction(trx: Trx) {
     if (trx.type === "check") {
       const item = this.tree.idMap.get(trx.item.id);
       if (!item) {
@@ -25,15 +26,6 @@ export class HistoricalItems {
         );
       }
     }
-    // if (node) {
-    //   if (trx.item.tsCompleted === null) {
-    //     this.tree.delete(new Set([node]));
-    //   }
-    // } else {
-    //   // create node if tsCompleted is true
-    //   if (trx.item.tsCompleted !== null) {
-    //   }
-    // }
   }
   async load() {
     const itemsRaw = await this.store.loadCompletedItems();
