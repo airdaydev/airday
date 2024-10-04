@@ -3,10 +3,7 @@ import { SunlistIDB } from "./main";
 import { Queue } from "./queue";
 
 /**
- * Item model
- * Provides idb persistence layer & websocket interface
- * Note: Fast-list provides in-memory layer
- * TODO: Put DB functions in a base class
+ * Item model provides idb persistence layer & websocket interface
  */
 export class ItemStore {
   storeName = "item";
@@ -15,18 +12,12 @@ export class ItemStore {
   queue = new Queue();
   init = (db: SunlistIDB) => {
     this.sundb = db;
-    // this.load();
-    // load
   };
-  // load = async () => {
-  //     const items = await this.db.getAll(this.storeName);
-  // }
   upgrade = (db: SunlistIDB) => {
     const itemStore = db.createObjectStore(this.storeName, {
       keyPath: "id",
     });
     itemStore.createIndex("listId", "listId");
-    // itemStore.createIndex('id', 'id');
     itemStore.createIndex("ordered", ["listId", "sortKey", "id"]);
     itemStore.createIndex("done", ["tsCompleted"]);
   };
@@ -42,15 +33,12 @@ export class ItemStore {
    * @param data
    */
   insert = async (data: SunlistItem | SunlistItem[]) => {
-    // Track touched lists to trigger batched UI refresh
-    // const touchedLists = new Set<string>();
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
     const insert = async (item: SunlistItem) => {
       const prev = await store.get(item.id);
       if (prev) throw new Error("Key already exists");
       const val = await store.add(item);
-      // touchedLists.add(item.listId);
       return val;
     };
     if (Array.isArray(data)) {
@@ -59,8 +47,6 @@ export class ItemStore {
       insert(data);
     }
     await tx.done;
-    // TODO: Fast-list update sketch
-    // touchedLists.forEach((listId) => this.events.dispatchEvent(new Event(`list-update-${listId}`)));
   };
   getItemsByList = async (listId: string): Promise<SunlistItem[]> => {
     if (!listId) {
@@ -85,6 +71,7 @@ export class ItemStore {
     // const items = await this.db.g(this.storeName, 'done', now);
     return items;
   };
+  // Generic update
   update = async (id: string, attributes: Partial<SunlistItem>) => {
     const item = await this.db.get(this.storeName, id);
     const updated = { ...item, ...attributes };
@@ -93,9 +80,11 @@ export class ItemStore {
   };
   move = async (id: string, attributes: Partial<SunlistItem>) => {};
   remove = async (id: string, attributes: Partial<SunlistItem>) => {};
-  complete = async (id: string, tsCompleted: Date | null) => {
+  check = async (id: string, tsCompleted: Date | null) => {
     const item = await this.db.get(this.storeName, id);
-    const update = { ...item, tsCompleted };
-    await this.db.put(this.storeName, update).catch((err) => console.log(err));
+    await this.db
+      .put(this.storeName, { ...item, tsCompleted })
+      .catch((err) => console.log(err));
+    this.queue.enqueue({ type: "check", id, tsCompleted });
   };
 }

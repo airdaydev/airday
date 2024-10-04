@@ -52,17 +52,12 @@ export class GenericItem extends Node {
   toggleComplete() {
     if (!this.tsCompleted) {
       this.tsCompleted = new Date();
+      this.workspace.itemStore.check(this.id, this.tsCompleted);
     } else {
       this.tsCompleted = null;
+      this.workspace.itemStore.check(this.id, this.tsCompleted);
     }
     this.triggerUpdate();
-    // TODO: Continue
-    const update = {
-      type: "local-item-complete",
-      id: this.id,
-      tsCompleted: this.tsCompleted,
-    };
-    this.workspace.itemStore.update(this.id, { tsCompleted: this.tsCompleted });
   }
 }
 
