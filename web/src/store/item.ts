@@ -54,7 +54,6 @@ export class GenericItem extends Node {
   // at the place of construction
   // if it occurs from the doneList, the interaction is much simpler
   async toggleComplete(historical = false) {
-    console.log("toggleComplete:historical:", historical);
     if (!this.tsCompleted) {
       this.tsCompleted = new Date();
       const updatedItem = await this.workspace.itemStore.check(
@@ -72,8 +71,15 @@ export class GenericItem extends Node {
       }
     } else {
       this.tsCompleted = null;
-      this.workspace.itemStore.check(this.id, this.tsCompleted);
+      const updatedItem = await this.workspace.itemStore.check(
+        this.id,
+        this.tsCompleted,
+      );
       this.justChecked = false;
+      this.workspace.itemStore.queue.enqueue({
+        type: "check",
+        item: updatedItem,
+      });
       clearTimeout(this.justCheckedTimer);
     }
     this.triggerUpdate();

@@ -19,7 +19,6 @@ const GenericItemCheckbox: Component<{
   node: GenericItem;
   options: ListOptions;
 }> = (props) => {
-  console.log(props.options);
   return (
     <Checkbox
       onChange={(event: InputEvent) => {

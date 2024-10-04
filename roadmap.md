@@ -41,6 +41,7 @@
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
+- [] Prevent keyboard moving items on Done list
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
