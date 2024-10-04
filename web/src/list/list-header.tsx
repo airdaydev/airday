@@ -19,7 +19,7 @@ const KeyboardMarker = (props: { view: DataView }) => {
       class={styles["keyboard-marker"]}
       style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
     >
-      •
+      -
     </div>
   );
 };

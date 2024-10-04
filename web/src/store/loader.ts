@@ -44,6 +44,11 @@ export class GenericItem extends Node {
     this.triggerUpdate();
     this.workspace.itemStore.update(this.id, { content: newText });
   }
+  // If toggling off, this should stay in its parent list for 2 seconds but grey before disappearing
+  // deleting from memory list & moving to done memory list (having 2 items simultaneously may be confusing)
+  // the state update, however, should take place immediately
+  // because of the specificity of the transaction, it's better we create actions with specific instructions
+  // at the place of construction``
   toggleComplete() {
     if (!this.tsCompleted) {
       this.tsCompleted = new Date();
@@ -51,6 +56,12 @@ export class GenericItem extends Node {
       this.tsCompleted = null;
     }
     this.triggerUpdate();
+    // TODO: Continue
+    const update = {
+      type: "local-item-complete",
+      id: this.id,
+      tsCompleted: this.tsCompleted,
+    };
     this.workspace.itemStore.update(this.id, { tsCompleted: this.tsCompleted });
   }
 }
