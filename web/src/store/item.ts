@@ -1,90 +1,89 @@
-import { IDBPObjectStore } from "idb";
-import { SunlistIDB } from "./main";
-import { Queue } from "./queue";
+import { Node, GenericNode } from "@sunlist/list";
+import { GenericComponent } from "../item/item";
+import { v, compile } from "suretype";
+import type { TypeOf } from "suretype";
+import { createUniqueId } from "solid-js";
+import { ItemStore } from "./item-store";
+import { SunlistWorkspace } from "./main";
 
-/**
- * Item model provides idb persistence layer & websocket interface
- */
-export class ItemStore {
-  storeName = "item";
-  sundb: SunlistIDB | null = null;
-  itemStore: IDBPObjectStore | null = null;
-  queue = new Queue();
-  init = (db: SunlistIDB) => {
-    this.sundb = db;
-  };
-  upgrade = (db: SunlistIDB) => {
-    const itemStore = db.createObjectStore(this.storeName, {
-      keyPath: "id",
-    });
-    itemStore.createIndex("listId", "listId");
-    itemStore.createIndex("ordered", ["listId", "sortKey", "id"]);
-    itemStore.createIndex("done", ["tsCompleted"]);
-  };
-  ready() {
-    return !!this.db;
+const GenericItemSchema = v.object({
+  id: v.string(),
+  content: v.string(),
+  tsCompleted: v.any(), // TODO: Validate date
+});
+
+type GenericItemSchema = TypeOf<typeof GenericItemSchema> & GenericNode<any>;
+
+export class GenericItem extends Node {
+  id: string;
+  type = "generic";
+  allowChildren = true;
+  tsCreated?: Date;
+  tsCompleted?: Date | null;
+  sticker?: string;
+  content?: string;
+  component = GenericComponent;
+  workspace: SunlistWorkspace;
+  justChecked = false;
+  justCheckedTimer?: number;
+  static validate = compile(GenericItemSchema, { simple: true });
+  constructor(props: GenericItemSchema, workspace: SunlistWorkspace) {
+    super(props);
+    this.id = props.id || createUniqueId();
+    this.content = props.content;
+    this.tsCompleted = props.tsCompleted;
+    this.workspace = workspace;
   }
-  get db() {
-    if (!this.sundb) throw new Error("Item store uninitialised");
-    return this.sundb;
-  }
-  /**
-   * Insert new tasks, generating a new key
-   * @param data
-   */
-  insert = async (data: SunlistItem | SunlistItem[]) => {
-    const tx = this.db.transaction(this.storeName, "readwrite");
-    const store = tx.objectStore(this.storeName);
-    const insert = async (item: SunlistItem) => {
-      const prev = await store.get(item.id);
-      if (prev) throw new Error("Key already exists");
-      const val = await store.add(item);
-      return val;
+  serialise() {
+    return {
+      id: this.id,
+      content: this.content,
+      tsCompleted: this.tsCompleted,
+      justChecked: this.justChecked,
     };
-    if (Array.isArray(data)) {
-      await data.map((item) => insert(item));
+  }
+  updateContent(newText: string) {
+    this.content = newText;
+    this.triggerUpdate();
+    this.workspace.itemStore.update(this.id, { content: newText });
+  }
+  // If toggling off, this should stay in its parent list for 2 seconds but grey before disappearing
+  // deleting from memory list & moving to done memory list (having 2 items simultaneously may be confusing)
+  // the state update, however, should take place immediately
+  // because of the specificity of the transaction, it's better we create actions with specific instructions
+  // at the place of construction``
+  async toggleComplete() {
+    if (!this.tsCompleted) {
+      this.tsCompleted = new Date();
+      const updatedItem = await this.workspace.itemStore.check(
+        this.id,
+        this.tsCompleted,
+      );
+      this.justChecked = true;
+      this.justCheckedTimer = setTimeout(() => {
+        this.workspace.itemStore.queue.enqueue({
+          type: "check",
+          item: updatedItem,
+        });
+      }, 1500);
     } else {
-      insert(data);
+      this.tsCompleted = null;
+      this.workspace.itemStore.check(this.id, this.tsCompleted);
+      this.justChecked = false;
+      clearTimeout(this.justCheckedTimer);
     }
-    await tx.done;
-  };
-  getItemsByList = async (listId: string): Promise<SunlistItem[]> => {
-    if (!listId) {
-      console.warn("attempted to getItemsByList with null listId");
-      return [];
-    }
-    const range = IDBKeyRange.bound([listId, "A"], [listId, "zzzzzz"]);
-    const items = await this.db.getAllFromIndex(
-      this.storeName,
-      "ordered",
-      range,
-    );
-    return items;
-  };
-  loadCompletedItems = async (fromDate?: Date): Promise<SunlistItem[]> => {
-    if (!this.db) {
-      throw new Error("Item store not initialised.");
-    }
-    // const now = IDBKeyRange.upperBound([new Date()])
-    // const cursor = this.itemStore.openCursor(now, 'next'); // initially, from null index
-    const items = await this.db.getAllFromIndex(this.storeName, "done");
-    // const items = await this.db.g(this.storeName, 'done', now);
-    return items;
-  };
-  // Generic update
-  update = async (id: string, attributes: Partial<SunlistItem>) => {
-    const item = await this.db.get(this.storeName, id);
-    const updated = { ...item, ...attributes };
-    this.queue.enqueue({ type: "update", item: updated });
-    await this.db.put(this.storeName, updated).catch((err) => console.log(err));
-  };
-  move = async (id: string, attributes: Partial<SunlistItem>) => {};
-  remove = async (id: string, attributes: Partial<SunlistItem>) => {};
-  check = async (id: string, tsCompleted: Date | null) => {
-    const item = await this.db.get(this.storeName, id);
-    await this.db
-      .put(this.storeName, { ...item, tsCompleted })
-      .catch((err) => console.log(err));
-    this.queue.enqueue({ type: "check", id, tsCompleted });
+    this.triggerUpdate();
+  }
+}
+
+export function itemLoader(workspace: SunlistWorkspace) {
+  return function loader(data: any) {
+    // if (data.type === "generic") {
+    const validated = GenericItem.validate(data);
+    if (!validated) return false;
+    return new GenericItem(data, workspace);
+    // }
+    console.warn("invalid data in container loader");
+    return false;
   };
 }

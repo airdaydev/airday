@@ -1,5 +1,5 @@
-import { ItemStore } from "./item";
-import { GenericItem, itemLoader } from "./loader";
+import { ItemStore } from "./item-store";
+import { GenericItem, itemLoader } from "./item";
 import { SunlistWorkspace } from "./main";
 import { TreeState } from "@sunlist/list";
 
@@ -15,21 +15,18 @@ export class HistoricalItems {
     this.store.queue.subscribe(this.onTransaction.bind(this));
   }
   onTransaction(trx) {
-    const node = this.tree.idMap.get(trx.item.id);
-    if (node) {
-      if (trx.item.tsCompleted === null) {
-        this.tree.delete(new Set([node]));
-      }
-    } else {
-      // create node if tsCompleted is true
-      if (trx.item.tsCompleted !== null) {
-        this.tree.insertNode(
-          new GenericItem(trx.item, this.workspace),
-          null,
-          0,
-        );
-      }
+    if (trx.type === "check") {
+      this.tree.insertNode(new GenericItem(trx.item, this.workspace), null, 0);
     }
+    // if (node) {
+    //   if (trx.item.tsCompleted === null) {
+    //     this.tree.delete(new Set([node]));
+    //   }
+    // } else {
+    //   // create node if tsCompleted is true
+    //   if (trx.item.tsCompleted !== null) {
+    //   }
+    // }
   }
   async load() {
     const itemsRaw = await this.store.loadCompletedItems();

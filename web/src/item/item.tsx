@@ -4,7 +4,7 @@ import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
 import { ItemContextMenu } from "./context-menu";
 import { ListOptionsContext } from "../list/list-options";
-import { GenericItem } from "../store/loader";
+import { GenericItem } from "../store/item";
 
 function formatDate(date: Date | undefined): string {
   if (!date) return "";
@@ -75,6 +75,7 @@ export const GenericComponent: NodeComponentType = (props) => {
         classList={{
           [styles["tree-item"]]: true,
           [styles["focus"]]: props.ctx.isFocused(),
+          [styles["just-checked"]]: node().justChecked,
         }}
         onMouseDown={(event) => {
           props.onMouseDown(event);

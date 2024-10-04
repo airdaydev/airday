@@ -1,11 +1,11 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
-import { ItemStore } from "./item";
+import { ItemStore } from "./item-store";
 import { ContainerStore } from "./container";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
-import { itemLoader } from "./loader";
+import { itemLoader } from "./item";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 

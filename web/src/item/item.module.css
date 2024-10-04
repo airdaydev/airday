@@ -142,3 +142,7 @@ h3 {
 .content-col {
     padding-left: 0.5em;
 }
+
+.just-checked {
+    color: #ccc;
+}

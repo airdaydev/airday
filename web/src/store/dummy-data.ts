@@ -1,5 +1,5 @@
 import { generateNKeysBetween } from "fractional-indexing";
-import { GenericItem } from "./loader";
+import { GenericItem } from "./item";
 import { createUniqueId } from "solid-js";
 
 export const sunlistItems = [

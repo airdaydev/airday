@@ -1,5 +1,5 @@
 import styles from "./focus.module.css";
-import { GenericItem } from "../store/loader";
+import { GenericItem } from "../store/item";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { Key } from "../generic/key";

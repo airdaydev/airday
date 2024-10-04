@@ -34,9 +34,10 @@
 - [x] Done item: Don't allow movement within or to a particular list
 - [x] allow done items to hack into existing list dnd context
 - [x] Reinstate Done board
+- [x] Done items should appear immediately in done list
+- [] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [] Dragging out of Done should undo its done start
 - [] Done items should be removed from normal lists
-- [] Done items should appear immediately in done list
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav

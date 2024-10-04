@@ -1,5 +1,5 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
-import { GenericItem } from "../store/loader";
+import { GenericItem } from "../store/item";
 import { SunlistWorkspace } from "../store/main";
 import { KeyboardShortcuts } from "./keyboard";
 
