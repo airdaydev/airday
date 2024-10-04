@@ -1,7 +1,7 @@
 .check {
     display: block;
     position: relative;
-    width: 2rem;
+    width: 1.5rem;
     flex-shrink: 0;
     margin-bottom: 1em;
     cursor: pointer;

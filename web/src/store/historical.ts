@@ -17,8 +17,9 @@ export class HistoricalItems {
   onTransaction(trx) {
     const node = this.tree.idMap.get(trx.item.id);
     if (node) {
-      // update node
-      // node.
+      if (trx.item.tsCompleted === null) {
+        this.tree.delete(new Set([node]));
+      }
     } else {
       // create node if tsCompleted is true
       if (trx.item.tsCompleted !== null) {

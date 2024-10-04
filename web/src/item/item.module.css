@@ -137,6 +137,7 @@ h3 {
     align-items: center;
     width: 5rem;
     flex-shrink: 0;
+    padding-left: 0.5em;
 }
 
 .content-col {
