@@ -148,7 +148,7 @@ export const Footer = () => {
           style="background: #5937ff; color: white; line-height: 1.25rem;"
           tabIndex={-1}
         >
-          Sync AUD$4 monthly
+          Sync AUD$24/year
         </button>
       </div>
     </footer>

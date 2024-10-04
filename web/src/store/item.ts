@@ -41,12 +41,12 @@ export class ItemStore {
    * Insert new tasks, generating a new key
    * @param data
    */
-  insert = async (data: Sunlist | Sunlist[]) => {
+  insert = async (data: SunlistItem | SunlistItem[]) => {
     // Track touched lists to trigger batched UI refresh
     // const touchedLists = new Set<string>();
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
-    const insert = async (item: Sunlist) => {
+    const insert = async (item: SunlistItem) => {
       const prev = await store.get(item.id);
       if (prev) throw new Error("Key already exists");
       const val = await store.add(item);
@@ -62,7 +62,7 @@ export class ItemStore {
     // TODO: Fast-list update sketch
     // touchedLists.forEach((listId) => this.events.dispatchEvent(new Event(`list-update-${listId}`)));
   };
-  getItemsByList = async (listId: string): Promise<Sunlist[]> => {
+  getItemsByList = async (listId: string): Promise<SunlistItem[]> => {
     if (!listId) {
       console.warn("attempted to getItemsByList with null listId");
       return [];
@@ -75,7 +75,7 @@ export class ItemStore {
     );
     return items;
   };
-  loadCompletedItems = async (fromDate?: Date): Promise<Sunlist[]> => {
+  loadCompletedItems = async (fromDate?: Date): Promise<SunlistItem[]> => {
     if (!this.db) {
       throw new Error("Item store not initialised.");
     }
@@ -85,14 +85,14 @@ export class ItemStore {
     // const items = await this.db.g(this.storeName, 'done', now);
     return items;
   };
-  update = async (id: string, attributes: Partial<Sunlist>) => {
+  update = async (id: string, attributes: Partial<SunlistItem>) => {
     const item = await this.db.get(this.storeName, id);
     const updated = { ...item, ...attributes };
     this.queue.enqueue({ type: "update", item: updated });
     await this.db.put(this.storeName, updated).catch((err) => console.log(err));
   };
-  move = async (id: string, attributes: Partial<Sunlist>) => {};
-  remove = async (id: string, attributes: Partial<Sunlist>) => {};
+  move = async (id: string, attributes: Partial<SunlistItem>) => {};
+  remove = async (id: string, attributes: Partial<SunlistItem>) => {};
   complete = async (id: string, tsCompleted: Date | null) => {
     const item = await this.db.get(this.storeName, id);
     const update = { ...item, tsCompleted };

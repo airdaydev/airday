@@ -179,11 +179,47 @@ export class TreeState {
     return root;
   }
   delete(set: Set<Node>) {
-    console.log("delete", set);
     const result = this.remove(set);
     this.onDelete?.(set);
     set.forEach((node) => this.idMap.delete(node.id));
     this.childrenSignal[1](() => result.filtered);
+  }
+  // TODO: AI Written
+  insertNode(newNode: Node, parentNode: Node | null, position: number) {
+    if (!parentNode) {
+      // Insert at root level
+      const currentChildren = this.childrenSignal[0]();
+      const updatedChildren = [
+        ...currentChildren.slice(0, position),
+        newNode,
+        ...currentChildren.slice(position),
+      ];
+      this.childrenSignal[1](updatedChildren);
+    } else {
+      // Insert under a specific parent node
+      const updatedTree = this.mutableRoot;
+      const updateNode = (node: Node) => {
+        if (node === parentNode) {
+          node.children = [
+            ...node.children.slice(0, position),
+            newNode,
+            ...node.children.slice(position),
+          ];
+          return node;
+        }
+        node.children = node.children.map(updateNode);
+        return node;
+      };
+      const updatedChildren = updatedTree.children.map(updateNode);
+      this.childrenSignal[1](updatedChildren);
+    }
+
+    // Update the new node's properties
+    newNode.root = this;
+    newNode.parent = parentNode;
+
+    // Add the new node to the idMap
+    this.idMap.set(newNode.id, newNode);
   }
   getNodesByIds(ids: Set<string>) {
     const nodeSet = new Set<Node>();

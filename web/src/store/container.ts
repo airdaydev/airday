@@ -101,7 +101,7 @@ export class ContainerStore {
     }
     await tx.done;
   };
-  getLists = async (): Promise<Sunlist[]> => {
+  getLists = async (): Promise<SunlistItem[]> => {
     const items = await this.db.getAll(this.storeName);
     return items;
   };

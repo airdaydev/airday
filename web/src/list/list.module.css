@@ -140,3 +140,18 @@
     margin-left: 0.25em;
     color: #5937ff;
 }
+
+.list-col-head {
+    display: flex;
+    padding: 0 0.5em;
+    color: var(--body-tint);
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+}
+
+.list-col-head-item {
+    display: inline-flex;
+    padding: 0 0.5em;
+    height: 28px;
+    align-items: center;
+}

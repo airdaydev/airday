@@ -17,7 +17,7 @@ const map: Record<string, any> = {
 
 interface StickerProps {
   set: "baseline" | "remote";
-  item: Signal<Sunlist>;
+  item: Signal<SunlistItem>;
 }
 
 // TODO: Retrieve id for updating etc

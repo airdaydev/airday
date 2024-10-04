@@ -9,7 +9,7 @@ import { Key } from "../generic/key";
 
 interface ItemContextMenuProps {
   close: () => void;
-  item: Accessor<Sunlist>;
+  item: Accessor<SunlistItem>;
   updateSticker: (sticker: string) => void;
   style: string;
   offset: [number, number];

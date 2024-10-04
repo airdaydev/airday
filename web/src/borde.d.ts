@@ -1,4 +1,4 @@
-interface Sunlist {
+interface SunlistItem {
   id: string;
   text: string;
   tsCreated: Date;

@@ -36,7 +36,9 @@ const GenericItemDate: Component<{ node: GenericItem }> = (props) => {
 };
 
 const GenericItemContent: Component<{ node: GenericItem }> = (props) => {
-  return <span>{props.node.accessor().content}</span>;
+  return (
+    <span class={styles["content-col"]}>{props.node.accessor().content}</span>
+  );
 };
 
 const colMap = new Map<string, Component<{ node: GenericItem }>>([
@@ -83,7 +85,7 @@ export const GenericComponent: NodeComponentType = (props) => {
         onDblClick={(event) => {
           event.preventDefault();
           props.select();
-          props.node.updateContent("gogogoo");
+          // props.node.updateContent("gogogoo");
         }}
         onContextMenu={openContextMenu}
         data-index={props.index}
@@ -92,7 +94,6 @@ export const GenericComponent: NodeComponentType = (props) => {
         <For each={options.columns[0]()}>
           {(col) => {
             const Col = colMap.get(col);
-            console.log(Col);
             if (Col) {
               return <Col node={props.node} />;
             }

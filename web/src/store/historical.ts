@@ -1,5 +1,5 @@
 import { ItemStore } from "./item";
-import { itemLoader } from "./loader";
+import { GenericItem, itemLoader } from "./loader";
 import { SunlistWorkspace } from "./main";
 import { TreeState } from "@sunlist/list";
 
@@ -15,12 +15,18 @@ export class HistoricalItems {
     this.store.queue.subscribe(this.onTransaction.bind(this));
   }
   onTransaction(trx) {
-    if (trx.type === "done") {
-      if (trx.item.tsCompleted === null) {
-        const idSet = this.tree.getNodesByIds(new Set([trx.item.id]));
-        if (idSet.size) this.tree.delete(idSet);
-      } else {
-        // this.tree.add (respect current sort order)
+    const node = this.tree.idMap.get(trx.item.id);
+    if (node) {
+      // update node
+      // node.
+    } else {
+      // create node if tsCompleted is true
+      if (trx.item.tsCompleted !== null) {
+        this.tree.insertNode(
+          new GenericItem(trx.item, this.workspace),
+          null,
+          0,
+        );
       }
     }
   }

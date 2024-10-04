@@ -130,11 +130,15 @@ h3 {
 }
 
 .date-col {
-    font-family: var(--mono);
+    font-family: var(--mono-font);
     border-right: 1px solid var(--border);
     height: 100%;
     display: flex;
     align-items: center;
-    width: 4rem;
+    width: 5rem;
     flex-shrink: 0;
+}
+
+.content-col {
+    padding-left: 0.5em;
 }
