@@ -8,7 +8,9 @@ export class List {
   store: ItemStore;
   workspace: SunlistWorkspace;
   tree: TreeState;
-  constructor(store: ItemStore, workspace: SunlistWorkspace) {
+  id: string;
+  constructor(id: string, store: ItemStore, workspace: SunlistWorkspace) {
+    this.id = id;
     this.store = store;
     this.workspace = workspace;
     this.tree = new TreeState({ loader: itemLoader(workspace) });
@@ -31,7 +33,7 @@ export class List {
     }
   }
   async load() {
-    const itemsRaw = await this.store.loadCompletedItems();
-    this.tree.load({ children: itemsRaw });
+    const itemsRaw = await this.store.getItemsByList(this.id);
+    this.tree.load({ id: "root", children: itemsRaw });
   }
 }

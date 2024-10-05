@@ -8,6 +8,7 @@ import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { itemLoader } from "./item";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
+import { List } from "./list";
 
 const schemaVersion = 1;
 
@@ -121,7 +122,7 @@ export class SunlistWorkspace {
   name: string = "Uninitialised";
   initialised = false;
   localOnly: boolean = true;
-  openLists = new Map<string, TreeState>();
+  openLists = new Map<string, List>();
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
   historical: HistoricalItems;
@@ -208,26 +209,20 @@ export class SunlistWorkspace {
     ]);
   };
   // Creates or loads new session-persistent state
-  openList(view: DataView): TreeState {
+  openList(view: DataView): List {
     let identifier = null;
-    let state = null;
+    let list = null;
     if (view.type === "data") {
       identifier = `c#${view.containerId}`;
-      state = this.openLists.get(identifier);
-      if (!state) {
-        const state = this.listStateContext.createTree({
-          loader: itemLoader(this),
-        });
-        const list = this.itemStore
-          .getItemsByList(view.containerId)
-          .then((items) => {
-            state.load({ id: "root", children: items });
-          });
-        this.openLists.set(identifier, state);
-        return state;
+      list = this.openLists.get(identifier);
+      if (!list) {
+        const list = new List(view.containerId, this.itemStore, this);
+        list.load();
+        this.openLists.set(identifier, list);
+        return list;
       }
     }
-    if (!state) throw new Error("Cannot determine list from view");
-    return state;
+    if (!list) throw new Error("Cannot determine list from view");
+    return list;
   }
 }

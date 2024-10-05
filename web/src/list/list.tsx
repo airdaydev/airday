@@ -26,9 +26,9 @@ interface ListProps {
 
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
-  const state = session.workspace.openList(props.view);
+  const list = session.workspace.openList(props.view);
   const ctx = new ListDragContext({
-    treeState: state,
+    treeState: list.tree,
     dndContext: session.workspace.dndContext,
     itemHeight: 32,
     placeholderStyle: itemStyles["placeholder"],
