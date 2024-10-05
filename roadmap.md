@@ -35,6 +35,7 @@
 - [x] allow done items to hack into existing list dnd context
 - [x] Reinstate Done board
 - [x] Done items should appear immediately in done list
+- [x] Prevent keyboard moving items on Done list
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [] Dragging out of Done should undo its done start
@@ -42,7 +43,6 @@
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
-- [] Prevent keyboard moving items on Done list
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
