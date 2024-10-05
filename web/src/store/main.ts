@@ -133,7 +133,6 @@ export class SunlistWorkspace {
   }
   /**
    * Creates connection to existing database, alters schema where version changes
-   * TODO: Loading screen while db is not ready
    */
   connect = async () => {
     // TODO: Check if items etc exist
@@ -146,9 +145,6 @@ export class SunlistWorkspace {
         await self.itemStore.upgrade(db);
         await self.containerStore.upgrade(db);
         console.log("Completed upgrade");
-        // const doneStore = db.createObjectStore(doneStoreName, {
-        //     keyPath: 'id',
-        // });
       },
     });
     this.containerStore.init(db);

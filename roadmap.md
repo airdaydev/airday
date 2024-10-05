@@ -36,10 +36,12 @@
 - [x] Reinstate Done board
 - [x] Done items should appear immediately in done list
 - [x] Prevent keyboard moving items on Done list
+- [] Done items should not be pulled into normal lists
+- [] can't multiselect nav
+- [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [] Dragging out of Done should undo its done start
-- [] Done items should be removed from normal lists
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
@@ -74,9 +76,9 @@
 - [] Weekly view
 - [] Monthly view
 - [] Loading pane
-- [] Save views! (arrangements of panes)
-- [ ] experiment with sounds
-- [] Print styles!!
+- [] Save views (arrangements of panes)
+- [] experiment with sounds
+- [] Print styles
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology

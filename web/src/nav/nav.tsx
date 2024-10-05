@@ -9,6 +9,7 @@ import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
+import { MonthNav } from "../cal/month-nav";
 
 export function SunlistNav() {
   const session = useContext(sessionContext);
@@ -27,6 +28,8 @@ export function SunlistNav() {
       }}
       onClick={() => session.viewState.focusSidebar()}
     >
+      {/* <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
+      <MonthNav /> */}
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
       <div
         class={`${styles["nav-list"]} ${styles["nav-text"]}`}

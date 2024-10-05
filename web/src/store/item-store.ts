@@ -9,7 +9,6 @@ import { Trx } from "./trx";
 export class ItemStore {
   storeName = "item";
   sundb: SunlistIDB | null = null;
-  itemStore: IDBPObjectStore | null = null;
   queue = new Queue<Trx>();
   init = (db: SunlistIDB) => {
     this.sundb = db;
