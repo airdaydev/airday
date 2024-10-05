@@ -1,11 +1,10 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
 import { ItemStore } from "./item-store";
-import { ContainerStore } from "./container";
+import { ContainerStore } from "./container-store";
 import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
-import { itemLoader } from "./item";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 import { List } from "./list";
@@ -20,12 +19,6 @@ interface DBTypes {
 export type SunlistIDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage =
   "DB not loaded, pre-load buffer not yet implemented";
-
-// TODO: Retrieve these from model
-const itemStoreName = "item";
-const doneStoreName = "done";
-const containerStoreName = "container";
-// Remote Config store per browser (but could do local storage)
 
 const workspaceCache = v.object({
   activeWorkspace: v.string(),

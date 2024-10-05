@@ -130,13 +130,15 @@ h3 {
 }
 
 .date-col {
-    border-right: 1px solid var(--border);
     height: 100%;
     display: flex;
     align-items: center;
-    width: 4rem;
+    width: 3.25rem;
     flex-shrink: 0;
     padding-left: 0.5em;
+    color: var(--body-tint);
+    font-size: 0.9rem;
+    font-weight: 500;
 }
 
 .content-col {
