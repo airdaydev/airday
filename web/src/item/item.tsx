@@ -25,7 +25,7 @@ const GenericItemCheckbox: Component<{
         props.node.toggleComplete(props.options.historical);
         event.stopPropagation();
       }}
-      checked={!!props.node.tsCompleted}
+      checked={!!props.node.accessor().tsCompleted}
     />
   );
 };
