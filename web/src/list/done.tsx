@@ -27,7 +27,7 @@ export const Done = (props: { view: DataView }) => {
     allowInternalMovement: false,
   });
   const opts = listOptions({
-    columnHeaders: true,
+    columnHeaders: false,
     columns: ["check", "date", "content"],
     historical: true,
   });
