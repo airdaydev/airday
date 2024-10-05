@@ -91,6 +91,7 @@ export class ListStateContext {
     this.trees.add(tree);
     return tree;
   }
+  // TODO: consider deleting & recreating each item (cleaner)
   moveItems(
     nodes: Set<Node>,
     srcState: TreeState,
@@ -105,6 +106,9 @@ export class ListStateContext {
 
     const transformNodes = Array.from(nodes).map((node) => {
       node.root = destState;
+      // Remove from source idMap and add to destination idMap
+      srcState.idMap.delete(node.id);
+      destState.idMap.set(node.id, node);
       return node;
     });
 

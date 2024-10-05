@@ -15,6 +15,7 @@ import itemStyles from "../item/item.module.css";
 import styles from "./list.module.css";
 import { ListColumnHeaders } from "./list-col-head";
 import { listOptions, ListOptionsContext } from "./list-options";
+import { Timeline } from "./timeline";
 
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
@@ -49,7 +50,12 @@ export const Done = (props: { view: DataView }) => {
             class={styles["tree-wrap"]}
             // classList={{ [styles["focus"]]: ctx.isFocused() }}
           >
-            <Tree />
+            <Tree
+              additionalClasses={{
+                [styles["hide-native-scroll"]]: true,
+              }}
+            />
+            <Timeline />
           </div>
         </SolidListContext.Provider>
       </section>

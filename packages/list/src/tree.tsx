@@ -24,6 +24,7 @@ interface TreeComponentProps {
   data: GenericNode<any>;
   itemHeight: number;
   hideBackdrop?: boolean;
+  additionalClasses?: Record<string, boolean>;
 }
 
 export type ContainerVector = [scrollHeight: number, scrollTop: number];
@@ -93,6 +94,7 @@ export const Tree = (props: TreeComponentProps) => {
     <div
       classList={{
         focus: listDragContext.isFocused(), // TODO: Do better
+        ...props.additionalClasses,
       }}
       style={{
         display: "flex",
