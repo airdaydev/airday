@@ -37,7 +37,6 @@
 - [x] Done items should appear immediately in done list
 - [x] Prevent keyboard moving items on Done list
 - [x] Done items should not be pulled into normal lists
-- [] justChecked timer needs to be queued!
 - [] can't multiselect nav
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
@@ -46,6 +45,7 @@
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
+- [] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
