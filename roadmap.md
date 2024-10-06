@@ -43,6 +43,7 @@
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [] views to be set as active on close, split horizontally, vertically
 - [] splitting non container list horizontally/vertically etc breaks
+- [] Dummy data some dumb items
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start
