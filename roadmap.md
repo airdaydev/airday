@@ -38,6 +38,8 @@
 - [x] Prevent keyboard moving items on Done list
 - [x] Done items should not be pulled into normal lists
 - [] can't multiselect nav
+- [] opt+- to split pane horizontally
+- [] opt+| to split pane vertically
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
