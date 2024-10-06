@@ -19,7 +19,7 @@ export class ItemStore {
     });
     itemStore.createIndex("listId", "listId");
     itemStore.createIndex("ordered", ["listId", "sortKey", "id"]);
-    itemStore.createIndex("done", ["tsCompleted"]);
+    itemStore.createIndex("done", ["tsDone"]);
   };
   ready() {
     return !!this.db;
@@ -86,9 +86,9 @@ export class ItemStore {
     await this.db.delete(this.storeName, id);
     this.queue.enqueue({ type: "remove", id });
   };
-  check = async (id: string, tsCompleted: Date | null) => {
+  check = async (id: string, tsDone: Date | null) => {
     const item = await this.db.get(this.storeName, id);
-    const updatedItem = { ...item, tsCompleted };
+    const updatedItem = { ...item, tsDone };
     await this.db
       .put(this.storeName, updatedItem)
       .catch((err) => console.log(err));

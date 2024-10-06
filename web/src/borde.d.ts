@@ -2,7 +2,7 @@ interface SunlistItem {
   id: string;
   text: string;
   tsCreated: Date;
-  tsCompleted: Date | null;
+  tsDone: Date | null;
   sortKey: string; // global, persisted sort key
   sticker?: string;
   listId: string;

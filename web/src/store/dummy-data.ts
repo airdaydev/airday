@@ -31,7 +31,7 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
       content: tasks[index],
       sortKey: sortKeys[i],
       tsCreated: new Date(),
-      tsCompleted: null,
+      tsDone: null,
       listId,
       ...(sticker && { sticker: "smiley" }),
     });

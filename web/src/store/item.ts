@@ -9,7 +9,7 @@ import { SunlistWorkspace } from "./main";
 const GenericItemSchema = v.object({
   id: v.string(),
   content: v.string(),
-  tsCompleted: v.any(), // TODO: Validate date
+  tsDone: v.any(), // TODO: Validate date
 });
 
 type GenericItemSchema = TypeOf<typeof GenericItemSchema> & GenericNode<any>;
@@ -19,7 +19,7 @@ export class GenericItem extends Node {
   type = "generic";
   allowChildren = true;
   tsCreated?: Date;
-  tsCompleted?: Date | null;
+  tsDone?: Date | null;
   sticker?: string;
   content?: string;
   component = GenericComponent;
@@ -31,14 +31,14 @@ export class GenericItem extends Node {
     super(props);
     this.id = props.id || createUniqueId();
     this.content = props.content;
-    this.tsCompleted = props.tsCompleted;
+    this.tsDone = props.tsDone;
     this.workspace = workspace;
   }
   serialise() {
     return {
       id: this.id,
       content: this.content,
-      tsCompleted: this.tsCompleted,
+      tsDone: this.tsDone,
       justChecked: this.justChecked,
     };
   }
@@ -54,11 +54,11 @@ export class GenericItem extends Node {
   // at the place of construction
   // if it occurs from the doneList, the interaction is much simpler
   async toggleComplete(historical = false) {
-    if (!this.tsCompleted) {
-      this.tsCompleted = new Date();
+    if (!this.tsDone) {
+      this.tsDone = new Date();
       const updatedItem = await this.workspace.itemStore.check(
         this.id,
-        this.tsCompleted,
+        this.tsDone,
       );
       if (!historical) {
         this.justChecked = true;
@@ -70,10 +70,10 @@ export class GenericItem extends Node {
         }, 1500);
       }
     } else {
-      this.tsCompleted = null;
+      this.tsDone = null;
       const updatedItem = await this.workspace.itemStore.check(
         this.id,
-        this.tsCompleted,
+        this.tsDone,
       );
       this.justChecked = false;
       this.workspace.itemStore.queue.enqueue({

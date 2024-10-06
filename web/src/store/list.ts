@@ -20,7 +20,7 @@ export class List {
   onTransaction(trx: Trx) {
     if (trx.type === "check") {
       const item = this.tree.idMap.get(trx.item.id);
-      if (item && trx.item.tsCompleted) {
+      if (item && trx.item.tsDone) {
         this.tree.delete(new Set([item]));
         // this.tree.insertNode(
         //   new GenericItem(trx.item, this.workspace),
@@ -28,7 +28,7 @@ export class List {
         //   0,
         // );
       }
-      // if (item && !trx.item.tsCompleted) {
+      // if (item && !trx.item.tsDone) {
       //   this.tree.delete(new Set([item]));
       // }
     }

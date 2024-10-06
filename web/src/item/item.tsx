@@ -25,7 +25,7 @@ const GenericItemCheckbox: Component<{
         props.node.toggleComplete(props.options.historical);
         event.stopPropagation();
       }}
-      checked={!!props.node.accessor().tsCompleted}
+      checked={!!props.node.accessor().tsDone}
     />
   );
 };
@@ -33,7 +33,7 @@ const GenericItemCheckbox: Component<{
 const GenericItemDate: Component<{ node: GenericItem }> = (props) => {
   return (
     <span class={styles["date-col"]}>
-      {formatDate(props.node.accessor().tsCompleted)}
+      {formatDate(props.node.accessor().tsDone)}
     </span>
   );
 };
@@ -52,7 +52,7 @@ const colMap = new Map<string, Component<{ node: GenericItem }>>([
 
 {
   /* <GenericItemCheckbox node={props.node} />
-<span class={styles["date-col"]}>{formatDate(node().tsCompleted)}</span>
+<span class={styles["date-col"]}>{formatDate(node().tsDone)}</span>
 <span>{node().content}</span> */
 }
 
