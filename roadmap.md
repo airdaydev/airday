@@ -39,15 +39,15 @@
 - [x] Done items should not be pulled into normal lists
 - [x] opt+- to split pane horizontally
 - [x] opt+| to split pane vertically
-- [] views to be set as active on close, split horizontally, verticall
+- [x] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
+- [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
+- [] views to be set as active on close, split horizontally, vertically
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
-- [] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [] Dragging out of Done should undo its done start
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
-- [] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)

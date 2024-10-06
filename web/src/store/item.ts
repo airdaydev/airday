@@ -3,8 +3,8 @@ import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
-import { ItemStore } from "./item-store";
 import { SunlistWorkspace } from "./main";
+import { Debouncer } from "./utils";
 
 const GenericItemSchema = v.object({
   id: v.string(),
@@ -13,6 +13,8 @@ const GenericItemSchema = v.object({
 });
 
 type GenericItemSchema = TypeOf<typeof GenericItemSchema> & GenericNode<any>;
+
+const justCheckedDebouncer = new Debouncer(1500);
 
 export class GenericItem extends Node {
   id: string;
@@ -25,7 +27,8 @@ export class GenericItem extends Node {
   component = GenericComponent;
   workspace: SunlistWorkspace;
   justChecked = false;
-  justCheckedTimer?: number;
+  justCheckedRef?: () => void;
+
   static validate = compile(GenericItemSchema, { simple: true });
   constructor(props: GenericItemSchema, workspace: SunlistWorkspace) {
     super(props);
@@ -62,12 +65,12 @@ export class GenericItem extends Node {
       );
       if (!historical) {
         this.justChecked = true;
-        this.justCheckedTimer = setTimeout(() => {
+        this.justCheckedRef = justCheckedDebouncer.add(() => {
           this.workspace.itemStore.queue.enqueue({
             type: "check",
             item: updatedItem,
           });
-        }, 1500);
+        });
       }
     } else {
       this.tsDone = null;
@@ -77,7 +80,7 @@ export class GenericItem extends Node {
         type: "check",
         item: updatedItem,
       });
-      clearTimeout(this.justCheckedTimer);
+      justCheckedDebouncer.remove(this.justCheckedRef);
     }
     this.triggerUpdate();
   }
