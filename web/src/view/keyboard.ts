@@ -23,6 +23,7 @@ export class KeyboardShortcuts {
     this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
+      console.log(event.key);
       if (this.stopKeys.has(event.key)) {
         event.preventDefault();
         return;

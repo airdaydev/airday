@@ -35,4 +35,22 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
       if (view) ctx.viewState.closeView(view);
     },
   ],
+  [
+    encodeShortcut({ key: "«", altKey: true }),
+    (ctx) => {
+      // split vertically
+      const view = ctx.viewState.activePane[0]();
+      if (view)
+        ctx.viewState.addViewRelative(view.containerId, view.id, "right");
+    },
+  ],
+  [
+    encodeShortcut({ key: "–", altKey: true }),
+    (ctx) => {
+      // split horizontally
+      const view = ctx.viewState.activePane[0]();
+      if (view)
+        ctx.viewState.addViewRelative(view.containerId, view.id, "down");
+    },
+  ],
 ]);
