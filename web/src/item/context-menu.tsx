@@ -36,8 +36,18 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         </div>
       </button>
       <hr />
-      <button disabled>
+      <button
+        disabled
+        style="display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 12em;"
+      >
         <span>Copy</span>
+        <div>
+          <Key key="⌘" />
+          <Key key="C" />
+        </div>
       </button>
       <button disabled>
         <span>Copy special</span>
@@ -59,8 +69,17 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Duplicate</span>
       </button>
-      <button disabled>
+      <button
+        disabled
+        style="display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 12em;"
+      >
         <span>Delete</span>
+        <div>
+          <Key key="del" />
+        </div>
       </button>
     </ContextMenu>
   );
