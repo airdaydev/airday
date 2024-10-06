@@ -124,6 +124,7 @@ interface NavItemContextMenuProps {
 }
 
 export function NavItemContextMenu(props: NavItemContextMenuProps) {
+  const session = useContext(sessionContext);
   return (
     <ContextMenu
       close={props.close}
@@ -136,7 +137,11 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
       <button disabled>
         <span>Export</span>
       </button>
-      <button disabled>
+      <button
+        onClick={() => {
+          session.workspace.containerStore.remove(props.container().id);
+        }}
+      >
         <span>Delete</span>
       </button>
     </ContextMenu>

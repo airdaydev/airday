@@ -72,10 +72,20 @@ export class ContainerStore {
     const store = tx.objectStore(this.storeName);
     // Create signals
     src.map((item, index) => {
-      this.tree.insertNode(new GenericList(item), null, 0);
+      this.tree.insertNode(new GenericList(item), null, this.tree.count());
       return dbPromises.push(store.add(item));
     });
     Promise.all(dbPromises).catch((err) => console.log(err));
+  };
+  remove = async (id: string) => {
+    if (!this.db) {
+      throw new Error("Item store not initialised.");
+    }
+    const node = this.tree.idMap.get(id);
+    if (node) {
+      this.tree.delete(new Set([node]));
+    }
+    await this.db.delete(this.storeName, id);
   };
   idb_insert = async (data: SunlistContainer | SunlistContainer[]) => {
     const tx = this.db.transaction(this.storeName, "readwrite");
