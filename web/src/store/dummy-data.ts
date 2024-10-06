@@ -9,7 +9,7 @@ export const sunlistItems = [
   "https://openstax.org/details/books/precalculus-2e",
 ];
 
-export const inboxItems = [
+export const taskItems = [
   "Banana",
   "FastAI Course",
   "Seguir viendo la casa de papel desde temporada 4",

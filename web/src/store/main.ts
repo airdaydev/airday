@@ -1,7 +1,7 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
 import { ItemStore } from "./item-store";
 import { ContainerStore } from "./container-store";
-import { genTestData, sunlistItems, inboxItems } from "./dummy-data";
+import { genTestData, sunlistItems, taskItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
 import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
@@ -169,13 +169,13 @@ export class SunlistWorkspace {
   dummyData = async () => {
     const items = [
       ...genTestData("work", sunlistItems),
-      ...genTestData("inbox", inboxItems),
+      ...genTestData("tasks", taskItems),
     ];
     await this.itemStore.insert(items);
     await this.containerStore.insert([
       {
-        id: "inbox",
-        name: "Inbox",
+        id: "tasks",
+        name: "Tasks",
         icon: "task",
         sortKey: "a",
         type: "generic-list",

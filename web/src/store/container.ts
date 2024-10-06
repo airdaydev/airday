@@ -16,7 +16,6 @@ export class GenericList extends Node {
   name: string;
   type = "generic-list";
   tsCreated?: Date;
-  sticker?: string;
   component = NavListItem;
   static validate = compile(GenericListSchema, { simple: true });
   constructor(props: GenericListSchema) {
@@ -28,6 +27,7 @@ export class GenericList extends Node {
     return {
       id: this.id,
       name: this.name,
+      default: this.default,
     };
   }
   updateName(newName: string) {

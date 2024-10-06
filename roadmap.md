@@ -41,6 +41,7 @@
 - [x] opt+| to split pane vertically
 - [x] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
+- [] nav list setup should use loader if it doesn't (get list.default working)
 - [] show active list in page title
 - [] item links
 - [] views to be set as active on close, split horizontally, vertically
