@@ -88,7 +88,7 @@ export class ItemStore {
   };
   check = async (id: string, tsDone: Date | null) => {
     const item = await this.db.get(this.storeName, id);
-    const updatedItem = { ...item, tsDone };
+    const updatedItem = { ...item, tsDone, listId: "archive" };
     await this.db
       .put(this.storeName, updatedItem)
       .catch((err) => console.log(err));
