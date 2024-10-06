@@ -71,10 +71,7 @@ export class GenericItem extends Node {
       }
     } else {
       this.tsDone = null;
-      const updatedItem = await this.workspace.itemStore.check(
-        this.id,
-        this.tsDone,
-      );
+      const updatedItem = await this.workspace.itemStore.uncheck(this.id);
       this.justChecked = false;
       this.workspace.itemStore.queue.enqueue({
         type: "check",

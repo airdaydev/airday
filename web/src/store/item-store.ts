@@ -86,9 +86,22 @@ export class ItemStore {
     await this.db.delete(this.storeName, id);
     this.queue.enqueue({ type: "remove", id });
   };
-  check = async (id: string, tsDone: Date | null) => {
+  check = async (id: string, tsDone: Date) => {
     const item = await this.db.get(this.storeName, id);
-    const updatedItem = { ...item, tsDone, listId: "archive" };
+    const updatedItem = {
+      ...item,
+      tsDone,
+      listId: "archive",
+      from: item.listId,
+    };
+    await this.db
+      .put(this.storeName, updatedItem)
+      .catch((err) => console.log(err));
+    return updatedItem;
+  };
+  uncheck = async (id: string) => {
+    const item = await this.db.get(this.storeName, id);
+    const updatedItem = { ...item, tsDone: null, listId: item.from };
     await this.db
       .put(this.storeName, updatedItem)
       .catch((err) => console.log(err));

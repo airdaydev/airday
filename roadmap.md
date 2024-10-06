@@ -36,7 +36,8 @@
 - [x] Reinstate Done board
 - [x] Done items should appear immediately in done list
 - [x] Prevent keyboard moving items on Done list
-- [] Done items should not be pulled into normal lists
+- [x] Done items should not be pulled into normal lists
+- [] justChecked timer needs to be queued!
 - [] can't multiselect nav
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
