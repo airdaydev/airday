@@ -42,6 +42,7 @@
 - [x] Done items should not pull into normal lists (but we may still need to keep track of which list it was from - crdt can give us this... but we will need to get it in front-end as "previousList" or something)
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [] views to be set as active on close, split horizontally, vertically
+- [] splitting non container list horizontally/vertically etc breaks
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start
