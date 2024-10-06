@@ -201,6 +201,7 @@
 - [] Natural looking cross outs? Consider tick seed, underline length
 - [] Custom fields
 - [] consider flexsearch
+- [] Pages
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open

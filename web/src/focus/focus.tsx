@@ -18,6 +18,7 @@ export const Focus = (props: FocusProps) => {
       <div class={styles["content"]}>
         <h1>{props.item.content}</h1>
       </div>
+      <div class={styles["timer"]}>25:00</div>
       <ThrottleButton
         action={() => session.viewState.openDefaultScene()}
         key={"Escape"}

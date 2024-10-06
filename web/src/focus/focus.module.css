@@ -1,5 +1,6 @@
 .container {
     display: flex;
+    flex-direction: column;
     margin: 0;
     top: 0;
     position: absolute;
@@ -75,4 +76,9 @@
 
 [data-theme="dark"] .focus-button {
     box-shadow: 1px 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.timer {
+    font-family: var(--mono-font);
+    font-size: 3em;
 }
