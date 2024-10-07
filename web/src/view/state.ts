@@ -33,6 +33,10 @@ export class ViewNode {
   direction: SplitDirection = "horizontal";
   children?: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
   parent?: ViewNode;
+  viewState: ViewState;
+  constructor(viewState: ViewState) {
+    this.viewState = viewState;
+  }
   detach() {
     this.parent?.removeView(this);
   }
@@ -162,14 +166,14 @@ export class VerticalSplitNode extends ViewNode {
 export class DoneView extends ViewNode {
   type: ViewType = "data";
   dataType: DataViewType = "done";
-  constructor() {
-    super();
+  constructor(viewState: ViewState) {
+    super(viewState);
   }
   get title() {
     return "Done";
   }
   duplicate() {
-    return new DoneView();
+    return new DoneView(this.viewState);
   }
 }
 
@@ -186,15 +190,18 @@ export class DataView extends ViewNode {
   type: ViewType = "data";
   dataType: DataViewType = "list";
   projection: "list" | "kanban" = "list";
-  constructor(containerId: string) {
-    super();
+  constructor(viewState: ViewState, containerId: string) {
+    super(viewState);
     this.containerId = containerId;
   }
   get title(): false {
-    return false;
+    const containerNode =
+      this.viewState.workspace.containerStore.tree.idMap.get(this.containerId);
+    if (!containerNode) return false;
+    return containerNode.name;
   }
   duplicate() {
-    return new DataView(this.containerId);
+    return new DataView(this.viewState, this.containerId);
   }
 }
 
@@ -304,10 +311,10 @@ export class ViewState {
     this.openFocusScene();
   }
   openDataView(containerId: string) {
-    this.openView(new DataView(containerId));
+    this.openView(new DataView(this, containerId));
   }
   openDoneView = () => {
-    this.openView(new DoneView());
+    this.openView(new DoneView(this));
   };
   openView = (view: ViewNode) => {
     const activePane = this.activePane[0]();

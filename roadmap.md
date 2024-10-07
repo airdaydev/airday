@@ -45,8 +45,7 @@
 - [x] show active list in page title
 - [x] Ability to drag Done nav item to activate drop
 - [x] Pane drop view should create new view, not create new container id view
-- [] show active container list in page title (requires a link to session - make session proper singleton?)
-- [] item links
+- [x] show active container list in page title (requires a link to session - make session proper singleton?)
 - [] views to be set as active on close, split horizontally, vertically
 - [] splitting non container list horizontally/vertically etc breaks
 - [] Dummy data some dumb items
@@ -56,6 +55,7 @@
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
+- [] item links
 - [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers

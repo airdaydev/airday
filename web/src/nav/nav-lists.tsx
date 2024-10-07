@@ -30,11 +30,17 @@ export const NavListItem: NodeComponentType = (props) => {
           setCtxOpen(true);
         }}
         onMouseDown={(event) => {
-          session.viewState.paneDropView = new DataView(node().id);
+          session.viewState.paneDropView = new DataView(
+            session.viewState,
+            node().id,
+          );
           props.onMouseDown(event);
         }}
         onTouchStart={(event) => {
-          session.viewState.paneDropView = new DataView(node().id);
+          session.viewState.paneDropView = new DataView(
+            session.viewState,
+            node().id,
+          );
           props.onTouchStart(event);
         }}
         data-index={props.index}
