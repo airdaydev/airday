@@ -48,6 +48,7 @@
 - [x] show active container list in page title (requires a link to session - make session proper singleton?)
 - [x] views to be set as active on split horizontally, vertically
 - [x] splitting non container list horizontally/vertically etc breaks
+- [] Splitting horizontal on root doesn't create a border
 - [] closing a list focuses on the previous list item
 - [] Dummy data some dumb items
 - [] group lists (one level)
