@@ -47,7 +47,7 @@ const GenericItemContent: Component<{ node: GenericItem }> = (props) => {
 
 const GenericSticker: Component<{ node: GenericItem }> = (props) => {
   return (
-    <span class={styles["content-col"]}>
+    <span class={styles["sticker-col"]}>
       <Sticker set="baseline" item={props.node} />
     </span>
   );
