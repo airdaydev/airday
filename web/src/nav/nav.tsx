@@ -66,7 +66,9 @@ export function SunlistNav() {
               tabindex="-1"
               onClick={session.viewState.openDoneView}
               onMouseDown={(event) => {
-                session.viewState.paneDropView = new DoneView(this.viewState);
+                session.viewState.paneDropView = new DoneView(
+                  session.viewState,
+                );
                 props.onMouseDown(event);
               }}
               ref={props.ref}
