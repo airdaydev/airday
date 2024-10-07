@@ -43,8 +43,8 @@
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [x] nav list setup should use loader if it doesn't (get list.default working)
 - [x] show active list in page title
-- [] Clicking on a list in nav - look for existing list view before creating a new one
-- [] Pane drop view should clone view, not create new container id view
+- [] Ability to drag Done nav item to activate drop
+- [] Pane drop view should create new view, not create new container id view
 - [] show active container list in page title (requires a link to session - make session proper singleton?)
 - [] item links
 - [] views to be set as active on close, split horizontally, vertically
@@ -56,6 +56,7 @@
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
+- [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
