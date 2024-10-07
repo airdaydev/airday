@@ -36,6 +36,17 @@ export class ViewNode {
   detach() {
     this.parent?.removeView(this);
   }
+  get title(): string | false {
+    return false;
+  }
+  setDocumentTitle() {
+    const titleText = this.title;
+    if (titleText) {
+      document.title = `${titleText} - Sunlist`;
+      return;
+    }
+    document.title = "Sunlist";
+  }
   getIndexShallow() {
     if (!this.parent) return -1;
     return this.parent.children[0]().findIndex((node) => node === this);
@@ -154,6 +165,9 @@ export class DoneView extends ViewNode {
   constructor() {
     super();
   }
+  get title() {
+    return "Done";
+  }
 }
 
 export class HorizontalSplitNode extends ViewNode {
@@ -172,6 +186,9 @@ export class DataView extends ViewNode {
   constructor(containerId: string) {
     super();
     this.containerId = containerId;
+  }
+  get title(): false {
+    return false;
   }
 }
 
@@ -225,6 +242,7 @@ export class ViewState {
   setActivePane(view: ViewNode) {
     this.focusContainer();
     this.activePane[1](view);
+    view.setDocumentTitle();
   }
   setActiveRegion(region: ActiveRegionType) {
     this.activeRegion[1](region);
@@ -264,7 +282,7 @@ export class ViewState {
         relativeNode.addDown(view);
         break;
     }
-    this.activePane[1](view.id);
+    this.setActivePane(view);
   }
 
   count() {
@@ -279,20 +297,16 @@ export class ViewState {
     this.openFocusScene();
   }
   openDataView(containerId: string) {
-    const view = new DataView(containerId);
-    const activePane = this.activePane[0]();
-    if (activePane) {
-      activePane?.replace(view);
-    } else {
-      this.addViewToRoot(view);
-    }
+    this.openView(new DataView(containerId));
   }
   openDoneView = () => {
-    const view = new DoneView();
+    this.openView(new DoneView());
+  };
+  openView = (view: ViewNode) => {
     const activePane = this.activePane[0]();
     if (activePane) {
       activePane?.replace(view);
-      this.activePane[1](view);
+      this.setActivePane(view);
     } else {
       this.addViewToRoot(view);
     }

@@ -3,8 +3,6 @@ import { SunlistSession, SunlistWorkspace } from "../store/main";
 import { ViewState } from "./state";
 import { defaultMapping } from "./mapping";
 
-const keyName = (event: string, contextId: string) => `${event}:${contextId}`;
-
 export function toggleSidebar(session: SunlistSession) {
   session.viewState.toggleSidebar();
 }
@@ -23,7 +21,6 @@ export class KeyboardShortcuts {
     this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
-      console.log(event.key);
       if (this.stopKeys.has(event.key)) {
         event.preventDefault();
         return;
