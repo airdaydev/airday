@@ -11,6 +11,7 @@ import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
 import { SoloNode } from "@sunlist/list";
+import { DoneView } from "../view/state";
 
 export function SunlistNav() {
   const session = useContext(sessionContext);
@@ -65,6 +66,7 @@ export function SunlistNav() {
               tabindex="-1"
               onClick={session.viewState.openDoneView}
               onMouseDown={(event) => {
+                session.viewState.paneDropView = new DoneView();
                 props.onMouseDown(event);
               }}
               ref={props.ref}

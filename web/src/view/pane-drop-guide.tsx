@@ -1,7 +1,8 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { DataView } from "./state";
 import { ListDragContext } from "@sunlist/list";
+import { sessionContext } from "../store/context";
 
 interface PaneDropDOMRect extends DOMRect {
   limitWidth: number;
@@ -12,10 +13,10 @@ type DropRegion = "all" | "left" | "right" | "top" | "bottom" | "none";
 
 interface PaneDropGuideProps {
   view: DataView;
-  container: ListDragContext;
 }
 
 export const PaneDropGuide = (props: PaneDropGuideProps) => {
+  const session = useContext(sessionContext);
   const dropRegion = createSignal<DropRegion>("all");
   const limitFactor = 0.15;
   let rect: PaneDropDOMRect;
@@ -70,26 +71,23 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         return dropRegion[1]("none");
       }}
       onMouseUp={() => {
-        if (!props.container) {
-          console.warn("props.container.id unset");
-        }
         const region = dropRegion[0]();
-        // TODO: Clone view here
-        const dataView = new DataView(props.container.id);
+        const view = session.viewState.paneDropView;
+        if (!view) return;
         if (region === "left") {
-          props.view.addLeft(dataView);
+          props.view.addLeft(view);
         }
         if (region === "right") {
-          props.view.addRight(dataView);
+          props.view.addRight(view);
         }
         if (region === "top") {
-          props.view.addUp(dataView);
+          props.view.addUp(view);
         }
         if (region === "bottom") {
-          props.view.addDown(dataView);
+          props.view.addDown(view);
         }
         if (region === "all") {
-          props.view.replace(dataView);
+          props.view.replace(view);
         }
       }}
       class={styles["pane-drop-guide-container"]}

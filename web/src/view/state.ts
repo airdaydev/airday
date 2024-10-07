@@ -214,6 +214,7 @@ export class ViewState {
   focus?: GenericItem;
   workspace: SunlistWorkspace;
   keyboard: KeyboardShortcuts;
+  paneDropView?: ViewNode; // This is the currently selected pane being dragged
   constructor(workspace: SunlistWorkspace) {
     this.workspace = workspace;
     this.keyboard = new KeyboardShortcuts(workspace, this);

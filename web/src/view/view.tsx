@@ -28,12 +28,7 @@ export function View(props: ViewProps) {
           <Match when={view.type === "data"}>
             <div class={styles["view-cell"]}>
               {session.workspace.containerStore.dndContext.isDragging() && (
-                <PaneDropGuide
-                  view={view}
-                  container={session.workspace.containerStore
-                    .getNavDnd()
-                    .getFirstSelected()}
-                />
+                <PaneDropGuide view={view} />
               )}
               <DataViewComponent view={view} />
             </div>

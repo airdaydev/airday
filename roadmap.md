@@ -44,7 +44,7 @@
 - [x] nav list setup should use loader if it doesn't (get list.default working)
 - [x] show active list in page title
 - [x] Ability to drag Done nav item to activate drop
-- [] Pane drop view should create new view, not create new container id view
+- [x] Pane drop view should create new view, not create new container id view
 - [] show active container list in page title (requires a link to session - make session proper singleton?)
 - [] item links
 - [] views to be set as active on close, split horizontally, vertically

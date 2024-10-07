@@ -5,6 +5,7 @@ import { NavItemContextMenu } from "./context-menus";
 import { NodeComponentType } from "@sunlist/list";
 import styles from "./nav.module.css";
 import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
+import { DataView } from "../view/state";
 
 // TODO: Turn off keyboard when context menu open
 export const NavListItem: NodeComponentType = (props) => {
@@ -29,9 +30,11 @@ export const NavListItem: NodeComponentType = (props) => {
           setCtxOpen(true);
         }}
         onMouseDown={(event) => {
+          session.viewState.paneDropView = new DataView(node().id);
           props.onMouseDown(event);
         }}
         onTouchStart={(event) => {
+          session.viewState.paneDropView = new DataView(node().id);
           props.onTouchStart(event);
         }}
         data-index={props.index}
