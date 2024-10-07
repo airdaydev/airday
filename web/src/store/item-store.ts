@@ -1,4 +1,3 @@
-import { IDBPObjectStore } from "idb";
 import { SunlistIDB } from "./main";
 import { Queue } from "./queue";
 import { Trx } from "./trx";

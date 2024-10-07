@@ -1,7 +1,7 @@
 import { createSignal, onMount } from "solid-js";
 import styles from "./view.module.css";
 import { DataView } from "./state";
-import { ListDragContext, Node } from "@sunlist/list";
+import { ListDragContext } from "@sunlist/list";
 
 interface PaneDropDOMRect extends DOMRect {
   limitWidth: number;
