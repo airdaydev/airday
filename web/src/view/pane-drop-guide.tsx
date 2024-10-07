@@ -74,24 +74,21 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
           console.warn("props.container.id unset");
         }
         const region = dropRegion[0]();
+        // TODO: Clone view here
+        const dataView = new DataView(props.container.id);
         if (region === "left") {
-          const dataView = new DataView(props.container.id);
           props.view.addLeft(dataView);
         }
         if (region === "right") {
-          const dataView = new DataView(props.container.id);
           props.view.addRight(dataView);
         }
         if (region === "top") {
-          const dataView = new DataView(props.container.id);
           props.view.addUp(dataView);
         }
         if (region === "bottom") {
-          const dataView = new DataView(props.container.id);
           props.view.addDown(dataView);
         }
         if (region === "all") {
-          const dataView = new DataView(props.container.id);
           props.view.replace(dataView);
         }
       }}
