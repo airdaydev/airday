@@ -34,6 +34,7 @@ export class GenericList extends Node {
       id: this.id,
       name: this.name,
       default: this.default,
+      icon: this.icon,
     };
   }
   updateName(newName: string) {
