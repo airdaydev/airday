@@ -43,6 +43,7 @@
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [x] nav list setup should use loader if it doesn't (get list.default working)
 - [x] show active list in page title
+- [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] Pane drop view should clone view, not create new container id view
 - [] show active container list in page title (requires a link to session - make session proper singleton?)
 - [] item links
