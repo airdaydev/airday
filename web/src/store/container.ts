@@ -7,6 +7,8 @@ import { createUniqueId } from "solid-js";
 const GenericListSchema = v.object({
   id: v.string(),
   name: v.string(),
+  icon: v.string(),
+  default: v.boolean(),
 });
 
 type GenericListSchema = TypeOf<typeof GenericListSchema> & GenericNode<any>;
@@ -17,11 +19,15 @@ export class GenericList extends Node {
   type = "generic-list";
   tsCreated?: Date;
   component = NavListItem;
+  default: boolean = false;
+  icon?: string;
   static validate = compile(GenericListSchema, { simple: true });
   constructor(props: GenericListSchema) {
     super(props);
     this.id = props.id || createUniqueId();
     this.name = props.name || "";
+    this.default = props.default || false;
+    if (props.icon) this.icon = props.icon;
   }
   serialise() {
     return {

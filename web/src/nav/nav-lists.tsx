@@ -41,7 +41,9 @@ export const NavListItem: NodeComponentType = (props) => {
         <ListIcon container={node()} />
         <span style="overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;">
           {node().name}
-          {node().default && "(Default)"}
+        </span>
+        <span style="margin-left: auto; color: var(--body-tint); font-size: 0.9em;">
+          {node().default && "Default"}
         </span>
       </button>
       {ctxOpen() && (

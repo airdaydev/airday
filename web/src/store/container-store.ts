@@ -60,7 +60,7 @@ export class ContainerStore {
     if (!this.sundb) throw new Error("Item store uninitialised");
     return this.sundb;
   }
-  insert = async (data: SunlistContainer | SunlistContainer[]) => {
+  insert = async (data: GenericList | GenericList[]) => {
     // Convert to array
     const src = Array.isArray(data) ? data : [data];
     // Store in database (TODO: Optimisation: Immediately store in mem)

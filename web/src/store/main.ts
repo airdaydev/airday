@@ -190,7 +190,7 @@ export class SunlistWorkspace {
       },
       {
         id: "long",
-        name: "Sunlist list with more characters",
+        name: "A Sunlist list with more characters",
         icon: "red",
         sortKey: "c",
         type: "generic-list",
