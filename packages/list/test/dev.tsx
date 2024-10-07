@@ -105,6 +105,20 @@ render(
               </div>
             )}
           />
+          <h3>A lone item outside of a list, no drop allowed</h3>
+          <SoloNode
+            dndContext={dndContext}
+            enableDrop={false}
+            Component={(props) => (
+              <div
+                onMouseDown={props.onMouseDown}
+                ref={props.ref}
+                selected={props.selected}
+              >
+                Drag
+              </div>
+            )}
+          />
         </div>
       </div>
     </div>

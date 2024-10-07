@@ -10,6 +10,7 @@ import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
+import { SoloNode } from "@sunlist/list";
 
 export function SunlistNav() {
   const session = useContext(sessionContext);
@@ -55,14 +56,25 @@ export function SunlistNav() {
           <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
         </button>
-        <button
-          onClick={session.viewState.openDoneView}
-          class={styles["nav-text-button"]}
-          tabindex="-1"
-        >
-          <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
-          <span>Done</span>
-        </button>
+        <SoloNode
+          dndContext={session.workspace.containerStore.dndContext}
+          enableDrop={false}
+          Component={(props) => (
+            <button
+              class={styles["nav-text-button"]}
+              tabindex="-1"
+              onClick={session.viewState.openDoneView}
+              onMouseDown={(event) => {
+                props.onMouseDown(event);
+              }}
+              ref={props.ref}
+              selected={props.selected}
+            >
+              <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
+              <span>Done</span>
+            </button>
+          )}
+        />
         <button class={styles["nav-text-button"]} tabindex="-1">
           <TrashSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
           <span>Trash</span>

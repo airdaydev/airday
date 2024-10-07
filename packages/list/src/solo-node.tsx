@@ -1,11 +1,12 @@
 import { PropsWithChildren, Component } from "solid-js";
 import { DndContext, ListDragContext } from "./dnd-context";
-import { distance, isTouchDevice } from "./utils";
+import { distance } from "./utils";
 
 interface SoloNodeProps extends PropsWithChildren {
   dndContext: DndContext;
   listDragContext: ListDragContext;
   Component: SoloNodeComponentType;
+  enableDrop: boolean; // Can still be used with other components
 }
 
 export type SoloNodeComponentType = Component<{
@@ -25,6 +26,7 @@ export type SoloNodeComponentType = Component<{
  */
 export const SoloNode = (props: SoloNodeProps) => {
   let ref: HTMLElement;
+  const enableDrop = props.enableDrop === false ? false : true;
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault(); // prevents selection on Safari
@@ -36,6 +38,7 @@ export const SoloNode = (props: SoloNodeProps) => {
       if (
         distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
       ) {
+        if (enableDrop === false) props.dndContext.enableDrop = false;
         const targetBounding = event.target.getBoundingClientRect();
         const targetOffset = [
           event.pageX - targetBounding.x,
@@ -52,9 +55,10 @@ export const SoloNode = (props: SoloNodeProps) => {
       }
     };
     window.addEventListener("mousemove", mouseMove);
-    window.addEventListener("mouseup", () =>
-      window.removeEventListener("mousemove", mouseMove),
-    );
+    window.addEventListener("mouseup", () => {
+      props.dndContext.enableDrop = true;
+      window.removeEventListener("mousemove", mouseMove);
+    });
   };
   return (
     <div class="solo-item">

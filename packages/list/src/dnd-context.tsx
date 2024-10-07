@@ -45,6 +45,9 @@ export class ListDragContext {
     this.placeholderStyle = opts.placeholderStyle;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
   }
+  get allowMovement() {
+    return this.dndContext.enableDrop && this.allowInternalMovement;
+  }
   isFocused() {
     return this.dndContext.focusContext[0]() === this;
   }
@@ -106,7 +109,7 @@ export class ListDragContext {
     this.isOrigin = false;
     this.originIndex = null;
     this.originNode = null;
-    this.setLastTouchedIndex(0); // TODO: think about carefully, causes slight bug
+    this.setLastTouchedIndex(undefined); // TODO: a little bit smelly
   }
   selectOne(node: Node) {
     if (!node) return;
@@ -216,7 +219,7 @@ export class ListDragContext {
     this.selection[1](selection);
   }
   setLastTouchedIndex(index: number) {
-    if (!this.allowInternalMovement) return;
+    if (!this.allowMovement) return;
     return this.lastTouchedIndexSignal[1](index);
   }
   projection() {
@@ -300,6 +303,7 @@ export class DndContext {
   elDimensionsPx: [number, number] = [200, 32];
   dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
+  enableDrop = true;
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
   }

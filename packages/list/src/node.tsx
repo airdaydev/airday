@@ -156,7 +156,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // TODO: Perhaps wrap this within the context
             const activeContext =
               props.listDragContext.dndContext.dragContext[0]();
-            if (activeContext && activeContext.allowInternalMovement) {
+            if (activeContext && activeContext.allowMovement) {
               props.listDragContext.treeState.context.moveItems(
                 props.listDragContext.selection[0](),
                 props.listDragContext.treeState,

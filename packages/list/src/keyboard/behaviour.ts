@@ -123,7 +123,7 @@ export function clearSelection(ctx: ListDragContext) {
 }
 
 export function moveSelectionUp(ctx: ListDragContext) {
-  if (!ctx.allowInternalMovement) return;
+  if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
   if (selection.size === 0) return;
   let newPosition = null;
@@ -142,7 +142,7 @@ export function moveSelectionUp(ctx: ListDragContext) {
 }
 
 export function moveSelectionDown(ctx: ListDragContext) {
-  if (!ctx.allowInternalMovement) return;
+  if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
   if (selection.size === 0) return;
   let newPosition = null;

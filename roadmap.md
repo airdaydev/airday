@@ -43,7 +43,7 @@
 - [x] justChecked timer needs to be queued so you can keep selecting shit without it disappearing on you!
 - [x] nav list setup should use loader if it doesn't (get list.default working)
 - [x] show active list in page title
-- [] Ability to drag Done nav item to activate drop
+- [x] Ability to drag Done nav item to activate drop
 - [] Pane drop view should create new view, not create new container id view
 - [] show active container list in page title (requires a link to session - make session proper singleton?)
 - [] item links
@@ -212,6 +212,7 @@
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
+- [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
