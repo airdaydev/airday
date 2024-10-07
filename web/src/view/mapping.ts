@@ -40,8 +40,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
     (ctx) => {
       // split vertically
       const view = ctx.viewState.activePane[0]();
-      if (view)
-        ctx.viewState.addViewRelative(view.containerId, view.id, "right");
+      if (view) ctx.viewState.addViewRelative(view, view.id, "right");
     },
   ],
   [
@@ -49,8 +48,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
     (ctx) => {
       // split horizontally
       const view = ctx.viewState.activePane[0]();
-      if (view)
-        ctx.viewState.addViewRelative(view.containerId, view.id, "down");
+      if (view) ctx.viewState.addViewRelative(view, view.id, "down");
     },
   ],
 ]);

@@ -168,6 +168,9 @@ export class DoneView extends ViewNode {
   get title() {
     return "Done";
   }
+  duplicate() {
+    return new DoneView();
+  }
 }
 
 export class HorizontalSplitNode extends ViewNode {
@@ -189,6 +192,9 @@ export class DataView extends ViewNode {
   }
   get title(): false {
     return false;
+  }
+  duplicate() {
+    return new DataView(this.containerId);
   }
 }
 
@@ -261,29 +267,29 @@ export class ViewState {
     return result;
   }
   addViewRelative(
-    containerId: string,
+    view: DataView | DoneView,
     relativeTo: string,
     position: "left" | "right" | "up" | "down",
   ) {
     const relativeNode = this.findNodeById(relativeTo);
     if (!relativeNode) return;
 
-    const view = new DataView(containerId);
+    const newView = view.duplicate();
     switch (position) {
       case "left":
-        relativeNode.addLeft(view);
+        relativeNode.addLeft(newView);
         break;
       case "right":
-        relativeNode.addRight(view);
+        relativeNode.addRight(newView);
         break;
       case "up":
-        relativeNode.addUp(view);
+        relativeNode.addUp(newView);
         break;
       case "down":
-        relativeNode.addDown(view);
+        relativeNode.addDown(newView);
         break;
     }
-    this.setActivePane(view);
+    this.setActivePane(newView);
   }
 
   count() {
