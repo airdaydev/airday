@@ -50,7 +50,7 @@
 - [x] splitting non container list horizontally/vertically etc breaks
 - [] Splitting horizontal on root doesn't create a border
 - [] closing a list focuses on the previous list item
-- [] Dummy data some dumb items
+- [] Dummy data - done items with varied dates over last 2 years
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start
