@@ -149,6 +149,63 @@ export class ViewNode {
       ogParent.replaceChild(vertSplit, thisIndex);
     }
   }
+  // TODO: AI gen code needs review
+  getSibling(direction: "up" | "down" | "left" | "right"): ViewNode | null {
+    if (!this.parent) return null;
+
+    const isHorizontal = this.parent.direction === "horizontal";
+    const index = this.getIndexShallow();
+    const siblings = this.parent.children?.[0]() || [];
+
+    let nextSibling: ViewNode | null = null;
+
+    const getNextSibling = (increment: number) => {
+      let nextIndex = (index + increment + siblings.length) % siblings.length;
+      return siblings[nextIndex];
+    };
+
+    if (
+      (direction === "left" && isHorizontal) ||
+      (direction === "up" && !isHorizontal)
+    ) {
+      nextSibling = getNextSibling(-1);
+    } else if (
+      (direction === "right" && isHorizontal) ||
+      (direction === "down" && !isHorizontal)
+    ) {
+      nextSibling = getNextSibling(1);
+    }
+
+    if (nextSibling) {
+      if (nextSibling.type === "container") {
+        return this.getDeepestChild(nextSibling, direction);
+      }
+      return nextSibling;
+    }
+
+    // If no sibling found, go up to parent and try again
+    return this.parent.getSibling(direction);
+  }
+
+  private getDeepestChild(
+    node: ViewNode,
+    direction: "up" | "down" | "left" | "right",
+  ): ViewNode | null {
+    const children = node.children?.[0]() || [];
+    if (children.length === 0) return node;
+
+    let targetChild: ViewNode;
+    if (direction === "left" || direction === "up") {
+      targetChild = children[children.length - 1];
+    } else {
+      targetChild = children[0];
+    }
+
+    if (targetChild.type === "container") {
+      return this.getDeepestChild(targetChild, direction);
+    }
+    return targetChild;
+  }
 }
 
 export class RootViewNode extends ViewNode {

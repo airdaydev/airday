@@ -46,8 +46,9 @@
 - [x] Ability to drag Done nav item to activate drop
 - [x] Pane drop view should create new view, not create new container id view
 - [x] show active container list in page title (requires a link to session - make session proper singleton?)
-- [] views to be set as active on close, split horizontally, vertically
-- [] splitting non container list horizontally/vertically etc breaks
+- [x] views to be set as active on split horizontally, vertically
+- [x] splitting non container list horizontally/vertically etc breaks
+- [] closing a list focuses on the previous list item
 - [] Dummy data some dumb items
 - [] group lists (one level)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
@@ -60,8 +61,8 @@
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
+- [] consider a flash or something more obvious when switching panes
 - [] Deselect nav bar items when leaving focus
-- [ ] closing a list focuses on the previous list item
 - [ ] list switcher to switch between open files (opt+tab)
 - [ ] empty list state nice
 - [ ] Context click on list header

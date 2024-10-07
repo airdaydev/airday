@@ -38,7 +38,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   [
     encodeShortcut({ key: "«", altKey: true }),
     (ctx) => {
-      // split vertically
+      // split horizontally
       const view = ctx.viewState.activePane[0]();
       if (view) ctx.viewState.addViewRelative(view, view.id, "right");
     },
@@ -46,9 +46,41 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   [
     encodeShortcut({ key: "–", altKey: true }),
     (ctx) => {
-      // split horizontally
+      // split vertically
       const view = ctx.viewState.activePane[0]();
       if (view) ctx.viewState.addViewRelative(view, view.id, "down");
+    },
+  ],
+  [
+    encodeShortcut({ key: "˙", altKey: true }),
+    (ctx) => {
+      // jump left
+      const view = ctx.viewState.activePane[0]()?.getSibling("left");
+      if (view) ctx.viewState.setActivePane(view);
+    },
+  ],
+  [
+    encodeShortcut({ key: "∆", altKey: true }),
+    (ctx) => {
+      // jump left
+      const view = ctx.viewState.activePane[0]()?.getSibling("up");
+      if (view) ctx.viewState.setActivePane(view);
+    },
+  ],
+  [
+    encodeShortcut({ key: "˚", altKey: true }),
+    (ctx) => {
+      // jump left
+      const view = ctx.viewState.activePane[0]()?.getSibling("down");
+      if (view) ctx.viewState.setActivePane(view);
+    },
+  ],
+  [
+    encodeShortcut({ key: "¬", altKey: true }),
+    (ctx) => {
+      // jump left
+      const view = ctx.viewState.activePane[0]()?.getSibling("right");
+      if (view) ctx.viewState.setActivePane(view);
     },
   ],
 ]);
