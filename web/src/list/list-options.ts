@@ -6,7 +6,7 @@ interface ListCtx {
 
 const defaultListOptions = {
   columnHeaders: false,
-  columns: ["check", "content"],
+  columns: ["check", "content", "sticker"],
   historical: false,
 };
 

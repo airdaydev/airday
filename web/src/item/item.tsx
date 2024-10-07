@@ -5,6 +5,7 @@ import styles from "./item.module.css";
 import { ItemContextMenu } from "./context-menu";
 import { ListOptions, ListOptionsContext } from "../list/list-options";
 import { GenericItem } from "../store/item";
+import { Sticker } from "../stickers/main";
 
 function formatDate(date: Date | undefined): string {
   if (!date) return "";
@@ -44,10 +45,19 @@ const GenericItemContent: Component<{ node: GenericItem }> = (props) => {
   );
 };
 
+const GenericSticker: Component<{ node: GenericItem }> = (props) => {
+  return (
+    <span class={styles["content-col"]}>
+      <Sticker set="baseline" item={props.node} />
+    </span>
+  );
+};
+
 const colMap = new Map<string, Component<{ node: GenericItem }>>([
   ["check", GenericItemCheckbox],
   ["date", GenericItemDate],
   ["content", GenericItemContent],
+  ["sticker", GenericSticker],
 ]);
 
 {

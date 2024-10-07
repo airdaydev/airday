@@ -13,11 +13,7 @@ import { Tree, SolidListContext, ListDragContext } from "@sunlist/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 import NullList from "./null-list";
-import {
-  defaultListOptions,
-  listOptions,
-  ListOptionsContext,
-} from "./list-options";
+import { listOptions, ListOptionsContext } from "./list-options";
 import { ListColumnHeaders } from "./list-col-head";
 
 interface ListProps {

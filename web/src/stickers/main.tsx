@@ -6,6 +6,7 @@ import CirclePink from "../stickers/baseline/circle-pink.svg?component-solid";
 import Sandbar from "../stickers/baseline/sand-bar.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import styles from "./sticker.module.css";
+import { GenericItem } from "../store/item";
 
 const map: Record<string, any> = {
   triangle: Triangle,
@@ -17,15 +18,16 @@ const map: Record<string, any> = {
 
 interface StickerProps {
   set: "baseline" | "remote";
-  item: Signal<SunlistItem>;
+  item: GenericItem;
 }
 
 // TODO: Retrieve id for updating etc
 export const Sticker = (props: StickerProps) => {
+  // console.log(props.item);
   if (!props.item) return null;
   return (
     <span class={styles["sticker"]}>
-      {props.item[0]() && map[props.item[0]().sticker]}
+      {props.item.accessor().sticker && map[props.item.accessor().sticker]}
       {/* {props.item[0]() && props.item[0]().sticker} */}
     </span>
   );

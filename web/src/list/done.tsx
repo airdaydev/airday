@@ -29,7 +29,7 @@ export const Done = (props: { view: DataView }) => {
   });
   const opts = listOptions({
     columnHeaders: false,
-    columns: ["check", "date", "content"],
+    columns: ["check", "date", "content", "sticker"],
     historical: true,
   });
   return (
