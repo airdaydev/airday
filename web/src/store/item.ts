@@ -22,7 +22,7 @@ export class GenericItem extends Node {
   allowChildren = true;
   tsCreated?: Date;
   tsDone?: Date | null;
-  sticker?: string;
+  sticker: string | null = null;
   content?: string;
   component = GenericComponent;
   workspace: SunlistWorkspace;
@@ -35,6 +35,7 @@ export class GenericItem extends Node {
     this.id = props.id || createUniqueId();
     this.content = props.content;
     this.tsDone = props.tsDone;
+    this.sticker = props.sticker;
     this.workspace = workspace;
   }
   serialise() {
@@ -43,12 +44,18 @@ export class GenericItem extends Node {
       content: this.content,
       tsDone: this.tsDone,
       justChecked: this.justChecked,
+      sticker: this.sticker,
     };
   }
   updateContent(newText: string) {
     this.content = newText;
     this.triggerUpdate();
     this.workspace.itemStore.update(this.id, { content: newText });
+  }
+  updateSticker(sticker: string) {
+    this.sticker = sticker || null;
+    this.triggerUpdate();
+    this.workspace.itemStore.update(this.id, { sticker });
   }
   // If toggling off, this should stay in its parent list for 2 seconds but grey before disappearing
   // deleting from memory list & moving to done memory list (having 2 items simultaneously may be confusing)

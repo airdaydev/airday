@@ -111,7 +111,7 @@ export const GenericComponent: NodeComponentType = (props) => {
           item={node()}
           offset={ctxOffset()}
           updateSticker={(sticker: string) => {
-            // props.fastList.updateItemContents(item.id, { sticker });
+            props.node.updateSticker(sticker);
             setCtxOpen(false);
           }}
         />
