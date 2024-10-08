@@ -60,6 +60,7 @@
 - [] Done board chronological index
 - [] indexing system for nav
 - [] item links
+- [] Location/map
 - [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
