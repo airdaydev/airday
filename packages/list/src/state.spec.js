@@ -58,11 +58,11 @@ describe("TreeState", () => {
 
     treeState.load(sampleTree);
 
-    const count = treeState.count()();
+    const count = treeState.count();
     expect(count).toBe(3); // 2 children + 1 grandchild (root not counted)
   });
 
-  test("moveLayersWithinTree method reorders nodes", () => {
+  test.only("moveItems method reorders nodes", () => {
     const sampleTree = {
       id: "root",
       children: [{ id: "child1" }, { id: "child2" }, { id: "child3" }],
@@ -70,8 +70,8 @@ describe("TreeState", () => {
 
     treeState.load(sampleTree);
 
-    const nodesToMove = [treeState.idMap.get("child1")];
-    treeState.moveLayersWithinTree(nodesToMove, null, 2);
+    const nodesToMove = new Set([treeState.idMap.get("child1")]);
+    treeState.moveItems(nodesToMove, null, 2);
 
     const newOrder = treeState.childrenSignal[0]().map((node) => node.id);
     expect(newOrder).toEqual(["child2", "child3", "child1"]);

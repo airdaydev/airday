@@ -32,7 +32,7 @@ const treeStateA = listStateContext.createTree({ loader });
 treeStateA.load(dummyTree({ maxDepth: 1, maxChildren: 5 }));
 
 const treeStateB = listStateContext.createTree({ loader });
-treeStateB.load(dummyTree({ maxDepth: 1, maxChildren: 25 }));
+treeStateB.load(dummyTree({ maxDepth: 3, maxChildren: 25 }));
 
 const treeStateC = listStateContext.createTree({ loader });
 treeStateC.load(dummyTree({ maxDepth: 1, maxChildren: 30000 }));
@@ -78,7 +78,7 @@ render(
             style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxB.isFocused() }}
           >
-            <h3>Tree A ({treeStateB.count()} items)</h3>
+            <h3>Tree B ({treeStateB.count()} items) - 3 levels</h3>
             <Tree />
           </div>
         </SolidListContext.Provider>
@@ -87,7 +87,7 @@ render(
             style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxC.isFocused() }}
           >
-            <h3>Tree A ({treeStateC.count()} items)</h3>
+            <h3>Tree C ({treeStateC.count()} items)</h3>
             <Tree />
           </div>
         </SolidListContext.Provider>
