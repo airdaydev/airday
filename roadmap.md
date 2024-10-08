@@ -123,11 +123,11 @@
 - [x] Command+up/down keyboard resorts
 - [x] Context menu for one item
 - [x] Clear selection on 'esc' key (vim?)
+- [x] Show date finished on completed items
 - [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc
 - Rich text https://docs.slatejs.org/ ?
-- [] Show date finished on completed items
 - [] Show completed item in og list for 5 seconds before disappearing (progress bar follows checkbox border)
 - [] Rename container in sidenav
 - [] Toast notification whenever an item disappears from current context e.g. moves to done, or inbox (MAYBE)
