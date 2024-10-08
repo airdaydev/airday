@@ -48,17 +48,18 @@
 - [x] show active container list in page title (requires a link to session - make session proper singleton?)
 - [x] views to be set as active on split horizontally, vertically
 - [x] splitting non container list horizontally/vertically etc breaks
-- [] Bug: moving pane with keyboard doesn't make nested list active
-- [] show active pane border highlighted, then fade
-- [] Splitting horizontal on root doesn't create a border
-- [] closing a list focuses on the previous list item
-- [] Dummy data - done items with varied dates over last 2 years
+- [x] Bug: moving pane with keyboard doesn't make nested list active
+- [x] Splitting horizontal on root doesn't create a border
 - [] group lists (one level)
+- [] subitems (one level)
+- [] Dummy data - done items with varied dates over last 2 years (after import/export)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start
+- [] Done board show from list
 - [] Done board month headings
 - [] Done board chronological index
 - [] indexing system for nav
+- [] Remove many stickers
 - [] item links
 - [] Location/map
 - [] Clicking on a list in nav - look for existing list view before creating a new one
@@ -218,6 +219,7 @@
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
 - [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
+- [] Maybe: show active pane border highlighted, then fade
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API

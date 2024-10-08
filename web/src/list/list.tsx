@@ -38,12 +38,17 @@ export function List(props: ListProps) {
   });
 
   createEffect(() => {
-    if (ctx.dndContext.focusContext[0]() === ctx) {
-      session.viewState.setActivePane(props.view);
+    const activePane = session.viewState.activePane[0]();
+    if (activePane === props.view) {
+      ctx.setFocus();
     }
+    // if (ctx.dndContext.focusContext[0]() === ctx) {
+    //   session.viewState.setActivePane(props.view);
+    // }
   });
   onMount(() => {
     ctx.setFocus();
+    session.viewState.setActivePane(props.view);
   });
   const opts = listOptions();
   return (
