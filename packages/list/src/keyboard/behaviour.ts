@@ -151,3 +151,11 @@ export function moveSelectionDown(ctx: ListDragContext) {
     ctx.treeState.moveItems(selection, null, newPosition);
   }
 }
+
+export function expandNode(ctx: ListDragContext) {
+  // TODO: expand node
+}
+
+export function collapseNode(ctx: ListDragContext) {
+  // TODO: expand node
+}

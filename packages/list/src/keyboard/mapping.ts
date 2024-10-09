@@ -10,6 +10,8 @@ import {
   clearSelection,
   moveSelectionUp,
   moveSelectionDown,
+  expandNode,
+  collapseNode,
 } from "./behaviour";
 import { ListDragContext } from "../dnd-context";
 import { encodeShortcut } from "@sunlist/keyboard";
@@ -33,6 +35,8 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   ],
   [encodeShortcut({ key: "ArrowDown", shiftKey: true }), selectFromOriginDown],
   [encodeShortcut({ key: "ArrowDown", altKey: true }), moveSelectionDown],
+  [encodeShortcut({ key: "ArrowLeft", altKey: true }), collapseNode],
+  [encodeShortcut({ key: "ArrowRight", altKey: true }), expandNode],
   [encodeShortcut({ key: "a", metaKey: true }), selectAll],
   [encodeShortcut({ key: "Escape" }), clearSelection],
 ]);
