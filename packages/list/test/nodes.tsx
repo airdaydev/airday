@@ -47,6 +47,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
       }}
       data-index={props.index}
       ref={props.ref}
+      style={{ "padding-left": `${(props.node.accessor().depth - 1) * 10}px` }}
     >
       {node().id} - {node().content}
     </div>

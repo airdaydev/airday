@@ -248,7 +248,18 @@ export class ListDragContext {
           index++;
           visibleChildren.push(node);
         }
-        if (!node.expanded) return true;
+        if (
+          node.expanded &&
+          isDragging &&
+          this.selection[0]().has(node) &&
+          this.isOrigin
+        ) {
+          // Skipping the selected items children when dragging
+          return true;
+        }
+        if (!node.expanded) {
+          return true;
+        }
       });
       return visibleChildren;
     });

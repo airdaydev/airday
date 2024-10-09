@@ -270,7 +270,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
       style={{
         top: `${treeIndex() * props.listDragContext.itemHeight}px`,
         height: `${props.listDragContext.itemHeight}px`,
-        "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,
       }}
       aria-selected={isSelected()}
     >
