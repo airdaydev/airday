@@ -1,5 +1,5 @@
 import { describe, beforeEach, test, expect } from "vitest";
-import { TreeState, Node } from "./state";
+import { TreeState } from "./state";
 
 describe("TreeState", () => {
   let treeState;

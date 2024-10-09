@@ -1,10 +1,8 @@
-import styles from './dev.module.css';
-import {
-  NodeComponentType, Node, GenericNode,
-} from '../src/index';
+import styles from "./dev.module.css";
+import { NodeComponentType, Node, GenericNode } from "../src/index";
 
 export class TextNode extends Node {
-  type = 'text';
+  type = "text";
   allowChildren = true;
   content?: string;
   component = TextNodeComponent;
@@ -32,25 +30,26 @@ export function loader(node: GenericNode<any>) {
 
 export const TextNodeComponent: NodeComponentType = (props) => {
   const node = props.node.accessor;
+  console.log(props.node.depth);
   return (
     <div
       aria-selected={props.ariaSelected}
-      class={styles['tree-item']}
+      class={styles["tree-item"]}
       onMouseDown={(event) => {
-        props.onMouseDown(event)
+        props.onMouseDown(event);
       }}
       onTouchStart={(event) => {
-        props.onTouchStart(event)
+        props.onTouchStart(event);
       }}
       onDblClick={(event) => {
         event.preventDefault();
         props.select();
-        props.node.updateContent('gogogoo')
+        props.node.updateContent("gogogoo");
       }}
       data-index={props.index}
       ref={props.ref}
     >
       {node().id} - {node().content}
     </div>
-  )
+  );
 };
