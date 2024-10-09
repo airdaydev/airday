@@ -257,9 +257,9 @@ export class TreeState {
     };
   }
 
-  load(tree: GenericNode<any>) {
-    const children = map<any, any>(
-      tree,
+  loadChildren(children: GenericNode<any>[]) {
+    const tree = map<any, any>(
+      { children },
       (rawNode, parent, depth) => {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
         if (!node) return new Node({ type: "invalid" });
@@ -270,8 +270,8 @@ export class TreeState {
         return node;
       },
       this,
-    ).children;
-    this.childrenSignal[1](() => children);
+    );
+    this.childrenSignal[1](() => tree.children);
   }
   count = (expandedOnly?: boolean) => {
     let count = 0;

@@ -10,7 +10,7 @@ import {
   SoloNode,
 } from "../src/index";
 import { loader } from "./nodes";
-import { dummyTree } from "./dummy";
+import { dummyChildren } from "./dummy";
 import styles from "./dev.module.css";
 
 const root = document.getElementById("root");
@@ -29,13 +29,13 @@ const listStateContext = new ListStateContext({
 });
 
 const treeStateA = listStateContext.createTree({ loader });
-treeStateA.load(dummyTree({ maxDepth: 1, maxChildren: 5 }));
+treeStateA.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
 
 const treeStateB = listStateContext.createTree({ loader });
-treeStateB.load(dummyTree({ maxDepth: 3, maxChildren: 25 }));
+treeStateB.loadChildren(dummyChildren({ maxDepth: 3, maxChildren: 25 }));
 
 const treeStateC = listStateContext.createTree({ loader });
-treeStateC.load(dummyTree({ maxDepth: 1, maxChildren: 30000 }));
+treeStateC.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));
 
 const ctxA = new ListDragContext({
   treeState: treeStateA,

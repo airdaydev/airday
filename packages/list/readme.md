@@ -76,8 +76,10 @@ pnpm run dev
 - [x] projection() memoised
 - [x] left/right keyboard to Expand/Collapse item
 - [x] correct count incl. expanded/collapsed items
+- [] isRoot issue
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
 - [] moving item ends up at correct location
+- [] Moving between lists at different depths
 - [] Separate style for parent item of where current drag is hovered over
 - [] placeholder indents variable at bottom of children lists depending on mouse location
 - [] Drag & drop placed at correct positions

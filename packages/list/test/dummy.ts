@@ -6,9 +6,26 @@ interface DummyTreeOpts {
 }
 
 const frutas = [
-  'manzana','plátano','naranja','fresa','sandía','piña','mango',
-  'papaya','kiwi','pera','durazno','cereza','uva','melón','frambuesa',
-  'mora','arándano','guayaba','maracuyá','coco',
+  "manzana",
+  "plátano",
+  "naranja",
+  "fresa",
+  "sandía",
+  "piña",
+  "mango",
+  "papaya",
+  "kiwi",
+  "pera",
+  "durazno",
+  "cereza",
+  "uva",
+  "melón",
+  "frambuesa",
+  "mora",
+  "arándano",
+  "guayaba",
+  "maracuyá",
+  "coco",
 ];
 
 function elegirFruta() {
@@ -17,33 +34,39 @@ function elegirFruta() {
 }
 
 const defaults: DummyTreeOpts = {
-  idFunction: (path) => path.join('.'),
+  idFunction: (path) => path.join("."),
   maxDepth: 3,
-  maxChildren: 50,
+  maxChildren: 20,
   _path: [],
-}
+};
 
-export function dummyTree(opts?: Partial<DummyTreeOpts>) {
+export function dummyChildren(opts?: Partial<DummyTreeOpts>) {
   let internalOpts: DummyTreeOpts = {
     ...defaults,
     ...opts,
-  }
-  let seed = Math.random();
-  const node = {
-    id: internalOpts.idFunction(internalOpts._path) || 'root',
-    content: elegirFruta(),
-    children: []
   };
-  if (internalOpts.maxDepth > 0) {
-    for (let i = 0; i < seed * internalOpts.maxChildren; i++) {
+  function generateNodes(opts: DummyTreeOpts) {
+    let seed = Math.random();
+    const nodes = [];
+    for (let i = 0; i < Math.ceil(seed * internalOpts.maxChildren); i++) {
+      const node = {
+        id: internalOpts.idFunction(internalOpts._path),
+        content: elegirFruta(),
+        children: [],
+      };
       let path = [...internalOpts._path, i];
-      const child = dummyTree({
-        idFunction: internalOpts.idFunction,
-        maxDepth: internalOpts.maxDepth - 1,
-        _path: path,
-      });
-      node.children.push(child);
+      if (opts.maxDepth > 1) {
+        const children = generateNodes({
+          idFunction: internalOpts.idFunction,
+          maxChildren: internalOpts.maxChildren,
+          maxDepth: opts.maxDepth - 1,
+          _path: path,
+        });
+        node.children = children;
+      }
+      nodes.push(node);
     }
+    return nodes;
   }
-  return node;
+  return generateNodes(internalOpts);
 }

@@ -157,11 +157,22 @@ export const NodeContainer = (props: NodeContainerProps) => {
             const activeContext =
               props.listDragContext.dndContext.dragContext[0]();
             if (activeContext && activeContext.allowMovement) {
+              const lastTouchedNode =
+                activeContext.projection()[
+                  activeContext.lastTouchedIndexSignal[0]()
+                ];
+              // TODO: root is not getting isRoot === true
+              // TODO: if parent, index needs to be local index
+              const parent =
+                lastTouchedNode.parent?.id === "root"
+                  ? null
+                  : lastTouchedNode.parent;
+              console.log(lastTouchedNode);
               props.listDragContext.treeState.context.moveItems(
                 props.listDragContext.selection[0](),
                 props.listDragContext.treeState,
                 activeContext.treeState,
-                [null, activeContext.lastTouchedIndexSignal[0]()],
+                [parent, activeContext.lastTouchedIndexSignal[0]()],
               );
               activeContext.setFocus();
               activeContext.selection[1](props.listDragContext.selection[0]());
@@ -248,6 +259,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // This looks at where the previous draggedOn index was, as its final position
     // is determined by whether the user drags up or down onto it.
     // N.b. the sequence here prevents a flicker on drag start.
+    // TODO: Test if item can be dragged in here...
     const newIndex = treeIndex() - draggedOn[0]();
     props.listDragContext.setLastTouchedIndex(newIndex);
     props.listDragContext.setDragOver();
