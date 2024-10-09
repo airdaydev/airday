@@ -50,9 +50,10 @@
 - [x] splitting non container list horizontally/vertically etc breaks
 - [x] Bug: moving pane with keyboard doesn't make nested list active
 - [x] Splitting horizontal on root doesn't create a border
-- [] Add new item
+- [] sunlist/@list -> sunlist/@tree conversion
 - [] group lists (one level)
 - [] subitems (one level)
+- [] Add new item
 - [] Dummy data - done items with varied dates over last 2 years (after import/export)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start

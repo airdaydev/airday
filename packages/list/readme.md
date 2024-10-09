@@ -71,6 +71,14 @@ pnpm install
 pnpm run dev
 ```
 
+## Tree conversion
+- [] Only show placeholder on hover (necessary with now indented items)
+- [] Drag & drop placed at correct positions
+- [] select down/up traverses depth
+- [] range select up & down remains at same depth
+- [] select last item works with nesting
+- [] can't drag parent within itself
+
 ## Roadmap
 - consider triggering a [reflow](https://stackoverflow.com/questions/6268508/restart-animation-in-css3-any-better-way-than-removing-the-element) on last index change to show full fade animation
 - Smoother down scrolling when moving off list item
@@ -81,9 +89,9 @@ pnpm run dev
 - Disable placeholder when autoscrolling (coz it's a little janky)
 
 ## Stretch goals
+- Tree
 - Variable heights
 - Dynamically retrieved, variable heights
-- Tree
 - Prevent infinite recursion in tree
 
 ## Bugs
