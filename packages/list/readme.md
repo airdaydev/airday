@@ -73,6 +73,7 @@ pnpm run dev
 
 ## Tree conversion
 - [x] Only show placeholder on hover (necessary with now indented items)
+- [] Expand/Collapse item button/behaviour
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (to faciliate next goal)
 - [] moving item ends up at correct location
 - [] Separate style for parent item of where current drag is hovered over
