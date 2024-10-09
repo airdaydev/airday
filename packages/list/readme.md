@@ -72,10 +72,14 @@ pnpm run dev
 ```
 
 ## Tree conversion
-- [] Only show placeholder on hover (necessary with now indented items)
+- [x] Only show placeholder on hover (necessary with now indented items)
+- [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (to faciliate next goal)
+- [] moving item ends up at correct location
+- [] Separate style for parent item of where current drag is hovered over
+- [] placeholder indents variable at bottom of children lists depending on mouse location
 - [] Drag & drop placed at correct positions
 - [] select down/up traverses depth
-- [] range select up & down remains at same depth
+- [] range select up & down only allowed at same depth
 - [] select last item works with nesting
 - [] can't drag parent within itself
 

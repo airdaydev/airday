@@ -59,7 +59,11 @@ body {
 }
 
 .placeholder {
-    background: red;
+    background: none;
+    animation: fadeIn 0.15s ease-in forwards;
+}
+.placeholder:hover {
+    background: blue;
     animation: fadeIn 0.15s ease-in forwards;
 }
 
