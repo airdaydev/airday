@@ -51,6 +51,15 @@ export class Node {
     this.expanded = false;
     if (recursive) {
       map<Node, Node>(this, (node) => {
+        node.expanded = false;
+        return node;
+      });
+    }
+  }
+  expand(recursive = false) {
+    this.expanded = true;
+    if (recursive) {
+      map<Node, Node>(this, (node) => {
         node.expanded = true;
         return node;
       });
@@ -266,14 +275,13 @@ export class TreeState {
   }
   count = (expandedOnly?: boolean) => {
     let count = 0;
-    walk(
-      { isRoot: true, children: this.childrenSignal[0]() },
+    walk<Node, Node>(
+      { isRoot: true, children: this.childrenSignal[0](), expanded: true },
       (node) => {
         count++;
         if (expandedOnly && !node.expanded) return true;
         return false;
       },
-      undefined,
     );
     return count - 1; // accounts for root node
   };

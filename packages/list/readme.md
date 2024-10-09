@@ -74,8 +74,9 @@ pnpm run dev
 ## Tree conversion
 - [x] Only show placeholder on hover (necessary with now indented items)
 - [x] projection() memoised
-- [] left/right keyboard to Expand/Collapse item
-- [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (to faciliate next goal)
+- [x] left/right keyboard to Expand/Collapse item
+- [x] correct count incl. expanded/collapsed items
+- [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
 - [] moving item ends up at correct location
 - [] Separate style for parent item of where current drag is hovered over
 - [] placeholder indents variable at bottom of children lists depending on mouse location

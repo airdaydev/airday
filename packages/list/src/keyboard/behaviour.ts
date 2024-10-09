@@ -153,9 +153,18 @@ export function moveSelectionDown(ctx: ListDragContext) {
 }
 
 export function expandNode(ctx: ListDragContext) {
-  // TODO: expand node
+  // TODO: Base on selection?
+  if (ctx.originNode) {
+    ctx.originNode.expand();
+    const children = ctx.treeState.childrenSignal[0]();
+    ctx.treeState.childrenSignal[1]([...children]);
+  }
 }
 
 export function collapseNode(ctx: ListDragContext) {
-  // TODO: expand node
+  if (ctx.originNode) {
+    ctx.originNode.collapse();
+    const children = ctx.treeState.childrenSignal[0]();
+    ctx.treeState.childrenSignal[1]([...children]);
+  }
 }

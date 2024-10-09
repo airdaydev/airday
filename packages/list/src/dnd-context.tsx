@@ -283,10 +283,11 @@ export class ListDragContext {
    * or total count generally
    */
   presentCount = () => {
+    console.log(this.treeState.count(true));
     if (this.dndContext.isDragging() && this.isOrigin) {
-      return this.treeState.count() - this.selection[0]().size + 1;
+      return this.treeState.count(true) - this.selection[0]().size + 1;
     } else {
-      return this.treeState.count();
+      return this.treeState.count(true);
     }
   };
 }
