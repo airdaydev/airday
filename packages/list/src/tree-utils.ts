@@ -16,6 +16,7 @@ export function map<T extends GenericNode<any>, O extends GenericNode<any>>(
   return modified;
 }
 
+// Return true in walker function to skip its children
 export function walk<T extends GenericNode<any>, O extends GenericNode<any>>(
   node: T,
   func: (node: T, parent?: O) => boolean | void,

@@ -45,7 +45,7 @@ export function selectOriginToBottom(ctx: ListDragContext) {
 
 // jump to & select top of list
 export function jumpToTop(ctx: ListDragContext) {
-  ctx.selectOne(ctx.getNodeByIndex(0));
+  ctx.selectOne(ctx.projection()[0]);
   ctx.jumpScrollToIndex(0);
 }
 
@@ -55,8 +55,8 @@ export function selectAll(ctx: ListDragContext) {
 
 // jump to & select bottom of list
 export function jumpToBottom(ctx: ListDragContext) {
-  const bottomIndex = ctx.treeState.count() - 1;
-  const bottomNode = ctx.getNodeByIndex(bottomIndex);
+  const bottomIndex = ctx.projection().length - 1;
+  const bottomNode = ctx.projection()[bottomIndex];
   ctx.selectOne(bottomNode);
   ctx.jumpScrollToIndex(bottomIndex);
 }
@@ -73,7 +73,7 @@ export function selectFromOriginUp(ctx: ListDragContext) {
   ) {
     // select up
     const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
-    const node = ctx.getNodeByIndex(prevIndex);
+    const node = ctx.projection()[prevIndex];
     if (prevIndex !== false) ctx?.toggleSelection(node);
     return;
   } else {
@@ -98,7 +98,7 @@ export function selectFromOriginDown(ctx: ListDragContext) {
   if (prevDeselected === originIndex - 1 || originIndex === 0) {
     // select down
     const nextIndex = ctx?.getNextDeselectedFromOrigin();
-    const node = ctx.getNodeByIndex(nextIndex);
+    const node = ctx.projection()[nextIndex];
     if (nextIndex !== false) ctx?.toggleSelection(node);
     return;
   } else {

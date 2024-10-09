@@ -190,9 +190,7 @@ export class ListDragContext {
     const index = last + 1;
     return [index, this.projection()[index]];
   }
-  getNodeByIndex(index: number) {
-    return this.treeState.childrenSignal[0]()[index];
-  }
+
   getNextDeselectedFromOrigin(direction: "next" | "prev" = "next") {
     const list = this.treeState.childrenSignal[0]();
     let rangeEnded = false;
