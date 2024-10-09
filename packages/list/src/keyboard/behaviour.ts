@@ -1,40 +1,34 @@
 import { ListDragContext } from "../dnd-context";
 
-export function selectBelowOrigin(ctx: ListDragContext) {
-  // Down movement from selection or top
-  if (ctx.selection[0]().size === 0 || !ctx.originNode) {
-    const firstIndex = 0;
-    const firstItem = ctx.treeState.childrenSignal[0]()[firstIndex];
-    ctx.selectOne(firstItem);
-    ctx.jumpScrollToIndex(firstIndex);
-    return;
-  }
-  const origin = ctx?.originNode;
-  if (origin) {
-    const sibling = ctx.getSibling(origin, "next");
-    ctx?.selectOne(sibling[1]);
-    ctx.jumpScrollToIndex(sibling[0]);
-  }
-}
-
 /**
  * n.b. if there is no valid selection, will start from the end of the list
  */
-export function selectAboveOrigin(ctx: ListDragContext) {
-  // Up movement from selectionA
-  if (ctx.selection[0]().size === 0 || !ctx.originNode) {
-    const lastIndex = ctx.treeState.count();
-    const lastItem = ctx.treeState.childrenSignal[0]()[lastIndex - 1];
-    ctx.selectOne(lastItem);
-    ctx.jumpScrollToIndex(lastIndex - 1);
-    return;
-  }
-  const origin = ctx?.originNode;
-  if (origin) {
-    const sibling = ctx.getSibling(origin, "prev");
-    ctx?.selectOne(sibling[1]);
-    ctx.jumpScrollToIndex(sibling[0]);
-  }
+export function selectRelativeToOrigin(direction: "above" | "below") {
+  return (ctx: ListDragContext) => {
+    // Movement from selection
+    if (ctx.selection[0]().size === 0 || !ctx.originNode) {
+      const lastIndex = ctx.treeState.count();
+      const item =
+        direction === "above"
+          ? ctx.treeState.childrenSignal[0]()[lastIndex - 1]
+          : ctx.treeState.childrenSignal[0]()[0];
+      ctx.selectOne(item);
+      ctx.jumpScrollToIndex(direction === "above" ? lastIndex - 1 : 0);
+      return;
+    }
+    const origin = ctx?.originNode;
+    if (origin) {
+      const d = ctx.getProjectionIndex(ctx.originNode);
+      const next =
+        direction === "above"
+          ? ctx.projection()[d - 1]
+          : ctx.projection()[d + 1];
+      if (next) {
+        ctx?.selectOne(next);
+        ctx.jumpScrollToIndex(direction === "above" ? d - 1 : d + 1);
+      }
+    }
+  };
 }
 
 export function selectOriginToTop(ctx: ListDragContext) {

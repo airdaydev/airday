@@ -3,8 +3,7 @@ import {
   selectFromOriginUp,
   jumpToBottom,
   selectFromOriginDown,
-  selectAboveOrigin,
-  selectBelowOrigin,
+  selectRelativeToOrigin,
   selectOriginToTop,
   selectOriginToBottom,
   selectAll,
@@ -18,7 +17,7 @@ import { encodeShortcut } from "@sunlist/keyboard";
 export type ShortcutFunction = (ctx: ListDragContext) => void;
 
 export const defaultMapping = new Map<string, ShortcutFunction>([
-  [encodeShortcut({ key: "ArrowUp" }), selectAboveOrigin],
+  [encodeShortcut({ key: "ArrowUp" }), selectRelativeToOrigin("above")],
   [encodeShortcut({ key: "ArrowUp", metaKey: true }), jumpToTop],
   [encodeShortcut({ key: "ArrowUp", shiftKey: true }), selectFromOriginUp],
   [encodeShortcut({ key: "ArrowUp", altKey: true }), moveSelectionUp],
@@ -26,7 +25,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
     encodeShortcut({ key: "ArrowUp", metaKey: true, shiftKey: true }),
     selectOriginToTop,
   ],
-  [encodeShortcut({ key: "ArrowDown" }), selectBelowOrigin],
+  [encodeShortcut({ key: "ArrowDown" }), selectRelativeToOrigin("below")],
   [encodeShortcut({ key: "ArrowDown", metaKey: true }), jumpToBottom],
   [
     encodeShortcut({ key: "ArrowDown", metaKey: true, shiftKey: true }),
@@ -39,8 +38,8 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
 ]);
 
 export const vimMapping = new Map<string, ShortcutFunction>([
-  [encodeShortcut({ key: "k" }), selectAboveOrigin],
-  [encodeShortcut({ key: "j" }), selectBelowOrigin],
+  [encodeShortcut({ key: "k" }), selectRelativeToOrigin("above")],
+  [encodeShortcut({ key: "j" }), selectRelativeToOrigin("below")],
   [encodeShortcut({ key: "G", shiftKey: true }), jumpToBottom],
   [encodeShortcut([{ key: "g" }, { key: "g" }]), jumpToTop],
 ]);

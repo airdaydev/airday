@@ -160,7 +160,6 @@ export class ListDragContext {
     const index = node.getIndex();
     const projection = this.projection();
     const lastIndex = projection.length - 1;
-
     if (index === lastIndex && direction === "next") {
       return [index, node];
     }
@@ -251,6 +250,11 @@ export class ListDragContext {
       if (!node.expanded) return true;
     });
     return visibleChildren;
+  }
+  getProjectionIndex(node: Node) {
+    // TODO: Memoise projection!
+    const t = this.projection().findIndex((n) => n === node);
+    return t;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(
