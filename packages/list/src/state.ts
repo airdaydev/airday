@@ -42,6 +42,7 @@ export class Node {
     return {
       ...(this.serialise && this.serialise()),
       id: this.id,
+      depth: this.depth,
     };
   }
   triggerUpdate() {
@@ -251,12 +252,12 @@ export class TreeState {
   load(tree: GenericNode<any>) {
     const children = map<any, any>(
       tree,
-      (rawNode, parent) => {
+      (rawNode, parent, depth) => {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
         if (!node) return new Node({ type: "invalid" });
         node.root = this;
         node.parent = parent;
-        // TODO: calc depth or level for display purposes
+        node.depth = depth;
         this.idMap.set(node.id, node);
         return node;
       },

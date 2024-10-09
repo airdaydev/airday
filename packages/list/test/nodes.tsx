@@ -30,7 +30,6 @@ export function loader(node: GenericNode<any>) {
 
 export const TextNodeComponent: NodeComponentType = (props) => {
   const node = props.node.accessor;
-  console.log(props.node.depth);
   return (
     <div
       aria-selected={props.ariaSelected}

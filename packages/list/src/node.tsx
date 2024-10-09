@@ -260,11 +260,18 @@ export const NodeContainer = (props: NodeContainerProps) => {
    * Hide down when container is not actively being dragged over
    * Need to revert as if there's no above/below classes!
    */
+  // padding-left: 31px;
+  //   max-width: 100%;
+  //   box-sizing: border-box;
   return (
     <div
       class="item"
       data-type="node"
-      style={`top: ${treeIndex() * props.listDragContext.itemHeight}px; height: ${props.listDragContext.itemHeight}px !important;`}
+      style={{
+        top: `${treeIndex() * props.listDragContext.itemHeight}px`,
+        height: `${props.listDragContext.itemHeight}px`,
+        "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,
+      }}
       aria-selected={isSelected()}
     >
       {draggedOn[0]() === -1 && <Placeholder />}
@@ -288,6 +295,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           onMouseEnter={onUIEnter}
+          style={{}}
         >
           <props.Component
             onMouseDown={onMouseDown}
