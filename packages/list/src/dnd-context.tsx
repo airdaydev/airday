@@ -31,6 +31,7 @@ export class ListDragContext {
   scrollContainerRef?: HTMLElement;
   placeholderStyle?: string;
   allowInternalMovement = true;
+  projection: Accessor<Node[]>;
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
@@ -44,6 +45,7 @@ export class ListDragContext {
     this.itemHeight = opts.itemHeight;
     this.placeholderStyle = opts.placeholderStyle;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
+    this.projection = this.createProjectionMemo();
   }
   get allowMovement() {
     return this.dndContext.enableDrop && this.allowInternalMovement;
@@ -221,35 +223,37 @@ export class ListDragContext {
     if (!this.allowMovement) return;
     return this.lastTouchedIndexSignal[1](index);
   }
-  projection() {
-    const visibleChildren: Node[] = [];
-    let n = new Node();
-    n.isRoot = true;
-    n.children = this.treeState.childrenSignal[0]();
-    let index = 0;
-    const isDragging = this.dndContext.isDragging();
-    // Flattens the tree
-    walk<Node, Node>(n, (node) => {
-      // Keeping the node that user actually dragged in place
-      const dragOriginNode = node === this.originNode;
-      if (dragOriginNode) {
-        this.originIndex = index;
-        index++;
-      }
-      // Skip root & other selected items
-      const skip =
-        node.isRoot ||
-        (isDragging &&
-          this.selection[0]().has(node) &&
-          !dragOriginNode &&
-          this.isOrigin);
-      if (!skip) {
-        index++;
-        visibleChildren.push(node);
-      }
-      if (!node.expanded) return true;
+  createProjectionMemo() {
+    return createMemo(() => {
+      const visibleChildren: Node[] = [];
+      let n = new Node();
+      n.isRoot = true;
+      n.children = this.treeState.childrenSignal[0]();
+      let index = 0;
+      const isDragging = this.dndContext.isDragging();
+      // Flattens the tree
+      walk<Node, Node>(n, (node) => {
+        // Keeping the node that user actually dragged in place
+        const dragOriginNode = node === this.originNode;
+        if (dragOriginNode) {
+          this.originIndex = index;
+          index++;
+        }
+        // Skip root & other selected items
+        const skip =
+          node.isRoot ||
+          (isDragging &&
+            this.selection[0]().has(node) &&
+            !dragOriginNode &&
+            this.isOrigin);
+        if (!skip) {
+          index++;
+          visibleChildren.push(node);
+        }
+        if (!node.expanded) return true;
+      });
+      return visibleChildren;
     });
-    return visibleChildren;
   }
   getProjectionIndex(node: Node) {
     // TODO: Memoise projection!
