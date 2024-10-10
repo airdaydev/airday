@@ -78,14 +78,14 @@ pnpm run dev
 - [x] correct count incl. expanded/collapsed items
 - [x] isRoot issue
 - [x] list backdrop not working well with depth
-- [] Dragging down to z-peer item with children doesn't move lastTouched
+- [] Separate style for parent item of where current drag is hovered over
+- [] Dragging down to z-peer item with children doesn't move lastTouched (optional!)
 - [] Dragging up to z-peer item with children does move lastTouched
 - [] Last item before depth change activates special placeholder where dragging
 over left-most edge places item outside of container (think for multiple levels!)
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
 - [] moving item ends up at correct location
 - [] Moving between lists at different depths
-- [] Separate style for parent item of where current drag is hovered over
 - [] placeholder indents variable at bottom of children lists depending on mouse location
 - [] Drag & drop placed at correct positions
 - [] select down/up traverses depth

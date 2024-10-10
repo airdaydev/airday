@@ -242,8 +242,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // N.b. the sequence here prevents a flicker on drag start.
     // TODO: Test if item can be dragged in here...
     const newIndex = treeIndex() - draggedOn[0]();
-    props.listDragContext.setLastTouchedIndex(newIndex);
-    props.listDragContext.setDragOver();
+    const node = props.listDragContext.projection()[newIndex];
+    if (node.depth === 1) {
+      props.listDragContext.setLastTouchedIndex(newIndex);
+      props.listDragContext.setDragOver();
+    }
   };
   /**
    * Hiding the placeholder:
