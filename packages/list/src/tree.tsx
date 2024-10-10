@@ -169,18 +169,13 @@ export const Tree = (props: TreeComponentProps) => {
         onMouseEnter={() => {
           if (listDragContext.dndContext.isDragging()) {
             listDragContext.setDragOver();
+            const endIndex = signal().window.length + signal().start;
             if (listDragContext.isOrigin) {
-              // TODO: This COULD fuck up in the case of a window... but maybe not because the window
-              // should overextend. Yes, this needs to be the
-              listDragContext.setLastTouchedIndex(
-                signal().window.length + signal().start,
-              );
+              listDragContext.setLastTouchedIndex(endIndex);
               listDragContext.setDragOver();
             } else {
               listDragContext.setDragOver();
-              listDragContext.setLastTouchedIndex(
-                signal().window.length + signal().start,
-              );
+              listDragContext.setLastTouchedIndex(endIndex);
             }
           }
         }}

@@ -77,6 +77,10 @@ pnpm run dev
 - [x] left/right keyboard to Expand/Collapse item
 - [x] correct count incl. expanded/collapsed items
 - [x] isRoot issue
+- [x] list backdrop not working well with depth
+- [] Dragging down, when next item is a depth up, use a special placeholder where
+  dragging over left-most edge places item outside of container
+  (must work for multiple levels...)
 - [] Leave dragged item in last position if going places it shouldn't
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
 - [] moving item ends up at correct location

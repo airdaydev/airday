@@ -295,9 +295,9 @@ export class ListDragContext {
    */
   presentCount = () => {
     if (this.dndContext.isDragging() && this.isOrigin) {
-      return this.treeState.count(true) - this.selection[0]().size + 1;
+      return this.projection().length - this.selection[0]().size + 1;
     } else {
-      return this.treeState.count(true);
+      return this.projection().length;
     }
   };
   dropItems = (originList: ListDragContext) => {
