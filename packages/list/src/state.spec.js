@@ -19,27 +19,21 @@ describe("TreeState", () => {
   });
 
   test("load method populates the tree", () => {
-    const sampleTree = {
-      id: "root",
-      children: [
-        { id: "child1" },
-        { id: "child2", children: [{ id: "grandchild" }] },
-      ],
-    };
+    const children = [
+      { id: "child1" },
+      { id: "child2", children: [{ id: "grandchild" }] },
+    ];
 
-    treeState.load(sampleTree);
+    treeState.loadChildren(children);
 
     expect(treeState.childrenSignal[0]().length).toBe(2);
     expect(treeState.idMap.size).toBe(4); // root + 2 children + 1 grandchild
   });
 
   test("delete method removes nodes from the tree", () => {
-    const sampleTree = {
-      id: "root",
-      children: [{ id: "child1" }, { id: "child2" }],
-    };
+    const children = [{ id: "child1" }, { id: "child2" }];
 
-    treeState.load(sampleTree);
+    treeState.loadChildren(children);
 
     const nodeToDelete = treeState.idMap.get("child1");
     treeState.delete(new Set([nodeToDelete]));
@@ -48,27 +42,21 @@ describe("TreeState", () => {
   });
 
   test("count method returns correct number of nodes", () => {
-    const sampleTree = {
-      id: "root",
-      children: [
-        { id: "child1" },
-        { id: "child2", children: [{ id: "grandchild" }] },
-      ],
-    };
+    const children = [
+      { id: "child1" },
+      { id: "child2", children: [{ id: "grandchild" }] },
+    ];
 
-    treeState.load(sampleTree);
+    treeState.loadChildren(children);
 
     const count = treeState.count();
     expect(count).toBe(3); // 2 children + 1 grandchild (root not counted)
   });
 
-  test.only("moveItems method reorders nodes", () => {
-    const sampleTree = {
-      id: "root",
-      children: [{ id: "child1" }, { id: "child2" }, { id: "child3" }],
-    };
+  test("moveItems method reorders nodes", () => {
+    const children = [{ id: "child1" }, { id: "child2" }, { id: "child3" }];
 
-    treeState.load(sampleTree);
+    treeState.loadChildren(children);
 
     const nodesToMove = new Set([treeState.idMap.get("child1")]);
     treeState.moveItems(nodesToMove, null, 2);
