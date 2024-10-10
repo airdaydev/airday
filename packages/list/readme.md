@@ -76,7 +76,8 @@ pnpm run dev
 - [x] projection() memoised
 - [x] left/right keyboard to Expand/Collapse item
 - [x] correct count incl. expanded/collapsed items
-- [] isRoot issue
+- [x] isRoot issue
+- [] Leave dragged item in last position if going places it shouldn't
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
 - [] moving item ends up at correct location
 - [] Moving between lists at different depths

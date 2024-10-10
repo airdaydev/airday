@@ -11,7 +11,7 @@ export class Node {
   isRoot: boolean = false;
   depth = 0; // cached
   expanded = true;
-  parent?: Node;
+  parent: Node | null = null;
   root?: TreeState;
   uiSignal?: Signal<NodeSignalProps> | undefined;
   signalSubscriptions = 0;
