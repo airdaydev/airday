@@ -161,13 +161,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
                 activeContext.projection()[
                   activeContext.lastTouchedIndexSignal[0]()
                 ];
+              console.log(lastTouchedNode);
               // TODO: root is not getting isRoot === true
               // TODO: if parent, index needs to be local index
               const parent =
                 lastTouchedNode.parent?.id === "root"
                   ? null
                   : lastTouchedNode.parent;
-              console.log(lastTouchedNode);
               props.listDragContext.treeState.context.moveItems(
                 props.listDragContext.selection[0](),
                 props.listDragContext.treeState,

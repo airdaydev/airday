@@ -259,12 +259,12 @@ export class TreeState {
 
   loadChildren(children: GenericNode<any>[]) {
     const tree = map<any, any>(
-      { children },
+      { children, root: true },
       (rawNode, parent, depth) => {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
         if (!node) return new Node({ type: "invalid" });
         node.root = this;
-        node.parent = parent;
+        node.parent = parent.root ? this : parent; // Discards temporary root
         node.depth = depth;
         this.idMap.set(node.id, node);
         return node;

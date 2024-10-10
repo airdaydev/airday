@@ -26,6 +26,7 @@ describe("TreeState", () => {
 
     treeState.loadChildren(children);
 
+    expect(treeState.childrenSignal[0]()[0].parent).toBe(treeState);
     expect(treeState.childrenSignal[0]().length).toBe(2);
     expect(treeState.idMap.size).toBe(4); // root + 2 children + 1 grandchild
   });
