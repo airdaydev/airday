@@ -135,10 +135,10 @@ export const Tree = (props: TreeComponentProps) => {
               min-height: ${listDragContext.presentCount() * listDragContext.itemHeight}px;`}
       >
         <For each={signal().window}>
-          {(node, index) => (
+          {(node, projectionIndex) => (
             // TODO: Consider using context here instead
             <NodeContainer
-              index={index}
+              index={projectionIndex}
               autoscroller={autoscroller}
               virtualisedList={signal}
               node={node}
