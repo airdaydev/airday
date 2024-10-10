@@ -42,7 +42,7 @@ export class ContainerStore {
   load = async () => {
     const items = await this.db.getAll(this.storeName);
     const defaultContainer = items.find((c) => c.default === true);
-    this.tree.load({ id: "root", children: items });
+    this.tree.loadChildren(items);
     // TODO: Remove temporary default view logic in favour of layouts
     if (defaultContainer) {
       this.workspace.app.viewState.openDataView(defaultContainer.id);

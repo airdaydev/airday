@@ -35,6 +35,6 @@ export class List {
   }
   async load() {
     const itemsRaw = await this.store.getItemsByList(this.id);
-    this.tree.load({ id: "root", children: itemsRaw });
+    this.tree.loadChildren(itemsRaw);
   }
 }

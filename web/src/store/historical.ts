@@ -32,6 +32,6 @@ export class HistoricalItems {
   }
   async load() {
     const itemsRaw = await this.store.loadCompletedItems();
-    this.tree.load({ children: itemsRaw });
+    this.tree.loadChildren(itemsRaw);
   }
 }
