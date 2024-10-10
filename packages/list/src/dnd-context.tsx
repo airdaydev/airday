@@ -300,6 +300,26 @@ export class ListDragContext {
       return this.treeState.count(true);
     }
   };
+  dropItems = (originList: ListDragContext) => {
+    if (!this.allowMovement) return;
+    const lastTouchedNode =
+      this.projection()[this.lastTouchedIndexSignal[0]() || 0];
+    // TODO: if parent, index needs to be local index
+    const parent = lastTouchedNode.parent?.isRoot
+      ? null
+      : lastTouchedNode.parent;
+    this.treeState.context?.moveItems(
+      originList.selection[0](),
+      originList.treeState,
+      this.treeState,
+      [parent, this.lastTouchedIndexSignal[0]()],
+    );
+    this.setFocus();
+    this.selection[1](originList.selection[0]());
+    if (originList !== this) {
+      originList.clearSelection();
+    }
+  };
 }
 
 type dragMode = "touch" | "mouse" | null;

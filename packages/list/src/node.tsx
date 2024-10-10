@@ -153,33 +153,13 @@ export const NodeContainer = (props: NodeContainerProps) => {
         window.addEventListener(
           "mouseup",
           () => {
+            // Dropping an item
+            // The even is on the node being dragged itself, but this is also recorded as selected item
+            // We need to discover the parent, the local index
             // TODO: Perhaps wrap this within the context
             const activeContext =
               props.listDragContext.dndContext.dragContext[0]();
-            if (activeContext && activeContext.allowMovement) {
-              const lastTouchedNode =
-                activeContext.projection()[
-                  activeContext.lastTouchedIndexSignal[0]()
-                ];
-              console.log(lastTouchedNode);
-              // TODO: root is not getting isRoot === true
-              // TODO: if parent, index needs to be local index
-              const parent =
-                lastTouchedNode.parent?.id === "root"
-                  ? null
-                  : lastTouchedNode.parent;
-              props.listDragContext.treeState.context.moveItems(
-                props.listDragContext.selection[0](),
-                props.listDragContext.treeState,
-                activeContext.treeState,
-                [parent, activeContext.lastTouchedIndexSignal[0]()],
-              );
-              activeContext.setFocus();
-              activeContext.selection[1](props.listDragContext.selection[0]());
-              if (props.listDragContext !== activeContext) {
-                props.listDragContext.clearSelection();
-              }
-            }
+            activeContext?.dropItems(props.listDragContext);
             props.listDragContext.stopDrag();
             window.removeEventListener("mousemove", mouseMove);
           },
