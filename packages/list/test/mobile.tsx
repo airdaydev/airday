@@ -2,7 +2,7 @@
 import { render } from "solid-js/web";
 import { Tree, TreeState, DndContext, Dragged } from "../src/index";
 import { loader } from "./nodes";
-import { dummyTree } from "./dummy";
+import { dummyChildren } from "./dummy";
 import styles from "./dev.module.css";
 
 const root = document.getElementById("root");
@@ -12,7 +12,7 @@ const dndContext = new DndContext();
 const treeStateA = new TreeState({
   loader,
 });
-treeStateA.load(dummyTree({ maxDepth: 2, maxChildren: 5 }));
+treeStateA.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 5 }));
 
 render(
   () => (
