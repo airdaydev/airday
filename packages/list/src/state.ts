@@ -10,6 +10,7 @@ export class Node {
   children: Node[] = [];
   isRoot: boolean = false;
   depth = 0; // cached
+  maxDepth = 5;
   expanded = true;
   parent: Node | null = null;
   root?: TreeState;

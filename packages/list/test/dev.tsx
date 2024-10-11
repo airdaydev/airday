@@ -32,7 +32,7 @@ const treeStateA = listStateContext.createTree({ loader });
 treeStateA.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
 
 const treeStateB = listStateContext.createTree({ loader });
-treeStateB.loadChildren(dummyChildren({ maxDepth: 3, maxChildren: 8 }));
+treeStateB.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
 
 const treeStateC = listStateContext.createTree({ loader });
 treeStateC.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));

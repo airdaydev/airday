@@ -243,7 +243,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // TODO: Test if item can be dragged in here...
     const newIndex = treeIndex() - draggedOn[0]();
     const node = props.listDragContext.projection()[newIndex];
-    if (node.depth === 1) {
+    if (node && node.depth <= props.node.maxDepth) {
       props.listDragContext.setLastTouchedIndex(newIndex);
       props.listDragContext.setDragOver();
     }
