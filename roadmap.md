@@ -56,6 +56,7 @@
 - [] group lists (one level)
 - [] subitems (one level)
 - [] Add new item
+- [] Locations
 - [] Dummy data - done items with varied dates over last 2 years (after import/export)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Dragging out of Done should undo its done start
