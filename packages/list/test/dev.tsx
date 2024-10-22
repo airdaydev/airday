@@ -40,7 +40,7 @@ treeStateC.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));
 const ctxA = new ListDragContext({
   treeState: treeStateA,
   dndContext: dndContext,
-  itemHeight: 28,
+  itemHeight: 30,
   placeholderStyle: styles["placeholder"],
   allowInternalMovement: false,
 });
@@ -48,14 +48,14 @@ const ctxA = new ListDragContext({
 const ctxB = new ListDragContext({
   treeState: treeStateB,
   dndContext: dndContext,
-  itemHeight: 28,
+  itemHeight: 30,
   placeholderStyle: styles["placeholder"],
 });
 
 const ctxC = new ListDragContext({
   treeState: treeStateC,
   dndContext: dndContext,
-  itemHeight: 28,
+  itemHeight: 30,
   placeholderStyle: styles["placeholder"],
 });
 

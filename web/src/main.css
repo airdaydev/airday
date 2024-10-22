@@ -46,7 +46,7 @@ body {
     padding: 0;
     margin: 0;
     font-family: var(--body-font);
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

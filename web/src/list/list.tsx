@@ -26,7 +26,7 @@ export function List(props: ListProps) {
   const ctx = new ListDragContext({
     treeState: list.tree,
     dndContext: session.workspace.dndContext,
-    itemHeight: 32,
+    itemHeight: 30,
     placeholderStyle: itemStyles["placeholder"],
   });
   const container = session.workspace.containerStore.tree.idMap.get(

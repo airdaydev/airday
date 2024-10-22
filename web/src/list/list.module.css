@@ -39,7 +39,7 @@
 }
 
 .primary {
-    height: 32px;
+    height: 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -51,6 +51,7 @@
 }
 
 .list-head-button {
+    font-size: 1rem;
     cursor: pointer;
     margin: 0;
     background: none;
@@ -160,6 +161,6 @@
 .list-col-head-item {
     display: inline-flex;
     padding: 0 0.5em;
-    height: 28px;
+    height: 30px;
     align-items: center;
 }

@@ -23,7 +23,7 @@ export const Done = (props: { view: DataView }) => {
   const ctx = new ListDragContext({
     treeState: tree,
     dndContext: session.workspace.dndContext,
-    itemHeight: 32,
+    itemHeight: 30,
     placeholderStyle: itemStyles["placeholder"],
     allowInternalMovement: false,
   });
