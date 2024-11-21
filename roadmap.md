@@ -149,6 +149,7 @@
 - [] Export data markdown, json, csv
 - [] Import markdown, json, things 3 etc
 - [] Split view 4+ ways
+- [] AI roadmap
 
 ## Stickers
 - [x] Sticker system

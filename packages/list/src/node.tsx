@@ -289,12 +289,12 @@ export const NodeContainer = (props: NodeContainerProps) => {
             animated: props.listDragContext.dndContext.isDragging(),
             // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
-          onMouseEnter={onUIEnter}
           style={{}}
         >
           <props.Component
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
+            onMouseEnter={onUIEnter}
             node={props.node}
             index={treeIndex()}
             localIndex={props.localIndex}
@@ -314,6 +314,7 @@ export type NodeComponentType = Component<{
   node: Node;
   ariaSelected: boolean;
   onMouseDown: (event: MouseEvent) => void;
+  onMouseEnter: (event: MouseEvent) => void;
   onTouchStart: (event: TouchEvent) => void;
   select: () => void;
   ctx: ListDragContext;
@@ -325,6 +326,7 @@ export const DefaultNodeComponent: NodeComponentType = (props) => {
       aria-selected={props.ariaSelected}
       onMouseDown={props.onMouseDown}
       onTouchStart={props.onTouchStart}
+      onMouseEnter={props.onMouseEnter}
     >
       {props.node.id}
     </div>

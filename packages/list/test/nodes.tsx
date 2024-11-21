@@ -32,24 +32,42 @@ export const TextNodeComponent: NodeComponentType = (props) => {
   const node = props.node.accessor;
   return (
     <div
+      class={styles["tree-item-container"]}
       aria-selected={props.ariaSelected}
-      class={styles["tree-item"]}
-      onMouseDown={(event) => {
-        props.onMouseDown(event);
-      }}
-      onTouchStart={(event) => {
-        props.onTouchStart(event);
-      }}
-      onDblClick={(event) => {
-        event.preventDefault();
-        props.select();
-        props.node.updateContent("gogogoo");
-      }}
-      data-index={props.index}
-      ref={props.ref}
-      style={{ "padding-left": `${(props.node.accessor().depth - 1) * 10}px` }}
+      aria-expanded={node().expanded}
     >
-      {node().id} - {node().content}
+      <div class={styles["item-margin"]}>
+        {props.node?.children.length && (
+          <button
+            class={styles["expand"]}
+            onClick={() => props.node.toggleExpansion()}
+          >
+            <img src="/public/caret.svg" />
+          </button>
+        )}
+      </div>
+      <div
+        class={styles["tree-item"]}
+        onMouseDown={(event) => {
+          props.onMouseDown(event);
+        }}
+        onMouseEnter={props.onMouseEnter}
+        onTouchStart={(event) => {
+          props.onTouchStart(event);
+        }}
+        onDblClick={(event) => {
+          event.preventDefault();
+          props.select();
+          props.node.updateContent("gogogoo");
+        }}
+        data-index={props.index}
+        ref={props.ref}
+        style={{
+          "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,
+        }}
+      >
+        {node().id} - {node().content}
+      </div>
     </div>
   );
 };

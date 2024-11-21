@@ -3,6 +3,7 @@ import { GenericNode, map, walk, filter } from "./tree-utils";
 
 export interface NodeSignalProps {
   id: string;
+  expanded: boolean;
 }
 
 export class Node {
@@ -43,10 +44,15 @@ export class Node {
       ...(this.serialise && this.serialise()),
       id: this.id,
       depth: this.depth,
+      expanded: this.expanded,
     };
   }
   triggerUpdate() {
     this.uiSignal?.[1](() => this.toJSON());
+  }
+  toggleExpansion() {
+    if (this.expanded) this.collapse();
+    else this.expand();
   }
   collapse(recursive = false) {
     this.expanded = false;
@@ -56,6 +62,8 @@ export class Node {
         return node;
       });
     }
+    this.triggerUpdate();
+    this.root?.refresh();
   }
   expand(recursive = false) {
     this.expanded = true;
@@ -65,6 +73,8 @@ export class Node {
         return node;
       });
     }
+    this.triggerUpdate();
+    this.root?.refresh();
   }
 }
 
@@ -197,6 +207,9 @@ export class TreeState {
     this.onDelete?.(set);
     set.forEach((node) => this.idMap.delete(node.id));
     this.childrenSignal[1](() => result.filtered);
+  }
+  refresh() {
+    this.childrenSignal[1]([...this.childrenSignal[0]()]);
   }
   // TODO: AI Written
   insertNode(newNode: Node, parentNode: Node | null, position: number) {
