@@ -20,7 +20,6 @@ export interface NodeContainerProps {
   node: Node;
   Component: NodeComponentType;
   index: Accessor<number>;
-  localIndex: Accessor<number>;
   virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
   autoscroller: AutoscrollController;
@@ -299,7 +298,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
             onMouseEnter={onUIEnter}
             node={props.node}
             index={treeIndex()}
-            localIndex={props.localIndex}
             ariaSelected={isSelected()}
             select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}

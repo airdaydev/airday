@@ -33,6 +33,9 @@ export class Node {
     this.signalSubscriptions++;
     return this.uiSignal[0];
   }
+  get localIndex() {
+    return this.parent?.children.findIndex((c) => c === this);
+  }
   unsubscribe() {
     this.signalSubscriptions--;
     if (this.signalSubscriptions === 0) {

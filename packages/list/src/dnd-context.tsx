@@ -305,7 +305,6 @@ export class ListDragContext {
     const lastTouchedIndex = this.lastTouchedIndexSignal[0](); // projected index
     const lastTouchedNode = this.projection()[lastTouchedIndex || 0];
     // TODO: if parent, calc local index:
-
     // TODO: Depth needs to be updated
     const parent = lastTouchedNode.parent?.isRoot
       ? null
@@ -314,7 +313,12 @@ export class ListDragContext {
       originList.selection[0](),
       originList.treeState,
       this.treeState,
-      [parent, lastTouchedIndex || 0],
+      [
+        parent,
+        lastTouchedNode.parent.isRoot
+          ? lastTouchedIndex
+          : lastTouchedNode.localIndex || 0,
+      ],
     );
     this.setFocus();
     this.selection[1](originList.selection[0]());
