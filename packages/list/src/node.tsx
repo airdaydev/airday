@@ -104,7 +104,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
   };
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
-    console.log(props.node);
     event.preventDefault(); // prevents selection on Safari
     props.listDragContext.setFocus();
     if (event.metaKey) {

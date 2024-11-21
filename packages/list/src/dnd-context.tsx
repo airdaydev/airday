@@ -302,9 +302,11 @@ export class ListDragContext {
   };
   dropItems = (originList: ListDragContext) => {
     if (!this.allowMovement) return;
-    const lastTouchedNode =
-      this.projection()[this.lastTouchedIndexSignal[0]() || 0];
-    // TODO: if parent, index needs to be local index
+    const lastTouchedIndex = this.lastTouchedIndexSignal[0](); // projected index
+    const lastTouchedNode = this.projection()[lastTouchedIndex || 0];
+    // TODO: if parent, calc local index:
+
+    // TODO: Depth needs to be updated
     const parent = lastTouchedNode.parent?.isRoot
       ? null
       : lastTouchedNode.parent;
@@ -312,7 +314,7 @@ export class ListDragContext {
       originList.selection[0](),
       originList.treeState,
       this.treeState,
-      [parent, this.lastTouchedIndexSignal[0]()],
+      [parent, lastTouchedIndex || 0],
     );
     this.setFocus();
     this.selection[1](originList.selection[0]());

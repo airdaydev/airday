@@ -119,6 +119,7 @@ export class ListStateContext {
     destState: TreeState,
     dstPosition: [Node | null, number],
   ) {
+    console.log(nodes, srcState, destState, dstPosition);
     // Remove items from the source tree
     const result = srcState.remove(nodes);
     if (!result.removed) {
@@ -130,6 +131,9 @@ export class ListStateContext {
       // Remove from source idMap and add to destination idMap
       srcState.idMap.delete(node.id);
       destState.idMap.set(node.id, node);
+      // TODO: Auto trigger update in node
+      node.depth = dstPosition[0] ? dstPosition[0].depth + 1 : 0;
+      node.triggerUpdate();
       return node;
     });
 
@@ -273,10 +277,15 @@ export class TreeState {
   }
 
   loadChildren(children: GenericNode<any>[]) {
+    const loader = this.loader
+      ? this.loader
+      : (rawNode: any) => new Node(rawNode);
     const tree = map<any, any>(
-      { children, root: true },
+      { children, isRoot: true },
       (rawNode, parent, depth) => {
-        const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
+        // a bit silly but important to realise the root node goes through the map function
+        // so we need to treat it as a root node to then discard it.
+        const node = rawNode.isRoot ? new RootNode() : loader(rawNode);
         if (!node) return new Node({ type: "invalid" });
         node.root = this;
         node.parent = parent.isRoot === true ? this : parent; // Discards temporary root
