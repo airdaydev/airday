@@ -32,11 +32,38 @@ export const TextNodeComponent: NodeComponentType = (props) => {
   const node = props.node.accessor;
   return (
     <div
-      class={styles["tree-item-container"]}
       aria-selected={props.ariaSelected}
       aria-expanded={node().expanded}
+      class={styles["tree-item"]}
+      onMouseDown={(event) => {
+        props.onMouseDown(event);
+      }}
+      onTouchStart={(event) => {
+        props.onTouchStart(event);
+      }}
+      onDblClick={(event) => {
+        event.preventDefault();
+        props.select();
+        props.node.updateContent("gogogoo");
+      }}
+      data-index={props.index}
+      ref={props.ref}
+      style={{
+        "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,
+      }}
     >
-      <div class={styles["item-margin"]}>
+      <div
+        class={styles["item-margin"]}
+        onMouseEnter={(event) => {
+          // TODO: Treats margin as blank space contained within item if item has no children
+          // TODO: Get context & check if dragging!
+          // if (props.node?.children.length) {
+          //   props.node.expand();
+          //   return;
+          // }
+          props.onMouseEnter(event);
+        }}
+      >
         {props.node?.children.length && (
           <button
             class={styles["expand"]}
@@ -46,26 +73,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
           </button>
         )}
       </div>
-      <div
-        class={styles["tree-item"]}
-        onMouseDown={(event) => {
-          props.onMouseDown(event);
-        }}
-        onMouseEnter={props.onMouseEnter}
-        onTouchStart={(event) => {
-          props.onTouchStart(event);
-        }}
-        onDblClick={(event) => {
-          event.preventDefault();
-          props.select();
-          props.node.updateContent("gogogoo");
-        }}
-        data-index={props.index}
-        ref={props.ref}
-        style={{
-          "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,
-        }}
-      >
+      <div onMouseEnter={props.onMouseEnter} class={styles["item-internal"]}>
         {node().id} - {node().content}
       </div>
     </div>

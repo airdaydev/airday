@@ -14,6 +14,7 @@ import "./root.css";
 import { ListDragContext, VirtualisedList } from "./dnd-context";
 import { touchBandaid } from "./touch-bandaid";
 import { Placeholder } from "./placeholder";
+import { AutoscrollController } from "./autoscroll";
 
 export interface NodeContainerProps {
   node: Node;
@@ -22,6 +23,7 @@ export interface NodeContainerProps {
   localIndex: Accessor<number>;
   virtualisedList: VirtualisedList;
   listDragContext: ListDragContext;
+  autoscroller: AutoscrollController;
 }
 
 export const NodeContainer = (props: NodeContainerProps) => {
@@ -102,6 +104,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
   };
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
+    console.log(props.node);
     event.preventDefault(); // prevents selection on Safari
     props.listDragContext.setFocus();
     if (event.metaKey) {
@@ -155,7 +158,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
           "mouseup",
           () => {
             // Dropping an item
-            // The even is on the node being dragged itself, but this is also recorded as selected item
+            // The event is on the node being dragged itself, but this is also recorded as selected item
             // We need to discover the parent, the local index
             // TODO: Perhaps wrap this within the context
             const activeContext =

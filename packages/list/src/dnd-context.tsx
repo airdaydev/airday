@@ -6,7 +6,7 @@ import {
   createSignal,
   createUniqueId,
 } from "solid-js";
-import { Node, TreeState } from "./state";
+import { Node, RootNode, TreeState } from "./state";
 import { walk } from "./tree-utils";
 import { ContainerVector } from "./tree";
 import { DndContextKeyboardEvents } from "./keyboard/index";
@@ -224,7 +224,7 @@ export class ListDragContext {
   createProjectionMemo() {
     return createMemo(() => {
       const visibleChildren: Node[] = [];
-      let n = new Node();
+      let n = new RootNode();
       n.isRoot = true;
       n.children = this.treeState.childrenSignal[0]();
       let index = 0;

@@ -180,9 +180,7 @@ export const Tree = (props: TreeComponentProps) => {
           }
         }}
       >
-        {showBackdropPlaceholder() && (
-          <Placeholder listDragContext={listDragContext} backdrop={true} />
-        )}
+        {showBackdropPlaceholder() && <Placeholder backdrop={true} />}
       </div>
     </div>
   );
