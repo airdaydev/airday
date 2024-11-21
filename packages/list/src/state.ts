@@ -12,7 +12,7 @@ export class Node {
   isRoot: boolean = false;
   depth = 0; // cached
   maxDepth = 5;
-  expanded = true;
+  expanded = false;
   parent: Node | null = null;
   root?: TreeState;
   uiSignal?: Signal<NodeSignalProps> | undefined;
@@ -80,6 +80,7 @@ export class Node {
 
 export class RootNode extends Node {
   isRoot = true;
+  expanded = true;
   children: Node[] = [];
 }
 
@@ -278,7 +279,7 @@ export class TreeState {
         const node = this.loader ? this.loader(rawNode) : new Node(rawNode);
         if (!node) return new Node({ type: "invalid" });
         node.root = this;
-        node.parent = parent.root ? this : parent; // Discards temporary root
+        node.parent = parent.isRoot === true ? this : parent; // Discards temporary root
         node.depth = depth;
         this.idMap.set(node.id, node);
         return node;
