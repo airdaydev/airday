@@ -171,7 +171,7 @@ export const Tree = (props: TreeComponentProps) => {
             listDragContext.setDragOver();
             const endIndex = signal().window.length + signal().start;
             if (listDragContext.isOrigin) {
-              listDragContext.setLastTouchedIndex(endIndex);
+              listDragContext.setLastTouchedIndex(endIndex - 1);
               listDragContext.setDragOver();
             } else {
               listDragContext.setDragOver();

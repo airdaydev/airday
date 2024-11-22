@@ -27,6 +27,8 @@ describe("TreeState", () => {
     treeState.loadChildren(children);
 
     expect(treeState.childrenSignal[0]()[0].parent).toBe(treeState);
+    expect(treeState.childrenSignal[0]()[0].depth).toBe(1);
+    expect(treeState.childrenSignal[0]()[1].children[0].depth).toBe(2);
     expect(treeState.childrenSignal[0]().length).toBe(2);
     expect(treeState.idMap.size).toBe(4); // root + 2 children + 1 grandchild
   });
@@ -64,5 +66,21 @@ describe("TreeState", () => {
 
     const newOrder = treeState.childrenSignal[0]().map((node) => node.id);
     expect(newOrder).toEqual(["child2", "child3", "child1"]);
+  });
+  test.only("moveItems nests & sets depth correctly", () => {
+    const children = [
+      { id: "child1", children: [{ id: "child:d1" }] },
+      { id: "child2", children: [] },
+    ];
+
+    treeState.loadChildren(children);
+
+    const nodesToMove = new Set([treeState.idMap.get("child1")]);
+    const child2 = treeState.idMap.get("child2");
+    treeState.take(nodesToMove);
+    treeState.insertItems(nodesToMove, [child2, 0]);
+    const t = treeState.idMap.get("child:d1");
+    expect(t.depth).toEqual(3);
+    expect(treeState.childrenSignal[0]()[0].children[0].children[0]).toEqual(t);
   });
 });

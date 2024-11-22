@@ -79,6 +79,13 @@ export class Node {
     this.triggerUpdate();
     this.root?.refresh();
   }
+  setDepth(depth: number = 1) {
+    this.depth = depth;
+    map<Node, Node>(this, (node, _, intDepth) => {
+      node.depth = depth + intDepth;
+      return node;
+    });
+  }
 }
 
 export class RootNode extends Node {
@@ -114,70 +121,6 @@ export class ListStateContext {
     const tree = new TreeState({ ...opts, context: this });
     this.trees.add(tree);
     return tree;
-  }
-  // TODO: consider deleting & recreating each item (cleaner)
-  moveItems(
-    nodes: Set<Node>,
-    srcState: TreeState,
-    destState: TreeState,
-    dstPosition: [Node | null, number],
-  ) {
-    console.log(nodes, srcState, destState, dstPosition);
-    // Remove items from the source tree
-    const result = srcState.remove(nodes);
-    if (!result.removed) {
-      return;
-    }
-
-    const transformNodes = Array.from(nodes).map((node) => {
-      node.root = destState;
-      // Remove from source idMap and add to destination idMap
-      srcState.idMap.delete(node.id);
-      destState.idMap.set(node.id, node);
-      // TODO: Auto trigger update in node
-      node.depth = dstPosition[0] ? dstPosition[0].depth + 1 : 0;
-      node.triggerUpdate();
-      return node;
-    });
-
-    // Update the source tree
-    srcState.childrenSignal[1](result.filtered);
-
-    // Add items to the destination tree
-    // TODO: We should probably clone these...
-    const [parentNode, newPosition] = dstPosition;
-    if (!parentNode) {
-      // Add to root level
-      const currentChildren = destState.childrenSignal[0]();
-      const updatedChildren = [
-        ...currentChildren.slice(0, newPosition),
-        ...Array.from(transformNodes),
-        ...currentChildren.slice(newPosition),
-      ];
-      destState.childrenSignal[1](updatedChildren);
-    } else {
-      // Add to a specific parent node
-      const updatedTree = destState.mutableRoot;
-      const updateNode = (node: Node) => {
-        if (node === parentNode) {
-          node.children = [
-            ...node.children.slice(0, newPosition),
-            ...Array.from(transformNodes),
-            ...node.children.slice(newPosition),
-          ];
-          return node;
-        }
-        node.children = node.children.map(updateNode);
-        return node;
-      };
-      const updatedChildren = updatedTree.children.map(updateNode);
-      destState.childrenSignal[1](updatedChildren);
-    }
-
-    // Call the onMove callback if it exists
-    if (this.onMove) {
-      this.onMove(nodes, srcState, destState, dstPosition);
-    }
   }
 }
 
@@ -256,6 +199,39 @@ export class TreeState {
     // Add the new node to the idMap
     this.idMap.set(newNode.id, newNode);
   }
+  insertItems(nodes: Set<Node>, dstPosition: [Node | null, number]) {
+    const transformNodes = Array.from(nodes).map((node) => {
+      node.root = this;
+      this.idMap.set(node.id, node);
+      node.parent = dstPosition[0] || node.root;
+      node.setDepth(dstPosition[0] ? dstPosition[0].depth + 1 : 1);
+      node.triggerUpdate();
+      return node;
+    });
+
+    const [parentNode, newPosition] = dstPosition;
+    if (!parentNode) {
+      // Add to root level
+      const currentChildren = this.childrenSignal[0]();
+      const updatedChildren = [
+        ...currentChildren.slice(0, newPosition),
+        ...Array.from(transformNodes),
+        ...currentChildren.slice(newPosition),
+      ];
+      this.childrenSignal[1](updatedChildren);
+    } else {
+      // Add to a specific parent node
+      const newChildren = [
+        ...parentNode.children.slice(0, newPosition),
+        ...Array.from(transformNodes),
+        ...parentNode.children.slice(newPosition),
+      ];
+      const updatedTree = this.mutableRoot;
+      parentNode.children = newChildren;
+      const updatedChildren = updatedTree.children.map((node) => node); // is this needed?
+      this.childrenSignal[1](updatedChildren);
+    }
+  }
   getNodesByIds(ids: Set<string>) {
     const nodeSet = new Set<Node>();
     for (const id of ids) {
@@ -277,6 +253,14 @@ export class TreeState {
       removed: set,
       filtered,
     };
+  }
+  take(set: Set<Node>) {
+    set.forEach((item) => {
+      this.idMap.delete(item.id);
+    });
+    const result = this.remove(set);
+    this.childrenSignal[1](() => result.filtered);
+    return set;
   }
 
   loadChildren(children: GenericNode<any>[]) {
@@ -312,27 +296,4 @@ export class TreeState {
     );
     return count - 1; // accounts for root node
   };
-  moveItems(nodes: Set<Node>, parentNode: Node | null, newPosition: number) {
-    const sortedNodes = Array.from(nodes).sort((nodeA, nodeB) => {
-      return nodeA.getIndex() - nodeB.getIndex();
-    });
-    const result = this.remove(nodes);
-    if (!result.removed) {
-      return;
-    }
-    if (!parentNode) {
-      result.filtered.splice(newPosition, 0, ...sortedNodes);
-    }
-    // Add back layers
-    if (parentNode) {
-      map<RootNode, any>(result.filtered, (node) => {
-        if (node === parentNode) {
-          node.children.splice(newPosition, 0, ...sortedNodes);
-          return node;
-        }
-        return node;
-      });
-    }
-    this.childrenSignal[1](result.filtered);
-  }
 }

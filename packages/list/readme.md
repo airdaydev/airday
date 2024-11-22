@@ -78,22 +78,28 @@ pnpm run dev
 - [x] correct count incl. expanded/collapsed items
 - [x] isRoot issue
 - [x] list backdrop not working well with depth
+- [x] depth set correctly for dropping
+- [x] moving item ends up at correct location
+- [x] Moving between lists at different depths
+- [x] Drag & drop placed at correct positions
+- [x] select down/up traverses depth
+- [x] Consolidate moveItems into single API
+- [x] depth set tests
+- [] drop offset / placement issues, methodically
+- [] undefined lasttouchednode issue
 - [] Separate style for parent item of where current drag is hovered over
 - [] Dragging down to z-peer item with children doesn't move lastTouched (optional!)
 - [] Dragging up to z-peer item with children does move lastTouched
 - [] Last item before depth change activates special placeholder where dragging
 over left-most edge places item outside of container (think for multiple levels!)
 - [] data-global-index vs data-local-index vs data-depth vs maybe data-index for all (maybe, to faciliate next goal)
-- [] moving item ends up at correct location
-- [] Moving between lists at different depths
 - [] placeholder indents variable at bottom of children lists depending on mouse location
-- [] Drag & drop placed at correct positions
-- [] select down/up traverses depth
 - [] range select up & down only allowed at same depth
 - [] select last item works with nesting
-- [] can't drag parent within itself
+- [] can't drag parent within itself (if same list is open!)
 
 ## Roadmap
+- 2D canvas version.
 - consider triggering a [reflow](https://stackoverflow.com/questions/6268508/restart-animation-in-css3-any-better-way-than-removing-the-element) on last index change to show full fade animation
 - Smoother down scrolling when moving off list item
 - move down via line numbers (vim)

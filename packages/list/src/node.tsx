@@ -271,8 +271,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
       aria-selected={isSelected()}
     >
       {draggedOn[0]() === -1 && <Placeholder />}
-      {/* Second condition resolves edge case where dragging onto own list
-        from outside own list, last item momentarily doesn't cover last item placeholder. */}
       {draggedOn[0]() === 1 &&
         props.listDragContext.isDraggingOver() &&
         treeIndex() -
@@ -288,7 +286,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
             above: draggedOn[0]() === 1,
             below: draggedOn[0]() === -1,
             animated: props.listDragContext.dndContext.isDragging(),
-            // Ok but a bit janky, can we set last touched / draggedOn to neutral...?
           }}
           style={{}}
         >
@@ -305,7 +302,6 @@ export const NodeContainer = (props: NodeContainerProps) => {
           />
         </div>
       )}
-      {/* Foreign drop at the very end of a list goes here! */}
     </div>
   );
 };

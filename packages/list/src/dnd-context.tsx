@@ -309,17 +309,13 @@ export class ListDragContext {
     const parent = lastTouchedNode.parent?.isRoot
       ? null
       : lastTouchedNode.parent;
-    this.treeState.context?.moveItems(
-      originList.selection[0](),
-      originList.treeState,
-      this.treeState,
-      [
-        parent,
-        lastTouchedNode.parent.isRoot
-          ? lastTouchedIndex
-          : lastTouchedNode.localIndex || 0,
-      ],
-    );
+    const items = originList.treeState.take(originList.selection[0]());
+    this.treeState.insertItems(items, [
+      parent,
+      lastTouchedNode.parent.isRoot
+        ? lastTouchedIndex
+        : lastTouchedNode.localIndex || 0,
+    ]);
     this.setFocus();
     this.selection[1](originList.selection[0]());
     if (originList !== this) {

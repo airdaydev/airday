@@ -55,13 +55,14 @@ export const TextNodeComponent: NodeComponentType = (props) => {
       <div
         class={styles["item-margin"]}
         onMouseEnter={(event) => {
-          // TODO: Treats margin as blank space contained within item if item has no children
-          // TODO: Get context & check if dragging!
-          // if (props.node?.children.length) {
-          //   props.node.expand();
-          //   return;
-          // }
-          props.onMouseEnter(event);
+          if (
+            props.ctx.dndContext.isDragging() &&
+            props.node?.children.length
+          ) {
+            props.node.expand();
+            return;
+          }
+          // props.onMouseEnter(event);
         }}
       >
         {props.node?.children.length && (
@@ -74,7 +75,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
         )}
       </div>
       <div onMouseEnter={props.onMouseEnter} class={styles["item-internal"]}>
-        {node().id} - {node().content}
+        {node().id} - {node().content} d:{props.node.depth}
       </div>
     </div>
   );
