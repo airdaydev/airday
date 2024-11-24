@@ -174,8 +174,10 @@ export const Tree = (props: TreeComponentProps) => {
               listDragContext.setLastTouchedIndex(endIndex - 1);
               listDragContext.setDragOver();
             } else {
-              listDragContext.setDragOver();
+              // foreign entry
+              console.log("foreignentryindex", endIndex);
               listDragContext.setLastTouchedIndex(endIndex);
+              listDragContext.setDragOver();
             }
           }
         }}

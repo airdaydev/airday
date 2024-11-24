@@ -26,7 +26,6 @@ export class ListDragContext {
   lastTouchedIndexSignal = createSignal<number | undefined>();
   dndContext: DndContext;
   originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
-  dragOriginNodeIndex: number | undefined; // TODO: Use & memoised w respect to treestate
   itemHeight: number;
   scrollContainerRef?: HTMLElement;
   placeholderStyle?: string;
@@ -57,6 +56,7 @@ export class ListDragContext {
     this.dndContext.focusContext[1](() => this);
   }
   isDraggingOver() {
+    // Are we dragging over this particular list?
     return this.dndContext.dragContext[0]() === this;
   }
   setDragOver() {

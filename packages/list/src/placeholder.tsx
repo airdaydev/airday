@@ -1,7 +1,10 @@
-import { useContext } from "solid-js";
+import { Show, useContext } from "solid-js";
 import { ListDragContext, SolidListContext } from "./dnd-context";
 
-export const Placeholder = (props: { backdrop?: boolean }) => {
+export const Placeholder = (props: {
+  backdrop?: boolean;
+  debugText?: string;
+}) => {
   const listDragContext = useContext<ListDragContext>(SolidListContext);
   return (
     <div
@@ -15,6 +18,8 @@ export const Placeholder = (props: { backdrop?: boolean }) => {
       style={{
         "max-height": `${listDragContext.itemHeight}px`,
       }}
-    />
+    >
+      <Show when={!!props.debugText}>{props.debugText}</Show>
+    </div>
   );
 };

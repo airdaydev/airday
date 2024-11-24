@@ -192,11 +192,11 @@ export const NodeContainer = (props: NodeContainerProps) => {
       ],
       ([lastTouchedIndex, isDragging, dragOver]) => {
         if (!isDragging) {
-          draggedOn[1](0);
+          draggedOn[1](0); // Turn off dragging state on local node, as user is not dragging at all
           return;
         }
-        const index = treeIndex();
-        const originIndex = props.listDragContext.originIndex as number;
+        const index = treeIndex(); // the current index of the dragged item within the total filtered list
+        const originIndex = props.listDragContext.originIndex as number; // the drag origin
         if (!props.listDragContext.isOrigin && dragOver) {
           if (index >= lastTouchedIndex) {
             draggedOn[1](-1);
@@ -244,6 +244,10 @@ export const NodeContainer = (props: NodeContainerProps) => {
     // TODO: Test if item can be dragged in here...
     const newIndex = treeIndex() - draggedOn[0]();
     const node = props.listDragContext.projection()[newIndex];
+    // if (node.depth > 1) {
+    //   // document.body.style.cursor = "no-drop";
+    //   return;
+    // }
     if (node && node.depth <= props.node.maxDepth) {
       props.listDragContext.setLastTouchedIndex(newIndex);
       props.listDragContext.setDragOver();
@@ -264,20 +268,21 @@ export const NodeContainer = (props: NodeContainerProps) => {
     <div
       class="item"
       data-type="node"
+      data-index={treeIndex()}
       style={{
         top: `${treeIndex() * props.listDragContext.itemHeight}px`,
         height: `${props.listDragContext.itemHeight}px`,
       }}
       aria-selected={isSelected()}
     >
-      {draggedOn[0]() === -1 && <Placeholder />}
+      {draggedOn[0]() === -1 && <Placeholder debugText="above" />}
       {draggedOn[0]() === 1 &&
         props.listDragContext.isDraggingOver() &&
         treeIndex() -
           Math.abs(props.listDragContext.lastTouchedIndexSignal[0]()) <
-          1 && <Placeholder />}
+          1 && <Placeholder debugText="below" />}
       {isDragOrigin() && props.listDragContext.isDraggingOver() && (
-        <Placeholder />
+        <Placeholder debugText="dragging-over" />
       )}
       {(!isDragOrigin() || !props.listDragContext.dndContext.isDragging()) && (
         <div
