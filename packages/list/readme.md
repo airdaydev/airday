@@ -1,10 +1,7 @@
 # @sunlist/list
 
-A very opinionated interactive list system including store & UI component for SolidJS written for sunlist.app. Drag & drop, optionally virtualised or variable height (can be determined by function).
-
-N.b. the original of this package is to become a tree, however only a 1 level tree i.e. 2D list is implemented at this point, but some tree code is present.
-
-The architecture has lead to a few marked special cases, dealing with many subtle difference between dragging locally & dragging to a foreign list, as well as differences in the placeholders beneath the originally dragged item & other items and special cases for the final placeholder in remote and local drags.
+An opinionated, imperfect interactive tree system including store & UI component for SolidJS written for sunlist.app.
+Drag & drop, virtualised, static height per element.
 
 ## Features
 - Window expands to fill minimum size.
@@ -14,8 +11,6 @@ The architecture has lead to a few marked special cases, dealing with many subtl
 - Searching & filters.
 - Animated transitions & dragging.
 - Granular updates on individual items applied without looping over list.
-
-TODO: include webm vid
 
 ## A minimal example
 
@@ -72,22 +67,6 @@ pnpm run dev
 ```
 
 ## Tree conversion
-- [x] Only show placeholder on hover (necessary with now indented items)
-- [x] projection() memoised
-- [x] left/right keyboard to Expand/Collapse item
-- [x] correct count incl. expanded/collapsed items
-- [x] isRoot issue
-- [x] list backdrop not working well with depth
-- [x] depth set correctly for dropping
-- [x] moving item ends up at correct location
-- [x] Moving between lists at different depths
-- [x] Drag & drop placed at correct positions
-- [x] select down/up traverses depth
-- [x] Consolidate moveItems into single API
-- [x] depth set tests
-- [x] undefined lasttouchednode issue
-- [x] drop offset / placement issues, methodically
-- [x] Separate style for parent item of where current drag is hovered over
 - [] Last item before depth change activates special placeholder where dragging
 over left-most edge places item outside of container (think for multiple levels!)
 - [] placeholder indents variable at bottom of children lists depending on mouse location
