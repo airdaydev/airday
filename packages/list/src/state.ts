@@ -83,6 +83,7 @@ export class Node {
     this.depth = depth;
     map<Node, Node>(this, (node, _, intDepth) => {
       node.depth = depth + intDepth;
+      node.triggerUpdate();
       return node;
     });
   }

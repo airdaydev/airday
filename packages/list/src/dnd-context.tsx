@@ -306,15 +306,18 @@ export class ListDragContext {
     const lastTouchedNode = this.projection()[lastTouchedIndex || 0];
     // TODO: if parent, calc local index:
     // TODO: Depth needs to be updated
-    const parent = lastTouchedNode.parent?.isRoot
-      ? null
-      : lastTouchedNode.parent;
+    let parent = null;
+    if (
+      lastTouchedNode &&
+      lastTouchedNode.parent &&
+      !lastTouchedNode.parent.isRoot
+    ) {
+      parent = lastTouchedNode.parent;
+    }
     const items = originList.treeState.take(originList.selection[0]());
     this.treeState.insertItems(items, [
       parent,
-      lastTouchedNode.parent.isRoot
-        ? lastTouchedIndex
-        : lastTouchedNode.localIndex || 0,
+      parent === null ? lastTouchedIndex : lastTouchedNode.localIndex || 0,
     ]);
     this.setFocus();
     this.selection[1](originList.selection[0]());

@@ -59,6 +59,8 @@ export const TextNodeComponent: NodeComponentType = (props) => {
             props.ctx.dndContext.isDragging() &&
             props.node?.children.length
           ) {
+            props.ctx.dndContext.dragContext[1](() => null);
+            props.ctx.setLastTouchedIndex(null);
             props.node.expand();
             return;
           }

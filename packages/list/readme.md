@@ -85,8 +85,8 @@ pnpm run dev
 - [x] select down/up traverses depth
 - [x] Consolidate moveItems into single API
 - [x] depth set tests
-- [] drop offset / placement issues, methodically
-- [] undefined lasttouchednode issue
+- [x] undefined lasttouchednode issue
+- [x] drop offset / placement issues, methodically
 - [] Separate style for parent item of where current drag is hovered over
 - [] Dragging down to z-peer item with children doesn't move lastTouched (optional!)
 - [] Dragging up to z-peer item with children does move lastTouched
