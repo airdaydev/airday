@@ -131,7 +131,8 @@ export function moveSelectionUp(ctx: ListDragContext) {
     }
   }
   if (newPosition !== null) {
-    ctx.treeState.moveItems(selection, null, newPosition);
+    ctx.treeState.take(selection);
+    ctx.treeState.insertItems(selection, [null, newPosition]);
   }
 }
 
@@ -148,7 +149,8 @@ export function moveSelectionDown(ctx: ListDragContext) {
     if (typeof newPosition === "number") newPosition += 1;
   }
   if (newPosition !== null && newPosition < ctx.treeState.count()) {
-    ctx.treeState.moveItems(selection, null, newPosition);
+    ctx.treeState.take(selection);
+    ctx.treeState.insertItems(selection, [null, newPosition]);
   }
 }
 

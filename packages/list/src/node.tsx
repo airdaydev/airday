@@ -253,6 +253,16 @@ export const NodeContainer = (props: NodeContainerProps) => {
       props.listDragContext.setDragOver();
     }
   };
+  const childSelected = () => {
+    if (props.listDragContext.dndContext.isDragging()) {
+      const index = props.listDragContext.lastTouchedIndexSignal[0]();
+      const node = props.virtualisedList().window[index];
+      if (node && node.parent === props.node) {
+        return true;
+      }
+    }
+    return false;
+  };
   /**
    * Hiding the placeholder:
    * We have 3 placeholders (up/down & origin)
@@ -304,6 +314,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
             select={() => props.listDragContext.selectOne(props.node)}
             ref={ref}
             ctx={props.listDragContext}
+            childSelected={childSelected()}
           />
         </div>
       )}
@@ -314,6 +325,7 @@ export const NodeContainer = (props: NodeContainerProps) => {
 export type NodeComponentType = Component<{
   node: Node;
   ariaSelected: boolean;
+  childSelected: boolean;
   onMouseDown: (event: MouseEvent) => void;
   onMouseEnter: (event: MouseEvent) => void;
   onTouchStart: (event: TouchEvent) => void;

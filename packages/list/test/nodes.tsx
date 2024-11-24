@@ -34,7 +34,10 @@ export const TextNodeComponent: NodeComponentType = (props) => {
     <div
       aria-selected={props.ariaSelected}
       aria-expanded={node().expanded}
-      class={styles["tree-item"]}
+      classList={{
+        [styles["tree-item"]]: true,
+        [styles["child_selected"]]: props.childSelected,
+      }}
       onMouseDown={(event) => {
         props.onMouseDown(event);
       }}

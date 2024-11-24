@@ -56,18 +56,19 @@ describe("TreeState", () => {
     expect(count).toBe(3); // 2 children + 1 grandchild (root not counted)
   });
 
-  test("moveItems method reorders nodes", () => {
+  test("take/insertItems method reorders nodes", () => {
     const children = [{ id: "child1" }, { id: "child2" }, { id: "child3" }];
 
     treeState.loadChildren(children);
 
     const nodesToMove = new Set([treeState.idMap.get("child1")]);
-    treeState.moveItems(nodesToMove, null, 2);
+    treeState.take(nodesToMove);
+    treeState.insertItems(nodesToMove, [null, 2]);
 
     const newOrder = treeState.childrenSignal[0]().map((node) => node.id);
     expect(newOrder).toEqual(["child2", "child3", "child1"]);
   });
-  test.only("moveItems nests & sets depth correctly", () => {
+  test("take/insertItems nests & sets depth correctly", () => {
     const children = [
       { id: "child1", children: [{ id: "child:d1" }] },
       { id: "child2", children: [] },
