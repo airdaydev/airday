@@ -8,6 +8,7 @@ import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 import { List } from "./list";
+import { UpNext } from "./up-next";
 
 const schemaVersion = 1;
 
@@ -119,6 +120,7 @@ export class SunlistWorkspace {
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
   historical: HistoricalItems;
+  upNext: UpNext;
   app: SunlistSession;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
@@ -130,6 +132,7 @@ export class SunlistWorkspace {
       this.name = workspace.name;
     }
     this.historical = new HistoricalItems(this.itemStore, this);
+    this.upNext = new UpNext(this.itemStore, this);
   }
   /**
    * Creates connection to existing database, alters schema where version changes

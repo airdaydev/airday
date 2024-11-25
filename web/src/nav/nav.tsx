@@ -37,7 +37,11 @@ export function SunlistNav() {
         class={`${styles["nav-list"]} ${styles["nav-text"]}`}
         style="padding-top: 0.5em;"
       >
-        <button class={styles["nav-text-button"]} tabindex="-1">
+        <button
+          class={styles["nav-text-button"]}
+          tabindex="-1"
+          onClick={session.viewState.openUpNextView}
+        >
           <NextSVG
             style="position: relative;
             width: 1.25em;

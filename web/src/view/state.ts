@@ -234,6 +234,20 @@ export class DoneView extends ViewNode {
   }
 }
 
+export class UpNextView extends ViewNode {
+  type: ViewType = "data";
+  dataType: DataViewType = "done";
+  constructor(viewState: ViewState) {
+    super(viewState);
+  }
+  get title() {
+    return "Up Next";
+  }
+  duplicate() {
+    return new UpNextView(this.viewState);
+  }
+}
+
 export class HorizontalSplitNode extends ViewNode {
   constructor() {
     super();
@@ -372,6 +386,9 @@ export class ViewState {
   }
   openDoneView = () => {
     this.openView(new DoneView(this));
+  };
+  openUpNextView = () => {
+    this.openView(new UpNextView(this));
   };
   openView = (view: ViewNode) => {
     const activePane = this.activePane[0]();
