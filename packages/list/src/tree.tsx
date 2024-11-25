@@ -158,6 +158,8 @@ export const Tree = (props: TreeComponentProps) => {
           "min-height": `${listDragContext.itemHeight * 2}px`,
           ...(props.hideBackdrop && {
             bottom: 0,
+            // More hacks...
+            "z-index": listDragContext.dndContext.isDragging() ? 20 : 0,
             position: "absolute",
             "min-height": `${listDragContext.itemHeight}px`,
           }),

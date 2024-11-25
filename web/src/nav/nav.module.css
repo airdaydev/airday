@@ -1,78 +1,78 @@
 .nav {
-    display: flex;
-    flex-shrink: 0;
-    flex-direction: column;
-    width: 16em;
-    padding: 0 0.5em;
-    border-right: 1px solid var(--border);
-    transition: margin 0.1s;
-    overflow-y: scroll;
-    background: var(--shade-bg);
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  width: 16em;
+  padding: 0 0.5em;
+  border-right: 1px solid var(--border);
+  transition: margin 0.1s;
+  overflow-y: scroll;
+  background: var(--shade-bg);
 }
 
 .nav-text-button {
-    position: relative;
-    display: flex;
-    align-items: center;
-    font-size: 1rem;
-    font-weight: 400;
-    height: 30px;
-    width: 100%;
-    background: var(--shade-bg);
-    border: 1px solid transparent;
-    border-radius: 3px;
-    padding: 0.25em 0.5em;
-    cursor: pointer;
-    margin: 0;
-    line-height: 1em;
+  position: relative;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 400;
+  height: 32px;
+  width: 100%;
+  background: var(--shade-bg);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0.25em 0.5em;
+  cursor: pointer;
+  margin: 0;
+  line-height: 1em;
 }
 
 .nav-text-button[aria-selected="true"] {
-    background: var(--shade);
+  background: var(--shade);
 }
 
 .nav-text-button.active {
-    border: 1px solid var(--blue-tint);
+  border: 1px solid var(--blue-tint);
 }
 
 .nav-text-button span {
-    margin-left: 0.5em;
+  margin-left: 0.5em;
 }
 
 .nav-text-button:hover {
-    background: var(--mid-shade);
+  background: var(--mid-shade);
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .placeholder {
-    background: var(--mid-shade);
-    animation: fadeIn 0.15s linear forwards;
+  background: var(--mid-shade);
+  animation: fadeIn 0.15s linear forwards;
 }
 
 .add-list-button {
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 0.5em;
-    color: #81777f;
-    font-size: 1rem;
-    text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.5em;
+  color: #81777f;
+  font-size: 1rem;
+  text-align: left;
 }
 
 .sticker-nav {
-    padding: 0.5em 0.25em;
+  padding: 0.5em 0.25em;
 }
 
 .sticker-nav button {
-    background: none;
-    border: none;
-    cursor: pointer;
+  background: none;
+  border: none;
+  cursor: pointer;
 }

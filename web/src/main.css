@@ -1,91 +1,91 @@
 :root {
-    --background: hsl(180, 4.8%, 97%);
-    --border: #eaeaea;
-    --border-heavy: hsl(0, 0%, 82%);
-    --shade-bg: #f3f3f3;
-    --shade: #e1e1e1;
-    --light-shade: #f3f3f3;
-    --mid-shade: #e5e5e5;
-    --ultra-light-shade: #f6f6f6;
-    --tint-shade: #e7ecff;
-    --glass: #faf7ffe0;
-    --body-tint: #5b5b5be5;
-    --blue-tint: #d0deff;
-    --blue-tint-light: #e9ebf0;
-    --body: black;
-    /* Translucent */
-    --firefly: #ffffff14;
-    --sunshade: #30303021;
-    --body-font: -apple-system, BlinkMacSystemFont, "Test Söhne", sans-serif;
-    --mono-font: "Departure Mono", monospace;
+  --background: hsl(180, 4.8%, 97%);
+  --border: #eaeaea;
+  --border-heavy: hsl(0, 0%, 82%);
+  --shade-bg: #f3f3f3;
+  --shade: #e1e1e1;
+  --light-shade: #f3f3f3;
+  --mid-shade: #e5e5e5;
+  --ultra-light-shade: #f6f6f6;
+  --tint-shade: #e7ecff;
+  --glass: #faf7ffe0;
+  --body-tint: #5b5b5be5;
+  --blue-tint: #d0deff;
+  --blue-tint-light: #e9ebf0;
+  --body: black;
+  /* Translucent */
+  --firefly: #ffffff14;
+  --sunshade: #30303021;
+  --body-font: -apple-system, BlinkMacSystemFont, "Test Söhne", sans-serif;
+  --mono-font: "Departure Mono", monospace;
 }
 
 #root {
-    /* z-index: 0; */
-    position: relative;
+  /* z-index: 0; */
+  position: relative;
 }
 
 [data-theme="dark"] {
-    --dank: #212121;
-    --background: #1e1e1e;
-    --shade-bg: #1e1e1e;
-    --border: #28282c;
-    --shade: #28282c;
-    --light-shade: #313135;
-    --mid-shade: #313135;
-    --ultra-light-shade: #3e3e44;
-    --tint-shade: #262632;
-    --glass: #1e1e1ee5;
-    --body: rgb(227, 210, 210);
+  --dank: #212121;
+  --background: #1e1e1e;
+  --shade-bg: #1e1e1e;
+  --border: #28282c;
+  --shade: #28282c;
+  --light-shade: #313135;
+  --mid-shade: #313135;
+  --ultra-light-shade: #3e3e44;
+  --tint-shade: #262632;
+  --glass: #1e1e1ee5;
+  --body: rgb(227, 210, 210);
 }
 
 html,
 body {
-    height: 100%;
-    width: 100%;
-    padding: 0;
-    margin: 0;
-    font-family: var(--body-font);
-    font-size: 12px;
-    font-weight: 400;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: var(--background);
-    color: var(--body);
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font-family: var(--body-font);
+  font-size: 14px;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background);
+  color: var(--body);
 }
 
 button {
-    color: inherit;
+  color: inherit;
 }
 
 input {
-    color: inherit;
+  color: inherit;
 }
 
 #context-menu {
-    width: 100vw;
-    height: 100vh;
-    position: absolute;
-    top: 0;
-    left: 0;
-    /* z-index can be overriden in context-menu js */
-    z-index: 100;
-    visibility: hidden;
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* z-index can be overriden in context-menu js */
+  z-index: 100;
+  visibility: hidden;
 }
 
 button {
-    font-family: inherit;
+  font-family: inherit;
 }
 
 .list-backdrop .placeholder {
-    background: var(--mid-shade);
+  background: var(--mid-shade);
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

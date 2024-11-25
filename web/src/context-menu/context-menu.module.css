@@ -1,40 +1,40 @@
 .context-menu {
-    position: absolute;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    background: var(--background);
-    border-radius: 6px;
-    box-shadow: 7px 7px 14px #0000002e;
-    padding: 0.25em;
-    user-select: none;
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  border-radius: 6px;
+  box-shadow: 7px 7px 14px #0000002e;
+  padding: 0.25em;
+  user-select: none;
 }
 
 [data-theme="dark"] .context-menu {
-    border: 1px solid var(--ultra-light-shade);
+  border: 1px solid var(--ultra-light-shade);
 }
 
 [data-theme="light"] .context-menu {
-    border: 1px solid var(--sunshade);
+  border: 1px solid var(--sunshade);
 }
 
 .context-menu > button {
-    border: none;
-    background: none;
-    cursor: pointer;
-    text-align: left;
-    font-size: 1em;
-    padding: 0 0.5em;
-    height: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 1em;
+  padding: 0 0.5em;
+  height: 32px;
 }
 
 .context-menu button:hover {
-    background: var(--shade);
+  background: var(--shade);
 }
 
 .context-menu hr {
-    width: 100%;
-    border: none;
-    border-bottom: 1px solid var(--shade);
-    margin: 0.25em 0em;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--shade);
+  margin: 0.25em 0em;
 }

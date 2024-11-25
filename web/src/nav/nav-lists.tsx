@@ -29,6 +29,7 @@ export const NavListItem: NodeComponentType = (props) => {
           setCtxOffset([event.clientX, event.clientY]);
           setCtxOpen(true);
         }}
+        onMouseEnter={props.onMouseEnter}
         onMouseDown={(event) => {
           session.viewState.paneDropView = new DataView(
             session.viewState,
@@ -71,7 +72,7 @@ export const NavLists = () => {
   const listDragContext = new ListDragContext({
     treeState: session.workspace.containerStore.tree,
     dndContext: session.workspace.containerStore.dndContext,
-    itemHeight: 30,
+    itemHeight: 32,
     placeholderStyle: styles["placeholder"],
   });
   onCleanup(() => {
