@@ -40,9 +40,11 @@ export class TreeContext {
   rowDraggedOver = createSignal<number | null>(null); // TODO: Do we need a signal?
   // DOM & Render
   canvas?: TreeCanvas;
+  listRef?: HTMLElement;
   scrollContainerRef?: HTMLElement; // TODO: Integrate into v3 properly
   height = createSignal(500);
   scrollOffset = createSignal(0);
+  listXBounds: [number, number] = [0, 0];
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
@@ -63,13 +65,18 @@ export class TreeContext {
       return [this.height[0](), this.scrollOffset[0]()];
     });
   }
-  mount(opts: { canvasRef: HTMLCanvasElement }) {
+  mount(opts: { canvasRef: HTMLCanvasElement; listRef: HTMLElement }) {
+    this.listRef = opts.listRef;
+    // TODO: Recalculate!!
+    const bounds = this.listRef.getBoundingClientRect();
+    this.listXBounds = [bounds.x, bounds.x + bounds.width];
     this.canvas = new TreeCanvas({
       treeContext: this,
       canvasRef: opts.canvasRef,
     });
   }
   unmount() {
+    this.listRef = undefined;
     this.canvas = undefined;
   }
   get allowMovement() {
@@ -117,19 +124,33 @@ export class TreeContext {
     } // Keeps origin in place for origin list
     this.reset();
   }
+  // This controls
+  // TODO: Possibly doubling up with dragged.tsx
+  dragMouseMove = (event) => {
+    requestAnimationFrame(() => {
+      if (
+        window.scrollX + event.x < this.listXBounds[0] ||
+        window.scrollX + event.x > this.listXBounds[1]
+      )
+        return;
+      console.log("we in x");
+    });
+  };
   startDrag(
     originIndex: number,
     originNode: Node,
     ref: HTMLElement,
-    elClickOffset: [number, number] = [0, 0],
+    elClickOffset: Coordinates = [0, 0],
   ) {
     this.isDragOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
     this.setDragOver();
+    window.addEventListener("mousemove", this.dragMouseMove);
   }
   stopDrag() {
+    window.removeEventListener("mousemove", this.dragMouseMove);
     this.reset();
     this.dndContext.stopDrag();
   }
@@ -281,6 +302,11 @@ export class TreeContext {
     const t = this.projection().findIndex((n) => n === node);
     return t;
   }
+  getItemPosition(list: VirtualisedList, index: Accessor<number>) {
+    // Takes into account current drag over position!
+    // list().start
+    return index() * this.itemHeight;
+  }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
     // Virtualisation
@@ -354,8 +380,8 @@ export class DndContext {
   listContexts = new Set<TreeContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
-  elDimensionsPx: [number, number] = [200, 32];
-  dragMove = createSignal<[number, number]>([-100, -100]); // TODO: Don't render instead of storing off screen
+  elDimensionsPx: Coordinates = [200, 32];
+  dragMove = createSignal<Coordinates>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
   enableDrop = true;
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
@@ -363,7 +389,7 @@ export class DndContext {
   }
   startDrag(
     ref: HTMLElement,
-    elClickOffset: [number, number] = [0, 0],
+    elClickOffset: Coordinates = [0, 0],
     dragMode: dragMode = "mouse",
   ) {
     // Set up dragged element
@@ -392,7 +418,7 @@ export class DndContext {
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);
   }
-  onDragMove(callback: (coords: [number, number]) => void) {
+  onDragMove(callback: (coords: Coordinates) => void) {
     return createEffect(() => {
       callback(this.dragMove[0]());
     });

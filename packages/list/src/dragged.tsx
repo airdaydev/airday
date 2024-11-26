@@ -20,11 +20,13 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   const onMouseMove = (event: MouseEvent) => {
     requestAnimationFrame(() => {
       if (stackRef) {
+        console.log(window.scrollX, event.x, dndContext.elClickOffset[0]);
         stackRef.style.left = `${window.scrollX + event.x - dndContext.elClickOffset[0]}px`;
         stackRef.style.top = `${window.scrollY + event.y - dndContext.elClickOffset[1]}px`;
       }
     });
   };
+  // For touch...?
   dndContext.onDragMove((coords) => {
     requestAnimationFrame(() => {
       if (stackRef) {
@@ -52,7 +54,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     <div
       style={`
       pointer-events: none;
-      position: absolute;
+      position: fixed;
       z-index: 10;
       top: ${`${window.scrollY.toString()}px` || "0"};
       left: 0;

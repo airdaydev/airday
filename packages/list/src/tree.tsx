@@ -30,7 +30,7 @@ export const Tree = () => {
             <div
               class={styles["item-container"]}
               style={{
-                top: `${windowIndex() * treeContext.itemHeight}px`,
+                top: `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
                 height: `${treeContext.itemHeight}px`,
               }}
             >
