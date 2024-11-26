@@ -56,9 +56,12 @@
 }
 
 .list-backdrop {
-    z-index: 20;
+    z-index: 0;
     width: 100%;
     flex-grow: 1;
+    /* background: #ff00007a; */
+    /* border: 1px solid yellow; */
+    box-sizing: border-box;
 }
 
 @keyframes scaleUp {

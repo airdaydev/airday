@@ -132,6 +132,7 @@ export const Tree = (props: TreeComponentProps) => {
               top: 0;
               left: 0;
               width: 100%;
+              z-index:10;
               min-height: ${listDragContext.presentCount() * listDragContext.itemHeight}px;`}
       >
         <For each={signal().window}>
