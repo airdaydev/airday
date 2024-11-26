@@ -4,7 +4,7 @@ import {
   Tree,
   DndContext,
   Dragged,
-  ListDragContext,
+  TreeContext,
   ListStateContext,
   SolidListContext,
   SoloNode,
@@ -37,7 +37,7 @@ treeStateB.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
 const treeStateC = listStateContext.createTree({ loader });
 treeStateC.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));
 
-const ctxA = new ListDragContext({
+const ctxA = new TreeContext({
   treeState: treeStateA,
   dndContext: dndContext,
   itemHeight: 32,
@@ -45,14 +45,14 @@ const ctxA = new ListDragContext({
   allowInternalMovement: false,
 });
 
-const ctxB = new ListDragContext({
+const ctxB = new TreeContext({
   treeState: treeStateB,
   dndContext: dndContext,
   itemHeight: 32,
   placeholderStyle: styles["placeholder"],
 });
 
-const ctxC = new ListDragContext({
+const ctxC = new TreeContext({
   treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 32,
@@ -69,7 +69,8 @@ render(
             style={`display: flex; flex-direction: column; height: 100%; width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxA.isFocused() }}
           >
-            <h3>Tree A ({treeStateA.count()} items) - no drop allowed</h3>
+            <h3>Tree A ({treeStateA.count()} items) - no drop</h3>
+            <span>Focus: {ctxA.isFocused() ? "true" : "false"}</span>
             <Tree />
           </div>
         </SolidListContext.Provider>
@@ -79,6 +80,7 @@ render(
             classList={{ [styles["focus"]]: ctxB.isFocused() }}
           >
             <h3>Tree B ({treeStateB.count()} items) - 3 levels</h3>
+            <span>Focus: {ctxB.isFocused() ? "true" : "false"}</span>
             <Tree />
           </div>
         </SolidListContext.Provider>
@@ -88,6 +90,7 @@ render(
             classList={{ [styles["focus"]]: ctxC.isFocused() }}
           >
             <h3>Tree C ({treeStateC.count()} items)</h3>
+            <span>Focus: {ctxC.isFocused() ? "true" : "false"}</span>
             <Tree />
           </div>
         </SolidListContext.Provider>

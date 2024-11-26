@@ -13,10 +13,10 @@ import {
   expandNode,
   collapseNode,
 } from "./behaviour";
-import { ListDragContext } from "../dnd-context";
+import { TreeContext } from "../dnd-context";
 import { encodeShortcut } from "@sunlist/keyboard";
 
-export type ShortcutFunction = (ctx: ListDragContext) => void;
+export type ShortcutFunction = (ctx: TreeContext) => void;
 
 export const defaultMapping = new Map<string, ShortcutFunction>([
   [encodeShortcut({ key: "ArrowUp" }), selectRelativeToOrigin("above")],

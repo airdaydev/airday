@@ -73,7 +73,6 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           max-width: ${dndContext.elDimensionsPx[0]}px;
           height: ${dndContext.elDimensionsPx[1]}px;
           animation: scaleUp 0.15s ease-in-out forwards;
-          opacity: 0.95;
         `}
       ></div>
     </div>

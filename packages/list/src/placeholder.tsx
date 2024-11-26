@@ -1,22 +1,22 @@
 import { Show, useContext } from "solid-js";
-import { ListDragContext, SolidListContext } from "./dnd-context";
+import { TreeContext, SolidListContext } from "./dnd-context";
 
 export const Placeholder = (props: {
   backdrop?: boolean;
   debugText?: string;
 }) => {
-  const listDragContext = useContext<ListDragContext>(SolidListContext);
+  const treeContext = useContext<TreeContext>(SolidListContext);
   return (
     <div
       classList={{
         placeholder: true,
         backdrop: props.backdrop,
-        ...(listDragContext.placeholderStyle && {
-          [listDragContext.placeholderStyle]: true,
+        ...(treeContext.placeholderStyle && {
+          [treeContext.placeholderStyle]: true,
         }),
       }}
       style={{
-        "max-height": `${listDragContext.itemHeight}px`,
+        "max-height": `${treeContext.itemHeight}px`,
       }}
     >
       <Show when={!!props.debugText}>{props.debugText}</Show>

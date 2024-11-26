@@ -8,8 +8,11 @@ import {
 } from "solid-js";
 import { Node, RootNode, TreeState } from "./state";
 import { walk } from "./tree-utils";
-import { ContainerVector } from "./tree";
 import { DndContextKeyboardEvents } from "./keyboard/index";
+import { TreeCanvas } from "./canvas";
+import { Coordinates } from "./utils";
+
+export type ContainerVector = [scrollHeight: number, scrollOffset: number];
 
 export type VirtualisedList = Accessor<{
   window: Node[];
@@ -17,20 +20,29 @@ export type VirtualisedList = Accessor<{
 }>;
 
 // Per list dnd context
-export class ListDragContext {
+export class TreeContext {
   id = createUniqueId();
   treeState: TreeState;
   selection = createSignal(new Set<Node>());
-  originIndex: number | null = 0; // TODO: This could move if other items are inserted...
-  isOrigin = false; // true = this is the list where the user has dragged from
-  lastTouchedIndexSignal = createSignal<number | undefined>();
-  dndContext: DndContext;
-  originNode: Node | null = null; // prev, dragOriginNode The actual node that the user clicked on
+  projection: Accessor<Node[]>; // Current state
+  // User Options
   itemHeight: number;
-  scrollContainerRef?: HTMLElement;
-  placeholderStyle?: string;
   allowInternalMovement = true;
-  projection: Accessor<Node[]>;
+  placeholderStyle?: string; // TODO: Deprecate for canvas version
+  // Drag
+  dndContext: DndContext;
+  isDragOrigin = false; // TODO: Should this be derived this from dndContext?
+  originIndex: number | null = 0; // TODO: This could move if other items are inserted...
+  originNode: Node | null = null;
+  originRef?: HTMLElement;
+  mouseDownCoords?: Coordinates;
+  mouseDownOffset?: Coordinates;
+  rowDraggedOver = createSignal<number | null>(null); // TODO: Do we need a signal?
+  // DOM & Render
+  canvas?: TreeCanvas;
+  scrollContainerRef?: HTMLElement; // TODO: Integrate into v3 properly
+  height = createSignal(500);
+  scrollOffset = createSignal(0);
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
@@ -45,6 +57,20 @@ export class ListDragContext {
     this.placeholderStyle = opts.placeholderStyle;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
     this.projection = this.createProjectionMemo();
+  }
+  get containerVector() {
+    return createMemo<ContainerVector>(() => {
+      return [this.height[0](), this.scrollOffset[0]()];
+    });
+  }
+  mount(opts: { canvasRef: HTMLCanvasElement }) {
+    this.canvas = new TreeCanvas({
+      treeContext: this,
+      canvasRef: opts.canvasRef,
+    });
+  }
+  unmount() {
+    this.canvas = undefined;
   }
   get allowMovement() {
     return this.dndContext.enableDrop && this.allowInternalMovement;
@@ -86,7 +112,7 @@ export class ListDragContext {
   }
   leave() {
     if (this.dndContext.isDragging()) this.dndContext.dragContext[1](null);
-    if (this.isOrigin) {
+    if (this.isDragOrigin) {
       return;
     } // Keeps origin in place for origin list
     this.reset();
@@ -97,7 +123,7 @@ export class ListDragContext {
     ref: HTMLElement,
     elClickOffset: [number, number] = [0, 0],
   ) {
-    this.isOrigin = true;
+    this.isDragOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
@@ -108,10 +134,9 @@ export class ListDragContext {
     this.dndContext.stopDrag();
   }
   reset() {
-    this.isOrigin = false;
+    this.isDragOrigin = false;
     this.originIndex = null;
     this.originNode = null;
-    this.setLastTouchedIndex(undefined); // TODO: a little bit smelly
   }
   selectOne(node: Node) {
     if (!node) return;
@@ -217,10 +242,6 @@ export class ListDragContext {
     const selection = new Set(newSelection);
     this.selection[1](selection);
   }
-  setLastTouchedIndex(index: number) {
-    if (!this.allowMovement) return;
-    return this.lastTouchedIndexSignal[1](index);
-  }
   createProjectionMemo() {
     return createMemo(() => {
       const visibleChildren: Node[] = [];
@@ -243,7 +264,7 @@ export class ListDragContext {
           (isDragging &&
             this.selection[0]().has(node) &&
             !dragOriginNode &&
-            this.isOrigin);
+            this.isDragOrigin);
         if (!skip) {
           index++;
           visibleChildren.push(node);
@@ -252,7 +273,7 @@ export class ListDragContext {
           node.expanded &&
           isDragging &&
           this.selection[0]().has(node) &&
-          this.isOrigin
+          this.isDragOrigin
         ) {
           // Skipping the selected items children when dragging
           return true;
@@ -270,13 +291,11 @@ export class ListDragContext {
     return t;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
-  getWindowedSignal(
-    containerVector: Accessor<ContainerVector>,
-  ): VirtualisedList {
+  getWindowedSignal(): VirtualisedList {
     // Virtualisation
     return createMemo(() => {
       const rowHeight = this.itemHeight;
-      const [containerHeight, offset] = containerVector();
+      const [containerHeight, offset] = this.containerVector();
       const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
       const excess = offset % rowHeight;
       const start =
@@ -294,13 +313,15 @@ export class ListDragContext {
    * or total count generally
    */
   presentCount = () => {
-    if (this.dndContext.isDragging() && this.isOrigin) {
+    if (this.dndContext.isDragging() && this.isDragOrigin) {
       return this.projection().length - this.selection[0]().size + 1;
     } else {
       return this.projection().length;
     }
   };
-  dropItems = (originList: ListDragContext) => {
+  dropItems = (originList: TreeContext) => {
+    console.log("dropping disabled!");
+    return;
     if (!this.allowMovement) return;
     const lastTouchedIndex = this.lastTouchedIndexSignal[0](); // projected index
     const lastTouchedNode = this.projection()[lastTouchedIndex || 0];
@@ -337,9 +358,9 @@ interface DndContextInitArgs {
 // This mostly controls the dragged item
 export class DndContext {
   dragMode = createSignal<dragMode>();
-  focusContext = createSignal<ListDragContext | null>(null);
-  dragContext = createSignal<ListDragContext | null>(null);
-  listContexts = new Set<ListDragContext>();
+  focusContext = createSignal<TreeContext | null>(null);
+  dragContext = createSignal<TreeContext | null>(null);
+  listContexts = new Set<TreeContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
   elClickOffset = [0, 0];
   elDimensionsPx: [number, number] = [200, 32];
@@ -393,4 +414,4 @@ export class DndContext {
   }
 }
 
-export const SolidListContext = createContext<ListDragContext | null>(null);
+export const SolidListContext = createContext<TreeContext | null>(null);

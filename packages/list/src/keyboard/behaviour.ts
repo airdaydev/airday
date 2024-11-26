@@ -1,10 +1,10 @@
-import { ListDragContext } from "../dnd-context";
+import { TreeContext } from "../dnd-context";
 
 /**
  * n.b. if there is no valid selection, will start from the end of the list
  */
 export function selectRelativeToOrigin(direction: "above" | "below") {
-  return (ctx: ListDragContext) => {
+  return (ctx: TreeContext) => {
     // Movement from selection
     if (ctx.selection[0]().size === 0 || !ctx.originNode) {
       const lastIndex = ctx.treeState.count();
@@ -31,12 +31,12 @@ export function selectRelativeToOrigin(direction: "above" | "below") {
   };
 }
 
-export function selectOriginToTop(ctx: ListDragContext) {
+export function selectOriginToTop(ctx: TreeContext) {
   if (!ctx.originNode) return; // TODO: Start from top?
   ctx.selectNodesInRange(0, ctx.originNode.getIndex());
   ctx.jumpScrollToIndex(0);
 }
-export function selectOriginToBottom(ctx: ListDragContext) {
+export function selectOriginToBottom(ctx: TreeContext) {
   if (!ctx.originNode) return; // TODO: Start from bottom?
   const end = ctx.presentCount() - 1;
   ctx.selectNodesInRange(ctx.originNode.getIndex(), end);
@@ -44,17 +44,17 @@ export function selectOriginToBottom(ctx: ListDragContext) {
 }
 
 // jump to & select top of list
-export function jumpToTop(ctx: ListDragContext) {
+export function jumpToTop(ctx: TreeContext) {
   ctx.selectOne(ctx.projection()[0]);
   ctx.jumpScrollToIndex(0);
 }
 
-export function selectAll(ctx: ListDragContext) {
+export function selectAll(ctx: TreeContext) {
   ctx.selectAllNodes();
 }
 
 // jump to & select bottom of list
-export function jumpToBottom(ctx: ListDragContext) {
+export function jumpToBottom(ctx: TreeContext) {
   const bottomIndex = ctx.projection().length - 1;
   const bottomNode = ctx.projection()[bottomIndex];
   ctx.selectOne(bottomNode);
@@ -62,7 +62,7 @@ export function jumpToBottom(ctx: ListDragContext) {
 }
 
 // Selects or deselects depending on contiguous selected nodes from origin (shift + up/down)
-export function selectFromOriginUp(ctx: ListDragContext) {
+export function selectFromOriginUp(ctx: TreeContext) {
   if (!ctx.originNode) return; // TODO: Start from top?
   // Add to selection down
   const originIndex = ctx.originNode.getIndex();
@@ -89,7 +89,7 @@ export function selectFromOriginUp(ctx: ListDragContext) {
   }
 }
 
-export function selectFromOriginDown(ctx: ListDragContext) {
+export function selectFromOriginDown(ctx: TreeContext) {
   // Shift down/up selects objects between most extreme node contiguous to origin
   if (!ctx.originNode) return; // TODO:
   // Remove from selection (selection extends above origin)
@@ -112,11 +112,11 @@ export function selectFromOriginDown(ctx: ListDragContext) {
   }
 }
 
-export function clearSelection(ctx: ListDragContext) {
+export function clearSelection(ctx: TreeContext) {
   ctx.clearSelection();
 }
 
-export function moveSelectionUp(ctx: ListDragContext) {
+export function moveSelectionUp(ctx: TreeContext) {
   if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
   if (selection.size === 0) return;
@@ -136,7 +136,7 @@ export function moveSelectionUp(ctx: ListDragContext) {
   }
 }
 
-export function moveSelectionDown(ctx: ListDragContext) {
+export function moveSelectionDown(ctx: TreeContext) {
   if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
   if (selection.size === 0) return;
@@ -154,7 +154,7 @@ export function moveSelectionDown(ctx: ListDragContext) {
   }
 }
 
-export function expandNode(ctx: ListDragContext) {
+export function expandNode(ctx: TreeContext) {
   // TODO: Base on selection?
   if (ctx.originNode) {
     ctx.originNode.expand();
@@ -163,7 +163,7 @@ export function expandNode(ctx: ListDragContext) {
   }
 }
 
-export function collapseNode(ctx: ListDragContext) {
+export function collapseNode(ctx: TreeContext) {
   if (ctx.originNode) {
     ctx.originNode.collapse();
     const children = ctx.treeState.childrenSignal[0]();

@@ -1,10 +1,10 @@
 import { PropsWithChildren, Component } from "solid-js";
-import { DndContext, ListDragContext } from "./dnd-context";
+import { DndContext, TreeContext } from "./dnd-context";
 import { distance } from "./utils";
 
 interface SoloNodeProps extends PropsWithChildren {
   dndContext: DndContext;
-  listDragContext: ListDragContext;
+  treeContext: TreeContext;
   Component: SoloNodeComponentType;
   enableDrop: boolean; // Can still be used with other components
 }
