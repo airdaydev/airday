@@ -252,19 +252,10 @@ export class TreeContext {
       const isDragging = this.dndContext.isDragging();
       // Flattens the tree
       walk<Node, Node>(n, (node) => {
-        // Keeping the node that user actually dragged in place
-        const dragOriginNode = node === this.originNode;
-        if (dragOriginNode) {
-          this.originIndex = index;
-          index++;
-        }
         // Skip root & other selected items
         const skip =
           node.isRoot ||
-          (isDragging &&
-            this.selection[0]().has(node) &&
-            !dragOriginNode &&
-            this.isDragOrigin);
+          (isDragging && this.selection[0]().has(node) && this.isDragOrigin);
         if (!skip) {
           index++;
           visibleChildren.push(node);
