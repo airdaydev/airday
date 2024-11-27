@@ -45,12 +45,14 @@ const ctxA = new TreeContext({
 });
 
 const ctxB = new TreeContext({
+  id: "b",
   treeState: treeStateB,
   dndContext: dndContext,
   itemHeight: 32,
 });
 
 const ctxC = new TreeContext({
+  id: "c",
   treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 32,

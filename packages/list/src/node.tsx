@@ -89,6 +89,10 @@ export const TreeNode = (props: NodeProps) => {
       }
       ariaSelected={isSelected()}
       select={() => props.treeContext.selectOne(props.node)}
+      toggleExpansion={() => {
+        props.node.toggleExpansion();
+        props.treeContext.preventAnimationHack();
+      }}
     />
   );
 };

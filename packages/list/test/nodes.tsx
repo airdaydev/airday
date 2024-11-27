@@ -72,7 +72,7 @@ export const TextNodeComponent: NodeComponentType = (props) => {
         {props.node?.children.length && (
           <button
             class={styles["expand"]}
-            onClick={() => props.node.toggleExpansion()}
+            onClick={() => props.toggleExpansion()}
           >
             <img src="/public/caret.svg" />
           </button>

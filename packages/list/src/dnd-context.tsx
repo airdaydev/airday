@@ -47,12 +47,14 @@ export class TreeContext {
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   noAnimation = createSignal<boolean>(false);
   constructor(opts: {
+    id?: string;
     treeState: TreeState;
     dndContext: DndContext;
     itemHeight: number;
     placeholderStyle?: string;
     allowInternalMovement?: boolean;
   }) {
+    if (opts.id) this.id = opts.id;
     this.treeState = opts.treeState;
     this.dndContext = opts.dndContext;
     opts.dndContext.listContexts.add(this);
@@ -116,7 +118,9 @@ export class TreeContext {
     return this.dndContext.dragContext[0]() === this;
   }
   setDragOver() {
-    this.dndContext.dragContext[1](() => this);
+    if (this.dndContext.dragContext[0]() !== this) {
+      this.dndContext.dragContext[1](() => this);
+    }
   }
   clearSelection() {
     this.selection[1](new Set([]));
@@ -159,6 +163,7 @@ export class TreeContext {
       this.rowDraggedOver[1](undefined);
       return; // out of x bounds
     }
+    this.setDragOver();
     const mousePosListY =
       window.scrollY + this.listRef?.scrollTop + event.y - this.listBounds.minY;
     const row = Math.min(
@@ -184,10 +189,11 @@ export class TreeContext {
     this.dndContext.startDrag(ref, elClickOffset);
     this.recalcListBounds();
     this.setDragOver();
-    window.addEventListener("mousemove", this.dragMouseMove);
   }
   stopDrag() {
-    window.removeEventListener("mousemove", this.dragMouseMove);
+    if (!this.dndContext.isDragging()) {
+      return;
+    }
     this.reset();
     this.dndContext.stopDrag();
     this.rowDraggedOver[1](undefined);
@@ -195,7 +201,7 @@ export class TreeContext {
   reset() {
     this.isDragOrigin = false;
     this.originIndex = null;
-    this.originNode = null;
+    // this.originNode = null;
   }
   selectOne(node: Node) {
     if (!node) return;
@@ -345,7 +351,7 @@ export class TreeContext {
     // list().start
     let offset = 0;
     if (
-      this.isDraggingOver() &&
+      this.dndContext.isDragging() &&
       typeof this.rowDraggedOver[0]() === "number" &&
       index() + list().start >= this.rowDraggedOver[0]()
     ) {
@@ -384,13 +390,16 @@ export class TreeContext {
     }
     return (this.presentCount() + 1) * this.itemHeight;
   };
+  preventAnimationHack() {
+    this.noAnimation[1](true);
+    setTimeout(() => this.noAnimation[1](false), 10);
+  }
   dropItems = (originList: TreeContext) => {
     if (!this.allowMovement) return;
     const dropIndex = this.rowDraggedOver[0]();
     if (typeof dropIndex !== "number") return;
     // Hack but it's ok for now, stops an awkward drop animation for items below drop area
-    this.noAnimation[1](true);
-    setTimeout(() => this.noAnimation[1](false), 10);
+    this.preventAnimationHack();
     const dropNode = this.projection()[dropIndex];
     let parent = null;
     if (dropNode && dropNode.parent && !dropNode.parent.isRoot) {
@@ -442,7 +451,13 @@ export class DndContext {
     this.elDimensionsPx = [bounds.width, bounds.height];
     this.draggedEl = ref.cloneNode(true);
     this.dragMode[1](dragMode);
+    window.addEventListener("mousemove", this.react);
   }
+  react = (event: MouseEvent) => {
+    this.listContexts.forEach((listContext) =>
+      listContext.dragMouseMove(event),
+    );
+  };
   focusedContext() {
     return this.focusContext[0]();
   }
@@ -472,6 +487,7 @@ export class DndContext {
     this.draggedEl = null;
     this.dragMode[1](null);
     this.dragContext[1](null);
+    window.removeEventListener("mousemove", this.react);
   }
 }
 

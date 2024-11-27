@@ -43,7 +43,7 @@ export class TreeCanvas {
   ctx2D?: CanvasRenderingContext2D;
   scale = window.devicePixelRatio || 1;
   fps = new FPS();
-  currentRow: number;
+  currentRow?: number;
   rowsHighlighted = new Map<number, RowRecord>(); // Fades in over 100ms, fades out after 100ms
 
   constructor(opts: TreeCanvasOpts) {
@@ -55,11 +55,15 @@ export class TreeCanvas {
     } else {
       throw new Error("Failed to retrieve canvasEl context");
     }
+    this.resizeCanvas();
+    this.initRenderLoop();
+  }
+  resizeCanvas = () => {
+    if (!this.canvasEl || !this.ctx2D) return;
     this.canvasEl.width = this.canvasEl.offsetWidth * this.scale;
     this.canvasEl.height = this.canvasEl.offsetHeight * this.scale;
     this.ctx2D.scale(this.scale, this.scale);
-    this.initRenderLoop();
-  }
+  };
   get dimensions() {
     // TODO: Cache
     return [
