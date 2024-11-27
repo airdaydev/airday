@@ -66,17 +66,16 @@ pnpm install
 pnpm run dev
 ```
 
-## Tree conversion
-- [] Last item before depth change activates special placeholder where dragging
-over left-most edge places item outside of container (think for multiple levels!)
-- [] placeholder indents variable at bottom of children lists depending on mouse location
-- [] range select up & down only allowed at same depth
-- [] select last item works with nesting
-- [] can't drag parent within itself (if same list is open!)
+## V3 roadmap
+- [] Dragging to other lists
+- [] Smooth autoscrolling
+- [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
+- [] Virtual list height correctly calculated
+- [] Can't drop below last item
+- [] Provide API for rejecting bad positions ahead of time so UI can respond
 
 ## Roadmap
-- Prototype 2D canvas version
-- Move to GPU version
+- GPU version?
 - Smoother down scrolling when moving off list item
 - move down via line numbers (vim)
 - predict doubles to display in vim mode.
