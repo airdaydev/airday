@@ -61,7 +61,7 @@ render(
     <div class={styles["app"]}>
       {dndContext.isDragging() && <Dragged dndContext={dndContext} />}
       <div class={styles["container"]}>
-        <SolidListContext.Provider value={ctxA}>
+        {/* <SolidListContext.Provider value={ctxA}>
           <div
             style={`display: flex; flex-direction: column; height: 100%; width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxA.isFocused() }}
@@ -80,7 +80,7 @@ render(
             <span>Focus: {ctxB.isFocused() ? "true" : "false"}</span>
             <Tree />
           </div>
-        </SolidListContext.Provider>
+        </SolidListContext.Provider> */}
         <SolidListContext.Provider value={ctxC}>
           <div
             style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}

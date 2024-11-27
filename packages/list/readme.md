@@ -4,8 +4,8 @@ An opinionated, imperfect interactive tree system including store & UI component
 Drag & drop, virtualised, static height per element.
 
 ## Features
+- Virtualised window (ensure scroll list is correctly sized, )
 - Window expands to fill minimum size.
-- Virtualised window.
 - Drag & drop in same list or to other lists.
 - Items can have variable height in non-virtual mode.
 - Searching & filters.
@@ -70,33 +70,16 @@ pnpm run dev
 - [] Dragging to other lists
 - [] Smooth autoscrolling
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
-- [] Virtual list height correctly calculated
+- [] Virtual list height correctly calculated (BUG!)
 - [] Can't drop below last item
 - [] Provide API for rejecting bad positions ahead of time so UI can respond
+- [] Touch version
 
 ## Roadmap
 - GPU version?
-- Smoother down scrolling when moving off list item
 - move down via line numbers (vim)
-- predict doubles to display in vim mode.
-- Get autoscroller touch version working with other lists on mobile.
-- cmd+d to duplicate
-
-## Stretch goals
-- Tree
-- Variable heights
-- Dynamically retrieved, variable heights
-- Prevent infinite recursion in tree
 
 ## Bugs
-- [] Shifting up/down and deselecting doesn't move viewport when deselecting
-- [] Implement keyboard undefined behaviour - deselecting origin and trying to shift!!
-- Dragging to another list then using keyboard controls not working
-- Implement transitions for deleting & adding items (previously removed this due to issues with animation not finishing)
-- Touch drag - when moving back and forth between foreign lists a few times, the simulated touch enter stuff doesn't always work (state bug?)
-- On refresh, in Firefox (at least), when scroll bar assumes (same?) position, dragging an item drasticall moves the list (definitely happens in case that list size changes)
-- When dragging directly down to the end of list with overflow-y, the list jumps up and back down again! I suspect it is a value not resetting in the autoscroll controller after leaving and rejoining.
-- Rare: take a short list & select most but not the last item, drag from the bottom near the last item, and the final placeholder will activate below the last item placeholder (I believe)
 - When moving a lot of items (10 000s), O(2N) to sort each move!!
 
 # Other options:

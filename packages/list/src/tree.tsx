@@ -4,8 +4,9 @@ import { TreeContext, SolidListContext } from "./dnd-context";
 import { TreeNode } from "./node";
 
 export const Tree = () => {
-  let canvasRef: HTMLCanvasElement | undefined = undefined;
   let listRef: HTMLDivElement | undefined = undefined;
+  let scrollRef: HTMLDivElement | undefined = undefined;
+  let canvasRef: HTMLCanvasElement | undefined = undefined;
   const treeContext = useContext<TreeContext>(SolidListContext);
   const windowedList = treeContext.getWindowedSignal();
 
@@ -15,6 +16,7 @@ export const Tree = () => {
         canvasRef,
         listRef,
         treeContext,
+        scrollRef,
       });
     }
   });
@@ -28,28 +30,35 @@ export const Tree = () => {
         }}
         ref={listRef}
       >
-        <For each={windowedList().window}>
-          {(node, windowIndex) => (
-            <div
-              class={styles["item-container"]}
-              style={{
-                top: `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
-                height: `${treeContext.itemHeight}px`,
-              }}
-            >
-              <TreeNode
-                node={node}
-                treeContext={treeContext}
-                Component={
-                  node.component ||
-                  props.defaultNodeComponent ||
-                  DefaultNodeComponent
-                }
-                windowIndex={windowIndex}
-              />
-            </div>
-          )}
-        </For>
+        <div
+          ref={scrollRef}
+          style={{
+            "min-height": `${treeContext.listHeight()}px`,
+          }}
+        >
+          <For each={windowedList().window}>
+            {(node, windowIndex) => (
+              <div
+                class={styles["item-container"]}
+                style={{
+                  top: `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
+                  height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
+                }}
+              >
+                <TreeNode
+                  node={node}
+                  treeContext={treeContext}
+                  Component={
+                    node.component ||
+                    props.defaultNodeComponent ||
+                    DefaultNodeComponent
+                  }
+                  windowIndex={windowIndex}
+                />
+              </div>
+            )}
+          </For>
+        </div>
       </div>
       <canvas ref={canvasRef} />
     </div>

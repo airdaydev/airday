@@ -39,9 +39,9 @@ export class TreeContext {
   mouseDownOffset?: Coordinates;
   rowDraggedOver = createSignal<number | null>(null); // TODO: Do we need a signal?
   // DOM & Render
-  canvas?: TreeCanvas;
+  containerRef?: HTMLElement;
   listRef?: HTMLElement;
-  scrollContainerRef?: HTMLElement; // TODO: Integrate into v3 properly
+  canvas?: TreeCanvas;
   height = createSignal(500);
   scrollOffset = createSignal(0);
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
@@ -63,7 +63,10 @@ export class TreeContext {
   }
   get containerVector() {
     return createMemo<ContainerVector>(() => {
-      return [this.height[0](), this.scrollOffset[0]()];
+      return [
+        this.listBounds.maxY - this.listBounds.minY,
+        this.scrollOffset[0](),
+      ];
     });
   }
   recalcListBounds() {
@@ -77,22 +80,28 @@ export class TreeContext {
       };
     }
   }
-  mount(opts: { canvasRef: HTMLCanvasElement; listRef: HTMLElement }) {
+  mount(opts: {
+    canvasRef: HTMLCanvasElement;
+    listRef: HTMLElement;
+    containerRef: HTMLElement;
+  }) {
     this.listRef = opts.listRef;
     this.recalcListBounds();
     this.canvas = new TreeCanvas({
       treeContext: this,
       canvasRef: opts.canvasRef,
     });
-    this.listRef.addEventListener("scroll", () => this.setListOffset());
-  }
-  setListOffset() {
-    this.scrollOffset[1](this.listRef.scrollTop);
+    this.containerRef = opts.containerRef;
+    this.listRef.addEventListener("scroll", this.setListOffset);
   }
   unmount() {
+    this.listRef?.removeEventListener("scroll", this.setListOffset);
     this.listRef = undefined;
     this.canvas = undefined;
   }
+  setListOffset = () => {
+    this.scrollOffset[1](this.listRef.scrollTop);
+  };
   get allowMovement() {
     return this.dndContext.enableDrop && this.allowInternalMovement;
   }
@@ -118,14 +127,14 @@ export class TreeContext {
   }
   // TODO: Experiment with fast smooth scroll
   jumpScrollToIndex(index: number) {
-    if (!this.scrollContainerRef) return; // should never happen
+    if (!this.listRef) return; // should never happen
     const itemOffset = index * this.itemHeight;
-    const scrollBounds = this.scrollContainerRef.getBoundingClientRect();
-    if (itemOffset < this.scrollContainerRef.scrollTop) {
-      this.scrollContainerRef.scrollTo(0, itemOffset);
+    const scrollBounds = this.listRef.getBoundingClientRect();
+    if (itemOffset < this.listRef.scrollTop) {
+      this.listRef.scrollTo(0, itemOffset);
     }
-    if (itemOffset > this.scrollContainerRef.scrollTop + scrollBounds.height) {
-      this.scrollContainerRef.scrollTo(
+    if (itemOffset > this.listRef.scrollTop + scrollBounds.height) {
+      this.listRef.scrollTo(
         0,
         itemOffset + this.itemHeight - scrollBounds.height,
       );
@@ -148,7 +157,8 @@ export class TreeContext {
       this.rowDraggedOver[1](undefined);
       return; // out of x bounds
     }
-    const mousePosListY = window.scrollY + event.y - this.listBounds.minY;
+    const mousePosListY =
+      window.scrollY + this.listRef?.scrollTop + event.y - this.listBounds.minY;
     const row = Math.floor(mousePosListY / this.itemHeight);
     if (row !== this.rowDraggedOver[0]()) {
       this.rowDraggedOver[1](row);
@@ -332,11 +342,11 @@ export class TreeContext {
     if (
       this.isDraggingOver() &&
       typeof this.rowDraggedOver[0]() === "number" &&
-      index() >= this.rowDraggedOver[0]()
+      index() + list().start >= this.rowDraggedOver[0]()
     ) {
       offset = this.itemHeight;
     }
-    return index() * this.itemHeight + offset;
+    return index() * this.itemHeight + offset + list().start * this.itemHeight;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
@@ -344,10 +354,11 @@ export class TreeContext {
     return createMemo(() => {
       const rowHeight = this.itemHeight;
       const [containerHeight, offset] = this.containerVector();
-      const buffer = 20; // TODO: Buffer should be linked to scroll change required to update
+      const buffer = 20; // additional items to buffer in both directions
       const excess = offset % rowHeight;
       const start =
         Math.max(0, offset - excess - buffer * rowHeight) / rowHeight;
+      console.log(start);
       const renderCount = Math.floor(containerHeight / rowHeight) + buffer * 2;
       let window = this.projection().slice(start, start + renderCount);
       return {
@@ -361,11 +372,13 @@ export class TreeContext {
    * or total count generally
    */
   presentCount = () => {
-    if (this.dndContext.isDragging() && this.isDragOrigin) {
-      return this.projection().length - this.selection[0]().size + 1;
-    } else {
-      return this.projection().length;
+    return this.projection().length;
+  };
+  listHeight = () => {
+    if (this.dndContext.isDragging()) {
+      return (this.presentCount() + 2) * this.itemHeight;
     }
+    return (this.presentCount() + 1) * this.itemHeight;
   };
   dropItems = (originList: TreeContext) => {
     if (!this.allowMovement) return;
@@ -374,6 +387,7 @@ export class TreeContext {
     // Hack but it's ok for now, stops an awkward drop animation for items below drop area
     this.noAnimation[1](true);
     setTimeout(() => this.noAnimation[1](false), 10);
+    console.log(dropIndex);
     const lastTouchedNode = this.projection()[dropIndex];
     // TODO: if parent, calc local index:
     // TODO: Depth needs to be updated
@@ -439,7 +453,7 @@ export class DndContext {
   checkLeave(el: Element) {
     this.listContexts.forEach((ctx) => {
       if (ctx.isDraggingOver()) {
-        const contains = ctx.scrollContainerRef?.contains(el);
+        const contains = ctx.listRef?.contains(el);
         if (!contains) {
           ctx.leave();
         }

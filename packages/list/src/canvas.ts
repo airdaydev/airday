@@ -112,11 +112,11 @@ export class TreeCanvas {
       if (this.currentRow === row[0]) {
         // Fading in or full
         const elapsed = frame - row[1].start;
-        opacity = elapsed > 200 ? 1 : elapsed / 200;
+        opacity = elapsed > 150 ? 1 : elapsed / 150;
       } else {
         // Fading out
         const elapsed = frame - row[1].last;
-        opacity = 1 - elapsed / 200;
+        opacity = 1 - elapsed / 150;
       }
       this.ctx2D.fillStyle = `rgba(220, 220, 220, ${opacity})`;
       this.ctx2D.fillRect(
@@ -125,7 +125,7 @@ export class TreeCanvas {
         this.dimensions[0],
         itemHeight,
       );
-      if (frame - row[1].last > 200) {
+      if (frame - row[1].last > 150) {
         this.rowsHighlighted.delete(row[0]);
       }
     }
