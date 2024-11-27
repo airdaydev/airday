@@ -196,7 +196,6 @@ export class TreeContext {
     }
     this.reset();
     this.dndContext.stopDrag();
-    this.rowDraggedOver[1](undefined);
   }
   reset() {
     this.isDragOrigin = false;
@@ -483,6 +482,9 @@ export class DndContext {
     });
   }
   stopDrag() {
+    this.listContexts.forEach((ctx) => {
+      ctx.rowDraggedOver[1](undefined);
+    });
     this.elClickOffset = [0, 0];
     this.draggedEl = null;
     this.dragMode[1](null);
