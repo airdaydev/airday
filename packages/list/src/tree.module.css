@@ -13,18 +13,9 @@
     height: 100%;
 }
 
-.container .interactions {
-    position: absolute;
-    z-index: 1;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-
 .container .list {
     position: absolute;
-    z-index: 2;
+    z-index: 1;
     top: 0;
     left: 0;
     width: 100%;
@@ -35,5 +26,12 @@
 .item-container {
     position: absolute;
     width: 100%;
+}
+
+/* Without this, some odd animation i.e.
+dragging a group of items above other items,
+makes other items move awkwardly down to their intended position.
+*/
+[aria-pressed="true"] .item-container {
     transition: top 0.1s;
 }

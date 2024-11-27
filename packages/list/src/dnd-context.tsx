@@ -174,6 +174,7 @@ export class TreeContext {
     window.removeEventListener("mousemove", this.dragMouseMove);
     this.reset();
     this.dndContext.stopDrag();
+    this.rowDraggedOver[1](undefined);
   }
   reset() {
     this.isDragOrigin = false;
@@ -366,11 +367,10 @@ export class TreeContext {
     }
   };
   dropItems = (originList: TreeContext) => {
-    console.log("dropping disabled!");
-    return;
     if (!this.allowMovement) return;
-    const lastTouchedIndex = this.lastTouchedIndexSignal[0](); // projected index
-    const lastTouchedNode = this.projection()[lastTouchedIndex || 0];
+    const dropIndex = this.rowDraggedOver[0]();
+    if (typeof dropIndex !== "number") return;
+    const lastTouchedNode = this.projection()[dropIndex];
     // TODO: if parent, calc local index:
     // TODO: Depth needs to be updated
     let parent = null;
@@ -384,7 +384,7 @@ export class TreeContext {
     const items = originList.treeState.take(originList.selection[0]());
     this.treeState.insertItems(items, [
       parent,
-      parent === null ? lastTouchedIndex : lastTouchedNode.localIndex || 0,
+      parent === null ? dropIndex : lastTouchedNode.localIndex || 0,
     ]);
     this.setFocus();
     this.selection[1](originList.selection[0]());

@@ -6,16 +6,14 @@ import { TreeNode } from "./node";
 export const Tree = () => {
   let canvasRef: HTMLCanvasElement | undefined = undefined;
   let listRef: HTMLDivElement | undefined = undefined;
-  let interactionsRef: HTMLDivElement | undefined = undefined;
   const treeContext = useContext<TreeContext>(SolidListContext);
   const windowedList = treeContext.getWindowedSignal();
 
   onMount(() => {
-    if (canvasRef && listRef && interactionsRef) {
+    if (canvasRef && listRef) {
       treeContext.mount({
         canvasRef,
         listRef,
-        interactionsRef,
         treeContext,
       });
     }
@@ -23,8 +21,11 @@ export const Tree = () => {
 
   return (
     <div class={styles["container"]}>
-      <div class={styles["interactions"]} ref={interactionsRef} />
-      <div class={styles["list"]} ref={listRef}>
+      <div
+        class={styles["list"]}
+        aria-pressed={treeContext.isDraggingOver()}
+        ref={listRef}
+      >
         <For each={windowedList().window}>
           {(node, windowIndex) => (
             <div
