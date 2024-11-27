@@ -22,8 +22,10 @@ export const Tree = () => {
   return (
     <div class={styles["container"]}>
       <div
-        class={styles["list"]}
-        aria-pressed={treeContext.isDraggingOver()}
+        classList={{
+          [styles["list"]]: true,
+          [styles["no-animation"]]: treeContext.noAnimation[0](),
+        }}
         ref={listRef}
       >
         <For each={windowedList().window}>

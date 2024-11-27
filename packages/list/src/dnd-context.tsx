@@ -45,6 +45,7 @@ export class TreeContext {
   height = createSignal(500);
   scrollOffset = createSignal(0);
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  noAnimation = createSignal<boolean>(false);
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
@@ -370,6 +371,9 @@ export class TreeContext {
     if (!this.allowMovement) return;
     const dropIndex = this.rowDraggedOver[0]();
     if (typeof dropIndex !== "number") return;
+    // Hack but it's ok for now, stops an awkward drop animation for items below drop area
+    this.noAnimation[1](true);
+    setTimeout(() => this.noAnimation[1](false), 10);
     const lastTouchedNode = this.projection()[dropIndex];
     // TODO: if parent, calc local index:
     // TODO: Depth needs to be updated

@@ -26,12 +26,9 @@
 .item-container {
     position: absolute;
     width: 100%;
+    transition: top 0.1s;
 }
 
-/* Without this, some odd animation i.e.
-dragging a group of items above other items,
-makes other items move awkwardly down to their intended position.
-*/
-[aria-pressed="true"] .item-container {
-    transition: top 0.1s;
+.no-animation .item-container {
+    transition: none;
 }

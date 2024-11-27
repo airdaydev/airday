@@ -159,7 +159,6 @@ export const Tree = (props: TreeComponentProps) => {
               treeContext.setDragOver();
             } else {
               // foreign entry
-              console.log("foreignentryindex", endIndex);
               treeContext.setLastTouchedIndex(endIndex);
               treeContext.setDragOver();
             }

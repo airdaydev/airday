@@ -69,7 +69,6 @@ export const TreeNode = (props: NodeProps) => {
         // The event is on the node being dragged itself, but this is also recorded as selected item
         // We need to discover the parent, the local index
         // TODO: Perhaps wrap this within the context
-        console.log("stop drag");
         const activeContext = props.treeContext.dndContext.dragContext[0]();
         activeContext?.dropItems(props.treeContext);
         props.treeContext.stopDrag();
