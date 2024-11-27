@@ -9,7 +9,7 @@ import {
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView } from "../view/state";
-import { Tree, SolidListContext, ListDragContext } from "@sunlist/list";
+import { Tree, SolidListContext, TreeContext } from "@sunlist/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 import NullList from "./null-list";
@@ -23,7 +23,7 @@ interface ListProps {
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
   const list = session.workspace.openList(props.view);
-  const ctx = new ListDragContext({
+  const ctx = new TreeContext({
     treeState: list.tree,
     dndContext: session.workspace.dndContext,
     itemHeight: 32,

@@ -82,7 +82,6 @@ over left-most edge places item outside of container (think for multiple levels!
 - predict doubles to display in vim mode.
 - Get autoscroller touch version working with other lists on mobile.
 - cmd+d to duplicate
-- Disable placeholder when autoscrolling (coz it's a little janky)
 
 ## Stretch goals
 - Tree

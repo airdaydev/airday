@@ -73,11 +73,6 @@ body {
     }
 }
 
-.placeholder {
-    background: blue;
-    animation: fadeIn 0.15s ease-in forwards;
-}
-
 .app {
     display: flex;
 }

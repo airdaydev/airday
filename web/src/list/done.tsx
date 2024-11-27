@@ -10,7 +10,7 @@ import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { DoneListHeader } from "./list-header";
 import { DataView } from "../view/state";
-import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
+import { TreeContext, SolidListContext, Tree } from "@sunlist/list";
 import itemStyles from "../item/item.module.css";
 import styles from "./list.module.css";
 import { ListColumnHeaders } from "./list-col-head";
@@ -20,7 +20,7 @@ import { Timeline } from "./timeline";
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
   const tree = session.workspace.historical.tree;
-  const ctx = new ListDragContext({
+  const ctx = new TreeContext({
     treeState: tree,
     dndContext: session.workspace.dndContext,
     itemHeight: 32,

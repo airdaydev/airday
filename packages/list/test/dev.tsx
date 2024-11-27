@@ -41,7 +41,6 @@ const ctxA = new TreeContext({
   treeState: treeStateA,
   dndContext: dndContext,
   itemHeight: 32,
-  placeholderStyle: styles["placeholder"],
   allowInternalMovement: false,
 });
 
@@ -49,14 +48,12 @@ const ctxB = new TreeContext({
   treeState: treeStateB,
   dndContext: dndContext,
   itemHeight: 32,
-  placeholderStyle: styles["placeholder"],
 });
 
 const ctxC = new TreeContext({
   treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 32,
-  placeholderStyle: styles["placeholder"],
 });
 
 render(

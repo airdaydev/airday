@@ -4,7 +4,7 @@ import { sessionContext } from "../store/context.js";
 import { NavItemContextMenu } from "./context-menus";
 import { NodeComponentType } from "@sunlist/list";
 import styles from "./nav.module.css";
-import { ListDragContext, SolidListContext, Tree } from "@sunlist/list";
+import { TreeContext, SolidListContext, Tree } from "@sunlist/list";
 import { DataView } from "../view/state";
 
 // TODO: Turn off keyboard when context menu open
@@ -69,7 +69,7 @@ export const NavListItem: NodeComponentType = (props) => {
 
 export const NavLists = () => {
   const session = useContext(sessionContext);
-  const listDragContext = new ListDragContext({
+  const treeContext = new TreeContext({
     treeState: session.workspace.containerStore.tree,
     dndContext: session.workspace.containerStore.dndContext,
     itemHeight: 32,
@@ -77,12 +77,12 @@ export const NavLists = () => {
   });
   onCleanup(() => {
     session.workspace.containerStore.dndContext.listContexts.delete(
-      listDragContext,
+      treeContext,
     );
   });
   return (
     <div class={`${styles["nav-list"]} ${styles["nav-text"]}`}>
-      <SolidListContext.Provider value={listDragContext}>
+      <SolidListContext.Provider value={treeContext}>
         <Tree hideBackdrop />
       </SolidListContext.Provider>
     </div>
