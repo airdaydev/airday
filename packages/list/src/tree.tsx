@@ -1,9 +1,13 @@
-import { useContext, onMount, For } from "solid-js";
+import { useContext, onMount, For, Component } from "solid-js";
 import styles from "./tree.module.css";
 import { TreeContext, SolidListContext } from "./dnd-context";
 import { TreeNode } from "./node";
 
-export const Tree = () => {
+interface TreeProps {
+  shadowColor: [number, number, number]; // RGB
+}
+
+export const Tree: Component<TreeProps> = (props) => {
   let listRef: HTMLDivElement | undefined = undefined;
   let scrollRef: HTMLDivElement | undefined = undefined;
   let canvasRef: HTMLCanvasElement | undefined = undefined;
@@ -18,6 +22,9 @@ export const Tree = () => {
         treeContext,
         scrollRef,
       });
+      if (props.shadowColor) {
+        treeContext.canvas.setShadowColor(props.shadowColor);
+      }
     }
   });
 

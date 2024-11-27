@@ -5,6 +5,8 @@ interface TreeCanvasOpts {
   canvasRef: HTMLCanvasElement;
 }
 
+export type RGB = [number, number, number];
+
 class FPS {
   sampleSize = 60;
   samples: number[] = [];
@@ -44,6 +46,7 @@ export class TreeCanvas {
   scale = window.devicePixelRatio || 1;
   fps = new FPS();
   currentRow?: number;
+  shadowColor: RGB = [240, 240, 240];
   rowsHighlighted = new Map<number, RowRecord>(); // Fades in over 100ms, fades out after 100ms
 
   constructor(opts: TreeCanvasOpts) {
@@ -58,6 +61,9 @@ export class TreeCanvas {
     this.resizeCanvas();
     this.initRenderLoop();
   }
+  setShadowColor = (color: RGB) => {
+    this.shadowColor = color;
+  };
   resizeCanvas = () => {
     if (!this.canvasEl || !this.ctx2D) return;
     this.canvasEl.width = this.canvasEl.offsetWidth * this.scale;
@@ -74,14 +80,14 @@ export class TreeCanvas {
   initRenderLoop() {
     this.frame();
   }
-  bg() {
-    this.ctx2D.fillStyle = "#f0f0f0";
-    this.ctx2D.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
-    this.ctx2D.fillStyle = "black";
-  }
+  // bg() {
+  //   this.ctx2D.fillStyle = "#f0f0f0";
+  //   this.ctx2D.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
+  //   this.ctx2D.fillStyle = "black";
+  // }
   frame() {
     requestAnimationFrame((frame) => {
-      this.bg();
+      this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
       const fps = this.fps.update();
       this.ctx2D.font = "12px Alte Haas Grotesk";
       this.ctx2D.textAlign = "right";
@@ -93,14 +99,14 @@ export class TreeCanvas {
       this.frame();
       const row = this.treeContext.rowDraggedOver[0]();
       if (typeof row === "number") {
-        this.highlightRow(frame, row);
+        this.addShadow(frame, row);
       } else {
         this.currentRow = undefined;
       }
-      this.highlights(frame);
+      this.renderShadows(frame);
     });
   }
-  highlightRow(frame: number, index: number) {
+  addShadow(frame: number, index: number) {
     this.currentRow = index;
     const row = this.rowsHighlighted.get(index);
     if (!row) {
@@ -109,7 +115,7 @@ export class TreeCanvas {
       this.rowsHighlighted.set(index, { ...row, last: frame });
     }
   }
-  highlights(frame: number) {
+  renderShadows(frame: number) {
     const itemHeight = this.treeContext.itemHeight;
     for (const row of this.rowsHighlighted.entries()) {
       let opacity = 0;
@@ -122,7 +128,7 @@ export class TreeCanvas {
         const elapsed = frame - row[1].last;
         opacity = 1 - elapsed / 150;
       }
-      this.ctx2D.fillStyle = `rgba(220, 220, 220, ${opacity})`;
+      this.ctx2D.fillStyle = `rgba(${this.shadowColor[0]}, ${this.shadowColor[1]}, ${this.shadowColor[2]}, ${opacity})`;
       this.ctx2D.fillRect(
         0,
         row[0] * itemHeight - this.treeContext.scrollOffset[0](),
