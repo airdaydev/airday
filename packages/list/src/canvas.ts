@@ -89,13 +89,7 @@ export class TreeCanvas {
     requestAnimationFrame((frame) => {
       this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
       const fps = this.fps.update();
-      this.ctx2D.font = "12px Alte Haas Grotesk";
-      this.ctx2D.textAlign = "right";
-      this.ctx2D.fillText(
-        `FPS: ${fps}`,
-        this.dimensions[0] - 2,
-        this.dimensions[1] - 4,
-      );
+      this.fpsLabel(fps);
       this.frame();
       const row = this.treeContext.rowDraggedOver[0]();
       if (typeof row === "number") {
@@ -105,6 +99,16 @@ export class TreeCanvas {
       }
       this.renderShadows(frame);
     });
+  }
+  fpsLabel(fps: number) {
+    this.ctx2D.fillStyle = "black";
+    this.ctx2D.font = "12px Alte Haas Grotesk";
+    this.ctx2D.textAlign = "right";
+    this.ctx2D.fillText(
+      `FPS: ${fps}`,
+      this.dimensions[0] - 2,
+      this.dimensions[1] - 4,
+    );
   }
   addShadow(frame: number, index: number) {
     this.currentRow = index;
