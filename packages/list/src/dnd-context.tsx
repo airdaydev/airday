@@ -152,14 +152,19 @@ export class TreeContext {
   mousePosFrame = (event: MouseEvent) => {
     if (
       window.scrollX + event.x < this.listBounds.minX ||
-      window.scrollX + event.x > this.listBounds.maxX
+      window.scrollX + event.x > this.listBounds.maxX ||
+      window.scrollY + event.y < this.listBounds.minY ||
+      window.scrollY + event.y > this.listBounds.maxY
     ) {
       this.rowDraggedOver[1](undefined);
       return; // out of x bounds
     }
     const mousePosListY =
       window.scrollY + this.listRef?.scrollTop + event.y - this.listBounds.minY;
-    const row = Math.floor(mousePosListY / this.itemHeight);
+    const row = Math.min(
+      Math.floor(mousePosListY / this.itemHeight),
+      this.presentCount(),
+    );
     if (row !== this.rowDraggedOver[0]()) {
       this.rowDraggedOver[1](row);
     }
@@ -358,7 +363,6 @@ export class TreeContext {
       const excess = offset % rowHeight;
       const start =
         Math.max(0, offset - excess - buffer * rowHeight) / rowHeight;
-      console.log(start);
       const renderCount = Math.floor(containerHeight / rowHeight) + buffer * 2;
       let window = this.projection().slice(start, start + renderCount);
       return {
@@ -387,7 +391,6 @@ export class TreeContext {
     // Hack but it's ok for now, stops an awkward drop animation for items below drop area
     this.noAnimation[1](true);
     setTimeout(() => this.noAnimation[1](false), 10);
-    console.log(dropIndex);
     const lastTouchedNode = this.projection()[dropIndex];
     // TODO: if parent, calc local index:
     // TODO: Depth needs to be updated

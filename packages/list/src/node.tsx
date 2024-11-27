@@ -7,6 +7,7 @@ export interface NodeProps {
   node: Node;
   Component: NodeComponentType;
   windowIndex: Accessor<number>;
+  projectionIndex: Accessor<number>;
   treeContext: TreeContext;
   // virtualisedList: VirtualisedList;
   // autoscroller: AutoscrollController;
@@ -14,7 +15,7 @@ export interface NodeProps {
 
 export const TreeNode = (props: NodeProps) => {
   let componentRef: HTMLElement | undefined = undefined;
-  function onNodeMouseDown(event: MouseEvent, node: Node, windowIndex: number) {
+  function onNodeMouseDown(event: MouseEvent, node: Node) {
     event.preventDefault(); // Prevents selection
     props.treeContext.setFocus();
     if (event.metaKey) {
@@ -25,14 +26,14 @@ export const TreeNode = (props: NodeProps) => {
     if (event.shiftKey && props.treeContext.selection[0]().size) {
       const first = props.treeContext.getFirstIndexSelected();
       if (first === false) return; // no items found, TODO: how could this be the case?
-      if (props.windowIndex() < first) {
+      if (props.projectionIndex() < first) {
         // shift up
         const last = props.treeContext.getLastIndexSelected();
         if (!last) return;
-        props.treeContext.selectNodesInRange(props.windowIndex(), last);
+        props.treeContext.selectNodesInRange(props.projectionIndex(), last);
       } else {
         // shift down
-        props.treeContext.selectNodesInRange(first, props.windowIndex());
+        props.treeContext.selectNodesInRange(first, props.projectionIndex());
       }
       return;
     }

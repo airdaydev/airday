@@ -53,6 +53,7 @@ export const Tree = () => {
                     props.defaultNodeComponent ||
                     DefaultNodeComponent
                   }
+                  projectionIndex={() => windowIndex() + windowedList().start}
                   windowIndex={windowIndex}
                 />
               </div>
