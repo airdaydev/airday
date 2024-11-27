@@ -51,6 +51,7 @@ export const TreeNode = (props: NodeProps) => {
     }
     const mouseMove = (moveEvent) => {
       if (distance(origin, [moveEvent.clientX, moveEvent.clientY]) > 3) {
+        props.treeContext.mousePosFrame(moveEvent);
         props.treeContext.startDrag(
           props.windowIndex(),
           props.node,

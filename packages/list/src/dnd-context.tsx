@@ -44,7 +44,7 @@ export class TreeContext {
   scrollContainerRef?: HTMLElement; // TODO: Integrate into v3 properly
   height = createSignal(500);
   scrollOffset = createSignal(0);
-  listXBounds: [number, number] = [0, 0];
+  listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   constructor(opts: {
     treeState: TreeState;
     dndContext: DndContext;
@@ -65,15 +65,28 @@ export class TreeContext {
       return [this.height[0](), this.scrollOffset[0]()];
     });
   }
+  recalcListBounds() {
+    if (this.listRef) {
+      const bounds = this.listRef.getBoundingClientRect();
+      this.listBounds = {
+        minX: window.scrollX + bounds.x,
+        maxX: window.scrollX + bounds.x + bounds.width,
+        minY: window.scrollY + bounds.y,
+        maxY: window.scrollY + bounds.y + bounds.height,
+      };
+    }
+  }
   mount(opts: { canvasRef: HTMLCanvasElement; listRef: HTMLElement }) {
     this.listRef = opts.listRef;
-    // TODO: Recalculate!!
-    const bounds = this.listRef.getBoundingClientRect();
-    this.listXBounds = [bounds.x, bounds.x + bounds.width];
+    this.recalcListBounds();
     this.canvas = new TreeCanvas({
       treeContext: this,
       canvasRef: opts.canvasRef,
     });
+    this.listRef.addEventListener("scroll", () => this.setListOffset());
+  }
+  setListOffset() {
+    this.scrollOffset[1](this.listRef.scrollTop);
   }
   unmount() {
     this.listRef = undefined;
@@ -126,15 +139,22 @@ export class TreeContext {
   }
   // This controls
   // TODO: Possibly doubling up with dragged.tsx
-  dragMouseMove = (event) => {
-    requestAnimationFrame(() => {
-      if (
-        window.scrollX + event.x < this.listXBounds[0] ||
-        window.scrollX + event.x > this.listXBounds[1]
-      )
-        return;
-      console.log("we in x");
-    });
+  mousePosFrame = (event: MouseEvent) => {
+    if (
+      window.scrollX + event.x < this.listBounds.minX ||
+      window.scrollX + event.x > this.listBounds.maxX
+    ) {
+      this.rowDraggedOver[1](undefined);
+      return; // out of x bounds
+    }
+    const mousePosListY = window.scrollY + event.y - this.listBounds.minY;
+    const row = Math.floor(mousePosListY / this.itemHeight);
+    if (row !== this.rowDraggedOver[0]()) {
+      this.rowDraggedOver[1](row);
+    }
+  };
+  dragMouseMove = (event: MouseEvent) => {
+    this.mousePosFrame(event);
   };
   startDrag(
     originIndex: number,
@@ -146,6 +166,7 @@ export class TreeContext {
     this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag(ref, elClickOffset);
+    this.recalcListBounds();
     this.setDragOver();
     window.addEventListener("mousemove", this.dragMouseMove);
   }
@@ -305,7 +326,15 @@ export class TreeContext {
   getItemPosition(list: VirtualisedList, index: Accessor<number>) {
     // Takes into account current drag over position!
     // list().start
-    return index() * this.itemHeight;
+    let offset = 0;
+    if (
+      this.isDraggingOver() &&
+      typeof this.rowDraggedOver[0]() === "number" &&
+      index() >= this.rowDraggedOver[0]()
+    ) {
+      offset = this.itemHeight;
+    }
+    return index() * this.itemHeight + offset;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
