@@ -1,13 +1,12 @@
 # @sunlist/list
 
-An opinionated, imperfect interactive tree system including store & UI component for SolidJS written for sunlist.app.
-Drag & drop, virtualised, static height per element.
+An interactive tree system including store & UI component for SolidJS written for sunlist.app. Drag & drop, virtualised, static height per element.
 
 ## Features
-- Virtualised window (ensure scroll list is correctly sized, )
-- Window expands to fill minimum size.
-- Drag & drop in same list or to other lists.
-- Items can have variable height in non-virtual mode.
+- Drag and drop placeholders via underlaid canvas, same size as item.
+- Virtualised window (ensure scroll list is correctly sized).
+- List expands to fill size of container.
+- A shared DndContext allows multiple lists to interact with each other.
 - Searching & filters.
 - Animated transitions & dragging.
 - Granular updates on individual items applied without looping over list.
@@ -67,6 +66,7 @@ pnpm run dev
 ```
 
 ## V3 roadmap
+- [] Nested movement fixes
 - [] Dragging to other lists
 - [] Smooth autoscrolling
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths

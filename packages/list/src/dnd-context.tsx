@@ -391,21 +391,15 @@ export class TreeContext {
     // Hack but it's ok for now, stops an awkward drop animation for items below drop area
     this.noAnimation[1](true);
     setTimeout(() => this.noAnimation[1](false), 10);
-    const lastTouchedNode = this.projection()[dropIndex];
-    // TODO: if parent, calc local index:
-    // TODO: Depth needs to be updated
+    const dropNode = this.projection()[dropIndex];
     let parent = null;
-    if (
-      lastTouchedNode &&
-      lastTouchedNode.parent &&
-      !lastTouchedNode.parent.isRoot
-    ) {
-      parent = lastTouchedNode.parent;
+    if (dropNode && dropNode.parent && !dropNode.parent.isRoot) {
+      parent = dropNode.parent;
     }
     const items = originList.treeState.take(originList.selection[0]());
     this.treeState.insertItems(items, [
       parent,
-      parent === null ? dropIndex : lastTouchedNode.localIndex || 0,
+      parent === null ? dropIndex : dropNode.localIndex || 0,
     ]);
     this.setFocus();
     this.selection[1](originList.selection[0]());
