@@ -119,6 +119,9 @@ export function clearSelection(ctx: TreeContext) {
 export function moveSelectionUp(ctx: TreeContext) {
   if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
+  selection.forEach((node) => {
+    ctx.updateRef(node, { preventAnimation: true });
+  });
   if (selection.size === 0) return;
   let newPosition = null;
   if (selection.size === 1) {
@@ -138,6 +141,9 @@ export function moveSelectionUp(ctx: TreeContext) {
 export function moveSelectionDown(ctx: TreeContext) {
   if (!ctx.allowMovement) return;
   const selection = ctx.selection[0]();
+  selection.forEach((node) => {
+    ctx.updateRef(node, { preventAnimation: true });
+  });
   if (selection.size === 0) return;
   let newPosition = null;
   if (selection.size === 1) {

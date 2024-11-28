@@ -32,6 +32,7 @@ body {
 }
 
 .tree-item {
+    position: absolute;
     display: flex;
     align-items: center;
     cursor: default;
@@ -42,6 +43,7 @@ body {
 }
 
 .tree-item[aria-selected="true"] {
+    z-index: 5;
     background: #d7d7e7;
 }
 

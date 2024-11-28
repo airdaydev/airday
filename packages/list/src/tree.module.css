@@ -30,10 +30,10 @@
     transition: transform 0.1s ease;
     transition-delay: 0.01s;
     will-change: transform;
-    transform: translate3D(0, var(--pos), 0);
+    transform: translateY(var(--pos));
     height: 32px;
 }
 
-/* .no-animation .item-container {
+.no-animation .item-container {
     transition: none;
-} */
+}

@@ -1,7 +1,15 @@
-import { useContext, onMount, For, Component } from "solid-js";
+import {
+  useContext,
+  onMount,
+  For,
+  Component,
+  createEffect,
+  Accessor,
+} from "solid-js";
 import styles from "./tree.module.css";
-import { TreeContext, SolidListContext } from "./dnd-context";
+import { TreeContext, SolidListContext, VirtualisedList } from "./dnd-context";
 import { TreeNode } from "./node";
+import { Node } from "./state";
 
 interface TreeProps {
   shadowColor: [number, number, number]; // RGB
@@ -26,6 +34,23 @@ export const Tree: Component<TreeProps> = (props) => {
     }
   });
 
+  function getItemPosition(
+    list: VirtualisedList,
+    index: Accessor<number>,
+    node: Node,
+  ) {
+    // TODO: This should be on the context object not on the node itself.
+    if (treeContext.refMap.get(node)?.preventAnimation) {
+      requestAnimationFrame(() => {
+        const ref = treeContext.refMap.get(node);
+        const newPos = treeContext.getItemPosition(windowedList, index);
+        ref.ref?.style.setProperty("--pos", `${newPos}px`);
+        treeContext.updateRef(node, { preventAnimation: false });
+      });
+    }
+    return `${treeContext.getItemPosition(windowedList, index, node)}px`;
+  }
+
   return (
     <div class={styles["container"]}>
       <div
@@ -37,6 +62,7 @@ export const Tree: Component<TreeProps> = (props) => {
       >
         <div
           style={{
+            position: "relative",
             "min-height": `${treeContext.listHeight()}px`,
           }}
         >
@@ -45,8 +71,33 @@ export const Tree: Component<TreeProps> = (props) => {
               <div
                 class={styles["item-container"]}
                 style={{
-                  "--pos": `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
+                  "--pos": getItemPosition(windowedList, windowIndex, node),
                   height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
+                }}
+                ref={(ref) => {
+                  treeContext.updateRef(node, { ref });
+                  const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                      if (
+                        mutation.type === "attributes" &&
+                        mutation.attributeName === "style"
+                      ) {
+                        if (!mutation.target.style.getPropertyValue("--pos")) {
+                          console.log(
+                            "Style changed:",
+                            mutation.target,
+                            mutation.target.style,
+                          );
+                          console.trace();
+                        }
+                      }
+                    });
+                  });
+
+                  observer.observe(ref, {
+                    attributes: true,
+                    attributeFilter: ["style"],
+                  });
                 }}
               >
                 <TreeNode

@@ -20,6 +20,12 @@ export type VirtualisedList = Accessor<{
   start: number;
 }>;
 
+interface RefMapRecord {
+  ref?: HTMLElement;
+  preventAnimation?: boolean;
+  prevY?: number;
+}
+
 // Per list dnd context
 export class TreeContext {
   id = createUniqueId();
@@ -49,6 +55,7 @@ export class TreeContext {
   noAnimation = createSignal<boolean>(false);
   autoscroller = new Autoscroller2();
   debug = false;
+  refMap = new WeakMap<Node, RefMapRecord>();
   constructor(opts: {
     id?: string;
     treeState: TreeState;
@@ -67,6 +74,10 @@ export class TreeContext {
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
     this.projection = this.createProjectionMemo();
     if (opts.debug) this.debug = opts.debug;
+  }
+  updateRef(node: Node, opts: RefMapRecord) {
+    const prev = this.refMap.get(node) || {};
+    this.refMap.set(node, { ...prev, ...opts });
   }
   get containerVector() {
     return createMemo<ContainerVector>(() => {
@@ -384,9 +395,7 @@ export class TreeContext {
     const t = this.projection().findIndex((n) => n === node);
     return t;
   }
-  getItemPosition(list: VirtualisedList, index: Accessor<number>) {
-    // Takes into account current drag over position!
-    // list().start
+  getItemPosition(list: VirtualisedList, index: Accessor<number>, node?: Node) {
     let offset = 0;
     if (
       this.dndContext.isDragging() &&
@@ -395,7 +404,15 @@ export class TreeContext {
     ) {
       offset = this.itemHeight;
     }
-    return index() * this.itemHeight + offset + list().start * this.itemHeight;
+    let position =
+      index() * this.itemHeight + offset + list().start * this.itemHeight;
+    if (node) {
+      const ref = this.refMap.get(node);
+      if (ref?.preventAnimation) {
+        position = ref.ref.style.getPropertyValue("--pos").replace("px", "");
+      }
+    }
+    return position;
   }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
