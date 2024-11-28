@@ -68,13 +68,13 @@ pnpm run dev
 ## V3 roadmap
 - [x] Dragging to other lists
 - [x] Smooth autoscrolling
+- [x] Can't drop below last item
+- [] Virtual list height correctly calculated (BUG!)
+- [] Provide API for rejecting bad positions ahead of time so UI can respond
+- [] Touch version
 - [] Nested movement fixes
 - [] Ensure list tracked dimensions match list size at all times
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
-- [] Virtual list height correctly calculated (BUG!)
-- [] Can't drop below last item
-- [] Provide API for rejecting bad positions ahead of time so UI can respond
-- [] Touch version
 
 ## Roadmap
 - GPU version?
