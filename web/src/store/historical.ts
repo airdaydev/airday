@@ -19,10 +19,9 @@ export class HistoricalItems {
     if (trx.type === "check") {
       const item = this.tree.idMap.get(trx.item.id);
       if (!item && trx.item.tsDone) {
-        this.tree.insertNode(
-          new GenericItem(trx.item, this.workspace),
-          null,
-          0,
+        this.tree.insertItems(
+          new Set([new GenericItem(trx.item, this.workspace)]),
+          [null, 0],
         );
       }
       if (item && !trx.item.tsDone) {

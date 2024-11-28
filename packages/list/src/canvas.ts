@@ -63,6 +63,9 @@ export class TreeCanvas {
     }
     this.resizeCanvas();
     this.initRenderLoop();
+    window.addEventListener("resize", () => {
+      this.resizeCanvas();
+    });
   }
   setShadowColor = (color: RGB) => {
     this.shadowColor = color;

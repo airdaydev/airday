@@ -40,7 +40,7 @@ export function List(props: ListProps) {
 
   createEffect(() => {
     if (theme[0]() === "dark") {
-      if (ctx.canvas) ctx.canvas.shadowColor = [0, 0, 255];
+      if (ctx.canvas) ctx.canvas.shadowColor = [39, 39, 45];
     } else {
       if (ctx.canvas) ctx.canvas.shadowColor = [0, 255, 0];
     }

@@ -72,7 +72,10 @@ export class ContainerStore {
     const store = tx.objectStore(this.storeName);
     // Create signals
     src.map((item, index) => {
-      this.tree.insertNode(new GenericList(item), null, this.tree.count());
+      this.tree.insertItems(new Set([new GenericList(item)]), [
+        null,
+        this.tree.count(),
+      ]);
       return dbPromises.push(store.add(item));
     });
     Promise.all(dbPromises).catch((err) => console.log(err));
