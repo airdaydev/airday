@@ -56,5 +56,6 @@ export class Autoscroller2 {
   stop() {
     this.throttle = 0;
     this.enabled = false;
+    this.subscriptions.clear();
   }
 }
