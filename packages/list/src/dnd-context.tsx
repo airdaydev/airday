@@ -11,6 +11,7 @@ import { walk } from "./tree-utils";
 import { DndContextKeyboardEvents } from "./keyboard/index";
 import { TreeCanvas } from "./canvas";
 import { Coordinates } from "./utils";
+import { Autoscroller2 } from "./autoscroll";
 
 export type ContainerVector = [scrollHeight: number, scrollOffset: number];
 
@@ -46,6 +47,7 @@ export class TreeContext {
   scrollOffset = createSignal(0);
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   noAnimation = createSignal<boolean>(false);
+  autoscroller = new Autoscroller2();
   constructor(opts: {
     id?: string;
     treeState: TreeState;
@@ -88,6 +90,7 @@ export class TreeContext {
     containerRef: HTMLElement;
   }) {
     this.listRef = opts.listRef;
+    this.autoscroller.mount(opts.listRef);
     this.recalcListBounds();
     this.canvas = new TreeCanvas({
       treeContext: this,
@@ -151,21 +154,52 @@ export class TreeContext {
     } // Keeps origin in place for origin list
     this.reset();
   }
-  // This controls
-  // TODO: Possibly doubling up with dragged.tsx
-  mousePosFrame = (event: MouseEvent) => {
-    if (
-      window.scrollX + event.x < this.listBounds.minX ||
-      window.scrollX + event.x > this.listBounds.maxX ||
-      window.scrollY + event.y < this.listBounds.minY ||
-      window.scrollY + event.y > this.listBounds.maxY
-    ) {
-      this.rowDraggedOver[1](undefined);
-      return; // out of x bounds
+  autoScroll(mousePosListY: number, mousePosAbs: number) {
+    this.autoscroller.subscriptions.set("setRow", () =>
+      this.setRow(mousePosAbs),
+    );
+    if (mousePosListY < this.itemHeight) {
+      const throttle = Math.max(mousePosListY - this.itemHeight, -100) / 100;
+      this.autoscroller.setThrottle(throttle);
+      return;
     }
-    this.setDragOver();
+    if (
+      mousePosListY >
+      this.listBounds.maxY - this.listBounds.minY - this.itemHeight
+    ) {
+      const throttle =
+        Math.min(
+          mousePosListY -
+            (this.listBounds.maxY - this.listBounds.minY - this.itemHeight),
+          100,
+        ) / 100;
+      this.autoscroller.setThrottle(throttle);
+      return;
+    }
+    this.autoscroller.stop();
+    return;
+  }
+  mousePosFrame = (event: MouseEvent) => {
+    const outOfBoundsX =
+      window.scrollX + event.x < this.listBounds.minX ||
+      window.scrollX + event.x > this.listBounds.maxX;
+    if (outOfBoundsX) {
+      this.rowDraggedOver[1](undefined);
+      return;
+    }
+    this.autoScroll(window.scrollY + event.y - this.listBounds.minY, event.y);
+    this.setRow(event.y);
+  };
+  setRow(mouseY: number) {
+    const aboveY = window.scrollY + mouseY < this.listBounds.minY;
+    const belowY = window.scrollY + mouseY > this.listBounds.maxY;
+    if (aboveY || belowY) {
+      this.rowDraggedOver[1](undefined); // TODO: Only set once!
+      return;
+    }
     const mousePosListY =
-      window.scrollY + this.listRef?.scrollTop + event.y - this.listBounds.minY;
+      window.scrollY + this.listRef?.scrollTop + mouseY - this.listBounds.minY;
+    this.setDragOver();
     const row = Math.min(
       Math.floor(mousePosListY / this.itemHeight),
       this.presentCount(),
@@ -173,7 +207,7 @@ export class TreeContext {
     if (row !== this.rowDraggedOver[0]()) {
       this.rowDraggedOver[1](row);
     }
-  };
+  }
   dragMouseMove = (event: MouseEvent) => {
     this.mousePosFrame(event);
   };
@@ -196,6 +230,7 @@ export class TreeContext {
     }
     this.reset();
     this.dndContext.stopDrag();
+    this.autoscroller.stop();
   }
   reset() {
     this.isDragOrigin = false;

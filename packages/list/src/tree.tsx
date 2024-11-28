@@ -9,7 +9,6 @@ interface TreeProps {
 
 export const Tree: Component<TreeProps> = (props) => {
   let listRef: HTMLDivElement | undefined = undefined;
-  let scrollRef: HTMLDivElement | undefined = undefined;
   let canvasRef: HTMLCanvasElement | undefined = undefined;
   const treeContext = useContext<TreeContext>(SolidListContext);
   const windowedList = treeContext.getWindowedSignal();
@@ -20,7 +19,6 @@ export const Tree: Component<TreeProps> = (props) => {
         canvasRef,
         listRef,
         treeContext,
-        scrollRef,
       });
       if (props.shadowColor) {
         treeContext.canvas.setShadowColor(props.shadowColor);
@@ -38,7 +36,6 @@ export const Tree: Component<TreeProps> = (props) => {
         ref={listRef}
       >
         <div
-          ref={scrollRef}
           style={{
             "min-height": `${treeContext.listHeight()}px`,
           }}

@@ -1,54 +1,60 @@
-/**
- * Class for controlling autoscroll as the user drags towards the bottom of a scroll container
- * TODO: Add linear easing function over initial .5s-.1s
- * https://www.desmos.com/calculator/zukjgk9iry
- * y=ax^{3}+bx+c
- */
-export class AutoscrollController {
+export class Autoscroller2 {
+  currentSpeed = 0;
+  targetSpeed = 0;
+  maxSpeed = 100; // pixels per second?
+  accelerationTime = 50; // seconds to reach max speed
+  decelerationTime = 20; // fixed time to slow to 0
+  throttle = 0;
+  scrollRef?: HTMLElement;
   enabled = false;
-  direction?: -1 | 1 | 0;
-  scrollContainer?: HTMLElement;
-  controlRangePx = 84;
-  clientY = 0;
-  curve = (x: number) => 0.95 * x ** 2;
-  updateMouse = (event: MouseEvent) => { this.clientY = event.clientY }
-  updateTouch = (event: TouchEvent) => { this.clientY = event.touches[0].clientY }
+  direction: 1 | -1 = 1;
+  subscriptions = new Map();
+  mount(scrollRef: HTMLElement) {
+    this.scrollRef = scrollRef;
+  }
+  curve(x: number) {
+    return x ** 2;
+  }
+  setThrottle(throttle: number) {
+    this.direction = throttle > 0 ? 1 : -1;
+    this.throttle = Math.abs(throttle);
+    if (!this.enabled) this.start();
+  }
+  update(deltaTime: number) {
+    this.targetSpeed = this.maxSpeed * this.curve(this.throttle);
+
+    if (this.targetSpeed > this.currentSpeed) {
+      // Accelerating - smooth ease-in
+      const accelerationRate = this.maxSpeed / this.accelerationTime;
+      this.currentSpeed +=
+        accelerationRate *
+        deltaTime *
+        (1 - this.currentSpeed / this.targetSpeed);
+    } else {
+      // Decelerating - fixed time deceleration
+      const difference = this.targetSpeed - this.currentSpeed;
+      this.currentSpeed += (difference / this.decelerationTime) * deltaTime;
+    }
+    this.scrollRef.scrollBy(0, this.currentSpeed * this.direction);
+    this.subscriptions.forEach((cb) => {
+      cb();
+    });
+  }
   start() {
-    if (!this.scrollContainer) return;
     this.enabled = true;
-    this.scrollContainer.addEventListener('mousemove', this.updateMouse);
+    if (!this.scrollRef) return;
     let lastFrame = performance.now();
     // TODO: Introduce acceleration
-    const nextFrame = () => requestAnimationFrame((timestamp) => {
-      if (!this.scrollContainer) return;
-      const rect = this.scrollContainer.getBoundingClientRect();
-      const mouseY = this.clientY - rect.top;
-      // Go up
-      if (mouseY < this.controlRangePx) {
-        if (this.scrollContainer.scrollTop !== 0) {
-          // TODO: Introduce acceleration
-          const throttle = Math.abs(this.controlRangePx - mouseY) / this.controlRangePx;
-          const velocity = this.curve(throttle) * this.controlRangePx ** 1.5;
-          const y = (this.scrollContainer.scrollTop) - velocity / (timestamp - lastFrame);
-          this.scrollContainer.scrollTo(0, y);
-        }
-      }
-      // Go down
-      if (mouseY > (rect.height - this.controlRangePx)) {
-        if (this.scrollContainer.scrollTop !== this.scrollContainer.scrollHeight) {
-          const throttle = Math.abs(rect.height - mouseY - this.controlRangePx) / this.controlRangePx;
-          const velocity = this.curve(throttle) * this.controlRangePx ** 1.5;
-          const y = (this.scrollContainer.scrollTop) + velocity / (timestamp - lastFrame);
-          this.scrollContainer.scrollTo(0, y);
-        }
-      }
-      lastFrame = timestamp;
-      if (this.enabled) nextFrame();
-    });
+    const nextFrame = () =>
+      requestAnimationFrame((timestamp) => {
+        this.update(timestamp - lastFrame);
+        lastFrame = timestamp;
+        if (this.enabled) nextFrame();
+      });
     nextFrame();
   }
   stop() {
+    this.throttle = 0;
     this.enabled = false;
-    this.scrollContainer?.removeEventListener('mousemove', this.updateMouse);
   }
 }

@@ -67,9 +67,9 @@ pnpm run dev
 
 ## V3 roadmap
 - [x] Dragging to other lists
+- [] Smooth autoscrolling
 - [] Nested movement fixes
 - [] Ensure list tracked dimensions match list size at all times
-- [] Smooth autoscrolling
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
 - [] Virtual list height correctly calculated (BUG!)
 - [] Can't drop below last item
