@@ -15,6 +15,7 @@ import { ListHeader } from "./list-header";
 import NullList from "./null-list";
 import { listOptions, ListOptionsContext } from "./list-options";
 import { ListColumnHeaders } from "./list-col-head";
+import { theme } from "../theme/theme";
 
 interface ListProps {
   view: DataView;
@@ -35,6 +36,14 @@ export function List(props: ListProps) {
 
   onCleanup(() => {
     session.workspace.dndContext.listContexts.delete(ctx);
+  });
+
+  createEffect(() => {
+    if (theme[0]() === "dark") {
+      if (ctx.canvas) ctx.canvas.shadowColor = [0, 0, 255];
+    } else {
+      if (ctx.canvas) ctx.canvas.shadowColor = [0, 255, 0];
+    }
   });
 
   createEffect(() => {
