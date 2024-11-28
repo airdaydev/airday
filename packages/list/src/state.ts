@@ -163,44 +163,11 @@ export class TreeState {
   refresh() {
     this.childrenSignal[1]([...this.childrenSignal[0]()]);
   }
-  // TODO: AI Written
-  insertNode(newNode: Node, parentNode: Node | null, position: number) {
-    if (!parentNode) {
-      // Insert at root level
-      const currentChildren = this.childrenSignal[0]();
-      const updatedChildren = [
-        ...currentChildren.slice(0, position),
-        newNode,
-        ...currentChildren.slice(position),
-      ];
-      this.childrenSignal[1](updatedChildren);
-    } else {
-      // Insert under a specific parent node
-      const updatedTree = this.mutableRoot;
-      const updateNode = (node: Node) => {
-        if (node === parentNode) {
-          node.children = [
-            ...node.children.slice(0, position),
-            newNode,
-            ...node.children.slice(position),
-          ];
-          return node;
-        }
-        node.children = node.children.map(updateNode);
-        return node;
-      };
-      const updatedChildren = updatedTree.children.map(updateNode);
-      this.childrenSignal[1](updatedChildren);
-    }
-
-    // Update the new node's properties
-    newNode.root = this;
-    newNode.parent = parentNode;
-
-    // Add the new node to the idMap
-    this.idMap.set(newNode.id, newNode);
-  }
-  insertItems(nodes: Set<Node>, dstPosition: [Node | null, number]) {
+  insertItems(
+    nodes: Set<Node>,
+    dstPosition: [Node | null, number],
+    filterNodes = true,
+  ) {
     const transformNodes = Array.from(nodes).map((node) => {
       node.root = this;
       this.idMap.set(node.id, node);
@@ -210,16 +177,25 @@ export class TreeState {
       return node;
     });
 
+    if (filterNodes) {
+      this.remove(nodes);
+    }
+
+    const existingChildren = filterNodes
+      ? this.remove(nodes).filtered
+      : this.childrenSignal[0]();
+
     const [parentNode, newPosition] = dstPosition;
     if (!parentNode) {
       // Add to root level
-      const currentChildren = this.childrenSignal[0]();
+      const currentChildren = existingChildren;
       const updatedChildren = [
         ...currentChildren.slice(0, newPosition),
         ...Array.from(transformNodes),
         ...currentChildren.slice(newPosition),
       ];
       this.childrenSignal[1](updatedChildren);
+      return transformNodes;
     } else {
       // Add to a specific parent node
       const newChildren = [
@@ -231,6 +207,7 @@ export class TreeState {
       parentNode.children = newChildren;
       const updatedChildren = updatedTree.children.map((node) => node); // is this needed?
       this.childrenSignal[1](updatedChildren);
+      return transformNodes;
     }
   }
   getNodesByIds(ids: Set<string>) {

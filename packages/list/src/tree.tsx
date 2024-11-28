@@ -45,7 +45,7 @@ export const Tree: Component<TreeProps> = (props) => {
               <div
                 class={styles["item-container"]}
                 style={{
-                  top: `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
+                  "--pos": `${treeContext.getItemPosition(windowedList, windowIndex)}px`,
                   height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
                 }}
               >

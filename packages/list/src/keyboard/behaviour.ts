@@ -131,8 +131,7 @@ export function moveSelectionUp(ctx: TreeContext) {
     }
   }
   if (newPosition !== null) {
-    ctx.treeState.take(selection);
-    ctx.treeState.insertItems(selection, [null, newPosition]);
+    ctx.treeState.insertItems(selection, [null, newPosition], true);
   }
 }
 
@@ -149,8 +148,7 @@ export function moveSelectionDown(ctx: TreeContext) {
     if (typeof newPosition === "number") newPosition += 1;
   }
   if (newPosition !== null && newPosition < ctx.treeState.count()) {
-    ctx.treeState.take(selection);
-    ctx.treeState.insertItems(selection, [null, newPosition]);
+    ctx.treeState.insertItems(selection, [null, newPosition], true);
   }
 }
 
