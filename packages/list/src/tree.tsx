@@ -42,10 +42,12 @@ export const Tree: Component<TreeProps> = (props) => {
     // TODO: This should be on the context object not on the node itself.
     if (treeContext.refMap.get(node)?.preventAnimation) {
       requestAnimationFrame(() => {
-        const ref = treeContext.refMap.get(node);
-        const newPos = treeContext.getItemPosition(windowedList, index);
-        ref.ref?.style.setProperty("--pos", `${newPos}px`);
-        treeContext.updateRef(node, { preventAnimation: false });
+        requestAnimationFrame(() => {
+          const ref = treeContext.refMap.get(node);
+          const newPos = treeContext.getItemPosition(windowedList, index);
+          ref.ref?.style.setProperty("--pos", `${newPos}px`);
+          treeContext.updateRef(node, { preventAnimation: false });
+        });
       });
     }
     return `${treeContext.getItemPosition(windowedList, index, node)}px`;
@@ -70,6 +72,7 @@ export const Tree: Component<TreeProps> = (props) => {
             {(node, windowIndex) => (
               <div
                 class={styles["item-container"]}
+                aria-selected={treeContext.isSelected(node)}
                 style={{
                   "--pos": getItemPosition(windowedList, windowIndex, node),
                   height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
