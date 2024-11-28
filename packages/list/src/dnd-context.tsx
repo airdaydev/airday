@@ -48,6 +48,7 @@ export class TreeContext {
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   noAnimation = createSignal<boolean>(false);
   autoscroller = new Autoscroller2();
+  debug = false;
   constructor(opts: {
     id?: string;
     treeState: TreeState;
@@ -55,6 +56,7 @@ export class TreeContext {
     itemHeight: number;
     placeholderStyle?: string;
     allowInternalMovement?: boolean;
+    debug?: boolean;
   }) {
     if (opts.id) this.id = opts.id;
     this.treeState = opts.treeState;
@@ -64,6 +66,7 @@ export class TreeContext {
     this.placeholderStyle = opts.placeholderStyle;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
     this.projection = this.createProjectionMemo();
+    if (opts.debug) this.debug = opts.debug;
   }
   get containerVector() {
     return createMemo<ContainerVector>(() => {
@@ -95,6 +98,7 @@ export class TreeContext {
     this.canvas = new TreeCanvas({
       treeContext: this,
       canvasRef: opts.canvasRef,
+      debug: this.debug,
     });
     this.containerRef = opts.containerRef;
     this.listRef.addEventListener("scroll", this.setListOffset);

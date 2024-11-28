@@ -42,6 +42,7 @@ const ctxA = new TreeContext({
   dndContext: dndContext,
   itemHeight: 32,
   allowInternalMovement: false,
+  debug: true,
 });
 
 const ctxB = new TreeContext({
@@ -49,6 +50,7 @@ const ctxB = new TreeContext({
   treeState: treeStateB,
   dndContext: dndContext,
   itemHeight: 32,
+  debug: true,
 });
 
 const ctxC = new TreeContext({
@@ -56,6 +58,7 @@ const ctxC = new TreeContext({
   treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 32,
+  debug: true,
 });
 
 render(

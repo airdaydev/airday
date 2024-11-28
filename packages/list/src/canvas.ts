@@ -3,6 +3,7 @@ import { TreeContext } from "./dnd-context";
 interface TreeCanvasOpts {
   treeContext: TreeContext;
   canvasRef: HTMLCanvasElement;
+  debug?: boolean;
 }
 
 export type RGB = [number, number, number];
@@ -44,6 +45,7 @@ export class TreeCanvas {
   canvasEl?: HTMLCanvasElement;
   ctx2D?: CanvasRenderingContext2D;
   scale = window.devicePixelRatio || 1;
+  debug = false;
   fps = new FPS();
   currentRow?: number;
   shadowColor: RGB = [240, 240, 240];
@@ -52,6 +54,7 @@ export class TreeCanvas {
   constructor(opts: TreeCanvasOpts) {
     this.treeContext = opts.treeContext;
     this.canvasEl = opts.canvasRef;
+    if (opts.debug) this.debug = opts.debug;
     const ctx2D = this.canvasEl.getContext("2d");
     if (ctx2D) {
       this.ctx2D = ctx2D;
@@ -89,8 +92,6 @@ export class TreeCanvas {
     requestAnimationFrame((frame) => {
       this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
       const fps = this.fps.update();
-      this.fpsLabel(fps);
-      this.frame();
       const row = this.treeContext.rowDraggedOver[0]();
       if (typeof row === "number") {
         this.addShadow(frame, row);
@@ -98,6 +99,8 @@ export class TreeCanvas {
         this.currentRow = undefined;
       }
       this.renderShadows(frame);
+      if (this.debug) this.fpsLabel(fps);
+      this.frame();
     });
   }
   fpsLabel(fps: number) {
