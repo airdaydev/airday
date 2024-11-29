@@ -166,9 +166,9 @@ export class TreeContext {
   }
   // For html drag & drop (TODO: customisable)
   getSelectedNodeTextData() {
-    const arr: string[] = ["sunlist.app list"];
+    const arr: string[] = [];
     this.selection[0]().forEach((node) => {
-      arr.push(`- ${node.content}`);
+      arr.push(`- [] ${node.content}`);
     });
     const t = arr.join("\n");
     return t;
