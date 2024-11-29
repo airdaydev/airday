@@ -1,6 +1,6 @@
 import { useContext, onMount, For, Component, Accessor } from "solid-js";
 import styles from "./tree.module.css";
-import { TreeContext, SolidListContext, VirtualisedList } from "./dnd-context";
+import { TreeContext, SolidListContext } from "./dnd-context";
 import { TreeNode } from "./node";
 import { Node } from "./state";
 
@@ -10,6 +10,7 @@ interface TreeProps {
 
 export const Tree: Component<TreeProps> = (props) => {
   let listRef: HTMLDivElement | undefined = undefined;
+  let tempItemRef: HTMLDivElement | undefined = undefined;
   let canvasRef: HTMLCanvasElement | undefined = undefined;
   const treeContext = useContext<TreeContext>(SolidListContext);
   const windowedList = treeContext.getWindowedSignal();
@@ -20,6 +21,7 @@ export const Tree: Component<TreeProps> = (props) => {
         canvasRef,
         listRef,
         treeContext,
+        tempItemRef,
       });
       if (props.shadowColor) {
         treeContext.canvas.setShadowColor(props.shadowColor);
@@ -27,12 +29,7 @@ export const Tree: Component<TreeProps> = (props) => {
     }
   });
 
-  function getItemPosition(
-    list: VirtualisedList,
-    index: Accessor<number>,
-    node: Node,
-  ) {
-    // TODO: This should be on the context object not on the node itself.
+  function getItemPosition(index: Accessor<number>, node: Node) {
     if (treeContext.refMap.get(node)?.preventAnimation) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -48,6 +45,12 @@ export const Tree: Component<TreeProps> = (props) => {
 
   return (
     <div class={styles["container"]}>
+      <div class={styles["temp-container"]}>
+        <div
+          ref={tempItemRef}
+          style={{ height: `${treeContext.itemHeight}px` }}
+        ></div>
+      </div>
       <div
         classList={{
           [styles["list"]]: true,
@@ -67,7 +70,7 @@ export const Tree: Component<TreeProps> = (props) => {
                 class={styles["item-container"]}
                 aria-selected={treeContext.isSelected(node)}
                 style={{
-                  "--pos": getItemPosition(windowedList, windowIndex, node),
+                  "--pos": getItemPosition(windowIndex, node),
                   height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
                 }}
                 ref={(ref) => {

@@ -49,6 +49,7 @@ export class TreeContext {
   // DOM & Render
   containerRef?: HTMLElement;
   listRef?: HTMLElement;
+  tempItemRef?: HTMLElement; // We're using native dnd but we are disappearing the element, so we jack into this container
   canvas?: TreeCanvas;
   height = createSignal(500);
   scrollOffset = createSignal(0);
@@ -103,6 +104,7 @@ export class TreeContext {
     canvasRef: HTMLCanvasElement;
     listRef: HTMLElement;
     containerRef: HTMLElement;
+    tempItemRef: HTMLElement;
   }) {
     this.listRef = opts.listRef;
     this.autoscroller.mount(opts.listRef);
@@ -114,6 +116,8 @@ export class TreeContext {
     });
     this.containerRef = opts.containerRef;
     this.listRef.addEventListener("scroll", this.setListOffset);
+    // This is used to store a temporary version of the currently dragged item
+    this.tempItemRef = opts.tempItemRef;
   }
   unmount() {
     this.listRef?.removeEventListener("scroll", this.setListOffset);
@@ -375,10 +379,7 @@ export class TreeContext {
         // Skip root & other selected items
         const skip =
           node.isRoot ||
-          (this.originNode !== node &&
-            isDragging &&
-            this.isDragOrigin &&
-            this.selection[0]().has(node));
+          (isDragging && this.isDragOrigin && this.selection[0]().has(node));
         if (this.originNode === node) {
           this.projectedOriginIndex = index;
         }
@@ -408,32 +409,17 @@ export class TreeContext {
   }
   getItemPosition(list: VirtualisedList, index: Accessor<number>, node?: Node) {
     // This creates a gap where the item is hovering over
-    // and ignores & removes the currently dragged over item.
-    // TODO: We could simplify this by shifting the originNode to the beginning or end of the list...? or even fucking it over somewhere else entirely...?
+    // and ignores & removes the currently dragged over items
     let offset = 0;
-    let i = index();
-    i =
-      this.dndContext.isDragging() &&
-      this.isDragOrigin &&
-      i > this.projectedOriginIndex
-        ? i - 1
-        : i;
     if (
       this.dndContext.isDragging() &&
       typeof this.rowDraggedOver[0]() === "number" &&
-      i + list().start >= this.rowDraggedOver[0]()
+      index() + list().start >= this.rowDraggedOver[0]()
     ) {
-      offset += this.itemHeight;
-    }
-    if (
-      this.dndContext.isDragging() &&
-      this.isDragOrigin &&
-      this.projectedOriginIndex === index()
-    ) {
-      offset = 90000;
+      offset = this.itemHeight;
     }
     let position =
-      i * this.itemHeight + offset + list().start * this.itemHeight;
+      index() * this.itemHeight + offset + list().start * this.itemHeight;
     if (node) {
       const ref = this.refMap.get(node);
       if (ref?.preventAnimation) {
@@ -442,27 +428,6 @@ export class TreeContext {
     }
     return position;
   }
-  // getItemPosition(list: VirtualisedList, index: Accessor<number>, node?: Node) {
-  //   // This creates a gap where the item is hovering over
-  //   // and ignores & removes the currently dragged over items
-  //   let offset = 0;
-  //   if (
-  //     this.dndContext.isDragging() &&
-  //     typeof this.rowDraggedOver[0]() === "number" &&
-  //     index() + list().start >= this.rowDraggedOver[0]()
-  //   ) {
-  //     offset = this.itemHeight;
-  //   }
-  //   let position =
-  //     index() * this.itemHeight + offset + list().start * this.itemHeight;
-  //   if (node) {
-  //     const ref = this.refMap.get(node);
-  //     if (ref?.preventAnimation) {
-  //       position = ref.ref.style.getPropertyValue("--pos").replace("px", "");
-  //     }
-  //   }
-  //   return position;
-  // }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
     // Virtualisation

@@ -8,12 +8,37 @@ export interface NodeProps {
   windowIndex: Accessor<number>;
   projectionIndex: Accessor<number>;
   treeContext: TreeContext;
-  // virtualisedList: VirtualisedList;
-  // autoscroller: AutoscrollController;
+}
+
+function addDragStartEl(treeContext: TreeContext, element: HTMLElement) {
+  const pos =
+    element.parentElement.style.getPropertyValue("--pos").replace("px", "") -
+    treeContext.listRef.scrollTop;
+  treeContext.tempItemRef.style.top = `${pos}px`;
+  if (treeContext.tempItemRef) {
+    treeContext.tempItemRef.appendChild(element);
+  }
+}
+
+function clearDragStartEl(tempItemRef: HTMLElement) {
+  if (tempItemRef?.firstChild) {
+    tempItemRef.removeChild(tempItemRef.firstChild);
+  }
+}
+
+function putBack(element: HTMLElement, parent: HTMLElement) {
+  if (parent) {
+    parent.appendChild(element);
+  }
 }
 
 export const TreeNode = (props: NodeProps) => {
+  let containerRef: HTMLElement | undefined = undefined;
+  let componentRef: HTMLElement | undefined = undefined;
   function onDragStart(event: DragEvent, node: Node) {
+    requestAnimationFrame(() => {
+      clearDragStartEl(props.treeContext.tempItemRef);
+    });
     event.dataTransfer.setData(
       "text/plain",
       props.treeContext.getSelectedNodeTextData(),
@@ -22,6 +47,7 @@ export const TreeNode = (props: NodeProps) => {
     props.treeContext.startDrag(props.windowIndex(), props.node);
     event.target.addEventListener("dragend", (event) => {
       props.treeContext.stopDrag();
+      clearDragStartEl(props.treeContext.tempItemRef);
     });
     window.addEventListener(
       "drop",
@@ -30,16 +56,24 @@ export const TreeNode = (props: NodeProps) => {
         const activeContext = props.treeContext.dndContext.dragContext[0]();
         activeContext?.dropItems(props.treeContext);
         props.treeContext.stopDrag();
+        clearDragStartEl(props.treeContext.tempItemRef);
       },
       { once: true },
     );
   }
+  function mouseup() {
+    putBack(componentRef, containerRef);
+  }
   function onNodeMouseDown(event: MouseEvent, node: Node) {
-    // event.preventDefault(); // Prevents selection
+    containerRef = componentRef.parentElement;
+    window.addEventListener("mouseup", mouseup);
+    // Slightly insane but avoids a world of pain.
+    addDragStartEl(props.treeContext, componentRef);
     props.treeContext.setFocus();
     if (event.metaKey) {
       props.treeContext.toggleSelection(node, true);
     }
+
     // Shift key = range selection
     // TODO: Define shift key but nothing selected behaviour?
     if (event.shiftKey && props.treeContext.selection[0]().size) {
@@ -68,6 +102,7 @@ export const TreeNode = (props: NodeProps) => {
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
     <props.Component
+      ref={componentRef}
       node={props.node}
       ctx={props.treeContext}
       onMouseDown={(event) =>
