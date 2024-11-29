@@ -63,9 +63,7 @@ export class TreeCanvas {
     }
     this.resizeCanvas();
     this.initRenderLoop();
-    window.addEventListener("resize", () => {
-      this.resizeCanvas();
-    });
+    window.addEventListener("resize", this.resizeCanvas);
   }
   setShadowColor = (color: RGB) => {
     this.shadowColor = color;
@@ -75,6 +73,9 @@ export class TreeCanvas {
     this.canvasEl.width = this.canvasEl.offsetWidth * this.scale;
     this.canvasEl.height = this.canvasEl.offsetHeight * this.scale;
     this.ctx2D.scale(this.scale, this.scale);
+  };
+  destroy = () => {
+    window.removeEventListener("resize", this.resizeCanvas());
   };
   get dimensions() {
     // TODO: Cache

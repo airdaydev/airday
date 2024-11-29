@@ -38,9 +38,13 @@ export const TextNodeComponent: NodeComponentType = (props) => {
         [styles["tree-item"]]: true,
         [styles["child_selected"]]: props.childSelected,
       }}
+      onDragStart={(event) => {
+        props.onDragStart(event);
+      }}
       onMouseDown={(event) => {
         props.onMouseDown(event);
       }}
+      draggable="true"
       onTouchStart={(event) => {
         props.onTouchStart(event);
       }}

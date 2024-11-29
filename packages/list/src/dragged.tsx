@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from "solid-js";
 import { DndContext } from "./dnd-context";
 
+// NOTE: This was the original ghost before using native drag and drop
 // TODO: Drag physics?
 // TODO: Move back to original place if drop cancelled!
 // https://greensock.com/forums/topic/16928-physics-while-dragging/

@@ -15,8 +15,32 @@ export interface NodeProps {
 
 export const TreeNode = (props: NodeProps) => {
   let componentRef: HTMLElement | undefined = undefined;
+  function onDragStart(event: DragEvent, node: Node) {
+    console.log("drag start!");
+    const bounds = componentRef?.getBoundingClientRect();
+    props.treeContext.mousePosFrame(event);
+    props.treeContext.startDrag(
+      props.windowIndex(),
+      props.node,
+      componentRef,
+      [0, 0],
+    );
+    event.target.addEventListener("dragend", (event) => {
+      props.treeContext.stopDrag();
+    });
+    window.addEventListener(
+      "drop",
+      (event) => {
+        event.preventDefault();
+        const activeContext = props.treeContext.dndContext.dragContext[0]();
+        activeContext?.dropItems(props.treeContext);
+        props.treeContext.stopDrag();
+      },
+      { once: true },
+    );
+  }
   function onNodeMouseDown(event: MouseEvent, node: Node) {
-    event.preventDefault(); // Prevents selection
+    // event.preventDefault(); // Prevents selection
     props.treeContext.setFocus();
     if (event.metaKey) {
       props.treeContext.toggleSelection(node, true);
@@ -44,39 +68,6 @@ export const TreeNode = (props: NodeProps) => {
     if (event.button === 2) {
       return; // context click handled elsewhere (TODO: ?)
     }
-    const origin: Coordinates = [event.clientX, event.clientY];
-    const bounds = componentRef?.getBoundingClientRect();
-    let clickOffset = [0, 0];
-    if (bounds) {
-      clickOffset = [event.pageX - bounds.x, event.pageY - bounds.y];
-    }
-    const mouseMove = (moveEvent) => {
-      if (distance(origin, [moveEvent.clientX, moveEvent.clientY]) > 3) {
-        props.treeContext.mousePosFrame(moveEvent);
-        props.treeContext.startDrag(
-          props.windowIndex(),
-          props.node,
-          componentRef,
-          clickOffset,
-        );
-        window.removeEventListener("mousemove", mouseMove);
-      }
-    };
-    window.addEventListener("mousemove", mouseMove);
-    window.addEventListener(
-      "mouseup",
-      () => {
-        // Dropping an item
-        // The event is on the node being dragged itself, but this is also recorded as selected item
-        // We need to discover the parent, the local index
-        // TODO: Perhaps wrap this within the context
-        const activeContext = props.treeContext.dndContext.dragContext[0]();
-        activeContext?.dropItems(props.treeContext);
-        props.treeContext.stopDrag();
-        window.removeEventListener("mousemove", mouseMove);
-      },
-      { once: true },
-    );
   }
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
@@ -87,6 +78,9 @@ export const TreeNode = (props: NodeProps) => {
       onMouseDown={(event) =>
         onNodeMouseDown(event, props.node, props.windowIndex())
       }
+      onDragStart={(event: DragEvent) => {
+        onDragStart(event, props.node, props.windowIndex());
+      }}
       ariaSelected={isSelected()}
       select={() => props.treeContext.selectOne(props.node)}
       toggleExpansion={() => {

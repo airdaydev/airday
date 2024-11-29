@@ -1,11 +1,4 @@
-import {
-  useContext,
-  onMount,
-  For,
-  Component,
-  createEffect,
-  Accessor,
-} from "solid-js";
+import { useContext, onMount, For, Component, Accessor } from "solid-js";
 import styles from "./tree.module.css";
 import { TreeContext, SolidListContext, VirtualisedList } from "./dnd-context";
 import { TreeNode } from "./node";

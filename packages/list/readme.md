@@ -69,6 +69,9 @@ pnpm run dev
 - [x] Dragging to other lists
 - [x] Smooth autoscrolling
 - [x] Can't drop below last item
+- [x] Integrate native drag and drop
+- [] Handle external drag and drop
+- [] Variable item heights...
 - [] Virtual list height correctly calculated (BUG!)
 - [] Provide API for rejecting bad positions ahead of time so UI can respond
 - [] Touch version
@@ -80,7 +83,8 @@ pnpm run dev
 - GPU version?
 - move down via line numbers (vim)
 
-## Bugs
+## Ugly bits
+- I'm keeping the dragged item (not items) IN the list which means I have to do a few weird calculations to account for it, potentially, I could instead, place that node in a portal underneath the mouse
 - When moving a lot of items (10 000s), O(2N) to sort each move!!
 
 # Other options:

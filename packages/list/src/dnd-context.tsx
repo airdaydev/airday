@@ -40,6 +40,7 @@ export class TreeContext {
   dndContext: DndContext;
   isDragOrigin = false; // TODO: Should this be derived this from dndContext?
   originIndex: number | null = 0; // TODO: This could move if other items are inserted...
+  projectedOriginIndex: number | null = null;
   originNode: Node | null = null;
   originRef?: HTMLElement;
   mouseDownCoords?: Coordinates;
@@ -117,6 +118,7 @@ export class TreeContext {
   unmount() {
     this.listRef?.removeEventListener("scroll", this.setListOffset);
     this.listRef = undefined;
+    this.canvas?.destroy();
     this.canvas = undefined;
   }
   setListOffset = () => {
@@ -217,7 +219,7 @@ export class TreeContext {
     this.setDragOver();
     const row = Math.min(
       Math.floor(mousePosListY / this.itemHeight),
-      this.presentCount(),
+      this.isDragOrigin ? this.presentCount() - 1 : this.presentCount(), // Side effect of having to keep the dragged item in the list
     );
     if (row !== this.rowDraggedOver[0]()) {
       this.rowDraggedOver[1](row);
@@ -226,16 +228,11 @@ export class TreeContext {
   dragMouseMove = (event: MouseEvent) => {
     this.mousePosFrame(event);
   };
-  startDrag(
-    originIndex: number,
-    originNode: Node,
-    ref: HTMLElement,
-    elClickOffset: Coordinates = [0, 0],
-  ) {
+  startDrag(originIndex: number, originNode: Node) {
     this.isDragOrigin = true;
     this.originIndex = originIndex;
     this.originNode = originNode;
-    this.dndContext.startDrag(ref, elClickOffset);
+    this.dndContext.startDrag();
     this.recalcListBounds();
     this.setDragOver();
   }
@@ -369,7 +366,13 @@ export class TreeContext {
         // Skip root & other selected items
         const skip =
           node.isRoot ||
-          (isDragging && this.selection[0]().has(node) && this.isDragOrigin);
+          (this.originNode !== node &&
+            isDragging &&
+            this.isDragOrigin &&
+            this.selection[0]().has(node));
+        if (this.originNode === node) {
+          this.projectedOriginIndex = index;
+        }
         if (!skip) {
           index++;
           visibleChildren.push(node);
@@ -391,21 +394,37 @@ export class TreeContext {
     });
   }
   getProjectionIndex(node: Node) {
-    // TODO: Memoise projection!
     const t = this.projection().findIndex((n) => n === node);
     return t;
   }
   getItemPosition(list: VirtualisedList, index: Accessor<number>, node?: Node) {
+    // This creates a gap where the item is hovering over
+    // and ignores & removes the currently dragged over item.
+    // TODO: We could simplify this by shifting the originNode to the beginning or end of the list...? or even fucking it over somewhere else entirely...?
     let offset = 0;
+    let i = index();
+    i =
+      this.dndContext.isDragging() &&
+      this.isDragOrigin &&
+      i > this.projectedOriginIndex
+        ? i - 1
+        : i;
     if (
       this.dndContext.isDragging() &&
       typeof this.rowDraggedOver[0]() === "number" &&
-      index() + list().start >= this.rowDraggedOver[0]()
+      i + list().start >= this.rowDraggedOver[0]()
     ) {
-      offset = this.itemHeight;
+      offset += this.itemHeight;
+    }
+    if (
+      this.dndContext.isDragging() &&
+      this.isDragOrigin &&
+      this.projectedOriginIndex === index()
+    ) {
+      offset = 90000;
     }
     let position =
-      index() * this.itemHeight + offset + list().start * this.itemHeight;
+      i * this.itemHeight + offset + list().start * this.itemHeight;
     if (node) {
       const ref = this.refMap.get(node);
       if (ref?.preventAnimation) {
@@ -414,6 +433,27 @@ export class TreeContext {
     }
     return position;
   }
+  // getItemPosition(list: VirtualisedList, index: Accessor<number>, node?: Node) {
+  //   // This creates a gap where the item is hovering over
+  //   // and ignores & removes the currently dragged over items
+  //   let offset = 0;
+  //   if (
+  //     this.dndContext.isDragging() &&
+  //     typeof this.rowDraggedOver[0]() === "number" &&
+  //     index() + list().start >= this.rowDraggedOver[0]()
+  //   ) {
+  //     offset = this.itemHeight;
+  //   }
+  //   let position =
+  //     index() * this.itemHeight + offset + list().start * this.itemHeight;
+  //   if (node) {
+  //     const ref = this.refMap.get(node);
+  //     if (ref?.preventAnimation) {
+  //       position = ref.ref.style.getPropertyValue("--pos").replace("px", "");
+  //     }
+  //   }
+  //   return position;
+  // }
   // Projection of list i.e. visible children, often filtered by dragged items
   getWindowedSignal(): VirtualisedList {
     // Virtualisation
@@ -487,7 +527,6 @@ export class DndContext {
   dragContext = createSignal<TreeContext | null>(null);
   listContexts = new Set<TreeContext>();
   draggedEl: HTMLElement | null = null; // Clone of element that was dragged
-  elClickOffset = [0, 0];
   elDimensionsPx: Coordinates = [200, 32];
   dragMove = createSignal<Coordinates>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
@@ -495,20 +534,13 @@ export class DndContext {
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
   }
-  startDrag(
-    ref: HTMLElement,
-    elClickOffset: Coordinates = [0, 0],
-    dragMode: dragMode = "mouse",
-  ) {
+  startDrag(dragMode: dragMode = "mouse") {
     // Set up dragged element
-    this.elClickOffset = elClickOffset;
-    const bounds = ref.getBoundingClientRect();
-    this.elDimensionsPx = [bounds.width, bounds.height];
-    this.draggedEl = ref.cloneNode(true);
     this.dragMode[1](dragMode);
-    window.addEventListener("mousemove", this.react);
+    window.addEventListener("dragover", this.react);
   }
   react = (event: MouseEvent) => {
+    event.preventDefault();
     this.listContexts.forEach((listContext) =>
       listContext.dragMouseMove(event),
     );

@@ -3,7 +3,6 @@ import { render } from "solid-js/web";
 import {
   Tree,
   DndContext,
-  Dragged,
   TreeContext,
   ListStateContext,
   SolidListContext,
@@ -64,7 +63,6 @@ const ctxC = new TreeContext({
 render(
   () => (
     <div class={styles["app"]}>
-      {dndContext.isDragging() && <Dragged dndContext={dndContext} />}
       <div class={styles["container"]}>
         <SolidListContext.Provider value={ctxA}>
           <div
