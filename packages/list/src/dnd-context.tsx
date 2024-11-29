@@ -232,7 +232,7 @@ export class TreeContext {
     this.setDragOver();
     const row = Math.min(
       Math.floor(mousePosListY / this.itemHeight),
-      this.isDragOrigin ? this.presentCount() - 1 : this.presentCount(), // Side effect of having to keep the dragged item in the list
+      this.presentCount(), // Side effect of having to keep the dragged item in the list
     );
     if (row !== this.rowDraggedOver[0]()) {
       this.rowDraggedOver[1](row);
