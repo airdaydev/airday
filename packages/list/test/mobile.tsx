@@ -17,7 +17,6 @@ treeStateA.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 5 }));
 render(
   () => (
     <div class={styles["container"]}>
-      {dndContext.isDragging() && <Dragged dndContext={dndContext} />}
       <div style={`display: flex; flex-direction: column; height: 100%;`}>
         <h3>Tree A ({treeStateA.count()} items)</h3>
         <Tree dndContext={dndContext} state={treeStateA} itemHeight={36} />

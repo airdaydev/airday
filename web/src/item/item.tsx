@@ -93,6 +93,10 @@ export const GenericComponent: NodeComponentType = (props) => {
         onMouseDown={(event) => {
           props.onMouseDown(event);
         }}
+        onDragStart={(event) => {
+          props.onDragStart(event);
+        }}
+        draggable="true"
         onMouseEnter={props.onMouseEnter}
         onTouchStart={(event) => {
           props.onTouchStart(event);

@@ -1,7 +1,6 @@
 import { Accessor, Component } from "solid-js";
 import { Node } from "./state";
-import { TreeContext, VirtualisedList } from "./dnd-context";
-import { Coordinates, distance } from "./utils";
+import { TreeContext } from "./dnd-context";
 
 export interface NodeProps {
   node: Node;
@@ -14,17 +13,9 @@ export interface NodeProps {
 }
 
 export const TreeNode = (props: NodeProps) => {
-  let componentRef: HTMLElement | undefined = undefined;
   function onDragStart(event: DragEvent, node: Node) {
-    console.log("drag start!");
-    const bounds = componentRef?.getBoundingClientRect();
     props.treeContext.mousePosFrame(event);
-    props.treeContext.startDrag(
-      props.windowIndex(),
-      props.node,
-      componentRef,
-      [0, 0],
-    );
+    props.treeContext.startDrag(props.windowIndex(), props.node);
     event.target.addEventListener("dragend", (event) => {
       props.treeContext.stopDrag();
     });
@@ -72,7 +63,6 @@ export const TreeNode = (props: NodeProps) => {
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
     <props.Component
-      ref={componentRef}
       node={props.node}
       ctx={props.treeContext}
       onMouseDown={(event) =>
@@ -95,6 +85,7 @@ export type NodeComponentType = Component<{
   node: Node;
   ariaSelected: boolean;
   childSelected: boolean;
+  onDragStart: (event: DragEvent) => void;
   onMouseDown: (event: MouseEvent) => void;
   onMouseEnter: (event: MouseEvent) => void;
   onTouchStart: (event: TouchEvent) => void;
