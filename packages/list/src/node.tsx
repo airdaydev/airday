@@ -43,6 +43,7 @@ export const TreeNode = (props: NodeProps) => {
     // Shift key = range selection
     // TODO: Define shift key but nothing selected behaviour?
     if (event.shiftKey && props.treeContext.selection[0]().size) {
+      event.preventDefault(); // prevents drag - too easy to slip
       const first = props.treeContext.getFirstIndexSelected();
       if (first === false) return; // no items found, TODO: how could this be the case?
       if (props.projectionIndex() < first) {
