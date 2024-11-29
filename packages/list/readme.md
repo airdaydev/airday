@@ -70,6 +70,7 @@ pnpm run dev
 - [x] Smooth autoscrolling
 - [x] Can't drop below last item
 - [x] Integrate native drag and drop
+- [] Bug when after offset 0 in scroll container, weird stuff happens when you drag (probably try solution below re not having dragged item in list but extracting it manually and putting it in a cheeky portal)
 - [] Handle external drag and drop
 - [] Variable item heights...
 - [] Virtual list height correctly calculated (BUG!)

@@ -14,6 +14,10 @@ export interface NodeProps {
 
 export const TreeNode = (props: NodeProps) => {
   function onDragStart(event: DragEvent, node: Node) {
+    event.dataTransfer.setData(
+      "text/plain",
+      props.treeContext.getSelectedNodeTextData(),
+    );
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
     event.target.addEventListener("dragend", (event) => {
