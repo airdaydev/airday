@@ -1,4 +1,4 @@
-import { Accessor, Component, createSignal, onMount } from "solid-js";
+import { Accessor, Component } from "solid-js";
 import { Node } from "./state";
 import { TreeContext } from "./dnd-context";
 

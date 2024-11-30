@@ -70,15 +70,15 @@ pnpm run dev
 - [x] Smooth autoscrolling
 - [x] Can't drop below last item
 - [x] Integrate native drag and drop
-- [] Bug when after offset 0 in scroll container, weird stuff happens when you drag (probably try solution below re not having dragged item in list but extracting it manually and putting it in a cheeky portal)
 - [] Handle external drag and drop
 - [] Variable item heights...
 - [] Virtual list height correctly calculated (BUG!)
-- [] Provide API for rejecting bad positions ahead of time so UI can respond
+- [] Provide API for rejecting bad drops ahead of time so UI can respond
 - [] Touch version
 - [] Nested movement fixes
 - [] Ensure list tracked dimensions match list size at all times
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
+- [] Make native dnd optional, because it kind of fuckin sucks (no work on android bruh, lots of bs going on other platforms)
 
 ## Roadmap
 - GPU version?
