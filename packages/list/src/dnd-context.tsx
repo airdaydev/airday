@@ -419,7 +419,11 @@ export class TreeContext {
     ) {
       offset = this.itemHeight;
     }
-    if (this.dndContext.isDragging() && node === this.originNode) {
+    if (
+      this.dndContext.isDragging() &&
+      this.isDragOrigin &&
+      node === this.originNode
+    ) {
       i = this.rowDraggedOver[0]() - list().start;
       offset = 0;
     }
@@ -450,6 +454,7 @@ export class TreeContext {
         this.isDragOrigin &&
         this.originNode
       ) {
+        console.log("pushin");
         window.push(this.originNode);
       }
       return {
