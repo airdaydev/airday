@@ -11,14 +11,17 @@ export function Checkbox(props: CheckboxProps) {
       <input
         type="checkbox"
         checked={!!props.checked}
-        onClick={(event) => {
-          event.stopPropagation();
+        // onClick={(event) => {
+        //   event.stopPropagation();
+        // }}
+        onMouseDown={() => {
+          console.log("yo");
         }}
         onChange={props.onChange}
-        onDblClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
+        // onDblClick={(event) => {
+        //   event.preventDefault();
+        //   event.stopPropagation();
+        // }}
         tabIndex={-1}
       ></input>
       <span></span>

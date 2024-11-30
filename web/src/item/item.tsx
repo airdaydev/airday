@@ -23,6 +23,7 @@ const GenericItemCheckbox: Component<{
   return (
     <Checkbox
       onChange={(event: InputEvent) => {
+        console.log("wtf");
         props.node.toggleComplete(props.options.historical);
         event.stopPropagation();
       }}
@@ -97,10 +98,9 @@ export const GenericComponent: NodeComponentType = (props) => {
           props.onDragStart(event);
         }}
         draggable="true"
-        onMouseEnter={props.onMouseEnter}
-        onTouchStart={(event) => {
-          props.onTouchStart(event);
-        }}
+        // onTouchStart={(event) => {
+        //   props.onTouchStart(event);
+        // }}
         onDblClick={(event) => {
           event.preventDefault();
           props.select();

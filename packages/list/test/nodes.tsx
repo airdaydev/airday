@@ -76,13 +76,13 @@ export const TextNodeComponent: NodeComponentType = (props) => {
         {props.node?.children.length && (
           <button
             class={styles["expand"]}
-            onClick={() => props.toggleExpansion()}
+            onmousedown={() => props.toggleExpansion()}
           >
             <img src="/public/caret.svg" />
           </button>
         )}
       </div>
-      <div onMouseEnter={props.onMouseEnter} class={styles["item-internal"]}>
+      <div class={styles["item-internal"]}>
         {node().id} - {node().content} d:{props.node.depth}
       </div>
     </div>

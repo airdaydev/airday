@@ -411,15 +411,20 @@ export class TreeContext {
     // This creates a gap where the item is hovering over
     // and ignores & removes the currently dragged over items
     let offset = 0;
+    let i = index();
     if (
       this.dndContext.isDragging() &&
       typeof this.rowDraggedOver[0]() === "number" &&
-      index() + list().start >= this.rowDraggedOver[0]()
+      i + list().start >= this.rowDraggedOver[0]()
     ) {
       offset = this.itemHeight;
     }
+    if (this.dndContext.isDragging() && node === this.originNode) {
+      i = this.rowDraggedOver[0]() - list().start;
+      offset = 0;
+    }
     let position =
-      index() * this.itemHeight + offset + list().start * this.itemHeight;
+      i * this.itemHeight + offset + list().start * this.itemHeight;
     if (node) {
       const ref = this.refMap.get(node);
       if (ref?.preventAnimation) {
@@ -440,6 +445,13 @@ export class TreeContext {
         Math.max(0, offset - excess - buffer * rowHeight) / rowHeight;
       const renderCount = Math.floor(containerHeight / rowHeight) + buffer * 2;
       let window = this.projection().slice(start, start + renderCount);
+      if (
+        this.dndContext.isDragging() &&
+        this.isDragOrigin &&
+        this.originNode
+      ) {
+        window.push(this.originNode);
+      }
       return {
         window,
         start,

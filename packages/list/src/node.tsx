@@ -1,4 +1,4 @@
-import { Accessor, Component } from "solid-js";
+import { Accessor, Component, createSignal, onMount } from "solid-js";
 import { Node } from "./state";
 import { TreeContext } from "./dnd-context";
 
@@ -10,65 +10,35 @@ export interface NodeProps {
   treeContext: TreeContext;
 }
 
-function addDragStartEl(treeContext: TreeContext, element: HTMLElement) {
-  const pos =
-    element.parentElement.style.getPropertyValue("--pos").replace("px", "") -
-    treeContext.listRef.scrollTop;
-  treeContext.tempItemRef.style.top = `${pos}px`;
-  if (treeContext.tempItemRef) {
-    treeContext.tempItemRef.appendChild(element);
-  }
-}
-
-function clearDragStartEl(tempItemRef: HTMLElement) {
-  if (tempItemRef?.firstChild) {
-    tempItemRef.removeChild(tempItemRef.firstChild);
-  }
-}
-
-function putBack(element: HTMLElement, parent: HTMLElement) {
-  if (parent) {
-    parent.appendChild(element);
-  }
-}
-
 export const TreeNode = (props: NodeProps) => {
-  let containerRef: HTMLElement | undefined = undefined;
   let componentRef: HTMLElement | undefined = undefined;
   function onDragStart(event: DragEvent, node: Node) {
-    requestAnimationFrame(() => {
-      clearDragStartEl(props.treeContext.tempItemRef);
-    });
     event.dataTransfer.setData(
       "text/plain",
       props.treeContext.getSelectedNodeTextData(),
     );
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
+    requestAnimationFrame(() => {
+      componentRef.parentElement.style.opacity = "0";
+    });
     event.target.addEventListener("dragend", (event) => {
+      componentRef.parentElement.style.opacity = "1";
       props.treeContext.stopDrag();
-      clearDragStartEl(props.treeContext.tempItemRef);
     });
     window.addEventListener(
       "drop",
       (event) => {
         event.preventDefault();
+        componentRef.parentElement.style.opacity = "1";
         const activeContext = props.treeContext.dndContext.dragContext[0]();
         activeContext?.dropItems(props.treeContext);
         props.treeContext.stopDrag();
-        clearDragStartEl(props.treeContext.tempItemRef);
       },
       { once: true },
     );
   }
-  function mouseup() {
-    putBack(componentRef, containerRef);
-  }
   function onNodeMouseDown(event: MouseEvent, node: Node) {
-    containerRef = componentRef.parentElement;
-    window.addEventListener("mouseup", mouseup);
-    // Slightly insane but avoids a world of pain.
-    addDragStartEl(props.treeContext, componentRef);
     props.treeContext.setFocus();
     if (event.metaKey) {
       props.treeContext.toggleSelection(node, true);

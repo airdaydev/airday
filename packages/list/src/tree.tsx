@@ -71,7 +71,7 @@ export const Tree: Component<TreeProps> = (props) => {
                 aria-selected={treeContext.isSelected(node)}
                 style={{
                   "--pos": getItemPosition(windowIndex, node),
-                  height: `${windowIndex() === treeContext.presentCount() ? treeContext.itemHeight * 2 : treeContext.itemHeight}px`,
+                  height: `${treeContext.itemHeight}px`,
                 }}
                 ref={(ref) => {
                   treeContext.updateRef(node, { ref });
