@@ -35,7 +35,8 @@ export class Autoscroller2 {
       const difference = this.targetSpeed - this.currentSpeed;
       this.currentSpeed += (difference / this.decelerationTime) * deltaTime;
     }
-    this.scrollRef.scrollBy(0, this.currentSpeed * this.direction);
+    if (this.scrollRef)
+      this.scrollRef.scrollBy(0, this.currentSpeed * this.direction);
     this.subscriptions.forEach((cb) => {
       cb();
     });

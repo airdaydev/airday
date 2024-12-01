@@ -75,10 +75,11 @@ export class TreeCanvas {
     this.ctx2D.scale(this.scale, this.scale);
   };
   destroy = () => {
-    window.removeEventListener("resize", this.resizeCanvas());
+    window.removeEventListener("resize", () => this.resizeCanvas());
   };
   get dimensions() {
-    // TODO: Cache
+    if (!this.canvasEl)
+      throw new Error("Attempted to get non-existent canvas dimensions");
     return [
       this.canvasEl.width / this.scale,
       this.canvasEl.height / this.scale,
@@ -94,6 +95,10 @@ export class TreeCanvas {
   // }
   frame() {
     requestAnimationFrame((frame) => {
+      if (!this.ctx2D) {
+        console.warn("Attempted to call frame while canvas not instantiated");
+        return;
+      }
       this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
       const fps = this.fps.update();
       const row = this.treeContext.rowDraggedOver[0]();

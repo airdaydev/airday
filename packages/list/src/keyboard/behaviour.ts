@@ -73,8 +73,10 @@ export function selectFromOriginUp(ctx: TreeContext) {
   ) {
     // select up
     const prevIndex = ctx?.getNextDeselectedFromOrigin("prev");
-    const node = ctx.projection()[prevIndex];
-    if (prevIndex !== false) ctx?.toggleSelection(node);
+    if (typeof prevIndex === "number") {
+      const node = ctx.projection()[prevIndex];
+      ctx?.toggleSelection(node);
+    }
     return;
   } else {
     // deselect up
@@ -98,8 +100,10 @@ export function selectFromOriginDown(ctx: TreeContext) {
   if (prevDeselected === originIndex - 1 || originIndex === 0) {
     // select down
     const nextIndex = ctx?.getNextDeselectedFromOrigin();
-    const node = ctx.projection()[nextIndex];
-    if (nextIndex !== false) ctx?.toggleSelection(node);
+    if (typeof nextIndex === "number") {
+      const node = ctx.projection()[nextIndex];
+      ctx?.toggleSelection(node);
+    }
     return;
   } else {
     // Deselect down
