@@ -1,4 +1,5 @@
 export interface GenericNode<T extends GenericNode<any | undefined>> {
+  id: string;
   children?: T[];
 }
 

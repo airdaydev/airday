@@ -1,6 +1,6 @@
-import { describe, beforeEach, test, expect } from "vitest";
+import { describe, test, expect } from "vitest";
 import { createUniqueId } from "solid-js";
-import { map, walk, filter } from "./tree-utils";
+import { map } from "./tree-utils";
 
 class Node {
   id = createUniqueId();
@@ -33,7 +33,7 @@ describe("Tree map depth works", () => {
     let maxResult = 0;
     const maxDepth = 5;
     const tree = treeGen(maxDepth);
-    map(tree, (node, parent, depth) => {
+    map(tree, (node, _, depth) => {
       if ((depth === 0) & (has0Depth === false)) has0Depth = true;
       maxResult = Math.max(maxResult, depth);
       return node;

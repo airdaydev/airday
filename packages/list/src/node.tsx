@@ -4,7 +4,7 @@ import { TreeContext } from "./dnd-context";
 
 export interface NodeProps {
   node: Node;
-  Component: NodeComponentType;
+  Component: NodeComponentType<any>;
   windowIndex: Accessor<number>;
   projectionIndex: Accessor<number>;
   treeContext: TreeContext;
@@ -13,10 +13,12 @@ export interface NodeProps {
 export const TreeNode = (props: NodeProps) => {
   let componentRef: HTMLElement | undefined = undefined;
   function onDragStart(event: DragEvent, node: Node) {
-    event.dataTransfer.setData(
-      "text/plain",
-      props.treeContext.getSelectedNodeTextData(),
-    );
+    if (event.dataTransfer) {
+      event.dataTransfer.setData(
+        "text/plain",
+        props.treeContext.getSelectedNodeTextData(),
+      );
+    }
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
     requestAnimationFrame(() => {
@@ -91,8 +93,8 @@ export const TreeNode = (props: NodeProps) => {
   );
 };
 
-export type NodeComponentType = Component<{
-  node: Node;
+export type NodeComponentType<T extends Node> = Component<{
+  node: T;
   ariaSelected: boolean;
   childSelected: boolean;
   onDragStart: (event: DragEvent) => void;

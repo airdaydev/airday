@@ -6,9 +6,9 @@ export class TextNode extends Node {
   allowChildren = true;
   content?: string;
   component = TextNodeComponent;
-  constructor(node) {
+  constructor(node: Partial<Node> & { content?: string }) {
     super(node);
-    this.content = node.content;
+    if (node.content) this.content = node.content;
   }
   serialise() {
     return {
@@ -21,14 +21,14 @@ export class TextNode extends Node {
   }
 }
 
-export function loader(node: GenericNode<any>) {
+export function loader(node: TextNode) {
   return new TextNode({
     id: node.id,
     content: node.content,
   });
 }
 
-export const TextNodeComponent: NodeComponentType = (props) => {
+export const TextNodeComponent: NodeComponentType<any> = (props) => {
   const node = props.node.accessor;
   return (
     <div
