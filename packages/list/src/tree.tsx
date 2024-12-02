@@ -1,18 +1,18 @@
-import { useContext, onMount, For, Component, Accessor } from "solid-js";
+import { onMount, For, Component, Accessor } from "solid-js";
 import styles from "./tree.module.css";
-import { TreeContext, SolidListContext } from "./dnd-context";
+import { useTreeContext } from "./dnd-context";
 import { TreeNode } from "./node";
 import { Node } from "./state";
 
 interface TreeProps {
-  shadowColor: [number, number, number]; // RGB
+  shadowColor?: [number, number, number]; // RGB
 }
 
 export const Tree: Component<TreeProps> = (props) => {
   let listRef: HTMLDivElement | undefined = undefined;
   let tempItemRef: HTMLDivElement | undefined = undefined;
   let canvasRef: HTMLCanvasElement | undefined = undefined;
-  const treeContext = useContext<TreeContext>(SolidListContext);
+  const treeContext = useTreeContext();
   const windowedList = treeContext.getWindowedSignal();
 
   onMount(() => {

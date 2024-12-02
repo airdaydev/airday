@@ -29,6 +29,7 @@ export const NavListItem: NodeComponentType = (props) => {
           setCtxOffset([event.clientX, event.clientY]);
           setCtxOpen(true);
         }}
+        draggable="true"
         onMouseEnter={props.onMouseEnter}
         onMouseDown={(event) => {
           session.viewState.paneDropView = new DataView(

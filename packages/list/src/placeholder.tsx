@@ -1,11 +1,11 @@
-import { Show, useContext } from "solid-js";
-import { TreeContext, SolidListContext } from "./dnd-context";
+import { Show } from "solid-js";
+import { useTreeContext } from "./dnd-context";
 
 export const Placeholder = (props: {
   backdrop?: boolean;
   debugText?: string;
 }) => {
-  const treeContext = useContext<TreeContext>(SolidListContext);
+  const treeContext = useTreeContext();
   return (
     <div
       classList={{

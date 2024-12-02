@@ -5,6 +5,7 @@ import {
   createMemo,
   createSignal,
   createUniqueId,
+  useContext,
 } from "solid-js";
 import { Node, RootNode, TreeState } from "./state";
 import { walk } from "./tree-utils";
@@ -568,3 +569,11 @@ export class DndContext {
 }
 
 export const SolidListContext = createContext<TreeContext | null>(null);
+
+export function useTreeContext() {
+  const ctx = useContext(SolidListContext);
+  if (!ctx) {
+    throw new Error("Missing context Provider");
+  }
+  return ctx;
+}

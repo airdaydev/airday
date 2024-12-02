@@ -18,6 +18,7 @@ const root = document.getElementById("root");
 // We'll use this between TreeState to allow a shared selection state
 const dndContext = new DndContext();
 
+// State context
 const listStateContext = new ListStateContext({
   onDelete: (set) => {
     console.log(`Deleting ${set.size} items`);
