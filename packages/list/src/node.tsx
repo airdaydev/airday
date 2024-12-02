@@ -1,4 +1,4 @@
-import { Accessor, Component } from "solid-js";
+import { Accessor, Component, Ref } from "solid-js";
 import { Node } from "./state";
 import { TreeContext } from "./dnd-context";
 
@@ -12,7 +12,7 @@ export interface NodeProps {
 
 export const TreeNode = (props: NodeProps) => {
   let componentRef: HTMLElement | undefined = undefined;
-  function onDragStart(event: DragEvent, node: Node) {
+  function onDragStart(event: DragEvent) {
     if (event.dataTransfer) {
       event.dataTransfer.setData(
         "text/plain",
@@ -22,17 +22,20 @@ export const TreeNode = (props: NodeProps) => {
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
     requestAnimationFrame(() => {
-      componentRef.parentElement.style.opacity = "0";
+      if (componentRef?.parentElement)
+        componentRef.parentElement.style.opacity = "0";
     });
-    event.target.addEventListener("dragend", (event) => {
-      componentRef.parentElement.style.opacity = "1";
+    event.target?.addEventListener("dragend", () => {
+      if (componentRef?.parentElement)
+        componentRef.parentElement.style.opacity = "1";
       props.treeContext.stopDrag();
     });
     window.addEventListener(
       "drop",
       (event) => {
         event.preventDefault();
-        componentRef.parentElement.style.opacity = "1";
+        if (componentRef?.parentElement)
+          componentRef.parentElement.style.opacity = "1";
         const activeContext = props.treeContext.dndContext.dragContext[0]();
         activeContext?.dropItems(props.treeContext);
         props.treeContext.stopDrag();
@@ -77,11 +80,9 @@ export const TreeNode = (props: NodeProps) => {
       ref={componentRef}
       node={props.node}
       ctx={props.treeContext}
-      onMouseDown={(event) =>
-        onNodeMouseDown(event, props.node, props.windowIndex())
-      }
+      onMouseDown={(event) => onNodeMouseDown(event, props.node)}
       onDragStart={(event: DragEvent) => {
-        onDragStart(event, props.node, props.windowIndex());
+        onDragStart(event);
       }}
       ariaSelected={isSelected()}
       select={() => props.treeContext.selectOne(props.node)}
@@ -96,11 +97,12 @@ export const TreeNode = (props: NodeProps) => {
 export type NodeComponentType<T extends Node> = Component<{
   node: T;
   ariaSelected: boolean;
-  childSelected: boolean;
   onDragStart: (event: DragEvent) => void;
   onMouseDown: (event: MouseEvent) => void;
-  onMouseEnter: (event: MouseEvent) => void;
-  onTouchStart: (event: TouchEvent) => void;
+  // onMouseEnter: (event: MouseEvent) => void;
+  // onTouchStart: (event: TouchEvent) => void;
   select: () => void;
+  ref: Ref<HTMLDivElement | undefined>;
   ctx: TreeContext;
+  toggleExpansion: () => void;
 }>;

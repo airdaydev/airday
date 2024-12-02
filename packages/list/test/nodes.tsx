@@ -1,12 +1,16 @@
 import styles from "./dev.module.css";
 import { NodeComponentType, Node, GenericNode } from "../src/index";
 
+interface TextNodeProps extends GenericNode<TextNodeProps> {
+  content?: string;
+}
+
 export class TextNode extends Node {
   type = "text";
   allowChildren = true;
   content?: string;
   component = TextNodeComponent;
-  constructor(node: Partial<Node> & { content?: string }) {
+  constructor(node: TextNodeProps) {
     super(node);
     if (node.content) this.content = node.content;
   }
@@ -28,7 +32,7 @@ export function loader(node: TextNode) {
   });
 }
 
-export const TextNodeComponent: NodeComponentType<any> = (props) => {
+export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
   const node = props.node.accessor;
   return (
     <div
@@ -36,7 +40,7 @@ export const TextNodeComponent: NodeComponentType<any> = (props) => {
       aria-expanded={node().expanded}
       classList={{
         [styles["tree-item"]]: true,
-        [styles["child_selected"]]: props.childSelected,
+        // [styles["child_selected"]]: props.childSelected,
       }}
       onDragStart={(event) => {
         props.onDragStart(event);
@@ -46,14 +50,13 @@ export const TextNodeComponent: NodeComponentType<any> = (props) => {
       }}
       draggable="true"
       onTouchStart={(event) => {
-        props.onTouchStart(event);
+        // props.onTouchStart(event);
       }}
       onDblClick={(event) => {
         event.preventDefault();
         props.select();
         props.node.updateContent("gogogoo");
       }}
-      data-index={props.index}
       ref={props.ref}
       style={{
         "padding-left": `${(props.node.accessor().depth - 1) * 10}px`,

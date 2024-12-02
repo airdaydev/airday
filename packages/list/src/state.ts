@@ -1,9 +1,10 @@
-import { Signal, createSignal, createUniqueId } from "solid-js";
+import { Signal, createSignal, createUniqueId, Accessor } from "solid-js";
 import { GenericNode, map, walk, filter } from "./tree-utils";
 
 export interface NodeSignalProps {
   id: string;
   expanded: boolean;
+  depth: number;
 }
 
 export class Node {
@@ -15,10 +16,15 @@ export class Node {
   expanded = false;
   parent: Node | null = null;
   root?: TreeState;
-  uiSignal?: Signal<NodeSignalProps> | undefined;
+  uiSignal?:
+    | Signal<NodeSignalProps & ReturnType<this["serialise"]>>
+    | undefined;
   signalSubscriptions = 0;
   constructor(node?: GenericNode<any>) {
     this.id = node?.id || createUniqueId();
+  }
+  serialise(): any | undefined {
+    return undefined;
   }
   // TODO: Consider maintaining an index
   getIndex() {
