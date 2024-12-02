@@ -81,7 +81,7 @@ export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
             class={styles["expand"]}
             onmousedown={() => props.toggleExpansion()}
           >
-            <img src="/public/caret.svg" />
+            <img src="./caret.svg" />
           </button>
         )}
       </div>
