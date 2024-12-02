@@ -35,7 +35,7 @@ export const Tree: Component<TreeProps> = (props) => {
         requestAnimationFrame(() => {
           const ref = treeContext.refMap.get(node);
           const newPos = treeContext.getItemPosition(windowedList, index);
-          ref.ref?.style.setProperty("--pos", `${newPos}px`);
+          ref?.ref?.style.setProperty("--pos", `${newPos}px`);
           treeContext.updateRef(node, { preventAnimation: false });
         });
       });
