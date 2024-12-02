@@ -1,4 +1,4 @@
-import { Signal, createSignal, createUniqueId, Accessor } from "solid-js";
+import { Signal, createSignal, createUniqueId } from "solid-js";
 import { GenericNode, map, walk, filter } from "./tree-utils";
 
 export interface NodeSignalProps {

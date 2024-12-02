@@ -20,11 +20,9 @@ export const Tree: Component<TreeProps> = (props) => {
       treeContext.mount({
         canvasRef,
         listRef,
-        treeContext,
-        tempItemRef,
       });
       if (props.shadowColor) {
-        treeContext.canvas.setShadowColor(props.shadowColor);
+        treeContext.canvas?.setShadowColor(props.shadowColor);
       }
     }
   });
@@ -81,11 +79,7 @@ export const Tree: Component<TreeProps> = (props) => {
                 <TreeNode
                   node={node}
                   treeContext={treeContext}
-                  Component={
-                    node.component ||
-                    props.defaultNodeComponent ||
-                    DefaultNodeComponent
-                  }
+                  Component={node.component || props.defaultNodeComponent}
                   projectionIndex={() => windowIndex() + windowedList().start}
                   windowIndex={windowIndex}
                 />

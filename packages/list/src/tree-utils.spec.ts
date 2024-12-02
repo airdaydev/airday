@@ -10,7 +10,7 @@ class Node {
   }
 }
 
-const treeGen = (depth: number = 2, maxLength: number = 5) => {
+const treeGen = (maxLength: number = 5) => {
   const root = new Node();
   function genChildren(parentNode: Node, depth: number) {
     const children = [];
@@ -34,7 +34,7 @@ describe("Tree map depth works", () => {
     const maxDepth = 5;
     const tree = treeGen(maxDepth);
     map(tree, (node, _, depth) => {
-      if ((depth === 0) & (has0Depth === false)) has0Depth = true;
+      if (depth === 0 && has0Depth === false) has0Depth = true;
       maxResult = Math.max(maxResult, depth);
       return node;
     });

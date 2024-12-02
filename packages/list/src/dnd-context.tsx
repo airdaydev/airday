@@ -47,7 +47,6 @@ export class TreeContext {
   mouseDownOffset?: Coordinates;
   rowDraggedOver = createSignal<number | null>(null); // TODO: Do we need a signal?
   // DOM & Render
-  containerRef?: HTMLElement;
   listRef?: HTMLElement;
   tempItemRef?: HTMLElement; // We're using native dnd but we are disappearing the element, so we jack into this container
   canvas?: TreeCanvas;
@@ -100,12 +99,7 @@ export class TreeContext {
       };
     }
   }
-  mount(opts: {
-    canvasRef: HTMLCanvasElement;
-    listRef: HTMLElement;
-    containerRef: HTMLElement;
-    tempItemRef: HTMLElement;
-  }) {
+  mount(opts: { canvasRef: HTMLCanvasElement; listRef: HTMLElement }) {
     this.listRef = opts.listRef;
     this.autoscroller.mount(opts.listRef);
     this.recalcListBounds();
@@ -114,10 +108,7 @@ export class TreeContext {
       canvasRef: opts.canvasRef,
       debug: this.debug,
     });
-    this.containerRef = opts.containerRef;
     this.listRef.addEventListener("scroll", this.setListOffset);
-    // This is used to store a temporary version of the currently dragged item
-    this.tempItemRef = opts.tempItemRef;
   }
   unmount() {
     this.listRef?.removeEventListener("scroll", this.setListOffset);

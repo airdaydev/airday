@@ -7,6 +7,7 @@ interface SoloNodeProps extends PropsWithChildren {
   treeContext: TreeContext;
   Component: SoloNodeComponentType;
   enableDrop: boolean; // Can still be used with other components
+  node: Node;
 }
 
 export type SoloNodeComponentType = Component<{
@@ -25,7 +26,7 @@ export type SoloNodeComponentType = Component<{
  * It can hook itself into other drag contexts
  */
 export const SoloNode = (props: SoloNodeProps) => {
-  let ref: HTMLElement;
+  let ref!: HTMLElement;
   const enableDrop = props.enableDrop === false ? false : true;
   // Mouse interactions
   const onMouseDown = (event: MouseEvent) => {
@@ -39,14 +40,14 @@ export const SoloNode = (props: SoloNodeProps) => {
         distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
       ) {
         if (enableDrop === false) props.dndContext.enableDrop = false;
-        const targetBounding = event.target.getBoundingClientRect();
-        const targetOffset = [
-          event.pageX - targetBounding.x,
-          event.pageY - targetBounding.y,
-        ] as [number, number];
+        // const targetBounding = ref.getBoundingClientRect();
+        // const targetOffset = [
+        //   event.pageX - targetBounding.x,
+        //   event.pageY - targetBounding.y,
+        // ] as [number, number];
         // Start dragging
         props.dndContext.dragContext[1](null);
-        props.dndContext.startDrag(ref, targetOffset);
+        props.dndContext.startDrag();
         window.removeEventListener("mousemove", mouseMove);
         window.addEventListener("mouseup", () => {
           props.dndContext.stopDrag();
@@ -62,7 +63,12 @@ export const SoloNode = (props: SoloNodeProps) => {
   };
   return (
     <div class="solo-item">
-      <props.Component selected={false} ref={ref} onMouseDown={onMouseDown} />
+      <props.Component
+        node={props.node}
+        ctx={props.dndContext}
+        ref={ref}
+        onMouseDown={onMouseDown}
+      />
     </div>
   );
 };

@@ -25,7 +25,7 @@ export class TextNode extends Node {
   }
 }
 
-export function loader(node: TextNode) {
+export function loader(node: { id: string; content: string }) {
   return new TextNode({
     id: node.id,
     content: node.content,
