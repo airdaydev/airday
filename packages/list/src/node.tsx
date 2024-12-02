@@ -99,10 +99,21 @@ export type NodeComponentType<T extends Node> = Component<{
   ariaSelected: boolean;
   onDragStart: (event: DragEvent) => void;
   onMouseDown: (event: MouseEvent) => void;
-  // onMouseEnter: (event: MouseEvent) => void;
   // onTouchStart: (event: TouchEvent) => void;
   select: () => void;
   ref: Ref<HTMLDivElement | undefined>;
   ctx: TreeContext;
   toggleExpansion: () => void;
 }>;
+
+export const DefaultNodeComponent: NodeComponentType<any> = (props) => {
+  return (
+    <div
+      aria-selected={props.ariaSelected}
+      onMouseDown={props.onMouseDown}
+      // onTouchStart={props.onTouchStart}
+    >
+      {props.node.id}
+    </div>
+  );
+};

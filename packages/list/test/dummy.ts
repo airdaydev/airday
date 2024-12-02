@@ -52,7 +52,7 @@ export function dummyChildren(opts?: Partial<DummyTreeOpts>) {
       const node = {
         id: internalOpts.idFunction(internalOpts._path),
         content: elegirFruta(),
-        children: [],
+        children: [] as any[],
       };
       let path = [...internalOpts._path, i];
       if (opts.maxDepth > 1) {

@@ -1,17 +1,16 @@
-import { PropsWithChildren, Component } from "solid-js";
-import { DndContext, TreeContext } from "./dnd-context";
+import { ParentProps, Component } from "solid-js";
+import { DndContext } from "./dnd-context";
 import { distance } from "./utils";
 
-interface SoloNodeProps extends PropsWithChildren {
+interface SoloNodeProps extends ParentProps {
   dndContext: DndContext;
-  treeContext: TreeContext;
   Component: SoloNodeComponentType;
-  enableDrop: boolean; // Can still be used with other components
-  node: Node;
+  enableDrop?: boolean; // Can still be used with other components
+  node?: Node;
 }
 
 export type SoloNodeComponentType = Component<{
-  node: Node;
+  node?: Node;
   // ariaSelected: boolean;
   onMouseDown: (event: MouseEvent) => void;
   // onTouchStart: (event: TouchEvent) => void;

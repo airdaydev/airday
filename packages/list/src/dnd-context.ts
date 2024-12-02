@@ -489,7 +489,7 @@ export class TreeContext {
     }
     const items = originList.treeState.take(originList.selection[0]());
     this.treeState.insertItems(items, [
-      parent,
+      parent instanceof TreeState ? null : parent,
       parent === null ? dropIndex : dropNode.localIndex || 0,
     ]);
     this.setFocus();

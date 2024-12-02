@@ -79,7 +79,7 @@ export const Tree: Component<TreeProps> = (props) => {
                 <TreeNode
                   node={node}
                   treeContext={treeContext}
-                  Component={node.component || props.defaultNodeComponent}
+                  Component={node.component}
                   projectionIndex={() => windowIndex() + windowedList().start}
                   windowIndex={windowIndex}
                 />

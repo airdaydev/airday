@@ -1,5 +1,6 @@
 import { Signal, createSignal, createUniqueId } from "solid-js";
 import { GenericNode, map, walk, filter } from "./tree-utils";
+import { DefaultNodeComponent, NodeComponentType } from "./node";
 
 export interface NodeSignalProps {
   id: string;
@@ -14,8 +15,9 @@ export class Node {
   depth = 0; // cached
   maxDepth = 5;
   expanded = false;
-  parent: Node | null = null;
+  parent: Node | TreeState | null = null;
   root?: TreeState;
+  component: NodeComponentType<any> = DefaultNodeComponent;
   uiSignal?:
     | Signal<NodeSignalProps & ReturnType<this["serialise"]>>
     | undefined;
@@ -40,7 +42,9 @@ export class Node {
     return this.uiSignal[0];
   }
   get localIndex() {
-    return this.parent?.children.findIndex((c) => c === this);
+    if (this.parent instanceof Node) {
+      return this.parent?.children.findIndex((c) => c === this);
+    }
   }
   unsubscribe() {
     this.signalSubscriptions--;
@@ -133,7 +137,7 @@ export class ListStateContext {
 
 interface TreeStateOpts {
   mutate?: boolean;
-  loader?: (node: GenericNode<any>) => Node;
+  loader?: (node: any & { id: string }) => Node;
   context?: ListStateContext;
 }
 
@@ -145,7 +149,7 @@ export class TreeState {
   mutate = false;
   maxDepth = 10;
   expanded = true;
-  loader?: (node: GenericNode<any>) => Node | false;
+  loader?: (node: any & { id: string }) => Node | false;
   onDelete?: (set: Set<Node>) => void;
   context?: ListStateContext;
   constructor(opts: TreeStateOpts = {}) {
@@ -257,7 +261,9 @@ export class TreeState {
         // a bit silly but important to realise the root node goes through the map function
         // so we need to treat it as a root node to then discard it.
         const node = rawNode.isRoot ? new RootNode() : loader(rawNode);
-        if (!node) return new Node({ type: "invalid" });
+        if (!node) {
+          return new Node();
+        }
         node.root = this;
         node.parent = parent.isRoot === true ? this : parent; // Discards temporary root
         node.depth = depth;
@@ -270,14 +276,11 @@ export class TreeState {
   }
   count = (expandedOnly?: boolean) => {
     let count = 0;
-    walk<Node, Node>(
-      { isRoot: true, children: this.childrenSignal[0](), expanded: true },
-      (node) => {
-        count++;
-        if (expandedOnly && !node.expanded) return true;
-        return false;
-      },
-    );
+    walk<Node, Node>(this.mutableRoot, (node) => {
+      count++;
+      if (expandedOnly && !node.expanded) return true;
+      return false;
+    });
     return count - 1; // accounts for root node
   };
 }

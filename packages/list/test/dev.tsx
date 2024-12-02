@@ -100,13 +100,7 @@ render(
           <SoloNode
             dndContext={dndContext}
             Component={(props) => (
-              <div
-                onMouseDown={props.onMouseDown}
-                ref={props.ref}
-                selected={props.selected}
-              >
-                Drag
-              </div>
+              <div onMouseDown={props.onMouseDown}>Drag</div>
             )}
           />
           <h3>A lone item outside of a list, no drop allowed</h3>
@@ -114,13 +108,7 @@ render(
             dndContext={dndContext}
             enableDrop={false}
             Component={(props) => (
-              <div
-                onMouseDown={props.onMouseDown}
-                ref={props.ref}
-                selected={props.selected}
-              >
-                Drag
-              </div>
+              <div onMouseDown={props.onMouseDown}>Drag</div>
             )}
           />
         </div>
