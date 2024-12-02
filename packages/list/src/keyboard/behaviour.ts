@@ -137,7 +137,11 @@ export function moveSelectionUp(ctx: TreeContext) {
       newPosition = Math.max(0, (newPosition -= 1));
     }
   }
-  if (newPosition !== null) {
+  if (
+    newPosition !== null &&
+    typeof newPosition === "number" &&
+    newPosition >= 0
+  ) {
     ctx.treeState.insertItems(selection, [null, newPosition], true);
   }
 }

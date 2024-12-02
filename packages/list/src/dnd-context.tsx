@@ -126,7 +126,7 @@ export class TreeContext {
     this.canvas = undefined;
   }
   setListOffset = () => {
-    this.scrollOffset[1](this.listRef.scrollTop);
+    if (this.listRef) this.scrollOffset[1](this.listRef.scrollTop);
   };
   get allowMovement() {
     return this.dndContext.enableDrop && this.allowInternalMovement;
@@ -172,7 +172,7 @@ export class TreeContext {
   getSelectedNodeTextData() {
     const arr: string[] = [];
     this.selection[0]().forEach((node) => {
-      arr.push(`- [] ${node.content}`);
+      arr.push(`- [] ${node.id}`);
     });
     const t = arr.join("\n");
     return t;
@@ -214,17 +214,18 @@ export class TreeContext {
       window.scrollX + event.x < this.listBounds.minX ||
       window.scrollX + event.x > this.listBounds.maxX;
     if (outOfBoundsX) {
-      this.rowDraggedOver[1](undefined);
+      this.rowDraggedOver[1](null);
       return;
     }
     this.autoScroll(window.scrollY + event.y - this.listBounds.minY, event.y);
     this.setRow(event.y);
   };
   setRow(mouseY: number) {
+    if (!this.listRef) return;
     const aboveY = window.scrollY + mouseY < this.listBounds.minY;
     const belowY = window.scrollY + mouseY > this.listBounds.maxY;
     if (aboveY || belowY) {
-      this.rowDraggedOver[1](undefined); // TODO: Only set once!
+      this.rowDraggedOver[1](null); // TODO: Only set once!
       return;
     }
     const mousePosListY =
@@ -344,7 +345,7 @@ export class TreeContext {
     const list = this.treeState.childrenSignal[0]();
     let rangeEnded = false;
     let i = this.originNode?.getIndex();
-    if (i === false) return false;
+    if (!i) return false;
     while (!rangeEnded) {
       const next = list[i];
       if (!next) return false;
@@ -412,10 +413,11 @@ export class TreeContext {
     // and ignores & removes the currently dragged over items
     let offset = 0;
     let i = index();
+    const rowDraggedOver = this.rowDraggedOver[0]() || 0;
     if (
       this.dndContext.isDragging() &&
       typeof this.rowDraggedOver[0]() === "number" &&
-      i + list().start >= this.rowDraggedOver[0]()
+      i + list().start >= rowDraggedOver
     ) {
       offset = this.itemHeight;
     }
@@ -424,15 +426,17 @@ export class TreeContext {
       this.isDragOrigin &&
       node === this.originNode
     ) {
-      i = this.rowDraggedOver[0]() - list().start;
+      i = rowDraggedOver - list().start;
       offset = 0;
     }
     let position =
       i * this.itemHeight + offset + list().start * this.itemHeight;
     if (node) {
       const ref = this.refMap.get(node);
-      if (ref?.preventAnimation) {
-        position = ref.ref.style.getPropertyValue("--pos").replace("px", "");
+      if (ref?.preventAnimation && ref.ref) {
+        position = Number(
+          ref.ref.style.getPropertyValue("--pos").replace("px", ""),
+        );
       }
     }
     return position;
@@ -562,9 +566,9 @@ export class DndContext {
   }
   stopDrag() {
     this.listContexts.forEach((ctx) => {
-      ctx.rowDraggedOver[1](undefined);
+      ctx.rowDraggedOver[1](null);
     });
-    this.elClickOffset = [0, 0];
+    // this.elClickOffset = [0, 0];
     this.draggedEl = null;
     this.dragMode[1](null);
     this.dragContext[1](null);

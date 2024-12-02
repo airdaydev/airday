@@ -113,6 +113,10 @@ export class TreeCanvas {
     });
   }
   fpsLabel(fps: number) {
+    if (!this.ctx2D) {
+      console.warn("Attempted to call fpsLabel while canvas not instantiated");
+      return;
+    }
     this.ctx2D.fillStyle = "black";
     this.ctx2D.font = "12px Alte Haas Grotesk";
     this.ctx2D.textAlign = "right";
@@ -132,6 +136,10 @@ export class TreeCanvas {
     }
   }
   renderShadows(frame: number) {
+    if (!this.ctx2D) {
+      console.warn("Attempted to render shadows while canvas not instantiated");
+      return;
+    }
     const itemHeight = this.treeContext.itemHeight;
     for (const row of this.rowsHighlighted.entries()) {
       let opacity = 0;
