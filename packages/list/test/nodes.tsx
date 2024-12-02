@@ -1,5 +1,6 @@
 import styles from "./dev.module.css";
 import { NodeComponentType, Node, GenericNode } from "../src/index";
+import CaretSVG from "./caret.svg";
 
 interface TextNodeProps extends GenericNode<TextNodeProps> {
   content?: string;
@@ -81,7 +82,7 @@ export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
             class={styles["expand"]}
             onmousedown={() => props.toggleExpansion()}
           >
-            <img src="./caret.svg" />
+            <img src={CaretSVG} />
           </button>
         )}
       </div>
