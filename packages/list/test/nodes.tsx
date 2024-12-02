@@ -49,7 +49,7 @@ export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
         props.onMouseDown(event);
       }}
       draggable="true"
-      onTouchStart={(event) => {
+      onTouchStart={() => {
         // props.onTouchStart(event);
       }}
       onDblClick={(event) => {
@@ -64,7 +64,7 @@ export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
     >
       <div
         class={styles["item-margin"]}
-        onMouseEnter={(event) => {
+        onMouseEnter={() => {
           if (
             props.ctx.dndContext.isDragging() &&
             props.node?.children.length

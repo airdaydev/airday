@@ -75,28 +75,7 @@ export const Tree: Component<TreeProps> = (props) => {
                 }}
                 ref={(ref) => {
                   treeContext.updateRef(node, { ref });
-                  const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                      if (
-                        mutation.type === "attributes" &&
-                        mutation.attributeName === "style"
-                      ) {
-                        if (!mutation.target.style.getPropertyValue("--pos")) {
-                          console.log(
-                            "Style changed:",
-                            mutation.target,
-                            mutation.target.style,
-                          );
-                          console.trace();
-                        }
-                      }
-                    });
-                  });
-
-                  observer.observe(ref, {
-                    attributes: true,
-                    attributeFilter: ["style"],
-                  });
+                  // TODO: is this necessary?
                 }}
               >
                 <TreeNode

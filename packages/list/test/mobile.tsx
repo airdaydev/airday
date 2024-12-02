@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { Tree, TreeState, DndContext, Dragged } from "../src/index";
+import { Tree, TreeState, DndContext } from "../src/index";
 import { loader } from "./nodes";
 import { dummyChildren } from "./dummy";
 import styles from "./dev.module.css";
