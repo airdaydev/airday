@@ -124,7 +124,10 @@ export const TreeNode = (props: NodeProps) => {
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
     <props.Component
-      ref={componentRef}
+      ref={(componentRef) => {
+        if (!componentRef) throw new Error("undefined componentRef");
+        componentRef = componentRef;
+      }}
       node={props.node}
       ctx={props.treeContext}
       onMouseDown={(event) => onNodeMouseDown(event, props.node)}

@@ -53,6 +53,7 @@ export function dummyChildren(opts?: Partial<DummyTreeOpts>) {
         id: internalOpts.idFunction(internalOpts._path),
         content: elegirFruta(),
         children: [] as any[],
+        height: Math.random() > 0.5 ? 32 : 64,
       };
       let path = [...internalOpts._path, i];
       if (Math.random() > 0.5 && opts.maxDepth > 1) {

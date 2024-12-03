@@ -118,7 +118,6 @@ class guiModifier {
   };
   gui = (gui: dat.GUI) => {
     const folder = gui.addFolder(this.id);
-    folder.open();
     folder.add(this, "maxChildren", 1, 50).step(1);
     folder.add(this, "maxDepth", 1, 3).step(1);
     folder.add(this, "loadChildren").name("Generate tree");
@@ -138,6 +137,7 @@ const context = {
 };
 
 const gui = new dat.GUI();
+(document.querySelector(".dg.ac") as HTMLElement).style.zIndex = "10";
 const contextFolder = gui.addFolder("Context");
 contextFolder.open();
 contextFolder
