@@ -1,9 +1,7 @@
 import { onCleanup, onMount } from "solid-js";
 import { DndContext } from "./dnd-context";
 
-// TODO: Drag physics?
-// TODO: Move back to original place if drop cancelled!
-// https://greensock.com/forums/topic/16928-physics-while-dragging/
+// TODO: Drag physics? https://greensock.com/forums/topic/16928-physics-while-dragging/
 
 interface DraggedProps {
   dndContext: DndContext;
@@ -11,8 +9,6 @@ interface DraggedProps {
 
 const defaultComponent = () => <div>Unset drag component</div>;
 
-// TODO: This container could be replaced with DnD native API
-// TODO: Advantage - automatical scroll when dragging
 export const Dragged = ({ dndContext }: DraggedProps) => {
   let component: HTMLElement =
     dndContext.customDragEl || (defaultComponent() as HTMLElement);
@@ -35,21 +31,12 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     });
   });
   onMount(() => {
-    // Luckily, resize events should be very rare while dragging
-    // This function allows draggable area to cover the entire document
-    // without adding scrollbars. Scroll flash can be seen when using
-    // keyboard to go fullscreen while dragging (NBD for now)
     // TODO: Safari: turn on user-select: none; for entire page!
     stackRef.appendChild(component);
-    // window.addEventListener('resize', onResize);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("dragover", onMouseMove);
-    // stackRef.style.width = dndContext.customDragBounds[2];
-    // stackRef.style.height = dndContext.customDragBounds[3];
-    // onResize();
   });
   onCleanup(() => {
-    // window.removeEventListener('resize', onResize)
     window.removeEventListener("mousemove", onMouseMove);
   });
   return (
