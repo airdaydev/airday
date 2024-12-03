@@ -1,73 +1,72 @@
 .footer {
-    display: flex;
-    width: 100%;
-    box-sizing: border-box;
-    justify-content: space-between;
-    padding: 0.25em 0.5em calc(0.25em + 1px);
-    background: var(--shade-bg);
-    border-top: 1px solid var(--border);
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: space-between;
+  padding: 0.25em 0.5em calc(0.25em + 1px);
+  background: var(--shade-bg);
+  border-top: 1px solid var(--border);
 }
 
 [data-theme="dark"] .footer {
-    background: var(--dank);
+  background: var(--dank);
 }
 
 .nav-section {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
 }
 
 .nav-section svg {
-    stroke-width: 1.25px;
-    width: 1em;
-    height: 1em;
+  stroke-width: 1.25px;
+  width: 1em;
+  height: 1em;
 }
 
 .workspace-button {
-    display: flex;
-    align-items: center;
-    background: none;
-    border: none;
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .nav-button {
-    display: flex;
-    align-items: center;
-    z-index: 20;
-    padding: 0.5em;
-    background: none;
-    border: none;
-    cursor: pointer;
-    border-radius: 2px;
-    font-size: 1rem;
-    line-height: 1rem; /* Inline SVG issue */
-    border-radius: 2px;
-    transition: 100ms transform;
+  display: flex;
+  align-items: center;
+  z-index: 20;
+  padding: 0.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 1rem;
+  line-height: 1rem; /* Inline SVG issue */
+  border-radius: 2px;
+  transition: 100ms transform;
 }
 
 [data-theme="light"] .nav-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
 [data-theme="light"] .nav-button {
-    box-shadow: 1px 1px 1px 0 rgba(102, 102, 102, 0.25);
+  box-shadow: 1px 1px 1px 0 rgba(102, 102, 102, 0.25);
 }
 
 [data-theme="dark"] .nav-button {
-    box-shadow: 1px 1px 1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 1px 1px 1px 0 rgba(0, 0, 0, 0.25);
 }
 
 .nav-button:not(:last-child) {
-    margin-right: 0.25em;
+  margin-right: 0.25em;
 }
 
 .nav-button:hover {
-    background: var(--shade);
+  background: var(--shade);
 }
 
 .count {
-    font-family: var(--mono-font);
-    margin-right: 0.25em;
-    font-size: 0.9rem;
+  margin-right: 0.25em;
+  font-size: 0.9rem;
 }

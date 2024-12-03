@@ -1,7 +1,7 @@
 import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import NextSVG from "../icons/next.svg?component-solid";
+import ArrowRight from "../icons/arrow-right.svg?component-solid";
 import PerformanceSVG from "../icons/activity.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import CheckSVG from "../icons/check.svg?component-solid";
@@ -42,7 +42,7 @@ export function SunlistNav() {
           tabindex="-1"
           onClick={session.viewState.openUpNextView}
         >
-          <NextSVG
+          <ArrowRight
             style="position: relative;
             width: 1.25em;
             stroke-width: 0.75px;

@@ -1,6 +1,6 @@
 import { createSignal, createEffect } from "solid-js";
-import MoonSVG from "../icons/pixel-moon.svg?component-solid";
-import SunSVG from "../icons/pixel-sun.svg?component-solid";
+import MoonSVG from "../icons/moon.svg?component-solid";
+import SunSVG from "../icons/sun.svg?component-solid";
 
 function setTheme(name: string) {
   document.body.setAttribute("data-theme", name);

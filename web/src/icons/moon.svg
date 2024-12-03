@@ -1,10 +1,1 @@
-<svg width="12px" height="12px" viewBox="0 0 12 12" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>moon</title>
-    <g id="Sunlist" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
-        <g id="list-dual" transform="translate(-677, -81)" fill="#DFD8FF" stroke="#2A2B53" stroke-width="0.75">
-            <g id="moon" transform="translate(678, 82)">
-                <path d="M4.85676275,9.99759682 C2.21018969,9.91627641 0.0837235882,7.78981031 0.00240318327,5.14323725 C-0.0789172217,2.49666419 1.91298212,0.243654397 4.54956978,0 C3.40289832,1.55131365 3.56373593,3.70810371 4.92781611,5.07218389 C6.29189629,6.43626407 8.44868635,6.59710168 10,5.45043022 C9.7563456,8.08701788 7.50333581,10.0789172 4.85676275,9.99759682 Z" id="Path"></path>
-            </g>
-        </g>
-    </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><path d="M108.11,28.11A96.09,96.09,0,0,0,227.89,147.89,96,96,0,1,1,108.11,28.11Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>

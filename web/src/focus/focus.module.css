@@ -1,84 +1,83 @@
 .container {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    top: 0;
-    position: absolute;
-    overflow: hidden;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    align-items: center;
-    justify-content: center;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  top: 0;
+  position: absolute;
+  overflow: hidden;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
 }
 
 .container h1 {
-    font-family: alte haas grotesk;
-    font-weight: 400;
-    font-size: 2em;
-    max-width: 48em;
+  font-family: alte haas grotesk;
+  font-weight: 400;
+  font-size: 2em;
+  max-width: 48em;
 }
 
 .content {
-    position: relative;
+  position: relative;
 }
 
 .focus-button {
-    position: absolute;
-    top: 1em;
-    left: 1em;
-    display: flex;
-    align-items: center;
-    z-index: 20;
-    padding: 0.5em;
-    background: none;
-    border: none;
-    cursor: pointer;
-    border-radius: 2px;
-    font-size: 1rem;
-    line-height: 1rem; /* Inline SVG issue */
-    border-radius: 2px;
-    transition: 100ms transform;
+  position: absolute;
+  top: 1em;
+  left: 1em;
+  display: flex;
+  align-items: center;
+  z-index: 20;
+  padding: 0.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 1rem;
+  line-height: 1rem; /* Inline SVG issue */
+  border-radius: 2px;
+  transition: 100ms transform;
 }
 
 .overlay-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .focus-button-alt {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    padding: 0.5em;
-    width: fit-content;
-    color: white;
-    background-color: #5937ff;
-    z-index: 10;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding: 0.5em;
+  width: fit-content;
+  color: white;
+  background-color: #5937ff;
+  z-index: 10;
 }
 
 .focus-button-alt :global(.key) {
-    background-color: #3917ff;
+  background-color: #3917ff;
 }
 
 [data-theme="light"] .focus-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
 [data-theme="light"] .focus-button {
-    box-shadow: 1px 1px 1px 0 rgba(102, 102, 102, 0.25);
+  box-shadow: 1px 1px 1px 0 rgba(102, 102, 102, 0.25);
 }
 
 [data-theme="dark"] .focus-button {
-    box-shadow: 1px 1px 1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 1px 1px 1px 0 rgba(0, 0, 0, 0.25);
 }
 
 .timer {
-    font-family: var(--mono-font);
-    font-size: 3em;
+  font-size: 3em;
 }
