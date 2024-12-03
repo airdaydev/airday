@@ -70,9 +70,9 @@ pnpm run dev
 - [x] Smooth autoscrolling
 - [x] Can't drop below last item
 - [x] Integrate native drag and drop
+- [x] Dragging from foreign list into autoscroller keeps autoscroller going
+- [x] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
 - [] Reintegrate non-native dnd, as option
-- [] Dragging from foreign list into autoscroller keeps autoscroller going
-- [] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
 - [] Handle external drag and drop
 - [] Variable item heights...
 - [] Virtual list height correctly calculated (BUG!)

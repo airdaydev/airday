@@ -177,9 +177,10 @@ export class TreeContext {
     this.reset();
   }
   autoScroll(mousePosListY: number, mousePosAbs: number) {
-    this.autoscroller.subscriptions.set("setRow", () =>
-      this.setRow(mousePosAbs),
-    );
+    this.autoscroller.subscriptions.set("setRow", () => {
+      console.log("setrow autoscroll", this.id);
+      this.setRow(mousePosAbs);
+    });
     if (mousePosListY < this.itemHeight) {
       const throttle = Math.max(mousePosListY - this.itemHeight, -100) / 100;
       this.autoscroller.setThrottle(throttle);
@@ -207,6 +208,7 @@ export class TreeContext {
       window.scrollX + event.x > this.listBounds.maxX;
     if (outOfBoundsX) {
       this.rowDraggedOver[1](null);
+      this.autoscroller.stop();
       return;
     }
     this.autoScroll(window.scrollY + event.y - this.listBounds.minY, event.y);
@@ -253,7 +255,7 @@ export class TreeContext {
   reset() {
     this.isDragOrigin = false;
     this.originIndex = null;
-    // this.originNode = null;
+    this.originNode = null;
   }
   selectOne(node: Node) {
     if (!node) return;
