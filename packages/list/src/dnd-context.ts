@@ -450,7 +450,6 @@ export class TreeContext {
         this.isDragOrigin &&
         this.originNode
       ) {
-        console.log("pushin");
         window.push(this.originNode);
       }
       return {

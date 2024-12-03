@@ -108,20 +108,22 @@ export class TreeCanvas {
         this.currentRow = undefined;
       }
       this.renderShadows(frame);
-      if (this.debug) this.fpsLabel(fps);
+      if (this.debug) this.debugLabel(fps);
       this.frame();
     });
   }
-  fpsLabel(fps: number) {
+  debugLabel(fps: number) {
     if (!this.ctx2D) {
-      console.warn("Attempted to call fpsLabel while canvas not instantiated");
+      console.warn(
+        "Attempted to call debugLabel while canvas not instantiated",
+      );
       return;
     }
     this.ctx2D.fillStyle = "black";
     this.ctx2D.font = "12px Alte Haas Grotesk";
     this.ctx2D.textAlign = "right";
     this.ctx2D.fillText(
-      `FPS: ${fps}`,
+      `Offset: ${Math.round(this.treeContext.scrollOffset[0]())} Row: ${this.treeContext.rowDraggedOver[0]()} FPS: ${fps}`,
       this.dimensions[0] - 2,
       this.dimensions[1] - 4,
     );
