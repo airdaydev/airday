@@ -500,16 +500,18 @@ export class TreeContext {
   };
 }
 
-type dragMode = "touch" | "mouse" | null;
+type DragMode = "touch" | "mouse" | null;
+type Mode = "custom" | "native";
 
 interface DndContextInitArgs {
-  enableKeyboard: boolean;
+  enableKeyboard?: boolean;
+  mode?: Mode;
 }
 
 // There is only one drag context, but there can be multiple select contexts
 // This mostly controls the dragged item
 export class DndContext {
-  dragMode = createSignal<dragMode>();
+  dragMode = createSignal<DragMode>();
   focusContext = createSignal<TreeContext | null>(null);
   dragContext = createSignal<TreeContext | null>(null);
   listContexts = new Set<TreeContext>();
@@ -518,10 +520,22 @@ export class DndContext {
   dragMove = createSignal<Coordinates>([-100, -100]); // TODO: Don't render instead of storing off screen
   keyboard: DndContextKeyboardEvents;
   enableDrop = true;
+  // Drag behaviour
+  mode: Mode = "custom";
+  customDragEl?: HTMLElement;
+  customDragElOffset = [0, 0];
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
+    if (this.mode) this.mode = props.mode;
   }
-  startDrag(dragMode: dragMode = "mouse") {
+  setCustomDragOpts(
+    customDragEl: HTMLElement,
+    customDragElOffset: [number, number],
+  ) {
+    this.customDragEl = customDragEl;
+    this.customDragElOffset = customDragElOffset;
+  }
+  startDrag(dragMode: DragMode = "mouse") {
     // Set up dragged element
     this.dragMode[1](dragMode);
     window.addEventListener("dragover", this.react);
@@ -547,6 +561,7 @@ export class DndContext {
     });
   }
   isDragging = () => !!this.dragMode[0]();
+  isCustomDragging = () => !!this.dragMode[0]() && this.mode === "custom";
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);
@@ -560,7 +575,6 @@ export class DndContext {
     this.listContexts.forEach((ctx) => {
       ctx.rowDraggedOver[1](null);
     });
-    // this.elClickOffset = [0, 0];
     this.draggedEl = null;
     this.dragMode[1](null);
     this.dragContext[1](null);

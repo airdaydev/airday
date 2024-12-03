@@ -11,7 +11,7 @@ export interface NodeProps {
 }
 
 export const TreeNode = (props: NodeProps) => {
-  let componentRef: HTMLElement | undefined = undefined;
+  let componentRef!: HTMLElement;
   function onDragStart(event: DragEvent) {
     if (event.dataTransfer) {
       event.dataTransfer.setData(
@@ -19,7 +19,13 @@ export const TreeNode = (props: NodeProps) => {
         props.treeContext.getSelectedNodeTextData(),
       );
     }
+    const targetBounding = componentRef.getBoundingClientRect();
+    const targetOffset = [
+      event.pageX - targetBounding.x,
+      event.pageY - targetBounding.y,
+    ] as [number, number];
     props.treeContext.mousePosFrame(event);
+    props.treeContext.dndContext.setCustomDragOpts(componentRef, targetOffset);
     props.treeContext.startDrag(props.windowIndex(), props.node);
     requestAnimationFrame(() => {
       if (componentRef?.parentElement)

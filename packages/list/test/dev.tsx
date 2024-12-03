@@ -11,12 +11,15 @@ import {
 import { loader } from "./nodes";
 import { dummyChildren } from "./dummy";
 import styles from "./dev.module.css";
+import { Dragged } from "../src/dragged";
 
 const root = document.getElementById("root");
 
 // TODO: Allow file drag & drop via https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API
 // We'll use this between TreeState to allow a shared selection state
-const dndContext = new DndContext();
+const dndContext = new DndContext({
+  mode: "custom",
+});
 
 // State context
 const listStateContext = new ListStateContext({
@@ -64,6 +67,7 @@ const ctxC = new TreeContext({
 render(
   () => (
     <div class={styles["app"]}>
+      {dndContext.isCustomDragging() && <Dragged dndContext={dndContext} />}
       <div class={styles["container"]}>
         <SolidListContext.Provider value={ctxA}>
           <div
