@@ -9,6 +9,7 @@ export class Autoscroller2 {
   enabled = false;
   direction: 1 | -1 = 1;
   subscriptions = new Map();
+  constructor() {}
   mount(scrollRef: HTMLElement) {
     this.scrollRef = scrollRef;
   }
@@ -35,8 +36,10 @@ export class Autoscroller2 {
       const difference = this.targetSpeed - this.currentSpeed;
       this.currentSpeed += (difference / this.decelerationTime) * deltaTime;
     }
-    if (this.scrollRef)
-      this.scrollRef.scrollBy(0, this.currentSpeed * this.direction);
+    if (this.scrollRef) {
+      const relPos = this.currentSpeed * this.direction;
+      this.scrollRef.scrollTop = this.scrollRef.scrollTop + relPos;
+    }
     this.subscriptions.forEach((cb) => {
       cb();
     });
