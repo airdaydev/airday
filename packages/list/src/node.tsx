@@ -20,7 +20,7 @@ export const TreeNode = (props: NodeProps) => {
       event.pageY - targetBounding.y,
     ] as [number, number];
     props.treeContext.dndContext.setCustomDragOpts(
-      componentRef.cloneNode() as HTMLElement,
+      componentRef.cloneNode(true) as HTMLElement,
       targetOffset,
     );
     props.treeContext.mousePosFrame(event);
@@ -97,9 +97,9 @@ export const TreeNode = (props: NodeProps) => {
         distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
       ) {
         // Start dragging
+        startCustomDrag(event);
         if (componentRef?.parentElement)
           componentRef.parentElement.style.opacity = "0";
-        startCustomDrag(event);
         window.removeEventListener("mousemove", mouseMove);
         window.addEventListener(
           "mouseup",
