@@ -5,6 +5,7 @@ import XSVG from "../icons/x.svg?component-solid";
 import { ListIcon } from "./list-icon";
 import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
+import CheckSVG from "../icons/check.svg?component-solid";
 import ArrowRightSVG from "../icons/arrow-right.svg?component-solid";
 
 interface ListHeaderProps {

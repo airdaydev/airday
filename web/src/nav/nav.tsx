@@ -2,7 +2,7 @@ import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
 import ArrowRight from "../icons/arrow-right.svg?component-solid";
-import PerformanceSVG from "../icons/activity.svg?component-solid";
+import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import CheckSVG from "../icons/check.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
@@ -58,7 +58,7 @@ export function SunlistNav() {
         </button>
         <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
         <button class={styles["nav-text-button"]} tabindex="-1">
-          <PerformanceSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+          <PulseSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
         </button>
         <SoloNode
