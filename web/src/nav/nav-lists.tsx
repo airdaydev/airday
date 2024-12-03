@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, useContext } from "solid-js";
+import { createSignal, onCleanup, onMount, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
 import { sessionContext } from "../store/context.js";
 import { NavItemContextMenu } from "./context-menus";
@@ -71,9 +71,13 @@ export const NavListItem: NodeComponentType = (props) => {
 export const NavLists = () => {
   const session = useContext(sessionContext);
   const treeContext = new TreeContext({
+    id: "navlist",
     treeState: session.workspace.containerStore.tree,
     dndContext: session.workspace.containerStore.dndContext,
     itemHeight: 32,
+    fitContent: true,
+    bottomRowPadding: 0,
+    shadowColor: [100, 100, 100],
   });
   onCleanup(() => {
     session.workspace.containerStore.dndContext.listContexts.delete(

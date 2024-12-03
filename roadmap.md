@@ -51,7 +51,7 @@
 - [x] Bug: moving pane with keyboard doesn't make nested list active
 - [x] Splitting horizontal on root doesn't create a border
 - [x] sunlist/@list -> sunlist/@tree conversion
-- [] Escape key should cancel drag
+- [x] Escape key should cancel drag
 - [] Dragging item over navbar goes below it!
 - [] group lists (one level)
 - [] subitems (one level)

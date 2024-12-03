@@ -10,7 +10,7 @@ import {
 import { Node, RootNode, TreeState } from "./state";
 import { walk } from "./tree-utils";
 import { DndContextKeyboardEvents } from "./keyboard/index";
-import { TreeCanvas } from "./canvas";
+import { RGB, TreeCanvas } from "./canvas";
 import { Coordinates } from "./utils";
 import { Autoscroller2 } from "./autoscroll";
 
@@ -50,8 +50,11 @@ export class TreeContext {
   listRef?: HTMLElement;
   tempItemRef?: HTMLElement; // We're using native dnd but we are disappearing the element, so we jack into this container
   canvas?: TreeCanvas;
+  fitContent = false;
+  bottomRowPadding = 1;
   height = createSignal(500);
   scrollOffset = createSignal(0);
+  shadowColor: RGB = [240, 240, 240];
   listBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   noAnimation = createSignal<boolean>(false);
   autoscroller = new Autoscroller2();
@@ -64,6 +67,9 @@ export class TreeContext {
     itemHeight: number;
     allowInternalMovement?: boolean;
     debug?: boolean;
+    fitContent?: boolean;
+    bottomRowPadding?: number;
+    shadowColor?: RGB;
   }) {
     if (opts.id) this.id = opts.id;
     this.treeState = opts.treeState;
@@ -72,6 +78,10 @@ export class TreeContext {
     this.itemHeight = opts.itemHeight;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
     this.projection = this.createProjectionMemo();
+    if (opts.fitContent) this.fitContent = opts.fitContent;
+    if (opts.shadowColor) this.shadowColor = opts.shadowColor;
+    if (typeof opts.bottomRowPadding === "number")
+      this.bottomRowPadding = opts.bottomRowPadding;
     if (opts.debug) this.debug = opts.debug;
   }
   updateRef(node: Node, opts: RefMapRecord) {
@@ -105,6 +115,7 @@ export class TreeContext {
       treeContext: this,
       canvasRef: opts.canvasRef,
       debug: this.debug,
+      shadowColor: this.shadowColor,
     });
     this.listRef.addEventListener("scroll", this.setListOffset);
   }
@@ -466,9 +477,11 @@ export class TreeContext {
   };
   listHeight = () => {
     if (this.dndContext.isDragging()) {
-      return (this.presentCount() + 2) * this.itemHeight;
+      return (
+        (this.presentCount() + this.bottomRowPadding + 1) * this.itemHeight
+      );
     }
-    return (this.presentCount() + 1) * this.itemHeight;
+    return (this.presentCount() + this.bottomRowPadding) * this.itemHeight;
   };
   preventAnimationHack() {
     this.noAnimation[1](true);

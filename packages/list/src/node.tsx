@@ -29,11 +29,13 @@ export const TreeNode = (props: NodeProps) => {
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
   }
-  function drop() {
+  function endDrag(drop = false) {
     if (componentRef?.parentElement)
       componentRef.parentElement.style.opacity = "1";
-    const activeContext = props.treeContext.dndContext.dragContext[0]();
-    activeContext?.dropItems(props.treeContext);
+    if (drop) {
+      const activeContext = props.treeContext.dndContext.dragContext[0]();
+      activeContext?.dropItems(props.treeContext);
+    }
     props.treeContext.stopDrag();
   }
   function onNativeDragStart(event: DragEvent) {
@@ -45,21 +47,24 @@ export const TreeNode = (props: NodeProps) => {
     }
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
+    const escToEndNative = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        componentRef.dispatchEvent(new DragEvent("dragend"));
+      }
+    };
+    window.addEventListener("keydown", escToEndNative);
     requestAnimationFrame(() => {
       if (componentRef?.parentElement)
         componentRef.parentElement.style.opacity = "0";
     });
-    componentRef.addEventListener("dragend", () => {
-      if (componentRef?.parentElement)
-        componentRef.parentElement.style.opacity = "1";
-      props.treeContext.stopDrag();
-    });
+    componentRef.addEventListener("dragend", () => endDrag(false));
     window.addEventListener(
       "drop",
       (event) => {
-        console.log("dropping");
         event.preventDefault();
-        drop();
+        endDrag(true);
       },
       { once: true },
     );
@@ -91,7 +96,7 @@ export const TreeNode = (props: NodeProps) => {
       props.treeContext.originNode = props.node;
     }
     if (event.button === 2) {
-      return; // context click handled elsewhere (TODO: ?)
+      return;
     }
     if (props.treeContext.dndContext.mode[0]() === "native") return;
     event.preventDefault(); // prevent selection (esp. on Safari)
@@ -104,14 +109,24 @@ export const TreeNode = (props: NodeProps) => {
       ) {
         // Start dragging
         startCustomDrag(event);
+        const escToEndCustom = (event: KeyboardEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.key === "Escape") {
+            window.removeEventListener("mousemove", mouseMove);
+            endDrag(false);
+          }
+        };
         if (componentRef?.parentElement)
           componentRef.parentElement.style.opacity = "0";
+        window.addEventListener("keydown", escToEndCustom, { once: true });
         window.removeEventListener("mousemove", mouseMove);
         window.addEventListener(
           "mouseup",
           () => {
-            drop();
+            endDrag(true);
             window.removeEventListener("mousemove", mouseMove);
+            window.removeEventListener("keydown", escToEndCustom);
           },
           { once: true },
         );

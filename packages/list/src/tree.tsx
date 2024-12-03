@@ -41,7 +41,15 @@ export const Tree: Component<TreeProps> = (props) => {
   }
 
   return (
-    <div class={styles["container"]}>
+    <div
+      class={styles["container"]}
+      style={{
+        height: treeContext.fitContent
+          ? `${treeContext.listHeight()}px`
+          : undefined,
+        "min-height": `${treeContext.itemHeight * 2}px`,
+      }}
+    >
       <div
         classList={{
           [styles["list"]]: true,

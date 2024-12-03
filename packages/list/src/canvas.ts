@@ -4,6 +4,7 @@ interface TreeCanvasOpts {
   treeContext: TreeContext;
   canvasRef: HTMLCanvasElement;
   debug?: boolean;
+  shadowColor?: RGB;
 }
 
 export type RGB = [number, number, number];
@@ -55,6 +56,7 @@ export class TreeCanvas {
     this.treeContext = opts.treeContext;
     this.canvasEl = opts.canvasRef;
     if (opts.debug) this.debug = opts.debug;
+    if (opts.shadowColor) this.shadowColor = opts.shadowColor;
     const ctx2D = this.canvasEl.getContext("2d");
     if (ctx2D) {
       this.ctx2D = ctx2D;
