@@ -74,9 +74,10 @@ pnpm run dev
 - [x] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
 - [x] Reintegrate non-native dnd, as option
 - [x] Clean switching on the fly between drag modes (native vs custom)
+- [x] dat.gui item height
 - [] Bug: Deeply nested items not dragging across to more than 1 level!
 - [] dat.gui prevent drag entirely
-- [] moving item down follows user
+- [] moving item down follows user smoothly
 - [] Custom ghost for native drop
 - [] Handle external drag and drop
 - [] Variable item heights...

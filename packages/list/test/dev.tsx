@@ -7,7 +7,6 @@ import {
   ListStateContext,
   SolidListContext,
   SoloNode,
-  TreeState,
 } from "../src/index";
 import { loader } from "./nodes";
 import { dummyChildren } from "./dummy";
@@ -20,7 +19,7 @@ const root = document.getElementById("root");
 // TODO: Allow file drag & drop via https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API
 // We'll use this between TreeState to allow a shared selection state
 const dndContext = new DndContext({
-  mode: "custom",
+  mode: "native",
 });
 
 // State context
@@ -105,15 +104,15 @@ render(
 
 class guiModifier {
   id: string;
-  treeState: TreeState;
+  ctx: TreeContext;
   maxChildren = 100;
   maxDepth = 2;
-  constructor(id: string, treeState: TreeState) {
+  constructor(id: string, ctx: TreeContext) {
     this.id = id;
-    this.treeState = treeState;
+    this.ctx = ctx;
   }
   loadChildren = () => {
-    this.treeState.loadChildren(
+    this.ctx.treeState.loadChildren(
       dummyChildren({ maxDepth: this.maxDepth, maxChildren: this.maxChildren }),
     );
   };
@@ -123,6 +122,14 @@ class guiModifier {
     folder.add(this, "maxChildren", 1, 50).step(1);
     folder.add(this, "maxDepth", 1, 3).step(1);
     folder.add(this, "loadChildren").name("Generate tree");
+    folder
+      .add(this.ctx, "itemHeight", 20, 80)
+      .step(1)
+      .onChange(() => {
+        this.ctx.treeState.childrenSignal[1]([
+          ...this.ctx.treeState.childrenSignal[0](),
+        ]);
+      });
   };
 }
 
@@ -151,8 +158,8 @@ contextFolder
     }
   });
 
-const guiA = new guiModifier("Tree A", treeStateA);
-const guiB = new guiModifier("Tree B", treeStateB);
+const guiA = new guiModifier("Tree A", ctxA);
+const guiB = new guiModifier("Tree B", ctxB);
 
 guiA.gui(gui);
 guiB.gui(gui);

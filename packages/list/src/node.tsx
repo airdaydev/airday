@@ -91,6 +91,7 @@ export const TreeNode = (props: NodeProps) => {
     if (event.button === 2) {
       return; // context click handled elsewhere (TODO: ?)
     }
+    if (props.treeContext.dndContext.mode[0]() === "native") return;
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
       event.preventDefault();
