@@ -72,7 +72,8 @@ pnpm run dev
 - [x] Integrate native drag and drop
 - [x] Dragging from foreign list into autoscroller keeps autoscroller going
 - [x] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
-- [] Reintegrate non-native dnd, as option
+- [x] Reintegrate non-native dnd, as option
+- [] Clean switching on the fly between drag modes (native vs custom)
 - [] Handle external drag and drop
 - [] Variable item heights...
 - [] Virtual list height correctly calculated (BUG!)
@@ -84,12 +85,9 @@ pnpm run dev
 - [] Make native dnd optional, because it kind of fuckin sucks (no work on android bruh, lots of bs going on other platforms)
 
 ## Roadmap
-- GPU version?
-- move down via line numbers (vim)
-
-## Ugly bits
-- I'm keeping the dragged item (not items) IN the list which means I have to do a few weird calculations to account for it, potentially, I could instead, place that node in a portal underneath the mouse
-- When moving a lot of items (10 000s), O(2N) to sort each move!!
+- Pure canvas version
+- GPU version
+- Move down via line numbers (vim)
 
 # Other options:
 - [Draggable](https://shopify.github.io/draggable/examples/sort-animation.html)

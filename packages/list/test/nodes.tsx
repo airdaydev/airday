@@ -49,7 +49,7 @@ export const TextNodeComponent: NodeComponentType<TextNode> = (props) => {
       onMouseDown={(event) => {
         props.onMouseDown(event);
       }}
-      draggable="true"
+      draggable={props.draggable}
       onTouchStart={() => {
         // props.onTouchStart(event);
       }}

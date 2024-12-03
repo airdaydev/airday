@@ -521,12 +521,12 @@ export class DndContext {
   keyboard: DndContextKeyboardEvents;
   enableDrop = true;
   // Drag behaviour
-  mode: Mode = "custom";
+  mode = createSignal<Mode>("custom");
   customDragEl?: HTMLElement;
   customDragElOffset = [0, 0];
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
-    if (this.mode) this.mode = props.mode;
+    if (props.mode) this.mode[1](props.mode);
   }
   setCustomDragOpts(
     customDragEl: HTMLElement,
@@ -538,7 +538,10 @@ export class DndContext {
   startDrag(dragMode: DragMode = "mouse") {
     // Set up dragged element
     this.dragMode[1](dragMode);
-    window.addEventListener("dragover", this.react);
+    if (this.mode[0]() === "native")
+      window.addEventListener("dragover", this.react);
+    if (this.mode[0]() === "custom")
+      window.addEventListener("mousemove", this.react);
   }
   react = (event: MouseEvent) => {
     event.preventDefault();
@@ -561,7 +564,7 @@ export class DndContext {
     });
   }
   isDragging = () => !!this.dragMode[0]();
-  isCustomDragging = () => !!this.dragMode[0]() && this.mode === "custom";
+  isCustomDragging = () => !!this.dragMode[0]() && this.mode[0]() === "custom";
   /** mouse or touch coords */
   moveDragCoords(x: number, y: number) {
     this.dragMove[1]([x, y]);

@@ -1,6 +1,7 @@
 import { Accessor, Component, Ref } from "solid-js";
 import { Node } from "./state";
 import { TreeContext } from "./dnd-context";
+import { distance } from "./utils";
 
 export interface NodeProps {
   node: Node;
@@ -12,20 +13,23 @@ export interface NodeProps {
 
 export const TreeNode = (props: NodeProps) => {
   let componentRef!: HTMLElement;
-  function onDragStart(event: DragEvent) {
+  function startCustomDrag(event: MouseEvent) {
+    const targetBounding = componentRef.getBoundingClientRect();
+    const targetOffset = [
+      event.pageX - targetBounding.x,
+      event.pageY - targetBounding.y,
+    ] as [number, number];
+    props.treeContext.dndContext.setCustomDragOpts(componentRef, targetOffset);
+    props.treeContext.startDrag(props.windowIndex(), props.node);
+  }
+  function onNativeDragStart(event: DragEvent) {
     if (event.dataTransfer) {
       event.dataTransfer.setData(
         "text/plain",
         props.treeContext.getSelectedNodeTextData(),
       );
     }
-    const targetBounding = componentRef.getBoundingClientRect();
-    const targetOffset = [
-      event.pageX - targetBounding.x,
-      event.pageY - targetBounding.y,
-    ] as [number, number];
     props.treeContext.mousePosFrame(event);
-    props.treeContext.dndContext.setCustomDragOpts(componentRef, targetOffset);
     props.treeContext.startDrag(props.windowIndex(), props.node);
     requestAnimationFrame(() => {
       if (componentRef?.parentElement)
@@ -54,7 +58,6 @@ export const TreeNode = (props: NodeProps) => {
     if (event.metaKey) {
       props.treeContext.toggleSelection(node, true);
     }
-
     // Shift key = range selection
     // TODO: Define shift key but nothing selected behaviour?
     if (event.shiftKey && props.treeContext.selection[0]().size) {
@@ -79,6 +82,36 @@ export const TreeNode = (props: NodeProps) => {
     if (event.button === 2) {
       return; // context click handled elsewhere (TODO: ?)
     }
+    const origin: [number, number] = [event.clientX, event.clientY];
+    const mouseMove = (mouseMoveEvent: MouseEvent) => {
+      event.preventDefault();
+      // Make moving a little more effort to avoid slips
+      if (
+        distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
+      ) {
+        // Start dragging
+        startCustomDrag(event);
+        window.removeEventListener("mousemove", mouseMove);
+        window.addEventListener(
+          "mouseup",
+          () => {
+            // Dropping an item
+            // The event is on the node being dragged itself, but this is also recorded as selected item
+            // We need to discover the parent, the local index
+            // TODO: Perhaps wrap this within the context
+            const activeContext = props.treeContext.dndContext.dragContext[0]();
+            activeContext?.dropItems(props.treeContext);
+            props.treeContext.stopDrag();
+            window.removeEventListener("mousemove", mouseMove);
+          },
+          { once: true },
+        );
+      }
+    };
+    window.addEventListener("mousemove", mouseMove);
+    window.addEventListener("mouseup", () =>
+      window.removeEventListener("mousemove", mouseMove),
+    );
   }
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
@@ -88,8 +121,9 @@ export const TreeNode = (props: NodeProps) => {
       ctx={props.treeContext}
       onMouseDown={(event) => onNodeMouseDown(event, props.node)}
       onDragStart={(event: DragEvent) => {
-        onDragStart(event);
+        onNativeDragStart(event);
       }}
+      draggable={props.treeContext.dndContext.mode[0]() === "native"}
       ariaSelected={isSelected()}
       select={() => props.treeContext.selectOne(props.node)}
       toggleExpansion={() => {
@@ -105,6 +139,7 @@ export type NodeComponentType<T extends Node> = Component<{
   ariaSelected: boolean;
   onDragStart: (event: DragEvent) => void;
   onMouseDown: (event: MouseEvent) => void;
+  draggable: boolean;
   // onTouchStart: (event: TouchEvent) => void;
   select: () => void;
   ref: Ref<HTMLDivElement | undefined>;

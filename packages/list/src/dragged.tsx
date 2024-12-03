@@ -14,7 +14,7 @@ const defaultComponent = () => <div>Unset drag component</div>;
 // TODO: This container could be replaced with DnD native API
 // TODO: Advantage - automatical scroll when dragging
 export const Dragged = ({ dndContext }: DraggedProps) => {
-  let component = dndContext.draggedEl;
+  let component = dndContext.customDragEl;
   if (!component) component = defaultComponent();
   let stackRef: HTMLDivElement | undefined = undefined;
   const onMouseMove = (event: MouseEvent) => {
