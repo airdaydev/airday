@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "src/index.tsx",
+  "main": "src/index.ts",
   "scripts": {
     "start": "vite --host 0.0.0.0",
     "test": "vitest",

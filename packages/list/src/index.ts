@@ -4,3 +4,4 @@ export { type GenericNode, map, walk, filter } from "./tree-utils";
 export { type NodeComponentType } from "./node";
 export { DndContext, TreeContext, SolidListContext } from "./dnd-context";
 export { SoloNode } from "./solo-node";
+export { Dragged } from "./dragged";

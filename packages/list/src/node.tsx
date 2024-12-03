@@ -14,6 +14,7 @@ export interface NodeProps {
 export const TreeNode = (props: NodeProps) => {
   let componentRef!: HTMLElement;
   function startCustomDrag(event: MouseEvent) {
+    if (!componentRef) return;
     const targetBounding = componentRef.getBoundingClientRect();
     const targetBounds = [
       event.pageX - targetBounding.x,
@@ -124,9 +125,9 @@ export const TreeNode = (props: NodeProps) => {
   const isSelected = () => props.treeContext.isSelected(props.node);
   return (
     <props.Component
-      ref={(componentRef) => {
-        if (!componentRef) throw new Error("undefined componentRef");
-        componentRef = componentRef;
+      ref={(ref) => {
+        if (!ref) throw new Error("undefined componentRef");
+        componentRef = ref;
       }}
       node={props.node}
       ctx={props.treeContext}

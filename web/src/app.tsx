@@ -16,6 +16,9 @@ export function App() {
     >
       <Match when={session.viewState.scene[0]() == "default"}>
         <div class={styles.app}>
+          {session.workspace.dndContext.isCustomDragging() && (
+            <Dragged dndContext={session.workspace.dndContext} />
+          )}
           <div class={styles.main}>
             <SunlistNav />
             <PaneRegion tree={session.viewState.tree} />
