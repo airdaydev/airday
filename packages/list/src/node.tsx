@@ -48,7 +48,7 @@ export const TreeNode = (props: NodeProps) => {
       if (componentRef?.parentElement)
         componentRef.parentElement.style.opacity = "0";
     });
-    event.target?.addEventListener("dragend", () => {
+    componentRef.addEventListener("dragend", () => {
       if (componentRef?.parentElement)
         componentRef.parentElement.style.opacity = "1";
       props.treeContext.stopDrag();
@@ -56,6 +56,7 @@ export const TreeNode = (props: NodeProps) => {
     window.addEventListener(
       "drop",
       (event) => {
+        console.log("dropping");
         event.preventDefault();
         drop();
       },
@@ -92,6 +93,7 @@ export const TreeNode = (props: NodeProps) => {
       return; // context click handled elsewhere (TODO: ?)
     }
     if (props.treeContext.dndContext.mode[0]() === "native") return;
+    event.preventDefault(); // prevent selection (esp. on Safari)
     const origin: [number, number] = [event.clientX, event.clientY];
     const mouseMove = (mouseMoveEvent: MouseEvent) => {
       event.preventDefault();
