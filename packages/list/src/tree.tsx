@@ -10,7 +10,6 @@ interface TreeProps {
 
 export const Tree: Component<TreeProps> = (props) => {
   let listRef: HTMLDivElement | undefined = undefined;
-  let tempItemRef: HTMLDivElement | undefined = undefined;
   let canvasRef: HTMLCanvasElement | undefined = undefined;
   const treeContext = useTreeContext();
   const windowedList = treeContext.getWindowedSignal();

@@ -55,7 +55,7 @@ export function dummyChildren(opts?: Partial<DummyTreeOpts>) {
         children: [] as any[],
       };
       let path = [...internalOpts._path, i];
-      if (opts.maxDepth > 1) {
+      if (Math.random() > 0.5 && opts.maxDepth > 1) {
         const children = generateNodes({
           idFunction: internalOpts.idFunction,
           maxChildren: internalOpts.maxChildren,

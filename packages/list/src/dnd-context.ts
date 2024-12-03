@@ -583,6 +583,7 @@ export class DndContext {
     this.dragMode[1](null);
     this.dragContext[1](null);
     window.removeEventListener("mousemove", this.react);
+    window.removeEventListener("dragover", this.react);
   }
 }
 

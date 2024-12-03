@@ -44,6 +44,12 @@ importers:
         specifier: ^2.0.5
         version: 2.0.5(@types/node@20.12.7)(jsdom@24.1.1)
     devDependencies:
+      '@types/dat.gui':
+        specifier: 0.7.13
+        version: 0.7.13
+      dat.gui:
+        specifier: 0.7.9
+        version: 0.7.9
       jsdom:
         specifier: ^24.1.1
         version: 24.1.1
@@ -721,6 +727,9 @@ packages:
   '@types/babel__traverse@7.20.4':
     resolution: {integrity: sha512-mSM/iKUk5fDDrEV/e83qY+Cr3I1+Q3qqTuEn++HAWYjEa1+NxZr6CNrcJGf2ZTnq4HoFGC3zaTPZTobCzCFukA==}
 
+  '@types/dat.gui@0.7.13':
+    resolution: {integrity: sha512-LmG4Pr0mbsB/1WVttf8xaHx45BvSBDGY5D9+0/9AZCbI4vvOguwBHZdKyJMxt5Yst8+icRSHKmr7ClV2u5ZtDA==}
+
   '@types/estree@1.0.5':
     resolution: {integrity: sha512-/kYRxGDLWzHOB7q+wtSUQlFrtcdUccpfy+X+9iMBpHK8QLLhx2wIPYuS5DYtR9Wa/YlZAbIovy7qVdB1Aq6Lyw==}
 
@@ -874,6 +883,9 @@ packages:
 
   csstype@3.1.2:
     resolution: {integrity: sha512-I7K1Uu0MBPzaFKg4nI5Q7Vs2t+3gWWW648spaF+Rg7pI9ds18Ugn+lvg4SHczUdKlHI5LWBXyqfS8+DufyBsgQ==}
+
+  dat.gui@0.7.9:
+    resolution: {integrity: sha512-sCNc1OHobc+Erc1HqiswYgHdVNpSJUlk/Hz8vzOCsER7rl+oF/4+v8GXFUyCgtXpoCX6+bnmg07DedLvBLwYKQ==}
 
   data-urls@5.0.0:
     resolution: {integrity: sha512-ZYP5VBHshaDAiVZxjbRVcFJpc+4xGgT0bK3vzy1HLN8jTO975HEbuYzZJcHoQEY5K1a0z8YayJkyVETa08eNTg==}
@@ -2205,6 +2217,8 @@ snapshots:
     dependencies:
       '@babel/types': 7.23.0
 
+  '@types/dat.gui@0.7.13': {}
+
   '@types/estree@1.0.5': {}
 
   '@types/node@20.12.7':
@@ -2390,6 +2404,8 @@ snapshots:
       rrweb-cssom: 0.6.0
 
   csstype@3.1.2: {}
+
+  dat.gui@0.7.9: {}
 
   data-urls@5.0.0:
     dependencies:

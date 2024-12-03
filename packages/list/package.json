@@ -16,6 +16,8 @@
     "vitest": "^2.0.5"
   },
   "devDependencies": {
+    "@types/dat.gui": "0.7.13",
+    "dat.gui": "0.7.9",
     "jsdom": "^24.1.1",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
