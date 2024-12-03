@@ -75,6 +75,7 @@ pnpm run dev
 - [x] Reintegrate non-native dnd, as option
 - [x] Clean switching on the fly between drag modes (native vs custom)
 - [x] dat.gui item height
+- [] Support for list: top & bottom
 - [] Bug: Deeply nested items not dragging across to more than 1 level!
 - [] dat.gui prevent drag entirely
 - [] moving item down follows user smoothly
