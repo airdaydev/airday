@@ -73,18 +73,19 @@ pnpm run dev
 - [x] Dragging from foreign list into autoscroller keeps autoscroller going
 - [x] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
 - [x] Reintegrate non-native dnd, as option
-- [] Clean switching on the fly between drag modes (native vs custom)
+- [x] Clean switching on the fly between drag modes (native vs custom)
+- [] Bug: Deeply nested items not dragging across to more than 1 level!
+- [] dat.gui prevent drag entirely
+- [] moving item down follows user
 - [] Custom ghost for native drop
 - [] Handle external drag and drop
 - [] Variable item heights...
-- [] moving item down follows user
 - [] jumping to top and bottom smooth scroll (try?)
 - [] Provide API for rejecting bad drops ahead of time so UI can respond
 - [] Touch version
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
 - [] Add Empty item state for groups with nothing in them (optionally via node property)
 - [] Ensure list tracked dimensions match list size at all times
-- [] Make native dnd optional, because it kind of fuckin sucks (no work on android bruh, lots of bs going on other platforms)
 
 ## Roadmap
 - Pure canvas version
