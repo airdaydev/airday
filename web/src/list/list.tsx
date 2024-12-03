@@ -28,7 +28,6 @@ export function List(props: ListProps) {
     treeState: list.tree,
     dndContext: session.workspace.dndContext,
     itemHeight: 32,
-    placeholderStyle: itemStyles["placeholder"],
   });
   const container = session.workspace.containerStore.tree.idMap.get(
     props.view.containerId,

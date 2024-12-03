@@ -23,7 +23,6 @@ export const UpNext = (props: { view: DataView }) => {
     treeState: tree,
     dndContext: session.workspace.dndContext,
     itemHeight: 32,
-    placeholderStyle: itemStyles["placeholder"],
   });
   const opts = listOptions({
     columnHeaders: false,

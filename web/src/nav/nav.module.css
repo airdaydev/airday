@@ -52,11 +52,6 @@
   }
 }
 
-.placeholder {
-  background: var(--mid-shade);
-  animation: fadeIn 0.15s linear forwards;
-}
-
 .add-list-button {
   border: none;
   background: none;

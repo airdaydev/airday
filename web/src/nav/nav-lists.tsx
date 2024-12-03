@@ -74,7 +74,6 @@ export const NavLists = () => {
     treeState: session.workspace.containerStore.tree,
     dndContext: session.workspace.containerStore.dndContext,
     itemHeight: 32,
-    placeholderStyle: styles["placeholder"],
   });
   onCleanup(() => {
     session.workspace.containerStore.dndContext.listContexts.delete(
@@ -82,10 +81,8 @@ export const NavLists = () => {
     );
   });
   return (
-    <div class={`${styles["nav-list"]} ${styles["nav-text"]}`}>
-      <SolidListContext.Provider value={treeContext}>
-        <Tree hideBackdrop />
-      </SolidListContext.Provider>
-    </div>
+    <SolidListContext.Provider value={treeContext}>
+      <Tree />
+    </SolidListContext.Provider>
   );
 };

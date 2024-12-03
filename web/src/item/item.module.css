@@ -89,12 +89,6 @@
   border-bottom: 1px solid transparent;
 }
 
-.placeholder {
-  border-radius: 3px;
-  background: var(--mid-shade);
-  animation: fadeIn 0.15s linear forwards;
-}
-
 .app {
   display: flex;
   justify-content: center;

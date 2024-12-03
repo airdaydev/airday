@@ -36,7 +36,6 @@ export class TreeContext {
   // User Options
   itemHeight: number;
   allowInternalMovement = true;
-  placeholderStyle?: string; // TODO: Deprecate for canvas version
   // Drag
   dndContext: DndContext;
   isDragOrigin = false; // TODO: Should this be derived this from dndContext?
@@ -63,7 +62,6 @@ export class TreeContext {
     treeState: TreeState;
     dndContext: DndContext;
     itemHeight: number;
-    placeholderStyle?: string;
     allowInternalMovement?: boolean;
     debug?: boolean;
   }) {
@@ -72,7 +70,6 @@ export class TreeContext {
     this.dndContext = opts.dndContext;
     opts.dndContext.listContexts.add(this);
     this.itemHeight = opts.itemHeight;
-    this.placeholderStyle = opts.placeholderStyle;
     this.allowInternalMovement = opts.allowInternalMovement ?? true;
     this.projection = this.createProjectionMemo();
     if (opts.debug) this.debug = opts.debug;
