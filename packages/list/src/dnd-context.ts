@@ -178,7 +178,6 @@ export class TreeContext {
   }
   autoScroll(mousePosListY: number, mousePosAbs: number) {
     this.autoscroller.subscriptions.set("setRow", () => {
-      console.log("setrow autoscroll", this.id);
       this.setRow(mousePosAbs);
     });
     if (mousePosListY < this.itemHeight) {
