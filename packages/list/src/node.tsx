@@ -19,8 +19,19 @@ export const TreeNode = (props: NodeProps) => {
       event.pageX - targetBounding.x,
       event.pageY - targetBounding.y,
     ] as [number, number];
-    props.treeContext.dndContext.setCustomDragOpts(componentRef, targetOffset);
+    props.treeContext.dndContext.setCustomDragOpts(
+      componentRef.cloneNode() as HTMLElement,
+      targetOffset,
+    );
+    props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);
+  }
+  function drop() {
+    if (componentRef?.parentElement)
+      componentRef.parentElement.style.opacity = "1";
+    const activeContext = props.treeContext.dndContext.dragContext[0]();
+    activeContext?.dropItems(props.treeContext);
+    props.treeContext.stopDrag();
   }
   function onNativeDragStart(event: DragEvent) {
     if (event.dataTransfer) {
@@ -44,11 +55,7 @@ export const TreeNode = (props: NodeProps) => {
       "drop",
       (event) => {
         event.preventDefault();
-        if (componentRef?.parentElement)
-          componentRef.parentElement.style.opacity = "1";
-        const activeContext = props.treeContext.dndContext.dragContext[0]();
-        activeContext?.dropItems(props.treeContext);
-        props.treeContext.stopDrag();
+        drop();
       },
       { once: true },
     );
@@ -90,18 +97,14 @@ export const TreeNode = (props: NodeProps) => {
         distance(origin, [mouseMoveEvent.clientX, mouseMoveEvent.clientY]) > 3
       ) {
         // Start dragging
+        if (componentRef?.parentElement)
+          componentRef.parentElement.style.opacity = "0";
         startCustomDrag(event);
         window.removeEventListener("mousemove", mouseMove);
         window.addEventListener(
           "mouseup",
           () => {
-            // Dropping an item
-            // The event is on the node being dragged itself, but this is also recorded as selected item
-            // We need to discover the parent, the local index
-            // TODO: Perhaps wrap this within the context
-            const activeContext = props.treeContext.dndContext.dragContext[0]();
-            activeContext?.dropItems(props.treeContext);
-            props.treeContext.stopDrag();
+            drop();
             window.removeEventListener("mousemove", mouseMove);
           },
           { once: true },

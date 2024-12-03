@@ -1,4 +1,4 @@
-# @sunlist/list
+# @sunlist/tree
 
 An interactive tree system including store & UI component for SolidJS written for sunlist.app. Drag & drop, virtualised, static height per element.
 
@@ -74,14 +74,16 @@ pnpm run dev
 - [x] Dragging to top item on foreign list and back keeps the placeholder in place (flashes)
 - [x] Reintegrate non-native dnd, as option
 - [] Clean switching on the fly between drag modes (native vs custom)
+- [] Custom ghost for native drop
 - [] Handle external drag and drop
 - [] Variable item heights...
-- [] Virtual list height correctly calculated (BUG!)
+- [] moving item down follows user
+- [] jumping to top and bottom smooth scroll (try?)
 - [] Provide API for rejecting bad drops ahead of time so UI can respond
 - [] Touch version
-- [] Nested movement fixes
-- [] Ensure list tracked dimensions match list size at all times
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
+- [] Add Empty item state for groups with nothing in them (optionally via node property)
+- [] Ensure list tracked dimensions match list size at all times
 - [] Make native dnd optional, because it kind of fuckin sucks (no work on android bruh, lots of bs going on other platforms)
 
 ## Roadmap
