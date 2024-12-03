@@ -20,8 +20,8 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   const onMouseMove = (event: MouseEvent) => {
     requestAnimationFrame(() => {
       if (stackRef) {
-        stackRef.style.left = `${window.scrollX + event.x - dndContext.customDragElOffset[0]}px`;
-        stackRef.style.top = `${window.scrollY + event.y - dndContext.customDragElOffset[1]}px`;
+        stackRef.style.left = `${window.scrollX + event.x - dndContext.customDragBounds[0]}px`;
+        stackRef.style.top = `${window.scrollY + event.y - dndContext.customDragBounds[1]}px`;
       }
     });
   };
@@ -29,8 +29,8 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
   dndContext.onDragMove((coords) => {
     requestAnimationFrame(() => {
       if (stackRef) {
-        stackRef.style.left = `${window.scrollX + coords[0] - dndContext.customDragElOffset[0]}px`;
-        stackRef.style.top = `${window.scrollY + coords[1] - dndContext.customDragElOffset[1]}px`;
+        stackRef.style.left = `${window.scrollX + coords[0] - dndContext.customDragBounds[0]}px`;
+        stackRef.style.top = `${window.scrollY + coords[1] - dndContext.customDragBounds[1]}px`;
       }
     });
   });
@@ -44,6 +44,9 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     // window.addEventListener('resize', onResize);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("dragover", onMouseMove);
+    console.log(dndContext.customDragBounds);
+    // stackRef.style.width = dndContext.customDragBounds[2];
+    // stackRef.style.height = dndContext.customDragBounds[3];
     // onResize();
   });
   onCleanup(() => {
@@ -71,11 +74,11 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           z-index: 100;
           top: -100%;
           left: -100%;
+          max-width: ${dndContext.customDragBounds[2]}px;
+          height: ${dndContext.customDragBounds[3]}px;
           box-shadow: rgba(0, 0, 0, 0.05) 0px 3px 7px, rgba(0, 0, 0, 0.08) 0px 2px 2px;
-          max-width: ${dndContext.elDimensionsPx[0]}px;
-          height: ${dndContext.elDimensionsPx[1]}px;
           animation: scaleUp 0.15s ease-in-out forwards;
-                background: white;
+          background: red;
         `}
       ></div>
     </div>

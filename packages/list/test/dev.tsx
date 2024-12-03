@@ -35,30 +35,19 @@ const treeStateA = listStateContext.createTree({ loader });
 treeStateA.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
 
 const treeStateB = listStateContext.createTree({ loader });
-treeStateB.loadChildren(dummyChildren({ maxDepth: 2, maxChildren: 8 }));
-
-const treeStateC = listStateContext.createTree({ loader });
-treeStateC.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));
+treeStateB.loadChildren(dummyChildren({ maxDepth: 1, maxChildren: 30000 }));
 
 const ctxA = new TreeContext({
+  id: "a",
   treeState: treeStateA,
   dndContext: dndContext,
   itemHeight: 32,
-  allowInternalMovement: false,
   debug: true,
 });
 
 const ctxB = new TreeContext({
   id: "b",
   treeState: treeStateB,
-  dndContext: dndContext,
-  itemHeight: 32,
-  debug: true,
-});
-
-const ctxC = new TreeContext({
-  id: "c",
-  treeState: treeStateC,
   dndContext: dndContext,
   itemHeight: 32,
   debug: true,
@@ -84,18 +73,8 @@ render(
             style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
             classList={{ [styles["focus"]]: ctxB.isFocused() }}
           >
-            <h3>Tree B ({treeStateB.count()} items) - 3 levels</h3>
+            <h3>Tree B ({treeStateA.count()} items) - 3 levels</h3>
             <span>Focus: {ctxB.isFocused() ? "true" : "false"}</span>
-            <Tree />
-          </div>
-        </SolidListContext.Provider>
-        <SolidListContext.Provider value={ctxC}>
-          <div
-            style={`display: flex; flex-direction: column; height: 100%;  width: 33.3%;`}
-            classList={{ [styles["focus"]]: ctxC.isFocused() }}
-          >
-            <h3>Tree C ({treeStateC.count()} items)</h3>
-            <span>Focus: {ctxC.isFocused() ? "true" : "false"}</span>
             <Tree />
           </div>
         </SolidListContext.Provider>

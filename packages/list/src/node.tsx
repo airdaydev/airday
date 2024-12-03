@@ -15,13 +15,15 @@ export const TreeNode = (props: NodeProps) => {
   let componentRef!: HTMLElement;
   function startCustomDrag(event: MouseEvent) {
     const targetBounding = componentRef.getBoundingClientRect();
-    const targetOffset = [
+    const targetBounds = [
       event.pageX - targetBounding.x,
       event.pageY - targetBounding.y,
-    ] as [number, number];
+      targetBounding.width,
+      targetBounding.height,
+    ] as [number, number, number, number];
     props.treeContext.dndContext.setCustomDragOpts(
       componentRef.cloneNode(true) as HTMLElement,
-      targetOffset,
+      targetBounds,
     );
     props.treeContext.mousePosFrame(event);
     props.treeContext.startDrag(props.windowIndex(), props.node);

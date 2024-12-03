@@ -240,6 +240,7 @@ export class TreeContext {
     this.originIndex = originIndex;
     this.originNode = originNode;
     this.dndContext.startDrag();
+    this.setListOffset();
     this.recalcListBounds();
     this.setDragOver();
   }
@@ -523,17 +524,17 @@ export class DndContext {
   // Drag behaviour
   mode = createSignal<Mode>("custom");
   customDragEl?: HTMLElement;
-  customDragElOffset = [0, 0];
+  customDragBounds = [0, 0, 25, 25];
   constructor(props: DndContextInitArgs = { enableKeyboard: true }) {
     this.keyboard = new DndContextKeyboardEvents(this, props.enableKeyboard);
     if (props.mode) this.mode[1](props.mode);
   }
   setCustomDragOpts(
     customDragEl: HTMLElement,
-    customDragElOffset: [number, number],
+    customDragBounds: [number, number, number, number],
   ) {
     this.customDragEl = customDragEl;
-    this.customDragElOffset = customDragElOffset;
+    this.customDragBounds = customDragBounds;
   }
   startDrag(dragMode: DragMode = "mouse") {
     // Set up dragged element

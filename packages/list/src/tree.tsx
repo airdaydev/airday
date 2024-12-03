@@ -43,12 +43,6 @@ export const Tree: Component<TreeProps> = (props) => {
 
   return (
     <div class={styles["container"]}>
-      <div class={styles["temp-container"]}>
-        <div
-          ref={tempItemRef}
-          style={{ height: `${treeContext.itemHeight}px` }}
-        ></div>
-      </div>
       <div
         classList={{
           [styles["list"]]: true,
