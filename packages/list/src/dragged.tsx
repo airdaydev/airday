@@ -44,7 +44,6 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
     // window.addEventListener('resize', onResize);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("dragover", onMouseMove);
-    console.log(dndContext.customDragBounds);
     // stackRef.style.width = dndContext.customDragBounds[2];
     // stackRef.style.height = dndContext.customDragBounds[3];
     // onResize();
