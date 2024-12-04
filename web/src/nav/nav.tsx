@@ -4,7 +4,7 @@ import styles from "./nav.module.css";
 import ArrowRight from "../icons/arrow-right.svg?component-solid";
 import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
-import CheckSVG from "../icons/check.svg?component-solid";
+import CheckSVG from "../icons/check-hand.svg?component-solid";
 import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";

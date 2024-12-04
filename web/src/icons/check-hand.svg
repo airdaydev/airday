@@ -1,7 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <title>check</title>
     <g id="check" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-opacity="0.663434222">
-        <path d="M1,7.73586686 C4.09924351,15.8820157 2.62257297,11.4642013 11.6421926,2" id="Path-12" stroke="#325EFF" stroke-width="1.5"></path>
+        <path d="M1,7.73586686 C4.09924351,15.8820157 2.62257297,11.4642013 11.6421926,2" id="Path-12" stroke="currentColor" stroke-width="1.5"></path>
     </g>
 </svg>
