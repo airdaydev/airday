@@ -1,4 +1,6 @@
 .check {
+  position: relative;
+  z-index: 1;
   display: block;
   min-width: 0.9em;
   min-height: 0.9em;

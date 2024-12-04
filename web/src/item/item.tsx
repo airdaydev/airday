@@ -82,7 +82,7 @@ const GenericItemContent: Component<{
     // Autofocus
     if (props.inlineEditing()) {
       editableRef.focus();
-      window.addEventListener("mousedown", clickOutside);
+      window.addEventListener("mousedown", clickOutside, { capture: true });
     }
   });
   const clickOutside = (event: MouseEvent) => {
@@ -156,6 +156,7 @@ export const GenericComponent: NodeComponentType<GenericItem> = (props) => {
   const [inlineEditing, setInlineEditing] = createSignal(false);
   const edit = () => {
     session.viewState.keyboard.disable();
+    props.select();
     setInlineEditing(true);
   };
   const endEdit = () => {
