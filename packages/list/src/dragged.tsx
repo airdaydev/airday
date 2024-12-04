@@ -44,7 +44,7 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
       style={`
       pointer-events: none;
       position: fixed;
-      z-index: 10;
+      z-index: 100;
       top: ${`${window.scrollY.toString()}px` || "0"};
       left: 0;
       width: 100vw;
@@ -57,12 +57,11 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
         class="dragged"
         style={`
           position: relative;
-          z-index: 100;
           top: -100%;
           left: -100%;
           max-width: ${dndContext.customDragBounds[2]}px;
           height: ${dndContext.customDragBounds[3]}px;
-          box-shadow: rgba(0, 0, 0, 0.05) 0px 3px 7px, rgba(0, 0, 0, 0.08) 0px 2px 2px;
+          box-shadow: 0 0 0 1px rgba(63, 63, 68, 0.05), 0 1px 3px 0 rgba(34, 33, 81, 0.15);
           animation: scaleUp 0.15s ease-in-out forwards;
           background: red;
         `}

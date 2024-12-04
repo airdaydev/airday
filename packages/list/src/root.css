@@ -1,14 +1,14 @@
 /* Prevents select on long touch on iOS (at least) */
 .touch-no-select {
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none !important;
 }
 @keyframes scaleUp {
-    from {
-        transform: scale(1);
-    }
-    to {
-        transform: scale(1.05);
-    }
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.05);
+  }
 }
