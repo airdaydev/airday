@@ -7,7 +7,7 @@ interface CheckboxProps {
 
 export function Checkbox(props: CheckboxProps) {
   return (
-    <div
+    <button
       classList={{
         [styles["check"]]: true,
         [styles["checked"]]: !!props.checked,
@@ -17,6 +17,6 @@ export function Checkbox(props: CheckboxProps) {
       }}
     >
       <span></span>
-    </div>
+    </button>
   );
 }

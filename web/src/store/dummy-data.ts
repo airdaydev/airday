@@ -23,9 +23,6 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
   for (let i = 0; i < count; i++) {
     const index = (i + tasks.length) % tasks.length;
     let sticker;
-    if (Math.random() < 0.1) {
-      sticker = "smiley";
-    }
     dummyItems.push({
       id: createUniqueId(),
       content: tasks[index],
@@ -33,7 +30,6 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
       tsCreated: new Date(),
       tsDone: null,
       listId,
-      ...(sticker && { sticker: "smiley" }),
     });
   }
   return dummyItems;

@@ -1,5 +1,4 @@
 import Sandbar from "../stickers/baseline/sand-bar.svg?component-solid";
-import Smiley from "../stickers/baseline/smiley.svg?component-solid";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
 import CirclePink from "../stickers/baseline/circle-pink.svg?component-solid";
@@ -11,9 +10,6 @@ export const Stickers = () => (
     <div>
       <button tabIndex={-1}>
         <Sandbar />
-      </button>
-      <button tabIndex={-1}>
-        <Smiley />
       </button>
       <button tabIndex={-1}>
         <Triangle />

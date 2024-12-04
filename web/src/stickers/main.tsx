@@ -1,6 +1,5 @@
 import { Signal } from "solid-js";
 import { BaselineSticker } from "./baseline";
-import Smiley from "../stickers/baseline/smiley.svg?component-solid";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CirclePink from "../stickers/baseline/circle-pink.svg?component-solid";
 import Sandbar from "../stickers/baseline/sand-bar.svg?component-solid";
@@ -10,7 +9,6 @@ import { GenericItem } from "../store/item";
 
 const map: Record<string, any> = {
   triangle: Triangle,
-  smiley: Smiley,
   circlePink: CirclePink,
   sandBar: Sandbar,
   circleAqua: CircleAqua,

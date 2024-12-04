@@ -1,7 +1,6 @@
 import { ContextMenu } from "../context-menu/context-menu";
 import Triangle from "../stickers/baseline/triangle.svg?component-solid";
 import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
-import Smiley from "../stickers/baseline/smiley.svg?component-solid";
 import styles from "./item.module.css";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
@@ -54,9 +53,6 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       </button>
       <hr />
       <div class={styles["sticker-container"]}>
-        <button onClick={() => props.updateSticker("smiley")}>
-          <Smiley />
-        </button>
         <button onClick={() => props.updateSticker("triangle")}>
           <Triangle />
         </button>

@@ -8,6 +8,7 @@
   transition: margin 0.1s;
   overflow-y: scroll;
   background: var(--shade-bg);
+  box-sizing: border-box;
 }
 
 .nav-text-button {
@@ -33,6 +34,10 @@
 
 .nav-text-button.active {
   border: 1px solid var(--blue-tint);
+}
+
+[data-theme="dark"] .nav-text-button.active {
+  border: 1px solid var(--body-tint);
 }
 
 .nav-text-button span {

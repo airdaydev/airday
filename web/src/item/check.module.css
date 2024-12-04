@@ -2,11 +2,16 @@
   display: block;
   min-width: 0.9em;
   min-height: 0.9em;
-  border: 1px solid #a5a5a5;
+  border: 1px solid #dedede;
   border-radius: 4px;
+  background: none;
 }
 
 .checked {
   background: blue;
   border-color: blue;
+}
+
+[data-theme="dark"] .check {
+  border-color: #3f3f3f;
 }

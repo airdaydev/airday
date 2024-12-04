@@ -52,10 +52,11 @@
 - [x] Splitting horizontal on root doesn't create a border
 - [x] sunlist/@list -> sunlist/@tree conversion
 - [x] Escape key should cancel drag
+- [x] Dragging item over navbar goes below it!
 - [] Add new item
-- [] Dragging item over navbar goes below it!
+- [] Paste into app (strip `- []`)
+- [] Save/Load to JSON
 - [] Dragging out of Done should undo its done start
-- [] Locations
 - [] Dummy data - done items with varied dates over last 2 years (after import/export)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
 - [] Done board show from list
@@ -102,6 +103,7 @@
 - [] Print styles
 - [] group lists (one level)
 - [] subitems (one level)
+- [] Locations/Map?
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology

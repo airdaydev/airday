@@ -1,7 +1,9 @@
 import { sessionContext } from "../store/context.js";
 import { createSignal, useContext } from "solid-js";
 import CloudOffSVG from "../icons/cloud-off.svg?component-solid";
-import SearchSVG from "../icons/pixel-search.svg?component-solid";
+import SearchSVG from "../icons/search.svg?component-solid";
+import NewSVG from "../icons/new.svg?component-solid";
+import TerminalSVG from "../icons/terminal.svg?component-solid";
 import SidebarSVG from "../icons/rainbow.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
@@ -94,31 +96,13 @@ export const Footer = () => {
         >
           <Key key="⌘" />
           <Key key="/" />
-          Cmd
+          <TerminalSVG />
         </button>
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
-        {selectedItems() && (
-          <button
-            tabIndex={-1}
-            class={styles["nav-button"]}
-            style={"line-height: 0rem;"}
-            onClick={() => {
-              const firstSelected = session.workspace.dndContext
-                .focusedContext()
-                ?.getFirstSelected();
-              if (firstSelected) {
-                session.viewState.focus = firstSelected;
-                session.viewState.openFocusScene();
-              }
-            }}
-          >
-            <Key key="⌥" />
-            <Key key="F" />
-            Focus
-          </button>
-        )}
+        {/* {selectedItems() && (
+        )} */}
         <button
           tabIndex={-1}
           class={styles["nav-button"]}
@@ -131,7 +115,7 @@ export const Footer = () => {
           }}
         >
           <Key key="N" />
-          New
+          <NewSVG />
         </button>
         <button
           tabIndex={-1}
@@ -139,7 +123,7 @@ export const Footer = () => {
           style={"line-height: 0rem;"}
         >
           <Key key="/" />
-          Find
+          <SearchSVG />
         </button>
         <ThemeToggle class={styles["nav-button"]} />
         <button
@@ -149,11 +133,7 @@ export const Footer = () => {
         >
           <CloudOffSVG />
         </button>
-        <button
-          class={styles["nav-button"]}
-          style="background: #5937ff; color: white; line-height: 1.25rem;"
-          tabIndex={-1}
-        >
+        <button class={styles["nav-button"]} tabIndex={-1}>
           Sync AUD$24/year
         </button>
       </div>
