@@ -21,7 +21,7 @@ export const UpNext = (props: { view: DataView }) => {
   const ctx = new TreeContext({
     treeState: tree,
     dndContext: session.workspace.dndContext,
-    itemHeight: 32,
+    itemHeight: 64,
   });
   const opts = listOptions({
     columnHeaders: false,

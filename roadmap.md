@@ -54,6 +54,7 @@
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [] Deleting items
+- [] Editing text inline
 - [] Add new item
 - [] Paste into app (strip `- []`)
 - [] Save/Load to JSON

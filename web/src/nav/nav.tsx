@@ -55,7 +55,7 @@ export function SunlistNav() {
           <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Calendar</span>
         </button>
-        <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
+        <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
         <button class={styles["nav-text-button"]} tabindex="-1">
           <PulseSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
