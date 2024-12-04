@@ -30,8 +30,7 @@ export function SunlistNav() {
       }}
       onClick={() => session.viewState.focusSidebar()}
     >
-      {/* <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
-      <MonthNav /> */}
+      <MonthNav />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
       <div
         class={`${styles["nav-list"]} ${styles["nav-text"]}`}
@@ -56,7 +55,7 @@ export function SunlistNav() {
           <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Calendar</span>
         </button>
-        <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+        <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
         <button class={styles["nav-text-button"]} tabindex="-1">
           <PulseSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Performance</span>
@@ -96,14 +95,6 @@ export function SunlistNav() {
       <div style="color: #81777f; border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;">
         Add stickers
       </div>
-      {/* <button>
-        <CalendarSVG style="width: 1.25em; stroke-width: 1.25px;" />
-        <span>Scheduled</span>
-      </button>
-      <button onClick={session.viewState.openDoneView}>
-        <TrashSVG style="width: 1.25em; stroke-width: 1.25px;" />
-        <span>Trash</span>
-      </button> */}
     </nav>
   );
 }

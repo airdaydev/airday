@@ -8,8 +8,8 @@
 }
 
 .checked {
-  background: blue;
-  border-color: blue;
+  background: #a5a5ff;
+  border-color: #a5a5ff;
 }
 
 [data-theme="dark"] .check {

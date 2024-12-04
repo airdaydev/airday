@@ -1,23 +1,23 @@
 .mini-cal {
-    padding: 1em 0.5em 0.5em 0;
+  padding: 1.5em 0.5em 1em 0;
 }
 
 .weekday th {
-    text-align: center;
-    font-size: 0.8em;
-    font-weight: 500;
-    color: var(--body-tint);
+  text-align: center;
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--body-tint);
 }
 
 .day-index td {
-    text-align: center;
-    font-weight: 500;
-    height: 25px;
-    font-size: 0.8em;
-    border-radius: 2px;
+  text-align: center;
+  font-weight: 500;
+  height: 25px;
+  font-size: 0.8em;
+  border-radius: 2px;
 }
 
 .current-day {
-    background: var(--body-tint);
-    color: white;
+  background: var(--body-tint);
+  color: white;
 }

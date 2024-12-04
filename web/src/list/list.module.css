@@ -133,7 +133,7 @@
   min-height: 0;
   max-height: 100%;
   flex-grow: 1;
-  padding: 0.25em 0.5em;
+  padding: 0.25em 0em;
 }
 /* Hide scrollbar for Chrome, Safari and Opera */
 .hide-native-scroll::-webkit-scrollbar {

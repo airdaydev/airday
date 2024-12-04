@@ -53,6 +53,7 @@
 - [x] sunlist/@list -> sunlist/@tree conversion
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
+- [] Deleting items
 - [] Add new item
 - [] Paste into app (strip `- []`)
 - [] Save/Load to JSON
@@ -95,7 +96,7 @@
 - [] Begin back-end
 - [] Themes incl. Departure Mono
 - [] Shared lists
-- [] Weekly view
+- [] Weekly block view
 - [] Monthly view
 - [] Loading pane
 - [] Save views (arrangements of panes)
