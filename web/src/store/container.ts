@@ -1,28 +1,29 @@
 import { Node, GenericNode } from "@sunlist/list";
-import { NavListItem } from "../nav/nav-lists";
+import { ContainerNodeComponent } from "../nav/nav-lists";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
 
-const GenericListSchema = v.object({
+const ContainerNodeSchema = v.object({
   id: v.string(),
   name: v.string(),
   icon: v.string(),
   default: v.boolean(),
 });
 
-type GenericListSchema = TypeOf<typeof GenericListSchema> & GenericNode<any>;
+type ContainerNodeSchema = TypeOf<typeof ContainerNodeSchema> &
+  GenericNode<any>;
 
-export class GenericList extends Node {
+export class ContainerNode extends Node {
   id: string;
   name: string;
   type = "generic-list";
   tsCreated?: Date;
-  component = NavListItem;
+  component = ContainerNodeComponent;
   default: boolean = false;
   icon?: string;
-  static validate = compile(GenericListSchema, { simple: true });
-  constructor(props: GenericListSchema) {
+  static validate = compile(ContainerNodeSchema, { simple: true });
+  constructor(props: ContainerNodeSchema) {
     super(props);
     this.id = props.id || createUniqueId();
     this.name = props.name || "";
@@ -43,16 +44,26 @@ export class GenericList extends Node {
   }
 }
 
+const ContainerFolder = v.object({
+  id: v.string(),
+  name: v.string(),
+  icon: v.string(),
+  default: v.boolean(),
+});
+
+type ContainerFolder = TypeOf<typeof ContainerNodeSchema> & GenericNode<any>;
+
 export class ContainerFolderNode extends Node {
   id: string;
   name: string;
   type = "folder";
   tsCreated?: Date;
-  component = NavListItem;
+  component = ContainerNodeComponent;
   default: boolean = false;
+  expanded = true;
   icon?: string;
-  static validate = compile(GenericListSchema, { simple: true });
-  constructor(props: GenericListSchema) {
+  static validate = compile(ContainerNodeSchema, { simple: true });
+  constructor(props: ContainerNodeSchema) {
     super(props);
     this.id = props.id || createUniqueId();
     this.name = props.name || "";
@@ -75,9 +86,14 @@ export class ContainerFolderNode extends Node {
 
 export function containerLoader(data: any) {
   if (data.type === "generic-list") {
-    const validated = GenericList.validate(data);
+    const validated = ContainerNode.validate(data);
     if (!validated) return false;
-    return new GenericList(data);
+    return new ContainerNode(data);
+  }
+  if (data.type === "folder") {
+    const validated = ContainerFolderNode.validate(data);
+    if (!validated) return false;
+    return new ContainerFolderNode(data);
   }
   console.warn("invalid data in container loader");
   return false;

@@ -6,7 +6,7 @@ import {
   ListStateContext,
   TreeState,
 } from "@sunlist/list";
-import { containerLoader, GenericList } from "./container";
+import { containerLoader, ContainerNode } from "./container";
 import { ViewNode } from "../view/state";
 
 export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
@@ -60,7 +60,7 @@ export class ContainerStore {
     if (!this.sundb) throw new Error("Item store uninitialised");
     return this.sundb;
   }
-  insert = async (data: GenericList | GenericList[]) => {
+  insert = async (data: ContainerNode | ContainerNode[]) => {
     // Convert to array
     const src = Array.isArray(data) ? data : [data];
     // Store in database (TODO: Optimisation: Immediately store in mem)
@@ -72,7 +72,7 @@ export class ContainerStore {
     const store = tx.objectStore(this.storeName);
     // Create signals
     src.map((item, index) => {
-      this.tree.insertItems(new Set([new GenericList(item)]), [
+      this.tree.insertItems(new Set([new ContainerNode(item)]), [
         null,
         this.tree.count(),
       ]);

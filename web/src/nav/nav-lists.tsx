@@ -6,9 +6,12 @@ import { NodeComponentType } from "@sunlist/list";
 import styles from "./nav.module.css";
 import { TreeContext, SolidListContext, Tree } from "@sunlist/list";
 import { DataView } from "../view/state";
+import { ContainerNode } from "../store/container";
 
 // TODO: Turn off keyboard when context menu open
-export const NavListItem: NodeComponentType = (props) => {
+export const ContainerNodeComponent: NodeComponentType<ContainerNode> = (
+  props,
+) => {
   const session = useContext(sessionContext);
   const node = props.node.accessor;
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);

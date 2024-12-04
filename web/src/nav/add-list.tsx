@@ -68,7 +68,7 @@ export const AddListButton = () => {
           onClick={() => enterEditMode()}
           tabIndex={-1}
         >
-          Add list
+          Add
         </button>
       )}
     </>
