@@ -16,7 +16,7 @@ import { DoneView } from "../view/state";
 export function SunlistNav() {
   const session = useContext(sessionContext);
   const [sidebarVisible] = session.viewState.sidebarVisible;
-  let ref: HTMLDivElement | undefined = undefined;
+  let ref: HTMLDivElement | undefined;
   const getMargin = () =>
     sidebarVisible()
       ? "0"

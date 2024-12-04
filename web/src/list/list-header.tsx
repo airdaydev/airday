@@ -121,7 +121,10 @@ export const UpNextHeader = (props: ListHeaderProps) => {
           <span>Up Next</span>
           <KeyboardMarker view={props.view} />
         </button>
-        <div>
+        <div
+          style="display: flex;
+          align-items: center;"
+        >
           <button>Clear</button>
           <CloseViewButton view={props.view} />
         </div>

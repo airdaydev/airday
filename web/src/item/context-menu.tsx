@@ -21,6 +21,9 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <button disabled>
         <span>Add to up next</span>
       </button>
+      <button disabled>
+        <span>Add date</span>
+      </button>
       <button
         onClick={() => session.viewState.focusItem(props.item)}
         style="display: flex;
