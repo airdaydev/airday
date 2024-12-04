@@ -62,8 +62,9 @@ export const Dragged = ({ dndContext }: DraggedProps) => {
           max-width: ${dndContext.customDragBounds[2]}px;
           height: ${dndContext.customDragBounds[3]}px;
           box-shadow: 0 0 0 1px rgba(63, 63, 68, 0.05), 0 1px 3px 0 rgba(34, 33, 81, 0.15);
+          border-radius: 3px;
           animation: scaleUp 0.15s ease-in-out forwards;
-          background: red;
+          background: none;
         `}
       ></div>
     </div>
