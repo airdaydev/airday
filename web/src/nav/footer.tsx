@@ -123,6 +123,12 @@ export const Footer = () => {
           tabIndex={-1}
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
+          onClick={() => {
+            const activePane = session.viewState.activePane[0]();
+            if (activePane.containerId) {
+              // session.workspace.itemStore.insert(new )
+            }
+          }}
         >
           <Key key="N" />
           New
