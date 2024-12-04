@@ -154,7 +154,7 @@ export class TreeCanvas {
       } else {
         // Fading out
         const elapsed = frame - row[1].last;
-        opacity = 1 - elapsed / 150;
+        opacity = 1 - elapsed / 50;
       }
       this.ctx2D.fillStyle = `rgba(${this.shadowColor[0]}, ${this.shadowColor[1]}, ${this.shadowColor[2]}, ${opacity})`;
       this.ctx2D.fillRect(
