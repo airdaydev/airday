@@ -14,10 +14,6 @@ import styles from "./list.module.css";
 import { distance, moveCaretToPosition } from "../utils";
 import { Checkbox } from "./checkbox";
 import { Sticker } from "../stickers/main";
-import Triangle from "../stickers/baseline/triangle.svg?component-solid";
-import CircleAqua from "../stickers/baseline/circle-aqua.svg?component-solid";
-import Smiley from "../stickers/baseline/smiley.svg?component-solid";
-import { elapsedString } from "../generic/date";
 
 interface ItemProps {
   listIndex: number;

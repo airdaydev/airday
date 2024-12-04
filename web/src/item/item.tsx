@@ -52,30 +52,36 @@ const GenericItemDate: Component<{ node: GenericItem }> = (props) => {
 const GenericItemContent: Component<{
   node: GenericItem;
   inlineEditing: Accessor<boolean>;
+  endEdit: () => void;
 }> = (props) => {
   let editableRef: HTMLElement | undefined;
   createEffect(() => {
+    // Autofocus
     if (props.inlineEditing()) {
       editableRef.focus();
+      window.addEventListener("mousedown", clickOutside);
     }
   });
+  const clickOutside = (event: MouseEvent) => {
+    if (!editableRef?.contains(event.target)) {
+      props.node.updateContent(editableRef?.innerText);
+      window.removeEventListener("mousedown", clickOutside);
+      props.endEdit();
+    }
+  };
   return (
     <>
       <Show when={props.inlineEditing()}>
-        <span
-          class={styles["content-col"]}
+        <div
+          class={styles["content-col-editable"]}
           contentEditable
           onLoad={() => {
             console.log("loaded");
           }}
-          onBlur={() => {
-            console.log("blurring");
-            props.endEdit();
-          }}
           ref={editableRef}
         >
           {props.node.accessor().content}
-        </span>
+        </div>
       </Show>
       <Show when={props.inlineEditing() === false}>
         <span class={styles["content-col"]} onDblClick={() => props.edit()}>
