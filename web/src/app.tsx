@@ -19,6 +19,9 @@ export function App() {
           {session.workspace.dndContext.isCustomDragging() && (
             <Dragged dndContext={session.workspace.dndContext} />
           )}
+          {session.workspace.containerStore.dndContext.isCustomDragging() && (
+            <Dragged dndContext={session.workspace.containerStore.dndContext} />
+          )}
           <div class={styles.main}>
             <SunlistNav />
             <PaneRegion tree={session.viewState.tree} />
