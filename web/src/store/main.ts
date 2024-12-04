@@ -185,17 +185,26 @@ export class SunlistWorkspace {
         default: true,
       },
       {
+        id: "yo",
+        name: "yo",
+        icon: "task",
+        sortKey: "z",
+        type: "folder",
+        children: [
+          {
+            id: "long",
+            name: "A Sunlist list with more characters",
+            icon: "red",
+            sortKey: "c",
+            type: "generic-list",
+          },
+        ],
+      },
+      {
         id: "work",
         name: "Work",
         icon: "craft",
         sortKey: "b",
-        type: "generic-list",
-      },
-      {
-        id: "long",
-        name: "A Sunlist list with more characters",
-        icon: "red",
-        sortKey: "c",
         type: "generic-list",
       },
     ]);
