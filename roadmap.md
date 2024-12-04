@@ -64,6 +64,7 @@
 - [] Done board show from list
 - [] Done board month headings
 - [] Done board chronological index
+- [] Manually define height of list section (by dragging)
 - [] indexing system for nav
 - [] Remove many stickers
 - [] item links

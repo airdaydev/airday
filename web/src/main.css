@@ -1,8 +1,8 @@
 :root {
-  --background: hsl(180, 4.8%, 97%);
-  --border: #eaeaea;
+  --background: #ffffff;
+  --border: #eae5df8c;
   --border-heavy: hsl(0, 0%, 82%);
-  --shade-bg: #f3f3f3;
+  --shade-bg: #fcfcfc;
   --shade: #e1e1e1;
   --light-shade: #f3f3f3;
   --mid-shade: #e5e5e5;

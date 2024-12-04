@@ -1,8 +1,7 @@
 .tree-item {
   display: flex;
   align-items: center;
-  background: var(--background);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.75px solid var(--border);
   cursor: default;
   color: var(--body);
   height: 100%;
@@ -10,6 +9,7 @@
   white-space: nowrap;
   overflow-x: hidden;
   padding: 0 0.25em;
+  margin: 0 0.25em;
   user-select: none;
   -webkit-user-select: none;
 }

@@ -23,7 +23,6 @@ const GenericItemCheckbox: Component<{
   return (
     <Checkbox
       onChange={(event: InputEvent) => {
-        console.log("wtf");
         props.node.toggleComplete(props.options.historical);
         event.stopPropagation();
       }}

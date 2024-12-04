@@ -30,8 +30,8 @@ export function SunlistNav() {
       }}
       onClick={() => session.viewState.focusSidebar()}
     >
-      <MonthNav />
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" />
+      {/* <MonthNav /> */}
+      {/* <hr style="width: 100%; border: none; border-top: 1px solid var(--border); margin: 0;" /> */}
       <div
         class={`${styles["nav-list"]} ${styles["nav-text"]}`}
         style="padding-top: 0.5em;"
@@ -55,41 +55,39 @@ export function SunlistNav() {
           <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
           <span>Calendar</span>
         </button>
-        <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-        <button class={styles["nav-text-button"]} tabindex="-1">
-          <PulseSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
-          <span>Performance</span>
-        </button>
-        <SoloNode
-          dndContext={session.workspace.containerStore.dndContext}
-          enableDrop={false}
-          Component={(props) => (
-            <button
-              class={styles["nav-text-button"]}
-              tabindex="-1"
-              onClick={session.viewState.openDoneView}
-              onMouseDown={(event) => {
-                session.viewState.paneDropView = new DoneView(
-                  session.viewState,
-                );
-                props.onMouseDown(event);
-              }}
-              ref={props.ref}
-              selected={props.selected}
-            >
-              <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
-              <span>Done</span>
-            </button>
-          )}
-        />
-        <button class={styles["nav-text-button"]} tabindex="-1">
-          <TrashSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
-          <span>Trash</span>
-        </button>
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <NavLists />
       <AddListButton />
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      <button class={styles["nav-text-button"]} tabindex="-1">
+        <PulseSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+        <span>Performance</span>
+      </button>
+      <SoloNode
+        dndContext={session.workspace.containerStore.dndContext}
+        enableDrop={false}
+        Component={(props) => (
+          <button
+            class={styles["nav-text-button"]}
+            tabindex="-1"
+            onClick={session.viewState.openDoneView}
+            onMouseDown={(event) => {
+              session.viewState.paneDropView = new DoneView(session.viewState);
+              props.onMouseDown(event);
+            }}
+            ref={props.ref}
+            selected={props.selected}
+          >
+            <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
+            <span>Done</span>
+          </button>
+        )}
+      />
+      <button class={styles["nav-text-button"]} tabindex="-1">
+        <TrashSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
+        <span>Trash</span>
+      </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
       <div style="color: #81777f; border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;">
