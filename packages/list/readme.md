@@ -76,7 +76,7 @@ pnpm run dev
 - [x] Clean switching on the fly between drag modes (native vs custom)
 - [x] dat.gui item height
 - [] scaleUp animation not triggering
-- [] Support for list: top & bottom
+- [] only one autoscroller at a time (triggers twice if one list is ontop of another!)
 - [] Bug: Deeply nested items not dragging across to more than 1 level!
 - [] dat.gui prevent drag entirely
 - [] moving item down follows user smoothly
@@ -85,7 +85,7 @@ pnpm run dev
 - [] Variable item heights...
 - [] jumping to top and bottom smooth scroll (try?)
 - [] Provide API for rejecting bad drops ahead of time so UI can respond
-- [] Touch version
+- [] Touch version for custom list
 - [] In rows below items of a greater nesting, users can move horizontally to drag through different depths
 - [] Add Empty item state for groups with nothing in them (optionally via node property)
 - [] Ensure list tracked dimensions match list size at all times
