@@ -149,28 +149,21 @@ h3 {
   padding: 0.5em;
   align-items: center;
   height: 100%;
+  width: 100%;
   overflow-x: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
   white-space: nowrap;
-}
 
-.content-col-editable {
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  align-items: center;
-  margin-left: 1.25em;
-  padding: 0.5em;
-  outline: none;
-  position: absolute;
-  top: 0;
-  width: 100%;
-  min-height: 100%;
-  white-space: preserve;
-  word-break: break-all;
-  box-sizing: border-box;
+  &[contenteditable] {
+    outline: none;
+    min-height: 100%;
+    white-space: preserve;
+    word-break: break-all;
+    cursor: text;
+    overflow-x: visible;
+    text-overflow: unset;
+  }
 }
 
 .just-checked {

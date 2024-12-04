@@ -26,6 +26,29 @@ function formatDate(date: Date | undefined): string {
   return date.toLocaleDateString("en-US", options);
 }
 
+// TODO: Set care position
+// Firefox
+// let position = 0;
+// if (typeof document.caretPositionFromPoint === "function") {
+//   position = document.caretPositionFromPoint(
+//     event.clientX,
+//     event.clientY,
+//   ).offset;
+// }
+// // TODO: caretRangeFromPoint(x, y) for other browsers
+// setCaretPos(position);
+// props.selection.clear();
+//
+// createEffect(
+//   on([edit], () => {
+//     if (textAreaRef && dummyRef) {
+//       textAreaRef.focus();
+//       moveCaretToPosition(textAreaRef, caretPos());
+//       dummyRef.textContent = textAreaRef.value;
+//     }
+//   }),
+// );
+
 const GenericItemCheckbox: Component<{
   node: GenericItem;
   options: ListOptions;
@@ -65,18 +88,33 @@ const GenericItemContent: Component<{
   const clickOutside = (event: MouseEvent) => {
     if (!editableRef?.contains(event.target)) {
       props.node.updateContent(editableRef?.innerText);
-      window.removeEventListener("mousedown", clickOutside);
+      cleanUp();
       props.endEdit();
     }
+  };
+  const cleanUp = () => {
+    window.removeEventListener("mousedown", clickOutside);
   };
   return (
     <>
       <Show when={props.inlineEditing()}>
         <div
-          class={styles["content-col-editable"]}
+          class={styles["content-col"]}
           contentEditable
           onLoad={() => {
             console.log("loaded");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              cleanUp();
+              props.endEdit();
+            }
+            if (event.key === "Enter") {
+              props.node.updateContent(editableRef?.innerText);
+              event.preventDefault();
+              cleanUp();
+              props.endEdit();
+            }
           }}
           ref={editableRef}
         >
