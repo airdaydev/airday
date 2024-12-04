@@ -1,4 +1,13 @@
-import { Component, createSignal, useContext } from "solid-js";
+import {
+  Accessor,
+  Component,
+  createEffect,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  useContext,
+} from "solid-js";
 import { NodeComponentType } from "@sunlist/list";
 import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
@@ -6,6 +15,7 @@ import { ItemContextMenu } from "./context-menu";
 import { ListOptions, ListOptionsContext } from "../list/list-options";
 import { GenericItem } from "../store/item";
 import { Sticker } from "../stickers/main";
+import { sessionContext } from "../store/context";
 
 function formatDate(date: Date | undefined): string {
   if (!date) return "";
@@ -39,9 +49,40 @@ const GenericItemDate: Component<{ node: GenericItem }> = (props) => {
   );
 };
 
-const GenericItemContent: Component<{ node: GenericItem }> = (props) => {
+const GenericItemContent: Component<{
+  node: GenericItem;
+  inlineEditing: Accessor<boolean>;
+}> = (props) => {
+  let editableRef: HTMLElement | undefined;
+  createEffect(() => {
+    if (props.inlineEditing()) {
+      editableRef.focus();
+    }
+  });
   return (
-    <span class={styles["content-col"]}>{props.node.accessor().content}</span>
+    <>
+      <Show when={props.inlineEditing()}>
+        <span
+          class={styles["content-col"]}
+          contentEditable
+          onLoad={() => {
+            console.log("loaded");
+          }}
+          onBlur={() => {
+            console.log("blurring");
+            props.endEdit();
+          }}
+          ref={editableRef}
+        >
+          {props.node.accessor().content}
+        </span>
+      </Show>
+      <Show when={props.inlineEditing() === false}>
+        <span class={styles["content-col"]} onDblClick={() => props.edit()}>
+          {props.node.accessor().content}
+        </span>
+      </Show>
+    </>
   );
 };
 
@@ -66,13 +107,28 @@ const colMap = new Map<string, Component<{ node: GenericItem }>>([
 <span>{node().content}</span> */
 }
 
-export const GenericComponent: NodeComponentType = (props) => {
+export const GenericComponent: NodeComponentType<GenericItem> = (props) => {
+  const session = useContext(sessionContext);
+  const [inlineEditing, setInlineEditing] = createSignal(false);
+  const edit = () => {
+    session.viewState.keyboard.disable();
+    setInlineEditing(true);
+  };
+  const endEdit = () => {
+    session.viewState.keyboard.enable();
+    setInlineEditing(false);
+  };
+  onCleanup(() => {
+    if (!session.viewState.keyboard.enabled)
+      session.viewState.keyboard.enable();
+  });
   const node = props.node.accessor;
   const options = useContext(ListOptionsContext);
   // ContextMenu
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>();
   function openContextMenu(event: MouseEvent) {
+    if (inlineEditing()) return;
     // TODO: Prevent shift key + context menu (too much work)
     event.preventDefault();
     if (event.target) {
@@ -91,19 +147,18 @@ export const GenericComponent: NodeComponentType = (props) => {
           [styles["just-checked"]]: node().justChecked,
         }}
         onMouseDown={(event) => {
-          props.onMouseDown(event);
+          if (!inlineEditing()) props.onMouseDown(event);
         }}
         onDragStart={(event) => {
           props.onDragStart(event);
         }}
-        draggable="true"
-        // onTouchStart={(event) => {
-        //   props.onTouchStart(event);
-        // }}
+        draggable={props.draggable}
+        onTouchStart={(event) => {
+          props.onTouchStart(event);
+        }}
         onDblClick={(event) => {
           event.preventDefault();
-          props.select();
-          // props.node.updateContent("gogogoo");
+          edit();
         }}
         onContextMenu={openContextMenu}
         data-index={props.index}
@@ -112,6 +167,17 @@ export const GenericComponent: NodeComponentType = (props) => {
         <For each={options.columns[0]()}>
           {(col) => {
             const Col = colMap.get(col);
+            if (Col === GenericItemContent) {
+              return (
+                <Col
+                  node={props.node}
+                  options={options}
+                  edit={edit}
+                  endEdit={endEdit}
+                  inlineEditing={inlineEditing}
+                />
+              );
+            }
             if (Col) {
               return <Col node={props.node} options={options} />;
             }
@@ -122,7 +188,7 @@ export const GenericComponent: NodeComponentType = (props) => {
       {ctxOpen() && (
         <ItemContextMenu
           close={() => setCtxOpen(false)}
-          item={node()}
+          item={props.node}
           offset={ctxOffset()}
           updateSticker={(sticker: string) => {
             props.node.updateSticker(sticker);

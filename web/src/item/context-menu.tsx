@@ -5,19 +5,19 @@ import styles from "./item.module.css";
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { Key } from "../generic/key";
+import { GenericItem } from "../store/item";
 
 interface ItemContextMenuProps {
   close: () => void;
-  item: Accessor<SunlistItem>;
+  item: GenericItem;
   updateSticker: (sticker: string) => void;
-  style: string;
-  offset: [number, number];
+  offset?: [number, number];
 }
 
 export function ItemContextMenu(props: ItemContextMenuProps) {
   const session = useContext(sessionContext);
   return (
-    <ContextMenu close={props.close} style={props.style} offset={props.offset}>
+    <ContextMenu close={props.close} offset={props.offset}>
       <button disabled>
         <span>Add to up next</span>
       </button>

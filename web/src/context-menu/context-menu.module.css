@@ -29,12 +29,12 @@
 }
 
 .context-menu button:hover {
-  background: var(--shade);
+  background: var(--ultra-light-shade);
 }
 
 .context-menu hr {
   width: 100%;
   border: none;
-  border-bottom: 1px solid var(--shade);
+  border-bottom: 1px solid var(--border);
   margin: 0.25em 0em;
 }

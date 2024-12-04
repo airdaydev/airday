@@ -2,7 +2,7 @@
   display: block;
   min-width: 0.9em;
   min-height: 0.9em;
-  border: 1px solid #dedede;
+  border: 1px solid #00000021;
   border-radius: 4px;
   background: none;
 }
@@ -13,5 +13,5 @@
 }
 
 [data-theme="dark"] .check {
-  border-color: #3f3f3f;
+  border-color: #ffffff1f;
 }
