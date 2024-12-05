@@ -56,6 +56,7 @@
 - [x] Editing text inline
 - [] Editing text inline cursor set correctly.
 - [] Deleting items
+- [] Canvas bg resets WHENEVER container size changes
 - [] Add new item
 - [] Paste into app (strip `- []`)
 - [] Save/Load to JSON

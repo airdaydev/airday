@@ -2,6 +2,7 @@ import { createSignal, Signal, useContext } from "solid-js";
 import { DataView } from "../view/state";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
+import CalendarSVG from "../icons/calendar.svg?component-solid";
 import { ListIcon } from "./list-icon";
 import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
@@ -100,6 +101,25 @@ export const DoneListHeader = (props: ListHeaderProps) => {
             left: -3px; padding-right: 0.25em;"
           />
           <span>Done</span>
+          <KeyboardMarker view={props.view} />
+        </button>
+        <CloseViewButton view={props.view} />
+      </div>
+      {/* <div class={styles["description"]}>Description</div> */}
+    </div>
+  );
+};
+
+export const CalendarHeader = (props: ListHeaderProps) => {
+  return (
+    <div class={styles["list-header"]}>
+      <div class={styles["primary"]}>
+        <button class={styles["list-head-button"]}>
+          <CalendarSVG
+            style="width: 1.25em; height: 1.25em; stroke-width: 1.25px; color: var(--body-tint); position: relative;
+            left: -3px; padding-right: 0.25em;"
+          />
+          <span>Calendar</span>
           <KeyboardMarker view={props.view} />
         </button>
         <CloseViewButton view={props.view} />
