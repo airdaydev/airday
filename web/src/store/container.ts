@@ -1,5 +1,5 @@
 import { Node, GenericNode } from "@sunlist/list";
-import { ContainerNodeComponent } from "../nav/nav-lists";
+import { ContainerNodeComponent, FolderNodeComponent } from "../nav/nav-lists";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
@@ -58,7 +58,7 @@ export class ContainerFolderNode extends Node {
   name: string;
   type = "folder";
   tsCreated?: Date;
-  component = ContainerNodeComponent;
+  component = FolderNodeComponent;
   default: boolean = false;
   expanded = true;
   icon?: string;

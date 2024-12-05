@@ -7,7 +7,6 @@ import {
   TreeState,
 } from "@sunlist/list";
 import { containerLoader, ContainerNode } from "./container";
-import { ViewNode } from "../view/state";
 
 export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
 

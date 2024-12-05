@@ -186,8 +186,8 @@ export class SunlistWorkspace {
       },
       {
         id: "yo",
-        name: "yo",
-        icon: "task",
+        name: "Media",
+        icon: "folder",
         sortKey: "z",
         type: "folder",
         children: [
