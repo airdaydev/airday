@@ -7,9 +7,6 @@ export const ListColumnHeaders = () => {
       <span style={`width: 1rem;`} class={styles["list-col-head-item"]}>
         <CheckSVG />
       </span>
-      <span class={styles["list-col-head-item"]} style={`width: 4em;`}>
-        Date
-      </span>
       <span
         class={styles["list-col-head-item"]}
         style="position: relative;
@@ -18,6 +15,9 @@ export const ListColumnHeaders = () => {
         stroke-width: 2px;"
       >
         Az
+      </span>
+      <span class={styles["list-col-head-item"]} style={`width: 4em;`}>
+        Date
       </span>
     </div>
   );

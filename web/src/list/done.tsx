@@ -42,7 +42,7 @@ export const Done = (props: { view: DataView }) => {
         }}
       >
         <DoneListHeader view={props.view} />
-        {opts.columnHeaders[0]() && <ListColumnHeaders />}
+        <ListColumnHeaders />
         <SolidListContext.Provider value={ctx}>
           <div
             class={styles["tree-wrap"]}
@@ -53,9 +53,9 @@ export const Done = (props: { view: DataView }) => {
                 [styles["hide-native-scroll"]]: true,
               }}
             />
-            <Timeline />
           </div>
         </SolidListContext.Provider>
+        <Timeline />
       </section>
     </ListOptionsContext.Provider>
   );

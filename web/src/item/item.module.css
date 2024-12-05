@@ -1,4 +1,5 @@
 .tree-item {
+  overflow: hidden;
   display: flex;
   border-bottom: 0.75px solid var(--border);
   cursor: default;
