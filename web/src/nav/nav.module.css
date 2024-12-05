@@ -76,3 +76,10 @@
   border: none;
   cursor: pointer;
 }
+.sticker-nav svg {
+  width: 1.5em;
+  height: 1.5em;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
