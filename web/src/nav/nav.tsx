@@ -51,10 +51,28 @@ export function SunlistNav() {
           />
           <span>Up next</span>
         </button>
-        <button class={styles["nav-text-button"]} tabindex="-1">
-          <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
-          <span>Calendar</span>
-        </button>
+        <SoloNode
+          dndContext={session.workspace.containerStore.dndContext}
+          enableDrop={false}
+          Component={(props) => (
+            <button
+              class={styles["nav-text-button"]}
+              tabindex="-1"
+              onClick={session.viewState.openCalendarView}
+              onMouseDown={(event) => {
+                session.viewState.paneDropView = new DoneView(
+                  session.viewState,
+                );
+                props.onMouseDown(event);
+              }}
+              ref={props.ref}
+              selected={props.selected}
+            >
+              <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+              <span>Calendar</span>
+            </button>
+          )}
+        />
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <NavLists />

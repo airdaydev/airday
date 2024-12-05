@@ -7,7 +7,7 @@ type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
 type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data";
-type DataViewType = "list" | "done";
+type DataViewType = "list" | "done" | "calendar";
 
 export interface SignalNode<T extends SignalNode<any | undefined>> {
   children?: Signal<T[]>;
@@ -234,6 +234,20 @@ export class DoneView extends ViewNode {
   }
 }
 
+export class CalendarView extends ViewNode {
+  type: ViewType = "data";
+  dataType: DataViewType = "calendar";
+  constructor(viewState: ViewState) {
+    super(viewState);
+  }
+  get title() {
+    return "Calendar";
+  }
+  duplicate() {
+    return new DoneView(this.viewState);
+  }
+}
+
 export class UpNextView extends ViewNode {
   type: ViewType = "data";
   dataType: DataViewType = "done";
@@ -386,6 +400,9 @@ export class ViewState {
   }
   openDoneView = () => {
     this.openView(new DoneView(this));
+  };
+  openCalendarView = () => {
+    this.openView(new CalendarView(this));
   };
   openUpNextView = () => {
     this.openView(new UpNextView(this));

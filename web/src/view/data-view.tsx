@@ -1,8 +1,15 @@
-import { DoneView, ViewNode, DataView, UpNextView } from "./state";
+import {
+  DoneView,
+  ViewNode,
+  DataView,
+  UpNextView,
+  CalendarView,
+} from "./state";
 import { List } from "../list/list";
 import { Done } from "../list/done";
 import { Match, Switch } from "solid-js";
 import { UpNext } from "../list/up-next";
+import { Calendar } from "../cal/cal";
 
 interface ViewProps {
   view: ViewNode;
@@ -16,6 +23,9 @@ export function DataViewComponent(props: ViewProps) {
       </Match>
       <Match when={props.view instanceof UpNextView}>
         <UpNext view={props.view} />
+      </Match>
+      <Match when={props.view instanceof CalendarView}>
+        <Calendar view={props.view} />
       </Match>
       <Match when={props.view instanceof DataView}>
         <List view={props.view} />
