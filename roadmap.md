@@ -54,6 +54,7 @@
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
+- [] Editing text inline cursor set correctly.
 - [] Deleting items
 - [] Add new item
 - [] Paste into app (strip `- []`)
