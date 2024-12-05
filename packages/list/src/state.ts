@@ -139,6 +139,7 @@ interface TreeStateOpts {
   mutate?: boolean;
   loader?: (node: any & { id: string }) => Node;
   context?: ListStateContext;
+  onDelete: (set: Set<Node>) => void;
 }
 
 export class TreeState {
@@ -155,7 +156,7 @@ export class TreeState {
   constructor(opts: TreeStateOpts = {}) {
     this.id = createUniqueId();
     this.loader = opts.loader;
-    this.onDelete = this.onDelete;
+    this.onDelete = opts.onDelete;
     this.context = opts.context;
   }
   get mutableRoot(): RootNode {

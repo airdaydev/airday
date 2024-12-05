@@ -13,7 +13,12 @@ export class List {
     this.id = id;
     this.store = store;
     this.workspace = workspace;
-    this.tree = new TreeState({ loader: itemLoader(workspace) });
+    this.tree = new TreeState({
+      loader: itemLoader(workspace),
+      onDelete: (node) => {
+        console.log(node);
+      },
+    });
     this.tree.context = this.workspace.listStateContext;
     this.store.queue.subscribe(this.onTransaction.bind(this));
   }

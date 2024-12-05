@@ -83,4 +83,11 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
       if (view) ctx.viewState.setActivePane(view);
     },
   ],
+  [
+    encodeShortcut({ key: "Backspace" }),
+    (ctx) => {
+      const context = ctx.workspace.dndContext.focusedContext();
+      context?.treeState.delete(context.selection[0]());
+    },
+  ],
 ]);
