@@ -1,6 +1,5 @@
 .tree-item {
   display: flex;
-  align-items: center;
   border-bottom: 0.75px solid var(--border);
   cursor: default;
   color: var(--body);
@@ -146,7 +145,7 @@ h3 {
   top: 0;
   left: 0;
   padding: 0.5em;
-  padding-left: 1.5em;
+  padding-left: 2em;
   align-items: center;
   height: 100%;
   width: 100%;

@@ -1,12 +1,19 @@
-.check {
+.check-button {
+  display: flex;
+  align-items: center;
   position: relative;
   z-index: 1;
-  display: block;
-  min-width: 0.9em;
-  min-height: 0.9em;
+  background: none;
+  border: none;
+  width: 32px;
+  height: 32px;
+}
+
+.check {
+  width: 0.9em;
+  height: 0.9em;
   border: 1px solid #00000021;
   border-radius: 4px;
-  background: none;
 }
 
 .checked {

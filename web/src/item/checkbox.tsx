@@ -8,15 +8,17 @@ interface CheckboxProps {
 export function Checkbox(props: CheckboxProps) {
   return (
     <button
-      classList={{
-        [styles["check"]]: true,
-        [styles["checked"]]: !!props.checked,
-      }}
+      class={styles["check-button"]}
       onMouseDown={(event) => {
         props.onChange(event);
       }}
     >
-      <span></span>
+      <div
+        classList={{
+          [styles["check"]]: true,
+          [styles["checked"]]: !!props.checked,
+        }}
+      ></div>
     </button>
   );
 }
