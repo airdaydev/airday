@@ -64,7 +64,7 @@ export class TreeCanvas {
       throw new Error("Failed to retrieve canvasEl context");
     }
     this.resizeCanvas();
-    this.initRenderLoop();
+    this.frame();
     window.addEventListener("resize", this.resizeCanvas);
   }
   setShadowColor = (color: RGB) => {
@@ -86,9 +86,6 @@ export class TreeCanvas {
       this.canvasEl.width / this.scale,
       this.canvasEl.height / this.scale,
     ];
-  }
-  initRenderLoop() {
-    this.frame();
   }
   // bg() {
   //   this.ctx2D.fillStyle = "#f0f0f0";
