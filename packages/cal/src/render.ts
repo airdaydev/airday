@@ -6,10 +6,39 @@
  * Show grid
  */
 
+const getStartOfWeek = (date: Date) => {
+  const dayOfWeek = date.getDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const mondayDate = new Date(date);
+  mondayDate.setDate(date.getDate() - daysSinceMonday);
+  return mondayDate;
+};
+
+const getDate = (date: Date) => {
+  const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const day = days[date.getDay()];
+  const dateMonth = date.getDate();
+  return `${day} ${dateMonth.toString().padStart(2, "0")}`;
+};
+
+const relativeDay = (dateVal: number, relativeDays: number) => {
+  return new Date(dateVal + relativeDays * 864e5);
+};
+
+const getDateArray = (startDate: number, dayCount: number): Date[] => {
+  let arr: Date[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    arr.push(relativeDay(startDate, i));
+  }
+  return arr;
+};
+
 export class Cal {
   canvas?: HTMLCanvasElement;
   ctx2D?: CanvasRenderingContext2D;
   scale = window.devicePixelRatio || 1;
+  dayWidth = 100;
+  zeroDate = getStartOfWeek(new Date());
   constructor() {}
   mount(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -51,13 +80,16 @@ export class Cal {
     // 00:00-24:00
   }
   day() {
-    this.dayLabel();
+    const dates = getDateArray(this.zeroDate.valueOf(), 7);
+    dates.map((date, index) => {
+      this.dayLabel(date, 100 + index * 100);
+    });
   }
-  dayLabel() {
+  dayLabel(date: Date, offset: number = 25) {
     this.ctx2D.fillStyle = "black";
-    this.ctx2D.font = "12px Alte Haas Grotesk";
+    this.ctx2D.font = "14px Alte Haas Grotesk";
     this.ctx2D.textAlign = "center";
-    this.ctx2D.fillText(`Mo 30`, 50, 25);
+    this.ctx2D.fillText(getDate(date), offset, 25);
   }
   cleanUp() {}
 }
