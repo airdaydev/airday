@@ -8,7 +8,7 @@ export default function App() {
   let canvas: HTMLCanvasElement | undefined;
   let cal = new Cal();
   onMount(() => {
-    if (canvas) cal.mount(canvas);
+    if (canvas) cal.mount(canvas, containerEl);
   });
   onCleanup(() => {
     cal.cleanUp();
@@ -17,7 +17,9 @@ export default function App() {
     <>
       <h1>@sunlist/cal</h1>
       <div class={styles["cal-container"]} ref={containerEl}>
-        <div ref={html}></div>
+        <div class={styles["events"]} ref={html}>
+          test
+        </div>
         <canvas ref={canvas} />
       </div>
     </>

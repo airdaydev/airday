@@ -1,8 +1,7 @@
 /**
- * Week start on Mondays (find today, then the nearest monday backwards)
- * Aim for 7 days (or drag for free movement)
+ * Week starts 1 day before today
+ * Aim for 7 days (+ drag for free movement)
  * Buffer 1 day in either direction
- * Proof of concept: Use BIG canvas OR let canvas follow scroll (but account for jump)?
  * Show grid
  */
 
@@ -34,12 +33,16 @@ const getDateArray = (startDate: number, dayCount: number): Date[] => {
 };
 
 export class Cal {
+  container?: HTMLElement;
   canvas?: HTMLCanvasElement;
   _ctx2D?: CanvasRenderingContext2D;
   scale = window.devicePixelRatio || 1;
   timeColWidth = 50;
   dayColWidth = 100;
+  gridOffset = 0;
+  scrollTopOffset = 0;
   margin = 10;
+  resized = false;
   zeroDate = getStartOfWeek(new Date());
   constructor() {}
   get ctx2D() {
@@ -48,7 +51,8 @@ export class Cal {
     }
     return this._ctx2D;
   }
-  mount(canvas: HTMLCanvasElement) {
+  mount(canvas: HTMLCanvasElement, container: HTMLElement) {
+    this.container = container;
     this.canvas = canvas;
     const ctx2D = this.canvas.getContext("2d");
     if (ctx2D) {
@@ -58,7 +62,10 @@ export class Cal {
     }
     this.resizeCanvas();
     this.frame();
-    window.addEventListener("resize", this.resizeCanvas);
+    window.addEventListener("resize", () => (this.resized = true));
+    container.addEventListener("scroll", (event) => {
+      this.scrollTopOffset = container.scrollTop;
+    });
   }
   get dimensions() {
     if (!this.canvas)
@@ -70,18 +77,29 @@ export class Cal {
     this.canvas.width = this.canvas.offsetWidth * this.scale;
     this.canvas.height = this.canvas.offsetHeight * this.scale;
     this.ctx2D.scale(this.scale, this.scale);
-    this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
+    this.dayColWidth = Math.max(
+      (this.canvas.offsetWidth - this.timeColWidth) / 7,
+      100,
+    );
+    this.resized = false;
   };
+  draw() {
+    if (this.resized) {
+      this.resizeCanvas();
+    }
+    this.canvas.style.top = `${this.scrollTopOffset}px`;
+    this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
+    this.times();
+    this.day();
+    this.hzLine(25 + this.margin);
+  }
   frame() {
     requestAnimationFrame((frame) => {
       if (!this.ctx2D) {
         console.warn("Attempted to call frame while canvas not instantiated");
         return;
       }
-      this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
-      this.times();
-      this.day();
-      this.hzLine(25 + this.margin);
+      this.draw();
       this.frame();
     });
   }
