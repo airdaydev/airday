@@ -32,51 +32,77 @@ const getDateArray = (startDate: number, dayCount: number): Date[] => {
   return arr;
 };
 
+function getCanvasContext(canvas: HTMLCanvasElement) {
+  const ctx2D = canvas.getContext("2d");
+  if (!ctx2D) {
+    throw new Error("Failed to retrieve canvas context");
+  }
+  return ctx2D;
+}
+
+const defaultContainerWidth = 100000;
+const scale = window.devicePixelRatio || 1;
+
+function resizeCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = canvas.offsetWidth * scale;
+  canvas.height = canvas.offsetHeight * scale;
+  const ctx2D = getCanvasContext(canvas);
+  ctx2D.scale(scale, scale);
+}
+
+function dimensions(canvas: HTMLCanvasElement) {
+  if (!canvas)
+    throw new Error("Attempted to get non-existent canvas dimensions");
+  return [canvas.width / scale, canvas.height / scale];
+}
+
+function clearCanvas(canvas: HTMLCanvasElement) {
+  const canvasDimensions = dimensions(canvas);
+  getCanvasContext(canvas).clearRect(
+    0,
+    0,
+    canvasDimensions[0],
+    canvasDimensions[1],
+  );
+}
+
 export class Cal {
-  container?: HTMLElement;
-  canvas?: HTMLCanvasElement;
-  _ctx2D?: CanvasRenderingContext2D;
-  scale = window.devicePixelRatio || 1;
+  container: HTMLDivElement;
+  canvas: HTMLCanvasElement;
+  headerCanvas: HTMLCanvasElement;
+  ctx2D: CanvasRenderingContext2D;
+  headerCtx2D: CanvasRenderingContext2D;
+  containerWidth = defaultContainerWidth;
   timeColWidth = 50;
   dayColWidth = 100;
   gridOffset = 0;
-  scrollTopOffset = 0;
+  scrollOffset = [0, defaultContainerWidth / 2];
   margin = 10;
   resized = false;
   zeroDate = getStartOfWeek(new Date());
-  constructor() {}
-  get ctx2D() {
-    if (!this._ctx2D) {
-      throw new Error("CanvasRenderingContext2D doesn't exist");
-    }
-    return this._ctx2D;
-  }
-  mount(canvas: HTMLCanvasElement, container: HTMLElement) {
-    this.container = container;
-    this.canvas = canvas;
-    const ctx2D = this.canvas.getContext("2d");
-    if (ctx2D) {
-      this._ctx2D = ctx2D;
-    } else {
-      throw new Error("Failed to retrieve canvas context");
-    }
+  constructor(mntParams: {
+    container: HTMLDivElement;
+    headerCanvas: HTMLCanvasElement;
+    canvas: HTMLCanvasElement;
+  }) {
+    this.container = mntParams.container;
+    this.headerCanvas = mntParams.headerCanvas;
+    this.canvas = mntParams.canvas;
+    this.ctx2D = getCanvasContext(this.canvas);
+    this.headerCtx2D = getCanvasContext(this.headerCanvas);
     this.resizeCanvas();
     this.frame();
     window.addEventListener("resize", () => (this.resized = true));
-    container.addEventListener("scroll", (event) => {
-      this.scrollTopOffset = container.scrollTop;
+    this.container.addEventListener("scroll", (event) => {
+      this.scrollOffset = [this.container.scrollTop, this.container.scrollLeft];
     });
+    this.resizeCanvas();
+    this.frame();
   }
-  get dimensions() {
-    if (!this.canvas)
-      throw new Error("Attempted to get non-existent canvas dimensions");
-    return [this.canvas.width / this.scale, this.canvas.height / this.scale];
-  }
+  // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
-    if (!this.canvas || !this.ctx2D) return;
-    this.canvas.width = this.canvas.offsetWidth * this.scale;
-    this.canvas.height = this.canvas.offsetHeight * this.scale;
-    this.ctx2D.scale(this.scale, this.scale);
+    resizeCanvas(this.canvas);
+    resizeCanvas(this.headerCanvas);
     this.dayColWidth = Math.max(
       (this.canvas.offsetWidth - this.timeColWidth) / 7,
       100,
@@ -87,8 +113,9 @@ export class Cal {
     if (this.resized) {
       this.resizeCanvas();
     }
-    this.canvas.style.top = `${this.scrollTopOffset}px`;
-    this.ctx2D.clearRect(0, 0, this.dimensions[0], this.dimensions[1]);
+    this.canvas.style.top = `${this.scrollOffset[0]}px`;
+    clearCanvas(this.canvas);
+    clearCanvas(this.headerCanvas);
     this.times();
     this.day();
     this.hzLine(25 + this.margin);
@@ -108,7 +135,8 @@ export class Cal {
     const space = 50;
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
-    this.ctx2D.font = "14px Alte Haas Grotesk";
+    this.ctx2D.fillStyle = "#888";
+    this.ctx2D.font = "11px Alte Haas Grotesk";
     for (let i = 0; i <= 24; i++) {
       this.ctx2D.fillText(
         `${i.toString().padStart(2, "0")}:00`,
@@ -123,18 +151,19 @@ export class Cal {
   day() {
     const dates = getDateArray(this.zeroDate.valueOf(), 7);
     dates.map((date, index) => {
-      this.dayLabel(date, this.timeColWidth + index * this.dayColWidth);
+      const offset = this.timeColWidth + index * this.dayColWidth;
+      this.dayLabel(date, offset);
+      this.vtLine(offset, 25 + this.margin);
     });
   }
   dayLabel(date: Date, offset: number) {
     const text = getDate(date);
-    this.ctx2D.fillStyle = "black";
-    this.ctx2D.font = "14px Alte Haas Grotesk";
-    const textWidth = this.ctx2D.measureText(text).width;
+    this.headerCtx2D.fillStyle = "black";
+    this.headerCtx2D.font = "12px Alte Haas Grotesk";
+    const textWidth = this.headerCtx2D.measureText(text).width;
     const padding = (this.dayColWidth - textWidth) / 2;
-    this.ctx2D.textAlign = "left";
-    this.ctx2D.fillText(text, offset + padding, 25);
-    this.vtLine(offset, 25 + this.margin);
+    this.headerCtx2D.textAlign = "left";
+    this.headerCtx2D.fillText(text, offset + padding, 25);
   }
   hzLine(yOffset: number) {
     this.ctx2D.strokeStyle = "#eee";

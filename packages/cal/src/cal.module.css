@@ -2,12 +2,35 @@
   position: relative;
   width: 100%;
   height: 100%;
-  border: 1px solid black;
+  box-sizing: border-box;
+  border: 1px solid blue;
+}
+
+.header-canvas {
+  position: relative;
+  width: 100%;
+  height: 50px;
   box-sizing: border-box;
   overflow-y: scroll;
 }
 
-.cal-container canvas {
+.grid-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: scroll;
+}
+
+.grid-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 200px;
+}
+
+.grid-canvas {
   position: absolute;
   top: 0;
   left: 0;
