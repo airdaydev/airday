@@ -1,10 +1,3 @@
-/**
- * Week starts 1 day before today
- * Aim for 7 days (+ drag for free movement)
- * Buffer 1 day in either direction
- * Show grid
- */
-
 const getStartOfWeek = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -76,7 +69,8 @@ export class Cal {
   timeColWidth = 50;
   dayColWidth = 100;
   gridOffset = 0;
-  scrollOffset = [0, defaultContainerWidth / 2];
+  scrollOffset = [defaultContainerWidth / 2, 0];
+  // dayAnchor;
   margin = 10;
   resized = false;
   zeroDate = getStartOfWeek(new Date());
@@ -94,7 +88,7 @@ export class Cal {
     this.frame();
     window.addEventListener("resize", () => (this.resized = true));
     this.container.addEventListener("scroll", (event) => {
-      this.scrollOffset = [this.container.scrollTop, this.container.scrollLeft];
+      this.scrollOffset = [this.container.scrollLeft, this.container.scrollTop];
     });
     this.resizeCanvas();
     this.frame();
@@ -113,47 +107,48 @@ export class Cal {
     if (this.resized) {
       this.resizeCanvas();
     }
-    this.canvas.style.top = `${this.scrollOffset[0]}px`;
-    clearCanvas(this.canvas);
+    this.canvas.style.top = `${this.scrollOffset[1]}px`;
     clearCanvas(this.headerCanvas);
+    clearCanvas(this.canvas);
     this.times();
     this.day();
-    this.hzLine(25 + this.margin);
+    this.hzLine(this.headerCtx2D, 25 + this.margin);
+    this.hzLine(this.headerCtx2D, dimensions(this.headerCanvas)[1] - 1);
   }
   frame() {
     requestAnimationFrame((frame) => {
-      if (!this.ctx2D) {
-        console.warn("Attempted to call frame while canvas not instantiated");
-        return;
-      }
       this.draw();
       this.frame();
     });
   }
   times() {
-    const start = 50 + this.margin;
     const space = 50;
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = "#888";
     this.ctx2D.font = "11px Alte Haas Grotesk";
-    for (let i = 0; i <= 24; i++) {
+    const d = dimensions(this.canvas);
+    const y = this.scrollOffset[1];
+    const r = y % space;
+    const start = y - r;
+    const end = start + d[1];
+    console.log(start, end);
+    for (let i = start; i <= end; i++) {
       this.ctx2D.fillText(
         `${i.toString().padStart(2, "0")}:00`,
         this.timeColWidth - this.margin,
-        start + space * i,
+        space * i,
       );
-      this.hzLine(start + space * i);
+      this.hzLine(this.ctx2D, space * i);
     }
-    // Z offset required
-    // 00:00-24:00
   }
   day() {
     const dates = getDateArray(this.zeroDate.valueOf(), 7);
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth;
       this.dayLabel(date, offset);
-      this.vtLine(offset, 25 + this.margin);
+      this.vtLine(this.ctx2D, offset, 0);
+      this.vtLine(this.headerCtx2D, offset, this.margin + 25);
     });
   }
   dayLabel(date: Date, offset: number) {
@@ -165,21 +160,21 @@ export class Cal {
     this.headerCtx2D.textAlign = "left";
     this.headerCtx2D.fillText(text, offset + padding, 25);
   }
-  hzLine(yOffset: number) {
-    this.ctx2D.strokeStyle = "#eee";
-    this.ctx2D.beginPath();
-    this.ctx2D.lineWidth = 1;
-    this.ctx2D.moveTo(this.timeColWidth, yOffset);
-    this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
-    this.ctx2D.stroke();
+  hzLine(ctx: CanvasRenderingContext2D, yOffset: number) {
+    ctx.strokeStyle = "#eee";
+    ctx.beginPath();
+    ctx.lineWidth = 1;
+    ctx.moveTo(this.timeColWidth, yOffset);
+    ctx.lineTo(this.canvas?.offsetWidth, yOffset);
+    ctx.stroke();
   }
-  vtLine(xOffset: number, yStart: number) {
-    this.ctx2D.strokeStyle = "#ddd";
-    this.ctx2D.beginPath();
-    this.ctx2D.lineWidth = 0.75;
-    this.ctx2D.moveTo(xOffset, yStart);
-    this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
-    this.ctx2D.stroke();
+  vtLine(ctx: CanvasRenderingContext2D, xOffset: number, yStart: number) {
+    ctx.strokeStyle = "#ddd";
+    ctx.beginPath();
+    ctx.lineWidth = 0.75;
+    ctx.moveTo(xOffset, yStart);
+    ctx.lineTo(xOffset, this.canvas?.offsetHeight);
+    ctx.stroke();
   }
   cleanUp() {}
 }
