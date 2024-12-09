@@ -6,6 +6,7 @@ interface ContextMenuProps {
   close: () => void;
   children: any;
   anchorRef?: HTMLElement;
+  buttonRef?: HTMLElement;
   offset?: [number, number];
   anchor?: "bottom"; // default === 'top'
   containerZIndex?: number;
@@ -16,23 +17,27 @@ export function ContextMenu(props: ContextMenuProps) {
   const style = createSignal("opacity: 0;");
   const contextMenuDiv = document.getElementById("context-menu");
   const clickOutside = (event: MouseEvent) => {
-    if (!containerRef?.contains(event.target)) {
+    if (
+      !containerRef?.contains(event.target) &&
+      !props.buttonRef?.contains(event.target)
+    ) {
+      console.log(props.buttonRef, event.target);
       event.preventDefault();
       props.close();
     }
   };
   window.addEventListener("mousedown", clickOutside);
-  const closeOneEsc = (event: KeyboardEvent) => {
+  const closeOnEsc = (event: KeyboardEvent) => {
     // TODO: Consider global keyboard handler
     if (event.key === "Escape") {
       props.close();
     }
   };
-  window.addEventListener("keydown", closeOneEsc);
+  window.addEventListener("keydown", closeOnEsc);
   // TODO: Show context menu div
   onCleanup(() => {
     window.removeEventListener("mousedown", clickOutside);
-    window.removeEventListener("keydown", closeOneEsc);
+    window.removeEventListener("keydown", closeOnEsc);
     // TODO: Hide context menu div
   });
   onMount(() => {

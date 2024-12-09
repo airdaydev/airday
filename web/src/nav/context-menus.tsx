@@ -5,6 +5,7 @@ import { Key } from "../generic/key.jsx";
 
 interface SunlistContextMenuProps {
   close: () => void;
+  buttonRef?: HTMLElement;
   offset: [number, number];
   containerZIndex: number;
 }
@@ -17,6 +18,7 @@ export function SunlistContextMenu(props: SunlistContextMenuProps) {
       offset={props.offset}
       anchor="bottom"
       containerZIndex={10}
+      buttonRef={props.buttonRef}
     >
       <button
         onClick={() => {
@@ -53,6 +55,7 @@ export function SunlistContextMenu(props: SunlistContextMenuProps) {
 interface WorkspaceContextMenuProps {
   close: () => void;
   offset: [number, number];
+  buttonRef?: HTMLElement;
 }
 
 export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
@@ -63,6 +66,7 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
       offset={props.offset}
       anchor="bottom"
       containerZIndex={10}
+      buttonRef={props.buttonRef}
     >
       <div>
         {Array.from(session.map.values()).map((workspace) => (

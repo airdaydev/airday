@@ -55,12 +55,14 @@ export const Footer = () => {
         <SunlistContextMenu
           close={() => setCtxOpen(false)}
           offset={ctxOffset()}
+          buttonRef={appButtonRef}
         />
       )}
       {ctxOpen() === "workspace" && (
         <WorkspaceContextMenu
           close={() => setCtxOpen(false)}
           offset={ctxOffset()}
+          buttonRef={workspaceButtonRef}
         />
       )}
       <div class={styles["nav-section"]}>
@@ -68,7 +70,10 @@ export const Footer = () => {
           tabIndex={-1}
           ref={appButtonRef}
           class={styles["nav-button"]}
-          onClick={(event) => openContextMenu(event, "main", appButtonRef)}
+          onmouseup={(event) => {
+            if (ctxOpen()) setCtxOpen(false);
+            else openContextMenu(event, "main", appButtonRef);
+          }}
           onMouseOver={(event) => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
@@ -80,9 +85,10 @@ export const Footer = () => {
           tabIndex={-1}
           ref={workspaceButtonRef}
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
-          onClick={(event) =>
-            openContextMenu(event, "workspace", workspaceButtonRef)
-          }
+          onmouseup={(event) => {
+            if (ctxOpen()) setCtxOpen(false);
+            else openContextMenu(event, "workspace", workspaceButtonRef);
+          }}
           onMouseOver={(event) => {
             if (ctxOpen()) openContextMenu(event, "workspace");
           }}
