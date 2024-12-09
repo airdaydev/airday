@@ -86,6 +86,19 @@ export class Cal {
     });
   }
   times() {
+    const start = 50 + this.margin;
+    const space = 50;
+    this.ctx2D.textAlign = "right";
+    this.ctx2D.textBaseline = "middle";
+    this.ctx2D.font = "14px Alte Haas Grotesk";
+    for (let i = 0; i <= 24; i++) {
+      this.ctx2D.fillText(
+        `${i.toString().padStart(2, "0")}:00`,
+        this.timeColWidth - this.margin,
+        start + space * i,
+      );
+      this.hzLine(start + space * i);
+    }
     // Z offset required
     // 00:00-24:00
   }
@@ -103,13 +116,23 @@ export class Cal {
     const padding = (this.dayColWidth - textWidth) / 2;
     this.ctx2D.textAlign = "left";
     this.ctx2D.fillText(text, offset + padding, 25);
+    this.vtLine(offset, 25 + this.margin);
   }
   hzLine(yOffset: number) {
-    this.ctx2D.strokeStyle = "#ccc";
-    this.ctx2D?.beginPath();
-    this.ctx2D?.moveTo(this.timeColWidth, yOffset);
-    this.ctx2D?.lineTo(this.canvas?.offsetWidth, yOffset);
-    this.ctx2D?.stroke();
+    this.ctx2D.strokeStyle = "#eee";
+    this.ctx2D.beginPath();
+    this.ctx2D.lineWidth = 1;
+    this.ctx2D.moveTo(this.timeColWidth, yOffset);
+    this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
+    this.ctx2D.stroke();
+  }
+  vtLine(xOffset: number, yStart: number) {
+    this.ctx2D.strokeStyle = "#ddd";
+    this.ctx2D.beginPath();
+    this.ctx2D.lineWidth = 0.75;
+    this.ctx2D.moveTo(xOffset, yStart);
+    this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
+    this.ctx2D.stroke();
   }
   cleanUp() {}
 }
