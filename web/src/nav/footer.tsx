@@ -104,7 +104,12 @@ export const Footer = () => {
           <Key key="/" />
           CMD
         </button>
-        <span>SYD 09:55 GMT+10</span>
+        <span
+          style="font-size: 0.9em;
+          padding-left: 0.5rem;"
+        >
+          SYD 09:55 GMT+10
+        </span>
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
