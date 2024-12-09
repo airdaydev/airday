@@ -1,6 +1,7 @@
 import { createSignal, createEffect } from "solid-js";
 import MoonSVG from "../icons/moon.svg?component-solid";
 import SunSVG from "../icons/sun.svg?component-solid";
+import { RGB } from "@sunlist/list";
 
 function setTheme(name: string) {
   document.body.setAttribute("data-theme", name);
@@ -16,6 +17,9 @@ createEffect(() => {
 interface ThemeToggleProps {
   class: string;
 }
+
+export const canvasLightBg: RGB = [240, 240, 240];
+export const canvasDarkBg: RGB = [39, 39, 45];
 
 export const ThemeToggle = (props: ThemeToggleProps) => {
   let Icon = theme[0]() === "dark" ? MoonSVG : SunSVG;

@@ -21,7 +21,6 @@ export function ContextMenu(props: ContextMenuProps) {
       !containerRef?.contains(event.target) &&
       !props.buttonRef?.contains(event.target)
     ) {
-      console.log(props.buttonRef, event.target);
       event.preventDefault();
       props.close();
     }

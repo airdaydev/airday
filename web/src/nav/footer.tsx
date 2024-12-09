@@ -102,8 +102,9 @@ export const Footer = () => {
         >
           <Key key="⌘" />
           <Key key="/" />
-          <TerminalSVG />
+          CMD
         </button>
+        <span>SYD 09:55 GMT+10</span>
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
@@ -138,9 +139,6 @@ export const Footer = () => {
           style={"line-height: 0rem;"}
         >
           <CloudOffSVG />
-        </button>
-        <button class={styles["nav-button"]} tabIndex={-1}>
-          Sync AUD$24/year
         </button>
       </div>
     </footer>

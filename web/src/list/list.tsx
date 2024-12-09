@@ -15,7 +15,7 @@ import { ListHeader } from "./list-header";
 import NullList from "./null-list";
 import { listOptions, ListOptionsContext } from "./list-options";
 import { ListColumnHeaders } from "./list-col-head";
-import { theme } from "../theme/theme";
+import { canvasDarkBg, canvasLightBg, theme } from "../theme/theme";
 
 interface ListProps {
   view: DataView;
@@ -39,9 +39,9 @@ export function List(props: ListProps) {
 
   createEffect(() => {
     if (theme[0]() === "dark") {
-      if (ctx.canvas) ctx.canvas.shadowColor = [39, 39, 45];
+      if (ctx.canvas) ctx.canvas.shadowColor = canvasDarkBg;
     } else {
-      if (ctx.canvas) ctx.canvas.shadowColor = [0, 255, 0];
+      if (ctx.canvas) ctx.canvas.shadowColor = canvasLightBg;
     }
   });
 
