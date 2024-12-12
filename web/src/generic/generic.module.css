@@ -1,19 +1,19 @@
 .key {
-    display: inline-block;
-    text-align: center;
-    font-size: 0.8rem;
-    padding: 0 2px;
-    min-width: 10px;
-    height: 14px;
-    line-height: 1rem;
-    border-radius: 1px;
-    margin-right: 3px;
-    font-family: alte haas grotesk;
+  display: inline-block;
+  text-align: center;
+  font-size: 0.8rem;
+  padding: 0 2px;
+  min-width: 10px;
+  height: 14px;
+  line-height: 1rem;
+  border-radius: 1px;
+  margin-right: 3px;
+  font-family: alte haas grotesk;
 }
 
 [data-theme="light"] .key {
-    background: #e1e1e1;
+  background: #f1f1f1;
 }
 [data-theme="dark"] .key {
-    background: #323232;
+  background: #323232;
 }
