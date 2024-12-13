@@ -59,7 +59,7 @@ function clearCanvas(canvas: HTMLCanvasElement) {
   );
 }
 
-export class Cal {
+export class CalRenderer {
   container: HTMLDivElement;
   canvas: HTMLCanvasElement;
   headerCanvas: HTMLCanvasElement;

@@ -1,16 +1,16 @@
 import styles from "./cal.module.css";
 import { onCleanup, onMount } from "solid-js";
-import { Cal } from "./render";
+import { CalRenderer } from "./render";
 
-export default function App() {
+export function Cal() {
   let html: HTMLDivElement | undefined;
   let container: HTMLDivElement | undefined;
   let headerCanvas: HTMLCanvasElement | undefined;
   let canvas: HTMLCanvasElement | undefined;
-  let cal: Cal;
+  let cal: CalRenderer;
   onMount(() => {
     if (container && headerCanvas && canvas)
-      cal = new Cal({
+      cal = new CalRenderer({
         container,
         headerCanvas,
         canvas,

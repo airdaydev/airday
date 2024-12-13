@@ -54,6 +54,8 @@
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
+- [] Calendar
+- [] Weekly block view
 - [] Editing text inline cursor set correctly.
 - [] Deleting items
 - [] Canvas bg resets WHENEVER container size changes
@@ -100,7 +102,6 @@
 - [] Begin back-end
 - [] Themes incl. Departure Mono
 - [] Shared lists
-- [] Weekly block view
 - [] Monthly view
 - [] Loading pane
 - [] Save views (arrangements of panes)
