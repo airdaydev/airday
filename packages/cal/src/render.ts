@@ -127,13 +127,13 @@ export class CalRenderer {
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = "#888";
     this.ctx2D.font = "11px Alte Haas Grotesk";
-    const d = dimensions(this.canvas);
-    const y = this.scrollOffset[1];
-    const r = y % space;
-    const start = y - r;
-    const end = start + d[1];
-    console.log(start, end);
-    for (let i = start; i <= end; i++) {
+    // const d = dimensions(this.canvas);
+    // const y = this.scrollOffset[1];
+    // const r = y % space;
+    // const start = y - r;
+    // const end = start + d[1];
+    // console.log(start, end);
+    for (let i = 0; i <= 24; i++) {
       this.ctx2D.fillText(
         `${i.toString().padStart(2, "0")}:00`,
         this.timeColWidth - this.margin,

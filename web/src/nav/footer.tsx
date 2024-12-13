@@ -100,16 +100,10 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <Key key="⌘" />
           <Key key="/" />
           CMD
         </button>
-        <span
-          style="font-size: 0.9em;
-          padding-left: 0.5rem;"
-        >
-          SYD 09:55 GMT+10
-        </span>
+        <span>SYD 09:55</span>
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
@@ -134,7 +128,7 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <Key key="/" />
+          <Key key="F" />
           <SearchSVG />
         </button>
         <ThemeToggle class={styles["nav-button"]} />
