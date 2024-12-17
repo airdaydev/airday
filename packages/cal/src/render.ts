@@ -59,6 +59,20 @@ function clearCanvas(canvas: HTMLCanvasElement) {
   );
 }
 
+interface ColourScheme {
+  hzLine: string;
+  vtLine: string;
+  color: string;
+  labels: string;
+}
+
+const defaultColourScheme: ColourScheme = {
+  color: "#000000",
+  labels: "#888",
+  hzLine: "#eee",
+  vtLine: "#ddd",
+};
+
 export class CalRenderer {
   container: HTMLDivElement;
   domContainer: HTMLDivElement;
@@ -67,9 +81,10 @@ export class CalRenderer {
   ctx2D: CanvasRenderingContext2D;
   headerCtx2D: CanvasRenderingContext2D;
   containerWidth = defaultContainerWidth;
+  colourScheme = defaultColourScheme;
   timeColWidth = 50;
   dayColWidth = 100;
-  timeRowHeight = 50;
+  timeRowHeight = 75;
   gridOffset = 0;
   scrollOffset = [defaultContainerWidth / 2, 0];
   // dayAnchor;
@@ -140,7 +155,7 @@ export class CalRenderer {
   times() {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
-    this.ctx2D.fillStyle = "#888";
+    this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.font = "11px Alte Haas Grotesk";
     this.timeSpace();
     const [firstHour, firstHourPx, hrs] = this.timeSpace();
@@ -164,11 +179,23 @@ export class CalRenderer {
       this.dayLabel(date, offset);
       this.vtLine(this.ctx2D, offset, 0);
       this.vtLine(this.headerCtx2D, offset, this.margin + 25);
+
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      if (isWeekend) {
+        // Weekend shading
+        this.ctx2D.fillStyle = "#f7f7f7";
+        this.ctx2D.fillRect(
+          offset,
+          0,
+          this.dayColWidth,
+          this.canvas.offsetHeight,
+        );
+      }
     });
   }
   dayLabel(date: Date, offset: number) {
     const text = getDate(date);
-    this.headerCtx2D.fillStyle = "black";
+    this.headerCtx2D.fillStyle = this.colourScheme.color;
     this.headerCtx2D.font = "12px Alte Haas Grotesk";
     const textWidth = this.headerCtx2D.measureText(text).width;
     const padding = (this.dayColWidth - textWidth) / 2;
@@ -176,7 +203,7 @@ export class CalRenderer {
     this.headerCtx2D.fillText(text, offset + padding, 25);
   }
   hzLine(ctx: CanvasRenderingContext2D, yOffset: number) {
-    ctx.strokeStyle = "#eee";
+    ctx.strokeStyle = this.colourScheme.hzLine;
     ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.moveTo(this.timeColWidth, yOffset);
@@ -184,7 +211,7 @@ export class CalRenderer {
     ctx.stroke();
   }
   vtLine(ctx: CanvasRenderingContext2D, xOffset: number, yStart: number) {
-    ctx.strokeStyle = "#ddd";
+    ctx.strokeStyle = this.colourScheme.vtLine;
     ctx.beginPath();
     ctx.lineWidth = 0.75;
     ctx.moveTo(xOffset, yStart);
