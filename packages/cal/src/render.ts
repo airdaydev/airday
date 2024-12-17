@@ -61,6 +61,7 @@ function clearCanvas(canvas: HTMLCanvasElement) {
 
 export class CalRenderer {
   container: HTMLDivElement;
+  domContainer: HTMLDivElement;
   canvas: HTMLCanvasElement;
   headerCanvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
@@ -68,6 +69,7 @@ export class CalRenderer {
   containerWidth = defaultContainerWidth;
   timeColWidth = 50;
   dayColWidth = 100;
+  timeRowHeight = 50;
   gridOffset = 0;
   scrollOffset = [defaultContainerWidth / 2, 0];
   // dayAnchor;
@@ -76,18 +78,21 @@ export class CalRenderer {
   zeroDate = getStartOfWeek(new Date());
   constructor(mntParams: {
     container: HTMLDivElement;
+    domContainer: HTMLDivElement;
     headerCanvas: HTMLCanvasElement;
     canvas: HTMLCanvasElement;
   }) {
     this.container = mntParams.container;
     this.headerCanvas = mntParams.headerCanvas;
     this.canvas = mntParams.canvas;
+    this.domContainer = mntParams.domContainer;
+    this.domContainer.style.height = `${this.timeRowHeight * 25}px`;
     this.ctx2D = getCanvasContext(this.canvas);
     this.headerCtx2D = getCanvasContext(this.headerCanvas);
     this.resizeCanvas();
     this.frame();
     window.addEventListener("resize", () => (this.resized = true));
-    this.container.addEventListener("scroll", (event) => {
+    this.container.addEventListener("scroll", () => {
       this.scrollOffset = [this.container.scrollLeft, this.container.scrollTop];
     });
     this.resizeCanvas();
@@ -116,30 +121,40 @@ export class CalRenderer {
     this.hzLine(this.headerCtx2D, dimensions(this.headerCanvas)[1] - 1);
   }
   frame() {
-    requestAnimationFrame((frame) => {
+    requestAnimationFrame(() => {
       this.draw();
       this.frame();
     });
   }
+  timeSpace() {
+    const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
+    const minYClip = this.scrollOffset[1] - viewBuffer;
+    const r = minYClip % this.timeRowHeight;
+    const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
+    const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
+    const hours = Math.floor(
+      (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
+    );
+    return [firstHour, firstHourPx - viewBuffer, hours];
+  }
   times() {
-    const space = 50;
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = "#888";
     this.ctx2D.font = "11px Alte Haas Grotesk";
-    // const d = dimensions(this.canvas);
-    // const y = this.scrollOffset[1];
-    // const r = y % space;
-    // const start = y - r;
-    // const end = start + d[1];
-    // console.log(start, end);
-    for (let i = 0; i <= 24; i++) {
-      this.ctx2D.fillText(
-        `${i.toString().padStart(2, "0")}:00`,
-        this.timeColWidth - this.margin,
-        space * i,
-      );
-      this.hzLine(this.ctx2D, space * i);
+    this.timeSpace();
+    const [firstHour, firstHourPx, hrs] = this.timeSpace();
+    let pxOffset = firstHourPx;
+    for (let i = firstHour; i <= firstHour + hrs; i++) {
+      if (i >= 1 && i <= 24) {
+        this.ctx2D.fillText(
+          `${i.toString().padStart(2, "0")}:00`,
+          this.timeColWidth - this.margin,
+          pxOffset,
+        );
+      }
+      this.hzLine(this.ctx2D, pxOffset);
+      pxOffset += this.timeRowHeight;
     }
   }
   day() {
