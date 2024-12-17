@@ -18,20 +18,19 @@ export function Cal() {
       });
   });
   onCleanup(() => {
-    if (cal) cal.cleanUp();
+    if (cal) {
+      cal.cleanUp();
+    }
   });
   return (
-    <>
-      <h1>@sunlist/cal</h1>
-      <div class={styles["cal-container"]}>
-        <canvas ref={headerCanvas} class={styles["header-canvas"]} />
-        <div class={styles["grid-container"]} ref={container}>
-          <div class="grid-scroll">
-            <div class={styles["events"]} ref={domContainer} />
-          </div>
-          <canvas class={styles["grid-canvas"]} ref={canvas} />
+    <div class={styles["cal-container"]}>
+      <canvas ref={headerCanvas} class={styles["header-canvas"]} />
+      <div class={styles["grid-container"]} ref={container}>
+        <div class="grid-scroll">
+          <div class={styles["events"]} ref={domContainer} />
         </div>
+        <canvas class={styles["grid-canvas"]} ref={canvas} />
       </div>
-    </>
+    </div>
   );
 }

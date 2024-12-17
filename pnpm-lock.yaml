@@ -78,6 +78,9 @@ importers:
 
   web:
     dependencies:
+      '@sunlist/cal':
+        specifier: workspace:^
+        version: link:../packages/cal
       '@sunlist/keyboard':
         specifier: workspace:^
         version: link:../packages/keyboard
@@ -1041,6 +1044,7 @@ packages:
 
   boolean@3.2.0:
     resolution: {integrity: sha512-d0II/GO9uf9lfUHH2BQsjxzRJZBdsjgsBiW4BvhWk/3qoKwQFjIDVN19PfX8F2D/r9PCMTtLWjYVCFrpeYUzsw==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   browserslist@4.23.0:
     resolution: {integrity: sha512-QW8HiM1shhT2GuzkvklfjcKDiWFXHOeFCIA/huJPwHsslwcydgk7X+z2zXpEijP98UCY7HbubZt5J2Zgvf0CaQ==}

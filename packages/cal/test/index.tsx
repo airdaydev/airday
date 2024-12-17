@@ -5,4 +5,12 @@ import { Cal } from "../src/cal.tsx";
 
 const root = document.getElementById("root");
 
-render(() => <Cal />, root!);
+render(
+  () => (
+    <div style="width: 100%;height: 100%;">
+      <h1>@sunlist/cal demo</h1>
+      <Cal />
+    </div>
+  ),
+  root!,
+);

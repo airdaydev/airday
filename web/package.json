@@ -16,6 +16,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@sunlist/cal": "workspace:^",
     "@sunlist/keyboard": "workspace:^",
     "@sunlist/list": "workspace:^",
     "fractional-indexing": "^3.2.0",
