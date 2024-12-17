@@ -10,7 +10,7 @@ import CheckSVG from "../icons/check.svg?component-solid";
 import ArrowRightSVG from "../icons/arrow-right.svg?component-solid";
 
 interface ListHeaderProps {
-  container: SunlistContainer;
+  container: AirContainer;
   view: DataView;
 }
 

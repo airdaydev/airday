@@ -1,14 +1,14 @@
-import { encodeShortcut } from "@sunlist/keyboard";
-import { SunlistSession, SunlistWorkspace } from "../store/main";
+import { encodeShortcut } from "@air-app/keyboard";
+import { AirSession, AirWorkspace } from "../store/main";
 import { ViewState } from "./state";
 import { defaultMapping } from "./mapping";
 
-export function toggleSidebar(session: SunlistSession) {
+export function toggleSidebar(session: AirSession) {
   session.viewState.toggleSidebar();
 }
 
 export class KeyboardShortcuts {
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
   viewState: ViewState;
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();
   globalHandlerActive = true;
@@ -16,7 +16,7 @@ export class KeyboardShortcuts {
   stopKeys = new Set<KeyboardEvent["key"]>();
   buffer: string[] = [];
   vimKeys = true;
-  constructor(workspace: SunlistWorkspace, viewState: ViewState) {
+  constructor(workspace: AirWorkspace, viewState: ViewState) {
     this.workspace = workspace;
     this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {

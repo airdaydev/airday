@@ -3,14 +3,14 @@ import { sessionContext } from "../store/context.js";
 import { ContextMenu } from "../context-menu/context-menu";
 import { Key } from "../generic/key.jsx";
 
-interface SunlistContextMenuProps {
+interface AirContextMenuProps {
   close: () => void;
   buttonRef?: HTMLElement;
   offset: [number, number];
   containerZIndex: number;
 }
 
-export function SunlistContextMenu(props: SunlistContextMenuProps) {
+export function AirContextMenu(props: AirContextMenuProps) {
   const session = useContext(sessionContext);
   return (
     <ContextMenu
@@ -46,7 +46,7 @@ export function SunlistContextMenu(props: SunlistContextMenuProps) {
         <span>Download apps</span>
       </button>
       <button disabled>
-        <span>About SunList</span>
+        <span>About Air Organiser</span>
       </button>
     </ContextMenu>
   );
@@ -123,7 +123,7 @@ export function AccountContextMenu(props: AccountContextMenuProps) {
 
 interface NavItemContextMenuProps {
   close: () => void;
-  container: Accessor<SunlistContainer>;
+  container: Accessor<AirContainer>;
   offset: [number, number];
 }
 

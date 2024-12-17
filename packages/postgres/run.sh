@@ -3,10 +3,10 @@
 
 WORK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-CONTAINER=sunlist_postgres
-DB_NAME=sunlist_dev
-NETWORK_NAME=sunlist
-USER=sunlist_dev
+CONTAINER=air_postgres
+DB_NAME=air_dev
+NETWORK_NAME=air
+USER=air_dev
 # Using non-standard port as it conflicts with my day job
 PORT=5430
 

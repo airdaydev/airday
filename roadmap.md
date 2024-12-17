@@ -1,4 +1,4 @@
-# Sunlist Roadmap
+# Air Roadmap
 
 ## 2024 Q3
 - [x] Bring back item view
@@ -50,7 +50,7 @@
 - [x] splitting non container list horizontally/vertically etc breaks
 - [x] Bug: moving pane with keyboard doesn't make nested list active
 - [x] Splitting horizontal on root doesn't create a border
-- [x] sunlist/@list -> sunlist/@tree conversion
+- [x] @air-app/list -> @air-app/tree conversion
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
@@ -76,7 +76,7 @@
 - [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
-- [] host front-end on cloudflare pages initially (sunlist-private + opentofu)
+- [] host front-end on cloudflare pages initially (air-private + opentofu)
 - [] consider a flash or something more obvious when switching panes
 - [] Deselect nav bar items when leaving focus
 - [ ] list switcher to switch between open files (opt+tab)
@@ -87,7 +87,7 @@
 - [ ] on context click of nav item, select the list
 - [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
 - [ ] drag sidebar to resize
-- [ ] sunlist - experiment with sounds
+- [ ] air - experiment with sounds
 - [ ] add initial habit item
 - [ ] open performance list, add filters/configuration
 - [ ] open priority list (added by reference, no move!)
@@ -186,7 +186,7 @@
 - [] PWA update strategy
 - [] Automated testing story
 - [] Paid web service with introductory prices
-- [] Opens immediately into application, landing page at about.sunlist.app
+- [] Opens immediately into application, landing page at air.day/about
 - [] Consider license type for copyleft (reselling no)
 - [] Custom Themes / compact mode
 - [] Spanish (EU) localisation

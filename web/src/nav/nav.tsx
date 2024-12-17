@@ -10,10 +10,10 @@ import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
-import { SoloNode } from "@sunlist/list";
+import { SoloNode } from "@air-app/list";
 import { DoneView } from "../view/state";
 
-export function SunlistNav() {
+export function AirNav() {
   const session = useContext(sessionContext);
   const [sidebarVisible] = session.viewState.sidebarVisible;
   let ref: HTMLDivElement | undefined;

@@ -8,7 +8,7 @@ import {
   Show,
   useContext,
 } from "solid-js";
-import { NodeComponentType } from "@sunlist/list";
+import { NodeComponentType } from "@air-app/list";
 import { Checkbox } from "./checkbox";
 import styles from "./item.module.css";
 import { ItemContextMenu } from "./context-menu";

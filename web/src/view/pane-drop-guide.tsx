@@ -1,7 +1,7 @@
 import { createSignal, onMount, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { DataView } from "./state";
-import { TreeContext } from "@sunlist/list";
+import { TreeContext } from "@air-app/list";
 import { sessionContext } from "../store/context";
 
 interface PaneDropDOMRect extends DOMRect {

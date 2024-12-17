@@ -1,3 +1,3 @@
-## @sunlist/cal
+## @air-app/cal
 
-Calendar front-end powering Sunlist's calendar
+Calendar front-end powering Air Organiser's calendar

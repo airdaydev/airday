@@ -2,5 +2,5 @@
 
 export interface Trx {
   type: "check";
-  item: SunlistItem;
+  item: AirItem;
 }

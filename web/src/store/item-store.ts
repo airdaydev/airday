@@ -1,4 +1,4 @@
-import { SunlistIDB } from "./main";
+import { AirDB } from "./main";
 import { Queue } from "./queue";
 import { Trx } from "./trx";
 
@@ -7,12 +7,12 @@ import { Trx } from "./trx";
  */
 export class ItemStore {
   storeName = "item";
-  sundb: SunlistIDB | null = null;
+  sundb: AirDB | null = null;
   queue = new Queue<Trx>();
-  init = (db: SunlistIDB) => {
+  init = (db: AirDB) => {
     this.sundb = db;
   };
-  upgrade = (db: SunlistIDB) => {
+  upgrade = (db: AirDB) => {
     const itemStore = db.createObjectStore(this.storeName, {
       keyPath: "id",
     });
@@ -31,10 +31,10 @@ export class ItemStore {
    * Insert new tasks, generating a new key
    * @param data
    */
-  insert = async (data: SunlistItem | SunlistItem[]) => {
+  insert = async (data: AirItem | AirItem[]) => {
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
-    const insert = async (item: SunlistItem) => {
+    const insert = async (item: AirItem) => {
       const prev = await store.get(item.id);
       if (prev) throw new Error("Key already exists");
       const val = await store.add(item);
@@ -47,7 +47,7 @@ export class ItemStore {
     }
     await tx.done;
   };
-  getItemsByList = async (listId: string): Promise<SunlistItem[]> => {
+  getItemsByList = async (listId: string): Promise<AirItem[]> => {
     if (!listId) {
       console.warn("attempted to getItemsByList with null listId");
       return [];
@@ -60,7 +60,7 @@ export class ItemStore {
     );
     return items;
   };
-  loadCompletedItems = async (fromDate?: Date): Promise<SunlistItem[]> => {
+  loadCompletedItems = async (fromDate?: Date): Promise<AirItem[]> => {
     if (!this.db) {
       throw new Error("Item store not initialised.");
     }
@@ -71,13 +71,13 @@ export class ItemStore {
     return items;
   };
   // Generic update
-  update = async (id: string, attributes: Partial<SunlistItem>) => {
+  update = async (id: string, attributes: Partial<AirItem>) => {
     const item = await this.db.get(this.storeName, id);
     const updated = { ...item, ...attributes };
     this.queue.enqueue({ type: "update", item: updated });
     await this.db.put(this.storeName, updated).catch((err) => console.log(err));
   };
-  move = async (id: string, attributes: Partial<SunlistItem>) => {};
+  move = async (id: string, attributes: Partial<AirItem>) => {};
   remove = async (id: string) => {
     if (!this.db) {
       throw new Error("Item store not initialised.");

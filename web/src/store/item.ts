@@ -1,9 +1,9 @@
-import { Node, GenericNode } from "@sunlist/list";
+import { Node, GenericNode } from "@air-app/list";
 import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
-import { SunlistWorkspace } from "./main";
+import { AirWorkspace } from "./main";
 import { Debouncer } from "./utils";
 
 const GenericItemSchema = v.object({
@@ -25,12 +25,12 @@ export class GenericItem extends Node {
   sticker: string | null = null;
   content?: string;
   component = GenericComponent;
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
   justChecked = false;
   justCheckedRef?: () => void;
 
   static validate = compile(GenericItemSchema, { simple: true });
-  constructor(props: GenericItemSchema, workspace: SunlistWorkspace) {
+  constructor(props: GenericItemSchema, workspace: AirWorkspace) {
     super(props);
     this.id = props.id || createUniqueId();
     this.content = props.content;
@@ -93,7 +93,7 @@ export class GenericItem extends Node {
   }
 }
 
-export function itemLoader(workspace: SunlistWorkspace) {
+export function itemLoader(workspace: AirWorkspace) {
   return function loader(data: any) {
     // if (data.type === "generic") {
     const validated = GenericItem.validate(data);

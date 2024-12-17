@@ -1,15 +1,15 @@
 import { ItemStore } from "./item-store";
 import { itemLoader } from "./item";
-import { SunlistWorkspace } from "./main";
-import { TreeState } from "@sunlist/list";
+import { AirWorkspace } from "./main";
+import { TreeState } from "@air-app/list";
 import { Trx } from "./trx";
 
 export class List {
   store: ItemStore;
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
   tree: TreeState;
   id: string;
-  constructor(id: string, store: ItemStore, workspace: SunlistWorkspace) {
+  constructor(id: string, store: ItemStore, workspace: AirWorkspace) {
     this.id = id;
     this.store = store;
     this.workspace = workspace;

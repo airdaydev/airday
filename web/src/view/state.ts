@@ -1,6 +1,6 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/item";
-import { SunlistWorkspace } from "../store/main";
+import { AirWorkspace } from "../store/main";
 import { KeyboardShortcuts } from "./keyboard";
 
 type ActiveRegionType = "sidebar" | "container";
@@ -46,10 +46,10 @@ export class ViewNode {
   setDocumentTitle() {
     const titleText = this.title;
     if (titleText) {
-      document.title = `${titleText} - Sunlist`;
+      document.title = `${titleText} - Air Organiser`;
       return;
     }
-    document.title = "Sunlist";
+    document.title = "Air Organiser";
   }
   getIndexShallow() {
     if (!this.parent) return -1;
@@ -310,10 +310,10 @@ export class ViewState {
   tree = new RootViewNode();
   scene = createSignal<Scene>("default");
   focus?: GenericItem;
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
   keyboard: KeyboardShortcuts;
   paneDropView?: ViewNode; // This is the currently selected pane being dragged
-  constructor(workspace: SunlistWorkspace) {
+  constructor(workspace: AirWorkspace) {
     this.workspace = workspace;
     this.keyboard = new KeyboardShortcuts(workspace, this);
   }

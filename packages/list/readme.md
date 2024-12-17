@@ -1,6 +1,6 @@
-# @sunlist/tree
+# @air-app/tree
 
-An interactive tree system including store & UI component for SolidJS written for sunlist.app. Drag & drop, virtualised, static height per element.
+An interactive tree system including store & UI component for SolidJS written for air organiser. Drag & drop, virtualised, static height per element.
 
 ## Features
 - Drag and drop placeholders via underlaid canvas, same size as item.

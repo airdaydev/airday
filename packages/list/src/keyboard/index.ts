@@ -1,4 +1,4 @@
-import { encodeShortcut } from "@sunlist/keyboard";
+import { encodeShortcut } from "@air-app/keyboard";
 import { DndContext } from "../dnd-context";
 import { defaultMapping, vimMapping } from "./mapping";
 

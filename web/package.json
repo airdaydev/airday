@@ -1,7 +1,7 @@
 {
-  "name": "sunlist-web",
+  "name": "@air-app/web",
   "version": "0.0.1",
-  "description": "Sunlist productivity app",
+  "description": "Air Organiser",
   "scripts": {
     "start": "vite --host 0.0.0.0 --port 8000",
     "dev": "vite",
@@ -16,9 +16,9 @@
   },
   "type": "module",
   "dependencies": {
-    "@sunlist/cal": "workspace:^",
-    "@sunlist/keyboard": "workspace:^",
-    "@sunlist/list": "workspace:^",
+    "@air-app/cal": "workspace:^",
+    "@air-app/keyboard": "workspace:^",
+    "@air-app/list": "workspace:^",
     "fractional-indexing": "^3.2.0",
     "idb": "^7.1.1",
     "solid-js": "^1.8.22",

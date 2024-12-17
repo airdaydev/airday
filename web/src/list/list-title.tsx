@@ -3,7 +3,7 @@ import { keyboardShortcuts } from "../keyboard";
 import { moveCaretToPosition } from "./utils";
 
 interface EditableListTitleProps {
-  container: Signal<SunlistContainer>;
+  container: Signal<AirContainer>;
 }
 
 export const EditableListTitle = (props: EditableListTitleProps) => {

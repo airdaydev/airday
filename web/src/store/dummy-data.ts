@@ -2,8 +2,8 @@ import { generateNKeysBetween } from "fractional-indexing";
 import { GenericItem } from "./item";
 import { createUniqueId } from "solid-js";
 
-export const sunlistItems = [
-  "Sunlist",
+export const airItems = [
+  "Air Organiser",
   "Wrap handlebars with Cinelli wrap",
   "GET CAR SERVICED 02 xxxx xxxx",
   "https://openstax.org/details/books/precalculus-2e",
@@ -32,7 +32,7 @@ export function genTestData(listId: string, tasks: string[]): GenericItem[] {
 
 // export function simulateNetwork(listId: string) {
 //     const next = Math.random() * 10000;
-//     const index = Math.round(sunlistItems.length * Math.random());
+//     const index = Math.round(airItems.length * Math.random());
 //     setTimeout(() => store.insert({
 //         id: nanoid(),
 //         text: tasks[index],

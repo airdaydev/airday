@@ -1,10 +1,10 @@
 import { IDBPDatabase, openDB, deleteDB } from "idb";
 import { ItemStore } from "./item-store";
 import { ContainerStore } from "./container-store";
-import { genTestData, sunlistItems, taskItems } from "./dummy-data";
+import { genTestData, airItems, taskItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
-import { DndContext, ListStateContext, TreeState } from "@sunlist/list";
+import { DndContext, ListStateContext, TreeState } from "@air-app/list";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 import { List } from "./list";
@@ -13,11 +13,11 @@ import { UpNext } from "./up-next";
 const schemaVersion = 1;
 
 interface DBTypes {
-  items: Sunlist;
-  lists: SunlistContainer;
+  items: AirItems;
+  lists: AirContainer;
 }
 
-export type SunlistIDB = IDBPDatabase<DBTypes>;
+export type AirDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage =
   "DB not loaded, pre-load buffer not yet implemented";
 
@@ -34,10 +34,10 @@ const workspaceCache = v.object({
 /**
  * Session & workspace store
  */
-export class SunlistSession {
+export class AirSession {
   userId: string = "anonymous";
-  map = new Map<string, SunlistWorkspace>();
-  workspace = new SunlistWorkspace(this);
+  map = new Map<string, AirWorkspace>();
+  workspace = new AirWorkspace(this);
   viewState = new ViewState(this.workspace);
   constructor() {
     window.session = this;
@@ -58,7 +58,7 @@ export class SunlistSession {
     if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
       console.log("found existing workspaces");
       parsed.workspaces?.forEach((workspace) => {
-        this.map.set(workspace.id, new SunlistWorkspace(this, workspace));
+        this.map.set(workspace.id, new AirWorkspace(this, workspace));
       });
       if (parsed.activeWorkspace) {
         this.open(parsed.activeWorkspace);
@@ -108,8 +108,8 @@ export class SunlistSession {
 // Primary local persistence layer for a workspace
 // Handles one workspace concurrently
 // Each workspace has a separate idb connection
-export class SunlistWorkspace {
-  db: SunlistIDB | null = null;
+export class AirWorkspace {
+  db: AirDB | null = null;
   itemStore = new ItemStore();
   containerStore = new ContainerStore(this);
   id: string = createUniqueId();
@@ -121,11 +121,11 @@ export class SunlistWorkspace {
   dndContext = new DndContext({ enableKeyboard: false });
   historical: HistoricalItems;
   upNext: UpNext;
-  app: SunlistSession;
+  app: AirSession;
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
   }
-  constructor(app: SunlistSession, workspace?: { id: string; name: string }) {
+  constructor(app: AirSession, workspace?: { id: string; name: string }) {
     this.app = app;
     if (workspace) {
       this.id = workspace.id;
@@ -171,7 +171,7 @@ export class SunlistWorkspace {
   };
   dummyData = async () => {
     const items = [
-      ...genTestData("work", sunlistItems),
+      ...genTestData("work", airItems),
       ...genTestData("tasks", taskItems),
     ];
     await this.itemStore.insert(items);
@@ -193,7 +193,7 @@ export class SunlistWorkspace {
         children: [
           {
             id: "long",
-            name: "A Sunlist list with more characters",
+            name: "An Air list with more characters",
             icon: "red",
             sortKey: "c",
             type: "generic-list",

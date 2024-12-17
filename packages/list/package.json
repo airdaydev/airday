@@ -1,5 +1,5 @@
 {
-  "name": "@sunlist/list",
+  "name": "@air-app/list",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@sunlist/keyboard": "workspace:^",
+    "@air-app/keyboard": "workspace:^",
     "solid-js": "^1.8.15",
     "vitest": "^2.0.5"
   },

@@ -1,4 +1,4 @@
-interface SunlistItem {
+interface AirItem {
   id: string;
   text: string;
   tsCreated: Date;
@@ -8,7 +8,7 @@ interface SunlistItem {
   listId: string;
 }
 
-interface SunlistContainer {
+interface AirContainer {
   id: string;
   name: string;
   sortKey: string;
@@ -29,20 +29,20 @@ type OrderedKey = [string, string, string];
 
 type FastListType = "trash" | "upNext" | "container" | "done";
 
-interface SunlistViewBase {
+interface AirViewBase {
   id: string;
   type: FastListType;
 }
 
 // TODO: Finish these, useful for type checking
-interface SunlistContainerView extends SunlistViewBase {
+interface AirContainerView extends AirViewBase {
   containerId: string;
   type: "container";
   projection: "list" | "kanban";
 }
 
-interface SunlistDoneView extends SunlistViewBase {
+interface AirDoneView extends AirViewBase {
   type: "done";
 }
 
-type SunlistView = SunlistContainerView | SunlistDoneView;
+type AirView = AirContainerView | AirDoneView;

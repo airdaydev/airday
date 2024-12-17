@@ -1,4 +1,4 @@
-# Sunlist API
+# Air API
 
 ## Modules
 - Authentication & key management

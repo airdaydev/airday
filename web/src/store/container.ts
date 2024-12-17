@@ -1,4 +1,4 @@
-import { Node, GenericNode } from "@sunlist/list";
+import { Node, GenericNode } from "@air-app/list";
 import { ContainerNodeComponent, FolderNodeComponent } from "../nav/nav-lists";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";

@@ -1,14 +1,14 @@
 import { createSignal } from "solid-js";
-import { SunlistIDB, SunlistWorkspace } from "./main";
+import { AirDB, AirWorkspace } from "./main";
 import {
   DndContext,
   TreeContext,
   ListStateContext,
   TreeState,
-} from "@sunlist/list";
+} from "@air-app/list";
 import { containerLoader, ContainerNode } from "./container";
 
-export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
+export const [containers, setContainers] = createSignal<AirContainer[]>([]);
 
 // Structure:
 // 1. signal(list of signal(items)) (sorted index)
@@ -22,19 +22,19 @@ export const [containers, setContainers] = createSignal<SunlistContainer[]>([]);
  */
 export class ContainerStore {
   storeName = "container";
-  sundb: SunlistIDB | null = null;
+  sundb: AirDB | null = null;
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
   tree: TreeState;
-  workspace: SunlistWorkspace;
-  constructor(workspace: SunlistWorkspace) {
+  workspace: AirWorkspace;
+  constructor(workspace: AirWorkspace) {
     this.workspace = workspace;
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
   getNavDnd = () => {
     return this.dndContext.listContexts.values().next().value as TreeContext;
   };
-  init = async (db: SunlistIDB) => {
+  init = async (db: AirDB) => {
     this.sundb = db;
   };
   load = async () => {
@@ -46,7 +46,7 @@ export class ContainerStore {
       this.workspace.app.viewState.openDataView(defaultContainer.id);
     }
   };
-  upgrade = (db: SunlistIDB) => {
+  upgrade = (db: AirDB) => {
     db.createObjectStore(this.storeName, {
       keyPath: "id",
     });
@@ -89,10 +89,10 @@ export class ContainerStore {
     }
     await this.db.delete(this.storeName, id);
   };
-  idb_insert = async (data: SunlistContainer | SunlistContainer[]) => {
+  idb_insert = async (data: AirContainer | AirContainer[]) => {
     const tx = this.db.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
-    const insert = async (item: SunlistContainer) => {
+    const insert = async (item: AirContainer) => {
       const prev = await store.get(item.id);
       if (prev) throw new Error("Key already exists");
       const val = await store.add(item);
@@ -105,7 +105,7 @@ export class ContainerStore {
     }
     await tx.done;
   };
-  getLists = async (): Promise<SunlistItem[]> => {
+  getLists = async (): Promise<AirItem[]> => {
     const items = await this.db.getAll(this.storeName);
     return items;
   };

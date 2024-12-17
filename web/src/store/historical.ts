@@ -1,14 +1,14 @@
 import { ItemStore } from "./item-store";
 import { GenericItem, itemLoader } from "./item";
-import { SunlistWorkspace } from "./main";
-import { TreeState } from "@sunlist/list";
+import { AirWorkspace } from "./main";
+import { TreeState } from "@air-app/list";
 import { Trx } from "./trx";
 
 export class HistoricalItems {
   store: ItemStore;
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
   tree: TreeState;
-  constructor(store: ItemStore, workspace: SunlistWorkspace) {
+  constructor(store: ItemStore, workspace: AirWorkspace) {
     this.store = store;
     this.workspace = workspace;
     this.tree = new TreeState({ loader: itemLoader(workspace) });

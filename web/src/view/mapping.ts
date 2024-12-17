@@ -1,10 +1,10 @@
-import { encodeShortcut } from "@sunlist/keyboard";
+import { encodeShortcut } from "@air-app/keyboard";
 import { ViewState } from "./state";
-import { SunlistWorkspace } from "../store/main";
+import { AirWorkspace } from "../store/main";
 
 export type ShortcutFunction = (ctx: {
   viewState: ViewState;
-  workspace: SunlistWorkspace;
+  workspace: AirWorkspace;
 }) => void;
 
 export const defaultMapping = new Map<string, ShortcutFunction>([

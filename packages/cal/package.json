@@ -1,5 +1,5 @@
 {
-  "name": "@sunlist/cal",
+  "name": "@air-app/cal",
   "main": "dist/cal.js",
   "private": true,
   "version": "0.0.0",

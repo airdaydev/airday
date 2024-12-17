@@ -7,7 +7,7 @@ import TerminalSVG from "../icons/terminal.svg?component-solid";
 import SidebarSVG from "../icons/rainbow.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
-import { SunlistContextMenu, WorkspaceContextMenu } from "./context-menus";
+import { AirContextMenu, WorkspaceContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 import { Key } from "../generic/key.jsx";
 
@@ -52,7 +52,7 @@ export const Footer = () => {
   return (
     <footer class={styles.footer}>
       {ctxOpen() === "main" && (
-        <SunlistContextMenu
+        <AirContextMenu
           close={() => setCtxOpen(false)}
           offset={ctxOffset()}
           buttonRef={appButtonRef}
@@ -79,7 +79,7 @@ export const Footer = () => {
           }}
         >
           <SidebarSVG />
-          <span style={"margin-left: 0.25em; display: none;"}>SunList</span>
+          <span style={"margin-left: 0.25em; display: none;"}>Air</span>
         </button>
         <button
           tabIndex={-1}

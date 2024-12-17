@@ -1,9 +1,9 @@
 import { useContext, Switch, Match } from "solid-js";
-import { SunlistNav } from "./nav/nav";
+import { AirNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { PaneRegion } from "./view/view";
 import { Footer } from "./nav/footer";
-import { Dragged } from "@sunlist/list";
+import { Dragged } from "@air-app/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
 
@@ -23,7 +23,7 @@ export function App() {
             <Dragged dndContext={session.workspace.containerStore.dndContext} />
           )}
           <div class={styles.main}>
-            <SunlistNav />
+            <AirNav />
             <PaneRegion tree={session.viewState.tree} />
           </div>
           <Footer />
