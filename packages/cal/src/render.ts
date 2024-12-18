@@ -126,6 +126,7 @@ export class CalRenderer {
   margin = 10;
   resized = false;
   zeroDate = getStartOfWeek(new Date());
+  lastAction: number = performance.now();
   constructor(mntParams: {
     container: HTMLDivElement;
     domContainer: HTMLDivElement;
@@ -143,11 +144,13 @@ export class CalRenderer {
     this.frame();
     window.addEventListener("resize", () => (this.resized = true));
     this.container.addEventListener("scroll", () => {
+      this.act();
       this.transform.offset[1] = this.container.scrollTop;
     });
     this.resizeCanvas();
     this.frame();
   }
+  act = () => (this.lastAction = performance.now());
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
@@ -172,7 +175,9 @@ export class CalRenderer {
   }
   frame() {
     requestAnimationFrame(() => {
-      this.draw();
+      if (performance.now() - this.lastAction < 1000) {
+        this.draw();
+      }
       this.frame();
     });
   }

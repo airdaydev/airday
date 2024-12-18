@@ -35,8 +35,6 @@ const oneWeekFromNow = new Date(new Date().setDate(new Date().getDate() + 7));
 
 const events = createSignal(dummyEvents(oneWeekAgo));
 
-console.log(events[0]());
-
 render(
   () => (
     <div id="app-container">
