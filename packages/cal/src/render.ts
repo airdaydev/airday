@@ -195,17 +195,6 @@ export class CalRenderer {
       pxOffset += this.transform.hourPx;
     }
   }
-  daySpace() {
-    // const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
-    // const minYClip = this.scrollOffset[1] - viewBuffer;
-    // const r = minYClip % this.timeRowHeight;
-    // const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
-    // const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
-    // const hours = Math.floor(
-    //   (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
-    // );
-    // return [firstHour, firstHourPx - viewBuffer, hours];
-  }
   day() {
     const dates = getDateArray(this.zeroDate.valueOf(), 7);
     dates.map((date, index) => {
