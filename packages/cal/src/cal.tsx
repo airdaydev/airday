@@ -21,6 +21,7 @@ export function Cal(props: CalendarProps) {
         canvas,
         domContainer,
       });
+    // TODO: Register events here
   });
   onCleanup(() => {
     if (cal) {
@@ -35,7 +36,10 @@ export function Cal(props: CalendarProps) {
           <div class={styles["events"]} ref={domContainer}>
             <For each={props.events[0]()}>
               {(item, index) => (
-                <div class={styles["event"]} style={"top: 0; left: 0"}>
+                <div
+                  class={styles["event"]}
+                  style={`top: ${cal?.transform.timeToY(item.start) || 0}px; left: 0`}
+                >
                   Event {item.label}
                 </div>
               )}

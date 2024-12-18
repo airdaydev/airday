@@ -97,7 +97,11 @@ class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
-  timeToY() {}
+  timeToY(date: Date) {
+    const hours = date.getHours() * this.hourPx;
+    const min = (date.getMinutes() * this.hourPx) / 60;
+    return hours + min - this.offset[1];
+  }
   YToTime() {}
   XToDay() {}
   DayToX() {}
