@@ -114,7 +114,6 @@ export class CalRenderer {
   colourScheme = defaultColourScheme;
   timeColWidth = 50;
   dayColWidth = 100;
-  timeRowHeight = 60;
   gridOffset = 0;
   transform = new CalendarTransform();
   timeFormat: TimeFormat = "24hr";
@@ -133,7 +132,7 @@ export class CalRenderer {
     this.headerCanvas = mntParams.headerCanvas;
     this.canvas = mntParams.canvas;
     this.domContainer = mntParams.domContainer;
-    this.domContainer.style.height = `${this.timeRowHeight * 25}px`;
+    this.domContainer.style.height = `${this.transform.hourPx * 25}px`;
     this.ctx2D = getCanvasContext(this.canvas);
     this.headerCtx2D = getCanvasContext(this.headerCanvas);
     this.resizeCanvas();
@@ -193,7 +192,7 @@ export class CalRenderer {
         );
       }
       this.hzLine(this.ctx2D, pxOffset);
-      pxOffset += this.timeRowHeight;
+      pxOffset += this.transform.hourPx;
     }
   }
   daySpace() {
