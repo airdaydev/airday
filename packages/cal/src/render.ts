@@ -79,6 +79,30 @@ const defaultColourScheme: ColourScheme = {
 
 type TimeFormat = "24hr" | "12hr";
 
+class CalendarTransform {
+  origin = 0; // i.e. day
+  offset = [0, 0];
+  hourPx = 50; // 1 hour = 50px
+  get hourViewBuffer() {
+    // Hours visible outside view in each direction (-/+)
+    return this.hourPx * 2;
+  }
+  getVisibleHours() {
+    const minYClip = this.offset[1] - this.hourViewBuffer;
+    const r = minYClip % this.hourPx;
+    const firstHourPx = this.hourPx - r; // The first hour position within clip space
+    const firstHour = (minYClip + firstHourPx) / this.hourPx;
+    return [firstHour, firstHourPx - this.hourViewBuffer];
+  }
+  hoursVisible(viewportHeight: number) {
+    return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
+  }
+  timeToY() {}
+  YToTime() {}
+  XToDay() {}
+  DayToX() {}
+}
+
 export class CalRenderer {
   container: HTMLDivElement;
   domContainer: HTMLDivElement;
@@ -92,6 +116,7 @@ export class CalRenderer {
   dayColWidth = 100;
   timeRowHeight = 60;
   gridOffset = 0;
+  transform = new CalendarTransform();
   timeFormat: TimeFormat = "24hr";
   scrollOffset = [defaultContainerWidth / 2, 0];
   // dayAnchor;
@@ -115,7 +140,7 @@ export class CalRenderer {
     this.frame();
     window.addEventListener("resize", () => (this.resized = true));
     this.container.addEventListener("scroll", () => {
-      this.scrollOffset = [this.container.scrollLeft, this.container.scrollTop];
+      this.transform.offset[1] = this.container.scrollTop;
     });
     this.resizeCanvas();
     this.frame();
@@ -148,26 +173,18 @@ export class CalRenderer {
       this.frame();
     });
   }
-  timeSpace() {
-    const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
-    const minYClip = this.scrollOffset[1] - viewBuffer;
-    const r = minYClip % this.timeRowHeight;
-    const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
-    const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
-    const hours = Math.floor(
-      (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
-    );
-    return [firstHour, firstHourPx - viewBuffer, hours];
-  }
   times() {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.font = "11px Alte Haas Grotesk";
-    this.timeSpace();
-    const [firstHour, firstHourPx, hrs] = this.timeSpace();
+    const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx;
-    for (let i = firstHour; i <= firstHour + hrs; i++) {
+    for (
+      let i = firstHour;
+      i <= firstHour + this.transform.hoursVisible(this.container.offsetHeight);
+      i++
+    ) {
       if (i >= 1 && i <= 24) {
         this.ctx2D.fillText(
           `${i.toString().padStart(2, "0")}:00`,
