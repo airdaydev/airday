@@ -25,8 +25,8 @@ export function Cal() {
   return (
     <div class={styles["cal-container"]}>
       <canvas ref={headerCanvas} class={styles["header-canvas"]} />
-      <div class={styles["grid-container"]} ref={container}>
-        <div class="grid-scroll">
+      <div class={styles["grid-container"]}>
+        <div class={styles["grid-scroll"]} ref={container}>
           <div class={styles["events"]} ref={domContainer} />
         </div>
         <canvas class={styles["grid-canvas"]} ref={canvas} />

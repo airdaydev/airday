@@ -77,6 +77,8 @@ const defaultColourScheme: ColourScheme = {
   vtLine: "#ddd",
 };
 
+type TimeFormat = "24hr" | "12hr";
+
 export class CalRenderer {
   container: HTMLDivElement;
   domContainer: HTMLDivElement;
@@ -90,6 +92,7 @@ export class CalRenderer {
   dayColWidth = 100;
   timeRowHeight = 60;
   gridOffset = 0;
+  timeFormat: TimeFormat = "24hr";
   scrollOffset = [defaultContainerWidth / 2, 0];
   // dayAnchor;
   margin = 10;
@@ -131,7 +134,6 @@ export class CalRenderer {
     if (this.resized) {
       this.resizeCanvas();
     }
-    this.canvas.style.top = `${this.scrollOffset[1]}px`;
     clearCanvas(this.headerCanvas);
     clearCanvas(this.canvas);
     this.day();
@@ -178,15 +180,15 @@ export class CalRenderer {
     }
   }
   daySpace() {
-    const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
-    const minYClip = this.scrollOffset[1] - viewBuffer;
-    const r = minYClip % this.timeRowHeight;
-    const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
-    const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
-    const hours = Math.floor(
-      (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
-    );
-    return [firstHour, firstHourPx - viewBuffer, hours];
+    // const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
+    // const minYClip = this.scrollOffset[1] - viewBuffer;
+    // const r = minYClip % this.timeRowHeight;
+    // const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
+    // const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
+    // const hours = Math.floor(
+    //   (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
+    // );
+    // return [firstHour, firstHourPx - viewBuffer, hours];
   }
   day() {
     const dates = getDateArray(this.zeroDate.valueOf(), 7);
