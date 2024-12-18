@@ -11,7 +11,7 @@ import "@air-app/cal/dist/cal.css";
 export const Calendar = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
   return (
-    <div style="width: 100%; height: 100%;">
+    <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
       <CalendarHeader view={props.view} />
       <Cal />
     </div>
