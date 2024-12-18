@@ -33,6 +33,10 @@ function getCanvasContext(canvas: HTMLCanvasElement) {
   return ctx2D;
 }
 
+function isWeekend(date: Date) {
+  return date.getDay() === 0 || date.getDay() === 6;
+}
+
 const defaultContainerWidth = 100000;
 const scale = window.devicePixelRatio || 1;
 
@@ -84,7 +88,7 @@ export class CalRenderer {
   colourScheme = defaultColourScheme;
   timeColWidth = 50;
   dayColWidth = 100;
-  timeRowHeight = 75;
+  timeRowHeight = 60;
   gridOffset = 0;
   scrollOffset = [defaultContainerWidth / 2, 0];
   // dayAnchor;
@@ -130,8 +134,9 @@ export class CalRenderer {
     this.canvas.style.top = `${this.scrollOffset[1]}px`;
     clearCanvas(this.headerCanvas);
     clearCanvas(this.canvas);
-    this.times();
     this.day();
+    this.allDayLabel();
+    this.times();
     this.hzLine(this.headerCtx2D, 25 + this.margin);
     this.hzLine(this.headerCtx2D, dimensions(this.headerCanvas)[1] - 1);
   }
@@ -172,16 +177,22 @@ export class CalRenderer {
       pxOffset += this.timeRowHeight;
     }
   }
+  daySpace() {
+    const viewBuffer = this.timeRowHeight * 2; // render further up and down outside visible container
+    const minYClip = this.scrollOffset[1] - viewBuffer;
+    const r = minYClip % this.timeRowHeight;
+    const firstHourPx = this.timeRowHeight - r; // The first hour position within clip space
+    const firstHour = (minYClip + firstHourPx) / this.timeRowHeight;
+    const hours = Math.floor(
+      (this.container.offsetHeight + viewBuffer * 2) / this.timeRowHeight,
+    );
+    return [firstHour, firstHourPx - viewBuffer, hours];
+  }
   day() {
     const dates = getDateArray(this.zeroDate.valueOf(), 7);
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth;
-      this.dayLabel(date, offset);
-      this.vtLine(this.ctx2D, offset, 0);
-      this.vtLine(this.headerCtx2D, offset, this.margin + 25);
-
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      if (isWeekend) {
+      if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = "#f7f7f7";
         this.ctx2D.fillRect(
@@ -190,8 +201,26 @@ export class CalRenderer {
           this.dayColWidth,
           this.canvas.offsetHeight,
         );
+        this.headerCtx2D.fillStyle = "#f7f7f7";
+        this.headerCtx2D.fillRect(
+          offset,
+          this.margin + 25,
+          this.dayColWidth,
+          this.canvas.offsetHeight,
+        );
       }
+      this.dayLabel(date, offset);
+      this.vtLine(this.ctx2D, offset, 0);
+      this.vtLine(this.headerCtx2D, offset, this.margin + 25);
     });
+  }
+  allDayLabel() {
+    this.headerCtx2D.fillStyle = this.colourScheme.color;
+    this.headerCtx2D.font = "12px Alte Haas Grotesk";
+    this.headerCtx2D.textAlign = "right";
+    this.headerCtx2D.textBaseline = "middle";
+    this.headerCtx2D.fillStyle = this.colourScheme.labels;
+    this.headerCtx2D.fillText("all-day", this.timeColWidth - this.margin, 55); // TODO: Fix magic number
   }
   dayLabel(date: Date, offset: number) {
     const text = getDate(date);

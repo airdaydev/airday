@@ -7,7 +7,7 @@ const root = document.getElementById("root");
 
 render(
   () => (
-    <div style="width: 100%;height: 100%;">
+    <div id="app-container">
       <h1>@air-app/cal demo</h1>
       <Cal />
     </div>
