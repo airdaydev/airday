@@ -1,0 +1,3 @@
+class Quadtree {
+  constructor() {}
+}

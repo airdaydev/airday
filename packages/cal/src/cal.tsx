@@ -1,8 +1,13 @@
 import styles from "./cal.module.css";
-import { onCleanup, onMount } from "solid-js";
+import { For, onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
+import { CalendarEvent } from "./event";
 
-export function Cal() {
+interface CalendarProps {
+  events: Signal<CalendarEvent[]>;
+}
+
+export function Cal(props: CalendarProps) {
   let domContainer: HTMLDivElement | undefined;
   let container: HTMLDivElement | undefined;
   let headerCanvas: HTMLCanvasElement | undefined;
@@ -27,7 +32,15 @@ export function Cal() {
       <canvas ref={headerCanvas} class={styles["header-canvas"]} />
       <div class={styles["grid-container"]}>
         <div class={styles["grid-scroll"]} ref={container}>
-          <div class={styles["events"]} ref={domContainer} />
+          <div class={styles["events"]} ref={domContainer}>
+            <For each={props.events[0]()}>
+              {(item, index) => (
+                <div class={styles["event"]} style={"top: 0; left: 0"}>
+                  Event {item.label}
+                </div>
+              )}
+            </For>
+          </div>
         </div>
         <canvas class={styles["grid-canvas"]} ref={canvas} />
       </div>
