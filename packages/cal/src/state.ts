@@ -1,13 +1,13 @@
 import { CalendarEvent, CalendarEventConstructorProps } from "./event";
-import IntervalTree from "@flatten-js/interval-tree";
+import IntervalTree, { NumericTuple } from "@flatten-js/interval-tree";
 
 export class EventDB {
   idMap = new Map<string, CalendarEvent>();
-  intervalTree = new IntervalTree();
+  tree = new IntervalTree(); // TODO: Split per calendar?
   constructor() {}
   indexEvent(event: CalendarEvent) {
-    const range = {};
-    this.intervalTree.insert([1, 2], event);
+    const range: NumericTuple = [event.start.valueOf(), event.end.valueOf()];
+    this.tree.insert(range, event.id);
   }
   loadEvents(sEvents: CalendarEventConstructorProps[]) {
     for (let sEvent of sEvents) {
@@ -15,5 +15,15 @@ export class EventDB {
       this.indexEvent(event);
       this.idMap.set(event.id, event);
     }
+  }
+  getEvents(startDate: Date, endDate: Date) {
+    const range: NumericTuple = [startDate.valueOf(), endDate.valueOf()];
+    const ids = this.tree.search(range);
+    const set: CalendarEvent[] = [];
+    ids.forEach((id) => {
+      const event = this.idMap.get(id);
+      if (event) set.push(event);
+    });
+    return set;
   }
 }

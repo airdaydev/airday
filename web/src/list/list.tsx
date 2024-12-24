@@ -9,7 +9,7 @@ import {
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
 import { DataView } from "../view/state";
-import { Tree, SolidListContext, TreeContext } from "@air-app/list";
+import { Tree, SolidListContext, TreeContext } from "@airday/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";
 import NullList from "./null-list";

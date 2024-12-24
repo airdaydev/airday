@@ -1,7 +1,7 @@
 import { createSignal, createEffect } from "solid-js";
 import MoonSVG from "../icons/moon.svg?component-solid";
 import SunSVG from "../icons/sun.svg?component-solid";
-import { RGB } from "@air-app/list";
+import { RGB } from "@airday/list";
 
 function setTheme(name: string) {
   document.body.setAttribute("data-theme", name);

@@ -5,7 +5,7 @@ import {
   TreeContext,
   ListStateContext,
   TreeState,
-} from "@air-app/list";
+} from "@airday/list";
 import { containerLoader, ContainerNode } from "./container";
 
 export const [containers, setContainers] = createSignal<AirContainer[]>([]);

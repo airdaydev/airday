@@ -1,6 +1,6 @@
-## @air-app/cal
+## @airday/cal
 
-Calendar front-end powering Air Organiser's calendar
+Calendar front-end powering Airday's calendar
 
 ## Roadmap
 - [x] Idle render check to save battery etc

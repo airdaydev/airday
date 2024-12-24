@@ -1,4 +1,4 @@
-import { encodeShortcut } from "@air-app/keyboard";
+import { encodeShortcut } from "@airday/keyboard";
 import { ViewState } from "./state";
 import { AirWorkspace } from "../store/main";
 

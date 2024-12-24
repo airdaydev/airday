@@ -14,7 +14,7 @@ import {
   collapseNode,
 } from "./behaviour";
 import { TreeContext } from "../dnd-context";
-import { encodeShortcut } from "@air-app/keyboard";
+import { encodeShortcut } from "@airday/keyboard";
 
 export type ShortcutFunction = (ctx: TreeContext) => void;
 

@@ -10,7 +10,7 @@ import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
-import { SoloNode } from "@air-app/list";
+import { SoloNode } from "@airday/list";
 import { DoneView } from "../view/state";
 
 export function AirNav() {

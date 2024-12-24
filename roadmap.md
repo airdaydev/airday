@@ -50,7 +50,7 @@
 - [x] splitting non container list horizontally/vertically etc breaks
 - [x] Bug: moving pane with keyboard doesn't make nested list active
 - [x] Splitting horizontal on root doesn't create a border
-- [x] @air-app/list -> @air-app/tree conversion
+- [x] @airday/list -> @airday/tree conversion
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline

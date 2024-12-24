@@ -1,7 +1,7 @@
 import { ItemStore } from "./item-store";
 import { itemLoader } from "./item";
 import { AirWorkspace } from "./main";
-import { TreeState } from "@air-app/list";
+import { TreeState } from "@airday/list";
 import { Trx } from "./trx";
 
 export class List {

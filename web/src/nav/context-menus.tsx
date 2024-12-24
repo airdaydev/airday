@@ -46,7 +46,7 @@ export function AirContextMenu(props: AirContextMenuProps) {
         <span>Download apps</span>
       </button>
       <button disabled>
-        <span>About Air Organiser</span>
+        <span>About Airday</span>
       </button>
     </ContextMenu>
   );

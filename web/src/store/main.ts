@@ -4,7 +4,7 @@ import { ContainerStore } from "./container-store";
 import { genTestData, airItems, taskItems } from "./dummy-data";
 import { v, compile } from "suretype";
 import { createUniqueId } from "solid-js";
-import { DndContext, ListStateContext, TreeState } from "@air-app/list";
+import { DndContext, ListStateContext, TreeState } from "@airday/list";
 import { DataView, ViewState } from "../view/state";
 import { HistoricalItems } from "./historical";
 import { List } from "./list";

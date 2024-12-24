@@ -35,12 +35,12 @@ export function Cal(props: CalendarProps) {
         <div class={styles["grid-scroll"]} ref={container}>
           <div class={styles["events"]} ref={domContainer}>
             <For each={props.events[0]()}>
-              {(item, index) => (
+              {(item) => (
                 <div
                   class={styles["event"]}
                   style={`top: ${cal?.transform.timeToY(item.start) || 0}px; left: 0`}
                 >
-                  Event {item.label}
+                  Event {item.title}
                 </div>
               )}
             </For>

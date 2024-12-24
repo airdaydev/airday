@@ -1,7 +1,7 @@
 {
-  "name": "@air-app/web",
+  "name": "@airday/web",
   "version": "0.0.1",
-  "description": "Air Organiser",
+  "description": "Airday",
   "scripts": {
     "start": "vite --host 0.0.0.0 --port 8000",
     "dev": "vite",
@@ -16,9 +16,9 @@
   },
   "type": "module",
   "dependencies": {
-    "@air-app/cal": "workspace:^",
-    "@air-app/keyboard": "workspace:^",
-    "@air-app/list": "workspace:^",
+    "@airday/cal": "workspace:^",
+    "@airday/keyboard": "workspace:^",
+    "@airday/list": "workspace:^",
     "fractional-indexing": "^3.2.0",
     "idb": "^7.1.1",
     "solid-js": "^1.8.22",

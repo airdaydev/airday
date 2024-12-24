@@ -2,10 +2,10 @@ import { createSignal, onCleanup, onMount, useContext } from "solid-js";
 import { ListIcon } from "../list/list-icon";
 import { sessionContext } from "../store/context.js";
 import { NavItemContextMenu } from "./context-menus";
-import { NodeComponentType } from "@air-app/list";
+import { NodeComponentType } from "@airday/list";
 import styles from "./nav.module.css";
 import FolderSVG from "../icons/folder.svg?component-solid";
-import { TreeContext, SolidListContext, Tree } from "@air-app/list";
+import { TreeContext, SolidListContext, Tree } from "@airday/list";
 import { DataView } from "../view/state";
 import { ContainerFolderNode, ContainerNode } from "../store/container";
 
