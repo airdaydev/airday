@@ -111,9 +111,7 @@ export class CalRenderer {
   container: HTMLDivElement;
   domContainer: HTMLDivElement;
   canvas: HTMLCanvasElement;
-  headerCanvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
-  headerCtx2D: CanvasRenderingContext2D;
   containerWidth = defaultContainerWidth;
   colourScheme = defaultColourScheme;
   timeColWidth = 50;
@@ -127,37 +125,64 @@ export class CalRenderer {
   resized = false;
   zeroDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
-  constructor(mntParams: {
-    container: HTMLDivElement;
-    domContainer: HTMLDivElement;
-    headerCanvas: HTMLCanvasElement;
-    canvas: HTMLCanvasElement;
-  }) {
-    this.container = mntParams.container;
-    this.headerCanvas = mntParams.headerCanvas;
-    this.canvas = mntParams.canvas;
-    this.domContainer = mntParams.domContainer;
+  constructor(container: HTMLDivElement) {
+    const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
+    this.container = scrollable;
+    this.canvas = canvas;
+    this.domContainer = scrollChild;
     this.domContainer.style.height = `${this.transform.hourPx * 25}px`;
-    this.ctx2D = getCanvasContext(this.canvas);
-    this.headerCtx2D = getCanvasContext(this.headerCanvas);
+    this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
     window.addEventListener("resize", () => {
       this.resized = true;
       this.act();
     });
-    this.container.addEventListener("scroll", () => {
+    scrollable.addEventListener("scroll", () => {
       this.act();
       this.transform.offset[1] = this.container.scrollTop;
     });
     this.resizeCanvas();
     this.frame();
   }
+  mount = (container: HTMLElement) => {
+    // Scrollable area
+    const scrollable = document.createElement("div");
+    scrollable.id = "airday_scrollable";
+    scrollable.style.position = "absolute";
+    scrollable.style.top = "0";
+    scrollable.style.left = "0";
+    scrollable.style.width = "100%";
+    scrollable.style.height = "100%";
+    scrollable.style.overflow = "scroll";
+    scrollable.style.zIndex = "10";
+    scrollable.style.overscrollBehaviorY = "none";
+    // Scrolling content (empty)
+    const scrollChild = document.createElement("div");
+    scrollChild.id = "airday_scroll_child";
+    // Canvas (sits behind)
+    const canvas = document.createElement("canvas");
+    canvas.style.position = "absolute";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    const ctx2D = getCanvasContext(canvas);
+    // Attach everything
+    scrollable.append(scrollChild);
+    container.appendChild(scrollable);
+    container.appendChild(canvas);
+    return {
+      scrollable,
+      scrollChild,
+      canvas,
+      ctx2D,
+    };
+  };
   act = () => (this.lastAction = performance.now());
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
-    resizeCanvas(this.headerCanvas);
     this.dayColWidth = Math.max(
       (this.canvas.offsetWidth - this.timeColWidth) / 7,
       100,
@@ -168,13 +193,12 @@ export class CalRenderer {
     if (this.resized) {
       this.resizeCanvas();
     }
-    clearCanvas(this.headerCanvas);
     clearCanvas(this.canvas);
     this.day();
     this.allDayLabel();
     this.times();
-    this.hzLine(this.headerCtx2D, 25 + this.margin);
-    this.hzLine(this.headerCtx2D, dimensions(this.headerCanvas)[1] - 1);
+    this.hzLine(this.ctx2D, 25 + this.margin);
+    this.hzLine(this.ctx2D, dimensions(this.canvas)[1] - 1);
   }
   frame() {
     requestAnimationFrame(() => {
@@ -220,35 +244,28 @@ export class CalRenderer {
           this.dayColWidth,
           this.canvas.offsetHeight,
         );
-        this.headerCtx2D.fillStyle = "#f7f7f7";
-        this.headerCtx2D.fillRect(
-          offset,
-          this.margin + 25,
-          this.dayColWidth,
-          this.canvas.offsetHeight,
-        );
       }
       this.dayLabel(date, offset);
       this.vtLine(this.ctx2D, offset, 0);
-      this.vtLine(this.headerCtx2D, offset, this.margin + 25);
+      this.vtLine(this.ctx2D, offset, this.margin + 25);
     });
   }
   allDayLabel() {
-    this.headerCtx2D.fillStyle = this.colourScheme.color;
-    this.headerCtx2D.font = "12px Alte Haas Grotesk";
-    this.headerCtx2D.textAlign = "right";
-    this.headerCtx2D.textBaseline = "middle";
-    this.headerCtx2D.fillStyle = this.colourScheme.labels;
-    this.headerCtx2D.fillText("all-day", this.timeColWidth - this.margin, 55); // TODO: Fix magic number
+    this.ctx2D.fillStyle = this.colourScheme.color;
+    this.ctx2D.font = "12px Alte Haas Grotesk";
+    this.ctx2D.textAlign = "right";
+    this.ctx2D.textBaseline = "middle";
+    this.ctx2D.fillStyle = this.colourScheme.labels;
+    this.ctx2D.fillText("all-day", this.timeColWidth - this.margin, 55); // TODO: Fix magic number
   }
   dayLabel(date: Date, offset: number) {
     const text = getDate(date);
-    this.headerCtx2D.fillStyle = this.colourScheme.color;
-    this.headerCtx2D.font = "12px Alte Haas Grotesk";
-    const textWidth = this.headerCtx2D.measureText(text).width;
+    this.ctx2D.fillStyle = this.colourScheme.color;
+    this.ctx2D.font = "12px Alte Haas Grotesk";
+    const textWidth = this.ctx2D.measureText(text).width;
     const padding = (this.dayColWidth - textWidth) / 2;
-    this.headerCtx2D.textAlign = "left";
-    this.headerCtx2D.fillText(text, offset + padding, 25);
+    this.ctx2D.textAlign = "left";
+    this.ctx2D.fillText(text, offset + padding, 25);
   }
   hzLine(ctx: CanvasRenderingContext2D, yOffset: number) {
     ctx.strokeStyle = this.colourScheme.hzLine;

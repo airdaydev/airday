@@ -1,7 +1,7 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
 import "./index.css";
-import { Cal, CalendarEvent } from "../src/index";
+import { CalSolidWrapper, CalendarEvent } from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
 
 const root = document.getElementById("root");
@@ -39,7 +39,7 @@ render(
   () => (
     <div id="app-container">
       <h1>@airday/cal demo</h1>
-      <Cal events={events} />
+      <CalSolidWrapper />
     </div>
   ),
   root!,
