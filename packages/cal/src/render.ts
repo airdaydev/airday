@@ -121,8 +121,8 @@ class CalendarTransform {
 }
 
 export class CalRenderer {
-  container: HTMLDivElement;
-  domContainer: HTMLDivElement;
+  scrollable: HTMLDivElement;
+  scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   containerWidth = defaultContainerWidth;
@@ -134,17 +134,16 @@ export class CalRenderer {
   transform = new CalendarTransform();
   timeFormat: TimeFormat = "24hr";
   scrollOffset = [defaultContainerWidth / 2, 0];
-  // dayAnchor;
   margin = 10;
   resized = false;
-  zeroDate = getStartOfWeek(new Date());
+  midDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   constructor(container: HTMLDivElement) {
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
-    this.container = scrollable;
+    this.scrollable = scrollable;
     this.canvas = canvas;
-    this.domContainer = scrollChild;
-    this.domContainer.style.height = `${this.transform.hourPx * 25 + this.gridOffset[1]}px`;
+    this.scrollChild = scrollChild;
+    this.scrollChild.style.height = `${this.transform.hourPx * 25 + this.gridOffset[1]}px`;
     this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
@@ -154,7 +153,7 @@ export class CalRenderer {
     });
     scrollable.addEventListener("scroll", () => {
       this.act();
-      this.transform.offset[1] = this.container.scrollTop;
+      this.transform.offset[1] = this.scrollable.scrollTop;
     });
     this.resizeCanvas();
     this.frame();
@@ -168,12 +167,13 @@ export class CalRenderer {
     scrollable.style.left = "0";
     scrollable.style.width = "100%";
     scrollable.style.height = "100%";
-    scrollable.style.overflow = "scroll";
+    scrollable.style.overflowY = "scroll";
     scrollable.style.zIndex = "10";
     scrollable.style.overscrollBehaviorY = "none";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
+    scrollChild.style.width = `${365 * this.dayColWidth}px`;
     // Canvas (sits behind)
     const canvas = document.createElement("canvas");
     canvas.style.position = "absolute";
@@ -204,10 +204,8 @@ export class CalRenderer {
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
-    this.dayColWidth = Math.max(
-      (this.canvas.offsetWidth - this.timeColWidth) / 7,
-      100,
-    );
+    this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
+    // this.scrollable.scrollTo(this.midPoint(), 0);
     this.resized = false;
   };
   get gridOffset() {
@@ -218,7 +216,7 @@ export class CalRenderer {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const dates = getDateArray(this.zeroDate.valueOf(), 7);
+    const dates = getDateArray(this.midDate.valueOf(), 7);
     this.days(dates);
     this.times();
     this.header(dates);
@@ -262,7 +260,8 @@ export class CalRenderer {
     let pxOffset = firstHourPx + this.gridOffset[1];
     for (
       let i = firstHour;
-      i <= firstHour + this.transform.hoursVisible(this.container.offsetHeight);
+      i <=
+      firstHour + this.transform.hoursVisible(this.scrollable.offsetHeight);
       i++
     ) {
       if (i >= 1 && i <= 24) {
@@ -299,7 +298,7 @@ export class CalRenderer {
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.fillText(
-      "all-day",
+      "All day",
       this.timeColWidth - this.margin,
       this.headerHeight + this.allDayRowHeight / 2,
     );

@@ -6,9 +6,9 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Idle render check to save battery etc
 - [x] cal event y position
 - [x] strip solidjs
-- [] single canvas element, laid out properly
+- [x] single canvas element, laid out properly
+- [] scroll x position: start by getting week / day width
 - [] Render calendar events in correct position
-- [] scroll x position
 - [] TODAY label style
 - [] Move between weeks/days
 - [] Quadtree collision detection
