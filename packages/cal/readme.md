@@ -4,6 +4,10 @@ Calendar front-end powering Air Organiser's calendar
 
 ## Roadmap
 - [x] Idle render check to save battery etc
+- [x] cal event y position
+- [] cal event position/size update on resize
+- [] scroll x position
+- [] cal event x position
 - [] Add events
 - [] TODAY label style
 - [] Move between weeks/days

@@ -142,7 +142,10 @@ export class CalRenderer {
     this.headerCtx2D = getCanvasContext(this.headerCanvas);
     this.resizeCanvas();
     this.frame();
-    window.addEventListener("resize", () => (this.resized = true));
+    window.addEventListener("resize", () => {
+      this.resized = true;
+      this.act();
+    });
     this.container.addEventListener("scroll", () => {
       this.act();
       this.transform.offset[1] = this.container.scrollTop;

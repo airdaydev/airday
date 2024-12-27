@@ -58,4 +58,8 @@
 
 .event {
   position: absolute;
+  width: 200px;
+  height: 50px;
+  background: #eee;
+  border-radius: 3px;
 }
