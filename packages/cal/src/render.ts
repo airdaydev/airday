@@ -237,9 +237,21 @@ export class CalRenderer {
     this.allDayLabel();
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth;
+      if (isWeekend(date)) {
+        // Weekend shading
+        this.ctx2D.fillStyle = this.colourScheme.shade;
+        this.ctx2D.fillRect(
+          offset,
+          this.headerHeight,
+          this.dayColWidth,
+          this.gridOffset[1],
+        );
+      }
       this.dayLabel(date, offset);
+      this.vtLine(offset, this.headerHeight);
     });
-    // this.hzLine(ctx, yOffset)
+    this.hzLine(this.headerHeight);
+    this.hzLine(this.gridOffset[1]);
   }
   times() {
     this.ctx2D.textAlign = "right";
@@ -278,7 +290,6 @@ export class CalRenderer {
         );
       }
       this.vtLine(offset, 0);
-      this.vtLine(offset, this.margin + 25);
     });
   }
   allDayLabel() {
