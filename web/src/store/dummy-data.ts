@@ -3,7 +3,7 @@ import { GenericItem } from "./item";
 import { createUniqueId } from "solid-js";
 
 export const airItems = [
-  "Air Organiser",
+  "Airday",
   "Wrap handlebars with Cinelli wrap",
   "GET CAR SERVICED 02 xxxx xxxx",
   "https://openstax.org/details/books/precalculus-2e",

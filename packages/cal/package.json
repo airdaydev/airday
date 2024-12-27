@@ -1,5 +1,5 @@
 {
-  "name": "@air-app/cal",
+  "name": "@airday/cal",
   "main": "dist/cal.js",
   "private": true,
   "version": "0.0.0",

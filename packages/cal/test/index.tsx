@@ -38,7 +38,7 @@ const events = createSignal(dummyEvents(oneWeekAgo));
 render(
   () => (
     <div id="app-container">
-      <h1>@air-app/cal demo</h1>
+      <h1>@airday/cal demo</h1>
       <Cal events={events} />
     </div>
   ),

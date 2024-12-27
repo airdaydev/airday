@@ -1,4 +1,4 @@
-import { encodeShortcut } from "@air-app/keyboard";
+import { encodeShortcut } from "@airday/keyboard";
 import { AirSession, AirWorkspace } from "../store/main";
 import { ViewState } from "./state";
 import { defaultMapping } from "./mapping";

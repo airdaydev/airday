@@ -46,10 +46,10 @@ export class ViewNode {
   setDocumentTitle() {
     const titleText = this.title;
     if (titleText) {
-      document.title = `${titleText} - Air Organiser`;
+      document.title = `${titleText} - Airday`;
       return;
     }
-    document.title = "Air Organiser";
+    document.title = "Airday";
   }
   getIndexShallow() {
     if (!this.parent) return -1;

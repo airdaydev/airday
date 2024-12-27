@@ -3,7 +3,7 @@ import { AirNav } from "./nav/nav";
 import styles from "./app.module.css";
 import { PaneRegion } from "./view/view";
 import { Footer } from "./nav/footer";
-import { Dragged } from "@air-app/list";
+import { Dragged } from "@airday/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
 

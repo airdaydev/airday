@@ -1,4 +1,4 @@
-import { Node, GenericNode } from "@air-app/list";
+import { Node, GenericNode } from "@airday/list";
 import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";

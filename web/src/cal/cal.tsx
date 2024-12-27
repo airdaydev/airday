@@ -2,8 +2,8 @@ import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { DataView } from "../view/state";
 import { CalendarHeader } from "../list/list-header";
-import { Cal } from "@air-app/cal";
-import "@air-app/cal/dist/cal.css";
+import { Cal } from "@airday/cal";
+import "@airday/cal/dist/cal.css";
 
 /**
  * Initially, a weekly view.
