@@ -5,16 +5,14 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 ## Roadmap
 - [x] Idle render check to save battery etc
 - [x] cal event y position
-- [] strip solidjs
-- [] single canvas element
-- [] strip signal?
-- [] cal event position/size update on resize
+- [x] strip solidjs
+- [] single canvas element, laid out properly
+- [] Render calendar events in correct position
 - [] scroll x position
-- [] cal event x position
-- [] Add events
 - [] TODAY label style
 - [] Move between weeks/days
 - [] Quadtree collision detection
+- [] Drag and drop calendar events
 - [] Labels that register as objects with behaviour
 - [] Day view
 - [] Change between 12/24hr time
