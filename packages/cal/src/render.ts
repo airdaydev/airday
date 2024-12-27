@@ -64,24 +64,37 @@ function clearCanvas(canvas: HTMLCanvasElement) {
 }
 
 interface ColourScheme {
+  bg: string;
   hzLine: string;
   vtLine: string;
   color: string;
   labels: string;
+  shade: string;
 }
 
-const defaultColourScheme: ColourScheme = {
+const lightScheme: ColourScheme = {
+  bg: "white",
   color: "#000000",
   labels: "#888",
   hzLine: "#eee",
   vtLine: "#ddd",
+  shade: "#f7f7f7",
+};
+
+const darkScheme: ColourScheme = {
+  bg: "black",
+  color: "#000000",
+  labels: "#888",
+  hzLine: "#eee",
+  vtLine: "#ddd",
+  shade: "#f7f7f7",
 };
 
 type TimeFormat = "24hr" | "12hr";
 
 class CalendarTransform {
-  origin = 0; // i.e. day
-  offset = [0, 0];
+  gridOffset = [0, 80]; // Initial offset (accounting for header etc)
+  offset = [0, 0]; // Scroll offset
   hourPx = 50; // 1 hour = 50px
   get hourViewBuffer() {
     // Hours visible outside view in each direction (-/+)
@@ -100,7 +113,7 @@ class CalendarTransform {
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
     const min = (date.getMinutes() * this.hourPx) / 60;
-    return hours + min - this.offset[1];
+    return hours + min - this.offset[1] + this.gridOffset[0];
   }
   YToTime() {}
   XToDay() {}
@@ -113,10 +126,11 @@ export class CalRenderer {
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   containerWidth = defaultContainerWidth;
-  colourScheme = defaultColourScheme;
+  colourScheme = lightScheme;
   timeColWidth = 50;
   dayColWidth = 100;
-  gridOffset = 0;
+  headerHeight = 50; // aka header height
+  allDayRowHeight = 50;
   transform = new CalendarTransform();
   timeFormat: TimeFormat = "24hr";
   scrollOffset = [defaultContainerWidth / 2, 0];
@@ -130,7 +144,7 @@ export class CalRenderer {
     this.container = scrollable;
     this.canvas = canvas;
     this.domContainer = scrollChild;
-    this.domContainer.style.height = `${this.transform.hourPx * 25}px`;
+    this.domContainer.style.height = `${this.transform.hourPx * 25 + this.gridOffset[1]}px`;
     this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
@@ -179,6 +193,13 @@ export class CalRenderer {
       ctx2D,
     };
   };
+  changeTheme = (theme: "dark" | "light") => {
+    if (theme === "dark") {
+      this.colourScheme = darkScheme;
+    } else if (theme === "light") {
+      this.colourScheme = lightScheme;
+    }
+  };
   act = () => (this.lastAction = performance.now());
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
@@ -189,16 +210,18 @@ export class CalRenderer {
     );
     this.resized = false;
   };
+  get gridOffset() {
+    return [this.timeColWidth, this.headerHeight + this.allDayRowHeight];
+  }
   draw() {
     if (this.resized) {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    this.day();
-    this.allDayLabel();
+    const dates = getDateArray(this.zeroDate.valueOf(), 7);
+    this.days(dates);
     this.times();
-    this.hzLine(this.ctx2D, 25 + this.margin);
-    this.hzLine(this.ctx2D, dimensions(this.canvas)[1] - 1);
+    this.header(dates);
   }
   frame() {
     requestAnimationFrame(() => {
@@ -208,13 +231,23 @@ export class CalRenderer {
       this.frame();
     });
   }
+  header(dates: Date[]) {
+    this.ctx2D.fillStyle = this.colourScheme.bg;
+    this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
+    this.allDayLabel();
+    dates.map((date, index) => {
+      const offset = this.timeColWidth + index * this.dayColWidth;
+      this.dayLabel(date, offset);
+    });
+    // this.hzLine(ctx, yOffset)
+  }
   times() {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.font = "11px Alte Haas Grotesk";
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
-    let pxOffset = firstHourPx;
+    let pxOffset = firstHourPx + this.gridOffset[1];
     for (
       let i = firstHour;
       i <= firstHour + this.transform.hoursVisible(this.container.offsetHeight);
@@ -227,17 +260,16 @@ export class CalRenderer {
           pxOffset,
         );
       }
-      this.hzLine(this.ctx2D, pxOffset);
+      this.hzLine(pxOffset);
       pxOffset += this.transform.hourPx;
     }
   }
-  day() {
-    const dates = getDateArray(this.zeroDate.valueOf(), 7);
+  days(dates: Date[]) {
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth;
       if (isWeekend(date)) {
         // Weekend shading
-        this.ctx2D.fillStyle = "#f7f7f7";
+        this.ctx2D.fillStyle = this.colourScheme.shade;
         this.ctx2D.fillRect(
           offset,
           0,
@@ -245,9 +277,8 @@ export class CalRenderer {
           this.canvas.offsetHeight,
         );
       }
-      this.dayLabel(date, offset);
-      this.vtLine(this.ctx2D, offset, 0);
-      this.vtLine(this.ctx2D, offset, this.margin + 25);
+      this.vtLine(offset, 0);
+      this.vtLine(offset, this.margin + 25);
     });
   }
   allDayLabel() {
@@ -256,7 +287,11 @@ export class CalRenderer {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = this.colourScheme.labels;
-    this.ctx2D.fillText("all-day", this.timeColWidth - this.margin, 55); // TODO: Fix magic number
+    this.ctx2D.fillText(
+      "all-day",
+      this.timeColWidth - this.margin,
+      this.headerHeight + this.allDayRowHeight / 2,
+    );
   }
   dayLabel(date: Date, offset: number) {
     const text = getDate(date);
@@ -267,21 +302,21 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.fillText(text, offset + padding, 25);
   }
-  hzLine(ctx: CanvasRenderingContext2D, yOffset: number) {
-    ctx.strokeStyle = this.colourScheme.hzLine;
-    ctx.beginPath();
-    ctx.lineWidth = 1;
-    ctx.moveTo(this.timeColWidth, yOffset);
-    ctx.lineTo(this.canvas?.offsetWidth, yOffset);
-    ctx.stroke();
+  hzLine(yOffset: number) {
+    this.ctx2D.strokeStyle = this.colourScheme.hzLine;
+    this.ctx2D.beginPath();
+    this.ctx2D.lineWidth = 1;
+    this.ctx2D.moveTo(this.timeColWidth, yOffset);
+    this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
+    this.ctx2D.stroke();
   }
-  vtLine(ctx: CanvasRenderingContext2D, xOffset: number, yStart: number) {
-    ctx.strokeStyle = this.colourScheme.vtLine;
-    ctx.beginPath();
-    ctx.lineWidth = 0.75;
-    ctx.moveTo(xOffset, yStart);
-    ctx.lineTo(xOffset, this.canvas?.offsetHeight);
-    ctx.stroke();
+  vtLine(xOffset: number, yStart: number) {
+    this.ctx2D.strokeStyle = this.colourScheme.vtLine;
+    this.ctx2D.beginPath();
+    this.ctx2D.lineWidth = 0.75;
+    this.ctx2D.moveTo(xOffset, yStart);
+    this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
+    this.ctx2D.stroke();
   }
   cleanUp() {}
 }

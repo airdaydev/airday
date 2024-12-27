@@ -2,7 +2,7 @@
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  width: 18em;
+  width: 16em;
   padding: 0 0.5em;
   border-right: 1px solid var(--border);
   transition: margin 0.1s;
