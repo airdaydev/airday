@@ -110,6 +110,13 @@ class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
+  getVisibleDays(dayPx: number = 100) {
+    const minXClip = this.offset[0] - dayPx * 2;
+    const r = minXClip % dayPx;
+    const firstDayPx = dayPx - r; // The first hour position within clip space
+    const firstDay = (minXClip + firstDayPx) / dayPx;
+    return [firstDay, firstDayPx - this.hourViewBuffer];
+  }
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
     const min = (date.getMinutes() * this.hourPx) / 60;
@@ -213,16 +220,13 @@ export class CalRenderer {
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
     this.resizeCanvas();
     this.originDate = new Date(date.valueOf() - 365 * 864e5); // 1 year ago
-    this.scrollable.scrollTo(
-      365 * this.dayColWidth - this.scrollable.offsetWidth / 2,
-      0,
-    );
+    this.scrollable.scrollTo(365 * this.dayColWidth, 0);
   };
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
     this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
-    this.scrollChild.style.width = `${365 * this.dayColWidth}px`;
+    this.scrollChild.style.width = `${365 * 2 * this.dayColWidth}px`;
     this.resized = false;
   };
   get gridOffset() {
@@ -233,10 +237,13 @@ export class CalRenderer {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const dates = getDateArray(this.originDate.valueOf(), 7);
-    this.days(dates);
+    const [startDay, startDayPx] = this.transform.getVisibleDays(
+      this.dayColWidth,
+    );
+    const dates = getDateArray(this.originDate.valueOf() + startDay * 864e5, 7);
+    this.days(dates, startDayPx);
     this.times();
-    this.header(dates);
+    this.header(dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -247,12 +254,12 @@ export class CalRenderer {
       this.frame();
     });
   }
-  header(dates: Date[]) {
+  header(dates: Date[], offsetPx: number) {
     this.ctx2D.fillStyle = this.colourScheme.bg;
     this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
     this.allDayLabel();
     dates.map((date, index) => {
-      const offset = this.timeColWidth + index * this.dayColWidth;
+      const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
@@ -293,9 +300,9 @@ export class CalRenderer {
       pxOffset += this.transform.hourPx;
     }
   }
-  days(dates: Date[]) {
+  days(dates: Date[], offsetPx: number) {
     dates.map((date, index) => {
-      const offset = this.timeColWidth + index * this.dayColWidth;
+      const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
