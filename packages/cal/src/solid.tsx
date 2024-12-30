@@ -8,6 +8,7 @@ interface CalendarProps {
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
+  console.log(props);
   let domContainer: HTMLDivElement | undefined;
   let cal: CalRenderer;
   onMount(() => {
