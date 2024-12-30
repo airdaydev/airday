@@ -242,7 +242,7 @@ export class CalRenderer {
           offset,
           this.headerHeight,
           this.dayColWidth,
-          this.gridOffset[1],
+          this.allDayRowHeight,
         );
       }
       this.dayLabel(date, offset);
