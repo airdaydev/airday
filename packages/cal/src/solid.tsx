@@ -1,4 +1,3 @@
-import styles from "./cal.module.css";
 import { onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./event";
@@ -21,5 +20,15 @@ export function CalSolidWrapper(props: CalendarProps) {
       cal.cleanUp();
     }
   });
-  return <div ref={domContainer} class={styles["cal-container"]} />;
+  return (
+    <div
+      ref={domContainer}
+      style={`position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;`}
+    />
+  );
 }

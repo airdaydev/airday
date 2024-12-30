@@ -93,7 +93,7 @@ const darkScheme: ColourScheme = {
 type TimeFormat = "24hr" | "12hr";
 
 class CalendarTransform {
-  gridOffset = [0, 80]; // Initial offset (accounting for header etc)
+  gridOffset = [0, 50]; // Initial offset (accounting for header etc)
   offset = [0, 0]; // Scroll offset
   hourPx = 50; // 1 hour = 50px
   get hourViewBuffer() {
@@ -120,6 +120,12 @@ class CalendarTransform {
   DayToX() {}
 }
 
+const TIME_FONT_SIZE = 11;
+
+// Virtual calendar view: Reset origin at each 60 days start day (30 days in each direction)
+// Reset origin 20 days out either direction
+// scroll auto snaps to nearest day
+
 export class CalRenderer {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
@@ -133,17 +139,16 @@ export class CalRenderer {
   allDayRowHeight = 50;
   transform = new CalendarTransform();
   timeFormat: TimeFormat = "24hr";
-  scrollOffset = [defaultContainerWidth / 2, 0];
   margin = 10;
   resized = false;
-  midDate = getStartOfWeek(new Date());
+  originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   constructor(container: HTMLDivElement) {
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
     this.canvas = canvas;
     this.scrollChild = scrollChild;
-    this.scrollChild.style.height = `${this.transform.hourPx * 25 + this.gridOffset[1]}px`;
+    this.scrollChild.style.height = `${this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
@@ -153,10 +158,14 @@ export class CalRenderer {
     });
     scrollable.addEventListener("scroll", () => {
       this.act();
-      this.transform.offset[1] = this.scrollable.scrollTop;
+      this.transform.offset = [
+        this.scrollable.scrollLeft,
+        this.scrollable.scrollTop,
+      ];
     });
     this.resizeCanvas();
     this.frame();
+    this.goToDate();
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
@@ -173,7 +182,6 @@ export class CalRenderer {
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
-    scrollChild.style.width = `${365 * this.dayColWidth}px`;
     // Canvas (sits behind)
     const canvas = document.createElement("canvas");
     canvas.style.position = "absolute";
@@ -201,11 +209,20 @@ export class CalRenderer {
     }
   };
   act = () => (this.lastAction = performance.now());
+  // Resets origin and puts date arg at 365*dayColWidth
+  goToDate = (date: Date = getStartOfWeek(new Date())) => {
+    this.resizeCanvas();
+    this.originDate = new Date(date.valueOf() - 365 * 864e5); // 1 year ago
+    this.scrollable.scrollTo(
+      365 * this.dayColWidth - this.scrollable.offsetWidth / 2,
+      0,
+    );
+  };
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
     this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
-    // this.scrollable.scrollTo(this.midPoint(), 0);
+    this.scrollChild.style.width = `${365 * this.dayColWidth}px`;
     this.resized = false;
   };
   get gridOffset() {
@@ -216,10 +233,11 @@ export class CalRenderer {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const dates = getDateArray(this.midDate.valueOf(), 7);
+    const dates = getDateArray(this.originDate.valueOf(), 7);
     this.days(dates);
     this.times();
     this.header(dates);
+    this.debug();
   }
   frame() {
     requestAnimationFrame(() => {
@@ -255,7 +273,7 @@ export class CalRenderer {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.fillStyle = this.colourScheme.labels;
-    this.ctx2D.font = "11px Alte Haas Grotesk";
+    this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx + this.gridOffset[1];
     for (
@@ -327,6 +345,14 @@ export class CalRenderer {
     this.ctx2D.moveTo(xOffset, yStart);
     this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
     this.ctx2D.stroke();
+  }
+  debug() {
+    this.ctx2D.textAlign = "right";
+    this.ctx2D.fillText(
+      `Offset: ${this.transform.offset}`,
+      this.canvas.offsetWidth - this.margin,
+      this.canvas?.offsetHeight - 12,
+    );
   }
   cleanUp() {}
 }
