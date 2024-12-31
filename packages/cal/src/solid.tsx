@@ -1,20 +1,23 @@
-import { onCleanup, onMount, Signal } from "solid-js";
+import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./event";
 
 interface CalendarProps {
   events: Signal<CalendarEvent[]>;
+  theme: Accessor<"dark" | "light">;
   parentElement: HTMLElement;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
-  console.log(props);
   let domContainer: HTMLDivElement | undefined;
   let cal: CalRenderer;
   onMount(() => {
     if (domContainer) {
       cal = new CalRenderer(domContainer);
     }
+  });
+  createEffect(() => {
+    cal.changeTheme(props.theme());
   });
   onCleanup(() => {
     if (cal) {

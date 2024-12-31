@@ -75,7 +75,7 @@ interface ColourScheme {
 const lightScheme: ColourScheme = {
   bg: "white",
   color: "#000000",
-  labels: "#888",
+  labels: "#eee",
   hzLine: "#eee",
   vtLine: "#ddd",
   shade: "#f7f7f7",
@@ -83,11 +83,11 @@ const lightScheme: ColourScheme = {
 
 const darkScheme: ColourScheme = {
   bg: "black",
-  color: "#000000",
-  labels: "#888",
-  hzLine: "#eee",
-  vtLine: "#ddd",
-  shade: "#f7f7f7",
+  color: "#fff",
+  labels: "#333",
+  hzLine: "#222",
+  vtLine: "#222",
+  shade: "#111",
 };
 
 type TimeFormat = "24hr" | "12hr";
@@ -214,6 +214,7 @@ export class CalRenderer {
     } else if (theme === "light") {
       this.colourScheme = lightScheme;
     }
+    this.act();
   };
   act = () => (this.lastAction = performance.now());
   // Resets origin and puts date arg at 365*dayColWidth

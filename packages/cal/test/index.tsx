@@ -3,8 +3,11 @@ import { render } from "solid-js/web";
 import "./index.css";
 import { CalSolidWrapper, CalendarEvent } from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
+import * as dat from "dat.gui";
 
 const root = document.getElementById("root");
+
+const theme = createSignal<"dark" | "light">("dark");
 
 function dummyEvents(startDate: Date, days = 14, n = 100) {
   const zeroStartDate = new Date(startDate);
@@ -39,8 +42,49 @@ render(
   () => (
     <div id="app-container">
       <h1>@airday/cal demo</h1>
-      <CalSolidWrapper />
+      <CalSolidWrapper theme={theme[0]} />
     </div>
   ),
   root!,
 );
+
+class guiModifier {
+  id: string;
+  constructor(id: string) {
+    this.id = id;
+  }
+  toggleDarkMode() {
+    theme[1]((v) => (v === "light" ? "dark" : "light"));
+  }
+  gui = (gui: dat.GUI) => {
+    const folder = gui.addFolder(this.id);
+    folder.add(this, "toggleDarkMode").name("Toggle dark mode");
+    folder.open();
+  };
+}
+
+const gui = new dat.GUI();
+(document.querySelector(".dg.ac") as HTMLElement).style.zIndex = "10";
+// const contextFolder = gui.addFolder("Context");
+// contextFolder.open();
+// contextFolder
+//   .add(context, "mode", {
+//     ["Custom Drag"]: "custom",
+//     ["HTML Native Drag"]: "native",
+//   })
+//   .name("Drag Mode")
+//   .onChange((value) => {
+//     switch (value) {
+//       case "native":
+//         dndContext.mode[1]("native");
+//         break;
+//       case "custom":
+//         dndContext.mode[1]("custom");
+//         break;
+//       default:
+//     }
+//   });
+
+const guiA = new guiModifier("Calendar");
+
+guiA.gui(gui);
