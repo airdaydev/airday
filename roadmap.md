@@ -55,10 +55,9 @@
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
 - [] Calendar
-- [] Weekly block view
+- [] Canvas bg resets WHENEVER container size changes (change made but component needs building)
 - [] Editing text inline cursor set correctly.
 - [] Deleting items
-- [] Canvas bg resets WHENEVER container size changes
 - [] Add new item
 - [] Paste into app (strip `- []`)
 - [] Save/Load to JSON
@@ -136,6 +135,7 @@
 - [x] Context menu for one item
 - [x] Clear selection on 'esc' key (vim?)
 - [x] Show date finished on completed items
+- [] voice notes
 - [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc

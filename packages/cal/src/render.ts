@@ -159,10 +159,12 @@ export class CalRenderer {
     this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
-    window.addEventListener("resize", () => {
+    // TODO: Destroy
+    const resizeObserver = new ResizeObserver(() => {
       this.resized = true;
       this.act();
     });
+    resizeObserver.observe(canvas);
     scrollable.addEventListener("scroll", () => {
       this.act();
       this.transform.offset = [

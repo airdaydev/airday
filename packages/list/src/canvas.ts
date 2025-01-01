@@ -51,6 +51,7 @@ export class TreeCanvas {
   currentRow?: number;
   shadowColor: RGB = [240, 240, 240];
   rowsHighlighted = new Map<number, RowRecord>(); // Fades in over 100ms, fades out after 100ms
+  resizeObserver: ResizeObserver;
 
   constructor(opts: TreeCanvasOpts) {
     this.treeContext = opts.treeContext;
@@ -65,7 +66,10 @@ export class TreeCanvas {
     }
     this.resizeCanvas();
     this.frame();
-    window.addEventListener("resize", this.resizeCanvas);
+    this.resizeObserver = new ResizeObserver(() => {
+      this.resizeCanvas();
+    });
+    this.resizeObserver.observe(this.canvasEl);
   }
   setShadowColor = (color: RGB) => {
     this.shadowColor = color;
@@ -77,7 +81,7 @@ export class TreeCanvas {
     this.ctx2D.scale(this.scale, this.scale);
   };
   destroy = () => {
-    window.removeEventListener("resize", () => this.resizeCanvas());
+    this.resizeObserver.disconnect();
   };
   get dimensions() {
     if (!this.canvasEl)
