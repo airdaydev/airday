@@ -2,6 +2,9 @@ const getStartOfWeek = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const mondayDate = new Date(date);
+  mondayDate.setHours(0);
+  mondayDate.setMinutes(0);
+  mondayDate.setSeconds(0);
   mondayDate.setDate(date.getDate() - daysSinceMonday);
   return mondayDate;
 };
@@ -11,7 +14,8 @@ const getDate = (date: Date) => {
   const day = days[date.getDay()];
   const dateMonth = date.getDate();
   const mo = date.getMonth();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}/${mo + 1}`;
+  const year = date.getFullYear();
+  return `${day} ${dateMonth.toString().padStart(2, "0")}/${mo + 1}/${year}`;
 };
 
 const relativeDay = (dateVal: number, relativeDays: number) => {
@@ -116,6 +120,7 @@ class CalendarTransform {
     const r = minXClip % dayPx;
     const firstDayPx = dayPx - r; // The first hour position within clip space
     const firstDay = (minXClip + firstDayPx) / dayPx;
+    console.log(firstDay, firstDayPx, this.hourViewBuffer);
     return [firstDay, firstDayPx - this.hourViewBuffer];
   }
   timeToY(date: Date) {
@@ -125,7 +130,9 @@ class CalendarTransform {
   }
   YToTime() {}
   XToDay() {}
-  DayToX() {}
+  // dayToX(date: Date) {
+
+  // }
 }
 
 const TIME_FONT_SIZE = 11;
@@ -175,7 +182,7 @@ export class CalRenderer {
     });
     this.resizeCanvas();
     this.frame();
-    this.goToDate();
+    // this.goToDate();
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
@@ -222,9 +229,10 @@ export class CalRenderer {
   act = () => (this.lastAction = performance.now());
   // Resets origin and puts date arg at 365*dayColWidth
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
+    console.log(date);
     this.resizeCanvas();
     this.originDate = new Date(date.valueOf() - 365 * 864e5); // 1 year ago
-    this.scrollable.scrollTo(365 * this.dayColWidth, 0);
+    // this.scrollable.scrollTo(365 * this.dayColWidth - this.timeColWidth, 0);
   };
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
