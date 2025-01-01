@@ -7,6 +7,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] cal event y position
 - [x] strip solidjs
 - [x] single canvas element, laid out properly
+- [] use clip instead of backgrounds for covering sections not meant to be rendered!
 - [] scroll x position: start by getting week / day width
 - [] Render calendar events in correct position
 - [] TODAY label style

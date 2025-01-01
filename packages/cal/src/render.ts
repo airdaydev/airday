@@ -75,7 +75,7 @@ interface ColourScheme {
 const lightScheme: ColourScheme = {
   bg: "white",
   color: "#000000",
-  labels: "#eee",
+  labels: "#777",
   hzLine: "#eee",
   vtLine: "#ddd",
   shade: "#f7f7f7",
@@ -87,7 +87,7 @@ const darkScheme: ColourScheme = {
   labels: "#333",
   hzLine: "#222",
   vtLine: "#222",
-  shade: "#111",
+  shade: "#111111aa",
 };
 
 type TimeFormat = "24hr" | "12hr";
@@ -233,6 +233,16 @@ export class CalRenderer {
   get gridOffset() {
     return [this.timeColWidth, this.headerHeight + this.allDayRowHeight];
   }
+  get gridRectPath2D() {
+    const path = new Path2D();
+    path.rect(
+      0,
+      this.gridOffset[1],
+      this.canvas.offsetWidth,
+      this.canvas.offsetHeight,
+    );
+    return path;
+  }
   draw() {
     if (this.resized) {
       this.resizeCanvas();
@@ -256,21 +266,12 @@ export class CalRenderer {
     });
   }
   header(dates: Date[], offsetPx: number) {
-    this.ctx2D.fillStyle = this.colourScheme.bg;
-    this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
+    // bg optional
+    // this.ctx2D.fillStyle = this.colourScheme.bg;
+    // this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
     this.allDayLabel();
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
-      if (isWeekend(date)) {
-        // Weekend shading
-        this.ctx2D.fillStyle = this.colourScheme.shade;
-        this.ctx2D.fillRect(
-          offset,
-          this.headerHeight,
-          this.dayColWidth,
-          this.allDayRowHeight,
-        );
-      }
       this.dayLabel(date, offset);
       this.vtLine(offset, this.headerHeight);
     });
@@ -284,6 +285,8 @@ export class CalRenderer {
     this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx + this.gridOffset[1];
+    this.ctx2D.save();
+    this.ctx2D.clip(this.gridRectPath2D);
     for (
       let i = firstHour;
       i <=
@@ -300,6 +303,7 @@ export class CalRenderer {
       this.hzLine(pxOffset);
       pxOffset += this.transform.hourPx;
     }
+    this.ctx2D.restore();
   }
   days(dates: Date[], offsetPx: number) {
     dates.map((date, index) => {
