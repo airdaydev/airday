@@ -40,7 +40,10 @@ const events = createSignal(dummyEvents(oneWeekAgo));
 
 render(
   () => (
-    <div id="app-container">
+    <div
+      id="app-container"
+      style={{ background: theme[0]() === "dark" ? "black" : "white" }}
+    >
       <h1>@airday/cal demo</h1>
       <CalSolidWrapper theme={theme[0]} />
     </div>
