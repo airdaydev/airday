@@ -309,7 +309,6 @@ export class CalRenderer {
     this.ctx2D.clip(path);
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
-      this.dayLabel(date, offset);
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
@@ -321,6 +320,7 @@ export class CalRenderer {
         );
       }
       this.vtLine(offset, 0);
+      this.dayLabel(date, offset);
     });
     this.ctx2D.restore();
   }
