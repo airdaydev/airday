@@ -233,16 +233,6 @@ export class CalRenderer {
   get gridOffset() {
     return [this.timeColWidth, this.headerHeight + this.allDayRowHeight];
   }
-  get gridRectPath2D() {
-    const path = new Path2D();
-    path.rect(
-      0,
-      this.gridOffset[1],
-      this.canvas.offsetWidth,
-      this.canvas.offsetHeight,
-    );
-    return path;
-  }
   draw() {
     if (this.resized) {
       this.resizeCanvas();
@@ -254,7 +244,7 @@ export class CalRenderer {
     const dates = getDateArray(this.originDate.valueOf() + startDay * 864e5, 7);
     this.days(dates, startDayPx);
     this.times();
-    this.header(dates, startDayPx);
+    this.header();
     this.debug();
   }
   frame() {
@@ -265,16 +255,11 @@ export class CalRenderer {
       this.frame();
     });
   }
-  header(dates: Date[], offsetPx: number) {
+  header() {
     // bg optional
     // this.ctx2D.fillStyle = this.colourScheme.bg;
     // this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
     this.allDayLabel();
-    dates.map((date, index) => {
-      const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
-      this.dayLabel(date, offset);
-      this.vtLine(offset, this.headerHeight);
-    });
     this.hzLine(this.headerHeight);
     this.hzLine(this.gridOffset[1]);
   }
@@ -286,7 +271,14 @@ export class CalRenderer {
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx + this.gridOffset[1];
     this.ctx2D.save();
-    this.ctx2D.clip(this.gridRectPath2D);
+    const path = new Path2D();
+    path.rect(
+      0,
+      this.gridOffset[1],
+      this.canvas.offsetWidth,
+      this.canvas.offsetHeight,
+    );
+    this.ctx2D.clip(path);
     for (
       let i = firstHour;
       i <=
@@ -306,8 +298,18 @@ export class CalRenderer {
     this.ctx2D.restore();
   }
   days(dates: Date[], offsetPx: number) {
+    this.ctx2D.save();
+    const path = new Path2D();
+    path.rect(
+      this.gridOffset[0],
+      0,
+      this.canvas.offsetWidth,
+      this.canvas.offsetHeight,
+    );
+    this.ctx2D.clip(path);
     dates.map((date, index) => {
       const offset = this.timeColWidth + index * this.dayColWidth + offsetPx;
+      this.dayLabel(date, offset);
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
@@ -320,6 +322,7 @@ export class CalRenderer {
       }
       this.vtLine(offset, 0);
     });
+    this.ctx2D.restore();
   }
   allDayLabel() {
     this.ctx2D.fillStyle = this.colourScheme.color;
