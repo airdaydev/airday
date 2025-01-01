@@ -10,7 +10,8 @@ const getDate = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const day = days[date.getDay()];
   const dateMonth = date.getDate();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}`;
+  const mo = date.getMonth();
+  return `${day} ${dateMonth.toString().padStart(2, "0")}/${mo + 1}`;
 };
 
 const relativeDay = (dateVal: number, relativeDays: number) => {
@@ -186,7 +187,7 @@ export class CalRenderer {
     scrollable.style.width = "100%";
     scrollable.style.height = "100%";
     scrollable.style.overflowY = "scroll";
-    scrollable.style.zIndex = "10";
+    scrollable.style.zIndex = "2";
     scrollable.style.overscrollBehaviorY = "none";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
