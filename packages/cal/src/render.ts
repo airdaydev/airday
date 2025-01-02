@@ -68,6 +68,8 @@ function clearCanvas(canvas: HTMLCanvasElement) {
   );
 }
 
+const foxPng = "https://minio.gormly.co/airday/fox.png";
+
 interface ColourScheme {
   bg: string;
   hzLine: string;
@@ -146,6 +148,8 @@ const DAY_BUFFER_RESET = 25;
 // Reset origin RESET_POINT days out either direction
 // scroll auto snaps to nearest day
 
+const iconCache = new Map<string, ImageBitmap>();
+
 export class CalRenderer {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
@@ -189,7 +193,14 @@ export class CalRenderer {
     this.resizeCanvas();
     this.frame();
     this.goToDate();
+    this.loadPng(foxPng);
   }
+  loadPng = async (url: string) => {
+    const data = await fetch(url);
+    const blob = await data.blob();
+    const bmp = await createImageBitmap(blob);
+    iconCache.set(url, bmp);
+  };
   mount = (container: HTMLElement) => {
     // Scrollable area
     const scrollable = document.createElement("div");
@@ -265,6 +276,10 @@ export class CalRenderer {
     this.times();
     this.header();
     this.debug();
+    const fox = iconCache.get(foxPng);
+    if (fox) {
+      this.ctx2D.drawImage(fox, 100, 200, 150, 150);
+    }
   }
   frame() {
     requestAnimationFrame(() => {
