@@ -133,6 +133,10 @@ class CalendarTransform {
     const min = (date.getMinutes() * this.hourPx) / 60;
     return hours + min - this.offset[1] + this.renderer.gridOffset[1];
   }
+  xStart(x: number) {
+    const r = (x % this.renderer.gridOffset[0]) + this.offset[0];
+    return x - r;
+  }
   yToTime(y: number) {}
   xToDay(x: number) {
     return Math.floor(
@@ -173,6 +177,7 @@ export class CalRenderer {
   resized = false;
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
+  autoscrolling = false;
   constructor(container: HTMLDivElement) {
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
@@ -189,12 +194,15 @@ export class CalRenderer {
       this.act();
     });
     resizeObserver.observe(canvas);
-    scrollable.addEventListener("scroll", () => {
+    scrollable.addEventListener("scroll", (event) => {
+      this.transform.offset[1] = this.scrollable.scrollTop;
       this.act();
-      this.transform.offset = [
-        this.scrollable.scrollLeft,
-        this.scrollable.scrollTop,
-      ];
+    });
+    scrollable.addEventListener("wheel", (event: WheelEvent) => {
+      event.preventDefault();
+      this.transform.offset[0] = this.transform.offset[0] + event.deltaX;
+      console.log(this.transform.offset[0]);
+      this.act();
     });
     scrollable.addEventListener("mousemove", (event) => {
       console.log(this.transform.xToDay(event.x));
@@ -202,7 +210,6 @@ export class CalRenderer {
     this.resizeCanvas();
     this.frame();
     this.goToDate();
-    // this.loadPng(foxPng);
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
@@ -225,6 +232,7 @@ export class CalRenderer {
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
+    scrollChild.style.width = "100%";
     // Canvas (sits behind)
     const canvas = document.createElement("canvas");
     canvas.style.position = "absolute";
@@ -263,7 +271,6 @@ export class CalRenderer {
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
     this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
-    this.scrollChild.style.width = `${DAY_BUFFER_LENGTH * 2 * this.dayColWidth}px`;
     this.resized = false;
   };
   get gridOffset() {

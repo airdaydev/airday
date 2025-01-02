@@ -8,7 +8,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] strip solidjs
 - [x] single canvas element, laid out properly
 - [x] use clip instead of backgrounds for covering sections not meant to be rendered!
-- [x] scroll x position: start by getting week / day width
+- [] scroll x position: start by getting week / day width
+- [] custom scroller, snap to date or week when active scrolling stops
 - [] scroll beyond borders
 - [] Render calendar events in correct position
 - [] Distinct TODAY label style
