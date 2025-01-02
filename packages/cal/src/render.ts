@@ -120,12 +120,12 @@ class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
-  getVisibleDays(dayPx: number = 100) {
+  getFirstDay() {
     const minXClip = this.offset[0]; // scroll offset - 2 days
-    const r = minXClip % dayPx;
+    const r = minXClip % this.renderer.dayColWidth;
     const firstDayPx =
       minXClip - r - this.offset[0] + this.renderer.gridOffset[0]; // The first day position within clip space
-    const firstDay = (minXClip + firstDayPx) / dayPx;
+    const firstDay = (minXClip + firstDayPx) / this.renderer.dayColWidth;
     return [firstDay, firstDayPx];
   }
   timeToY(date: Date) {
@@ -133,8 +133,14 @@ class CalendarTransform {
     const min = (date.getMinutes() * this.hourPx) / 60;
     return hours + min - this.offset[1] + this.renderer.gridOffset[1];
   }
-  YToTime() {}
-  XToDay() {}
+  yToTime(y: number) {}
+  xToDay(x: number) {
+    return Math.floor(
+      (x - this.renderer.gridOffset[0] + this.offset[0]) /
+        this.renderer.dayColWidth,
+    );
+  }
+  coordsToDate() {}
   // dayToX(date: Date) {
 
   // }
@@ -190,10 +196,13 @@ export class CalRenderer {
         this.scrollable.scrollTop,
       ];
     });
+    scrollable.addEventListener("mousemove", (event) => {
+      console.log(this.transform.xToDay(event.x));
+    });
     this.resizeCanvas();
     this.frame();
     this.goToDate();
-    this.loadPng(foxPng);
+    // this.loadPng(foxPng);
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
@@ -265,9 +274,7 @@ export class CalRenderer {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const [startDay, startDayPx] = this.transform.getVisibleDays(
-      this.dayColWidth,
-    );
+    const [startDay, startDayPx] = this.transform.getFirstDay(this.dayColWidth);
     const dates = getDateArray(
       this.originDate.valueOf() + startDay * 864e5,
       12,
