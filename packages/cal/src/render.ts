@@ -116,12 +116,11 @@ class CalendarTransform {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
   getVisibleDays(dayPx: number = 100) {
-    const minXClip = this.offset[0] - dayPx * 2;
+    const minXClip = this.offset[0] - dayPx * 2; // scroll offset - 2 days
     const r = minXClip % dayPx;
-    const firstDayPx = dayPx - r; // The first hour position within clip space
+    const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
     const firstDay = (minXClip + firstDayPx) / dayPx;
-    console.log(firstDay, firstDayPx, this.hourViewBuffer);
-    return [firstDay, firstDayPx - this.hourViewBuffer];
+    return [firstDay, firstDayPx];
   }
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
@@ -136,9 +135,11 @@ class CalendarTransform {
 }
 
 const TIME_FONT_SIZE = 11;
+const DAY_BUFFER_LENGTH = 50; // 49-1-50
+const DAY_BUFFER_RESET = 25;
 
-// Virtual calendar view: Reset origin at each 60 days start day (30 days in each direction)
-// Reset origin 20 days out either direction
+// Virtual calendar view: Reset origin at each DAY_BUFFER days start day
+// Reset origin RESET_POINT days out either direction
 // scroll auto snaps to nearest day
 
 export class CalRenderer {
@@ -182,7 +183,7 @@ export class CalRenderer {
     });
     this.resizeCanvas();
     this.frame();
-    // this.goToDate();
+    this.goToDate();
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
@@ -227,18 +228,17 @@ export class CalRenderer {
     this.act();
   };
   act = () => (this.lastAction = performance.now());
-  // Resets origin and puts date arg at 365*dayColWidth
+  // Resets origin and puts date arg at DAY_BUFFER_LENGTH*dayColWidth
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
-    console.log(date);
-    this.resizeCanvas();
-    this.originDate = new Date(date.valueOf() - 365 * 864e5); // 1 year ago
-    // this.scrollable.scrollTo(365 * this.dayColWidth - this.timeColWidth, 0);
+    this.originDate = new Date(date.valueOf() - DAY_BUFFER_LENGTH * 864e5); // 1 year ago
+    console.log("this.originDate", this.originDate);
+    // this.scrollable.scrollTo(DAY_BUFFER_LENGTH * this.dayColWidth - this.timeColWidth, 0);
   };
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
     this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
-    this.scrollChild.style.width = `${365 * 2 * this.dayColWidth}px`;
+    this.scrollChild.style.width = `${DAY_BUFFER_LENGTH * 2 * this.dayColWidth}px`;
     this.resized = false;
   };
   get gridOffset() {
@@ -252,7 +252,10 @@ export class CalRenderer {
     const [startDay, startDayPx] = this.transform.getVisibleDays(
       this.dayColWidth,
     );
-    const dates = getDateArray(this.originDate.valueOf() + startDay * 864e5, 7);
+    const dates = getDateArray(
+      this.originDate.valueOf() + startDay * 864e5,
+      12,
+    );
     this.days(dates, startDayPx);
     this.times();
     this.header();
