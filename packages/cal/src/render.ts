@@ -1,3 +1,5 @@
+import { EventDB } from "./state";
+
 const getStartOfWeek = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -149,17 +151,15 @@ class CalendarTransform {
     const r = (x % this.renderer.gridOffset[0]) + this.offset[0];
     return x - r;
   }
-  yToTime(y: number) {}
+  yToTime(y: number) {
+    return (y - this.offset[1] - this.renderer.gridOffset[1]) / this.hourPx - 1;
+  }
   xToDay(x: number) {
     return Math.floor(
       (x - this.renderer.gridOffset[0] + this.offset[0]) /
         this.renderer.dayColWidth,
     );
   }
-  coordsToDate() {}
-  // dayToX(date: Date) {
-
-  // }
 }
 
 const TIME_FONT_SIZE = 11;
@@ -187,10 +187,12 @@ export class CalRenderer {
   timeFormat: TimeFormat = "24hr";
   margin = 10;
   resized = false;
+  hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
-  constructor(container: HTMLDivElement) {
+  db = EventDB;
+  constructor(container: HTMLDivElement, db?: EventDB) {
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -216,11 +218,13 @@ export class CalRenderer {
       this.act();
     });
     scrollable.addEventListener("mousemove", (event) => {
-      // console.log(this.transform.xToDay(event.x));
+      console.log(this.transform.xToDay(event.x));
+      console.log(this.transform.yToTime(event.y));
     });
     this.resizeCanvas();
     this.frame();
     this.goToDate();
+    this.loadPng(foxPng);
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
@@ -300,11 +304,8 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
+    this.events(dates, startDayPx);
     this.debug();
-    const fox = iconCache.get(foxPng);
-    if (fox) {
-      this.ctx2D.drawImage(fox, 100, 200, 150, 150);
-    }
   }
   frame() {
     requestAnimationFrame(() => {
@@ -380,6 +381,31 @@ export class CalRenderer {
       }
       this.vtLine(offset, 0);
       this.dayLabel(date, offset);
+    });
+    this.ctx2D.restore();
+  }
+  events(dates: Date[], offsetPx: number) {
+    this.ctx2D.save();
+    const path = new Path2D();
+    path.rect(
+      this.gridOffset[0],
+      this.gridOffset[1],
+      this.canvas.offsetWidth,
+      this.canvas.offsetHeight,
+    );
+    this.ctx2D.clip(path);
+    dates.map((_, index) => {
+      const offset = index * this.dayColWidth + offsetPx;
+      const fox = iconCache.get(foxPng);
+      if (fox) {
+        this.ctx2D.drawImage(
+          fox,
+          offset,
+          -this.transform.offset[1] + 500,
+          150,
+          150,
+        );
+      }
     });
     this.ctx2D.restore();
   }

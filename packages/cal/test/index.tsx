@@ -51,7 +51,7 @@ render(
       style={{ background: theme[0]() === "dark" ? "black" : "white" }}
     >
       <h1>@airday/cal demo</h1>
-      <CalSolidWrapper theme={theme[0]} />
+      <CalSolidWrapper theme={theme[0]} db={db} />
     </div>
   ),
   root!,

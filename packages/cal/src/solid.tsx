@@ -1,11 +1,13 @@
 import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./event";
+import { EventDB } from "./state";
 
 interface CalendarProps {
   events: Signal<CalendarEvent[]>;
   theme: Accessor<"dark" | "light">;
   parentElement: HTMLElement;
+  db?: EventDB;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
@@ -13,7 +15,7 @@ export function CalSolidWrapper(props: CalendarProps) {
   let cal: CalRenderer;
   onMount(() => {
     if (domContainer) {
-      cal = new CalRenderer(domContainer);
+      cal = new CalRenderer(domContainer, props.db);
     }
   });
   createEffect(() => {
