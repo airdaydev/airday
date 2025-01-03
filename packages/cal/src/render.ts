@@ -14,8 +14,7 @@ const getDate = (date: Date) => {
   const day = days[date.getDay()];
   const dateMonth = date.getDate();
   const mo = date.getMonth();
-  const year = date.getFullYear();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}/${mo + 1}/${year}`;
+  return `${day} ${dateMonth.toString().padStart(2, "0")}/${(mo + 1).toString().padStart(2, "0")}`;
 };
 
 const relativeDay = (dateVal: number, relativeDays: number) => {
@@ -91,7 +90,7 @@ const lightScheme: ColourScheme = {
 const darkScheme: ColourScheme = {
   bg: "black",
   color: "#fff",
-  labels: "#333",
+  labels: "#777",
   hzLine: "#222",
   vtLine: "#222",
   shade: "#111111aa",
@@ -209,6 +208,8 @@ export class CalRenderer {
     resizeObserver.observe(canvas);
     scrollable.addEventListener("scroll", (event) => {
       event.preventDefault();
+      this.transform.offset[1] = this.scrollable.scrollTop;
+      this.act();
     });
     scrollable.addEventListener("wheel", (event: WheelEvent) => {
       this.transform.addDelta(event.deltaX, event.deltaY);
@@ -274,11 +275,8 @@ export class CalRenderer {
     return this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE;
   }
   act = () => (this.lastAction = performance.now());
-  // Resets origin and puts date arg at DAY_BUFFER_LENGTH*dayColWidth
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
-    this.originDate = new Date(date.valueOf()); // 1 year ago
-    console.log("this.originDate", this.originDate);
-    this.scrollable.scrollTo(DAY_BUFFER_LENGTH * this.dayColWidth, 0);
+    this.originDate = new Date(date.valueOf());
   };
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
