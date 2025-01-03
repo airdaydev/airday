@@ -4,6 +4,7 @@ import IntervalTree, { NumericTuple } from "@flatten-js/interval-tree";
 export class EventDB {
   idMap = new Map<string, CalendarEvent>();
   tree = new IntervalTree(); // TODO: Split per calendar?
+  scene = new Set<CalendarEvent>();
   constructor() {}
   indexEvent(event: CalendarEvent) {
     const range: NumericTuple = [event.start.valueOf(), event.end.valueOf()];

@@ -163,8 +163,8 @@ class CalendarTransform {
 }
 
 const TIME_FONT_SIZE = 11;
-const DAY_BUFFER_LENGTH = 50; // 49-1-50
-const DAY_BUFFER_RESET = 25;
+// const DAY_BUFFER_LENGTH = 50; // 49-1-50
+// const DAY_BUFFER_RESET = 25;
 
 // Virtual calendar view: Reset origin at each DAY_BUFFER days start day
 // Reset origin RESET_POINT days out either direction
@@ -193,6 +193,7 @@ export class CalRenderer {
   autoscrolling = false;
   db = EventDB;
   constructor(container: HTMLDivElement, db?: EventDB) {
+    console.log(db);
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;

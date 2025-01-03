@@ -11,7 +11,7 @@ import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
 import { SoloNode } from "@airday/list";
-import { DoneView } from "../view/state";
+import { CalendarView, DoneView } from "../view/state";
 
 export function AirNav() {
   const session = useContext(sessionContext);
@@ -60,7 +60,7 @@ export function AirNav() {
               tabindex="-1"
               onClick={session.viewState.openCalendarView}
               onMouseDown={(event) => {
-                session.viewState.paneDropView = new DoneView(
+                session.viewState.paneDropView = new CalendarView(
                   session.viewState,
                 );
                 props.onMouseDown(event);
