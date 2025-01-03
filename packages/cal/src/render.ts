@@ -120,12 +120,12 @@ class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
-  getFirstDay() {
-    const minXClip = this.offset[0]; // scroll offset - 2 days
+  getClipspaceDay() {
+    const minXClip = this.offset[0] - this.renderer.dayColWidth; // 1 day buffer behind offset in screen space
     const r = minXClip % this.renderer.dayColWidth;
     const firstDayPx =
       minXClip - r - this.offset[0] + this.renderer.gridOffset[0]; // The first day position within clip space
-    const firstDay = (minXClip + firstDayPx) / this.renderer.dayColWidth;
+    const firstDay = (firstDayPx + this.offset[0]) / this.renderer.dayColWidth;
     return [firstDay, firstDayPx];
   }
   timeToY(date: Date) {
@@ -199,13 +199,14 @@ export class CalRenderer {
       this.act();
     });
     scrollable.addEventListener("wheel", (event: WheelEvent) => {
-      event.preventDefault();
-      this.transform.offset[0] = this.transform.offset[0] + event.deltaX;
-      console.log(this.transform.offset[0]);
+      if (event.deltaX) {
+        event.preventDefault();
+        this.transform.offset[0] = this.transform.offset[0] + event.deltaX;
+      }
       this.act();
     });
     scrollable.addEventListener("mousemove", (event) => {
-      console.log(this.transform.xToDay(event.x));
+      // console.log(this.transform.xToDay(event.x));
     });
     this.resizeCanvas();
     this.frame();
@@ -263,7 +264,7 @@ export class CalRenderer {
   act = () => (this.lastAction = performance.now());
   // Resets origin and puts date arg at DAY_BUFFER_LENGTH*dayColWidth
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
-    this.originDate = new Date(date.valueOf() - DAY_BUFFER_LENGTH * 864e5); // 1 year ago
+    this.originDate = new Date(date.valueOf()); // 1 year ago
     console.log("this.originDate", this.originDate);
     this.scrollable.scrollTo(DAY_BUFFER_LENGTH * this.dayColWidth, 0);
   };
@@ -281,7 +282,7 @@ export class CalRenderer {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const [startDay, startDayPx] = this.transform.getFirstDay(this.dayColWidth);
+    const [startDay, startDayPx] = this.transform.getClipspaceDay();
     const dates = getDateArray(
       this.originDate.valueOf() + startDay * 864e5,
       12,
