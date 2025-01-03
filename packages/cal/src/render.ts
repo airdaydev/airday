@@ -133,6 +133,19 @@ class CalendarTransform {
     const min = (date.getMinutes() * this.hourPx) / 60;
     return hours + min - this.offset[1] + this.renderer.gridOffset[1];
   }
+  maxYOffset() {
+    return Math.max(
+      0,
+      this.renderer.scrollHeight - this.renderer.canvas.clientHeight,
+    );
+  }
+  addDelta(x: number, y: number) {
+    this.offset[0] = this.offset[0] + x;
+    this.offset[1] = Math.min(
+      Math.max(this.offset[1] + y, 0),
+      this.maxYOffset(),
+    );
+  }
   xStart(x: number) {
     const r = (x % this.renderer.gridOffset[0]) + this.offset[0];
     return x - r;
@@ -184,7 +197,7 @@ export class CalRenderer {
     this.scrollable = scrollable;
     this.canvas = canvas;
     this.scrollChild = scrollChild;
-    this.scrollChild.style.height = `${this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE}px`; // Additional px to display 24:00
+    this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
     this.resizeCanvas();
     this.frame();
@@ -195,14 +208,10 @@ export class CalRenderer {
     });
     resizeObserver.observe(canvas);
     scrollable.addEventListener("scroll", (event) => {
-      this.transform.offset[1] = this.scrollable.scrollTop;
-      this.act();
+      event.preventDefault();
     });
     scrollable.addEventListener("wheel", (event: WheelEvent) => {
-      if (event.deltaX) {
-        event.preventDefault();
-        this.transform.offset[0] = this.transform.offset[0] + event.deltaX;
-      }
+      this.transform.addDelta(event.deltaX, event.deltaY);
       this.act();
     });
     scrollable.addEventListener("mousemove", (event) => {
@@ -261,6 +270,9 @@ export class CalRenderer {
     }
     this.act();
   };
+  get scrollHeight() {
+    return this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE;
+  }
   act = () => (this.lastAction = performance.now());
   // Resets origin and puts date arg at DAY_BUFFER_LENGTH*dayColWidth
   goToDate = (date: Date = getStartOfWeek(new Date())) => {
