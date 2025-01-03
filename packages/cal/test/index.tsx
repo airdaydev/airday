@@ -1,7 +1,11 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
 import "./index.css";
-import { CalSolidWrapper, CalendarEvent } from "../src/index";
+import {
+  CalSolidWrapper,
+  CalendarEventConstructorProps,
+  EventDB,
+} from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
 import * as dat from "dat.gui";
 
@@ -13,7 +17,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
   const zeroStartDate = new Date(startDate);
   const endDate = new Date(zeroStartDate);
   endDate.setDate(zeroStartDate.getDate() + days);
-  const events: CalendarEvent[] = [];
+  const events: CalendarEventConstructorProps[] = [];
   const range = endDate.valueOf() - zeroStartDate.valueOf();
   for (let i = 0; i < n; i++) {
     const random = Math.random() * range;
@@ -25,18 +29,20 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     date.setMilliseconds(0);
     events.push({
       id: createUniqueId(),
-      label: "test",
+      title: "test",
       start: new Date(date),
       end: new Date(date.valueOf() + duration),
+      allDay: false,
     });
   }
   return events;
 }
 
-const oneWeekAgo = new Date(new Date().setDate(new Date().getDate() - 7));
-const oneWeekFromNow = new Date(new Date().setDate(new Date().getDate() + 7));
+const start = new Date(new Date().setDate(new Date().getDate() - 182));
+const events = dummyEvents(start, 365, 10000);
 
-const events = createSignal(dummyEvents(oneWeekAgo));
+const db = new EventDB();
+db.loadEvents(events);
 
 render(
   () => (
