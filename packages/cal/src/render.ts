@@ -146,6 +146,9 @@ class CalendarTransform {
       Math.max(this.offset[1] + y, 0),
       this.maxYOffset(),
     );
+    if (y !== 0) {
+      this.renderer.scrollable.scrollTo(0, this.offset[1]);
+    }
   }
   xStart(x: number) {
     const r = (x % this.renderer.gridOffset[0]) + this.offset[0];
@@ -398,13 +401,13 @@ export class CalRenderer {
     dates.map((_, index) => {
       const offset = index * this.dayColWidth + offsetPx;
       const fox = iconCache.get(foxPng);
-      if (fox) {
+      if (fox && _.getDay() === 5) {
         this.ctx2D.drawImage(
           fox,
-          offset,
+          offset + this.margin,
           -this.transform.offset[1] + 500,
-          150,
-          150,
+          this.dayColWidth - this.margin,
+          this.dayColWidth - this.margin,
         );
       }
     });
