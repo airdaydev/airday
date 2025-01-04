@@ -13,6 +13,14 @@ const root = document.getElementById("root");
 
 const theme = createSignal<"dark" | "light">("dark");
 
+function randomTitle() {
+  return [
+    "Provisional riders license test",
+    "Cirque Du Soleil Sydney",
+    "Mudgee holiday",
+  ][Math.floor(Math.random() * 5)];
+}
+
 function dummyEvents(startDate: Date, days = 14, n = 100) {
   const zeroStartDate = new Date(startDate);
   const endDate = new Date(zeroStartDate);
@@ -29,7 +37,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     date.setMilliseconds(0);
     events.push({
       id: createUniqueId(),
-      title: "test",
+      title: randomTitle(),
       start: new Date(date),
       end: new Date(date.valueOf() + duration),
       allDay: false,
@@ -39,7 +47,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
 }
 
 const start = new Date(new Date().setDate(new Date().getDate() - 182));
-const events = dummyEvents(start, 365, 10000);
+const events = dummyEvents(start, 365, 100000);
 
 const db = new EventDB();
 db.loadEvents(events);

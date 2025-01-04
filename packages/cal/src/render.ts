@@ -163,6 +163,19 @@ class CalendarTransform {
         this.renderer.dayColWidth,
     );
   }
+  dateToX(date: Date) {
+    const normalisedDate = new Date(date);
+    normalisedDate.setHours(0);
+    normalisedDate.setMinutes(0);
+    normalisedDate.setSeconds(0);
+    return (
+      ((normalisedDate.valueOf() - this.renderer.originDate.valueOf()) /
+        864e5) *
+        this.renderer.dayColWidth -
+      this.offset[0] +
+      this.renderer.gridOffset[0]
+    );
+  }
 }
 
 const TIME_FONT_SIZE = 11;
@@ -199,7 +212,7 @@ export class CalRenderer {
   startDay?: Date;
   clipDays = 12;
   dates: Date[] = [];
-  eventObjects: any[];
+  eventObjects: any[] = [];
   constructor(container: HTMLDivElement, db: EventDB) {
     this.db = db;
     this.transform = new CalendarTransform(this);
@@ -306,15 +319,15 @@ export class CalRenderer {
     }
     clearCanvas(this.canvas);
     const [startDay, startDayPx] = this.transform.getClipspaceDay();
-    const absStartDay = new Date(this.originDate.valueOf() + startDay + 864e5);
+    const absStartDay = new Date(this.originDate.valueOf() + startDay * 864e5);
     if (this.startDay?.valueOf() !== absStartDay.valueOf()) {
       this.dates = getDateArray(
         this.originDate.valueOf() + startDay * 864e5,
         this.clipDays,
       );
       this.eventObjects = this.db.getEvents(
-        this.originDate.valueOf(),
-        this.originDate.valueOf() + 12 * 864e5,
+        absStartDay.valueOf(),
+        absStartDay.valueOf() + 12 * 864e5,
       );
       this.startDay = absStartDay;
     }
@@ -424,11 +437,12 @@ export class CalRenderer {
         );
       }
     });
+    this.ctx2D.textAlign = "left";
     this.eventObjects.map((event) => {
       this.ctx2D.fillText(
         event.title,
-        Math.random() * 1000,
-        Math.random() * 200,
+        this.transform.dateToX(event.start),
+        this.transform.timeToY(event.start),
       );
     });
     this.ctx2D.restore();
