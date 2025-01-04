@@ -78,7 +78,7 @@ export const Footer = () => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
         >
-          Φ Airday
+          Airday
           <span style={"margin-left: 0.25em; display: none;"}>Air</span>
         </button>
         {/* <button
