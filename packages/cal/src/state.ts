@@ -17,8 +17,8 @@ export class EventDB {
       this.idMap.set(event.id, event);
     }
   }
-  getEvents(startDate: Date, endDate: Date) {
-    const range: NumericTuple = [startDate.valueOf(), endDate.valueOf()];
+  getEvents(startDate: number, endDate: number) {
+    const range: NumericTuple = [startDate, endDate];
     const ids = this.tree.search(range);
     const set: CalendarEvent[] = [];
     ids.forEach((id) => {

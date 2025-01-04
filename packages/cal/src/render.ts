@@ -194,9 +194,14 @@ export class CalRenderer {
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
-  db = EventDB;
-  constructor(container: HTMLDivElement, db?: EventDB) {
-    console.log(db);
+  db: EventDB;
+  // current scene objects
+  startDay?: Date;
+  clipDays = 12;
+  dates: Date[] = [];
+  eventObjects: any[];
+  constructor(container: HTMLDivElement, db: EventDB) {
+    this.db = db;
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -222,8 +227,8 @@ export class CalRenderer {
       this.act();
     });
     scrollable.addEventListener("mousemove", (event) => {
-      console.log(this.transform.xToDay(event.x));
-      console.log(this.transform.yToTime(event.y));
+      // console.log(this.transform.xToDay(event.x));
+      // console.log(this.transform.yToTime(event.y));
     });
     this.resizeCanvas();
     this.frame();
@@ -301,14 +306,22 @@ export class CalRenderer {
     }
     clearCanvas(this.canvas);
     const [startDay, startDayPx] = this.transform.getClipspaceDay();
-    const dates = getDateArray(
-      this.originDate.valueOf() + startDay * 864e5,
-      12,
-    );
-    this.days(dates, startDayPx);
+    const absStartDay = new Date(this.originDate.valueOf() + startDay + 864e5);
+    if (this.startDay?.valueOf() !== absStartDay.valueOf()) {
+      this.dates = getDateArray(
+        this.originDate.valueOf() + startDay * 864e5,
+        this.clipDays,
+      );
+      this.eventObjects = this.db.getEvents(
+        this.originDate.valueOf(),
+        this.originDate.valueOf() + 12 * 864e5,
+      );
+      this.startDay = absStartDay;
+    }
+    this.days(this.dates, startDayPx);
     this.times();
     this.header();
-    this.events(dates, startDayPx);
+    this.events(this.dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -410,6 +423,13 @@ export class CalRenderer {
           this.dayColWidth - this.margin,
         );
       }
+    });
+    this.eventObjects.map((event) => {
+      this.ctx2D.fillText(
+        event.title,
+        Math.random() * 1000,
+        Math.random() * 200,
+      );
     });
     this.ctx2D.restore();
   }
