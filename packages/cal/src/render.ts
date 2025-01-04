@@ -239,7 +239,7 @@ export class CalRenderer {
       this.transform.addDelta(event.deltaX, event.deltaY);
       this.act();
     });
-    scrollable.addEventListener("mousemove", (event) => {
+    scrollable.addEventListener("mousemove", () => {
       // console.log(this.transform.xToDay(event.x));
       // console.log(this.transform.yToTime(event.y));
     });

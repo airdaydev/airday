@@ -7,7 +7,7 @@ interface CalendarProps {
   events: Signal<CalendarEvent[]>;
   theme: Accessor<"dark" | "light">;
   parentElement: HTMLElement;
-  db?: EventDB;
+  db: EventDB;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
