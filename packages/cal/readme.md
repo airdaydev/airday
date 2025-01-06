@@ -47,9 +47,11 @@ Rules:
 - left-most precedence = earlier start time, longer event
 
 # Algorithm
-1. group intersecting events.
-2. within group, get first group of intersecting headers, sort by earliest start time, then longest event, place from left to right, equidistantly (creating segments)
-3. get next group of intersecting headers, place at first horizontal segment from left without intersecting time, create new group if necessary*
+1. optimisation (maybe) ~~group any intersecting events.~~
+2. within group, sort by, in precedence, earliest start time, then longest event, then id
+3. if no segment, place as width 100%
+4. if intersects by time, but not header, place at first available segment from left, creating new if needed
+5. if header intersects, place from left to right, equidistantly (creating new horizontal segment)
 
 # UX optimisation in xcal
 * the first encounter will push the event a fixed length (3ish em (or 2px in week view)) away. But any further nesting will divide into segments.
@@ -61,8 +63,4 @@ Rules:
 - earliest start time is first
 - shortest last
 - in cal x, the distribution is left-skewed
-
-Segments
 - NO time intersections on same segment
-
-id or date created to resolve placement deterministically
