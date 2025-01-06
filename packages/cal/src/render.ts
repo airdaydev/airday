@@ -1,4 +1,4 @@
-import { EventDB } from "./state";
+import { EventDB, eventsToDateMap } from "./state";
 
 const getStartOfWeek = (date: Date) => {
   const dayOfWeek = date.getDay();
@@ -102,7 +102,7 @@ type TimeFormat = "24hr" | "12hr";
 
 class CalendarTransform {
   offset = [0, 0]; // Scroll offset
-  hourPx = 50; // 1 hour = 50px
+  hourPx = 30; // 1 hour = 50px
   renderer: CalRenderer;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
@@ -202,6 +202,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
+  daysVisible = 7;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -210,7 +211,6 @@ export class CalRenderer {
   db: EventDB;
   // current scene objects
   startDay?: Date;
-  clipDays = 12;
   dates: Date[] = [];
   eventObjects: any[] = [];
   constructor(container: HTMLDivElement, db: EventDB) {
@@ -247,6 +247,9 @@ export class CalRenderer {
     this.frame();
     this.goToDate();
     this.loadPng(foxPng);
+  }
+  get clipDays() {
+    return this.daysVisible + 3;
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
@@ -307,7 +310,8 @@ export class CalRenderer {
   // Fit canvas matrix to canvas px dimensions
   resizeCanvas = () => {
     resizeCanvas(this.canvas);
-    this.dayColWidth = (this.canvas.offsetWidth - this.timeColWidth) / 7;
+    this.dayColWidth =
+      (this.canvas.offsetWidth - this.timeColWidth) / this.daysVisible;
     this.resized = false;
   };
   get gridOffset() {
@@ -325,10 +329,16 @@ export class CalRenderer {
         this.originDate.valueOf() + startDay * 864e5,
         this.clipDays,
       );
-      this.eventObjects = this.db.getEvents(
-        absStartDay.valueOf(),
-        absStartDay.valueOf() + 12 * 864e5,
-      );
+      // Group events by day
+      // Get next clipDays days & save in map of active days
+      // If 1 day away from next day, get 3 days of events out, drop a day on the opp. edge every movement
+      // this.eventObjects = this.db.getEvents(
+      //   absStartDay.valueOf(),
+      //   absStartDay.valueOf() + 12 * 864e5,
+      // );
+      // file each date inside a map
+      // AND calculate positions (resolving conflicts etc)!
+      // (use scroll offsets to calculate render positions later)
       this.startDay = absStartDay;
     }
     this.days(this.dates, startDayPx);
@@ -381,8 +391,8 @@ export class CalRenderer {
           this.timeColWidth - this.margin,
           pxOffset,
         );
+        this.hzLine(pxOffset);
       }
-      this.hzLine(pxOffset);
       pxOffset += this.transform.hourPx;
     }
     this.ctx2D.restore();
@@ -438,13 +448,13 @@ export class CalRenderer {
       }
     });
     this.ctx2D.textAlign = "left";
-    this.eventObjects.map((event) => {
-      this.ctx2D.fillText(
-        event.title,
-        this.transform.dateToX(event.start),
-        this.transform.timeToY(event.start),
-      );
-    });
+    // this.eventObjects.map((event) => {
+    //   this.ctx2D.fillText(
+    //     event.title,
+    //     this.transform.dateToX(event.start),
+    //     this.transform.timeToY(event.start),
+    //   );
+    // });
     this.ctx2D.restore();
   }
   allDayLabel() {

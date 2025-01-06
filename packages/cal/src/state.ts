@@ -20,11 +20,58 @@ export class EventDB {
   getEvents(startDate: number, endDate: number) {
     const range: NumericTuple = [startDate, endDate];
     const ids = this.tree.search(range);
-    const set: CalendarEvent[] = [];
+    const arr: CalendarEvent[] = [];
     ids.forEach((id) => {
       const event = this.idMap.get(id);
-      if (event) set.push(event);
+      if (event) arr.push(event);
     });
-    return set;
+    return arr;
   }
+}
+
+function startOfDay(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+// Rendering cache for events
+// Must test if any event intersects on that day
+export class eventCache {
+  map = new Map<string, any>();
+  addEvent(event: CalendarEvent) {}
+  renderDay(clipMin, clipEnd) {}
+}
+
+export function eventsToDateMap(
+  arr: CalendarEvent[],
+  startDate: number,
+  endDate: number,
+) {
+  const map = new Map<Date, Set<CalendarEvent>>();
+  arr.forEach((event) => {
+    // change to ternaries
+    let min = startDate;
+    const eventStartDay = startOfDay(event.start);
+    if (eventStartDay.valueOf() > startDate) {
+      min = eventStartDay.valueOf();
+    }
+    let max = endDate;
+    const eventEndDay = startOfDay(event.end);
+    if (eventEndDay.valueOf() > endDate) {
+      max = eventEndDay.valueOf();
+    }
+    let cur = min;
+    while (cur < max) {
+      const curDate = new Date(cur);
+      const d = map.get(curDate);
+      if (!d) {
+        map.set(curDate, new Set([event]));
+      } else {
+        d.add(event);
+      }
+      cur += 864e5;
+    }
+  });
+  return map;
 }
