@@ -317,11 +317,10 @@ export class CalRenderer {
   get gridOffset() {
     return [this.timeColWidth, this.headerHeight + this.allDayRowHeight];
   }
-  draw() {
-    if (this.resized) {
-      this.resizeCanvas();
-    }
-    clearCanvas(this.canvas);
+  // data check every frame
+  // query if needed, cull every movement
+  // calculate dates, events & positions
+  data() {
     const [startDay, startDayPx] = this.transform.getClipspaceDay();
     const absStartDay = new Date(this.originDate.valueOf() + startDay * 864e5);
     if (this.startDay?.valueOf() !== absStartDay.valueOf()) {
@@ -341,6 +340,14 @@ export class CalRenderer {
       // (use scroll offsets to calculate render positions later)
       this.startDay = absStartDay;
     }
+    return startDayPx;
+  }
+  draw() {
+    if (this.resized) {
+      this.resizeCanvas();
+    }
+    clearCanvas(this.canvas);
+    const startDayPx = this.data();
     this.days(this.dates, startDayPx);
     this.times();
     this.header();
