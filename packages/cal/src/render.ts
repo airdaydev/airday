@@ -124,10 +124,11 @@ class CalendarTransform {
   getClipspaceDay() {
     const minXClip = this.offset[0] - this.renderer.dayColWidth; // 1 day buffer behind offset in screen space
     const r = minXClip % this.renderer.dayColWidth;
-    const firstDayPx =
-      minXClip - r - this.offset[0] + this.renderer.gridOffset[0]; // The first day position within clip space
-    const firstDay = (firstDayPx + this.offset[0]) / this.renderer.dayColWidth;
-    return [firstDay, firstDayPx];
+    const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
+    const firstDay = Math.round(
+      (firstDayPx + this.offset[0]) / this.renderer.dayColWidth,
+    );
+    return [firstDay, firstDayPx + this.renderer.gridOffset[0]];
   }
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
@@ -210,7 +211,7 @@ export class CalRenderer {
   autoscrolling = false;
   db: EventDB;
   // current scene objects
-  startDay?: Date;
+  startDay: Date = getStartOfWeek(new Date());
   dates: Date[] = [];
   eventObjects: any[] = [];
   constructor(container: HTMLDivElement, db: EventDB) {
@@ -323,11 +324,14 @@ export class CalRenderer {
   data() {
     const [startDay, startDayPx] = this.transform.getClipspaceDay();
     const absStartDay = new Date(this.originDate.valueOf() + startDay * 864e5);
-    if (this.startDay?.valueOf() !== absStartDay.valueOf()) {
+    // If clip space has changed:
+    const change = (absStartDay.valueOf() - this.startDay.valueOf()) / 864e5;
+    if (change) {
       this.dates = getDateArray(
         this.originDate.valueOf() + startDay * 864e5,
         this.clipDays,
       );
+      // for date arr pop (-1), shift (1) or clear out (more than 1)
       // Group events by day
       // Get next clipDays days & save in map of active days
       // If 1 day away from next day, get 3 days of events out, drop a day on the opp. edge every movement
