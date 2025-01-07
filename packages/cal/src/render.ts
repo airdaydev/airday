@@ -190,32 +190,40 @@ const EVENT_CACHE_BUFFER = 10; // days cache extends beyond current clipspace
 const iconCache = new Map<string, ImageBitmap>();
 
 class EventCache {
+  renderer: CalRenderer;
   db: EventDB;
   map = new Map<number, Set<CalendarEvent>>();
+  transformMap = new Map<string, { x: number; y: number }>();
   range: [number, number] | null;
   arr: CalendarEvent[] = []; // temp array of all events
-  constructor(db: EventDB) {
+  constructor(renderer: CalRenderer, db: EventDB) {
+    this.renderer = renderer;
     this.db = db;
   }
   private loadEvents(events: CalendarEvent[]) {
     this.arr = events;
+    events.forEach((event) => {
+      this.transformMap.set(event.id, [
+        this.renderer.transform.dateToX(event.start),
+        this.renderer.transform.timeToY(event.start),
+      ]);
+    });
   }
   addRange(range: [Date, Date]) {
     if (!this.range) {
       const events = this.db.getEvents(range[0], range[1]);
       this.loadEvents(events);
-      return;
     }
-    if (range[1].valueOf() < this.range[0]) {
+    if (this.range && range[1].valueOf() < this.range[0]) {
       const events = this.db.getEvents(range[0], range[1]);
       this.loadEvents(events);
-      return; // new range is right of existing
     }
-    if (range[0].valueOf() < this.range[1]) {
+    if (this.range && range[0].valueOf() > this.range[1]) {
       const events = this.db.getEvents(range[0], range[1]);
       this.loadEvents(events);
-      return; // new range is left of existing
     }
+    this.range = [range[0].valueOf(), range[1].valueOf()];
+    console.log(this.range);
   }
   // if (
   //   (this.eventCacheRange &&
@@ -254,7 +262,7 @@ export class CalRenderer {
   startDay: Date = getStartOfWeek(new Date());
   eventCache: EventCache;
   constructor(container: HTMLDivElement, db: EventDB) {
-    this.eventCache = new EventCache(db);
+    this.eventCache = new EventCache(this, db);
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -381,7 +389,7 @@ export class CalRenderer {
   }
   frame() {
     requestAnimationFrame(() => {
-      if (performance.now() - this.lastAction < 1000) {
+      if (performance.now() - this.lastAction < 100) {
         this.draw();
       }
       this.frame();
@@ -466,6 +474,9 @@ export class CalRenderer {
       this.canvas.offsetHeight,
     );
     this.ctx2D.clip(path);
+    this.ctx2D.font = "10px system-ui, -apple-system, BlinkMacSystemFont";
+    this.ctx2D.textAlign = "left";
+    this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
       const offset = index * this.dayColWidth + offsetPx;
       const fox = iconCache.get(foxPng);
@@ -478,15 +489,20 @@ export class CalRenderer {
           this.dayColWidth - this.margin,
         );
       }
-      this.eventCache.arr.map((event) => {
-        this.ctx2D.fillText(
-          event.title,
-          this.transform.dateToX(event.start),
-          this.transform.timeToY(event.start),
-        );
+      this.eventCache.arr.map((event, index) => {
+        // if (index > 1000) return false;
+        const transform = this.eventCache.transformMap.get(event.id);
+        const x = transform[0] - this.transform.offset[0];
+        const y = transform[1] - this.transform.offset[1];
+        if (transform) {
+          this.ctx2D.fillStyle = "#ccccccaa";
+          this.ctx2D.fillRect(x, y, this.dayColWidth - 5, 20);
+          this.ctx2D.fillStyle = this.colourScheme.color;
+          this.ctx2D.fillText(event.title, x, y);
+          console.log(event.title);
+        }
       });
     });
-    this.ctx2D.textAlign = "left";
     this.ctx2D.restore();
   }
   allDayLabel() {

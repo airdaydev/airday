@@ -18,7 +18,7 @@ function randomTitle() {
     "Provisional riders license test",
     "Cirque Du Soleil Sydney",
     "Mudgee holiday",
-  ][Math.floor(Math.random() * 5)];
+  ][Math.floor(Math.random() * 3)];
 }
 
 function dummyEvents(startDate: Date, days = 14, n = 100) {
