@@ -1,3 +1,4 @@
+import { CalendarEvent } from "./event";
 import { EventDB, eventsToDateMap } from "./state";
 
 const getStartOfWeek = (date: Date) => {
@@ -121,14 +122,14 @@ class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
-  getClipspaceDay() {
+  clipspaceOriginX() {
     const minXClip = this.offset[0] - this.renderer.dayColWidth; // 1 day buffer behind offset in screen space
     const r = minXClip % this.renderer.dayColWidth;
     const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
-    const firstDay = Math.round(
+    const relStartDay = Math.round(
       (firstDayPx + this.offset[0]) / this.renderer.dayColWidth,
     );
-    return [firstDay, firstDayPx + this.renderer.gridOffset[0]];
+    return [firstDayPx + this.renderer.gridOffset[0], relStartDay];
   }
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
@@ -180,14 +181,54 @@ class CalendarTransform {
 }
 
 const TIME_FONT_SIZE = 11;
-// const DAY_BUFFER_LENGTH = 50; // 49-1-50
-// const DAY_BUFFER_RESET = 25;
+const EVENT_CACHE_BUFFER = 10; // days cache extends beyond current clipspace
 
 // Virtual calendar view: Reset origin at each DAY_BUFFER days start day
 // Reset origin RESET_POINT days out either direction
 // scroll auto snaps to nearest day
 
 const iconCache = new Map<string, ImageBitmap>();
+
+class EventCache {
+  db: EventDB;
+  map = new Map<number, Set<CalendarEvent>>();
+  range: [number, number] | null;
+  arr: CalendarEvent[] = []; // temp array of all events
+  constructor(db: EventDB) {
+    this.db = db;
+  }
+  private loadEvents(events: CalendarEvent[]) {
+    this.arr = events;
+  }
+  addRange(range: [Date, Date]) {
+    if (!this.range) {
+      const events = this.db.getEvents(range[0], range[1]);
+      this.loadEvents(events);
+      return;
+    }
+    if (range[1].valueOf() < this.range[0]) {
+      const events = this.db.getEvents(range[0], range[1]);
+      this.loadEvents(events);
+      return; // new range is right of existing
+    }
+    if (range[0].valueOf() < this.range[1]) {
+      const events = this.db.getEvents(range[0], range[1]);
+      this.loadEvents(events);
+      return; // new range is left of existing
+    }
+  }
+  // if (
+  //   (this.eventCacheRange &&
+  //     clipspaceX[1].valueOf() < this.eventCacheRange[0]) ||
+  //   (this.eventCacheRange &&
+  //     clipspaceX[0].valueOf() > this.eventCacheRange[1])
+  // ) {
+  //   // Clipspace is entirely before, or after existing cache range
+  //   const events = this.db.getEvents(
+  //     clipspaceX[0].valueOf(),
+  //     clipspaceX[1].valueOf(),
+  //   );
+}
 
 export class CalRenderer {
   scrollable: HTMLDivElement;
@@ -209,13 +250,11 @@ export class CalRenderer {
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
-  db: EventDB;
   // current scene objects
   startDay: Date = getStartOfWeek(new Date());
-  dates: Date[] = [];
-  eventObjects: any[] = [];
+  eventCache: EventCache;
   constructor(container: HTMLDivElement, db: EventDB) {
-    this.db = db;
+    this.eventCache = new EventCache(db);
     this.transform = new CalendarTransform(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -318,44 +357,26 @@ export class CalRenderer {
   get gridOffset() {
     return [this.timeColWidth, this.headerHeight + this.allDayRowHeight];
   }
-  // data check every frame
-  // query if needed, cull every movement
-  // calculate dates, events & positions
-  data() {
-    const [startDay, startDayPx] = this.transform.getClipspaceDay();
-    const absStartDay = new Date(this.originDate.valueOf() + startDay * 864e5);
-    // If clip space has changed:
-    const change = (absStartDay.valueOf() - this.startDay.valueOf()) / 864e5;
-    if (change) {
-      this.dates = getDateArray(
-        this.originDate.valueOf() + startDay * 864e5,
-        this.clipDays,
-      );
-      // for date arr pop (-1), shift (1) or clear out (more than 1)
-      // Group events by day
-      // Get next clipDays days & save in map of active days
-      // If 1 day away from next day, get 3 days of events out, drop a day on the opp. edge every movement
-      // this.eventObjects = this.db.getEvents(
-      //   absStartDay.valueOf(),
-      //   absStartDay.valueOf() + 12 * 864e5,
-      // );
-      // file each date inside a map
-      // AND calculate positions (resolving conflicts etc)!
-      // (use scroll offsets to calculate render positions later)
-      this.startDay = absStartDay;
-    }
-    return startDayPx;
+  clipspace(): [Date[], number, Date, [Date, Date]] {
+    const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
+    const clipStartDayAbs = new Date(
+      this.originDate.valueOf() + relStartDay * 864e5,
+    );
+    const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays);
+    const clipspaceX: [Date, Date] = [dates[0], dates[dates.length - 1]];
+    return [dates, startDayPx, clipStartDayAbs, clipspaceX];
   }
   draw() {
     if (this.resized) {
       this.resizeCanvas();
     }
     clearCanvas(this.canvas);
-    const startDayPx = this.data();
-    this.days(this.dates, startDayPx);
+    const [dates, startDayPx, _, clipspaceX] = this.clipspace(); // TODO: Only necessary in resize/movement
+    this.eventCache.addRange(clipspaceX);
+    this.days(dates, startDayPx);
     this.times();
     this.header();
-    this.events(this.dates, startDayPx);
+    this.events(dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -445,10 +466,10 @@ export class CalRenderer {
       this.canvas.offsetHeight,
     );
     this.ctx2D.clip(path);
-    dates.map((_, index) => {
+    dates.map((date, index) => {
       const offset = index * this.dayColWidth + offsetPx;
       const fox = iconCache.get(foxPng);
-      if (fox && _.getDay() === 5) {
+      if (fox && date.getDay() === 5) {
         this.ctx2D.drawImage(
           fox,
           offset + this.margin,
@@ -457,15 +478,15 @@ export class CalRenderer {
           this.dayColWidth - this.margin,
         );
       }
+      this.eventCache.arr.map((event) => {
+        this.ctx2D.fillText(
+          event.title,
+          this.transform.dateToX(event.start),
+          this.transform.timeToY(event.start),
+        );
+      });
     });
     this.ctx2D.textAlign = "left";
-    // this.eventObjects.map((event) => {
-    //   this.ctx2D.fillText(
-    //     event.title,
-    //     this.transform.dateToX(event.start),
-    //     this.transform.timeToY(event.start),
-    //   );
-    // });
     this.ctx2D.restore();
   }
   allDayLabel() {
