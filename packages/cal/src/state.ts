@@ -1,4 +1,4 @@
-import { CalendarEvent, CalendarEventConstructorProps } from "./event";
+import { CalendarEvent, CalendarEventConstructorProps } from "./model";
 import IntervalTree, { NumericTuple } from "@flatten-js/interval-tree";
 
 export class EventDB {

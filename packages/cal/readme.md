@@ -9,6 +9,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] single canvas element, laid out properly
 - [x] use clip instead of backgrounds for covering sections not meant to be rendered!
 - [x] scroll x position: start by getting week / day width
+- [] Use off screen canvas + transform for events
 - [] Event position incl. intersecting events
 - [] Change time zone
 - [] event text align top
