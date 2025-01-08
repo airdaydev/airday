@@ -60,11 +60,17 @@ export class EventCache {
       // clear between
     }
     // Load new ranges
+    let newEvents = [];
     if (range[0].valueOf() < lastRange[0]) {
       // range before
+      newEvents.push(...this.db.getEvents(range[0], new Date(lastRange[0])));
     }
     if (range[1].valueOf() > lastRange[1]) {
       // range after
+      newEvents.push(...this.db.getEvents(new Date(lastRange[1]), range[1]));
+    }
+    if (newEvents.length) {
+      this.loadEvents(newEvents);
     }
   }
 }
@@ -73,7 +79,7 @@ export class EventCache {
 export class EventRenderer {
   calRenderer: CalRenderer;
   worker: Worker;
-  frame?: ImageBitmap;
+  map = new Map<number, ImageBitmap>();
   constructor(calRenderer: CalRenderer) {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
@@ -84,6 +90,9 @@ export class EventRenderer {
     this.worker.addEventListener("message", (event) => {
       if (event.data.type === "frame") {
         this.frame = event.data.bitmap;
+      }
+      if (event.data.type === "day") {
+        this.map.set(event.data.date, event.data.bitmap);
       }
     });
   }

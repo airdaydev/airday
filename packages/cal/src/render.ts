@@ -166,22 +166,7 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
-    if (this.eventRenderer.frame) {
-      console.log(
-        this.gridOffset[0],
-        this.gridOffset[1],
-        this.canvas.width - this.gridOffset[0],
-        this.canvas.height - this.gridOffset[1],
-      );
-      this.ctx2D.drawImage(
-        this.eventRenderer.frame,
-        this.gridOffset[0],
-        this.gridOffset[1],
-        (this.canvas.width - this.gridOffset[0]) / 2,
-        (this.canvas.height - this.gridOffset[1]) / 2,
-      );
-    }
-    // this.events(dates, startDayPx);
+    this.events(dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -279,6 +264,16 @@ export class CalRenderer {
           -this.transform.offset[1] + 500,
           this.dayWidth - this.margin,
           this.dayWidth - this.margin,
+        );
+      }
+      const image = this.eventRenderer.map.get(date.valueOf());
+      if (image) {
+        this.ctx2D.drawImage(
+          image,
+          offset + this.gridOffset[0],
+          -this.transform.offset[1] + this.gridOffset[1],
+          this.dayWidth,
+          this.canvas.height - this.gridOffset[1],
         );
       }
     });
