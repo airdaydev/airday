@@ -352,7 +352,6 @@ export class CalRenderer {
           this.ctx2D.fillRect(x, y, this.dayColWidth - 5, 20);
           this.ctx2D.fillStyle = this.colourScheme.color;
           this.ctx2D.fillText(event.title, x, y);
-          console.log(event.title);
         }
       });
     });

@@ -39,7 +39,6 @@ export class EventCache {
       this.loadEvents(events);
     }
     this.range = [range[0].valueOf(), range[1].valueOf()];
-    console.log(this.range);
   }
   // if (
   //   (this.eventCacheRange &&
