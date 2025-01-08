@@ -50,19 +50,22 @@ function isWeekend(date: Date) {
 }
 
 const defaultContainerWidth = 100000;
-const scale = window.devicePixelRatio || 1;
+const scale = () => window.devicePixelRatio || 1;
 
 function resizeCanvas2D(canvas: HTMLCanvasElement) {
-  canvas.width = canvas.offsetWidth * scale;
-  canvas.height = canvas.offsetHeight * scale;
+  const maxResolution = [window.screen.width, window.screen.height];
+  const target = [canvas.offsetWidth * scale(), canvas.offsetHeight * scale()];
+  canvas.width = canvas.offsetWidth * scale();
+  canvas.height = canvas.offsetHeight * scale();
+  console.log(canvas.width, canvas.height);
   const ctx2D = getCanvasContext(canvas);
-  ctx2D.scale(scale, scale);
+  ctx2D.scale(scale(), scale());
 }
 
 function dimensions(canvas: HTMLCanvasElement) {
   if (!canvas)
     throw new Error("Attempted to get non-existent canvas dimensions");
-  return [canvas.width / scale, canvas.height / scale];
+  return [canvas.width / scale(), canvas.height / scale()];
 }
 
 function clearCanvas(canvas: HTMLCanvasElement) {
