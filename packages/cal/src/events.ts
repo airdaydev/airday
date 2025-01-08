@@ -1,7 +1,7 @@
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
-import { getCanvasContext } from "./canvas";
+import { getCanvasContext, scale } from "./canvas";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -18,6 +18,7 @@ export class EventCache {
     this.db = db;
   }
   private loadEvents(events: CalendarEvent[]) {
+    console.log("loading events", events.length);
     this.arr = events;
     events.forEach((event) => {
       this.transformMap.set(event.id, [
@@ -27,44 +28,73 @@ export class EventCache {
     });
   }
   addRange(range: [Date, Date]) {
-    if (!this.range) {
-      const events = this.db.getEvents(range[0], range[1]);
-      this.loadEvents(events);
-    }
-    if (this.range && range[1].valueOf() < this.range[0]) {
-      const events = this.db.getEvents(range[0], range[1]);
-      this.loadEvents(events);
-    }
-    if (this.range && range[0].valueOf() > this.range[1]) {
-      const events = this.db.getEvents(range[0], range[1]);
-      this.loadEvents(events);
-    }
+    const lastRange = this.range;
     this.range = [range[0].valueOf(), range[1].valueOf()];
+    if (!lastRange) {
+      const events = this.db.getEvents(range[0], range[1]);
+      // New range is completely outside
+      this.loadEvents(events);
+      return;
+    }
+    if (range[1].valueOf() < lastRange[0]) {
+      // Range is entirely to the left of existing
+      const events = this.db.getEvents(range[0], range[1]);
+      this.loadEvents(events);
+      return;
+    }
+    if (range[0].valueOf() > lastRange[1]) {
+      // Range is entirely to the right of existing
+      const events = this.db.getEvents(range[0], range[1]);
+      this.loadEvents(events);
+      return;
+    }
+    // Clear previous ranges
+    if (range[0].valueOf() > lastRange[0]) {
+      // clear between
+    }
+    if (range[1].valueOf() < lastRange[0]) {
+      // clear between
+    }
+    // Load new ranges
+    if (range[0].valueOf() < lastRange[0]) {
+      // range before
+    }
+    if (range[1].valueOf() > lastRange[1]) {
+      // range after
+    }
   }
-  // if (
-  //   (this.eventCacheRange &&
-  //     clipspaceX[1].valueOf() < this.eventCacheRange[0]) ||
-  //   (this.eventCacheRange &&
-  //     clipspaceX[0].valueOf() > this.eventCacheRange[1])
-  // ) {
-  //   // Clipspace is entirely before, or after existing cache range
-  //   const events = this.db.getEvents(
-  //     clipspaceX[0].valueOf(),
-  //     clipspaceX[1].valueOf(),
-  //   );
 }
 
+// Performance test: translate vs rerender
 export class EventRenderer {
   calRenderer: CalRenderer;
-  canvas: OffscreenCanvas;
-  ctx2D: OffscreenCanvasRenderingContext2D;
+  worker: Worker;
+  frame?: ImageBitmap;
   constructor(calRenderer: CalRenderer) {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
-    this.canvas = new OffscreenCanvas(100, 100);
-    this.ctx2D = getCanvasContext(this.canvas);
+    this.worker = new Worker(new URL("./workers/events.ts", import.meta.url));
+    this.worker.onerror = (error) => {
+      console.error("Worker error:", error);
+    };
+    this.worker.addEventListener("message", (event) => {
+      if (event.data.type === "frame") {
+        this.frame = event.data.bitmap;
+      }
+    });
   }
-  resize() {}
+  resize() {
+    // Resized to width/height of grid only
+    const s = scale();
+    const w =
+      (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
+      s;
+    const h =
+      (this.calRenderer.canvas.offsetHeight - this.calRenderer.gridOffset[1]) *
+      s;
+    const resizeParams = [w, h, s];
+    this.worker.postMessage({ type: "resize", params: resizeParams });
+  }
   updateDay() {
     // day renderering
     //       // this.eventCache.arr.map((event, index) => {

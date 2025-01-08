@@ -1,11 +1,15 @@
 export const defaultContainerWidth = 100000;
 export const scale = () => window.devicePixelRatio || 1;
 
+// function overloads to determine correct type
+export function getCanvasContext(
+  canvas: HTMLCanvasElement,
+): CanvasRenderingContext2D;
+export function getCanvasContext(
+  canvas: OffscreenCanvas,
+): OffscreenCanvasRenderingContext2D;
 export function getCanvasContext(canvas: HTMLCanvasElement | OffscreenCanvas) {
-  const ctx2D =
-    canvas instanceof HTMLCanvasElement
-      ? (canvas.getContext("2d") as CanvasRenderingContext2D)
-      : (canvas.getContext("2d") as OffscreenCanvasRenderingContext2D);
+  const ctx2D = canvas.getContext("2d");
   if (!ctx2D) {
     throw new Error("Failed to retrieve canvas context");
   }

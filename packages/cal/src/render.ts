@@ -31,7 +31,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 28;
+  daysVisible = 7;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -166,7 +166,16 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
-    this.events(dates, startDayPx);
+    if (this.eventRenderer.frame) {
+      this.ctx2D.drawImage(
+        this.eventRenderer.frame,
+        this.gridOffset[0],
+        this.gridOffset[1],
+        this.canvas.width - this.gridOffset[0],
+        this.canvas.height - this.gridOffset[1],
+      );
+    }
+    // this.events(dates, startDayPx);
     this.debug();
   }
   frame() {
