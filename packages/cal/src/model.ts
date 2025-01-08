@@ -42,4 +42,12 @@ export class CalendarEvent {
       end: this.end,
     };
   }
+  transfer() {
+    return {
+      id: this.id,
+      title: this.title,
+      start: this.start.valueOf(),
+      end: this.end.valueOf(),
+    };
+  }
 }

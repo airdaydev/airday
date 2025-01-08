@@ -2,6 +2,7 @@ import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
 import { getCanvasContext, scale } from "./canvas";
+import { getStartOfDay } from "./time";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -18,16 +19,19 @@ export class EventCache {
     this.db = db;
   }
   private loadEvents(events: CalendarEvent[]) {
-    console.log("loading events", events.length);
-    this.arr = events;
-    events.forEach((event) => {
-      this.transformMap.set(event.id, [
-        this.renderer.transform.dateToX(event.start),
-        this.renderer.transform.timeToY(event.start),
-      ]);
+    this.renderer.eventRenderer.worker.postMessage({
+      type: "load",
+      events: events.map((e) => e.transfer()), // TODO: Date to number
+      range: this.range,
     });
+    // events.forEach((event) => {
+    //   this.transformMap.set(event.id, [
+    //     this.renderer.transform.dateToX(event.start),
+    //     this.renderer.transform.timeToY(event.start),
+    //   ]);
+    // });
   }
-  addRange(range: [Date, Date]) {
+  updateRange(range: [Date, Date]) {
     const lastRange = this.range;
     this.range = [range[0].valueOf(), range[1].valueOf()];
     if (!lastRange) {

@@ -9,6 +9,14 @@ export const getStartOfWeek = (date: Date) => {
   return mondayDate;
 };
 
+export const getStartOfDay = (date: Date) => {
+  const start = new Date(date);
+  start.setHours(0);
+  start.setMinutes(0);
+  start.setSeconds(0);
+  return start;
+};
+
 export const getDate = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const day = days[date.getDay()];

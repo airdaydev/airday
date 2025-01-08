@@ -31,7 +31,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 30;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -162,17 +162,23 @@ export class CalRenderer {
     }
     clearCanvas(this.canvas);
     const [dates, startDayPx, _, clipspaceX] = this.clipspace(); // TODO: Only necessary in resize/movement
-    this.eventCache.addRange(clipspaceX);
+    this.eventCache.updateRange(clipspaceX);
     this.days(dates, startDayPx);
     this.times();
     this.header();
     if (this.eventRenderer.frame) {
-      this.ctx2D.drawImage(
-        this.eventRenderer.frame,
+      console.log(
         this.gridOffset[0],
         this.gridOffset[1],
         this.canvas.width - this.gridOffset[0],
         this.canvas.height - this.gridOffset[1],
+      );
+      this.ctx2D.drawImage(
+        this.eventRenderer.frame,
+        this.gridOffset[0],
+        this.gridOffset[1],
+        (this.canvas.width - this.gridOffset[0]) / 2,
+        (this.canvas.height - this.gridOffset[1]) / 2,
       );
     }
     // this.events(dates, startDayPx);
