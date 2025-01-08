@@ -1,6 +1,6 @@
 # Air Roadmap
 
-## 2024 Q3
+## 2024 Q3-4
 - [x] Bring back item view
 - [x] New drag/drop list for list view
 - [x] Clean up list dnd CSS
@@ -54,8 +54,10 @@
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
+
+## 2025 Q1
 - [] Calendar
-- [] Canvas bg resets WHENEVER container size changes (change made but component needs building)
+- [] Canvas bg resets WHENEVER container size changes (change made for list but component needs rebuilding)
 - [] Editing text inline cursor set correctly.
 - [] Deleting items
 - [] Add new item
@@ -86,7 +88,6 @@
 - [ ] on context click of nav item, select the list
 - [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
 - [ ] drag sidebar to resize
-- [ ] air - experiment with sounds
 - [ ] add initial habit item
 - [ ] open performance list, add filters/configuration
 - [ ] open priority list (added by reference, no move!)
@@ -99,12 +100,9 @@
 - [] Sequences (one offs, projects)
 - [] Performance board
 - [] Begin back-end
-- [] Themes incl. Departure Mono
-- [] Shared lists
-- [] Monthly view
+- [] Shared lists?
 - [] Loading pane
 - [] Save views (arrangements of panes)
-- [] experiment with sounds
 - [] Print styles
 - [] group lists (one level)
 - [] subitems (one level)
@@ -214,11 +212,14 @@
 - [] Android release
 - [] Explore Ionic Capacitor as fallback
 
-## Stretch goals
+## Future goals
 - [x] List animations (v1)
+- [x] Canvas list
+- [] air - experiment with sounds
+- [] Monthly cal view
+- [] Annual cal view
 - [] Kanban board
-- [] Canvas list
-- [] Webgl list
+- [] Webgl shadows/pickup
 - [] Markdown descriptions
 - [] Pin Lock
 - [] Secrets
@@ -229,6 +230,7 @@
 - [] Custom fields
 - [] consider flexsearch
 - [] Pages
+- [] Themes incl. Departure Mono
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
