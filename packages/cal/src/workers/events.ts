@@ -11,6 +11,7 @@ const transform = {
   dayColWidth: 100,
   width: 100,
   height: 100,
+  scale: 1,
 };
 
 function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
@@ -42,36 +43,49 @@ function constructDayMap(events: any[], range: [number, number]) {
   });
 }
 
+function scale() {
+  if (!ctx2D) throw new Error("offscreen ctx2d not ready");
+  canvas.width = transform.width;
+  canvas.height = transform.height;
+  ctx2D.scale(transform.scale, transform.scale);
+}
+
+function renderCache() {
+  if (!ctx2D) throw new Error("offscreen ctx2d not ready");
+  let j = 0;
+  for (let kv of cache.entries()) {
+    let i = 0;
+    kv[1].forEach((event) => {
+      const x = transform.dayColWidth * j;
+      ctx2D.fillStyle = "#ccc";
+      ctx2D.fillRect(x, i * 10, 100, 20);
+      ctx2D.fillStyle = "#fff";
+      ctx2D?.fillText(event.title, x, i * 10);
+      i++;
+    });
+    j++;
+  }
+  const bitmap = canvas.transferToImageBitmap();
+  self.postMessage({ type: "frame", bitmap }, [bitmap]);
+}
+
 self.onmessage = (message: MessageEvent) => {
   // Will have to rerender all days
   if (message.data.type === "resize") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-    const [width, height, scale] = message.data.params;
-    canvas.width = width;
-    canvas.height = height;
-    ctx2D.scale(scale, scale);
-    console.debug("resized, painted");
+    transform.dayColWidth = message.data.params.dayColWidth || 100;
+    transform.height = message.data.params.height;
+    transform.width = message.data.params.width;
+    transform.scale = message.data.params.scale;
+    console.log(transform);
+    scale();
+    renderCache();
   }
   if (message.data.type === "load") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
     ctx2D.textBaseline = "top";
     ctx2D.font = "10px departure mono";
     constructDayMap(message.data.events, message.data.range);
-    console.log(message.data.events.length);
-    let j = 0;
-    for (let kv of cache.entries()) {
-      let i = 0;
-      kv[1].forEach((event) => {
-        const x = transform.dayColWidth * j;
-        ctx2D.fillStyle = "#ccc";
-        ctx2D.fillRect(x, i * 10, 100, 20);
-        ctx2D.fillStyle = "#fff";
-        ctx2D?.fillText(event.title, x, i * 10);
-        i++;
-      });
-      j++;
-    }
-    const bitmap = canvas.transferToImageBitmap();
-    self.postMessage({ type: "frame", bitmap }, [bitmap]);
+    renderCache();
   }
 };

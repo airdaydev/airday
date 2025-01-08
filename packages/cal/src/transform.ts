@@ -22,11 +22,11 @@ export class CalendarTransform {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
   clipspaceOriginX() {
-    const minXClip = this.offset[0] - this.renderer.dayColWidth; // 1 day buffer behind offset in screen space
-    const r = minXClip % this.renderer.dayColWidth;
+    const minXClip = this.offset[0] - this.renderer.dayWidth; // 1 day buffer behind offset in screen space
+    const r = minXClip % this.renderer.dayWidth;
     const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
     const relStartDay = Math.round(
-      (firstDayPx + this.offset[0]) / this.renderer.dayColWidth,
+      (firstDayPx + this.offset[0]) / this.renderer.dayWidth,
     );
     return [firstDayPx + this.renderer.gridOffset[0], relStartDay];
   }
@@ -61,7 +61,7 @@ export class CalendarTransform {
   xToDay(x: number) {
     return Math.floor(
       (x - this.renderer.gridOffset[0] + this.offset[0]) /
-        this.renderer.dayColWidth,
+        this.renderer.dayWidth,
     );
   }
   dateToX(date: Date) {
@@ -72,7 +72,7 @@ export class CalendarTransform {
     return (
       ((normalisedDate.valueOf() - this.renderer.originDate.valueOf()) /
         864e5) *
-        this.renderer.dayColWidth -
+        this.renderer.dayWidth -
       this.offset[0] +
       this.renderer.gridOffset[0]
     );

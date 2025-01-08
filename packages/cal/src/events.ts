@@ -90,13 +90,13 @@ export class EventRenderer {
   resize() {
     // Resized to width/height of grid only
     const s = scale();
-    const w =
+    const width =
       (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
       s;
-    const h =
+    const height =
       (this.calRenderer.canvas.offsetHeight - this.calRenderer.gridOffset[1]) *
       s;
-    const resizeParams = [w, h, s];
+    const resizeParams = { width, height, scale: s };
     this.worker.postMessage({ type: "resize", params: resizeParams });
   }
   updateDay() {
