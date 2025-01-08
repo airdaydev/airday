@@ -2,81 +2,8 @@ import { EventCache, EventRenderer } from "./events";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme } from "./colours";
 import { EventDB } from "./state";
-
-const getStartOfWeek = (date: Date) => {
-  const dayOfWeek = date.getDay();
-  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const mondayDate = new Date(date);
-  mondayDate.setHours(0);
-  mondayDate.setMinutes(0);
-  mondayDate.setSeconds(0);
-  mondayDate.setDate(date.getDate() - daysSinceMonday);
-  return mondayDate;
-};
-
-const getDate = (date: Date) => {
-  const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-  const day = days[date.getDay()];
-  const dateMonth = date.getDate();
-  const mo = date.getMonth();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}/${(mo + 1).toString().padStart(2, "0")}`;
-};
-
-const relativeDay = (dateVal: number, relativeDays: number) => {
-  return new Date(dateVal + relativeDays * 864e5);
-};
-
-const getDateArray = (startDate: number, dayCount: number): Date[] => {
-  let arr: Date[] = [];
-  for (let i = 0; i < dayCount; i++) {
-    arr.push(relativeDay(startDate, i));
-  }
-  return arr;
-};
-
-function getCanvasContext(canvas: HTMLCanvasElement | OffscreenCanvas) {
-  const ctx2D =
-    canvas instanceof HTMLCanvasElement
-      ? (canvas.getContext("2d") as CanvasRenderingContext2D)
-      : (canvas.getContext("2d") as OffscreenCanvasRenderingContext2D);
-  if (!ctx2D) {
-    throw new Error("Failed to retrieve canvas context");
-  }
-  return ctx2D;
-}
-
-function isWeekend(date: Date) {
-  return date.getDay() === 0 || date.getDay() === 6;
-}
-
-const defaultContainerWidth = 100000;
-const scale = () => window.devicePixelRatio || 1;
-
-function resizeCanvas2D(canvas: HTMLCanvasElement) {
-  const maxResolution = [window.screen.width, window.screen.height];
-  const target = [canvas.offsetWidth * scale(), canvas.offsetHeight * scale()];
-  canvas.width = canvas.offsetWidth * scale();
-  canvas.height = canvas.offsetHeight * scale();
-  console.log(canvas.width, canvas.height);
-  const ctx2D = getCanvasContext(canvas);
-  ctx2D.scale(scale(), scale());
-}
-
-function dimensions(canvas: HTMLCanvasElement) {
-  if (!canvas)
-    throw new Error("Attempted to get non-existent canvas dimensions");
-  return [canvas.width / scale(), canvas.height / scale()];
-}
-
-function clearCanvas(canvas: HTMLCanvasElement) {
-  const canvasDimensions = dimensions(canvas);
-  getCanvasContext(canvas).clearRect(
-    0,
-    0,
-    canvasDimensions[0],
-    canvasDimensions[1],
-  );
-}
+import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
+import { getStartOfWeek, getDate, getDateArray, isWeekend } from "./time";
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
 
@@ -96,7 +23,6 @@ export class CalRenderer {
   scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
-  containerWidth = defaultContainerWidth;
   colourScheme = lightScheme;
   timeColWidth = 50;
   dayColWidth = 100;
@@ -105,7 +31,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 28;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -240,7 +166,7 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
-    // this.events(dates, startDayPx);
+    this.events(dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -330,7 +256,7 @@ export class CalRenderer {
       this.canvas.offsetHeight,
     );
     this.ctx2D.clip(path);
-    this.ctx2D.font = "10px system-ui, -apple-system, BlinkMacSystemFont";
+    this.ctx2D.font = "8px Departure Mono";
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
@@ -345,18 +271,6 @@ export class CalRenderer {
           this.dayColWidth - this.margin,
         );
       }
-      this.eventCache.arr.map((event, index) => {
-        // if (index > 1000) return false;
-        const transform = this.eventCache.transformMap.get(event.id);
-        const x = transform[0];
-        const y = transform[1];
-        if (transform) {
-          this.ctx2D.fillStyle = "#ccccccaa";
-          this.ctx2D.fillRect(x, y, this.dayColWidth - 5, 20);
-          this.ctx2D.fillStyle = this.colourScheme.color;
-          this.ctx2D.fillText(event.title, x, y);
-        }
-      });
     });
     this.ctx2D.restore();
   }

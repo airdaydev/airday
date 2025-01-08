@@ -1,6 +1,7 @@
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
+import { getCanvasContext } from "./canvas";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -61,11 +62,23 @@ export class EventRenderer {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
     this.canvas = new OffscreenCanvas(100, 100);
-    // this.ctx2D = getCanvasContext(this.canvas);
+    this.ctx2D = getCanvasContext(this.canvas);
   }
   resize() {}
-  renderDay() {
+  updateDay() {
     // day renderering
+    //       // this.eventCache.arr.map((event, index) => {
+    //   // if (index > 1000) return false;
+    //   const transform = this.eventCache.transformMap.get(event.id);
+    //   const x = transform[0];
+    //   const y = transform[1];
+    //   if (transform) {
+    //     this.ctx2D.fillStyle = "#ccccccaa";
+    //     this.ctx2D.fillRect(x, y, this.dayColWidth - 5, 20);
+    //     this.ctx2D.fillStyle = this.colourScheme.color;
+    //     this.ctx2D.fillText(event.title, x, y);
+    //   }
+    // });
   }
   updateOffset() {
     // canvas methods
