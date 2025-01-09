@@ -55,5 +55,6 @@ export class DayRange {
   buffer(days: number = 3) {
     this.start = new Date(this.start.valueOf() - 864e5 * days);
     this.days = this.days + days;
+    return this;
   }
 }

@@ -14,7 +14,7 @@ function qperf(label?: string) {
 }
 
 const cache = new Map<number, Set<any>>();
-const stale = new Set<number>();
+const fresh = new Set<number>();
 
 const transform = {
   dayWidth: 100,
@@ -49,16 +49,18 @@ function updateCache(events: any[], range: [number, number]) {
     for (let i = 0; i < days; i++) {
       const day = startDay + i * 864e5;
       addMapSet(cache, day, event);
+      fresh.add(day);
     }
+    console.log(fresh);
   });
+  renderCache();
   for (
     let i = getStartOfDay(new Date(range[0])).valueOf();
     i < range[1];
     i = i + 864e5
   ) {
-    stale.add(i);
+    fresh.delete(i);
   }
-  renderCache();
   // for (let day of cache.keys()) {
   //   if (day < range[0] || day > range[1]) {
   //     cache.delete(day);
@@ -79,7 +81,7 @@ function renderCache() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   scale();
-  for (let date of stale) {
+  for (let date of fresh) {
     let i = 0;
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     cache.get(date)?.forEach((event) => {
@@ -100,7 +102,7 @@ function renderCache() {
     const bitmap = canvas.transferToImageBitmap();
     j++;
     self.postMessage({ type: "day", date: date, bitmap }, [bitmap]);
-    stale.delete(date);
+    fresh.delete(date);
   }
 }
 

@@ -36,7 +36,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 28;
   daysBuffer = 2;
   resized = false;
   hoveredDate: Date | null = null;
@@ -159,7 +159,7 @@ export class CalRenderer {
       this.originDate.valueOf() + relStartDay * 864e5,
     );
     const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays);
-    const clipspaceRange = new DayRange(dates[0], this.clipDays);
+    const clipspaceRange = new DayRange(dates[0], this.clipDays).buffer();
     return [dates, startDayPx, clipStartDayAbs, clipspaceRange];
   }
   draw() {
