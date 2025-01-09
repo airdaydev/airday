@@ -3,14 +3,19 @@ import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme } from "./colours";
 import { EventDB } from "./state";
 import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
-import { getStartOfWeek, getDate, getDateArray, isWeekend } from "./time";
+import {
+  getStartOfWeek,
+  getDate,
+  getDateArray,
+  isWeekend,
+  DayRange,
+} from "./time";
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
 
 type TimeFormat = "24hr" | "12hr";
 
 const TIME_FONT_SIZE = 11;
-const EVENT_CACHE_BUFFER = 10; // days cache extends beyond current clipspace
 
 // Virtual calendar view: Reset origin at each DAY_BUFFER days start day
 // Reset origin RESET_POINT days out either direction
@@ -32,6 +37,7 @@ export class CalRenderer {
   timeFormat: TimeFormat = "24hr";
   margin = 10;
   daysVisible = 7;
+  daysBuffer = 2;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -147,22 +153,22 @@ export class CalRenderer {
   get gridOffset() {
     return [this.timeHeight, this.headerHeight + this.allDayRowHeight];
   }
-  clipspace(): [Date[], number, Date, [Date, Date]] {
+  clipspace(): [Date[], number, Date, DayRange] {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
     );
     const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays);
-    const clipspaceX: [Date, Date] = [dates[0], dates[dates.length - 1]];
-    return [dates, startDayPx, clipStartDayAbs, clipspaceX];
+    const clipspaceRange = new DayRange(dates[0], this.clipDays);
+    return [dates, startDayPx, clipStartDayAbs, clipspaceRange];
   }
   draw() {
     if (this.resized) {
       this.resizeCal();
     }
     clearCanvas(this.canvas);
-    const [dates, startDayPx, _, clipspaceX] = this.clipspace(); // TODO: Only necessary in resize/movement
-    this.eventCache.updateRange(clipspaceX);
+    const [dates, startDayPx, _, clipspaceRange] = this.clipspace(); // TODO: Only necessary in resize/movement
+    this.eventCache.updateRange(clipspaceRange);
     this.days(dates, startDayPx);
     this.times();
     this.header();

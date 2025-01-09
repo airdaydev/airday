@@ -41,3 +41,19 @@ export const getDateArray = (startDate: number, dayCount: number): Date[] => {
 export function isWeekend(date: Date) {
   return date.getDay() === 0 || date.getDay() === 6;
 }
+
+export class DayRange {
+  start: Date;
+  days: number;
+  constructor(start: Date, days: number) {
+    this.start = start;
+    this.days = days;
+  }
+  get end() {
+    return new Date(this.start.valueOf() + 864e5 * this.days);
+  }
+  buffer(days: number = 3) {
+    this.start = new Date(this.start.valueOf() - 864e5 * days);
+    this.days = this.days + days;
+  }
+}

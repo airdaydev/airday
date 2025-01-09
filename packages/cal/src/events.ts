@@ -2,7 +2,7 @@ import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
 import { getCanvasContext, scale } from "./canvas";
-import { getStartOfDay } from "./time";
+import { DayRange, getStartOfDay } from "./time";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -12,17 +12,18 @@ export class EventCache {
   db: EventDB;
   map = new Map<number, Set<CalendarEvent>>();
   transformMap = new Map<string, { x: number; y: number }>();
-  range: [number, number] | null;
+  range: DayRange | null = null;
   arr: CalendarEvent[] = []; // temp array of all events
   constructor(renderer: CalRenderer, db: EventDB) {
     this.renderer = renderer;
     this.db = db;
   }
   private loadEvents(events: CalendarEvent[]) {
+    if (!this.range) throw new Error("No range in loadEvents");
     this.renderer.eventRenderer.worker.postMessage({
       type: "load",
       events: events.map((e) => e.transfer()), // TODO: Date to number
-      range: this.range,
+      range: [this.range.start.valueOf(), this.range.end.valueOf()],
     });
     // events.forEach((event) => {
     //   this.transformMap.set(event.id, [
@@ -31,43 +32,43 @@ export class EventCache {
     //   ]);
     // });
   }
-  updateRange(range: [Date, Date]) {
+  updateRange(range: DayRange) {
     const lastRange = this.range;
-    this.range = [range[0].valueOf(), range[1].valueOf()];
+    this.range = range;
     if (!lastRange) {
-      const events = this.db.getEvents(range[0], range[1]);
+      const events = this.db.getEvents(range.start, range.end);
       // New range is completely outside
       this.loadEvents(events);
       return;
     }
-    if (range[1].valueOf() < lastRange[0]) {
+    if (range.start.valueOf() < lastRange.start.valueOf()) {
       // Range is entirely to the left of existing
-      const events = this.db.getEvents(range[0], range[1]);
+      const events = this.db.getEvents(range.start, range.end);
       this.loadEvents(events);
       return;
     }
-    if (range[0].valueOf() > lastRange[1]) {
+    if (range.start.valueOf() > lastRange.end.valueOf()) {
       // Range is entirely to the right of existing
-      const events = this.db.getEvents(range[0], range[1]);
+      const events = this.db.getEvents(range.start, range.end);
       this.loadEvents(events);
       return;
     }
     // Clear previous ranges
-    if (range[0].valueOf() > lastRange[0]) {
+    if (range.start.valueOf() > lastRange.end.valueOf()) {
       // clear between
     }
-    if (range[1].valueOf() < lastRange[0]) {
+    if (range.end.valueOf() < lastRange.end.valueOf()) {
       // clear between
     }
     // Load new ranges
     let newEvents = [];
-    if (range[0].valueOf() < lastRange[0]) {
+    if (range.start.valueOf() < lastRange.end.valueOf()) {
       // range before
-      newEvents.push(...this.db.getEvents(range[0], new Date(lastRange[0])));
+      newEvents.push(...this.db.getEvents(range.start, lastRange.start));
     }
-    if (range[1].valueOf() > lastRange[1]) {
+    if (range.end.valueOf() > lastRange.end.valueOf()) {
       // range after
-      newEvents.push(...this.db.getEvents(new Date(lastRange[1]), range[1]));
+      newEvents.push(...this.db.getEvents(lastRange.end, range.end));
     }
     if (newEvents.length) {
       this.loadEvents(newEvents);
