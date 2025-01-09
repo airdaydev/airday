@@ -103,9 +103,8 @@ export class EventRenderer {
     const width =
       (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
       s;
-    const height =
-      (this.calRenderer.canvas.offsetHeight - this.calRenderer.gridOffset[1]) *
-      s;
+    const height = this.calRenderer.transform.hourPx * 24;
+    s;
     const resizeParams = {
       width,
       height,

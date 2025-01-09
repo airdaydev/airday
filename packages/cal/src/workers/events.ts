@@ -3,6 +3,16 @@ const ctx2D = canvas.getContext("2d");
 
 console.debug("event worker ready");
 
+function qperf(label?: string) {
+  const start = performance.now();
+  return () => {
+    const end = performance.now();
+    let str = `exec time: ${end - start}ms`;
+    if (label) str += ` (${label})`;
+    console.log(str);
+  };
+}
+
 const cache = new Map<number, Set<any>>();
 const stale = new Set<number>();
 
@@ -63,7 +73,6 @@ function scale() {
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
   ctx2D.font = "6px departure mono";
-  console.log("scale", canvas.width, canvas.height, transform.scale);
 }
 
 function renderCache() {
@@ -71,7 +80,6 @@ function renderCache() {
   let j = 0;
   scale();
   for (let date of stale) {
-    // console.log("rendering", new Date(date));
     let i = 0;
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     cache.get(date)?.forEach((event) => {

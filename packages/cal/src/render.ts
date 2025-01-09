@@ -31,7 +31,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 28;
+  daysVisible = 7;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
@@ -268,11 +268,10 @@ export class CalRenderer {
       // }
       const image = this.eventRenderer.map.get(date.valueOf());
       if (image) {
-        console.log(image.width);
         this.ctx2D.drawImage(
           image,
           offset,
-          -this.transform.offset[1],
+          -this.transform.offset[1] + this.gridOffset[1],
           this.dayWidth,
           this.canvas.height - this.gridOffset[1],
         );
