@@ -1,8 +1,8 @@
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
-import { getCanvasContext, scale } from "./canvas";
-import { DayRange, getStartOfDay } from "./time";
+import { scale } from "./canvas";
+import { DayRange } from "./time";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -41,7 +41,7 @@ export class EventCache {
       this.loadEvents(events);
       return;
     }
-    if (range.start.valueOf() < lastRange.start.valueOf()) {
+    if (range.end.valueOf() < lastRange.start.valueOf()) {
       // Range is entirely to the left of existing
       const events = this.db.getEvents(range.start, range.end);
       this.loadEvents(events);

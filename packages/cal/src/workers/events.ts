@@ -3,16 +3,7 @@ const ctx2D = canvas.getContext("2d");
 
 console.debug("event worker ready");
 
-function qperf(label?: string) {
-  const start = performance.now();
-  return () => {
-    const end = performance.now();
-    let str = `exec time: ${end - start}ms`;
-    if (label) str += ` (${label})`;
-    console.log(str);
-  };
-}
-
+const idCache = new Map<string, any>();
 const cache = new Map<number, Set<any>>();
 const fresh = new Set<number>();
 
@@ -32,12 +23,8 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function getStartOfDay(date: Date) {
-  const start = new Date(date);
-  start.setHours(0);
-  start.setMinutes(0);
-  start.setSeconds(0);
-  return start;
+function utcMidnight(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 function updateCache(events: any[], range: [number, number]) {
@@ -45,17 +32,17 @@ function updateCache(events: any[], range: [number, number]) {
     const start = Math.max(event.start.valueOf(), range[0] as number);
     const end = Math.min(event.end.valueOf(), range[1] as number);
     const days = Math.ceil((end - start) / 864e5);
-    const startDay = getStartOfDay(new Date(start)).valueOf();
+    const startDay = utcMidnight(new Date(start)).valueOf();
     for (let i = 0; i < days; i++) {
       const day = startDay + i * 864e5;
-      addMapSet(cache, day, event);
+      addMapSet(cache, day, event.id);
       fresh.add(day);
+      idCache.set(event.id, event);
     }
-    console.log(fresh);
   });
   renderCache();
   for (
-    let i = getStartOfDay(new Date(range[0])).valueOf();
+    let i = utcMidnight(new Date(range[0])).valueOf();
     i < range[1];
     i = i + 864e5
   ) {
@@ -84,7 +71,8 @@ function renderCache() {
   for (let date of fresh) {
     let i = 0;
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
-    cache.get(date)?.forEach((event) => {
+    cache.get(date)?.forEach((id) => {
+      const event = idCache.get(id);
       const x = 0;
       ctx2D.fillStyle = "#eeeeee";
       ctx2D.shadowColor = "#cccccc33";

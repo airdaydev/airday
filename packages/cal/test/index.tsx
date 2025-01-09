@@ -46,8 +46,8 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
   return events;
 }
 
-const start = new Date(new Date().setDate(new Date().getDate() - 182));
-const events = dummyEvents(start, 365, 10000);
+const start = new Date(new Date().setDate(new Date().getDate() - 365));
+const events = dummyEvents(start, 365 * 2, 20000);
 
 const db = new EventDB();
 db.loadEvents(events);

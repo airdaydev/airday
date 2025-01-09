@@ -2,21 +2,13 @@ export const getStartOfWeek = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const mondayDate = new Date(date);
-  mondayDate.setHours(0);
-  mondayDate.setMinutes(0);
-  mondayDate.setSeconds(0);
-  mondayDate.setMilliseconds(0);
   mondayDate.setDate(date.getDate() - daysSinceMonday);
-  return mondayDate;
+  return utcMidnight(mondayDate);
 };
 
-export const getStartOfDay = (date: Date) => {
-  const start = new Date(date);
-  start.setHours(0);
-  start.setMinutes(0);
-  start.setSeconds(0);
-  return start;
-};
+export function utcMidnight(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
 
 export const getDate = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
