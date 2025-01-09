@@ -31,7 +31,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 28;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());

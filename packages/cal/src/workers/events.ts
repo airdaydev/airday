@@ -8,7 +8,6 @@ const stale = new Set<number>();
 
 const transform = {
   dayWidth: 100,
-  width: 100,
   height: 100,
   scale: 1,
 };
@@ -20,7 +19,6 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
     map.set(key, newSet);
   } else {
     set.add(val);
-    map.set(key, set);
   }
 }
 
@@ -64,7 +62,7 @@ function scale() {
   canvas.height = transform.height * 2;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
-  ctx2D.font = "8px alte haas grotesk";
+  ctx2D.font = "6px departure mono";
   console.log("scale", canvas.width, canvas.height, transform.scale);
 }
 
@@ -78,7 +76,11 @@ function renderCache() {
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     cache.get(date)?.forEach((event) => {
       const x = 0;
-      ctx2D.fillStyle = "#eceeff";
+      ctx2D.fillStyle = "#eeeeee";
+      ctx2D.shadowColor = "#cccccc33";
+      ctx2D.shadowBlur = 3;
+      ctx2D.shadowOffsetX = 2;
+      ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
       ctx2D.roundRect(x, i * 22, transform.dayWidth - 5, 20, 2);
       ctx2D.fill();
@@ -100,8 +102,8 @@ self.onmessage = (message: MessageEvent) => {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
     transform.dayWidth = message.data.params.dayWidth || 100;
     transform.height = message.data.params.height;
-    transform.width = message.data.params.width;
     transform.scale = message.data.params.scale;
+    renderCache();
   }
   if (message.data.type === "load") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
