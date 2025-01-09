@@ -1,5 +1,3 @@
-// import { CalendarEvent } from "../model";
-
 const canvas = new OffscreenCanvas(100, 100);
 const ctx2D = canvas.getContext("2d");
 
@@ -9,7 +7,7 @@ const cache = new Map<number, Set<any>>();
 const stale = new Set<number>();
 
 const transform = {
-  dayColWidth: 100,
+  dayWidth: 100,
   width: 100,
   height: 100,
   scale: 1,
@@ -20,7 +18,10 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   if (!set) {
     const newSet = new Set([val]);
     map.set(key, newSet);
-  } else set.add(val);
+  } else {
+    set.add(val);
+    map.set(key, set);
+  }
 }
 
 function getStartOfDay(date: Date) {
@@ -40,23 +41,31 @@ function updateCache(events: any[], range: [number, number]) {
     for (let i = 0; i < days; i++) {
       const day = startDay + i * 864e5;
       addMapSet(cache, day, event);
-      stale.add(day);
     }
   });
-  for (let day of cache.keys()) {
-    if (day < range[0] || day > range[1]) {
-      cache.delete(day);
-    }
+  for (
+    let i = getStartOfDay(new Date(range[0])).valueOf();
+    i < range[1];
+    i = i + 864e5
+  ) {
+    stale.add(i);
   }
+  renderCache();
+  // for (let day of cache.keys()) {
+  //   if (day < range[0] || day > range[1]) {
+  //     cache.delete(day);
+  //   }
+  // }
 }
 
 function scale() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-  canvas.width = transform.dayColWidth;
-  canvas.height = transform.height;
+  canvas.width = transform.dayWidth * 2;
+  canvas.height = transform.height * 2;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
   ctx2D.font = "8px alte haas grotesk";
+  console.log("scale", canvas.width, canvas.height, transform.scale);
 }
 
 function renderCache() {
@@ -64,22 +73,24 @@ function renderCache() {
   let j = 0;
   scale();
   for (let date of stale) {
+    // console.log("rendering", new Date(date));
     let i = 0;
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     cache.get(date)?.forEach((event) => {
       const x = 0;
       ctx2D.fillStyle = "#eceeff";
       ctx2D.beginPath();
-      ctx2D.roundRect(x, i * 20, transform.dayColWidth - 10, 20, 5);
+      ctx2D.roundRect(x, i * 22, transform.dayWidth - 5, 20, 2);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.fillStyle = "#33343c";
-      ctx2D?.fillText(event.title, x, i * 20 + 4);
+      ctx2D?.fillText(`${event.id} - ${event.title}`, x + 2, i * 22 + 4);
       i++;
     });
-    j++;
     const bitmap = canvas.transferToImageBitmap();
+    j++;
     self.postMessage({ type: "day", date: date, bitmap }, [bitmap]);
+    stale.delete(date);
   }
 }
 
@@ -87,7 +98,7 @@ self.onmessage = (message: MessageEvent) => {
   // Will have to rerender all days
   if (message.data.type === "resize") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-    transform.dayColWidth = message.data.params.dayColWidth || 100;
+    transform.dayWidth = message.data.params.dayWidth || 100;
     transform.height = message.data.params.height;
     transform.width = message.data.params.width;
     transform.scale = message.data.params.scale;
@@ -95,6 +106,5 @@ self.onmessage = (message: MessageEvent) => {
   if (message.data.type === "load") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
     updateCache(message.data.events, message.data.range);
-    renderCache();
   }
 };

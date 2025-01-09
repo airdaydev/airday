@@ -5,6 +5,7 @@ export const getStartOfWeek = (date: Date) => {
   mondayDate.setHours(0);
   mondayDate.setMinutes(0);
   mondayDate.setSeconds(0);
+  mondayDate.setMilliseconds(0);
   mondayDate.setDate(date.getDate() - daysSinceMonday);
   return mondayDate;
 };

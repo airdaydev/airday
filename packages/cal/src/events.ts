@@ -93,6 +93,7 @@ export class EventRenderer {
       }
       if (event.data.type === "day") {
         this.map.set(event.data.date, event.data.bitmap);
+        this.calRenderer.act();
       }
     });
   }
@@ -105,7 +106,12 @@ export class EventRenderer {
     const height =
       (this.calRenderer.canvas.offsetHeight - this.calRenderer.gridOffset[1]) *
       s;
-    const resizeParams = { width, height, scale: s };
+    const resizeParams = {
+      width,
+      height,
+      scale: s,
+      dayWidth: this.calRenderer.dayWidth,
+    };
     this.worker.postMessage({ type: "resize", params: resizeParams });
   }
   updateDay() {
