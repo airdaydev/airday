@@ -13,6 +13,12 @@ const transform = {
   scale: 1,
 };
 
+function timeToY(date: Date, hourPx: number) {
+  const hours = date.getHours() * hourPx;
+  const min = (date.getMinutes() * hourPx) / 60;
+  return hours + min;
+}
+
 function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   const set = map.get(key);
   if (!set) {
@@ -74,17 +80,18 @@ function renderCache() {
     cache.get(date)?.forEach((id) => {
       const event = idCache.get(id);
       const x = 0;
+      const y = timeToY(new Date(event.start), 50);
       ctx2D.fillStyle = "#eeeeee";
       ctx2D.shadowColor = "#cccccc33";
       ctx2D.shadowBlur = 3;
       ctx2D.shadowOffsetX = 2;
       ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
-      ctx2D.roundRect(x, i * 22, transform.dayWidth - 5, 20, 2);
+      ctx2D.roundRect(x, y, transform.dayWidth - 5, 20, 2);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.fillStyle = "#33343c";
-      ctx2D?.fillText(`${event.id} - ${event.title}`, x + 2, i * 22 + 4);
+      ctx2D?.fillText(`${event.id} - ${event.title}`, x + 2, y + 4);
       i++;
     });
     const bitmap = canvas.transferToImageBitmap();

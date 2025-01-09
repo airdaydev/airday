@@ -108,7 +108,7 @@ export class EventRenderer {
     s;
     const resizeParams = {
       width,
-      height,
+      height: 50 * 24,
       scale: s,
       dayWidth: this.calRenderer.dayWidth,
     };
