@@ -195,7 +195,7 @@ export class CalRenderer {
   timeNow() {
     const now = new Date();
     const y = this.transform.timeToY(now);
-    const nowHour = `${now.getHours()}:${now.getMinutes()}`;
+    const nowHour = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
