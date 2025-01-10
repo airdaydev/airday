@@ -208,11 +208,11 @@ export class CalRenderer {
     this.ctx2D.clip(path);
     const now = new Date();
     const y = this.transform.timeToY(now);
-    const nowHour = `${now.getHours()}:00`;
+    const nowHour = `${now.getHours()}:${now.getMinutes()}`;
     this.hzLine(y, { strokeStyle: "red", lineWidth: 0.5 });
     this.ctx2D.fillStyle = "red";
     this.ctx2D.fillText(
-      `${nowHour.toString().padStart(2, "0")}`,
+      `${nowHour.toString()}`,
       this.timeHeight - this.margin,
       y,
     );
