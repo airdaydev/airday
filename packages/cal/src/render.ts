@@ -172,7 +172,8 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
-    // this.events(dates, startDayPx);
+    this.events(dates, startDayPx);
+    this.timeNow();
     this.debug();
   }
   frame() {
@@ -191,6 +192,21 @@ export class CalRenderer {
     this.hzLine(this.headerHeight);
     this.hzLine(this.gridOffset[1]);
   }
+  timeNow() {
+    const now = new Date();
+    const y = this.transform.timeToY(now);
+    const nowHour = `${now.getHours()}:${now.getMinutes()}`;
+    this.ctx2D.textAlign = "right";
+    this.ctx2D.textBaseline = "middle";
+    this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
+    this.hzLine(y, { strokeStyle: "#ff0000cc", lineWidth: 0.5 });
+    this.ctx2D.fillStyle = "#ff0000cc";
+    this.ctx2D.fillText(
+      `${nowHour.toString()}`,
+      this.timeHeight - this.margin,
+      y,
+    );
+  }
   times() {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
@@ -208,14 +224,6 @@ export class CalRenderer {
     this.ctx2D.clip(path);
     const now = new Date();
     const y = this.transform.timeToY(now);
-    const nowHour = `${now.getHours()}:${now.getMinutes()}`;
-    this.hzLine(y, { strokeStyle: "red", lineWidth: 0.5 });
-    this.ctx2D.fillStyle = "red";
-    this.ctx2D.fillText(
-      `${nowHour.toString()}`,
-      this.timeHeight - this.margin,
-      y,
-    );
     this.ctx2D.fillStyle = this.colourScheme.labels;
     for (
       let i = firstHour;
@@ -225,6 +233,7 @@ export class CalRenderer {
     ) {
       if (i >= 1 && i <= 24) {
         if (Math.abs(pxOffset - y) < TIME_FONT_SIZE) {
+          // Hides time if obscured by current hour
         } else {
           this.ctx2D.fillText(
             `${i.toString().padStart(2, "0")}:00`,

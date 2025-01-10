@@ -67,7 +67,7 @@ function scale() {
   canvas.height = transform.height * 2;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
-  ctx2D.font = "6px departure mono";
+  ctx2D.font = "6px";
 }
 
 function renderCache() {
@@ -81,17 +81,17 @@ function renderCache() {
       const event = idCache.get(id);
       const x = 0;
       const y = timeToY(new Date(event.start), 50);
-      ctx2D.fillStyle = "#eeeeee";
+      ctx2D.fillStyle = "rgb(255 240 190)";
       ctx2D.shadowColor = "#cccccc33";
       ctx2D.shadowBlur = 3;
       ctx2D.shadowOffsetX = 2;
       ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
-      ctx2D.roundRect(x, y, transform.dayWidth - 5, 20, 2);
+      ctx2D.roundRect(x, y, transform.dayWidth - 5, 50, 2);
       ctx2D.fill();
       ctx2D.closePath();
-      ctx2D.fillStyle = "#33343c";
-      ctx2D?.fillText(`${event.id} - ${event.title}`, x + 2, y + 4);
+      ctx2D.fillStyle = "rgb(152 136 102)";
+      ctx2D?.fillText(`${event.title}`, x + 2, y + 4);
       i++;
     });
     const bitmap = canvas.transferToImageBitmap();
