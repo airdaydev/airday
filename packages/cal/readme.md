@@ -12,9 +12,11 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Use off screen canvas + transform for events
 - [x] Optimise performance (layering, retaining buffer etc)
 - [x] Show current time
+- [] highlight area (to create new event)
+- [] hover style for event
 - [] Event position incl. intersecting events
 - [] Change time zone
-- [] event text align top
+- [] word wrap event
 - [] custom scroller, snap to date or week when active scrolling stops
 - [] scroll beyond borders
 - [] Render calendar events in correct position
