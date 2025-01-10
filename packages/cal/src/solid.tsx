@@ -1,6 +1,6 @@
 import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
-import { CalendarEvent } from "./event";
+import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
 
 interface CalendarProps {

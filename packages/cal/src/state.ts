@@ -35,14 +35,6 @@ function startOfDay(date: Date) {
   return start;
 }
 
-// Rendering cache for events
-// Must test if any event intersects on that day
-export class eventCache {
-  map = new Map<string, any>();
-  addEvent(event: CalendarEvent) {}
-  renderDay(clipMin, clipEnd) {}
-}
-
 export function eventsToDateMap(
   arr: CalendarEvent[],
   startDate: number,

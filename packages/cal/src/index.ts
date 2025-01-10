@@ -3,5 +3,5 @@ export { CalRenderer } from "./render";
 export {
   type CalendarEvent,
   type CalendarEventConstructorProps,
-} from "./event";
+} from "./model";
 export { EventDB } from "./state";

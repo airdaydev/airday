@@ -89,9 +89,6 @@ export class EventRenderer {
       console.error("Worker error:", error);
     };
     this.worker.addEventListener("message", (event) => {
-      if (event.data.type === "frame") {
-        this.frame = event.data.bitmap;
-      }
       if (event.data.type === "day") {
         this.map.set(event.data.date, event.data.bitmap);
         this.calRenderer.act();
@@ -104,7 +101,6 @@ export class EventRenderer {
     const width =
       (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
       s;
-    const height = this.calRenderer.transform.hourPx * 24;
     s;
     const resizeParams = {
       width,

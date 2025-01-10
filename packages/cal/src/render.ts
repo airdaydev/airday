@@ -36,7 +36,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 28;
+  daysVisible = 7;
   daysBuffer = 2;
   resized = false;
   hoveredDate: Date | null = null;
@@ -44,7 +44,7 @@ export class CalRenderer {
   lastAction: number = performance.now();
   autoscrolling = false;
   // current scene objects
-  startDay: Date = getStartOfWeek(new Date());
+  startDay?: Date;
   eventCache: EventCache;
   eventRenderer: EventRenderer;
   constructor(container: HTMLDivElement, db: EventDB) {
@@ -139,8 +139,8 @@ export class CalRenderer {
     return this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE;
   }
   act = () => (this.lastAction = performance.now());
-  goToDate = (date: Date = getStartOfWeek(new Date())) => {
-    this.originDate = new Date(date.valueOf());
+  goToDate = (date: Date = new Date(getStartOfWeek(new Date()))) => {
+    this.originDate = date.valueOf();
   };
   // Fit canvas matrix to canvas px dimensions
   resizeCal = () => {

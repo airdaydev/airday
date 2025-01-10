@@ -96,7 +96,7 @@ function renderCache() {
     });
     const bitmap = canvas.transferToImageBitmap();
     j++;
-    self.postMessage({ type: "day", date: date, bitmap }, [bitmap]);
+    self.postMessage({ type: "day", date: date, bitmap }, [bitmap] as any);
     fresh.delete(date);
   }
 }
