@@ -172,7 +172,7 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times();
     this.header();
-    this.events(dates, startDayPx);
+    // this.events(dates, startDayPx);
     this.debug();
   }
   frame() {
@@ -194,7 +194,6 @@ export class CalRenderer {
   times() {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
-    this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx + this.gridOffset[1];
@@ -207,6 +206,17 @@ export class CalRenderer {
       this.canvas.offsetHeight,
     );
     this.ctx2D.clip(path);
+    const now = new Date();
+    const y = this.transform.timeToY(now);
+    const nowHour = `${now.getHours()}:00`;
+    this.hzLine(y, { strokeStyle: "red", lineWidth: 0.5 });
+    this.ctx2D.fillStyle = "red";
+    this.ctx2D.fillText(
+      `${nowHour.toString().padStart(2, "0")}`,
+      this.timeHeight - this.margin,
+      y,
+    );
+    this.ctx2D.fillStyle = this.colourScheme.labels;
     for (
       let i = firstHour;
       i <=
@@ -214,11 +224,14 @@ export class CalRenderer {
       i++
     ) {
       if (i >= 1 && i <= 24) {
-        this.ctx2D.fillText(
-          `${i.toString().padStart(2, "0")}:00`,
-          this.timeHeight - this.margin,
-          pxOffset,
-        );
+        if (Math.abs(pxOffset - y) < TIME_FONT_SIZE) {
+        } else {
+          this.ctx2D.fillText(
+            `${i.toString().padStart(2, "0")}:00`,
+            this.timeHeight - this.margin,
+            pxOffset,
+          );
+        }
         this.hzLine(pxOffset);
       }
       pxOffset += this.transform.hourPx;
@@ -306,10 +319,16 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.fillText(text, offset + padding, 25);
   }
-  hzLine(yOffset: number) {
-    this.ctx2D.strokeStyle = this.colourScheme.hzLine;
+  hzLine(
+    yOffset: number,
+    opts: {
+      strokeStyle?: string;
+      lineWidth?: number;
+    } = {},
+  ) {
+    this.ctx2D.strokeStyle = opts.strokeStyle || this.colourScheme.hzLine;
     this.ctx2D.beginPath();
-    this.ctx2D.lineWidth = 1;
+    this.ctx2D.lineWidth = opts.lineWidth || 1;
     this.ctx2D.moveTo(this.timeHeight, yOffset);
     this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
     this.ctx2D.stroke();

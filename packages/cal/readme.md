@@ -11,6 +11,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] scroll x position: start by getting week / day width
 - [x] Use off screen canvas + transform for events
 - [x] Optimise performance (layering, retaining buffer etc)
+- [x] Show current time
 - [] Event position incl. intersecting events
 - [] Change time zone
 - [] event text align top
