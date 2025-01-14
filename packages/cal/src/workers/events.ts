@@ -3,9 +3,12 @@ const ctx2D = canvas.getContext("2d");
 
 console.debug("event worker ready");
 
+// This worker prepares events for rendering & renders them to an offscreen canvas
+// Range represents X clip dimension (i.e. visible days + buffer)
+let range: [number, number] = [0, 0];
 const idCache = new Map<string, any>();
 const cache = new Map<number, Set<any>>();
-const fresh = new Set<number>();
+const dirty = new Set<number>();
 
 const transform = {
   dayWidth: 100,
@@ -33,7 +36,8 @@ function utcMidnight(date: Date) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
-function updateCache(events: any[], range: [number, number]) {
+function updateCache(events: any[], cacheRange: [number, number]) {
+  range = cacheRange;
   events.forEach((event) => {
     const start = Math.max(event.start.valueOf(), range[0] as number);
     const end = Math.min(event.end.valueOf(), range[1] as number);
@@ -42,7 +46,7 @@ function updateCache(events: any[], range: [number, number]) {
     for (let i = 0; i < days; i++) {
       const day = startDay + i * 864e5;
       addMapSet(cache, day, event.id);
-      fresh.add(day);
+      dirty.add(day);
       idCache.set(event.id, event);
     }
   });
@@ -52,32 +56,35 @@ function updateCache(events: any[], range: [number, number]) {
     i < range[1];
     i = i + 864e5
   ) {
-    fresh.delete(i);
+    dirty.delete(i);
   }
-  // for (let day of cache.keys()) {
-  //   if (day < range[0] || day > range[1]) {
-  //     cache.delete(day);
-  //   }
-  // }
 }
 
 function scale() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-  canvas.width = transform.dayWidth * 2;
-  canvas.height = transform.height * 2;
+  canvas.width = transform.dayWidth * transform.scale;
+  canvas.height = transform.height * transform.scale;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
   ctx2D.font = "6px";
+}
+
+function getTime(dateNum: number) {
+  const date = new Date(dateNum);
+  return `${date.getHours()}:${date.getMinutes()}`;
 }
 
 function renderCache() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   scale();
-  for (let date of fresh) {
-    let i = 0;
+  for (let clip = range[0]; clip <= range[1]; clip += 864e5) {
+    if (!dirty.has(clip)) {
+      console.log("continuing");
+      continue;
+    }
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
-    cache.get(date)?.forEach((id) => {
+    cache.get(clip)?.forEach((id) => {
       const event = idCache.get(id);
       const x = 0;
       const y = timeToY(new Date(event.start), 50);
@@ -92,12 +99,12 @@ function renderCache() {
       ctx2D.closePath();
       ctx2D.fillStyle = "rgb(152 136 102)";
       ctx2D?.fillText(`${event.title}`, x + 2, y + 4);
-      i++;
+      ctx2D?.fillText(`${getTime(event.start)}`, x + 2, y + 4 + 16);
     });
     const bitmap = canvas.transferToImageBitmap();
     j++;
-    self.postMessage({ type: "day", date: date, bitmap }, [bitmap] as any);
-    fresh.delete(date);
+    self.postMessage({ type: "day", date: clip, bitmap }, [bitmap] as any);
+    dirty.delete(clip);
   }
 }
 

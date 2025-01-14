@@ -36,7 +36,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 28;
   daysBuffer = 2;
   resized = false;
   hoveredDate: Date | null = null;
@@ -301,7 +301,7 @@ export class CalRenderer {
           offset,
           -this.transform.offset[1] + this.gridOffset[1],
           this.dayWidth,
-          this.canvas.height - this.gridOffset[1],
+          this.timeHeight * 25,
         );
       }
     });

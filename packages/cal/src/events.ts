@@ -62,7 +62,7 @@ export class EventCache {
     }
     // Load new ranges
     let newEvents = [];
-    if (range.start.valueOf() < lastRange.end.valueOf()) {
+    if (range.start.valueOf() < lastRange.start.valueOf()) {
       // range before
       newEvents.push(...this.db.getEvents(range.start, lastRange.start));
     }
@@ -104,7 +104,7 @@ export class EventRenderer {
     s;
     const resizeParams = {
       width,
-      height: 50 * 24,
+      height: 50 * 25,
       scale: s,
       dayWidth: this.calRenderer.dayWidth,
     };
