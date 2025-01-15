@@ -284,6 +284,19 @@ export class CalRenderer {
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
       const offset = index * this.dayWidth + offsetPx;
+      const image = this.eventRenderer.map.get(date.valueOf());
+      if (image) {
+        const diff = performance.now() - image.time;
+        this.ctx2D.globalAlpha = diff < 50 ? diff / 50 : 1;
+        this.ctx2D.drawImage(
+          image.bmp,
+          offset,
+          -this.transform.offset[1] + this.gridOffset[1],
+          this.dayWidth,
+          this.timeHeight * 25,
+        );
+        this.ctx2D.globalAlpha = 1;
+      }
       // const fox = iconCache.get(foxPng);
       // if (fox && date.getDay() === 5) {
       //   this.ctx2D.drawImage(
@@ -294,16 +307,6 @@ export class CalRenderer {
       //     this.dayWidth - this.margin,
       //   );
       // }
-      const image = this.eventRenderer.map.get(date.valueOf());
-      if (image) {
-        this.ctx2D.drawImage(
-          image,
-          offset,
-          -this.transform.offset[1] + this.gridOffset[1],
-          this.dayWidth,
-          this.timeHeight * 25,
-        );
-      }
     });
     this.ctx2D.restore();
   }

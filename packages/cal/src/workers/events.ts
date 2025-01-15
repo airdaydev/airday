@@ -66,7 +66,7 @@ function scale() {
   canvas.height = transform.height * transform.scale;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
-  ctx2D.font = "6px Departure Mono";
+  ctx2D.font = "8px Departure Mono";
 }
 
 function getTime(dateNum: number) {
