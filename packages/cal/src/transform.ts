@@ -56,7 +56,7 @@ export class CalendarTransform {
     return x - r;
   }
   yToTime(y: number) {
-    return (y - this.offset[1] - this.renderer.gridOffset[1]) / this.hourPx - 1;
+    return (y + this.offset[1] - this.renderer.gridOffset[1]) / this.hourPx - 1;
   }
   xToDay(x: number) {
     return Math.floor(

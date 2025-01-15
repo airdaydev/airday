@@ -36,15 +36,15 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 3;
+  daysVisible = 7;
   daysBuffer = 2;
   resized = false;
-  hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
   // current scene objects
+  hover: [number, number] | null = null; // relative date, time 0-24
   startDay?: Date;
   eventCache: EventCache;
   eventRenderer: EventRenderer;
@@ -75,9 +75,13 @@ export class CalRenderer {
       this.transform.addDelta(event.deltaX, event.deltaY);
       this.act();
     });
-    scrollable.addEventListener("mousemove", () => {
-      // console.log(this.transform.xToDay(event.x));
-      // console.log(this.transform.yToTime(event.y));
+    scrollable.addEventListener("mousemove", (event: MouseEvent) => {
+      // const
+      this.act();
+      this.hover = [
+        this.transform.xToDay(event.x),
+        this.transform.yToTime(event.y),
+      ];
     });
     this.resizeCal();
     this.frame();
@@ -169,10 +173,12 @@ export class CalRenderer {
     }
     clearCanvas(this.canvas);
     const [dates, startDayPx, _, clipspaceRange] = this.clipspace(); // TODO: Only necessary in resize/movement
+    const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     this.eventCache.updateRange(clipspaceRange);
     this.days(dates, startDayPx);
-    this.times();
+    this.times(firstHour, firstHourPx);
     this.header();
+    this.interactions(startDayPx, firstHour, firstHourPx);
     this.events(dates, startDayPx);
     this.timeNow();
     this.debug();
@@ -208,11 +214,10 @@ export class CalRenderer {
       y,
     );
   }
-  times() {
+  times(firstHour: number, firstHourPx: number) {
     this.ctx2D.textAlign = "right";
     this.ctx2D.textBaseline = "middle";
     this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
-    const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     let pxOffset = firstHourPx + this.gridOffset[1];
     this.ctx2D.save();
     const path = new Path2D();
@@ -313,6 +318,29 @@ export class CalRenderer {
       // }
     });
     this.ctx2D.restore();
+  }
+  // TODO: Start from interactions
+  interactions(startDayPx, firstHour, firstHourPx) {
+    if (!this.hover) return;
+    const [relDay, time] = this.hover;
+    console.log(relDay, time);
+    const x =
+      this.gridOffset[0] +
+      startDayPx -
+      this.transform.offset[0] +
+      (relDay + 1) * this.dayWidth;
+    console.log(x);
+    this.ctx2D.fillStyle = "red";
+    const z = this.transform.offset[1];
+    this.ctx2D.rect(
+      startDayPx,
+      time * this.transform.hourPx -
+        this.transform.offset[1] +
+        this.gridOffset[1],
+      this.dayWidth,
+      100,
+    );
+    this.ctx2D.fill();
   }
   allDayLabel() {
     this.ctx2D.fillStyle = this.colourScheme.color;
