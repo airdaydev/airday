@@ -104,9 +104,9 @@ export class EventRenderer {
     s;
     const resizeParams = {
       width,
-      height: 50 * 25,
       scale: s,
-      dayWidth: this.calRenderer.dayWidth,
+      hourPx: this.calRenderer.transform.hourPx,
+      dayPx: this.calRenderer.dayPx,
     };
     this.worker.postMessage({ type: "resize", params: resizeParams });
   }

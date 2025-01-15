@@ -11,8 +11,8 @@ const cache = new Map<number, Set<any>>();
 const dirty = new Set<number>();
 
 const transform = {
-  dayWidth: 100,
-  height: 100,
+  dayPx: 100,
+  hourPx: 25,
   scale: 1,
 };
 
@@ -62,8 +62,8 @@ function updateCache(events: any[], cacheRange: [number, number]) {
 
 function scale() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-  canvas.width = transform.dayWidth * transform.scale;
-  canvas.height = transform.height * transform.scale;
+  canvas.width = transform.dayPx * transform.scale;
+  canvas.height = transform.hourPx * 25 * transform.scale;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
   ctx2D.font = "8px Departure Mono";
@@ -92,7 +92,7 @@ function renderCache() {
       const startTime = event.start < clip ? clip : event.start;
       const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
       const height = Math.max((endTime - startTime) / 1000 / 60, 10);
-      const y = timeToY(new Date(startTime), 50);
+      const y = timeToY(new Date(startTime), transform.hourPx);
       posMap.set(id, {
         startTime,
         endTime,
@@ -115,13 +115,7 @@ function renderCache() {
       ctx2D.shadowOffsetX = 2;
       ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
-      ctx2D.roundRect(
-        x,
-        position.y,
-        transform.dayWidth - 5,
-        position.height,
-        2,
-      );
+      ctx2D.roundRect(x, position.y, transform.dayPx - 5, position.height, 2);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.beginPath();
@@ -144,8 +138,8 @@ self.onmessage = (message: MessageEvent) => {
   // Will have to rerender all days
   if (message.data.type === "resize") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-    transform.dayWidth = message.data.params.dayWidth || 100;
-    transform.height = message.data.params.height;
+    transform.dayPx = message.data.params.dayPx || 100;
+    transform.hourPx = message.data.params.hourPx;
     transform.scale = message.data.params.scale;
     renderCache();
   }

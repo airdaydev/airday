@@ -12,25 +12,29 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Use off screen canvas + transform for events
 - [x] Optimise performance (layering, retaining buffer etc)
 - [x] Show current time
-- [] highlight area (to create new event)
-- [] hover style for event
+- [x] scroll beyond borders
+- [x] 1-day, 3-day, 7-day, 14-day view
+- [] drag to highlight neat area (15min factor) (to create new event)
+- [] tap to highlight neat 15min interval (to create new event)
+- [] Quadtree collision detection
+- [] hover style for event - add to quadtree
 - [] Event position incl. intersecting events
+- [] Items over 24hrs long get put in day area
+- [] Tap to highlight day area
 - [] Change time zone
 - [] word wrap event
 - [] custom scroller, snap to date or week when active scrolling stops
-- [] scroll beyond borders
 - [] Render calendar events in correct position
 - [] Distinct TODAY label style
 - [] Hover over date to see full date
 - [] Jump to date/today button
 - [] Move between weeks/days
+- [] Month/Year that shows up on pan
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
 - [] Events falling on DST borders... events disappearing in different zones?
-- [] Quadtree collision detection
 - [] Drag and drop calendar events
 - [] Labels that register as objects with behaviour
-- [] 1-day, 3-day, 7-day, 14-day view
 - [] Change between 12/24hr time
 - [] Click/drag to shorten/lengthen event each direction
 - [] Add all day events

@@ -29,14 +29,13 @@ export class CalRenderer {
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   colourScheme = lightScheme;
-  timeHeight = 50;
-  dayWidth = 100;
+  dayPx = 100;
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 28;
   daysBuffer = 2;
   resized = false;
   originDate = getStartOfWeek(new Date());
@@ -76,12 +75,11 @@ export class CalRenderer {
       this.act();
     });
     scrollable.addEventListener("mousemove", (event: MouseEvent) => {
-      // const
+      const bounds = this.canvas.getBoundingClientRect();
+      const x = event.x - bounds.left;
+      const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
       this.act();
-      this.hover = [
-        this.transform.xToDay(event.x),
-        this.transform.yToTime(event.y),
-      ];
+      this.hover = [this.transform.xToDay(x), this.transform.yToTime(y)];
     });
     this.resizeCal();
     this.frame();
@@ -150,13 +148,13 @@ export class CalRenderer {
   // Fit canvas matrix to canvas px dimensions
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
-    this.dayWidth =
-      (this.canvas.offsetWidth - this.timeHeight) / this.daysVisible;
+    this.dayPx =
+      (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
     this.eventRenderer.resize();
     this.resized = false;
   };
   get gridOffset() {
-    return [this.timeHeight, this.headerHeight + this.allDayRowHeight];
+    return [50, this.headerHeight + this.allDayRowHeight];
   }
   clipspace(): [Date[], number, Date, DayRange] {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
@@ -210,7 +208,7 @@ export class CalRenderer {
     this.ctx2D.fillStyle = "#ff0000cc";
     this.ctx2D.fillText(
       `${nowHour.toString()}`,
-      this.timeHeight - this.margin,
+      this.gridOffset[0] - this.margin,
       y,
     );
   }
@@ -243,7 +241,7 @@ export class CalRenderer {
         } else {
           this.ctx2D.fillText(
             `${i.toString().padStart(2, "0")}:00`,
-            this.timeHeight - this.margin,
+            this.gridOffset[0] - this.margin,
             pxOffset,
           );
         }
@@ -264,11 +262,11 @@ export class CalRenderer {
     );
     this.ctx2D.clip(path);
     dates.map((date, index) => {
-      const offset = index * this.dayWidth + offsetPx;
+      const offset = index * this.dayPx + offsetPx;
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
-        this.ctx2D.fillRect(offset, 0, this.dayWidth, this.canvas.offsetHeight);
+        this.ctx2D.fillRect(offset, 0, this.dayPx, this.canvas.offsetHeight);
       }
       this.vtLine(offset, 0);
       this.dayLabel(date, offset);
@@ -290,7 +288,7 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
-      const offset = index * this.dayWidth + offsetPx;
+      const offset = index * this.dayPx + offsetPx;
       const image = this.eventRenderer.map.get(date.valueOf());
       if (image) {
         if (this.firstRender) {
@@ -301,8 +299,8 @@ export class CalRenderer {
           image,
           offset,
           -this.transform.offset[1] + this.gridOffset[1],
-          this.dayWidth,
-          this.timeHeight * 25,
+          this.dayPx,
+          this.transform.hourPx * 25,
         );
         this.ctx2D.globalAlpha = 1;
       }
@@ -312,8 +310,8 @@ export class CalRenderer {
       //     fox,
       //     offset + this.margin,
       //     -this.transform.offset[1] + 500,
-      //     this.dayWidth - this.margin,
-      //     this.dayWidth - this.margin,
+      //     this.dayPx - this.margin,
+      //     this.dayPx - this.margin,
       //   );
       // }
     });
@@ -323,23 +321,15 @@ export class CalRenderer {
   interactions(startDayPx, firstHour, firstHourPx) {
     if (!this.hover) return;
     const [relDay, time] = this.hover;
-    console.log(relDay, time);
+    if (time < 0 || time > 25) return;
     const x =
-      this.gridOffset[0] +
-      startDayPx -
-      this.transform.offset[0] +
-      (relDay + 1) * this.dayWidth;
-    console.log(x);
-    this.ctx2D.fillStyle = "red";
-    const z = this.transform.offset[1];
-    this.ctx2D.rect(
-      startDayPx,
+      this.gridOffset[0] - this.transform.offset[0] + relDay * this.dayPx;
+    const y =
       time * this.transform.hourPx -
-        this.transform.offset[1] +
-        this.gridOffset[1],
-      this.dayWidth,
-      100,
-    );
+      this.transform.offset[1] +
+      this.gridOffset[1];
+    this.ctx2D.fillStyle = "#000055aa";
+    this.ctx2D.rect(x, y, this.dayPx, 50);
     this.ctx2D.fill();
   }
   allDayLabel() {
@@ -350,7 +340,7 @@ export class CalRenderer {
     this.ctx2D.fillStyle = this.colourScheme.labels;
     this.ctx2D.fillText(
       "All day",
-      this.timeHeight - this.margin,
+      this.gridOffset[0] - this.margin,
       this.headerHeight + this.allDayRowHeight / 2,
     );
   }
@@ -359,7 +349,7 @@ export class CalRenderer {
     this.ctx2D.fillStyle = this.colourScheme.color;
     this.ctx2D.font = "12px Alte Haas Grotesk";
     const textWidth = this.ctx2D.measureText(text).width;
-    const padding = (this.dayWidth - textWidth) / 2;
+    const padding = (this.dayPx - textWidth) / 2;
     this.ctx2D.textAlign = "left";
     this.ctx2D.fillText(text, offset + padding, 25);
   }
@@ -373,7 +363,7 @@ export class CalRenderer {
     this.ctx2D.strokeStyle = opts.strokeStyle || this.colourScheme.hzLine;
     this.ctx2D.beginPath();
     this.ctx2D.lineWidth = opts.lineWidth || 1;
-    this.ctx2D.moveTo(this.timeHeight, yOffset);
+    this.ctx2D.moveTo(this.gridOffset[0], yOffset);
     this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
     this.ctx2D.stroke();
   }
