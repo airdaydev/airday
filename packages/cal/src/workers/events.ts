@@ -71,7 +71,7 @@ function scale() {
 
 function getTime(dateNum: number) {
   const date = new Date(dateNum);
-  return `${date.getHours()}:${date.getMinutes()}`;
+  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function renderCache() {
@@ -84,22 +84,35 @@ function renderCache() {
       continue;
     }
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
-    cache.get(clip)?.forEach((id) => {
+    const events = cache.get(clip) || [];
+    events.forEach((id) => {
       const event = idCache.get(id);
       const x = 0;
       const y = timeToY(new Date(event.start), 50);
+      // Height calc
+      // If event starts before today, event start is beginning of day
+      // If event starts starts today, event is event time
+      // If event ends after today, event end time is end of day
+      // If event ends today, event end time is end time
+
       ctx2D.fillStyle = "rgb(255 240 190)";
-      ctx2D.shadowColor = "#cccccc33";
+      ctx2D.shadowColor = "#00000011";
       ctx2D.shadowBlur = 3;
       ctx2D.shadowOffsetX = 2;
       ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
-      ctx2D.roundRect(x, y, transform.dayWidth - 5, 50, 2);
+      ctx2D.roundRect(x, y, transform.dayWidth - 5, height, 2);
       ctx2D.fill();
       ctx2D.closePath();
+      ctx2D.beginPath();
+      ctx2D.fillStyle = "blue";
+      ctx2D.roundRect(x + 1, y + 1, 3, 50, 2);
+      ctx2D.fill();
+      // ctx2D.closePath();
+      ctx2D.shadowColor = "#00000000";
       ctx2D.fillStyle = "rgb(152 136 102)";
-      ctx2D?.fillText(`${event.title}`, x + 2, y + 4);
-      ctx2D?.fillText(`${getTime(event.start)}`, x + 2, y + 4 + 16);
+      ctx2D?.fillText(`${event.title}`, x + 8, y + 4);
+      ctx2D?.fillText(`${getTime(event.start)}`, x + 8, y + 4 + 16);
     });
     const bitmap = canvas.transferToImageBitmap();
     j++;
