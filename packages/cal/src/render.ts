@@ -36,13 +36,14 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 3;
   daysBuffer = 2;
   resized = false;
   hoveredDate: Date | null = null;
   originDate = getStartOfWeek(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
+  firstRender: number | null = null; // Used to fade in first events
   // current scene objects
   startDay?: Date;
   eventCache: EventCache;
@@ -270,6 +271,7 @@ export class CalRenderer {
     this.ctx2D.restore();
   }
   events(dates: Date[], offsetPx: number) {
+    if (!this.firstRender) this.firstRender = performance.now();
     this.ctx2D.save();
     const path = new Path2D();
     path.rect(
@@ -286,10 +288,12 @@ export class CalRenderer {
       const offset = index * this.dayWidth + offsetPx;
       const image = this.eventRenderer.map.get(date.valueOf());
       if (image) {
-        const diff = performance.now() - image.time;
-        this.ctx2D.globalAlpha = diff < 50 ? diff / 50 : 1;
+        if (this.firstRender) {
+          const diff = performance.now() - this.firstRender;
+          this.ctx2D.globalAlpha = diff < 150 ? diff / 150 : 1;
+        }
         this.ctx2D.drawImage(
-          image.bmp,
+          image,
           offset,
           -this.transform.offset[1] + this.gridOffset[1],
           this.dayWidth,

@@ -80,7 +80,7 @@ export class EventCache {
 export class EventRenderer {
   calRenderer: CalRenderer;
   worker: Worker;
-  map = new Map<number, { bmp: ImageBitmap; time: DOMHighResTimeStamp }>();
+  map = new Map<number, ImageBitmap>();
   constructor(calRenderer: CalRenderer) {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
@@ -90,10 +90,7 @@ export class EventRenderer {
     };
     this.worker.addEventListener("message", (event) => {
       if (event.data.type === "day") {
-        this.map.set(event.data.date, {
-          bmp: event.data.bitmap,
-          time: performance.now(),
-        });
+        this.map.set(event.data.date, event.data.bitmap);
         this.calRenderer.act();
       }
     });
