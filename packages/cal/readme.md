@@ -50,7 +50,7 @@ Rules:
 - z-index = left is lowest, right is highest
 - left-most precedence = earlier start time, longer event
 
-# Algorithm
+# Algorithm for predictable, fast positioning
 1. optimisation (maybe) ~~group any intersecting events.~~
 2. within group, sort by, in precedence, earliest start time, then longest event, then id
 3. if no segment, place as width 100%

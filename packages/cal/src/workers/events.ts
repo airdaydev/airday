@@ -66,7 +66,7 @@ function scale() {
   canvas.height = transform.height * transform.scale;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
-  ctx2D.font = "6px";
+  ctx2D.font = "6px Departure Mono";
 }
 
 function getTime(dateNum: number) {
@@ -85,34 +85,53 @@ function renderCache() {
     }
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     const events = cache.get(clip) || [];
+    let lastY = null;
+    const posMap = new Map<string, any>();
     events.forEach((id) => {
       const event = idCache.get(id);
+      const startTime = event.start < clip ? clip : event.start;
+      const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
+      const height = Math.max((endTime - startTime) / 1000 / 60, 10);
+      const y = timeToY(new Date(startTime), 50);
+      posMap.set(id, {
+        startTime,
+        endTime,
+        height,
+        y,
+      });
+    });
+    events.forEach((id) => {
+      const event = idCache.get(id);
+      const position = posMap.get(id);
       const x = 0;
-      const y = timeToY(new Date(event.start), 50);
       // Height calc
       // If event starts before today, event start is beginning of day
       // If event starts starts today, event is event time
       // If event ends after today, event end time is end of day
       // If event ends today, event end time is end time
-
       ctx2D.fillStyle = "rgb(255 240 190)";
       ctx2D.shadowColor = "#00000011";
       ctx2D.shadowBlur = 3;
       ctx2D.shadowOffsetX = 2;
       ctx2D.shadowOffsetY = 2;
       ctx2D.beginPath();
-      ctx2D.roundRect(x, y, transform.dayWidth - 5, height, 2);
+      ctx2D.roundRect(
+        x,
+        position.y,
+        transform.dayWidth - 5,
+        position.height,
+        2,
+      );
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.beginPath();
-      ctx2D.fillStyle = "blue";
-      ctx2D.roundRect(x + 1, y + 1, 3, 50, 2);
+      ctx2D.fillStyle = "#ffdc68";
+      ctx2D.roundRect(x, position.y, 3, position.height, 2);
       ctx2D.fill();
-      // ctx2D.closePath();
       ctx2D.shadowColor = "#00000000";
       ctx2D.fillStyle = "rgb(152 136 102)";
-      ctx2D?.fillText(`${event.title}`, x + 8, y + 4);
-      ctx2D?.fillText(`${getTime(event.start)}`, x + 8, y + 4 + 16);
+      ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
+      ctx2D?.fillText(`${getTime(event.start)}`, x + 8, position.y + 4 + 16);
     });
     const bitmap = canvas.transferToImageBitmap();
     j++;
