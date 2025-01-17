@@ -32,6 +32,10 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
+function utcMidnight(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
 function localMidnight(date: Date) {
   return new Date(
     date.getFullYear(),
@@ -39,6 +43,7 @@ function localMidnight(date: Date) {
     date.getDate(),
   ).getTime();
 }
+
 function updateCache(events: any[], cacheRange: [number, number]) {
   range = cacheRange;
   events.forEach((event) => {

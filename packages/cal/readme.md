@@ -14,12 +14,12 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Show current time
 - [x] scroll beyond borders
 - [x] 1-day, 3-day, 7-day, 14-day view
-- [] Correctly placing items in cache based on tz
+- [] Event position incl. intersecting events
+- [] Correctly placing items in cache based on tz (note dst)
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
-- [] Event position incl. intersecting events
 - [] Items over 24hrs long get put in day area
 - [] Tap to highlight day area
 - [] Change time zone
@@ -69,6 +69,18 @@ Rules:
 ## Optimisations
 - If event does intersect but not with header (above or below), and all segment parents have not already had this, it may sit closely to previous segment
 - If events intersects at header, events should reduce width
+
+## Cache strategy noting timezones
+UTC interval tree
+Origin date: UTC
+Offset +- add/subtract date, not hours!
+
+GetTZOffset for UTC time and subtract to get relevant range and also display dates
+e.g. UTC = 00:00 = 11:00 - tzOffset = 00:00 local TZ
+
+for cache, index in localTZ day start, because this aligns with our day display
+
+
 
 
 # UX optimisation in xcal

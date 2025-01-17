@@ -3,15 +3,11 @@ export const getStartOfWeek = (date: Date) => {
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const mondayDate = new Date(date);
   mondayDate.setDate(date.getDate() - daysSinceMonday);
-  return localMidnight(mondayDate);
+  return utcMidnight(mondayDate);
 };
 
-export function localMidnight(date: Date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
+export function utcMidnight(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 export const getDate = (date: Date) => {
