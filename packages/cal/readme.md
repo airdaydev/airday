@@ -14,6 +14,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Show current time
 - [x] scroll beyond borders
 - [x] 1-day, 3-day, 7-day, 14-day view
+- [] Correctly placing items in cache based on tz
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] Quadtree collision detection
@@ -60,6 +61,15 @@ Rules:
 3. if no segment, place as width 100%
 4. if intersects by time, but not header, place at first available segment from left, creating new if needed
 5. if header intersects, place from left to right, equidistantly (creating new horizontal segment)
+
+# After assimilating information
+1. Preparation. Sort earliest start time, then longest event, then id.
+2. From segment 1, check if there is an intersecting event, if not place event in segment, if yes, go to next segment
+
+## Optimisations
+- If event does intersect but not with header (above or below), and all segment parents have not already had this, it may sit closely to previous segment
+- If events intersects at header, events should reduce width
+
 
 # UX optimisation in xcal
 * the first encounter will push the event a fixed length (3ish em (or 2px in week view)) away. But any further nesting will divide into segments.
