@@ -32,23 +32,19 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function utcMidnight(date: Date) {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
 function localMidnight(date: Date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
+  const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  newDate.setMilliseconds(0);
+  newDate.setMinutes(0);
+  newDate.setHours(0);
+  return newDate.getTime();
 }
 
 function updateCache(events: any[], cacheRange: [number, number]) {
   range = cacheRange;
   events.forEach((event) => {
-    const start = Math.max(event.start.valueOf(), range[0] as number);
-    const end = Math.min(event.end.valueOf(), range[1] as number);
+    const start = Math.max(event.start, range[0] as number);
+    const end = Math.min(event.end, range[1] as number);
     const startDay = localMidnight(new Date(start)).valueOf();
     const endDay = localMidnight(new Date(end)).valueOf();
     const days = Math.ceil((endDay - startDay) / 864e5) + 1;
@@ -60,11 +56,7 @@ function updateCache(events: any[], cacheRange: [number, number]) {
     }
   });
   renderCache();
-  for (
-    let i = localMidnight(new Date(range[0])).valueOf();
-    i < range[1];
-    i = i + 864e5
-  ) {
+  for (let i = new Date(range[0]).valueOf(); i < range[1]; i = i + 864e5) {
     dirty.delete(i);
   }
 }
@@ -83,12 +75,20 @@ function getTime(dateNum: number) {
   return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function utcZeroDate(date: Date) {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
 function renderCache() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   scale();
+  dirty.forEach((t) => console.log(new Date(t)));
   for (let clip = range[0]; clip <= range[1]; clip += 864e5) {
     if (!dirty.has(clip)) {
+      console.log("continuing", new Date(clip));
       // No need to rerender
       continue;
     }
@@ -153,7 +153,10 @@ function renderCache() {
     });
     const bitmap = canvas.transferToImageBitmap();
     j++;
-    self.postMessage({ type: "day", date: clip, bitmap }, [bitmap] as any);
+    self.postMessage(
+      { type: "day", date: utcZeroDate(new Date(clip)).valueOf(), bitmap },
+      [bitmap] as any,
+    );
     dirty.delete(clip);
   }
 }

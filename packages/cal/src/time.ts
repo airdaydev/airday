@@ -1,4 +1,4 @@
-export const getStartOfWeek = (date: Date) => {
+export const getStartOfWeekUTC = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const mondayDate = new Date(date);
@@ -23,6 +23,7 @@ export function localZeroDate(date: Date) {
   const newDate = new Date();
   newDate.setMilliseconds(0);
   newDate.setSeconds(0);
+  newDate.setMinutes(0);
   newDate.setHours(0);
   newDate.setDate(date.getUTCDate());
   newDate.setMonth(date.getUTCMonth());
@@ -68,5 +69,11 @@ export class DayRange {
     this.start = new Date(this.start.valueOf() - 864e5 * days);
     this.days = this.days + days;
     return this;
+  }
+  get localStart() {
+    return localZeroDate(this.start);
+  }
+  get localEnd() {
+    return localZeroDate(this.end);
   }
 }

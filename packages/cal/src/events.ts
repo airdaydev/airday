@@ -23,7 +23,7 @@ export class EventCache {
     this.renderer.eventRenderer.worker.postMessage({
       type: "load",
       events: events.map((e) => e.transfer()), // TODO: Date to number
-      range: [this.range.start.valueOf(), this.range.end.valueOf()],
+      range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
     // events.forEach((event) => {
     //   this.transformMap.set(event.id, [
@@ -36,20 +36,20 @@ export class EventCache {
     const lastRange = this.range;
     this.range = range;
     if (!lastRange) {
-      const events = this.db.getEvents(range.start, range.end);
+      const events = this.db.getEvents(range.localStart, range.localEnd);
       // New range is completely outside
       this.loadEvents(events);
       return;
     }
     if (range.end.valueOf() < lastRange.start.valueOf()) {
       // Range is entirely to the left of existing
-      const events = this.db.getEvents(range.start, range.end);
+      const events = this.db.getEvents(range.localStart, range.localEnd);
       this.loadEvents(events);
       return;
     }
     if (range.start.valueOf() > lastRange.end.valueOf()) {
       // Range is entirely to the right of existing
-      const events = this.db.getEvents(range.start, range.end);
+      const events = this.db.getEvents(range.localStart, range.localEnd);
       this.loadEvents(events);
       return;
     }
@@ -64,11 +64,13 @@ export class EventCache {
     let newEvents = [];
     if (range.start.valueOf() < lastRange.start.valueOf()) {
       // range before
-      newEvents.push(...this.db.getEvents(range.start, lastRange.start));
+      newEvents.push(
+        ...this.db.getEvents(range.localStart, lastRange.localStart),
+      );
     }
     if (range.end.valueOf() > lastRange.end.valueOf()) {
       // range after
-      newEvents.push(...this.db.getEvents(lastRange.end, range.end));
+      newEvents.push(...this.db.getEvents(lastRange.localEnd, range.localEnd));
     }
     if (newEvents.length) {
       this.loadEvents(newEvents);

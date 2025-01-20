@@ -4,7 +4,7 @@ import { lightScheme, darkScheme } from "./colours";
 import { EventDB } from "./state";
 import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
 import {
-  getStartOfWeek,
+  getStartOfWeekUTC,
   getDate,
   getDateArray,
   isWeekend,
@@ -38,7 +38,7 @@ export class CalRenderer {
   daysVisible = 28;
   daysBuffer = 2;
   resized = false;
-  originDate = getStartOfWeek(new Date());
+  originDate = getStartOfWeekUTC(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
@@ -142,7 +142,7 @@ export class CalRenderer {
     return this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE;
   }
   act = () => (this.lastAction = performance.now());
-  goToDate = (date: Date = new Date(getStartOfWeek(new Date()))) => {
+  goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
     this.originDate = date.valueOf();
   };
   // Fit canvas matrix to canvas px dimensions
@@ -161,8 +161,8 @@ export class CalRenderer {
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
     );
-    const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays);
-    const clipspaceRange = new DayRange(dates[0], this.clipDays).buffer();
+    const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays + 5);
+    const clipspaceRange = new DayRange(dates[0], this.clipDays + 5);
     return [dates, startDayPx, clipStartDayAbs, clipspaceRange];
   }
   draw() {

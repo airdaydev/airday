@@ -14,8 +14,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Show current time
 - [x] scroll beyond borders
 - [x] 1-day, 3-day, 7-day, 14-day view
+- [x] Correctly placing items in cache based on tz (note dst)
 - [] Event position incl. intersecting events
-- [] Correctly placing items in cache based on tz (note dst)
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] Quadtree collision detection

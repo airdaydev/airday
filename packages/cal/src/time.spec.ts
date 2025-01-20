@@ -7,6 +7,9 @@ describe("localZeroDate", () => {
     const localDate = localZeroDate(utcDate);
     t.expect(localDate.getFullYear()).toBe(2006);
     t.expect(localDate.getHours()).toBe(0);
+    t.expect(localDate.getMinutes()).toBe(0);
+    t.expect(localDate.getSeconds()).toBe(0);
+    t.expect(localDate.getMilliseconds()).toBe(0);
     const hours = localDate.getTimezoneOffset() / 60;
     t.expect(utcDate.getHours() + hours).equals(0);
   });
