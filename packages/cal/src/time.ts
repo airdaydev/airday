@@ -10,6 +10,16 @@ export function utcMidnight(date: Date) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
+// Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
+export function localZeroDate(date: Date) {
+  const date = new Date(date.getUTCFullYear().toString());
+  const offset = date.getTimezoneOffset();
+  const hrs = date.getHours();
+  const local = new Date();
+  console.log(date.getUTCDay());
+  local.setDate(date.getUTCDay());
+}
+
 export const getDate = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const day = days[date.getDay()];
