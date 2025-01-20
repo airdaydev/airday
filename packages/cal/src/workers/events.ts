@@ -37,7 +37,17 @@ function localMidnight(date: Date) {
   newDate.setMilliseconds(0);
   newDate.setMinutes(0);
   newDate.setHours(0);
-  return newDate.getTime();
+  return newDate.valueOf();
+}
+
+function addDays(date: Date, i: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + i);
+  return next;
+}
+
+function addDaysNumber(number: number, i: number) {
+  return addDays(new Date(number), i).valueOf();
 }
 
 function updateCache(events: any[], cacheRange: [number, number]) {
@@ -49,7 +59,7 @@ function updateCache(events: any[], cacheRange: [number, number]) {
     const endDay = localMidnight(new Date(end)).valueOf();
     const days = Math.ceil((endDay - startDay) / 864e5) + 1;
     for (let i = 0; i < days; i++) {
-      const day = startDay + i * 864e5;
+      const day = addDaysNumber(startDay, 0); // utc start day
       addMapSet(cache, day, event.id);
       dirty.add(day);
       idCache.set(event.id, event);
@@ -85,10 +95,9 @@ function renderCache() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   scale();
-  dirty.forEach((t) => console.log(new Date(t)));
-  for (let clip = range[0]; clip <= range[1]; clip += 864e5) {
+  const map = new Map();
+  for (let clip = range[0]; clip <= range[1]; clip = addDaysNumber(clip, 1)) {
     if (!dirty.has(clip)) {
-      console.log("continuing", new Date(clip));
       // No need to rerender
       continue;
     }
@@ -151,12 +160,11 @@ function renderCache() {
         ctx2D?.fillText(`${getTime(event.start)}`, x + 8, position.y + 4 + 16);
       }
     });
+    const utcDay = utcZeroDate(new Date(clip)).valueOf();
     const bitmap = canvas.transferToImageBitmap();
+    map.set(utcDay, bitmap);
     j++;
-    self.postMessage(
-      { type: "day", date: utcZeroDate(new Date(clip)).valueOf(), bitmap },
-      [bitmap] as any,
-    );
+    self.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
     dirty.delete(clip);
   }
 }
