@@ -164,9 +164,12 @@ function renderCache() {
     const bitmap = canvas.transferToImageBitmap();
     map.set(utcDay, bitmap);
     j++;
-    self.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
+    // self.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
     dirty.delete(clip);
   }
+  map.forEach((v, k) =>
+    self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any),
+  );
 }
 
 self.onmessage = (message: MessageEvent) => {

@@ -35,7 +35,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 28;
+  daysVisible = 7;
   daysBuffer = 2;
   resized = false;
   originDate = getStartOfWeekUTC(new Date());
@@ -72,19 +72,23 @@ export class CalRenderer {
     });
     scrollable.addEventListener("wheel", (event: WheelEvent) => {
       this.transform.addDelta(event.deltaX, event.deltaY);
+      this.mouseMove(event);
       this.act();
     });
     scrollable.addEventListener("mousemove", (event: MouseEvent) => {
-      const bounds = this.canvas.getBoundingClientRect();
-      const x = event.x - bounds.left;
-      const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
-      this.act();
-      this.hover = [this.transform.xToDay(x), this.transform.yToTime(y)];
+      this.mouseMove(event);
     });
     this.resizeCal();
     this.frame();
     this.goToDate();
     this.loadPng(foxPng);
+  }
+  mouseMove(event: MouseEvent) {
+    const bounds = this.canvas.getBoundingClientRect();
+    const x = event.x - bounds.left;
+    const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
+    this.hover = [this.transform.xToDay(x), this.transform.yToTime(y)];
+    this.act();
   }
   get clipDays() {
     return this.daysVisible + 3;
@@ -274,7 +278,6 @@ export class CalRenderer {
     this.ctx2D.restore();
   }
   events(dates: Date[], offsetPx: number) {
-    if (!this.firstRender) this.firstRender = performance.now();
     this.ctx2D.save();
     const path = new Path2D();
     path.rect(
@@ -291,9 +294,11 @@ export class CalRenderer {
       const offset = index * this.dayPx + offsetPx;
       const image = this.eventRenderer.map.get(date.valueOf());
       if (image) {
+        if (!this.firstRender) this.firstRender = performance.now();
         if (this.firstRender) {
           const diff = performance.now() - this.firstRender;
           this.ctx2D.globalAlpha = diff < 150 ? diff / 150 : 1;
+          if (diff < 150) this.act();
         }
         this.ctx2D.drawImage(
           image,
