@@ -86,7 +86,10 @@ export class EventRenderer {
   constructor(calRenderer: CalRenderer) {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
-    this.worker = new Worker(new URL("./workers/events.ts", import.meta.url));
+    this.worker = new Worker(
+      new URL("./workers/events.ts?worker", import.meta.url),
+      { type: "module" },
+    );
     this.worker.onerror = (error) => {
       console.error("Worker error:", error);
     };

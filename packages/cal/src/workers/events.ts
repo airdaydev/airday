@@ -1,5 +1,6 @@
 const canvas = new OffscreenCanvas(100, 100);
 const ctx2D = canvas.getContext("2d");
+import { localMidnight, addDaysNumber } from "../time";
 
 console.debug("event worker ready");
 
@@ -30,24 +31,6 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   } else {
     set.add(val);
   }
-}
-
-function localMidnight(date: Date) {
-  const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  newDate.setMilliseconds(0);
-  newDate.setMinutes(0);
-  newDate.setHours(0);
-  return newDate.valueOf();
-}
-
-function addDays(date: Date, i: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + i);
-  return next;
-}
-
-function addDaysNumber(number: number, i: number) {
-  return addDays(new Date(number), i).valueOf();
 }
 
 function updateCache(events: any[], cacheRange: [number, number]) {

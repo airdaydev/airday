@@ -77,3 +77,21 @@ export class DayRange {
     return localZeroDate(this.end);
   }
 }
+
+export function localMidnight(date: Date) {
+  const newDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  newDate.setMilliseconds(0);
+  newDate.setMinutes(0);
+  newDate.setHours(0);
+  return newDate.valueOf();
+}
+
+export function addDays(date: Date, i: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + i);
+  return next;
+}
+
+export function addDaysNumber(number: number, i: number) {
+  return addDays(new Date(number), i).valueOf();
+}
