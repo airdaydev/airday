@@ -12,12 +12,22 @@ export function utcMidnight(date: Date) {
 
 // Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
 export function localZeroDate(date: Date) {
-  const date = new Date(date.getUTCFullYear().toString());
-  const offset = date.getTimezoneOffset();
-  const hrs = date.getHours();
-  const local = new Date();
-  console.log(date.getUTCDay());
-  local.setDate(date.getUTCDay());
+  const hours = date.getHours();
+  if (date.getMinutes() || date.getSeconds() || date.getMilliseconds()) {
+    throw new Error("localZeroDate expects 0:00:00 timestamp");
+  }
+  const tzOffset = date.getTimezoneOffset();
+  if (hours !== Math.abs(tzOffset / 60)) {
+    throw new Error("localZeroDate did not received UTC 0hrs");
+  }
+  const newDate = new Date();
+  newDate.setMilliseconds(0);
+  newDate.setSeconds(0);
+  newDate.setHours(0);
+  newDate.setDate(date.getUTCDate());
+  newDate.setMonth(date.getUTCMonth());
+  newDate.setFullYear(date.getUTCFullYear());
+  return newDate;
 }
 
 export const getDate = (date: Date) => {
