@@ -204,6 +204,15 @@ function renderCache() {
         ctx2D.shadowColor = "#00000000";
         ctx2D.fillStyle = "rgb(152 136 102)";
         if (position.startsToday) {
+          const path = new Path2D();
+          path.rect(
+            segmentSize * position.segment,
+            position.y,
+            transform.dayPx - x - 5,
+            position.height,
+          );
+          ctx2D.save();
+          ctx2D.clip(path);
           ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
           if (position.height > 24) {
             ctx2D.fillStyle = "rgb(122 106 76)";
@@ -213,6 +222,7 @@ function renderCache() {
               position.y + 4 + 16,
             );
           }
+          ctx2D.restore();
         }
       });
     });
