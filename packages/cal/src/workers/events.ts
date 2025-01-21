@@ -60,7 +60,7 @@ function scale() {
   canvas.height = transform.hourPx * 25 * transform.scale;
   ctx2D.scale(transform.scale, transform.scale);
   ctx2D.textBaseline = "top";
-  ctx2D.font = "12px Departure Mono";
+  ctx2D.font = "11px Departure Mono";
 }
 
 function getTime(dateNum: number) {
@@ -197,7 +197,7 @@ function renderCache() {
         ctx2D.closePath();
         ctx2D.beginPath();
         // ctx2D.fillStyle = "#ffdc68"; // light
-        ctx2D.fillStyle = "rgb(255 240 190/ 0.6)";
+        ctx2D.fillStyle = "rgb(255 240 190/ 0.2)";
         ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
         ctx2D.fill();
         ctx2D.closePath();
@@ -205,11 +205,14 @@ function renderCache() {
         ctx2D.fillStyle = "rgb(152 136 102)";
         if (position.startsToday) {
           ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
-          ctx2D?.fillText(
-            `${getTime(event.start)}`,
-            x + 8,
-            position.y + 4 + 16,
-          );
+          if (position.height > 24) {
+            ctx2D.fillStyle = "rgb(122 106 76)";
+            ctx2D?.fillText(
+              `${getTime(event.start)}`,
+              x + 8,
+              position.y + 4 + 16,
+            );
+          }
         }
       });
     });
