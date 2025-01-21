@@ -106,29 +106,22 @@ function renderCache() {
     }
     let clusterIndex = 0;
     let clusterYMax = 0;
-    function nextCluster(posY: number, height: number) {
-      const max = posY + height;
+    let maxSegment = 1; // per cluster
+    const clusterSegments = [];
+    function nextCluster(posY: number, height: number, segment: number) {
+      const largestSegment = Math.max(maxSegment, segment);
+      clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
+        ? largestSegment + 1
+        : 1;
+      maxSegment = largestSegment;
       if (posY > clusterYMax) {
+        maxSegment = 1;
         clusterIndex++;
       }
+      const max = posY + height;
       clusterYMax = max;
       return clusterIndex;
-      // let clusterCounts: number[] = []; // index = cluster number, count = numbers in cluster
-      // let clusterIndex = 0; // used to loop through clusters
-      // // Cluster maxes
-      // let clusterMax = 0;
-      // let prevClusterMax = 0;
-      // prevClusterMax = clusterMax;
-      // clusterMax = Math.max(clusterMax, posY + height);
-      // clusterCounts[clusterIndex] = clusterCounts[clusterIndex]
-      //   ? clusterCounts[clusterIndex] + 1
-      //   : 1;
-      // let curClusterIndex = clusterIndex;
-      // if (posY > prevClusterMax) {
-      //   clusterIndex++;
-      // }
     }
-    console.log(new Date(clip), events.size); // TODO: Wrong farkn date?
     events.forEach((id) => {
       const event = idCache.get(id);
       const startTime = event.start < clip ? clip : event.start;
@@ -137,7 +130,7 @@ function renderCache() {
       const y = timeToY(new Date(startTime), transform.hourPx);
       const startsToday = event.start > clip;
       const segment = nextSegment(y, height);
-      const cluster = nextCluster(y, height);
+      const cluster = nextCluster(y, height, segment);
       posMap.set(id, {
         startTime,
         endTime,
@@ -148,50 +141,80 @@ function renderCache() {
         cluster,
       });
     });
-    // console.log(new Date(clip), clusterCounts);
+    console.log(new Date(clip), clusterSegments);
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
+    let ops: (() => void)[][] = [];
+    function addOp(segment: number, op: () => void) {
+      if (!ops[segment]) ops[segment] = [op];
+      else ops[segment].push(op);
+    }
     events.forEach((id) => {
       const event = idCache.get(id);
       const position = posMap.get(id);
-      const segmentSize = (transform.dayPx - 3) / 4;
+      const cluster = clusterSegments[position.cluster];
+      const segmentSize = (transform.dayPx - 3) / cluster;
       const x = segmentSize * position.segment;
       // Height calc
       // If event starts before today, event start is beginning of day
       // If event starts starts today, event is event time
       // If event ends after today, event end time is end of day
       // If event ends today, event end time is end time
-      ctx2D.fillStyle = "rgb(255 240 190)";
-      ctx2D.shadowColor = "#00000011";
-      ctx2D.shadowBlur = 3;
-      ctx2D.shadowOffsetX = 2;
-      ctx2D.shadowOffsetY = 2;
-      ctx2D.beginPath();
-      const cornerRadii = [
-        position.startsToday ? 2 : 0,
-        position.startsToday ? 2 : 0,
-        2,
-        2,
-      ];
-      ctx2D.roundRect(
-        segmentSize * position.segment,
-        position.y,
-        segmentSize,
-        position.height,
-        cornerRadii,
-      );
-      ctx2D.fill();
-      ctx2D.closePath();
-      ctx2D.beginPath();
-      ctx2D.fillStyle = "#ffdc68";
-      ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
-      ctx2D.fill();
-      ctx2D.closePath();
-      ctx2D.shadowColor = "#00000000";
-      ctx2D.fillStyle = "rgb(152 136 102)";
-      if (position.startsToday) {
-        ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
-        ctx2D?.fillText(`${getTime(event.start)}`, x + 8, position.y + 4 + 16);
-      }
+      addOp(position.segment, () => {
+        ctx2D.shadowColor = "#00000011";
+        ctx2D.shadowBlur = 3;
+        ctx2D.shadowOffsetX = 2;
+        ctx2D.shadowOffsetY = 2;
+        ctx2D.beginPath();
+        const cornerRadii = [
+          position.startsToday ? 2 : 0,
+          position.startsToday ? 2 : 0,
+          2,
+          2,
+        ];
+        // outline
+        ctx2D.fillStyle = "black";
+        ctx2D.beginPath();
+        ctx2D.roundRect(
+          segmentSize * position.segment - 0.5,
+          position.y - 0.5,
+          transform.dayPx - x,
+          position.height + 1,
+          cornerRadii,
+        );
+        ctx2D.fill();
+        ctx2D.closePath();
+        ctx2D.beginPath();
+        // ctx2D.fillStyle = "rgb(255 240 190)"; // light
+        ctx2D.fillStyle = "rgb(64 60 48)";
+        ctx2D.roundRect(
+          segmentSize * position.segment,
+          position.y,
+          transform.dayPx - x - 5,
+          position.height,
+          cornerRadii,
+        );
+        ctx2D.fill();
+        ctx2D.closePath();
+        ctx2D.beginPath();
+        // ctx2D.fillStyle = "#ffdc68"; // light
+        ctx2D.fillStyle = "rgb(255 240 190/ 0.6)";
+        ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
+        ctx2D.fill();
+        ctx2D.closePath();
+        ctx2D.shadowColor = "#00000000";
+        ctx2D.fillStyle = "rgb(152 136 102)";
+        if (position.startsToday) {
+          ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
+          ctx2D?.fillText(
+            `${getTime(event.start)}`,
+            x + 8,
+            position.y + 4 + 16,
+          );
+        }
+      });
+    });
+    ops.map((fmap) => {
+      fmap.map((f) => f());
     });
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
     const bitmap = canvas.transferToImageBitmap();

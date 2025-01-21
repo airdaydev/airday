@@ -291,7 +291,7 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
-      const offset = index * this.dayPx + offsetPx;
+      const offset = (index + 1) * this.dayPx + offsetPx;
       const image = this.eventRenderer.map.get(date.valueOf());
       if (image) {
         if (!this.firstRender) this.firstRender = performance.now();
