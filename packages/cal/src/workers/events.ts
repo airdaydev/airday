@@ -177,7 +177,7 @@ function renderCache() {
         ctx2D.roundRect(
           segmentSize * position.segment - 0.5,
           position.y - 0.5,
-          transform.dayPx - x,
+          transform.dayPx - x - 4,
           position.height + 1,
           cornerRadii,
         );
