@@ -79,45 +79,56 @@ function renderCache() {
   let j = 0;
   scale();
   const map = new Map();
+  // Cycle through each day
   for (let clip = range[0]; clip <= range[1]; clip = addDaysNumber(clip, 1)) {
     if (!dirty.has(clip)) {
-      // No need to rerender
+      // Only rerender items marked as dirty
       continue;
     }
-    ctx2D.clearRect(0, 0, canvas.width, canvas.height);
-    const events = cache.get(clip) || [];
+    const events = cache.get(clip) || []; // Get events per day
     const posMap = new Map<string, any>();
-    // TODO: We are assuming that events have been sorted chronologically
-    // TODO: Clustering is necessary to start each cluster at 1 segment max
-    let clusterCountMap: number[] = []; // index = cluster number, count = numbers in cluster
-    let clusterMax = 0;
-    let clusterIndex = 0;
-    const segmentMap = new Map<number, number>(); // segment, lastYPos
-    const clusterMap = new Map<string, number>(); // id, cluster (TODO: Not needed really)
-    let segCount = 1;
+    // TODO: Check assumption that events have been sorted chronologically
+    // Clusters [1,2,3...], Segments [1,2,3...]
+    // Segments
+    const segPosMap = new Map<number, number>(); // segment, lastYPos
     function nextSegment(posY: number, height: number) {
-      let placed = false;
-      let i = 0;
-      while (!placed) {
-        const lastPos = segmentMap.get(i);
+      let i = 0; // segment number
+      while (true) {
+        const lastPos = segPosMap.get(i);
+        // If segment is empty, or posY exists after last position in segment
         if (!lastPos || posY > lastPos) {
-          placed = true;
-          segmentMap.set(i, posY + height);
-          const prevClusterMax = clusterMax;
-          clusterMax = Math.max(clusterMax, posY + height);
-          clusterCountMap[clusterIndex] = clusterCountMap[clusterIndex]
-            ? clusterCountMap[clusterIndex] + 1
-            : 1;
-          if (posY + height > prevClusterMax) {
-            clusterIndex++;
-          }
+          segPosMap.set(i, posY + height);
           break;
         }
-        i++;
+        i++; // go to next segment
       }
-      if (i >= segCount) segCount++;
       return i;
     }
+    let clusterIndex = 0;
+    let clusterYMax = 0;
+    function nextCluster(posY: number, height: number) {
+      const max = posY + height;
+      if (posY > clusterYMax) {
+        clusterIndex++;
+      }
+      clusterYMax = max;
+      return clusterIndex;
+      // let clusterCounts: number[] = []; // index = cluster number, count = numbers in cluster
+      // let clusterIndex = 0; // used to loop through clusters
+      // // Cluster maxes
+      // let clusterMax = 0;
+      // let prevClusterMax = 0;
+      // prevClusterMax = clusterMax;
+      // clusterMax = Math.max(clusterMax, posY + height);
+      // clusterCounts[clusterIndex] = clusterCounts[clusterIndex]
+      //   ? clusterCounts[clusterIndex] + 1
+      //   : 1;
+      // let curClusterIndex = clusterIndex;
+      // if (posY > prevClusterMax) {
+      //   clusterIndex++;
+      // }
+    }
+    console.log(new Date(clip), events.size); // TODO: Wrong farkn date?
     events.forEach((id) => {
       const event = idCache.get(id);
       const startTime = event.start < clip ? clip : event.start;
@@ -125,20 +136,24 @@ function renderCache() {
       const height = Math.max((endTime - startTime) / 1000 / 60, 22);
       const y = timeToY(new Date(startTime), transform.hourPx);
       const startsToday = event.start > clip;
+      const segment = nextSegment(y, height);
+      const cluster = nextCluster(y, height);
       posMap.set(id, {
         startTime,
         endTime,
         height,
         y,
         startsToday,
-        segment: nextSegment(y, height),
-        // cluster:
+        segment,
+        cluster,
       });
     });
-    const segmentSize = (transform.dayPx - 3) / segCount;
+    // console.log(new Date(clip), clusterCounts);
+    ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     events.forEach((id) => {
       const event = idCache.get(id);
       const position = posMap.get(id);
+      const segmentSize = (transform.dayPx - 3) / 4;
       const x = segmentSize * position.segment;
       // Height calc
       // If event starts before today, event start is beginning of day
@@ -170,6 +185,7 @@ function renderCache() {
       ctx2D.fillStyle = "#ffdc68";
       ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
       ctx2D.fill();
+      ctx2D.closePath();
       ctx2D.shadowColor = "#00000000";
       ctx2D.fillStyle = "rgb(152 136 102)";
       if (position.startsToday) {
