@@ -195,8 +195,8 @@ function renderCache(wrker: EventRenderer) {
 }
 
 export class EventRenderer {
-  canvas: OffscreenCanvas;
-  ctx2D: OffscreenCanvasRenderingContext2D;
+  _canvas: OffscreenCanvas;
+  _ctx2D: OffscreenCanvasRenderingContext2D;
   transform: Transform = {
     dayPx: 100,
     hourPx: 25,
@@ -206,15 +206,24 @@ export class EventRenderer {
   idCache = new Map<string, any>();
   cache = new Map<number, Set<any>>();
   dirty = new Set<number>();
-  constructor() {
+  constructor(headless = false) {
     self.addEventListener("message", this.onMessage);
-    this.canvas = new OffscreenCanvas(100, 100);
-    const ctx = this.canvas.getContext("2d");
-    if (!ctx) throw new Error("Failed to get 2D Canvas Context");
-    this.ctx2D = ctx;
+    if (!headless) {
+      this._canvas = new OffscreenCanvas(100, 100);
+      const ctx = this._canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get 2D Canvas Context");
+      this._ctx2D = ctx;
+    }
+  }
+  get ctx2D() {
+    if (!this._ctx2D) throw new Error("Failed to get 2D Canvas Context");
+    return this._ctx2D;
+  }
+  get canvas() {
+    if (!this._canvas) throw new Error("Failed to get canvas");
+    return this._canvas;
   }
   offscreenScale() {
-    if (!this.ctx2D) throw new Error("offscreen ctx2d not ready");
     this.canvas.width = this.transform.dayPx * this.transform.scale;
     this.canvas.height = this.transform.hourPx * 25 * this.transform.scale;
     this.ctx2D.scale(this.transform.scale, this.transform.scale);
@@ -223,7 +232,6 @@ export class EventRenderer {
   }
   onMessage = (message: MessageEvent) => {
     if (message.data.type === "resize") {
-      if (!this.ctx2D) throw new Error("offscreen ctx2d not ready");
       this.transform.dayPx = message.data.params.dayPx || 100;
       this.transform.hourPx = message.data.params.hourPx;
       this.transform.scale = message.data.params.scale;
@@ -231,7 +239,6 @@ export class EventRenderer {
       renderCache(this);
     }
     if (message.data.type === "load") {
-      if (!this.ctx2D) throw new Error("offscreen ctx2d not ready");
       this.updateCache(message.data.events, message.data.range);
       renderCache(this);
       for (
