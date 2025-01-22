@@ -1,4 +1,4 @@
-import { EventCache, EventRenderer } from "./events";
+import { EventCache, EventRenderer } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme } from "./colours";
 import { EventDB } from "./state";

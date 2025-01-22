@@ -1,6 +1,12 @@
 const canvas = new OffscreenCanvas(100, 100);
 const ctx2D = canvas.getContext("2d");
-import { localMidnight, addDaysNumber } from "../time";
+import {
+  localMidnight,
+  addDaysNumber,
+  getTime,
+  timeToY,
+  utcZeroDate,
+} from "../time";
 
 console.debug("event worker ready");
 
@@ -17,12 +23,6 @@ const transform = {
   scale: 1,
 };
 
-function timeToY(date: Date, hourPx: number) {
-  const hours = date.getHours() * hourPx;
-  const min = (date.getMinutes() * hourPx) / 60;
-  return hours + min;
-}
-
 function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   const set = map.get(key);
   if (!set) {
@@ -33,7 +33,11 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function updateCache(events: any[], cacheRange: [number, number]) {
+export function updateCache(
+  cache: Map<number, Set<any>>,
+  events: any[],
+  cacheRange: [number, number],
+) {
   range = cacheRange;
   events.forEach((event) => {
     const start = Math.max(event.start, range[0] as number);
@@ -54,7 +58,7 @@ function updateCache(events: any[], cacheRange: [number, number]) {
   }
 }
 
-function scale() {
+function offscreenScale() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   canvas.width = transform.dayPx * transform.scale;
   canvas.height = transform.hourPx * 25 * transform.scale;
@@ -63,21 +67,10 @@ function scale() {
   ctx2D.font = "09px Departure Mono";
 }
 
-function getTime(dateNum: number) {
-  const date = new Date(dateNum);
-  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-}
-
-function utcZeroDate(date: Date) {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-}
-
 function renderCache() {
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
-  scale();
+  offscreenScale();
   const map = new Map();
   // Cycle through each day
   for (let clip = range[0]; clip <= range[1]; clip = addDaysNumber(clip, 1)) {
@@ -141,7 +134,7 @@ function renderCache() {
         cluster,
       });
     });
-    console.log(new Date(clip), clusterSegments);
+    // console.log(new Date(clip), clusterSegments);
     ctx2D.clearRect(0, 0, canvas.width, canvas.height);
     let ops: (() => void)[][] = [];
     function addOp(segment: number, op: () => void) {
@@ -252,6 +245,6 @@ self.onmessage = (message: MessageEvent) => {
   }
   if (message.data.type === "load") {
     if (!ctx2D) throw new Error("offscreen ctx2d not ready");
-    updateCache(message.data.events, message.data.range);
+    updateCache(cache, message.data.events, message.data.range);
   }
 };

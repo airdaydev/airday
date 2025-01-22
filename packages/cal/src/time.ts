@@ -10,6 +10,12 @@ export function utcMidnight(date: Date) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
+export function utcZeroDate(date: Date) {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
 // Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
 export function localZeroDate(date: Date) {
   const hours = date.getHours();
@@ -94,4 +100,15 @@ export function addDays(date: Date, i: number) {
 
 export function addDaysNumber(number: number, i: number) {
   return addDays(new Date(number), i).valueOf();
+}
+
+export function getTime(dateNum: number) {
+  const date = new Date(dateNum);
+  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+}
+
+export function timeToY(date: Date, hourPx: number) {
+  const hours = date.getHours() * hourPx;
+  const min = (date.getMinutes() * hourPx) / 60;
+  return hours + min;
 }

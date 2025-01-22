@@ -1,8 +1,8 @@
-import { CalRenderer } from "./render";
-import { CalendarEvent } from "./model";
-import { EventDB } from "./state";
-import { scale } from "./canvas";
-import { DayRange } from "./time";
+import { CalRenderer } from "../render";
+import { CalendarEvent } from "../model";
+import { EventDB } from "../state";
+import { scale } from "../canvas";
+import { DayRange } from "../time";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -86,10 +86,9 @@ export class EventRenderer {
   constructor(calRenderer: CalRenderer) {
     // get grid size from parent, must connect to resize event from parent
     this.calRenderer = calRenderer;
-    this.worker = new Worker(
-      new URL("./workers/events.ts?worker", import.meta.url),
-      { type: "module" },
-    );
+    this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
+      type: "module",
+    });
     this.worker.onerror = (error) => {
       console.error("Worker error:", error);
     };
