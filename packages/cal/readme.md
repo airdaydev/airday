@@ -16,6 +16,9 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] 1-day, 3-day, 7-day, 14-day view
 - [x] Correctly placing items in cache based on tz (note dst)
 - [x] Event position incl. intersecting events
+- [] Event intersection / clustering fixes & tests
+- [] Confirm event dates are correct
+- [] Event colour schemes (light/dark)
 - [] Distinct TODAY label style
 - [] Slightly pink line instead of red
 - [] Day view to highlight today
@@ -31,7 +34,6 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Change time zone
 - [] word wrap event
 - [] custom scroller, snap to date or week when active scrolling stops
-- [] Render calendar events in correct position
 - [] Hover over date to see full date
 - [] Jump to date/today button
 - [] Move between weeks/days
