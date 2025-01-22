@@ -24,7 +24,7 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function renderCache(wrker: EventWorker) {
+function renderCache(wrker: EventRenderer) {
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   const map = new Map();
@@ -194,7 +194,7 @@ function renderCache(wrker: EventWorker) {
   );
 }
 
-export class EventWorker {
+export class EventRenderer {
   canvas: OffscreenCanvas;
   ctx2D: OffscreenCanvasRenderingContext2D;
   transform: Transform = {

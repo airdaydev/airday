@@ -1,3 +1,3 @@
-import { EventWorker } from "./worker-class";
+import { EventRenderer } from "./worker-class";
 
-new EventWorker();
+new EventRenderer();

@@ -20,7 +20,7 @@ export class EventCache {
   }
   private loadEvents(events: CalendarEvent[]) {
     if (!this.range) throw new Error("No range in loadEvents");
-    this.renderer.eventRenderer.worker.postMessage({
+    this.renderer.eventWorkerComms.worker.postMessage({
       type: "load",
       events: events.map((e) => e.transfer()), // TODO: Date to number
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
@@ -79,7 +79,7 @@ export class EventCache {
 }
 
 // Performance test: translate vs rerender
-export class EventRenderer {
+export class EventWorkerComms {
   calRenderer: CalRenderer;
   worker: Worker;
   map = new Map<number, ImageBitmap>();

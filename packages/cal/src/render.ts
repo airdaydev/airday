@@ -1,4 +1,4 @@
-import { EventCache, EventRenderer } from "./events/cache";
+import { EventCache, EventWorkerComms } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme } from "./colours";
 import { EventDB } from "./state";
@@ -46,11 +46,11 @@ export class CalRenderer {
   hover: [number, number] | null = null; // relative date, time 0-24
   startDay?: Date;
   eventCache: EventCache;
-  eventRenderer: EventRenderer;
+  eventWorkerComms: EventWorkerComms;
   constructor(container: HTMLDivElement, db: EventDB) {
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
-    this.eventRenderer = new EventRenderer(this);
+    this.eventWorkerComms = new EventWorkerComms(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
     this.canvas = canvas;
@@ -154,7 +154,7 @@ export class CalRenderer {
     resizeCanvas2D(this.canvas);
     this.dayPx =
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
-    this.eventRenderer.resize();
+    this.eventWorkerComms.resize();
     this.resized = false;
   };
   get gridOffset() {
@@ -292,7 +292,7 @@ export class CalRenderer {
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
       const offset = (index + 1) * this.dayPx + offsetPx;
-      const image = this.eventRenderer.map.get(date.valueOf());
+      const image = this.eventWorkerComms.map.get(date.valueOf());
       if (image) {
         if (!this.firstRender) this.firstRender = performance.now();
         if (this.firstRender) {
