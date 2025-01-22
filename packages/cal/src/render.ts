@@ -110,7 +110,6 @@ export class CalRenderer {
     scrollable.style.height = "100%";
     scrollable.style.overflowY = "scroll";
     scrollable.style.zIndex = "2";
-    scrollable.style.overscrollBehaviorY = "none";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
@@ -291,7 +290,7 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
-      const offset = (index + 1) * this.dayPx + offsetPx;
+      const offset = index * this.dayPx + offsetPx;
       const image = this.eventWorkerComms.map.get(date.valueOf());
       if (image) {
         if (!this.firstRender) this.firstRender = performance.now();

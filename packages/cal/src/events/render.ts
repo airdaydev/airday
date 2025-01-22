@@ -259,7 +259,7 @@ export class EventRenderer {
       const endDay = localMidnight(new Date(end)).valueOf();
       const days = Math.ceil((endDay - startDay) / 864e5) + 1;
       for (let i = 0; i < days; i++) {
-        const day = addDaysNumber(startDay, 0); // utc start day
+        const day = addDaysNumber(startDay, i); // utc start day
         addMapSet(this.cache, day, event.id);
         this.dirty.add(day);
         this.idCache.set(event.id, event);

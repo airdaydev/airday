@@ -3,7 +3,7 @@ import { CalRenderer } from "./render";
 export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   // TODO: Move dayPx here
-  hourPx = 50; // 1 hour = 50px
+  hourPx = 25; // 1 hour = 50px
   renderer: CalRenderer;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
