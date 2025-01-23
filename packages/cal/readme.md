@@ -16,19 +16,20 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] 1-day, 3-day, 7-day, 14-day view
 - [x] Correctly placing items in cache based on tz (note dst)
 - [x] Event position incl. intersecting events
-- [] Event intersection / clustering fixes & tests
-- [] Confirm event dates are correct
-- [] Event colour schemes (light/dark)
+- [x] Event colour schemes (light/dark)
+- [] Event colours (blue, yellow, red etc)
 - [] Distinct TODAY label style
 - [] Slightly pink line instead of red
-- [] Day view to highlight today
+
+- [] Event intersection / clustering fixes & tests
+- [] Confirm event dates are correct
 - [] Rollover event bug (not starting at x = 0)
 - [] Last simultaneous event bug (starting at x = 0)
-- [] Light mode for simultaneous events
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
+- [] "Day" view highlights today, must have minimum size
 - [] Items over 24hrs long get put in day area
 - [] Tap to highlight day area
 - [] Change time zone
