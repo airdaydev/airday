@@ -140,6 +140,8 @@ export class CalRenderer {
   changeTheme = (theme: Theme) => {
     this.theme = theme;
     this.eventWorkerComms.resize();
+    this.eventCache.bitmapMap.clear();
+    this.eventCache.range = null;
     this.act();
   };
   get scrollHeight() {
@@ -156,6 +158,8 @@ export class CalRenderer {
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
     this.eventWorkerComms.resize();
     this.resized = false;
+    // TODO: Debounce this (or reevaluate entire cache mgmt):
+    this.eventCache.range = null;
   };
   get gridOffset() {
     return [50, this.headerHeight + this.allDayRowHeight];
@@ -292,7 +296,7 @@ export class CalRenderer {
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
       const offset = index * this.dayPx + offsetPx;
-      const image = this.eventWorkerComms.map.get(date.valueOf());
+      const image = this.eventCache.bitmapMap.get(date.valueOf());
       if (image) {
         if (!this.firstRender) this.firstRender = performance.now();
         if (this.firstRender) {
