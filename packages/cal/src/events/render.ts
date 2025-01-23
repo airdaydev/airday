@@ -10,6 +10,7 @@ import {
   lightScheme,
   darkEventSchemes,
   lightEventSchemes,
+  Theme,
 } from "../colours";
 
 interface Transform {
@@ -30,7 +31,8 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function renderCache(wrker: EventRenderer, theme: "light" | "dark" = "light") {
+function renderCache(wrker: EventRenderer, theme: Theme = "light") {
+  console.log("theme", theme);
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
@@ -215,6 +217,7 @@ export class EventRenderer {
   idCache = new Map<string, any>();
   cache = new Map<number, Set<any>>();
   dirty = new Set<number>();
+  theme: Theme = "light";
   constructor(headless = false) {
     self.addEventListener("message", this.onMessage);
     if (!headless) {
@@ -240,16 +243,17 @@ export class EventRenderer {
     this.ctx2D.font = "09px Departure Mono";
   }
   onMessage = (message: MessageEvent) => {
-    if (message.data.type === "resize") {
+    if (message.data.type === "config") {
       this.transform.dayPx = message.data.params.dayPx || 100;
       this.transform.hourPx = message.data.params.hourPx;
       this.transform.scale = message.data.params.scale;
+      this.theme = message.data.params.theme;
       this.offscreenScale();
-      renderCache(this);
+      renderCache(this, this.theme);
     }
     if (message.data.type === "load") {
       this.updateCache(message.data.events, message.data.range);
-      renderCache(this);
+      renderCache(this, this.theme);
       for (
         let i = new Date(this.range[0]).valueOf();
         i < this.range[1];

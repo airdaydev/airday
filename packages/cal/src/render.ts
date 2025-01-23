@@ -1,6 +1,6 @@
 import { EventCache, EventWorkerComms } from "./events/cache";
 import { CalendarTransform } from "./transform";
-import { lightScheme, darkScheme } from "./colours";
+import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
 import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
 import {
@@ -133,7 +133,7 @@ export class CalRenderer {
       ctx2D,
     };
   };
-  changeTheme = (theme: "dark" | "light") => {
+  changeTheme = (theme: Theme) => {
     if (theme === "dark") {
       this.colourScheme = darkScheme;
     } else if (theme === "light") {

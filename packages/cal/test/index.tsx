@@ -8,10 +8,11 @@ import {
 } from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
 import * as dat from "dat.gui";
+import { Theme } from "../src/colours";
 
 const root = document.getElementById("root");
 
-const theme = createSignal<"dark" | "light">("dark");
+const theme = createSignal<Theme>("dark");
 
 function randomTitle() {
   return [

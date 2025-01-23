@@ -106,13 +106,14 @@ export class EventWorkerComms {
       (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
       s;
     s;
-    const resizeParams = {
+    const configParams = {
       width,
       scale: s,
       hourPx: this.calRenderer.transform.hourPx,
       dayPx: this.calRenderer.dayPx,
+      theme: this.calRenderer.colourScheme,
     };
-    this.worker.postMessage({ type: "resize", params: resizeParams });
+    this.worker.postMessage({ type: "config", params: configParams });
   }
   updateDay() {
     // day renderering

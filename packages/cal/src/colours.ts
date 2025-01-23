@@ -1,3 +1,5 @@
+export type Theme = "light" | "dark";
+
 export interface ColourScheme {
   bg: string;
   hzLine: string;

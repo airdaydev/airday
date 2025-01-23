@@ -2,10 +2,11 @@ import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
 import { CalRenderer } from "./render";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
+import { Theme } from "./colours";
 
 interface CalendarProps {
   events: Signal<CalendarEvent[]>;
-  theme: Accessor<"dark" | "light">;
+  theme: Accessor<Theme>;
   parentElement: HTMLElement;
   db: EventDB;
 }
