@@ -5,12 +5,16 @@ import {
   timeToY,
   utcZeroDate,
 } from "../time";
+import { darkScheme, darkEventSchemes } from "../colours";
 
 interface Transform {
   dayPx: number;
   hourPx: number;
   scale: number;
 }
+
+const globalScheme = darkScheme;
+const colourScheme = darkEventSchemes;
 
 // This worker prepares events for rendering & renders them to an offscreen canvas
 
@@ -107,13 +111,14 @@ function renderCache(wrker: EventRenderer) {
       const cluster = clusterSegments[position.cluster];
       const segmentSize = (wrker.transform.dayPx - 3) / cluster;
       const x = segmentSize * position.segment;
+      const scheme = colourScheme.yellow;
       // Height calc
       // If event starts before today, event start is beginning of day
       // If event starts starts today, event is event time
       // If event ends after today, event end time is end of day
       // If event ends today, event end time is end time
       addOp(position.segment, () => {
-        wrker.ctx2D.shadowColor = "#00000011";
+        wrker.ctx2D.shadowColor = scheme.shadow;
         wrker.ctx2D.shadowBlur = 3;
         wrker.ctx2D.shadowOffsetX = 2;
         wrker.ctx2D.shadowOffsetY = 2;
@@ -125,7 +130,7 @@ function renderCache(wrker: EventRenderer) {
           2,
         ];
         // outline
-        wrker.ctx2D.fillStyle = "black";
+        wrker.ctx2D.fillStyle = globalScheme.bg;
         wrker.ctx2D.beginPath();
         wrker.ctx2D.roundRect(
           segmentSize * position.segment - 0.5,
@@ -138,7 +143,7 @@ function renderCache(wrker: EventRenderer) {
         wrker.ctx2D.closePath();
         wrker.ctx2D.beginPath();
         // wrker.ctx2D.fillStyle = "rgb(255 240 190)"; // light
-        wrker.ctx2D.fillStyle = "rgb(64 60 48)";
+        wrker.ctx2D.fillStyle = scheme.bg;
         wrker.ctx2D.roundRect(
           segmentSize * position.segment,
           position.y,
@@ -150,12 +155,12 @@ function renderCache(wrker: EventRenderer) {
         wrker.ctx2D.closePath();
         wrker.ctx2D.beginPath();
         // wrker.ctx2D.fillStyle = "#ffdc68"; // light
-        wrker.ctx2D.fillStyle = "rgb(255 240 190/ 0.2)";
+        wrker.ctx2D.fillStyle = scheme.fg;
         wrker.ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
         wrker.ctx2D.fill();
         wrker.ctx2D.closePath();
-        wrker.ctx2D.shadowColor = "#00000000";
-        wrker.ctx2D.fillStyle = "rgb(152 136 102)";
+        wrker.ctx2D.shadowColor = "#00000000"; // reset
+        wrker.ctx2D.fillStyle = scheme.text;
         if (position.startsToday) {
           const path = new Path2D();
           path.rect(
@@ -168,7 +173,7 @@ function renderCache(wrker: EventRenderer) {
           wrker.ctx2D.clip(path);
           wrker.ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
           if (position.height > 24) {
-            wrker.ctx2D.fillStyle = "rgb(122 106 76)";
+            wrker.ctx2D.fillStyle = scheme.fg;
             wrker.ctx2D?.fillText(
               `${getTime(event.start)}`,
               x + 8,
@@ -195,8 +200,8 @@ function renderCache(wrker: EventRenderer) {
 }
 
 export class EventRenderer {
-  _canvas: OffscreenCanvas;
-  _ctx2D: OffscreenCanvasRenderingContext2D;
+  _canvas?: OffscreenCanvas;
+  _ctx2D?: OffscreenCanvasRenderingContext2D;
   transform: Transform = {
     dayPx: 100,
     hourPx: 25,

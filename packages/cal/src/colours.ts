@@ -24,3 +24,40 @@ export const darkScheme: ColourScheme = {
   vtLine: "#222",
   shade: "#111111aa",
 };
+
+interface EventColorScheme {
+  text: string;
+  bg: string;
+  fg: string;
+  shadow: string;
+}
+
+const yellowDark: EventColorScheme = {
+  text: "rgb(152 136 102)",
+  bg: "rgb(64 60 48)",
+  fg: "rgb(122 106 76)",
+  shadow: "#00000011",
+};
+
+const blueDark: EventColorScheme = {
+  text: "",
+  bg: "",
+  fg: "",
+  shadow: "",
+};
+
+export const darkEventSchemes = {
+  yellow: yellowDark,
+  blue: blueDark,
+};
+
+const yellowLight: EventColorScheme = {
+  text: "rgb(152 136 102)",
+  bg: "rgb(64 60 48)",
+  fg: "rgb(122 106 76)",
+  shadow: "#00000011",
+};
+
+const lightEventSchemes = {
+  yellow: yellowLight,
+};
