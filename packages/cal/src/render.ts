@@ -28,7 +28,7 @@ export class CalRenderer {
   scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
-  colourScheme = lightScheme;
+  theme: Theme = "dark";
   dayPx = 100;
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
@@ -83,6 +83,10 @@ export class CalRenderer {
     this.goToDate();
     this.loadPng(foxPng);
   }
+  get colourScheme() {
+    if (this.theme === "light") return lightScheme;
+    else return darkScheme;
+  }
   mouseMove(event: MouseEvent) {
     const bounds = this.canvas.getBoundingClientRect();
     const x = event.x - bounds.left;
@@ -134,11 +138,8 @@ export class CalRenderer {
     };
   };
   changeTheme = (theme: Theme) => {
-    if (theme === "dark") {
-      this.colourScheme = darkScheme;
-    } else if (theme === "light") {
-      this.colourScheme = lightScheme;
-    }
+    this.theme = theme;
+    this.eventWorkerComms.resize();
     this.act();
   };
   get scrollHeight() {
