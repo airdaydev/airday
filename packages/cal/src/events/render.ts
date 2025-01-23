@@ -5,16 +5,18 @@ import {
   timeToY,
   utcZeroDate,
 } from "../time";
-import { darkScheme, darkEventSchemes } from "../colours";
+import {
+  darkScheme,
+  lightScheme,
+  darkEventSchemes,
+  lightEventSchemes,
+} from "../colours";
 
 interface Transform {
   dayPx: number;
   hourPx: number;
   scale: number;
 }
-
-const globalScheme = darkScheme;
-const colourScheme = darkEventSchemes;
 
 // This worker prepares events for rendering & renders them to an offscreen canvas
 
@@ -28,7 +30,9 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function renderCache(wrker: EventRenderer) {
+function renderCache(wrker: EventRenderer, theme: "light" | "dark" = "light") {
+  const globalScheme = theme === "light" ? lightScheme : darkScheme;
+  const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
   const map = new Map();

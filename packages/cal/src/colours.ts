@@ -46,18 +46,20 @@ const blueDark: EventColorScheme = {
   shadow: "",
 };
 
+// TODO: Fix LLM generated colours
+const yellowLight: EventColorScheme = {
+  text: "rgb(89 76 48)", // Darker yellow-brown for readable text
+  bg: "rgb(253 248 233)", // Very light cream/yellow background
+  fg: "rgb(227 208 152)", // Muted golden yellow foreground
+  shadow: "#00000011", // Same subtle shadow
+};
+
 export const darkEventSchemes = {
   yellow: yellowDark,
   blue: blueDark,
 };
 
-const yellowLight: EventColorScheme = {
-  text: "rgb(152 136 102)",
-  bg: "rgb(64 60 48)",
-  fg: "rgb(122 106 76)",
-  shadow: "#00000011",
-};
-
-const lightEventSchemes = {
+export const lightEventSchemes = {
   yellow: yellowLight,
+  blue: blueDark,
 };
