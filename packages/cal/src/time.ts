@@ -12,7 +12,7 @@ export function utcMidnight(date: Date) {
 
 export function utcZeroDate(date: Date) {
   return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
   );
 }
 
@@ -36,6 +36,14 @@ export function localZeroDate(date: Date) {
   newDate.setFullYear(date.getUTCFullYear());
   return newDate;
 }
+
+export const getDateUTC = (date: Date) => {
+  const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const day = days[date.getUTCDay()];
+  const dateMonth = date.getUTCDate();
+  const mo = date.getUTCMonth();
+  return `${day} ${dateMonth.toString().padStart(2, "0")}/${(mo + 1).toString().padStart(2, "0")}`;
+};
 
 export const getDate = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];

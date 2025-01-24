@@ -5,7 +5,7 @@ import { EventDB } from "./state";
 import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
 import {
   getStartOfWeekUTC,
-  getDate,
+  getDateUTC,
   getDateArray,
   isWeekend,
   DayRange,
@@ -356,7 +356,7 @@ export class CalRenderer {
     );
   }
   dayLabel(date: Date, offset: number) {
-    const text = getDate(date);
+    const text = getDateUTC(date);
     this.ctx2D.fillStyle = this.colourScheme.color;
     this.ctx2D.font = "12px Alte Haas Grotesk";
     const textWidth = this.ctx2D.measureText(text).width;

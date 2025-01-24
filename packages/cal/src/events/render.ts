@@ -202,7 +202,7 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
     wrker.ctx2D.font = "16px bold";
     wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-    wrker.ctx2D.fillText(`zero:${new Date(utcDay).getDate()}`, 0, 32);
+    wrker.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
     const bitmap = wrker.canvas.transferToImageBitmap();
     map.set(utcDay, bitmap);
     j++;
