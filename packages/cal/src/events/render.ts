@@ -117,7 +117,8 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
       const cluster = clusterSegments[position.cluster];
       const segmentSize = (wrker.transform.dayPx - 3) / cluster;
       const x = segmentSize * position.segment;
-      const scheme = colourScheme.yellow;
+      console.log(event);
+      const scheme = colourScheme[event.color] || colourScheme.blue;
       // Height calc
       // If event starts before today, event start is beginning of day
       // If event starts starts today, event is event time

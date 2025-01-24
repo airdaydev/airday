@@ -33,6 +33,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     const r = random % 15;
     const roundedRandom = random - r + zeroStartDate.valueOf();
     const duration = (Math.random() > 0.5 ? 15 : 60) * 1000 * 60;
+    const color = Math.random() > 0.5 ? "blue" : "yellow";
     const date = new Date(roundedRandom);
     date.setSeconds(0);
     date.setMilliseconds(0);
@@ -42,6 +43,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
       start: date,
       end: new Date(date.valueOf() + duration),
       allDay: false,
+      color,
     });
   }
   return events;

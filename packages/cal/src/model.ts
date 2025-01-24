@@ -6,6 +6,7 @@ export interface CalendarEventConstructorProps {
   start?: Date;
   end?: Date;
   allDay: boolean;
+  color: string;
 }
 
 export interface EventSignalProps {
@@ -20,11 +21,13 @@ export class CalendarEvent {
   title: string;
   start: Date;
   end: Date;
+  color: string;
   signal: Signal<EventSignalProps & ReturnType<this["serialise"]>>;
   constructor(props: CalendarEventConstructorProps) {
     this.id = props.id || createUniqueId();
     this.title = props.title || "";
     this.start = props.start || new Date();
+    this.color = props.color;
     this.end =
       props.end ||
       new Date(new Date().setMinutes(new Date().getMinutes() + 15));
@@ -40,6 +43,7 @@ export class CalendarEvent {
       title: this.title,
       start: this.start,
       end: this.end,
+      color: this.color,
     };
   }
   transfer() {
@@ -48,6 +52,7 @@ export class CalendarEvent {
       title: this.title,
       start: this.start.valueOf(),
       end: this.end.valueOf(),
+      color: this.color,
     };
   }
 }

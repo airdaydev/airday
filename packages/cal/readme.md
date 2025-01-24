@@ -17,11 +17,11 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Correctly placing items in cache based on tz (note dst)
 - [x] Event position incl. intersecting events
 - [x] Event colour schemes (light/dark)
-- [] Event colours (blue, yellow, red etc)
+- [x] Event colours (blue, yellow, red etc)
 - [] Distinct TODAY label style
 - [] Slightly pink line instead of red
-
 - [] Event intersection / clustering fixes & tests
+- [] Resizing calendar retains same middle via offset change
 - [] Confirm event dates are correct
 - [] Rollover event bug (not starting at x = 0)
 - [] Last simultaneous event bug (starting at x = 0)
