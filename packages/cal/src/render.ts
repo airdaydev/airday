@@ -35,7 +35,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 20;
+  daysVisible = 28;
   daysBuffer = 2;
   resized = false;
   originDate = getStartOfWeekUTC(new Date());
@@ -140,6 +140,7 @@ export class CalRenderer {
   changeTheme = (theme: Theme) => {
     this.theme = theme;
     this.eventWorkerComms.resize();
+    console.log("clearing cache range & bitmap");
     this.eventCache.bitmapMap.clear();
     this.eventCache.range = null;
     this.act();
@@ -159,6 +160,7 @@ export class CalRenderer {
     this.eventWorkerComms.resize();
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
+    console.log("clearing cache range");
     this.eventCache.range = null;
   };
   get gridOffset() {

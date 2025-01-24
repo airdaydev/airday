@@ -32,12 +32,12 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
 }
 
 function renderCache(wrker: EventRenderer, theme: Theme = "light") {
-  console.log("theme", theme);
+  console.log("rendering()");
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
   let j = 0;
-  const map = new Map();
+  const map = new Map<number, ImageBitmap>();
   // Cycle through each day
   for (
     let clip = wrker.range[0];
@@ -45,10 +45,11 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     clip = addDaysNumber(clip, 1)
   ) {
     if (!wrker.dirty.has(clip)) {
-      // Only rerender items marked as dirty
+      // Only rerender days marked as dirty
       continue;
     }
     const events = wrker.cache.get(clip) || []; // Get events per day
+    console.log("rendering", new Date(clip), events.length);
     const posMap = new Map<string, any>();
     // TODO: Check assumption that events have been sorted chronologically
     // Clusters [1,2,3...], Segments [1,2,3...]
@@ -117,7 +118,6 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
       const cluster = clusterSegments[position.cluster];
       const segmentSize = (wrker.transform.dayPx - 3) / cluster;
       const x = segmentSize * position.segment;
-      console.log(event);
       const scheme = colourScheme[event.color] || colourScheme.blue;
       // Height calc
       // If event starts before today, event start is beginning of day
@@ -201,9 +201,14 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     // wrker.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
     wrker.dirty.delete(clip);
   }
-  map.forEach((v, k) =>
-    self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any),
-  );
+  console.log("prepared bitmap map", map);
+  let i = 0;
+  map.forEach((v, k) => {
+    i++;
+    console.log(`sending bitmap ${i}`, new Date(k));
+    self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any);
+  });
+  console.log("render finish");
 }
 
 export class EventRenderer {
@@ -216,7 +221,7 @@ export class EventRenderer {
   };
   range = [0, 0];
   idCache = new Map<string, any>();
-  cache = new Map<number, Set<any>>();
+  cache = new Map<number, Array<any>>();
   dirty = new Set<number>();
   theme: Theme = "light";
   constructor(headless = false) {
@@ -226,6 +231,7 @@ export class EventRenderer {
       const ctx = this._canvas.getContext("2d");
       if (!ctx) throw new Error("Failed to get 2D Canvas Context");
       this._ctx2D = ctx;
+      this.render();
     }
   }
   get ctx2D() {
@@ -250,22 +256,24 @@ export class EventRenderer {
       this.transform.scale = message.data.params.scale;
       this.theme = message.data.params.theme;
       this.offscreenScale();
-      renderCache(this, this.theme);
     }
     if (message.data.type === "load") {
       this.updateCache(message.data.events, message.data.range);
-      renderCache(this, this.theme);
-      for (
-        let i = new Date(this.range[0]).valueOf();
-        i < this.range[1];
-        i = i + 864e5
-      ) {
-        this.dirty.delete(i);
-      }
     }
   };
+  render() {
+    requestAnimationFrame(() => {
+      console.log("frame request");
+      if (this.dirty.size) {
+        renderCache(this, this.theme);
+      }
+      this.render();
+    });
+  }
   updateCache(events: any[], cacheRange: [number, number]) {
+    console.log("updateCache start", events.length, cacheRange);
     this.range = cacheRange;
+    const localCache = new Map<number, Set<any & { start: number }>>();
     events.forEach((event) => {
       const start = Math.max(event.start, this.range[0] as number);
       const end = Math.min(event.end, this.range[1] as number);
@@ -274,10 +282,17 @@ export class EventRenderer {
       const days = Math.ceil((endDay - startDay) / 864e5) + 1;
       for (let i = 0; i < days; i++) {
         const day = addDaysNumber(startDay, i); // utc start day
-        addMapSet(this.cache, day, event.id);
+        addMapSet(localCache, day, event);
         this.dirty.add(day);
         this.idCache.set(event.id, event);
       }
     });
+    for (let dayNum of localCache.keys()) {
+      const sorted = Array.from(localCache.get(dayNum))
+        .sort((a, b) => a.start - b.start)
+        .map((event) => event.id);
+      this.cache.set(dayNum, sorted);
+    }
+    console.log("updateCache finish", this.dirty);
   }
 }
