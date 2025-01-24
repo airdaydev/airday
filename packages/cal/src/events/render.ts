@@ -4,6 +4,8 @@ import {
   getTime,
   timeToY,
   utcZeroDate,
+  localZeroDate,
+  ddmm,
 } from "../time";
 import {
   darkScheme,
@@ -105,8 +107,6 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
         cluster,
       });
     });
-    // console.log(new Date(clip), clusterSegments);
-    wrker.ctx2D.clearRect(0, 0, wrker.canvas.width, wrker.canvas.height);
     let ops: (() => void)[][] = [];
     function addOp(segment: number, op: () => void) {
       if (!ops[segment]) ops[segment] = [op];
@@ -186,6 +186,11 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
               x + 8,
               position.y + 4 + 16,
             );
+            wrker.ctx2D?.fillText(
+              `${ddmm(event.start)}`,
+              x + 8,
+              position.y + 4 + 32,
+            );
           }
           wrker.ctx2D.restore();
         }
@@ -195,17 +200,22 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
       fmap.map((f) => f());
     });
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
+    wrker.ctx2D.font = "16px bold";
+    wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
+    wrker.ctx2D.fillText(`zero:${new Date(utcDay).getDate()}`, 0, 32);
     const bitmap = wrker.canvas.transferToImageBitmap();
     map.set(utcDay, bitmap);
     j++;
     // wrker.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
     wrker.dirty.delete(clip);
+    console.log("prepared day", events.length, new Date(clip).toString());
   }
-  console.log("prepared bitmap map", map);
   let i = 0;
+  // TODO: Change to array
   map.forEach((v, k) => {
     i++;
-    console.log(`sending bitmap ${i}`, new Date(k));
+    console.log(`sending bitmap ${i}`, localZeroDate(new Date(k)));
+    // TODO: Send all at once
     self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any);
   });
   console.log("render finish");

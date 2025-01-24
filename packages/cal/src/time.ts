@@ -107,6 +107,11 @@ export function getTime(dateNum: number) {
   return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
+export function ddmm(dateNum: number) {
+  const date = new Date(dateNum);
+  return `${date.getDate().toString().padStart(2, "0")}/${date.getMonth().toString().padStart(2, "0")}`;
+}
+
 export function timeToY(date: Date, hourPx: number) {
   const hours = date.getHours() * hourPx;
   const min = (date.getMinutes() * hourPx) / 60;
