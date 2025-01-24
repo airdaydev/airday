@@ -284,7 +284,7 @@ export class CalRenderer {
           this.canvas.offsetHeight,
         );
       }
-      this.vtLine(offset, 0);
+      this.vtLine(offset, this.headerHeight);
       this.dayLabel(date, offset);
     });
     this.ctx2D.restore();
