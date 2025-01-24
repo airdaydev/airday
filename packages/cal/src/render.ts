@@ -187,7 +187,7 @@ export class CalRenderer {
     this.days(dates, startDayPx);
     this.times(firstHour, firstHourPx);
     this.header();
-    this.interactions(startDayPx, firstHour, firstHourPx);
+    this.interactions();
     this.events(dates, startDayPx);
     this.timeNow();
     this.debug();
@@ -335,7 +335,7 @@ export class CalRenderer {
     this.ctx2D.restore();
   }
   // TODO: Start from interactions
-  interactions(startDayPx, firstHour, firstHourPx) {
+  interactions() {
     if (!this.hover) return;
     const [relDay, time] = this.hover;
     if (time < 0 || time > 25) return;

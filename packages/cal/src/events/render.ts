@@ -73,7 +73,7 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     let clusterIndex = 0;
     let clusterYMax = 0;
     let maxSegment = 1; // per cluster
-    const clusterSegments = [];
+    const clusterSegments: number[] = [];
     function nextCluster(posY: number, height: number, segment: number) {
       const largestSegment = Math.max(maxSegment, segment);
       maxSegment = largestSegment;

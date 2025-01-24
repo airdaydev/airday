@@ -35,6 +35,6 @@ describe("updateCache", () => {
     );
     t.expect(renderer.cache.size).toBe(3); // yesterday, today, tomorrow
     t.expect(Array.isArray(renderer.cache.get(today))).to.be.true;
-    t.expect(renderer.cache.get(today)?.length).toBe(3);
+    t.expect(renderer.cache.get(today)?.size).toBe(3);
   });
 });
