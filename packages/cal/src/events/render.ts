@@ -4,7 +4,6 @@ import {
   getTime,
   timeToY,
   utcZeroDate,
-  localZeroDate,
   ddmm,
 } from "../time";
 import {
@@ -34,7 +33,6 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
 }
 
 function renderCache(wrker: EventRenderer, theme: Theme = "light") {
-  console.log("rendering()");
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
@@ -51,9 +49,11 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
       continue;
     }
     const events = wrker.cache.get(clip) || []; // Get events per day
-    console.log("rendering", new Date(clip), events.length);
+    // Array.from(unsorted).sort(() => {
+
+    // })
     const posMap = new Map<string, any>();
-    // TODO: Check assumption that events have been sorted chronologically
+    // TODO: Check assumption that events have been sorted chronologically!
     // Clusters [1,2,3...], Segments [1,2,3...]
     // Segments
     const segPosMap = new Map<number, number>(); // segment, lastYPos
@@ -75,15 +75,16 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     let maxSegment = 1; // per cluster
     const clusterSegments = [];
     function nextCluster(posY: number, height: number, segment: number) {
+      const bluster = clusterIndex;
       const largestSegment = Math.max(maxSegment, segment);
-      clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
-        ? largestSegment + 1
-        : 1;
       maxSegment = largestSegment;
-      if (posY > clusterYMax) {
+      if (posY > clusterYMax && clusterYMax > 0) {
         maxSegment = 1;
         clusterIndex++;
       }
+      clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
+        ? largestSegment + 1
+        : 1;
       const max = posY + height;
       clusterYMax = max;
       return clusterIndex;
@@ -115,9 +116,19 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     events.forEach((id) => {
       const event = wrker.idCache.get(id);
       const position = posMap.get(id);
-      const cluster = clusterSegments[position.cluster];
-      const segmentSize = (wrker.transform.dayPx - 3) / cluster;
+      const segments = clusterSegments[position.cluster];
+      if (j === 1) {
+        console.log(event.title, new Date(event.start), position, segments);
+      }
+      const segmentSize = (wrker.transform.dayPx - 3) / segments;
       const x = segmentSize * position.segment;
+      // if (Number.isNaN(x))
+      //   throw new Error(`x = NaN {
+      //     ${position.cluster}
+      //     ${cluster}
+      //     ${segmentSize},
+      //     ${position.segment},
+      //   }`);
       const scheme = colourScheme[event.color] || colourScheme.blue;
       // Height calc
       // If event starts before today, event start is beginning of day
@@ -178,7 +189,11 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
           );
           wrker.ctx2D.save();
           wrker.ctx2D.clip(path);
-          wrker.ctx2D?.fillText(`${event.title}`, x + 6, position.y + 4);
+          wrker.ctx2D?.fillText(
+            `${event.title};c${position.cluster};s${position.segment}`,
+            x + 6,
+            position.y + 4,
+          );
           if (position.height > 24) {
             wrker.ctx2D.fillStyle = scheme.fg;
             wrker.ctx2D?.fillText(
@@ -196,6 +211,9 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
         }
       });
     });
+    if (j === 1) {
+      console.log(new Date(clip), clusterSegments);
+    }
     ops.map((fmap) => {
       fmap.map((f) => f());
     });
@@ -203,22 +221,20 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     wrker.ctx2D.font = "16px bold";
     wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
     wrker.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
+    wrker.ctx2D.font = "09px Departure Mono";
     const bitmap = wrker.canvas.transferToImageBitmap();
     map.set(utcDay, bitmap);
     j++;
     // wrker.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
     wrker.dirty.delete(clip);
-    console.log("prepared day", events.length, new Date(clip).toString());
   }
   let i = 0;
   // TODO: Change to array
   map.forEach((v, k) => {
     i++;
-    console.log(`sending bitmap ${i}`, localZeroDate(new Date(k)));
     // TODO: Send all at once
     self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any);
   });
-  console.log("render finish");
 }
 
 export class EventRenderer {
@@ -231,7 +247,7 @@ export class EventRenderer {
   };
   range = [0, 0];
   idCache = new Map<string, any>();
-  cache = new Map<number, Array<any>>();
+  cache = new Map<number, Set<string>>(); // unsorted
   dirty = new Set<number>();
   theme: Theme = "light";
   constructor(headless = false) {
@@ -273,7 +289,6 @@ export class EventRenderer {
   };
   render() {
     requestAnimationFrame(() => {
-      console.log("frame request");
       if (this.dirty.size) {
         renderCache(this, this.theme);
       }
@@ -281,9 +296,7 @@ export class EventRenderer {
     });
   }
   updateCache(events: any[], cacheRange: [number, number]) {
-    console.log("updateCache start", events.length, cacheRange);
     this.range = cacheRange;
-    const localCache = new Map<number, Set<any & { start: number }>>();
     events.forEach((event) => {
       const start = Math.max(event.start, this.range[0] as number);
       const end = Math.min(event.end, this.range[1] as number);
@@ -292,17 +305,10 @@ export class EventRenderer {
       const days = Math.ceil((endDay - startDay) / 864e5) + 1;
       for (let i = 0; i < days; i++) {
         const day = addDaysNumber(startDay, i); // utc start day
-        addMapSet(localCache, day, event);
-        this.dirty.add(day);
         this.idCache.set(event.id, event);
+        addMapSet(this.cache, day, event.id);
+        this.dirty.add(day);
       }
     });
-    for (let dayNum of localCache.keys()) {
-      const sorted = Array.from(localCache.get(dayNum))
-        .sort((a, b) => a.start - b.start)
-        .map((event) => event.id);
-      this.cache.set(dayNum, sorted);
-    }
-    console.log("updateCache finish", this.dirty);
   }
 }
