@@ -53,6 +53,9 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Tile vertically, even horizontally if needed
 - [] only re-render interaction day that changes (as opposed to spitting bmps again)
 
+## Future plans
+- [] True monthly view
+
 ## Handling concurring events UI
 - Simplest is side by side (create groups of overlapping events & split side-by-side)
 - X calendar's is graceful but complex (focuses on ensuring left bar - i.e. event length & top line i.e. first part of)
