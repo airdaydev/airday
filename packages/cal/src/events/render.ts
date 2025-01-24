@@ -75,7 +75,6 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
     let maxSegment = 1; // per cluster
     const clusterSegments = [];
     function nextCluster(posY: number, height: number, segment: number) {
-      const bluster = clusterIndex;
       const largestSegment = Math.max(maxSegment, segment);
       maxSegment = largestSegment;
       if (posY > clusterYMax && clusterYMax > 0) {
@@ -117,9 +116,6 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
       const event = wrker.idCache.get(id);
       const position = posMap.get(id);
       const segments = clusterSegments[position.cluster];
-      if (j === 1) {
-        console.log(event.title, new Date(event.start), position, segments);
-      }
       const segmentSize = (wrker.transform.dayPx - 3) / segments;
       const x = segmentSize * position.segment;
       // if (Number.isNaN(x))
@@ -211,9 +207,6 @@ function renderCache(wrker: EventRenderer, theme: Theme = "light") {
         }
       });
     });
-    if (j === 1) {
-      console.log(new Date(clip), clusterSegments);
-    }
     ops.map((fmap) => {
       fmap.map((f) => f());
     });

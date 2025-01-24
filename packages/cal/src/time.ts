@@ -16,6 +16,18 @@ export function utcZeroDate(date: Date) {
   );
 }
 
+export function isTodayUTC(utcDate: Date) {
+  const today = new Date();
+  const date = today.getDate();
+  const month = today.getMonth();
+  const year = today.getFullYear();
+  return (
+    utcDate.getUTCDate() === date &&
+    utcDate.getUTCMonth() === month &&
+    utcDate.getUTCFullYear() === year
+  );
+}
+
 // Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
 export function localZeroDate(date: Date) {
   const hours = date.getHours();
@@ -41,8 +53,9 @@ export const getDateUTC = (date: Date) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const day = days[date.getUTCDay()];
   const dateMonth = date.getUTCDate();
-  const mo = date.getUTCMonth();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}/${(mo + 1).toString().padStart(2, "0")}`;
+  return `${day} ${dateMonth.toString().padStart(2, "0")}`;
+  // const mo = date.getUTCMonth();
+  // /${(mo + 1).toString().padStart(2, "0")}
 };
 
 export const getDate = (date: Date) => {

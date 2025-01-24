@@ -9,6 +9,7 @@ import {
   getDateArray,
   isWeekend,
   DayRange,
+  isTodayUTC,
 } from "./time";
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
@@ -276,7 +277,12 @@ export class CalRenderer {
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
-        this.ctx2D.fillRect(offset, 0, this.dayPx, this.canvas.offsetHeight);
+        this.ctx2D.fillRect(
+          offset,
+          this.headerHeight,
+          this.dayPx,
+          this.canvas.offsetHeight,
+        );
       }
       this.vtLine(offset, 0);
       this.dayLabel(date, offset);
@@ -357,11 +363,19 @@ export class CalRenderer {
   }
   dayLabel(date: Date, offset: number) {
     const text = getDateUTC(date);
-    this.ctx2D.fillStyle = this.colourScheme.color;
-    this.ctx2D.font = "12px Alte Haas Grotesk";
+    this.ctx2D.textAlign = "left";
     const textWidth = this.ctx2D.measureText(text).width;
     const padding = (this.dayPx - textWidth) / 2;
-    this.ctx2D.textAlign = "left";
+    if (isTodayUTC(date)) {
+      this.ctx2D.fillStyle = "red";
+      this.ctx2D.roundRect(offset + padding - 4, 14, textWidth + 8, 25, 2);
+      this.ctx2D.fill();
+      this.ctx2D.font = "bold 12px Alte Haas Grotesk";
+      this.ctx2D.fillStyle = "white";
+    } else {
+      this.ctx2D.fillStyle = this.colourScheme.labels;
+      this.ctx2D.font = "12px Alte Haas Grotesk";
+    }
     this.ctx2D.fillText(text, offset + padding, 25);
   }
   hzLine(

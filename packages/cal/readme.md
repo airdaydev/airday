@@ -18,13 +18,12 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Event position incl. intersecting events
 - [x] Event colour schemes (light/dark)
 - [x] Event colours (blue, yellow, red etc)
-- [] Distinct TODAY label style
-- [] Slightly pink line instead of red
-- [] Event intersection / clustering fixes & tests
+- [x] Event intersection / clustering fixes
+- [x] Distinct TODAY label style
+- [x] Confirm event dates are correct
+- [x] Rollover event bug (not starting at x = 0)
+- [x] Last simultaneous event bug (starting at x = 0)
 - [] Resizing calendar retains same middle via offset change
-- [] Confirm event dates are correct
-- [] Rollover event bug (not starting at x = 0)
-- [] Last simultaneous event bug (starting at x = 0)
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] Quadtree collision detection
@@ -48,6 +47,11 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Click/drag to shorten/lengthen event each direction
 - [] Add all day events
 - [] Expand all day events
+
+## optimisations / quality udpates
+- [] event/worker tests
+- [] Tile vertically, even horizontally if needed
+- [] only re-render interaction day that changes (as opposed to spitting bmps again)
 
 ## Handling concurring events UI
 - Simplest is side by side (create groups of overlapping events & split side-by-side)
