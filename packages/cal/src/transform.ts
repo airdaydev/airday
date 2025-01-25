@@ -48,6 +48,8 @@ export class CalendarTransform {
       Math.max(this.offset[1] + y, 0),
       this.maxYOffset(),
     );
+    // TODO: allow overscroll but automatically swing back
+    // this.offset[1] = this.offset[1] + y;
     if (y !== 0) {
       this.renderer.scrollable.scrollTo(0, this.offset[1]);
     }

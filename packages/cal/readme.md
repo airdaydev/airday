@@ -23,7 +23,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Confirm event dates are correct
 - [x] Rollover event bug (not starting at x = 0)
 - [x] Last simultaneous event bug (starting at x = 0)
-- [] Resizing calendar retains same middle via offset change
+- [x] Resizing calendar retains same middle via offset change
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
 - [] drag to highlight neat area (15min factor) (to create new event)

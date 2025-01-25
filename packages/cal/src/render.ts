@@ -153,15 +153,16 @@ export class CalRenderer {
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
     this.originDate = date.valueOf();
   };
-  // Fit canvas matrix to canvas px dimensions
+  // TODO: Consider debouncing
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
+    const approxDay = this.transform.offset[0] / this.dayPx;
     this.dayPx =
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
+    this.transform.offset[0] = approxDay * this.dayPx;
     this.eventWorkerComms.resize();
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
-    console.log("clearing cache range");
     this.eventCache.range = null;
   };
   get gridOffset() {
