@@ -24,28 +24,31 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Rollover event bug (not starting at x = 0)
 - [x] Last simultaneous event bug (starting at x = 0)
 - [x] Resizing calendar retains same middle via offset change
+## Interactions
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] "Day" view highlights today, must have minimum size
+- [] Drag and drop calendar events
+- [] Click/drag to shorten/lengthen event each direction
+- [] Labels that register as objects with behaviour
+## Polish
 - [] Items over 24hrs long get put in day area
 - [] Tap to highlight day area
 - [] Change time zone
 - [] Add time zone
-- [] word wrap event
 - [] custom scroller, snap to date or week when active scrolling stops
 - [] Hover over date to see full date
 - [] Jump to date/today button
 - [] Move between weeks/days
 - [] Month/Year that shows up on pan
+- [] Change between 12/24hr time
+- [] word wrap event
+## Data
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
 - [] Events falling on DST borders... events disappearing in different zones?
-- [] Drag and drop calendar events
-- [] Labels that register as objects with behaviour
-- [] Change between 12/24hr time
-- [] Click/drag to shorten/lengthen event each direction
 - [] Add all day events
 - [] Expand all day events
 
