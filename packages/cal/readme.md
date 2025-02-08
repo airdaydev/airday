@@ -24,6 +24,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Rollover event bug (not starting at x = 0)
 - [x] Last simultaneous event bug (starting at x = 0)
 - [x] Resizing calendar retains same middle via offset change
+
 ## Interactions
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
@@ -33,6 +34,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Drag and drop calendar events
 - [] Click/drag to shorten/lengthen event each direction
 - [] Labels that register as objects with behaviour
+
 ## Polish
 - [] Items over 24hrs long get put in day area
 - [] Tap to highlight day area
@@ -45,6 +47,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Month/Year that shows up on pan
 - [] Change between 12/24hr time
 - [] word wrap event
+- [] buffer events to the left too
+
 ## Data
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
@@ -52,7 +56,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Add all day events
 - [] Expand all day events
 
-## optimisations / quality udpates
+## final optimisations / quality udpates
 - [] event/worker tests
 - [] Tile vertically, even horizontally if needed
 - [] only re-render interaction day that changes (as opposed to spitting bmps again)
