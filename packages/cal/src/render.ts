@@ -58,6 +58,8 @@ export class CalRenderer {
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
+    this.canvas.style.transform = "translateZ(0)";
+    this.ctx2D.imageSmoothingEnabled = false;
     this.resizeCal();
     this.frame();
     // TODO: Destroy
@@ -290,6 +292,8 @@ export class CalRenderer {
     });
     this.ctx2D.restore();
   }
+  // TODO: Potential optimisation, only re-render image when delivered, otherwise use a transform
+  // Also: Tile regions
   events(dates: Date[], offsetPx: number) {
     this.ctx2D.save();
     const path = new Path2D();

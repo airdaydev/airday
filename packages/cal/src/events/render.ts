@@ -32,202 +32,187 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-function renderCache(wrker: EventRenderer, theme: Theme = "light") {
+// Loop through range
+// Skip dirty days
+// Set positions
+// Collect render calls in segment order
+// Render each segment 0-n
+
+function renderDay(wrker: EventRenderer, theme: Theme = "light", clip: number) {
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
-  let j = 0;
-  const map = new Map<number, ImageBitmap>();
-  // Cycle through each day
-  for (
-    let clip = wrker.range[0];
-    clip <= wrker.range[1];
-    clip = addDaysNumber(clip, 1)
-  ) {
-    if (!wrker.dirty.has(clip)) {
-      // Only rerender days marked as dirty
-      continue;
-    }
-    const events = wrker.cache.get(clip) || []; // Get events per day
-    // Array.from(unsorted).sort(() => {
+  const events = wrker.cache.get(clip) || []; // Get events per day
+  // Array.from(unsorted).sort(() => {
 
-    // })
-    const posMap = new Map<string, any>();
-    // TODO: Check assumption that events have been sorted chronologically!
-    // Clusters [1,2,3...], Segments [1,2,3...]
-    // Segments
-    const segPosMap = new Map<number, number>(); // segment, lastYPos
-    function nextSegment(posY: number, height: number) {
-      let i = 0; // segment number
-      while (true) {
-        const lastPos = segPosMap.get(i);
-        // If segment is empty, or posY exists after last position in segment
-        if (!lastPos || posY > lastPos) {
-          segPosMap.set(i, posY + height);
-          break;
-        }
-        i++; // go to next segment
+  // })
+  const posMap = new Map<string, any>();
+  // TODO: Check assumption that events have been sorted chronologically!
+  // Clusters [1,2,3...], Segments [1,2,3...]
+  // Segments
+  const segPosMap = new Map<number, number>(); // segment, lastYPos
+  function nextSegment(posY: number, height: number) {
+    let i = 0; // segment number
+    while (true) {
+      const lastPos = segPosMap.get(i);
+      // If segment is empty, or posY exists after last position in segment
+      if (!lastPos || posY > lastPos) {
+        segPosMap.set(i, posY + height);
+        break;
       }
-      return i;
+      i++; // go to next segment
     }
-    let clusterIndex = 0;
-    let clusterYMax = 0;
-    let maxSegment = 1; // per cluster
-    const clusterSegments: number[] = [];
-    function nextCluster(posY: number, height: number, segment: number) {
-      const largestSegment = Math.max(maxSegment, segment);
-      maxSegment = largestSegment;
-      if (posY > clusterYMax && clusterYMax > 0) {
-        maxSegment = 1;
-        clusterIndex++;
-      }
-      clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
-        ? largestSegment + 1
-        : 1;
-      const max = posY + height;
-      clusterYMax = max;
-      return clusterIndex;
+    return i;
+  }
+  let clusterIndex = 0;
+  let clusterYMax = 0;
+  let maxSegment = 1; // per cluster
+  const clusterSegments: number[] = [];
+  function nextCluster(posY: number, height: number, segment: number) {
+    const largestSegment = Math.max(maxSegment, segment);
+    maxSegment = largestSegment;
+    if (posY > clusterYMax && clusterYMax > 0) {
+      maxSegment = 1;
+      clusterIndex++;
     }
-    events.forEach((id) => {
-      const event = wrker.idCache.get(id);
-      const startTime = event.start < clip ? clip : event.start;
-      const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
-      const height = Math.max((endTime - startTime) / 1000 / 60, 22);
-      const y = timeToY(new Date(startTime), wrker.transform.hourPx);
-      const startsToday = event.start > clip;
-      const segment = nextSegment(y, height);
-      const cluster = nextCluster(y, height, segment);
-      posMap.set(id, {
-        startTime,
-        endTime,
-        height,
-        y,
-        startsToday,
-        segment,
-        cluster,
-      });
+    clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
+      ? largestSegment + 1
+      : 1;
+    const max = posY + height;
+    clusterYMax = max;
+    return clusterIndex;
+  }
+  events.forEach((id) => {
+    const event = wrker.idCache.get(id);
+    const startTime = event.start < clip ? clip : event.start;
+    const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
+    const height = Math.max((endTime - startTime) / 1000 / 60, 22);
+    const y = timeToY(new Date(startTime), wrker.transform.hourPx);
+    const startsToday = event.start > clip;
+    const segment = nextSegment(y, height);
+    const cluster = nextCluster(y, height, segment);
+    posMap.set(id, {
+      startTime,
+      endTime,
+      height,
+      y,
+      startsToday,
+      segment,
+      cluster,
     });
-    let ops: (() => void)[][] = [];
-    function addOp(segment: number, op: () => void) {
-      if (!ops[segment]) ops[segment] = [op];
-      else ops[segment].push(op);
-    }
-    events.forEach((id) => {
-      const event = wrker.idCache.get(id);
-      const position = posMap.get(id);
-      const segments = clusterSegments[position.cluster];
-      const segmentSize = (wrker.transform.dayPx - 3) / segments;
-      const x = segmentSize * position.segment;
-      // if (Number.isNaN(x))
-      //   throw new Error(`x = NaN {
-      //     ${position.cluster}
-      //     ${cluster}
-      //     ${segmentSize},
-      //     ${position.segment},
-      //   }`);
-      const scheme = colourScheme[event.color] || colourScheme.blue;
-      // Height calc
-      // If event starts before today, event start is beginning of day
-      // If event starts starts today, event is event time
-      // If event ends after today, event end time is end of day
-      // If event ends today, event end time is end time
-      addOp(position.segment, () => {
-        wrker.ctx2D.shadowColor = scheme.shadow;
-        wrker.ctx2D.shadowBlur = 3;
-        wrker.ctx2D.shadowOffsetX = 2;
-        wrker.ctx2D.shadowOffsetY = 2;
-        wrker.ctx2D.beginPath();
-        const cornerRadii = [
-          position.startsToday ? 2 : 0,
-          position.startsToday ? 2 : 0,
-          2,
-          2,
-        ];
-        // outline
-        wrker.ctx2D.fillStyle = globalScheme.bg;
-        wrker.ctx2D.beginPath();
-        wrker.ctx2D.roundRect(
-          segmentSize * position.segment - 0.5,
-          position.y - 0.5,
-          wrker.transform.dayPx - x - 4,
-          position.height + 1,
-          cornerRadii,
-        );
-        wrker.ctx2D.fill();
-        wrker.ctx2D.closePath();
-        wrker.ctx2D.beginPath();
-        // wrker.ctx2D.fillStyle = "rgb(255 240 190)"; // light
-        wrker.ctx2D.fillStyle = scheme.bg;
-        wrker.ctx2D.roundRect(
+  });
+  let ops: (() => void)[][] = [];
+  function addOp(segment: number, op: () => void) {
+    if (!ops[segment]) ops[segment] = [op];
+    else ops[segment].push(op);
+  }
+  events.forEach((id) => {
+    const event = wrker.idCache.get(id);
+    const position = posMap.get(id);
+    const segments = clusterSegments[position.cluster];
+    const segmentSize = (wrker.transform.dayPx - 3) / segments;
+    const x = segmentSize * position.segment;
+    // if (Number.isNaN(x))
+    //   throw new Error(`x = NaN {
+    //     ${position.cluster}
+    //     ${cluster}
+    //     ${segmentSize},
+    //     ${position.segment},
+    //   }`);
+    const scheme = colourScheme[event.color] || colourScheme.blue;
+    // Height calc
+    // If event starts before today, event start is beginning of day
+    // If event starts starts today, event is event time
+    // If event ends after today, event end time is end of day
+    // If event ends today, event end time is end time
+    addOp(position.segment, () => {
+      wrker.ctx2D.shadowColor = scheme.shadow;
+      wrker.ctx2D.shadowBlur = 3;
+      wrker.ctx2D.shadowOffsetX = 2;
+      wrker.ctx2D.shadowOffsetY = 2;
+      wrker.ctx2D.beginPath();
+      const cornerRadii = [
+        position.startsToday ? 2 : 0,
+        position.startsToday ? 2 : 0,
+        2,
+        2,
+      ];
+      // outline
+      wrker.ctx2D.fillStyle = globalScheme.bg;
+      wrker.ctx2D.beginPath();
+      wrker.ctx2D.roundRect(
+        segmentSize * position.segment - 0.5,
+        position.y - 0.5,
+        wrker.transform.dayPx - x - 4,
+        position.height + 1,
+        cornerRadii,
+      );
+      wrker.ctx2D.fill();
+      wrker.ctx2D.closePath();
+      wrker.ctx2D.beginPath();
+      // wrker.ctx2D.fillStyle = "rgb(255 240 190)"; // light
+      wrker.ctx2D.fillStyle = scheme.bg;
+      wrker.ctx2D.roundRect(
+        segmentSize * position.segment,
+        position.y,
+        wrker.transform.dayPx - x - 5,
+        position.height,
+        cornerRadii,
+      );
+      wrker.ctx2D.fill();
+      wrker.ctx2D.closePath();
+      wrker.ctx2D.beginPath();
+      // wrker.ctx2D.fillStyle = "#ffdc68"; // light
+      wrker.ctx2D.fillStyle = scheme.fg;
+      const pillRadii = [position.startsToday ? 2 : 0, 0, 0, 2];
+      wrker.ctx2D.roundRect(x, position.y, 3, position.height, pillRadii);
+      wrker.ctx2D.fill();
+      wrker.ctx2D.closePath();
+      wrker.ctx2D.shadowColor = "#00000000"; // reset
+      wrker.ctx2D.fillStyle = scheme.text;
+      if (position.startsToday) {
+        const path = new Path2D();
+        path.rect(
           segmentSize * position.segment,
           position.y,
           wrker.transform.dayPx - x - 5,
           position.height,
-          cornerRadii,
         );
-        wrker.ctx2D.fill();
-        wrker.ctx2D.closePath();
-        wrker.ctx2D.beginPath();
-        // wrker.ctx2D.fillStyle = "#ffdc68"; // light
-        wrker.ctx2D.fillStyle = scheme.fg;
-        wrker.ctx2D.roundRect(x, position.y, 3, position.height, cornerRadii);
-        wrker.ctx2D.fill();
-        wrker.ctx2D.closePath();
-        wrker.ctx2D.shadowColor = "#00000000"; // reset
-        wrker.ctx2D.fillStyle = scheme.text;
-        if (position.startsToday) {
-          const path = new Path2D();
-          path.rect(
-            segmentSize * position.segment,
-            position.y,
-            wrker.transform.dayPx - x - 5,
-            position.height,
-          );
-          wrker.ctx2D.save();
-          wrker.ctx2D.clip(path);
+        wrker.ctx2D.save();
+        wrker.ctx2D.clip(path);
+        wrker.ctx2D?.fillText(
+          `${event.title};c${position.cluster};s${position.segment}`,
+          x + 6,
+          position.y + 4,
+        );
+        if (position.height > 24) {
+          wrker.ctx2D.fillStyle = scheme.fg;
           wrker.ctx2D?.fillText(
-            `${event.title};c${position.cluster};s${position.segment}`,
-            x + 6,
-            position.y + 4,
+            `${getTime(event.start)}`,
+            x + 8,
+            position.y + 4 + 16,
           );
-          if (position.height > 24) {
-            wrker.ctx2D.fillStyle = scheme.fg;
-            wrker.ctx2D?.fillText(
-              `${getTime(event.start)}`,
-              x + 8,
-              position.y + 4 + 16,
-            );
-            wrker.ctx2D?.fillText(
-              `${ddmm(event.start)}`,
-              x + 8,
-              position.y + 4 + 32,
-            );
-          }
-          wrker.ctx2D.restore();
+          wrker.ctx2D?.fillText(
+            `${ddmm(event.start)}`,
+            x + 8,
+            position.y + 4 + 32,
+          );
         }
-      });
+        wrker.ctx2D.restore();
+      }
     });
-    ops.map((fmap) => {
-      fmap.map((f) => f());
-    });
-    const utcDay = utcZeroDate(new Date(clip)).valueOf();
-    wrker.ctx2D.font = "16px bold";
-    wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-    wrker.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-    wrker.ctx2D.font = "09px Departure Mono";
-    const bitmap = wrker.canvas.transferToImageBitmap();
-    map.set(utcDay, bitmap);
-    j++;
-    // wrker.postMessage({ type: "day", date: utcDay, bitmap }, [bitmap] as any);
-    wrker.dirty.delete(clip);
-  }
-  let i = 0;
-  // TODO: Change to array
-  map.forEach((v, k) => {
-    i++;
-    // TODO: Send all at once
-    self.postMessage({ type: "day", date: k, bitmap: v }, [v] as any);
   });
+  ops.map((fmap) => {
+    fmap.map((f) => f());
+  });
+  const utcDay = utcZeroDate(new Date(clip)).valueOf();
+  wrker.ctx2D.font = "16px bold";
+  wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
+  wrker.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
+  wrker.ctx2D.font = "09px Departure Mono";
+  const bitmap = wrker.canvas.transferToImageBitmap();
+  wrker.dirty.delete(clip);
+  return [utcDay, bitmap];
 }
 
 export class EventRenderer {
@@ -243,13 +228,15 @@ export class EventRenderer {
   cache = new Map<number, Set<string>>(); // unsorted
   dirty = new Set<number>();
   theme: Theme = "light";
-  constructor(headless = false) {
-    self.addEventListener("message", this.onMessage);
-    if (!headless) {
-      this._canvas = new OffscreenCanvas(100, 100);
-      const ctx = this._canvas.getContext("2d");
-      if (!ctx) throw new Error("Failed to get 2D Canvas Context");
-      this._ctx2D = ctx;
+  worker: boolean;
+  constructor(worker: boolean) {
+    this.worker = worker;
+    this._canvas = new OffscreenCanvas(100, 100);
+    const ctx = this._canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get 2D Canvas Context");
+    this._ctx2D = ctx;
+    if (worker) {
+      self.addEventListener("message", this.onMessage);
       this.render();
     }
   }
@@ -281,9 +268,23 @@ export class EventRenderer {
     }
   };
   render() {
+    // TODO: This should be a queue tbh
     requestAnimationFrame(() => {
       if (this.dirty.size) {
-        renderCache(this, this.theme);
+        for (
+          let clip = this.range[0];
+          clip <= this.range[1];
+          clip = addDaysNumber(clip, 1)
+        ) {
+          if (!this.dirty.has(clip)) {
+            // Only rerender days marked as dirty
+            continue;
+          }
+          const [utcDay, bitmap] = renderDay(this, this.theme, clip);
+          self.postMessage({ type: "day", date: utcDay, bitmap }, [
+            bitmap,
+          ] as any);
+        }
       }
       this.render();
     });

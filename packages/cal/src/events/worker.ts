@@ -1,3 +1,3 @@
 import { EventRenderer } from "./render";
 
-new EventRenderer();
+new EventRenderer(true);
