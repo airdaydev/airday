@@ -10,6 +10,7 @@ import {
   isWeekend,
   DayRange,
   isTodayUTC,
+  localZeroDate,
 } from "./time";
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
@@ -81,6 +82,9 @@ export class CalRenderer {
     scrollable.addEventListener("mousemove", (event: MouseEvent) => {
       this.mouseMove(event);
     });
+    scrollable.addEventListener("mousedown", (event: MouseEvent) => {
+      this.mouseDown(event);
+    });
     this.resizeCal();
     this.frame();
     this.goToDate();
@@ -91,11 +95,19 @@ export class CalRenderer {
     else return darkScheme;
   }
   mouseMove(event: MouseEvent) {
-    const bounds = this.canvas.getBoundingClientRect();
+    const bounds = this.canvas.getBoundingClientRect(); // TODO: cache
     const x = event.x - bounds.left;
     const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
-    this.hover = [this.transform.xToDay(x), this.transform.yToTime(y)];
+    const day = this.transform.xToDay(x);
+    this.hover = [day, this.transform.yToTime(y)];
     this.act();
+  }
+  mouseDown(event: MouseEvent) {
+    const bounds = this.canvas.getBoundingClientRect();
+    console.log(event.x, bounds.left);
+    const day = this.transform.xToDay(event.x - bounds.left);
+    const clip = this.clipspaceCache[day + 1];
+    this.eventCache.rerenderDay(localZeroDate(clip).valueOf());
   }
   get clipDays() {
     return this.daysVisible + 3;
@@ -143,7 +155,6 @@ export class CalRenderer {
   changeTheme = (theme: Theme) => {
     this.theme = theme;
     this.eventWorkerComms.resize();
-    console.log("clearing cache range & bitmap");
     this.eventCache.bitmapMap.clear();
     this.eventCache.range = null;
     this.act();
@@ -185,6 +196,7 @@ export class CalRenderer {
     }
     clearCanvas(this.canvas);
     const [dates, startDayPx, _, clipspaceRange] = this.clipspace(); // TODO: Only necessary in resize/movement
+    this.clipspaceCache = dates;
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     this.eventCache.updateRange(clipspaceRange);
     this.days(dates, startDayPx);

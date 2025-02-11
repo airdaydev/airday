@@ -33,6 +33,12 @@ export class EventCache {
     //   ]);
     // });
   }
+  rerenderDay(clip: number) {
+    this.renderer.eventWorkerComms.worker.postMessage({
+      type: "rerender",
+      clip,
+    });
+  }
   updateRange(range: DayRange) {
     const lastRange = this.range;
     this.range = range;

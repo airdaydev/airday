@@ -39,14 +39,14 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
 // Render each segment 0-n
 
 function renderDay(
-  wrker: EventRenderer,
+  renderer: EventRenderer,
   theme: Theme = "light",
   clip: number,
 ): [number, ImageBitmap] {
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
-  if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
-  const events = wrker.cache.get(clip) || []; // Get events per day
+  if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
+  const events = renderer.cache.get(clip) || []; // Get events per day
   // Array.from(unsorted).sort(() => {
 
   // })
@@ -87,11 +87,11 @@ function renderDay(
     return clusterIndex;
   }
   events.forEach((id) => {
-    const event = wrker.idCache.get(id);
+    const event = renderer.idCache.get(id);
     const startTime = event.start < clip ? clip : event.start;
     const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
     const height = Math.max((endTime - startTime) / 1000 / 60, 22);
-    const y = timeToY(new Date(startTime), wrker.transform.hourPx);
+    const y = timeToY(new Date(startTime), renderer.transform.hourPx);
     const startsToday = event.start > clip;
     const segment = nextSegment(y, height);
     const cluster = nextCluster(y, height, segment);
@@ -111,10 +111,10 @@ function renderDay(
     else ops[segment].push(op);
   }
   events.forEach((id) => {
-    const event = wrker.idCache.get(id);
+    const event = renderer.idCache.get(id);
     const position = posMap.get(id);
     const segments = clusterSegments[position.cluster];
-    const segmentSize = (wrker.transform.dayPx - 3) / segments;
+    const segmentSize = (renderer.transform.dayPx - 3) / segments;
     const x = segmentSize * position.segment;
     // if (Number.isNaN(x))
     //   throw new Error(`x = NaN {
@@ -130,11 +130,11 @@ function renderDay(
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
     addOp(position.segment, () => {
-      wrker.ctx2D.shadowColor = scheme.shadow;
-      wrker.ctx2D.shadowBlur = 3;
-      wrker.ctx2D.shadowOffsetX = 2;
-      wrker.ctx2D.shadowOffsetY = 2;
-      wrker.ctx2D.beginPath();
+      renderer.ctx2D.shadowColor = scheme.shadow;
+      renderer.ctx2D.shadowBlur = 3;
+      renderer.ctx2D.shadowOffsetX = 2;
+      renderer.ctx2D.shadowOffsetY = 2;
+      renderer.ctx2D.beginPath();
       const cornerRadii = [
         position.startsToday ? 2 : 0,
         position.startsToday ? 2 : 0,
@@ -142,67 +142,67 @@ function renderDay(
         2,
       ];
       // outline
-      wrker.ctx2D.fillStyle = globalScheme.bg;
-      wrker.ctx2D.beginPath();
-      wrker.ctx2D.roundRect(
+      renderer.ctx2D.fillStyle = globalScheme.bg;
+      renderer.ctx2D.beginPath();
+      renderer.ctx2D.roundRect(
         segmentSize * position.segment - 0.5,
         position.y - 0.5,
-        wrker.transform.dayPx - x - 4,
+        renderer.transform.dayPx - x - 4,
         position.height + 1,
         cornerRadii,
       );
-      wrker.ctx2D.fill();
-      wrker.ctx2D.closePath();
-      wrker.ctx2D.beginPath();
-      // wrker.ctx2D.fillStyle = "rgb(255 240 190)"; // light
-      wrker.ctx2D.fillStyle = scheme.bg;
-      wrker.ctx2D.roundRect(
+      renderer.ctx2D.fill();
+      renderer.ctx2D.closePath();
+      renderer.ctx2D.beginPath();
+      // renderer.ctx2D.fillStyle = "rgb(255 240 190)"; // light
+      renderer.ctx2D.fillStyle = scheme.bg;
+      renderer.ctx2D.roundRect(
         segmentSize * position.segment,
         position.y,
-        wrker.transform.dayPx - x - 5,
+        renderer.transform.dayPx - x - 5,
         position.height,
         cornerRadii,
       );
-      wrker.ctx2D.fill();
-      wrker.ctx2D.closePath();
-      wrker.ctx2D.beginPath();
-      // wrker.ctx2D.fillStyle = "#ffdc68"; // light
-      wrker.ctx2D.fillStyle = scheme.fg;
+      renderer.ctx2D.fill();
+      renderer.ctx2D.closePath();
+      renderer.ctx2D.beginPath();
+      // renderer.ctx2D.fillStyle = "#ffdc68"; // light
+      renderer.ctx2D.fillStyle = scheme.fg;
       const pillRadii = [position.startsToday ? 2 : 0, 0, 0, 2];
-      wrker.ctx2D.roundRect(x, position.y, 3, position.height, pillRadii);
-      wrker.ctx2D.fill();
-      wrker.ctx2D.closePath();
-      wrker.ctx2D.shadowColor = "#00000000"; // reset
-      wrker.ctx2D.fillStyle = scheme.text;
+      renderer.ctx2D.roundRect(x, position.y, 3, position.height, pillRadii);
+      renderer.ctx2D.fill();
+      renderer.ctx2D.closePath();
+      renderer.ctx2D.shadowColor = "#00000000"; // reset
+      renderer.ctx2D.fillStyle = scheme.text;
       if (position.startsToday) {
         const path = new Path2D();
         path.rect(
           segmentSize * position.segment,
           position.y,
-          wrker.transform.dayPx - x - 5,
+          renderer.transform.dayPx - x - 5,
           position.height,
         );
-        wrker.ctx2D.save();
-        wrker.ctx2D.clip(path);
-        wrker.ctx2D?.fillText(
+        renderer.ctx2D.save();
+        renderer.ctx2D.clip(path);
+        renderer.ctx2D?.fillText(
           `${event.title};c${position.cluster};s${position.segment}`,
           x + 6,
           position.y + 4,
         );
         if (position.height > 24) {
-          wrker.ctx2D.fillStyle = scheme.fg;
-          wrker.ctx2D?.fillText(
+          renderer.ctx2D.fillStyle = scheme.fg;
+          renderer.ctx2D?.fillText(
             `${getTime(event.start)}`,
             x + 8,
             position.y + 4 + 16,
           );
-          wrker.ctx2D?.fillText(
+          renderer.ctx2D?.fillText(
             `${ddmm(event.start)}`,
             x + 8,
             position.y + 4 + 32,
           );
         }
-        wrker.ctx2D.restore();
+        renderer.ctx2D.restore();
       }
     });
   });
@@ -210,12 +210,13 @@ function renderDay(
     fmap.map((f) => f());
   });
   const utcDay = utcZeroDate(new Date(clip)).valueOf();
-  wrker.ctx2D.font = "16px bold";
-  wrker.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-  wrker.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  wrker.ctx2D.font = "09px Departure Mono";
-  const bitmap = wrker.canvas.transferToImageBitmap();
-  wrker.dirty.delete(clip);
+  renderer.ctx2D.fillStyle = "red";
+  renderer.ctx2D.font = "16px bold";
+  renderer.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
+  renderer.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
+  renderer.ctx2D.font = "09px Departure Mono";
+  const bitmap = renderer.canvas.transferToImageBitmap();
+  renderer.dirty.delete(clip);
   return [utcDay, bitmap];
 }
 
@@ -241,8 +242,8 @@ export class EventRenderer {
     this._ctx2D = ctx;
     if (worker) {
       self.addEventListener("message", this.onMessage);
-      this.render();
     }
+    this.render();
   }
   get ctx2D() {
     if (!this._ctx2D) throw new Error("Failed to get 2D Canvas Context");
@@ -270,9 +271,16 @@ export class EventRenderer {
     if (message.data.type === "load") {
       this.updateCache(message.data.events, message.data.range);
     }
+    if (message.data.type === "rerender") {
+      console.log("rerendering");
+      const [utcDay, bitmap] = this.renderDay(message.data.clip, "light");
+      self.postMessage({ type: "day", date: utcDay, bitmap: bitmap }, [
+        bitmap,
+      ] as any);
+    }
   };
   render() {
-    // TODO: This should be a queue tbh
+    // TODO: This could be a smarter queue, we're always rendering
     requestAnimationFrame(() => {
       if (this.dirty.size) {
         const map = new Map<number, ImageBitmap>();
@@ -296,6 +304,9 @@ export class EventRenderer {
       }
       this.render();
     });
+  }
+  renderDay(clip: number, theme = this.theme) {
+    return renderDay(this, theme, clip);
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;
