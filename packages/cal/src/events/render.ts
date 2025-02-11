@@ -38,7 +38,11 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
 // Collect render calls in segment order
 // Render each segment 0-n
 
-function renderDay(wrker: EventRenderer, theme: Theme = "light", clip: number) {
+function renderDay(
+  wrker: EventRenderer,
+  theme: Theme = "light",
+  clip: number,
+): [number, ImageBitmap] {
   const globalScheme = theme === "light" ? lightScheme : darkScheme;
   const colourScheme = theme === "light" ? lightEventSchemes : darkEventSchemes;
   if (!wrker.ctx2D) throw new Error("offscreen ctx2d not ready");
@@ -271,6 +275,7 @@ export class EventRenderer {
     // TODO: This should be a queue tbh
     requestAnimationFrame(() => {
       if (this.dirty.size) {
+        const map = new Map<number, ImageBitmap>();
         for (
           let clip = this.range[0];
           clip <= this.range[1];
@@ -281,10 +286,13 @@ export class EventRenderer {
             continue;
           }
           const [utcDay, bitmap] = renderDay(this, this.theme, clip);
-          self.postMessage({ type: "day", date: utcDay, bitmap }, [
-            bitmap,
-          ] as any);
+          map.set(utcDay, bitmap);
         }
+        Array.from(map).forEach((val) => {
+          self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
+            val[1],
+          ] as any);
+        });
       }
       this.render();
     });
