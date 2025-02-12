@@ -72,7 +72,8 @@ export class CalendarTransform {
     normalisedDate.setMinutes(0);
     normalisedDate.setSeconds(0);
     return (
-      ((normalisedDate.valueOf() - this.renderer.originDate.valueOf()) /
+      ((normalisedDate.valueOf() -
+        this.renderer.clipspace.originDate.valueOf()) /
         864e5) *
         this.renderer.dayPx -
       this.offset[0] +

@@ -26,12 +26,6 @@ export class EventCache {
       events: events.map((e) => e.transfer()), // TODO: Date to number
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
-    // events.forEach((event) => {
-    //   this.transformMap.set(event.id, [
-    //     this.renderer.transform.dateToX(event.start),
-    //     this.renderer.transform.timeToY(event.start),
-    //   ]);
-    // });
   }
   rerenderDay(clip: number) {
     this.renderer.eventWorkerComms.worker.postMessage({

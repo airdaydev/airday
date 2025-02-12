@@ -24,10 +24,10 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Rollover event bug (not starting at x = 0)
 - [x] Last simultaneous event bug (starting at x = 0)
 - [x] Resizing calendar retains same middle via offset change
-- [] Layout edge case - final events in each cluster can still start at x = dayWidth
+- [] Bug: Layout edge case - final events in each cluster can still start at x = dayWidth
 
 ## Interactions
-- [] Memoise clipspace to get update
+- [x] Solidify clipspace api
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
 - [] drag to highlight neat area (15min factor) (to create new event)
