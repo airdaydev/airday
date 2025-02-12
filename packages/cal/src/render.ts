@@ -49,6 +49,7 @@ export class CalRenderer {
   startDay?: Date;
   eventCache: EventCache;
   eventWorkerComms: EventWorkerComms;
+  canvasBounds: DOMRect;
   constructor(container: HTMLDivElement, db: EventDB) {
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
@@ -56,6 +57,7 @@ export class CalRenderer {
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
     this.canvas = canvas;
+    this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
@@ -65,6 +67,7 @@ export class CalRenderer {
     this.frame();
     // TODO: Destroy
     const resizeObserver = new ResizeObserver(() => {
+      this.canvasBounds = this.canvas.getBoundingClientRect();
       this.resized = true;
       this.act();
     });
@@ -95,7 +98,7 @@ export class CalRenderer {
     else return darkScheme;
   }
   mouseMove(event: MouseEvent) {
-    const bounds = this.canvas.getBoundingClientRect(); // TODO: cache
+    const bounds = this.canvasBounds;
     const x = event.x - bounds.left;
     const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
     const day = this.transform.xToDay(x);
