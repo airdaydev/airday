@@ -25,6 +25,33 @@ const TIME_FONT_SIZE = 11;
 
 const iconCache = new Map<string, ImageBitmap>();
 
+const startOfWeekUTC = getStartOfWeekUTC(new Date());
+
+class Clipspace {
+  originDate = startOfWeekUTC;
+  startPx: number = 0;
+  dates: Date[] = [];
+  calRenderer: CalRenderer;
+  range: DayRange = new DayRange(new Date(startOfWeekUTC), 10);
+  constructor(calRenderer: CalRenderer) {
+    this.calRenderer = calRenderer;
+  }
+  get size() {
+    return this.dates.length;
+  }
+  update(startPx: number, relStartDay: number) {
+    this.startPx = startPx;
+    const clipStartDayAbs = new Date(
+      this.originDate.valueOf() + relStartDay * 864e5,
+    );
+    this.dates = getDateArray(
+      clipStartDayAbs.valueOf(),
+      this.calRenderer.clipDays + 5,
+    );
+    this.range = new DayRange(this.dates[0], this.calRenderer.clipDays + 5);
+  }
+}
+
 export class CalRenderer {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
@@ -40,10 +67,11 @@ export class CalRenderer {
   daysVisible = 7;
   daysBuffer = 2;
   resized = false;
-  originDate = getStartOfWeekUTC(new Date());
+  // originDate = getStartOfWeekUTC(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
+  clipspace = new Clipspace(this);
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   startDay?: Date;
@@ -98,21 +126,21 @@ export class CalRenderer {
     else return darkScheme;
   }
   mouseMove(event: MouseEvent) {
-    const bounds = this.canvasBounds;
-    const x = event.x - bounds.left;
-    const y = event.y - bounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
+    const x = event.x - this.canvasBounds.left;
+    const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
     const day = this.transform.xToDay(x);
     this.hover = [day, this.transform.yToTime(y)];
     this.act();
   }
   mouseDown(event: MouseEvent) {
-    // const bounds = this.canvas.getBoundingClientRect();
-    // const day = this.transform.xToDay(event.x - bounds.left);
+    // console.log(
+    //   (event.x - this.gridOffset[0] + this.transform.offset[0]) / this.dayPx,
+    // );
+    // console.log(this.clipspace[1], this.clipspace);
+    // this.clipspace[0][day]
+    // console.log(day * this.dayPx + this.clipspace[1]);
     // const clip = this.clipspaceCache[day + 1];
     // this.eventCache.rerenderDay(localZeroDate(clip).valueOf());
-  }
-  get clipDays() {
-    return this.daysVisible + 3;
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
@@ -166,8 +194,11 @@ export class CalRenderer {
   }
   act = () => (this.lastAction = performance.now());
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
-    this.originDate = date.valueOf();
+    this.clipspace.originDate = date.valueOf();
   };
+  get clipDays() {
+    return this.daysVisible + 3;
+  }
   // TODO: Consider debouncing
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
@@ -183,29 +214,23 @@ export class CalRenderer {
   get gridOffset() {
     return [50, this.headerHeight + this.allDayRowHeight];
   }
-  recalcClipspace(): [Date[], number, Date, DayRange] {
+  recalcClipspace(): void {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
-    const clipStartDayAbs = new Date(
-      this.originDate.valueOf() + relStartDay * 864e5,
-    );
-    const dates = getDateArray(clipStartDayAbs.valueOf(), this.clipDays + 5);
-    const clipspaceRange = new DayRange(dates[0], this.clipDays + 5);
-    return [dates, startDayPx, clipStartDayAbs, clipspaceRange];
+    this.clipspace.update(startDayPx, relStartDay);
   }
   draw() {
     if (this.resized) {
       this.resizeCal();
     }
     clearCanvas(this.canvas);
-    this.clipspace = this.recalcClipspace();
-    const [dates, startDayPx, _, clipspaceRange] = this.clipspace;
+    this.recalcClipspace();
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
-    this.eventCache.updateRange(clipspaceRange);
-    this.days(dates, startDayPx);
+    this.eventCache.updateRange(this.clipspace.range);
+    this.days(this.clipspace.dates, this.clipspace.startPx);
     this.times(firstHour, firstHourPx);
     this.header();
     this.interactions();
-    this.events(dates, startDayPx);
+    this.events(this.clipspace.dates, this.clipspace.startPx);
     this.timeNow();
     this.debug();
   }
