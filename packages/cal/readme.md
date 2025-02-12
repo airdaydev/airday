@@ -27,6 +27,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Layout edge case - final events in each cluster can still start at x = dayWidth
 
 ## Interactions
+- [] Transform cleanup
+- [] Memoise clipspace to get update
 - [] Quadtree collision detection
 - [] hover style for event - add to quadtree
 - [] drag to highlight neat area (15min factor) (to create new event)

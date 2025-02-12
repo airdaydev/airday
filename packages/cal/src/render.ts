@@ -103,11 +103,10 @@ export class CalRenderer {
     this.act();
   }
   mouseDown(event: MouseEvent) {
-    const bounds = this.canvas.getBoundingClientRect();
-    console.log(event.x, bounds.left);
-    const day = this.transform.xToDay(event.x - bounds.left);
-    const clip = this.clipspaceCache[day + 1];
-    this.eventCache.rerenderDay(localZeroDate(clip).valueOf());
+    // const bounds = this.canvas.getBoundingClientRect();
+    // const day = this.transform.xToDay(event.x - bounds.left);
+    // const clip = this.clipspaceCache[day + 1];
+    // this.eventCache.rerenderDay(localZeroDate(clip).valueOf());
   }
   get clipDays() {
     return this.daysVisible + 3;
@@ -181,7 +180,7 @@ export class CalRenderer {
   get gridOffset() {
     return [50, this.headerHeight + this.allDayRowHeight];
   }
-  clipspace(): [Date[], number, Date, DayRange] {
+  recalcClipspace(): [Date[], number, Date, DayRange] {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
@@ -195,8 +194,8 @@ export class CalRenderer {
       this.resizeCal();
     }
     clearCanvas(this.canvas);
-    const [dates, startDayPx, _, clipspaceRange] = this.clipspace(); // TODO: Only necessary in resize/movement
-    this.clipspaceCache = dates;
+    this.clipspace = this.recalcClipspace();
+    const [dates, startDayPx, _, clipspaceRange] = this.clipspace;
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     this.eventCache.updateRange(clipspaceRange);
     this.days(dates, startDayPx);
