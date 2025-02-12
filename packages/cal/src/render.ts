@@ -133,14 +133,11 @@ export class CalRenderer {
     this.act();
   }
   mouseDown(event: MouseEvent) {
-    // console.log(
-    //   (event.x - this.gridOffset[0] + this.transform.offset[0]) / this.dayPx,
-    // );
-    // console.log(this.clipspace[1], this.clipspace);
-    // this.clipspace[0][day]
-    // console.log(day * this.dayPx + this.clipspace[1]);
-    // const clip = this.clipspaceCache[day + 1];
-    // this.eventCache.rerenderDay(localZeroDate(clip).valueOf());
+    // TODO: Are we in grid space!?
+    const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
+    const day = this.clipspace.dates[relDay];
+    console.log(day, localZeroDate(day));
+    this.eventCache.rerenderDay(localZeroDate(day).valueOf());
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
