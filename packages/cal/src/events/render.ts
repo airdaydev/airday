@@ -116,7 +116,7 @@ function calcDayLayout(
       ? largestSegment + 1
       : 1;
     const max = posY + height;
-    clusterYMax = max;
+    clusterYMax = Math.max(max, clusterYMax);
     return clusterIndex;
   }
   events.forEach((id) => {
@@ -190,7 +190,7 @@ export function renderDay(
       ctx2D.fillStyle = globalScheme.bg;
       ctx2D.beginPath();
       ctx2D.roundRect(
-        segmentSize * layout.segment - 0.5,
+        x - 0.5,
         layout.y - 0.5,
         renderer.transform.dayPx - x - 4,
         layout.height + 1,
@@ -201,7 +201,7 @@ export function renderDay(
       ctx2D.beginPath();
       ctx2D.fillStyle = scheme.bg;
       ctx2D.roundRect(
-        segmentSize * layout.segment,
+        x,
         layout.y,
         renderer.transform.dayPx - x - 5,
         layout.height,
@@ -220,12 +220,7 @@ export function renderDay(
       ctx2D.fillStyle = scheme.text;
       if (layout.startsToday) {
         const path = new Path2D();
-        path.rect(
-          segmentSize * layout.segment,
-          layout.y,
-          renderer.transform.dayPx - x - 5,
-          layout.height,
-        );
+        path.rect(x, layout.y, renderer.transform.dayPx - x - 5, layout.height);
         ctx2D.save();
         ctx2D.clip(path);
         ctx2D?.fillText(layout.displayText, x + 6, layout.y + 4);
@@ -246,7 +241,7 @@ export function renderDay(
   ctx2D.font = "16px bold";
   ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
   ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  ctx2D.font = "09px Departure Mono";
+  ctx2D.font = "10px Alte Haas Grotesk";
   const bitmap = renderer.canvas.transferToImageBitmap();
   renderer.dirty.delete(clip);
   return [utcDay, bitmap];
