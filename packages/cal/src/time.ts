@@ -43,7 +43,6 @@ export function localZeroDate(date: Date) {
   newDate.setSeconds(0);
   newDate.setMinutes(0);
   newDate.setHours(0);
-  console.log(date.getUTCDate(), date.getUTCMonth(), date.getUTCFullYear());
   newDate.setFullYear(date.getUTCFullYear());
   newDate.setMonth(date.getUTCMonth());
   newDate.setDate(date.getUTCDate());
