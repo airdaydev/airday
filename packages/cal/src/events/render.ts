@@ -352,7 +352,7 @@ export class EventRenderer {
       this.render();
     });
   }
-  renderDay(layout, clip, theme = this.theme) {
+  renderDay(layout: DayLayout, clip: number, theme = this.theme) {
     return renderDay(this, layout, clip, theme);
   }
   updateCache(events: any[], cacheRange: [number, number]) {
