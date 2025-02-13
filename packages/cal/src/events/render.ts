@@ -106,15 +106,16 @@ function calcDayLayout(
       segment,
       cluster,
       displayText: `${event.title};c${cluster};s${segment}`,
+      displayTime: getTime(event.start),
+      color: event.color,
     });
     layoutMap.set("_segments", clusterSegments);
   });
   return layoutMap;
 }
 
-function renderDay(
+export function renderDay(
   renderer: EventRenderer,
-  events: Set<string>,
   layoutMap: Map<string, any>,
   clip: number,
   theme: Theme = "light",
@@ -126,17 +127,15 @@ function renderDay(
   }
   const ctx2D = renderer.ctx2D;
   if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
-  events.forEach((id) => {
+  layoutMap.forEach((layout) => {
     // Render
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
       theme === "light" ? lightEventSchemes : darkEventSchemes;
-    const event = renderer.idCache.get(id);
-    const layout = layoutMap.get(id);
     const segments = layoutMap.get("_segments")[layout.cluster];
     const segmentSize = (renderer.transform.dayPx - 3) / segments;
     const x = segmentSize * layout.segment;
-    const scheme = colourScheme[parseColourScheme(event.color)];
+    const scheme = colourScheme[parseColourScheme(layout.color)];
     // Height calc
     // If event starts before today, event start is beginning of day
     // If event starts starts today, event is event time
@@ -199,8 +198,8 @@ function renderDay(
         ctx2D?.fillText(layout.displayText, x + 6, layout.y + 4);
         if (layout.height > 24) {
           ctx2D.fillStyle = scheme.fg;
-          ctx2D?.fillText(`${getTime(event.start)}`, x + 8, layout.y + 4 + 16);
-          ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
+          ctx2D?.fillText(layout.displayTime, x + 8, layout.y + 4 + 16);
+          // ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
         ctx2D.restore();
       }
@@ -281,7 +280,7 @@ export class EventRenderer {
         clip,
         this.transform.hourPx,
       );
-      const [utcDay, bitmap] = this.renderDay(events, layoutMap, clip, "light");
+      const [utcDay, bitmap] = this.renderDay(layoutMap, clip, "light");
       self.postMessage({ type: "day", date: utcDay, bitmap: bitmap }, [
         bitmap,
       ] as any);
@@ -308,7 +307,7 @@ export class EventRenderer {
             clip,
             this.transform.hourPx,
           );
-          const [utcDay, bitmap] = this.renderDay(events, layoutMap, clip);
+          const [utcDay, bitmap] = this.renderDay(layoutMap, clip);
           map.set(utcDay, bitmap);
         }
         Array.from(map).forEach((val) => {
@@ -320,8 +319,8 @@ export class EventRenderer {
       this.render();
     });
   }
-  renderDay(events, layoutMap, clip, theme = this.theme) {
-    return renderDay(this, events, layoutMap, clip, theme);
+  renderDay(layoutMap, clip, theme = this.theme) {
+    return renderDay(this, layoutMap, clip, theme);
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;
