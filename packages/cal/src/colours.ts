@@ -63,12 +63,17 @@ const blueDark: EventColorScheme = {
   shadow: "#00000011", // Same subtle shadow
 };
 
-export const darkEventSchemes = {
+interface EventSchemes {
+  yellow: EventColorScheme;
+  blue: EventColorScheme;
+}
+
+export const darkEventSchemes: EventSchemes = {
   yellow: yellowDark,
   blue: blueDark,
 };
 
-export const lightEventSchemes = {
+export const lightEventSchemes: EventSchemes = {
   yellow: yellowLight,
   blue: blueLight,
 };

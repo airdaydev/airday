@@ -38,6 +38,12 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
 // Collect render calls in segment order
 // Render each segment 0-n
 
+function parseColourScheme(colour: any): "yellow" | "blue" {
+  if (typeof colour !== "string") return "blue";
+  if (colour !== "blue" && colour !== "yellow") return "blue";
+  return colour;
+}
+
 function renderDay(
   renderer: EventRenderer,
   theme: Theme = "light",
@@ -123,7 +129,7 @@ function renderDay(
     //     ${segmentSize},
     //     ${position.segment},
     //   }`);
-    const scheme = colourScheme[event.color] || colourScheme.blue;
+    const scheme = colourScheme[parseColourScheme(event.color)];
     // Height calc
     // If event starts before today, event start is beginning of day
     // If event starts starts today, event is event time
