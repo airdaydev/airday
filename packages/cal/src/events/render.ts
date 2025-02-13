@@ -105,6 +105,7 @@ function calcDayLayout(
       startsToday,
       segment,
       cluster,
+      displayText: `${event.title};c${cluster};s${segment}`,
     });
     layoutMap.set("_segments", clusterSegments);
   });
@@ -123,104 +124,85 @@ function renderDay(
     if (!ops[segment]) ops[segment] = [op];
     else ops[segment].push(op);
   }
+  const ctx2D = renderer.ctx2D;
+  if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
   events.forEach((id) => {
     // Render
-    if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
       theme === "light" ? lightEventSchemes : darkEventSchemes;
     const event = renderer.idCache.get(id);
-    const position = layoutMap.get(id);
-    const segments = layoutMap.get("_segments")[position.cluster];
+    const layout = layoutMap.get(id);
+    const segments = layoutMap.get("_segments")[layout.cluster];
     const segmentSize = (renderer.transform.dayPx - 3) / segments;
-    const x = segmentSize * position.segment;
-    // if (Number.isNaN(x))
-    //   throw new Error(`x = NaN {
-    //     ${position.cluster}
-    //     ${cluster}
-    //     ${segmentSize},
-    //     ${position.segment},
-    //   }`);
+    const x = segmentSize * layout.segment;
     const scheme = colourScheme[parseColourScheme(event.color)];
     // Height calc
     // If event starts before today, event start is beginning of day
     // If event starts starts today, event is event time
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
-    addOp(position.segment, () => {
-      renderer.ctx2D.shadowColor = scheme.shadow;
-      renderer.ctx2D.shadowBlur = 3;
-      renderer.ctx2D.shadowOffsetX = 2;
-      renderer.ctx2D.shadowOffsetY = 2;
-      renderer.ctx2D.beginPath();
+    addOp(layout.segment, () => {
+      ctx2D.shadowColor = scheme.shadow;
+      ctx2D.shadowBlur = 3;
+      ctx2D.shadowOffsetX = 2;
+      ctx2D.shadowOffsetY = 2;
+      ctx2D.beginPath();
       const cornerRadii = [
-        position.startsToday ? 2 : 0,
-        position.startsToday ? 2 : 0,
+        layout.startsToday ? 2 : 0,
+        layout.startsToday ? 2 : 0,
         2,
         2,
       ];
       // outline
-      renderer.ctx2D.fillStyle = globalScheme.bg;
-      renderer.ctx2D.beginPath();
-      renderer.ctx2D.roundRect(
-        segmentSize * position.segment - 0.5,
-        position.y - 0.5,
+      ctx2D.fillStyle = globalScheme.bg;
+      ctx2D.beginPath();
+      ctx2D.roundRect(
+        segmentSize * layout.segment - 0.5,
+        layout.y - 0.5,
         renderer.transform.dayPx - x - 4,
-        position.height + 1,
+        layout.height + 1,
         cornerRadii,
       );
-      renderer.ctx2D.fill();
-      renderer.ctx2D.closePath();
-      renderer.ctx2D.beginPath();
-      // renderer.ctx2D.fillStyle = "rgb(255 240 190)"; // light
-      renderer.ctx2D.fillStyle = scheme.bg;
-      renderer.ctx2D.roundRect(
-        segmentSize * position.segment,
-        position.y,
+      ctx2D.fill();
+      ctx2D.closePath();
+      ctx2D.beginPath();
+      ctx2D.fillStyle = scheme.bg;
+      ctx2D.roundRect(
+        segmentSize * layout.segment,
+        layout.y,
         renderer.transform.dayPx - x - 5,
-        position.height,
+        layout.height,
         cornerRadii,
       );
-      renderer.ctx2D.fill();
-      renderer.ctx2D.closePath();
-      renderer.ctx2D.beginPath();
-      // renderer.ctx2D.fillStyle = "#ffdc68"; // light
-      renderer.ctx2D.fillStyle = scheme.fg;
-      const pillRadii = [position.startsToday ? 2 : 0, 0, 0, 2];
-      renderer.ctx2D.roundRect(x, position.y, 3, position.height, pillRadii);
-      renderer.ctx2D.fill();
-      renderer.ctx2D.closePath();
-      renderer.ctx2D.shadowColor = "#00000000"; // reset
-      renderer.ctx2D.fillStyle = scheme.text;
-      if (position.startsToday) {
+      ctx2D.fill();
+      ctx2D.closePath();
+      ctx2D.beginPath();
+      // ctx2D.fillStyle = "#ffdc68"; // light
+      ctx2D.fillStyle = scheme.fg;
+      const pillRadii = [layout.startsToday ? 2 : 0, 0, 0, 2];
+      ctx2D.roundRect(x, layout.y, 3, layout.height, pillRadii);
+      ctx2D.fill();
+      ctx2D.closePath();
+      ctx2D.shadowColor = "#00000000"; // reset
+      ctx2D.fillStyle = scheme.text;
+      if (layout.startsToday) {
         const path = new Path2D();
         path.rect(
-          segmentSize * position.segment,
-          position.y,
+          segmentSize * layout.segment,
+          layout.y,
           renderer.transform.dayPx - x - 5,
-          position.height,
+          layout.height,
         );
-        renderer.ctx2D.save();
-        renderer.ctx2D.clip(path);
-        renderer.ctx2D?.fillText(
-          `${event.title};c${position.cluster};s${position.segment}`,
-          x + 6,
-          position.y + 4,
-        );
-        if (position.height > 24) {
-          renderer.ctx2D.fillStyle = scheme.fg;
-          renderer.ctx2D?.fillText(
-            `${getTime(event.start)}`,
-            x + 8,
-            position.y + 4 + 16,
-          );
-          renderer.ctx2D?.fillText(
-            `${ddmm(event.start)}`,
-            x + 8,
-            position.y + 4 + 32,
-          );
+        ctx2D.save();
+        ctx2D.clip(path);
+        ctx2D?.fillText(layout.displayText, x + 6, layout.y + 4);
+        if (layout.height > 24) {
+          ctx2D.fillStyle = scheme.fg;
+          ctx2D?.fillText(`${getTime(event.start)}`, x + 8, layout.y + 4 + 16);
+          ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
-        renderer.ctx2D.restore();
+        ctx2D.restore();
       }
     });
   });
@@ -228,23 +210,11 @@ function renderDay(
     fmap.map((f) => f());
   });
   const utcDay = utcZeroDate(new Date(clip)).valueOf();
-  renderer.ctx2D.fillStyle = "red";
-  renderer.ctx2D.font = "16px bold";
-  renderer.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-  renderer.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  renderer.ctx2D.font = "09px Departure Mono";
-  const bitmap = renderer.canvas.transferToImageBitmap();
-  renderer.dirty.delete(clip);
-  return [utcDay, bitmap];
-}
-
-function renderExtras(renderer: EventRenderer, clip: number) {
-  const utcDay = utcZeroDate(new Date(clip)).valueOf();
-  renderer.ctx2D.fillStyle = "red";
-  renderer.ctx2D.font = "16px bold";
-  renderer.ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-  renderer.ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  renderer.ctx2D.font = "09px Departure Mono";
+  ctx2D.fillStyle = "red";
+  ctx2D.font = "16px bold";
+  ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
+  ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
+  ctx2D.font = "09px Departure Mono";
   const bitmap = renderer.canvas.transferToImageBitmap();
   renderer.dirty.delete(clip);
   return [utcDay, bitmap];
