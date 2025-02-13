@@ -44,6 +44,37 @@ function parseColourScheme(colour: any): "yellow" | "blue" {
   return colour;
 }
 
+export interface EventLayout {
+  startTime: number;
+  endTime: number;
+  height: number;
+  y: number;
+  startsToday: boolean;
+  segment: number;
+  cluster: number;
+  displayText: string;
+  displayTime: string;
+  color: string;
+}
+
+// class EventLayoutTransfer {
+//   static pack(layout: EventLayout) {
+//     return Object.keys(() => {
+
+//     })
+//   }
+//   static unpack() {
+
+//   }
+// }
+
+type DayLayoutMap = Map<string, EventLayout>;
+
+interface DayLayout {
+  map: DayLayoutMap;
+  clusterSegments: number[];
+}
+
 /**
  * Gets layout for a whole day
  * Divides into clusters (of shared contiguous vertical space), and then horizontal segments
@@ -54,8 +85,8 @@ function calcDayLayout(
   events: Set<string>,
   clip: number,
   hourHeight: number,
-): Map<string, any> {
-  const layoutMap = new Map<string, any>();
+): DayLayout {
+  const layoutMap = new Map<string, EventLayout>();
   const segPosMap = new Map<number, number>(); // segment, lastYPos
   function nextSegment(posY: number, height: number) {
     let i = 0; // segment number
@@ -109,17 +140,19 @@ function calcDayLayout(
       displayTime: getTime(event.start),
       color: event.color,
     });
-    layoutMap.set("_segments", clusterSegments);
   });
-  return layoutMap;
+  return {
+    map: layoutMap,
+    clusterSegments,
+  };
 }
 
 export function renderDay(
   renderer: EventRenderer,
-  layoutMap: Map<string, any>,
+  dayLayout: DayLayout,
   clip: number,
   theme: Theme = "light",
-) {
+): [number, ImageBitmap] {
   let ops: (() => void)[][] = [];
   function addOp(segment: number, op: () => void) {
     if (!ops[segment]) ops[segment] = [op];
@@ -127,12 +160,12 @@ export function renderDay(
   }
   const ctx2D = renderer.ctx2D;
   if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
-  layoutMap.forEach((layout) => {
+  dayLayout.map.forEach((layout) => {
     // Render
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
       theme === "light" ? lightEventSchemes : darkEventSchemes;
-    const segments = layoutMap.get("_segments")[layout.cluster];
+    const segments = dayLayout.clusterSegments[layout.cluster];
     const segmentSize = (renderer.transform.dayPx - 3) / segments;
     const x = segmentSize * layout.segment;
     const scheme = colourScheme[parseColourScheme(layout.color)];
@@ -274,13 +307,13 @@ export class EventRenderer {
       console.log("rerendering");
       const clip = message.data.clip;
       const events = this.cache.get(clip) || new Set(); // Get day's events
-      const layoutMap = calcDayLayout(
+      const layout = calcDayLayout(
         this.idCache,
         events,
         clip,
         this.transform.hourPx,
       );
-      const [utcDay, bitmap] = this.renderDay(layoutMap, clip, "light");
+      const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
       self.postMessage({ type: "day", date: utcDay, bitmap: bitmap }, [
         bitmap,
       ] as any);
@@ -301,13 +334,13 @@ export class EventRenderer {
             continue;
           }
           const events = this.cache.get(clip) || new Set(); // Get day's events
-          const layoutMap = calcDayLayout(
+          const layout = calcDayLayout(
             this.idCache,
             events,
             clip,
             this.transform.hourPx,
           );
-          const [utcDay, bitmap] = this.renderDay(layoutMap, clip);
+          const [utcDay, bitmap] = this.renderDay(layout, clip);
           map.set(utcDay, bitmap);
         }
         Array.from(map).forEach((val) => {
@@ -319,8 +352,8 @@ export class EventRenderer {
       this.render();
     });
   }
-  renderDay(layoutMap, clip, theme = this.theme) {
-    return renderDay(this, layoutMap, clip, theme);
+  renderDay(layout, clip, theme = this.theme) {
+    return renderDay(this, layout, clip, theme);
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;
