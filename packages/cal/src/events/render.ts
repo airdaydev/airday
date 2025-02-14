@@ -111,16 +111,18 @@ function calcDayLayout(
   let maxSegments = 1;
   const clusterSegments: number[] = [];
 
+  const curCluster = { minY: 0, maxY: 0, segments: 1 };
+
   function nextCluster(posY: number, height: number, segment: number) {
     const largestSegment = Math.max(maxSegments, segment); // largest segment within this cluster
     const max = posY + height; // maximum y position for this element
     maxSegments = largestSegment;
-    // If we are moving to a new cluster
+    // If we are moving to a new cluster (checking too that we do not move cluster on first event)
     if (posY > clusterYMax && clusterYMax > 0) {
       maxSegments = 1;
       clusterIndex++;
     }
-    // If we have moved to a new cluster, 1, otherwise, previous + 1;
+    // If we have just moved to a new cluster (from scratch or first go), 1, otherwise, previous + 1;
     clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
       ? largestSegment + 1
       : 1;
