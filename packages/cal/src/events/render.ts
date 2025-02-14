@@ -47,7 +47,9 @@ function parseColourScheme(colour: any): "yellow" | "blue" {
 export interface EventLayout {
   startTime: number;
   endTime: number;
+  width: number;
   height: number;
+  x: number;
   y: number;
   startsToday: boolean;
   segment: number;
@@ -85,6 +87,7 @@ function calcDayLayout(
   events: Set<string>,
   clip: number,
   hourHeight: number,
+  dayPx: number,
 ): DayLayout {
   const layoutMap = new Map<string, EventLayout>();
   const segPosMap = new Map<number, number>(); // segment, lastYPos
@@ -131,7 +134,9 @@ function calcDayLayout(
     layoutMap.set(id, {
       startTime,
       endTime,
+      width: 0, // unset yet
       height,
+      x: 0, // unset yet
       y,
       startsToday,
       segment,
@@ -140,6 +145,13 @@ function calcDayLayout(
       displayTime: getTime(event.start),
       color: event.color,
     });
+  });
+  layoutMap.forEach((layout) => {
+    const segments = clusterSegments[layout.cluster];
+    const segmentSize = (dayPx - 3) / segments;
+    const x = segmentSize * layout.segment;
+    const width = dayPx - x;
+    Object.assign(layout, { width, x });
   });
   return {
     map: layoutMap,
@@ -165,9 +177,6 @@ export function renderDay(
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
       theme === "light" ? lightEventSchemes : darkEventSchemes;
-    const segments = dayLayout.clusterSegments[layout.cluster];
-    const segmentSize = (renderer.transform.dayPx - 3) / segments;
-    const x = segmentSize * layout.segment;
     const scheme = colourScheme[parseColourScheme(layout.color)];
     // Height calc
     // If event starts before today, event start is beginning of day
@@ -190,9 +199,9 @@ export function renderDay(
       ctx2D.fillStyle = globalScheme.bg;
       ctx2D.beginPath();
       ctx2D.roundRect(
-        x - 0.5,
+        layout.x - 0.5,
         layout.y - 0.5,
-        renderer.transform.dayPx - x - 4,
+        layout.width - 4,
         layout.height + 1,
         cornerRadii,
       );
@@ -201,9 +210,9 @@ export function renderDay(
       ctx2D.beginPath();
       ctx2D.fillStyle = scheme.bg;
       ctx2D.roundRect(
-        x,
+        layout.x,
         layout.y,
-        renderer.transform.dayPx - x - 5,
+        layout.width - 5,
         layout.height,
         cornerRadii,
       );
@@ -213,20 +222,20 @@ export function renderDay(
       // ctx2D.fillStyle = "#ffdc68"; // light
       ctx2D.fillStyle = scheme.fg;
       const pillRadii = [layout.startsToday ? 2 : 0, 0, 0, 2];
-      ctx2D.roundRect(x, layout.y, 3, layout.height, pillRadii);
+      ctx2D.roundRect(layout.x, layout.y, 3, layout.height, pillRadii);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.shadowColor = "#00000000"; // reset
       ctx2D.fillStyle = scheme.text;
       if (layout.startsToday) {
         const path = new Path2D();
-        path.rect(x, layout.y, renderer.transform.dayPx - x - 5, layout.height);
+        path.rect(layout.x, layout.y, layout.width - 5, layout.height);
         ctx2D.save();
         ctx2D.clip(path);
-        ctx2D?.fillText(layout.displayText, x + 6, layout.y + 4);
+        ctx2D?.fillText(layout.displayText, layout.x + 6, layout.y + 4);
         if (layout.height > 24) {
           ctx2D.fillStyle = scheme.fg;
-          ctx2D?.fillText(layout.displayTime, x + 8, layout.y + 4 + 16);
+          ctx2D?.fillText(layout.displayTime, layout.x + 8, layout.y + 4 + 16);
           // ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
         ctx2D.restore();
@@ -307,9 +316,10 @@ export class EventRenderer {
         events,
         clip,
         this.transform.hourPx,
+        this.transform.dayPx,
       );
       const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
-      self.postMessage({ type: "day", date: utcDay, bitmap: bitmap }, [
+      self.postMessage({ type: "day", date: utcDay, bitmap: bitmap, layout }, [
         bitmap,
       ] as any);
     }
@@ -334,6 +344,7 @@ export class EventRenderer {
             events,
             clip,
             this.transform.hourPx,
+            this.transform.dayPx,
           );
           const [utcDay, bitmap] = this.renderDay(layout, clip);
           map.set(utcDay, bitmap);
