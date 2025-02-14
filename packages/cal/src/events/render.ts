@@ -71,6 +71,7 @@ export interface EventLayout {
 // }
 
 type DayLayoutMap = Map<string, EventLayout>;
+type Cluster = { minY: number; maxY: number; segments: number };
 
 interface DayLayout {
   map: DayLayoutMap;
@@ -104,24 +105,29 @@ function calcDayLayout(
     }
     return i;
   }
+
   let clusterIndex = 0;
-  let clusterYMax = 0;
-  let maxSegment = 1; // per cluster
+  let clusterYMax = 0; // maximum y position per cluster
+  let maxSegments = 1;
   const clusterSegments: number[] = [];
+
   function nextCluster(posY: number, height: number, segment: number) {
-    const largestSegment = Math.max(maxSegment, segment);
-    maxSegment = largestSegment;
+    const largestSegment = Math.max(maxSegments, segment); // largest segment within this cluster
+    const max = posY + height; // maximum y position for this element
+    maxSegments = largestSegment;
+    // If we are moving to a new cluster
     if (posY > clusterYMax && clusterYMax > 0) {
-      maxSegment = 1;
+      maxSegments = 1;
       clusterIndex++;
     }
+    // If we have moved to a new cluster, 1, otherwise, previous + 1;
     clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
       ? largestSegment + 1
       : 1;
-    const max = posY + height;
     clusterYMax = Math.max(max, clusterYMax);
     return clusterIndex;
   }
+
   events.forEach((id) => {
     const event = eventCache.get(id);
     const startTime = event.start < clip ? clip : event.start;
