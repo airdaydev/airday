@@ -75,7 +75,7 @@ type Cluster = { minY: number; maxY: number; segments: number };
 
 interface DayLayout {
   map: DayLayoutMap;
-  clusterSegments: number[];
+  clusters: Cluster[];
 }
 
 /**
@@ -107,26 +107,31 @@ function calcDayLayout(
   }
 
   let clusterIndex = 0;
-  let clusterYMax = 0; // maximum y position per cluster
+  let clusterMinY: number | null = null; // maximum y position per cluster
+  let clusterMaxY = 0; // maximum y position per cluster
   let maxSegments = 1;
-  const clusterSegments: number[] = [];
+  const clusters: Cluster[] = [];
 
-  const curCluster = { minY: 0, maxY: 0, segments: 1 };
-
-  function nextCluster(posY: number, height: number, segment: number) {
-    const largestSegment = Math.max(maxSegments, segment); // largest segment within this cluster
-    const max = posY + height; // maximum y position for this element
-    maxSegments = largestSegment;
-    // If we are moving to a new cluster (checking too that we do not move cluster on first event)
-    if (posY > clusterYMax && clusterYMax > 0) {
+  function nextCluster2(posY: number, height: number, segment: number) {
+    const maxY = posY + height; // maxY for this event
+    maxSegments = Math.max(maxSegments, segment); // max segment count for this cluster
+    if (clusterMinY === null) {
+      clusterMinY = posY; // triggers for first cluster only
+    }
+    // condition checking next position is clear of previous, and we are passed the first cluster
+    if (posY > clusterMaxY && clusterMaxY > 0) {
+      // Reset & move
       maxSegments = 1;
+      clusterMinY = posY;
       clusterIndex++;
     }
-    // If we have just moved to a new cluster (from scratch or first go), 1, otherwise, previous + 1;
-    clusterSegments[clusterIndex] = clusterSegments[clusterIndex]
-      ? largestSegment + 1
-      : 1;
-    clusterYMax = Math.max(max, clusterYMax);
+    clusterMaxY = Math.max(maxY, clusterMaxY); // maxY for cluster
+    const newSegment = !clusters[clusterIndex];
+    clusters[clusterIndex] = {
+      minY: clusterMinY,
+      maxY: clusterMaxY,
+      segments: newSegment ? 1 : maxSegments + 1,
+    };
     return clusterIndex;
   }
 
@@ -138,7 +143,7 @@ function calcDayLayout(
     const y = timeToY(new Date(startTime), hourHeight);
     const startsToday = event.start > clip;
     const segment = nextSegment(y, height);
-    const cluster = nextCluster(y, height, segment);
+    const cluster = nextCluster2(y, height, segment);
     layoutMap.set(id, {
       startTime,
       endTime,
@@ -155,15 +160,15 @@ function calcDayLayout(
     });
   });
   layoutMap.forEach((layout) => {
-    const segments = clusterSegments[layout.cluster];
-    const segmentSize = (dayPx - 3) / segments;
+    const cluster = clusters[layout.cluster];
+    const segmentSize = (dayPx - 3) / cluster.segments;
     const x = segmentSize * layout.segment;
     const width = dayPx - x;
     Object.assign(layout, { width, x });
   });
   return {
     map: layoutMap,
-    clusterSegments,
+    clusters,
   };
 }
 
