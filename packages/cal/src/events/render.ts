@@ -240,6 +240,7 @@ export function renderDay(
       ctx2D.closePath();
       ctx2D.shadowColor = "#00000000"; // reset
       ctx2D.fillStyle = scheme.text;
+      // ctx2D.fillStyle = "#FFFFFF88"; // reset
       if (layout.startsToday) {
         const path = new Path2D();
         path.rect(layout.x, layout.y, layout.width - 5, layout.height);
@@ -263,7 +264,7 @@ export function renderDay(
   ctx2D.font = "16px bold";
   ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
   ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  ctx2D.font = "10px Alte Haas Grotesk";
+  ctx2D.font = "12px bold Alte Haas Grotesk";
   const bitmap = renderer.canvas.transferToImageBitmap();
   renderer.dirty.delete(clip);
   return [utcDay, bitmap];
