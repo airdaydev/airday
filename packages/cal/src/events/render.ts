@@ -177,7 +177,7 @@ export function renderDay(
   dayLayout: DayLayout,
   clip: number,
   theme: Theme = "light",
-): [number, ImageBitmap] {
+): ImageBitmap {
   let ops: (() => void)[][] = [];
   function addOp(segment: number, op: () => void) {
     if (!ops[segment]) ops[segment] = [op];
@@ -267,7 +267,7 @@ export function renderDay(
   ctx2D.font = "12px bold Alte Haas Grotesk";
   const bitmap = renderer.canvas.transferToImageBitmap();
   renderer.dirty.delete(clip);
-  return [utcDay, bitmap];
+  return bitmap;
 }
 
 export class EventRenderer {
@@ -332,10 +332,9 @@ export class EventRenderer {
         this.transform.hourPx,
         this.transform.dayPx,
       );
-      const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
-      self.postMessage({ type: "day", date: utcDay, bitmap: bitmap, layout }, [
-        bitmap,
-      ] as any);
+      // const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
+      const utcDay = utcZeroDate(new Date(clip)).valueOf();
+      self.postMessage({ type: "reflow", date: utcDay, layout });
     }
   };
   render() {
@@ -360,7 +359,8 @@ export class EventRenderer {
             this.transform.hourPx,
             this.transform.dayPx,
           );
-          const [utcDay, bitmap] = this.renderDay(layout, clip);
+          const bitmap = this.renderDay(layout, clip);
+          const utcDay = utcZeroDate(new Date(clip)).valueOf();
           map.set(utcDay, bitmap);
         }
         Array.from(map).forEach((val) => {

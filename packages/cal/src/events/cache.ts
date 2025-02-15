@@ -100,6 +100,9 @@ export class EventWorkerComms {
         );
         this.calRenderer.act();
       }
+      if (event.data.type === "reflow") {
+        console.log(event.data.layout);
+      }
     });
   }
   resize() {
