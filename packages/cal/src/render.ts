@@ -64,7 +64,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 7;
+  daysVisible = 14;
   daysBuffer = 2;
   resized = false;
   // originDate = getStartOfWeekUTC(new Date());
