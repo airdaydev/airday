@@ -12,6 +12,7 @@ import {
   isTodayUTC,
   localZeroDate,
 } from "./time";
+import { CalUIObjects } from "./quadtree";
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
 
@@ -67,7 +68,6 @@ export class CalRenderer {
   daysVisible = 14;
   daysBuffer = 2;
   resized = false;
-  // originDate = getStartOfWeekUTC(new Date());
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
@@ -78,6 +78,7 @@ export class CalRenderer {
   eventCache: EventCache;
   eventWorkerComms: EventWorkerComms;
   canvasBounds: DOMRect;
+  uiObjects = new CalUIObjects(this);
   constructor(container: HTMLDivElement, db: EventDB) {
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
@@ -128,7 +129,17 @@ export class CalRenderer {
   mouseMove(event: MouseEvent) {
     const x = event.x - this.canvasBounds.left;
     const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
-    const day = this.transform.xToDay(x);
+    const day = this.transform.xToDay(x); // TODO: Are we doing too much work here!?
+    const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
+    const absDay = this.clipspace.dates[relDay];
+    if (!absDay)
+      return console.warn(
+        "TODO: no absDay available, dev stink to be resolved",
+      ); //
+    this.uiObjects.testCollision(absDay.valueOf(), [
+      event.x - this.gridOffset[0],
+      event.y - this.gridOffset[1],
+    ]);
     this.hover = [day, this.transform.yToTime(y)];
     this.act();
   }
@@ -229,7 +240,7 @@ export class CalRenderer {
     this.interactions();
     this.events(this.clipspace.dates, this.clipspace.startPx);
     this.timeNow();
-    this.debug();
+    this.debug(this.clipspace.dates, this.clipspace.startPx);
   }
   frame() {
     requestAnimationFrame(() => {
@@ -441,7 +452,12 @@ export class CalRenderer {
     this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
     this.ctx2D.stroke();
   }
-  debug() {
+  debug(dates: Date[], offsetPx: number) {
+    this.uiObjects.hits.map((obj) => {
+      // TODO: Offset by date
+      this.ctx2D.rect(obj.x, obj.y, obj.width, obj.height);
+      this.ctx2D.fill();
+    });
     this.ctx2D.textAlign = "right";
     this.ctx2D.fillText(
       `Offset: ${this.transform.offset}`,

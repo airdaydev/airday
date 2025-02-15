@@ -3,6 +3,9 @@ import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
 import { scale } from "../canvas";
 import { DayRange } from "../time";
+import { DayLayout } from "./render";
+import { Rectangle } from "@timohausmann/quadtree-ts";
+import { EventUIData } from "../quadtree";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -11,6 +14,7 @@ export class EventCache {
   renderer: CalRenderer;
   db: EventDB;
   bitmapMap = new Map<number, ImageBitmap>();
+  layoutMap = new Map<number, DayLayout>();
   map = new Map<number, Set<CalendarEvent>>();
   transformMap = new Map<string, { x: number; y: number }>();
   range: DayRange | null = null;
@@ -32,6 +36,25 @@ export class EventCache {
       type: "reflow",
       clip,
     });
+  }
+  reflow(date: number, layout: DayLayout) {
+    this.layoutMap.set(date, layout);
+    const objs: Rectangle<EventUIData>[] = [];
+    for (let [id, event] of layout.map.entries()) {
+      objs.push(
+        new Rectangle<EventUIData>({
+          x: event.x,
+          width: event.width,
+          y: event.y,
+          height: event.height,
+          data: {
+            type: 0,
+            id,
+          },
+        }),
+      );
+    }
+    this.renderer.uiObjects.updateDay(date, objs);
   }
   updateRange(range: DayRange) {
     const lastRange = this.range;
@@ -101,7 +124,7 @@ export class EventWorkerComms {
         this.calRenderer.act();
       }
       if (event.data.type === "reflow") {
-        console.log(event.data.layout);
+        this.calRenderer.eventCache.reflow(event.data.date, event.data.layout);
       }
     });
   }

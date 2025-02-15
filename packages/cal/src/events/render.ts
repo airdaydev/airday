@@ -71,9 +71,9 @@ export interface EventLayout {
 // }
 
 type DayLayoutMap = Map<string, EventLayout>;
-type Cluster = { minY: number; maxY: number; segments: number };
+export type Cluster = { minY: number; maxY: number; segments: number };
 
-interface DayLayout {
+export interface DayLayout {
   map: DayLayoutMap;
   clusters: Cluster[];
 }
