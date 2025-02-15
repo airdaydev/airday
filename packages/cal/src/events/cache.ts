@@ -27,9 +27,9 @@ export class EventCache {
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
   }
-  rerenderDay(clip: number) {
+  reflowDay(clip: number) {
     this.renderer.eventWorkerComms.worker.postMessage({
-      type: "rerender",
+      type: "reflow",
       clip,
     });
   }

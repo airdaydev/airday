@@ -321,8 +321,7 @@ export class EventRenderer {
     if (message.data.type === "load") {
       this.updateCache(message.data.events, message.data.range);
     }
-    if (message.data.type === "rerender") {
-      console.log("rerendering");
+    if (message.data.type === "reflow") {
       const clip = message.data.clip;
       const events = this.cache.get(clip) || new Set(); // Get day's events
       const layout = calcDayLayout(

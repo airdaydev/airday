@@ -137,7 +137,7 @@ export class CalRenderer {
     const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
     const day = this.clipspace.dates[relDay];
     console.log(day, localZeroDate(day));
-    this.eventCache.rerenderDay(localZeroDate(day).valueOf());
+    this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
   loadPng = async (url: string) => {
     const data = await fetch(url);
