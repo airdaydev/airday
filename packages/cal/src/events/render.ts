@@ -219,19 +219,18 @@ export class EventRenderer {
             this.transform.hourPx,
             this.transform.dayPx,
           );
-          // const bitmap = this.renderDay(layout, clip);
-          // const utcDay = utcZeroDate(new Date(clip)).valueOf();
-          // map.set(utcDay, bitmap);
-          // renderer.dirty.delete(clip);
-          // const bitmap = renderer.canvas.transferToImageBitmap();
+          this.renderDay(layout, clip);
+          const bitmap = this.canvas.transferToImageBitmap();
           const utcDay = utcZeroDate(new Date(clip)).valueOf();
+          map.set(utcDay, bitmap);
+          this.dirty.delete(clip);
           self.postMessage({ type: "reflow", date: utcDay, layout });
         }
-        // Array.from(map).forEach((val) => {
-        //   self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
-        //     val[1],
-        //   ] as any);
-        // });
+        Array.from(map).forEach((val) => {
+          self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
+            val[1],
+          ] as any);
+        });
       }
       this.render();
     });
