@@ -201,7 +201,7 @@ export class EventRenderer {
     // TODO: This could be a smarter queue, we're always rendering
     requestAnimationFrame(() => {
       if (this.dirty.size) {
-        // const map = new Map<number, ImageBitmap>();
+        const map = new Map<number, ImageBitmap>();
         for (
           let clip = this.range[0];
           clip <= this.range[1];
@@ -220,17 +220,17 @@ export class EventRenderer {
             this.transform.dayPx,
           );
           this.renderDay(layout, clip);
-          // const bitmap = this.canvas.transferToImageBitmap();
+          const bitmap = this.canvas.transferToImageBitmap();
           const utcDay = utcZeroDate(new Date(clip)).valueOf();
-          // map.set(utcDay, bitmap);
+          map.set(utcDay, bitmap);
           this.dirty.delete(clip);
           self.postMessage({ type: "reflow", date: utcDay, layout });
         }
-        // Array.from(map).forEach((val) => {
-        //   self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
-        //     val[1],
-        //   ] as any);
-        // });
+        Array.from(map).forEach((val) => {
+          self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
+            val[1],
+          ] as any);
+        });
       }
       this.render();
     });
