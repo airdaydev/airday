@@ -13,6 +13,11 @@ import {
   localZeroDate,
 } from "./time";
 import { CalUIObjects } from "./quadtree";
+import Stats from "stats.js";
+
+var stats = new Stats();
+stats.showPanel(0);
+document.body.appendChild(stats.dom);
 
 const foxPng = "https://minio.gormly.co/airday/fox.png";
 
@@ -244,10 +249,12 @@ export class CalRenderer {
   }
   frame() {
     requestAnimationFrame(() => {
+      stats.begin();
       if (performance.now() - this.lastAction < 100) {
         this.draw();
       }
       this.frame();
+      stats.end();
     });
   }
   header() {
@@ -453,11 +460,11 @@ export class CalRenderer {
     this.ctx2D.stroke();
   }
   debug(dates: Date[], offsetPx: number) {
-    this.uiObjects.hits.map((obj) => {
-      // TODO: Offset by date
-      this.ctx2D.rect(obj.x, obj.y, obj.width, obj.height);
-      this.ctx2D.fill();
-    });
+    // this.uiObjects.hits.map((obj) => {
+    //   // TODO: Offset by date
+    //   this.ctx2D.rect(obj.x, obj.y, obj.width, obj.height);
+    //   this.ctx2D.fill();
+    // });
     this.ctx2D.textAlign = "right";
     this.ctx2D.fillText(
       `Offset: ${this.transform.offset}`,
