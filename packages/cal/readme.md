@@ -28,7 +28,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 
 ## Interactions
 - [x] Solidify clipspace api
-- [] Quadtree collision detection
+- [] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move
+- [] Quadtree collision detection (wip)
 - [] hover style for event - add to quadtree
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
