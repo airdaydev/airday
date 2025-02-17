@@ -14,8 +14,6 @@ interface Transform {
   scale: number;
 }
 
-// This worker prepares events for rendering & renders them to an offscreen canvas
-
 function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   const set = map.get(key);
   if (!set) {
@@ -39,18 +37,17 @@ function parseColourScheme(colour: any): "yellow" | "blue" {
 }
 
 export function renderDay(
-  renderer: EventRenderer,
+  ctx2D: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   dayLayout: DayLayout,
   clip: number,
   theme: Theme = "light",
-): ImageBitmap {
+): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
   let ops: (() => void)[][] = [];
   function addOp(segment: number, op: () => void) {
     if (!ops[segment]) ops[segment] = [op];
     else ops[segment].push(op);
   }
-  const ctx2D = renderer.ctx2D;
-  if (!renderer.ctx2D) throw new Error("offscreen ctx2d not ready");
+  if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   dayLayout.map.forEach((layout) => {
     // Render
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
@@ -131,9 +128,7 @@ export function renderDay(
   ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
   ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
   ctx2D.font = "12px bold Alte Haas Grotesk";
-  const bitmap = renderer.canvas.transferToImageBitmap();
-  renderer.dirty.delete(clip);
-  return bitmap;
+  return ctx2D;
 }
 
 export class EventRenderer {
@@ -224,21 +219,25 @@ export class EventRenderer {
             this.transform.hourPx,
             this.transform.dayPx,
           );
-          const bitmap = this.renderDay(layout, clip);
+          // const bitmap = this.renderDay(layout, clip);
+          // const utcDay = utcZeroDate(new Date(clip)).valueOf();
+          // map.set(utcDay, bitmap);
+          // renderer.dirty.delete(clip);
+          // const bitmap = renderer.canvas.transferToImageBitmap();
           const utcDay = utcZeroDate(new Date(clip)).valueOf();
-          map.set(utcDay, bitmap);
+          self.postMessage({ type: "reflow", date: utcDay, layout });
         }
-        Array.from(map).forEach((val) => {
-          self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
-            val[1],
-          ] as any);
-        });
+        // Array.from(map).forEach((val) => {
+        //   self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
+        //     val[1],
+        //   ] as any);
+        // });
       }
       this.render();
     });
   }
   renderDay(layout: DayLayout, clip: number, theme = this.theme) {
-    return renderDay(this, layout, clip, theme);
+    return renderDay(this.ctx2D, layout, clip, theme);
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;
