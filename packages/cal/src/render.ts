@@ -245,7 +245,7 @@ export class CalRenderer {
     this.events(this.clipspace.dates, this.clipspace.startPx);
     this.interactions();
     this.timeNow();
-    this.debug(this.clipspace.dates, this.clipspace.startPx);
+    // this.debug(this.clipspace.dates, this.clipspace.startPx);
   }
   frame() {
     requestAnimationFrame(() => {
@@ -471,13 +471,6 @@ export class CalRenderer {
     this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
     this.ctx2D.stroke();
   }
-  debug(dates: Date[], offsetPx: number) {
-    this.ctx2D.textAlign = "right";
-    this.ctx2D.fillText(
-      `Offset: ${this.transform.offset}`,
-      this.canvas.offsetWidth - this.margin,
-      this.canvas?.offsetHeight - 12,
-    );
-  }
+  debug() {}
   cleanUp() {}
 }

@@ -3,9 +3,9 @@ import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
 import { scale } from "../canvas";
 import { DayRange } from "../time";
-import { DayLayout } from "./render";
+import { DayLayout } from "./layout";
 import { Rectangle } from "@timohausmann/quadtree-ts";
-import { EventUIData } from "../quadtree";
+import { EventUIData } from "../ui-objects";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
