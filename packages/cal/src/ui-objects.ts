@@ -29,8 +29,14 @@ export class CalUIObjects {
     const quad = this.quads.get(utcDay);
     if (quad) {
       this.hits = quad.retrieve(
-        new Rectangle({ x: coords[0], y: coords[1], width: 1, height: 1 }),
+        new Rectangle({
+          x: 0,
+          y: coords[1],
+          width: this.renderer.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
+          height: 1,
+        }),
       );
+      console.log(coords, this.hits);
     }
   }
   clear() {

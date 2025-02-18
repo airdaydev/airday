@@ -143,7 +143,7 @@ export class CalRenderer {
       ); //
     this.uiObjects.testCollision(absDay.valueOf(), [
       event.x - this.gridOffset[0],
-      event.y - this.gridOffset[1],
+      y - this.gridOffset[1] - this.transform.offset[1],
     ]);
     this.hover = [day, this.transform.yToTime(y)];
     this.act();
