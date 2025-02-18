@@ -12,7 +12,7 @@ import {
   isTodayUTC,
   localZeroDate,
 } from "./time";
-import { CalUIObjects } from "./quadtree";
+import { CalUIObjects } from "./ui-objects";
 import Stats from "stats.js";
 
 var stats = new Stats();
@@ -242,8 +242,8 @@ export class CalRenderer {
     this.days(this.clipspace.dates, this.clipspace.startPx);
     this.times(firstHour, firstHourPx);
     this.header();
-    this.interactions();
     this.events(this.clipspace.dates, this.clipspace.startPx);
+    this.interactions();
     this.timeNow();
     this.debug(this.clipspace.dates, this.clipspace.startPx);
   }
@@ -404,9 +404,21 @@ export class CalRenderer {
       time * this.transform.hourPx -
       this.transform.offset[1] +
       this.gridOffset[1];
-    this.ctx2D.fillStyle = "#000055aa";
+    this.ctx2D.fillStyle = "#00009944";
     this.ctx2D.rect(x, y, this.dayPx, 50);
     this.ctx2D.fill();
+    // Hits
+    this.uiObjects.hits.map((obj) => {
+      // TODO: x offset!
+      // TODO: clip!
+      this.ctx2D.rect(
+        x + obj.x,
+        obj.y + this.gridOffset[1] - this.transform.offset[1],
+        obj.width,
+        obj.height,
+      );
+      this.ctx2D.fill();
+    });
   }
   allDayLabel() {
     this.ctx2D.fillStyle = this.colourScheme.color;
@@ -460,11 +472,6 @@ export class CalRenderer {
     this.ctx2D.stroke();
   }
   debug(dates: Date[], offsetPx: number) {
-    // this.uiObjects.hits.map((obj) => {
-    //   // TODO: Offset by date
-    //   this.ctx2D.rect(obj.x, obj.y, obj.width, obj.height);
-    //   this.ctx2D.fill();
-    // });
     this.ctx2D.textAlign = "right";
     this.ctx2D.fillText(
       `Offset: ${this.transform.offset}`,
