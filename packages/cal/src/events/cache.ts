@@ -50,6 +50,7 @@ export class EventCache {
           data: {
             type: 0,
             id,
+            z: event.segment,
           },
         }),
       );

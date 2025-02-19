@@ -7,6 +7,7 @@ type UIElTypes = UIClusterType;
 export type EventUIData = {
   id: string;
   type: UIElTypes;
+  z: number;
 };
 
 export function hitTest(
@@ -26,7 +27,7 @@ export class CalUIObjects {
   renderer: CalRenderer;
   quads = new Map<number, Quadtree<Rectangle<EventUIData>>>();
   hits: Rectangle<EventUIData>[] = [];
-  hit?: EventUIData;
+  hit?: EventUIData | undefined;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
   }
@@ -49,9 +50,9 @@ export class CalUIObjects {
           height: 1,
         }),
       );
-      this.hit = this.hits.find((hit) => hitTest(hit, [coords[0], coords[1]]));
-      // this.hits.sort(() => {}) // zindex
-      // then find the actual hit
+      this.hit = this.hits
+        .sort((a, b) => b.data.z - a.data.z)
+        .find((hit) => hitTest(hit, [coords[0], coords[1]]));
     }
   }
   clear() {
