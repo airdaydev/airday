@@ -50,9 +50,21 @@ export class CalUIObjects {
           height: 1,
         }),
       );
-      this.hit = this.hits
+      const hit = this.hits
         .sort((a, b) => b.data.z - a.data.z)
         .find((hit) => hitTest(hit, [coords[0], coords[1]]));
+      if (!hit) {
+        this.hit = undefined;
+      } else {
+        if (!this.hit || this.hit.id !== hit.data?.id) {
+          const day = this.renderer.eventCache.layoutMap.get(utcDay);
+          if (!day) return console.warn("no day found in hit test");
+          const event = day.map.get(hit.data.id);
+          if (!event) return console.warn("no event found");
+          this.renderer.eventCache.renderClusterLocal(utcDay, event.cluster);
+          // this.hit = hit.data;
+        }
+      }
     }
   }
   clear() {

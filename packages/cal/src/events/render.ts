@@ -41,6 +41,7 @@ export function renderDay(
   dayLayout: DayLayout,
   clip: number,
   theme: Theme = "light",
+  cluster: null | number = null,
 ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
   let ops: (() => void)[][] = [];
   function addOp(segment: number, op: () => void) {
@@ -49,6 +50,7 @@ export function renderDay(
   }
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   dayLayout.map.forEach((layout) => {
+    if (cluster && layout.cluster !== cluster) return;
     // Render
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
@@ -141,6 +143,7 @@ export class EventRenderer {
   };
   range = [0, 0];
   idCache = new Map<string, any>();
+  layoutMap = new Map<number, DayLayout>();
   cache = new Map<number, Set<string>>(); // unsorted
   dirty = new Set<number>();
   theme: Theme = "light";
@@ -192,9 +195,32 @@ export class EventRenderer {
         this.transform.hourPx,
         this.transform.dayPx,
       );
+      this.layoutMap.set(clip, layout);
       // const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
       const utcDay = utcZeroDate(new Date(clip)).valueOf();
       self.postMessage({ type: "reflow", date: utcDay, layout });
+    }
+    if (message.data.type === "cluster") {
+      const { date, clusterIndex } = message.data;
+      if (typeof date !== "number" || typeof clusterIndex !== "number") {
+        throw new Error('worker message type "cluster" called with bad args');
+      }
+      this.renderCluster(date, clusterIndex)
+        .then((bitmap) => {
+          console.log("yepppp");
+          self.postMessage(
+            {
+              type: "cluster",
+              date: date,
+              clusterIndex: clusterIndex,
+              bitmap,
+            },
+            [bitmap],
+          );
+        })
+        .catch((error) => {
+          console.warn("unable to render cluster");
+        });
     }
   };
   render() {
@@ -219,6 +245,7 @@ export class EventRenderer {
             this.transform.hourPx,
             this.transform.dayPx,
           );
+          this.layoutMap.set(clip, layout);
           this.renderDay(layout, clip);
           const bitmap = this.canvas.transferToImageBitmap();
           const utcDay = utcZeroDate(new Date(clip)).valueOf();
@@ -237,6 +264,22 @@ export class EventRenderer {
   }
   renderDay(layout: DayLayout, clip: number, theme = this.theme) {
     return renderDay(this.ctx2D, layout, clip, theme);
+  }
+  renderCluster(date: number, clusterIndex: number) {
+    const layout = this.layoutMap.get(date);
+    const cluster = layout?.clusters[clusterIndex];
+    if (!layout || !cluster) {
+      console.warn(`Cant rerender cluster ${clusterIndex} for ${date}`);
+      return Promise.reject();
+    }
+    renderDay(this.ctx2D, layout, date, "light", clusterIndex);
+    return createImageBitmap(
+      this.canvas,
+      0,
+      cluster.minY,
+      this.transform.dayPx,
+      cluster.maxY - cluster.minY,
+    );
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;

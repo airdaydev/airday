@@ -31,6 +31,22 @@ export class EventCache {
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
   }
+  renderClusterLocal(date: number, clusterIndex: number) {
+    this.renderer.eventWorkerComms.worker.postMessage({
+      type: "cluster",
+      date,
+      clusterIndex,
+    });
+  }
+  // renderClusterLocal(date: number, clusterIndex: number) {
+  //   const layout = this.layoutMap.get(date);
+  //   const cluster = layout?.clusters[clusterIndex];
+  //   if (!layout) {
+  //     console.warn(`Cant rerender cluster ${clusterIndex} for ${date}`);
+  //     return;
+  //   }
+  //   return renderDay(this.renderer.ctx2D, layout, date, "light", clusterIndex);
+  // }
   reflowDay(clip: number) {
     this.renderer.eventWorkerComms.worker.postMessage({
       type: "reflow",
