@@ -143,7 +143,7 @@ export class CalRenderer {
       ); //
     this.uiObjects.testCollision(absDay.valueOf(), [
       event.x - this.gridOffset[0],
-      y - this.gridOffset[1] - this.transform.offset[1],
+      y - this.gridOffset[1] + this.transform.offset[1],
     ]);
     this.hover = [day, this.transform.yToTime(y)];
     this.act();
@@ -152,7 +152,6 @@ export class CalRenderer {
     // TODO: Are we in grid space!?
     const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
     const day = this.clipspace.dates[relDay];
-    console.log(day, localZeroDate(day));
     this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
   loadPng = async (url: string) => {
@@ -408,6 +407,7 @@ export class CalRenderer {
     this.ctx2D.rect(x, y, this.dayPx, 50);
     this.ctx2D.fill();
     // Hits
+    this.ctx2D.beginPath();
     this.uiObjects.hits.map((obj) => {
       // TODO: x offset!
       // TODO: clip!
@@ -417,8 +417,22 @@ export class CalRenderer {
         obj.width,
         obj.height,
       );
-      this.ctx2D.fill();
     });
+    this.ctx2D.fill();
+    this.ctx2D.closePath();
+    const hit = this.uiObjects.hit;
+    if (hit) {
+      this.ctx2D.beginPath();
+      this.ctx2D.fillStyle = "#ff009944";
+      this.ctx2D.rect(
+        x + hit.x,
+        hit.y + this.gridOffset[1] - this.transform.offset[1],
+        hit.width,
+        hit.height,
+      );
+      this.ctx2D.fill();
+      this.ctx2D.closePath();
+    }
   }
   allDayLabel() {
     this.ctx2D.fillStyle = this.colourScheme.color;

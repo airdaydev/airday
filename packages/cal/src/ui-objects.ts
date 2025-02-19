@@ -9,11 +9,24 @@ export type EventUIData = {
   type: UIElTypes;
 };
 
+export function hitTest(
+  rect: { x: number; y: number; width: number; height: number },
+  point: [number, number],
+): boolean {
+  return (
+    point[0] >= rect.x &&
+    point[0] <= rect.x + rect.width &&
+    point[1] >= rect.y &&
+    point[1] <= rect.y + rect.height
+  );
+}
+
 /* Manages interaction */
 export class CalUIObjects {
   renderer: CalRenderer;
   quads = new Map<number, Quadtree<Rectangle<EventUIData>>>();
   hits: Rectangle<EventUIData>[] = [];
+  hit?: EventUIData;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
   }
@@ -36,7 +49,9 @@ export class CalUIObjects {
           height: 1,
         }),
       );
-      console.log(coords, this.hits);
+      this.hit = this.hits.find((hit) => hitTest(hit, [0, coords[1]]));
+      // this.hits.sort(() => {}) // zindex
+      // then find the actual hit
     }
   }
   clear() {
