@@ -193,8 +193,7 @@
 
 ## Marketing, community
 - [] Website
-- [] Consider https://github.com/Linen-dev/linen.dev (chat)
-- [] Consider Zulip (chat)
+- [] Consider Zulip/matrix+element/discord (chat)
 - [] Consider https://motion.dev/ (Animation library)
 - [] Consider https://www.screen.studio/ (Screen recordings)
 - [] Consider https://forwardemail.net/en/private-business-email?pricing=true#enhanced
@@ -210,7 +209,7 @@
 - [] Android Tauri app POC
 - [] iOS release
 - [] Android release
-- [] Explore Ionic Capacitor as fallback
+- [] Explore Webview as partial fallback
 
 ## Future goals
 - [x] List animations (v1)
