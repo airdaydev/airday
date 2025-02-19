@@ -43,13 +43,13 @@ export class CalUIObjects {
     if (quad) {
       this.hits = quad.retrieve(
         new Rectangle({
-          x: 0,
+          x: coords[0],
           y: coords[1],
           width: this.renderer.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
           height: 1,
         }),
       );
-      this.hit = this.hits.find((hit) => hitTest(hit, [0, coords[1]]));
+      this.hit = this.hits.find((hit) => hitTest(hit, [coords[0], coords[1]]));
       // this.hits.sort(() => {}) // zindex
       // then find the actual hit
     }

@@ -133,16 +133,17 @@ export class CalRenderer {
   }
   mouseMove(event: MouseEvent) {
     const x = event.x - this.canvasBounds.left;
-    const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS)
+    const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS+Linux/FF)
     const day = this.transform.xToDay(x); // TODO: Are we doing too much work here!?
     const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
     const absDay = this.clipspace.dates[relDay];
+    const xDay = (event.x - this.clipspace.startPx) % this.dayPx;
     if (!absDay)
       return console.warn(
         "TODO: no absDay available, dev stink to be resolved",
       ); //
     this.uiObjects.testCollision(absDay.valueOf(), [
-      event.x - this.gridOffset[0],
+      xDay,
       y - this.gridOffset[1] + this.transform.offset[1],
     ]);
     this.hover = [day, this.transform.yToTime(y)];
