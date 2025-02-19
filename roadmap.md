@@ -177,6 +177,8 @@
 - [] CRDT: Define all data structures
 - [] Update strategy (anticipate changes)
 - [] Add new item adds saves item into store
+- [] Full jmap support (calendar) https://jmap.io/spec-calendars.html
+- [] Readonly CalDAV support
 
 ## Predeploy, meta app
 - [] Verify keyboard only, accessibility
