@@ -38,3 +38,10 @@ export function clearCanvas(canvas: HTMLCanvasElement) {
     canvasDimensions[1],
   );
 }
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}

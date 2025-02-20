@@ -2,7 +2,7 @@ import { EventCache, EventWorkerComms } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
-import { getCanvasContext, resizeCanvas2D, clearCanvas } from "./canvas";
+import { getCanvasContext, resizeCanvas2D, clearCanvas, scale } from "./canvas";
 import {
   getStartOfWeekUTC,
   getDateUTC,
@@ -19,8 +19,6 @@ var stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
-const foxPng = "https://minio.gormly.co/airday/fox.png";
-
 type TimeFormat = "24hr" | "12hr";
 
 const TIME_FONT_SIZE = 11;
@@ -28,9 +26,6 @@ const TIME_FONT_SIZE = 11;
 // Virtual calendar view: Reset origin at each DAY_BUFFER days start day
 // Reset origin RESET_POINT days out either direction
 // scroll auto snaps to nearest day
-
-const iconCache = new Map<string, ImageBitmap>();
-
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
 class Clipspace {
@@ -70,7 +65,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 14;
+  daysVisible = 7;
   daysBuffer = 2;
   resized = false;
   lastAction: number = performance.now();
@@ -125,7 +120,6 @@ export class CalRenderer {
     this.resizeCal();
     this.frame();
     this.goToDate();
-    this.loadPng(foxPng);
   }
   get colourScheme() {
     if (this.theme === "light") return lightScheme;
@@ -155,12 +149,6 @@ export class CalRenderer {
     const day = this.clipspace.dates[relDay];
     this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
-  loadPng = async (url: string) => {
-    const data = await fetch(url);
-    const blob = await data.blob();
-    const bmp = await createImageBitmap(blob);
-    iconCache.set(url, bmp);
-  };
   mount = (container: HTMLElement) => {
     // Scrollable area
     const scrollable = document.createElement("div");
@@ -380,16 +368,15 @@ export class CalRenderer {
         );
         this.ctx2D.globalAlpha = 1;
       }
-      // const fox = iconCache.get(foxPng);
-      // if (fox && date.getDay() === 5) {
-      //   this.ctx2D.drawImage(
-      //     fox,
-      //     offset + this.margin,
-      //     -this.transform.offset[1] + 500,
-      //     this.dayPx - this.margin,
-      //     this.dayPx - this.margin,
-      //   );
-      // }
+      if (this.eventCache.clusterOverlay) {
+        this.ctx2D.drawImage(
+          this.eventCache.clusterOverlay,
+          200,
+          200,
+          this.eventCache.clusterOverlay.width / scale(),
+          this.eventCache.clusterOverlay.height / scale(),
+        );
+      }
     });
     this.ctx2D.restore();
   }

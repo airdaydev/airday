@@ -1,7 +1,7 @@
 import { CalRenderer } from "../render";
 import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
-import { scale } from "../canvas";
+import { Rect, scale } from "../canvas";
 import { DayRange } from "../time";
 import { DayLayout } from "./layout";
 import { Rectangle } from "@timohausmann/quadtree-ts";
@@ -9,7 +9,6 @@ import { EventUIData } from "../ui-objects";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
-//
 export class EventCache {
   renderer: CalRenderer;
   db: EventDB;
@@ -31,22 +30,13 @@ export class EventCache {
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
   }
-  renderClusterLocal(date: number, clusterIndex: number) {
+  renderRegion(date: number, region: Rect) {
     this.renderer.eventWorkerComms.worker.postMessage({
-      type: "cluster",
+      type: "region",
       date,
-      clusterIndex,
+      region,
     });
   }
-  // renderClusterLocal(date: number, clusterIndex: number) {
-  //   const layout = this.layoutMap.get(date);
-  //   const cluster = layout?.clusters[clusterIndex];
-  //   if (!layout) {
-  //     console.warn(`Cant rerender cluster ${clusterIndex} for ${date}`);
-  //     return;
-  //   }
-  //   return renderDay(this.renderer.ctx2D, layout, date, "light", clusterIndex);
-  // }
   reflowDay(clip: number) {
     this.renderer.eventWorkerComms.worker.postMessage({
       type: "reflow",
@@ -142,6 +132,9 @@ export class EventWorkerComms {
       }
       if (event.data.type === "reflow") {
         this.calRenderer.eventCache.reflow(event.data.date, event.data.layout);
+      }
+      if (event.data.type === "region") {
+        this.calRenderer.eventCache.clusterOverlay = event.data.bitmap;
       }
     });
   }

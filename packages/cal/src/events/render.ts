@@ -7,6 +7,8 @@ import {
   lightEventSchemes,
   Theme,
 } from "../colours";
+import { Rect } from "../canvas";
+import { rectIntersection } from "../ui-objects";
 
 interface Transform {
   dayPx: number;
@@ -36,13 +38,23 @@ function parseColourScheme(colour: any): "yellow" | "blue" {
   return colour;
 }
 
+interface RenderOptions {
+  region?: Rect;
+  shadows?: boolean;
+  theme?: Theme;
+}
+
 export function renderDay(
   ctx2D: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   dayLayout: DayLayout,
   clip: number,
-  theme: Theme = "light",
-  cluster: null | number = null,
+  renderOpts: RenderOptions = {},
 ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
+  // Customise
+  const theme = renderOpts.theme || "dark";
+  const shadows = renderOpts.shadows ?? true;
+  const region = renderOpts.region;
+  // Render
   let ops: (() => void)[][] = [];
   function addOp(segment: number, op: () => void) {
     if (!ops[segment]) ops[segment] = [op];
@@ -50,7 +62,8 @@ export function renderDay(
   }
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   dayLayout.map.forEach((layout) => {
-    if (cluster && layout.cluster !== cluster) return;
+    // Skip events outside region
+    if (region && !rectIntersection(layout, region)) return;
     // Render
     const globalScheme = theme === "light" ? lightScheme : darkScheme;
     const colourScheme =
@@ -62,10 +75,12 @@ export function renderDay(
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
     addOp(layout.segment, () => {
-      ctx2D.shadowColor = scheme.shadow;
-      ctx2D.shadowBlur = 3;
-      ctx2D.shadowOffsetX = 2;
-      ctx2D.shadowOffsetY = 2;
+      if (shadows) {
+        ctx2D.shadowColor = scheme.shadow;
+        ctx2D.shadowBlur = 3;
+        ctx2D.shadowOffsetX = 2;
+        ctx2D.shadowOffsetY = 2;
+      }
       ctx2D.beginPath();
       const cornerRadii = [
         layout.startsToday ? 2 : 0,
@@ -200,19 +215,19 @@ export class EventRenderer {
       const utcDay = utcZeroDate(new Date(clip)).valueOf();
       self.postMessage({ type: "reflow", date: utcDay, layout });
     }
-    if (message.data.type === "cluster") {
-      const { date, clusterIndex } = message.data;
-      if (typeof date !== "number" || typeof clusterIndex !== "number") {
+    if (message.data.type === "region") {
+      const { date, region } = message.data;
+      // TODO: Parse region!
+      if (typeof date !== "number") {
         throw new Error('worker message type "cluster" called with bad args');
       }
-      this.renderCluster(date, clusterIndex)
+      this.renderRegion(date, region)
         .then((bitmap) => {
-          console.log("yepppp");
           self.postMessage(
             {
-              type: "cluster",
+              type: "region",
               date: date,
-              clusterIndex: clusterIndex,
+              region,
               bitmap,
             },
             [bitmap],
@@ -263,22 +278,25 @@ export class EventRenderer {
     });
   }
   renderDay(layout: DayLayout, clip: number, theme = this.theme) {
-    return renderDay(this.ctx2D, layout, clip, theme);
+    return renderDay(this.ctx2D, layout, clip, { theme });
   }
-  renderCluster(date: number, clusterIndex: number) {
+  async renderRegion(date: number, region: Rect) {
     const layout = this.layoutMap.get(date);
-    const cluster = layout?.clusters[clusterIndex];
-    if (!layout || !cluster) {
-      console.warn(`Cant rerender cluster ${clusterIndex} for ${date}`);
+    if (!layout) {
+      console.warn(`Cant rerender layout region ${date}`);
       return Promise.reject();
     }
-    renderDay(this.ctx2D, layout, date, "light", clusterIndex);
+    renderDay(this.ctx2D, layout, date, {
+      theme: "light",
+      region,
+      shadows: false,
+    });
     return createImageBitmap(
       this.canvas,
-      0,
-      cluster.minY,
-      this.transform.dayPx,
-      cluster.maxY - cluster.minY,
+      region.x * this.transform.scale,
+      region.y * this.transform.scale,
+      region.width * this.transform.scale,
+      region.height * this.transform.scale,
     );
   }
   updateCache(events: any[], cacheRange: [number, number]) {

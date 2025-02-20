@@ -1,5 +1,7 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import { CalRenderer } from "./render";
+import { localZeroDate } from "./time";
+import { Rect } from "./canvas";
 
 type UIClusterType = 0;
 type UIElTypes = UIClusterType;
@@ -10,15 +12,21 @@ export type EventUIData = {
   z: number;
 };
 
-export function hitTest(
-  rect: { x: number; y: number; width: number; height: number },
-  point: [number, number],
-): boolean {
+export function hitTest(rect: Rect, point: [number, number]): boolean {
   return (
     point[0] >= rect.x &&
     point[0] <= rect.x + rect.width &&
     point[1] >= rect.y &&
     point[1] <= rect.y + rect.height
+  );
+}
+
+export function rectIntersection(rect1: Rect, rect2: Rect): boolean {
+  return (
+    rect1.x < rect2.x + rect2.width &&
+    rect1.x + rect1.width > rect2.x &&
+    rect1.y < rect2.y + rect2.height &&
+    rect1.y + rect1.height > rect2.y
   );
 }
 
@@ -56,13 +64,15 @@ export class CalUIObjects {
       if (!hit) {
         this.hit = undefined;
       } else {
+        // Skip if hit is same
         if (!this.hit || this.hit.id !== hit.data?.id) {
           const day = this.renderer.eventCache.layoutMap.get(utcDay);
           if (!day) return console.warn("no day found in hit test");
           const event = day.map.get(hit.data.id);
           if (!event) return console.warn("no event found");
-          this.renderer.eventCache.renderClusterLocal(utcDay, event.cluster);
-          // this.hit = hit.data;
+          const localDate = localZeroDate(new Date(utcDay)).valueOf();
+          this.renderer.eventCache.renderRegion(localDate, hit);
+          this.hit = hit.data;
         }
       }
     }
