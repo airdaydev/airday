@@ -263,6 +263,7 @@ export class EventRenderer {
             date: date,
             region,
             bitmap,
+            regionType: "hover",
           },
           [bitmap],
         );

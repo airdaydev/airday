@@ -2,7 +2,7 @@ import { CalRenderer } from "../render";
 import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
 import { Rect, scale } from "../canvas";
-import { DayRange } from "../time";
+import { DayRange, localMidnight, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { Rectangle } from "@timohausmann/quadtree-ts";
 import { EventUIData } from "../ui-objects";
@@ -30,6 +30,15 @@ export class EventCache {
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
   }
+  // incoming region
+  addRegion(data) {
+    const { type, bitmap, date, region } = data;
+    this.hoverRegion = {
+      ...data,
+      date: utcZeroDate(new Date(data.date)).valueOf(),
+    };
+  }
+  // outgoing region
   renderRegion(date: number, region: Rect) {
     this.renderer.eventWorkerComms.worker.postMessage({
       type: "region",
@@ -37,12 +46,14 @@ export class EventCache {
       region,
     });
   }
+  // outgoing
   reflowDay(clip: number) {
     this.renderer.eventWorkerComms.worker.postMessage({
       type: "reflow",
       clip,
     });
   }
+  // incoming
   reflow(date: number, layout: DayLayout) {
     this.layoutMap.set(date, layout);
     const objs: Rectangle<EventUIData>[] = [];
@@ -134,7 +145,9 @@ export class EventWorkerComms {
         this.calRenderer.eventCache.reflow(event.data.date, event.data.layout);
       }
       if (event.data.type === "region") {
-        this.calRenderer.eventCache.clusterOverlay = event.data.bitmap;
+        const { type, bitmap, date, region } = event.data;
+        // TODO: Validate!
+        this.calRenderer.eventCache.addRegion(event.data);
       }
     });
   }

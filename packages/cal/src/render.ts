@@ -11,6 +11,8 @@ import {
   DayRange,
   isTodayUTC,
   localZeroDate,
+  utcZeroDate,
+  localMidnight,
 } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import Stats from "stats.js";
@@ -368,13 +370,18 @@ export class CalRenderer {
         );
         this.ctx2D.globalAlpha = 1;
       }
-      if (this.eventCache.clusterOverlay) {
+      if (
+        this.eventCache.hoverRegion &&
+        date.valueOf() === this.eventCache.hoverRegion.date
+      ) {
         this.ctx2D.drawImage(
-          this.eventCache.clusterOverlay,
-          200,
-          200,
-          this.eventCache.clusterOverlay.width / scale(),
-          this.eventCache.clusterOverlay.height / scale(),
+          this.eventCache.hoverRegion.bitmap,
+          offset + this.eventCache.hoverRegion.region.x,
+          this.eventCache.hoverRegion.region.y +
+            this.gridOffset[1] -
+            this.transform.offset[1],
+          this.eventCache.hoverRegion.bitmap.width / scale(),
+          this.eventCache.hoverRegion.bitmap.height / scale(),
         );
       }
     });
