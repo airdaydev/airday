@@ -121,7 +121,8 @@ export function calcDayLayout(
     const cluster = clusters[layout.cluster];
     const segmentSize = (dayPx - 3) / cluster.segments;
     const x = segmentSize * layout.segment;
-    const width = dayPx - x;
+    const width =
+      cluster.segments == 1 ? dayPx : Math.min(dayPx - x, dayPx * 0.8);
     Object.assign(layout, { width, x });
   });
   return {
