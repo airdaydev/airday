@@ -121,7 +121,7 @@ export function renderDay(
           color = RGBA.tween(
             scheme.bg,
             scheme.bg.highlight(),
-            Math.max(0.1, (performance.now() - renderOpts.fadeTs) / 125),
+            Math.max(0.5, (performance.now() - renderOpts.fadeTs) / 75),
           );
           console.log((performance.now() - renderOpts.fadeTs) / 250);
         }

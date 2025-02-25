@@ -68,7 +68,7 @@ export class CalRenderer {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   margin = 10;
-  daysVisible = 14;
+  daysVisible = 7;
   daysBuffer = 2;
   resized = false;
   lastAction: number = performance.now();
