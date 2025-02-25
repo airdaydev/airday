@@ -37,6 +37,7 @@ export class EventCache {
     region: Rect,
     offset?: [number, number],
     highlightId?: string,
+    ts?: number,
   ) {
     const zeroDate = utcZeroDate(new Date(date)).valueOf();
     const layout = this.layoutMap.get(zeroDate);
@@ -51,6 +52,7 @@ export class EventCache {
       shadows: true,
       offset,
       highlightId,
+      fadeTs: ts,
     });
   }
   // outgoing

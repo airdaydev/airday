@@ -369,6 +369,7 @@ export class CalRenderer {
           this.uiObjects.hover?.region,
           [offset, -this.transform.offset[1] + this.gridOffset[1]],
           this.uiObjects.hover.id,
+          this.uiObjects.hover.ts,
         );
       }
     });

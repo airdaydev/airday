@@ -6,6 +6,7 @@ import {
   darkEventSchemes,
   lightEventSchemes,
   Theme,
+  RGBA,
 } from "../colours";
 import { Rect } from "../canvas";
 import { rectIntersection } from "../ui-objects";
@@ -45,6 +46,7 @@ interface RenderOptions {
   debug?: boolean;
   offset?: [number, number];
   highlightId?: string;
+  fadeTs?: number;
 }
 
 export function renderDay(
@@ -85,7 +87,7 @@ export function renderDay(
       let x = offset ? layout.x + offset[0] : layout.x;
       let y = offset ? layout.y + offset[1] : layout.y;
       if (shadows) {
-        ctx2D.shadowColor = scheme.shadow;
+        ctx2D.shadowColor = scheme.shadow.toString();
         ctx2D.shadowBlur = 3;
         ctx2D.shadowOffsetX = 2;
         ctx2D.shadowOffsetY = 2;
@@ -98,7 +100,7 @@ export function renderDay(
         2,
       ];
       // outline
-      ctx2D.fillStyle = globalScheme.bg;
+      ctx2D.fillStyle = globalScheme.bg.toString();
       ctx2D.beginPath();
       ctx2D.roundRect(
         x - 0.5,
@@ -111,22 +113,31 @@ export function renderDay(
       ctx2D.closePath();
       // Main
       ctx2D.beginPath();
-      ctx2D.fillStyle = scheme.bg;
+      ctx2D.fillStyle = scheme.bg.toString();
       ctx2D.roundRect(x, y, layout.width - 5, layout.height, cornerRadii);
       if (layout.id === renderOpts.highlightId) {
-        ctx2D.fillStyle = "#ffdc68"; // light
+        let color = scheme.bg;
+        if (renderOpts.fadeTs) {
+          color = RGBA.tween(
+            scheme.bg,
+            scheme.bg.highlight(),
+            Math.max(0.1, (performance.now() - renderOpts.fadeTs) / 125),
+          );
+          console.log((performance.now() - renderOpts.fadeTs) / 250);
+        }
+        ctx2D.fillStyle = color.toString(); // light
       }
       ctx2D.fill();
       ctx2D.closePath();
       // Pill
       ctx2D.beginPath();
-      ctx2D.fillStyle = scheme.fg;
+      ctx2D.fillStyle = scheme.fg.toString();
       const pillRadii = [layout.startsToday ? 2 : 0, 0, 0, 2];
       ctx2D.roundRect(x, y, 3, layout.height, pillRadii);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.shadowColor = "#00000000"; // reset
-      ctx2D.fillStyle = scheme.text;
+      ctx2D.fillStyle = scheme.text.toString();
       // ctx2D.fillStyle = "#FFFFFF88"; // reset
       if (layout.startsToday) {
         const path = new Path2D();
@@ -135,7 +146,7 @@ export function renderDay(
         ctx2D.clip(path);
         ctx2D?.fillText(layout.displayText, x + 6, y + 4);
         if (layout.height > 24) {
-          ctx2D.fillStyle = scheme.fg;
+          ctx2D.fillStyle = scheme.fg.toString();
           ctx2D?.fillText(layout.displayTime, x + 8, y + 4 + 16);
           // ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
