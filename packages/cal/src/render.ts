@@ -11,8 +11,6 @@ import {
   DayRange,
   isTodayUTC,
   localZeroDate,
-  utcZeroDate,
-  localMidnight,
 } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import Stats from "stats.js";
@@ -398,36 +396,36 @@ export class CalRenderer {
       time * this.transform.hourPx -
       this.transform.offset[1] +
       this.gridOffset[1];
-    this.ctx2D.fillStyle = "#00009944";
-    this.ctx2D.rect(x, y, this.dayPx, 50);
-    this.ctx2D.fill();
+    // this.ctx2D.fillStyle = "#00009944";
+    // this.ctx2D.rect(x, y, this.dayPx, 50);
+    // this.ctx2D.fill();
     // Hits
-    this.ctx2D.beginPath();
-    this.uiObjects.hits.map((obj) => {
-      // TODO: x offset!
-      // TODO: clip!
-      this.ctx2D.rect(
-        x + obj.x,
-        obj.y + this.gridOffset[1] - this.transform.offset[1],
-        obj.width,
-        obj.height,
-      );
-    });
-    this.ctx2D.fill();
-    this.ctx2D.closePath();
-    const hit = this.uiObjects.hit;
-    if (hit) {
-      this.ctx2D.beginPath();
-      this.ctx2D.fillStyle = "#ff009944";
-      this.ctx2D.rect(
-        x + hit.x,
-        hit.y + this.gridOffset[1] - this.transform.offset[1],
-        hit.width,
-        hit.height,
-      );
-      this.ctx2D.fill();
-      this.ctx2D.closePath();
-    }
+    // this.ctx2D.beginPath();
+    // this.uiObjects.hits.map((obj) => {
+    //   // TODO: x offset!
+    //   // TODO: clip!
+    //   this.ctx2D.rect(
+    //     x + obj.x,
+    //     obj.y + this.gridOffset[1] - this.transform.offset[1],
+    //     obj.width,
+    //     obj.height,
+    //   );
+    // });
+    // this.ctx2D.fill();
+    // this.ctx2D.closePath();
+    // const hit = this.uiObjects.hit;
+    // if (hit) {
+    //   this.ctx2D.beginPath();
+    //   this.ctx2D.fillStyle = "#ff009944";
+    //   this.ctx2D.rect(
+    //     x + hit.x,
+    //     hit.y + this.gridOffset[1] - this.transform.offset[1],
+    //     hit.width,
+    //     hit.height,
+    //   );
+    //   this.ctx2D.fill();
+    //   this.ctx2D.closePath();
+    // }
   }
   allDayLabel() {
     this.ctx2D.fillStyle = this.colourScheme.color;

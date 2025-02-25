@@ -2,7 +2,7 @@ import { CalRenderer } from "../render";
 import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
 import { Rect, scale } from "../canvas";
-import { DayRange, localMidnight, utcZeroDate } from "../time";
+import { DayRange, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { Rectangle } from "@timohausmann/quadtree-ts";
 import { EventUIData } from "../ui-objects";

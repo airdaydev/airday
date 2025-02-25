@@ -255,8 +255,8 @@ export class EventRenderer {
     if (typeof date !== "number") {
       throw new Error('worker message type "cluster" called with bad args');
     }
-    this.partialQueue.enqueue(() =>
-      this.renderRegion(date, region).then((bitmap) => {
+    this.partialQueue.enqueue(() => {
+      return this.renderRegion(date, region).then((bitmap) => {
         self.postMessage(
           {
             type: "region",
@@ -268,8 +268,8 @@ export class EventRenderer {
           [bitmap],
         );
         return bitmap;
-      }),
-    );
+      });
+    });
   }
   render() {
     // TODO: This could be a smarter queue, we're always rendering
@@ -322,7 +322,7 @@ export class EventRenderer {
     renderDay(this.asyncCtx2D, layout, date, {
       theme: "light",
       region,
-      shadows: false,
+      shadows: true,
     });
     return createImageBitmap(
       this.asyncCanvas,
