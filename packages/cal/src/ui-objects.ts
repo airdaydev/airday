@@ -30,12 +30,26 @@ export function rectIntersection(rect1: Rect, rect2: Rect): boolean {
   );
 }
 
+function normaliseRect(rect: Rect): Rect {
+  return {
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+  };
+}
+
 /* Manages interaction */
 export class CalUIObjects {
   renderer: CalRenderer;
   quads = new Map<number, Quadtree<Rectangle<EventUIData>>>();
   hits: Rectangle<EventUIData>[] = [];
   hit?: EventUIData | undefined;
+  hover: {
+    rendered: boolean;
+    region: Rect;
+    date: number;
+  } | null = null;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
   }
@@ -63,6 +77,7 @@ export class CalUIObjects {
         .find((hit) => hitTest(hit, [coords[0], coords[1]]));
       if (!hit) {
         this.hit = undefined;
+        this.hover = null;
       } else {
         // Skip if hit is same
         if (!this.hit || this.hit.id !== hit.data?.id) {
@@ -71,7 +86,12 @@ export class CalUIObjects {
           const event = day.map.get(hit.data.id);
           if (!event) return console.warn("no event found");
           const localDate = localZeroDate(new Date(utcDay)).valueOf();
-          this.renderer.eventCache.renderRegion(localDate, hit);
+          // this.renderer.eventCache.renderRegion(localDate, normaliseRect(hit));
+          this.hover = {
+            rendered: false,
+            date: localDate,
+            region: normaliseRect(hit),
+          };
           this.hit = hit.data;
         }
       }

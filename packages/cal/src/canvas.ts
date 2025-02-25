@@ -21,6 +21,10 @@ export function resizeCanvas2D(canvas: HTMLCanvasElement) {
   canvas.height = canvas.offsetHeight * scale();
   const ctx2D = getCanvasContext(canvas);
   ctx2D.scale(scale(), scale());
+  return {
+    width: canvas.width,
+    height: canvas.height,
+  };
 }
 
 function dimensions(canvas: HTMLCanvasElement) {
@@ -44,4 +48,15 @@ export interface Rect {
   y: number;
   width: number;
   height: number;
+}
+
+export function createCanvasLayer() {
+  const canvas = document.createElement("canvas");
+  canvas.style.position = "absolute";
+  canvas.style.top = "0";
+  canvas.style.left = "0";
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  const ctx2D = getCanvasContext(canvas);
+  return { canvas, ctx2D };
 }

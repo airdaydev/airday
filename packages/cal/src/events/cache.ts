@@ -6,6 +6,7 @@ import { DayRange, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { Rectangle } from "@timohausmann/quadtree-ts";
 import { EventUIData } from "../ui-objects";
+import { renderDay } from "./render";
 
 // EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
@@ -30,21 +31,29 @@ export class EventCache {
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
     });
   }
-  // incoming region
-  addRegion(data) {
-    const { type, bitmap, date, region } = data;
-    this.hoverRegion = {
-      ...data,
-      date: utcZeroDate(new Date(data.date)).valueOf(),
-    };
-  }
   // outgoing region
-  renderRegion(date: number, region: Rect) {
-    this.renderer.eventWorkerComms.worker.postMessage({
-      type: "region",
-      date,
+  async renderRegion(date: number, region: Rect, offset?: [number, number]) {
+    const zeroDate = utcZeroDate(new Date(date)).valueOf();
+    const layout = this.layoutMap.get(zeroDate);
+    if (!layout) {
+      console.warn(`Cant rerender layout region ${date}`);
+      return;
+    }
+    // TODO: Set canvas x/y
+    renderDay(this.renderer.ctx2D, layout, date, {
+      theme: "light",
       region,
+      shadows: true,
+      offset,
     });
+    // TODO: Consider holding onto OG in a temp buffer
+    // const bitmap = await createImageBitmap(
+    //   this.asyncCanvas,
+    //   region.x,
+    //   region.y,
+    //   region.width,
+    //   region.height,
+    // );
   }
   // outgoing
   reflowDay(clip: number) {
@@ -143,11 +152,6 @@ export class EventWorkerComms {
       }
       if (event.data.type === "reflow") {
         this.calRenderer.eventCache.reflow(event.data.date, event.data.layout);
-      }
-      if (event.data.type === "region") {
-        const { type, bitmap, date, region } = event.data;
-        // TODO: Validate!
-        this.calRenderer.eventCache.addRegion(event.data);
       }
     });
   }

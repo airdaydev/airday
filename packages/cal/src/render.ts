@@ -2,7 +2,7 @@ import { EventCache, EventWorkerComms } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
-import { getCanvasContext, resizeCanvas2D, clearCanvas, scale } from "./canvas";
+import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import {
   getStartOfWeekUTC,
   getDateUTC,
@@ -11,6 +11,7 @@ import {
   DayRange,
   isTodayUTC,
   localZeroDate,
+  utcZeroDate,
 } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import Stats from "stats.js";
@@ -31,6 +32,7 @@ const startOfWeekUTC = getStartOfWeekUTC(new Date());
 class Clipspace {
   originDate = startOfWeekUTC;
   startPx: number = 0;
+  diff = 0;
   dates: Date[] = [];
   calRenderer: CalRenderer;
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10);
@@ -41,6 +43,7 @@ class Clipspace {
     return this.dates.length;
   }
   update(startPx: number, relStartDay: number) {
+    this.diff = startPx - this.startPx;
     this.startPx = startPx;
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
@@ -90,8 +93,8 @@ export class CalRenderer {
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
-    this.canvas.style.transform = "translateZ(0)";
-    this.ctx2D.imageSmoothingEnabled = false;
+    this.canvas.style.transform = "translateZ(0)"; // TODO: Maybe pointless
+    this.ctx2D.imageSmoothingEnabled = false; // TODO: Maybe pointless
     this.resizeCal();
     this.frame();
     // TODO: Destroy
@@ -165,13 +168,7 @@ export class CalRenderer {
     scrollChild.id = "airday_scroll_child";
     scrollChild.style.width = "100%";
     // Canvas (sits behind)
-    const canvas = document.createElement("canvas");
-    canvas.style.position = "absolute";
-    canvas.style.top = "0";
-    canvas.style.left = "0";
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    const ctx2D = getCanvasContext(canvas);
+    const { canvas, ctx2D } = createCanvasLayer();
     // Attach everything
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
@@ -231,9 +228,22 @@ export class CalRenderer {
     this.times(firstHour, firstHourPx);
     this.header();
     this.events(this.clipspace.dates, this.clipspace.startPx);
-    this.interactions();
+    // this.interactions();
     this.timeNow();
     // this.debug(this.clipspace.dates, this.clipspace.startPx);
+    // Moving event canvas
+    // this.eventCtx2D.imageSmoothingEnabled = false;
+    // this.eventCtx2D.imageSmoothingQuality = "high";
+    // this.eventCtx2D.globalCompositeOperation = "copy";
+    // this.eventCtx2D.drawImage(
+    //   this.eventCtx2D.canvas,
+    //   this.clipspace.diff,
+    //   0,
+    //   this.canvas.width / 2,
+    //   this.canvas.height / 2,
+    // );
+    // // reset back to normal for subsequent operations.
+    // this.eventCtx2D.globalCompositeOperation = "source-over";
   }
   frame() {
     requestAnimationFrame(() => {
@@ -368,18 +378,12 @@ export class CalRenderer {
         );
         this.ctx2D.globalAlpha = 1;
       }
-      if (
-        this.eventCache.hoverRegion &&
-        date.valueOf() === this.eventCache.hoverRegion.date
-      ) {
-        this.ctx2D.drawImage(
-          this.eventCache.hoverRegion.bitmap,
-          offset + this.eventCache.hoverRegion.region.x,
-          this.eventCache.hoverRegion.region.y +
-            this.gridOffset[1] -
-            this.transform.offset[1],
-          this.eventCache.hoverRegion.bitmap.width / scale(),
-          this.eventCache.hoverRegion.bitmap.height / scale(),
+      const zero = utcZeroDate(new Date(this.uiObjects.hover?.date)).valueOf();
+      if (date.valueOf() === zero) {
+        this.eventCache.renderRegion(
+          this.uiObjects.hover?.date,
+          this.uiObjects.hover?.region,
+          [offset, -this.transform.offset[1] + this.gridOffset[1]],
         );
       }
     });

@@ -42,6 +42,8 @@ interface RenderOptions {
   region?: Rect;
   shadows?: boolean;
   theme?: Theme;
+  debug?: boolean;
+  offset?: [number, number];
 }
 
 export function renderDay(
@@ -76,6 +78,9 @@ export function renderDay(
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
     addOp(layout.segment, () => {
+      const offset = renderOpts.offset;
+      let x = offset ? layout.x + offset[0] : layout.x;
+      let y = offset ? layout.y + offset[1] : layout.y;
       if (shadows) {
         ctx2D.shadowColor = scheme.shadow;
         ctx2D.shadowBlur = 3;
@@ -93,8 +98,8 @@ export function renderDay(
       ctx2D.fillStyle = globalScheme.bg;
       ctx2D.beginPath();
       ctx2D.roundRect(
-        layout.x - 0.5,
-        layout.y - 0.5,
+        x - 0.5,
+        y - 0.5,
         layout.width - 4,
         layout.height + 1,
         cornerRadii,
@@ -103,20 +108,14 @@ export function renderDay(
       ctx2D.closePath();
       ctx2D.beginPath();
       ctx2D.fillStyle = scheme.bg;
-      ctx2D.roundRect(
-        layout.x,
-        layout.y,
-        layout.width - 5,
-        layout.height,
-        cornerRadii,
-      );
+      ctx2D.roundRect(x, y, layout.width - 5, layout.height, cornerRadii);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.beginPath();
       // ctx2D.fillStyle = "#ffdc68"; // light
       ctx2D.fillStyle = scheme.fg;
       const pillRadii = [layout.startsToday ? 2 : 0, 0, 0, 2];
-      ctx2D.roundRect(layout.x, layout.y, 3, layout.height, pillRadii);
+      ctx2D.roundRect(x, y, 3, layout.height, pillRadii);
       ctx2D.fill();
       ctx2D.closePath();
       ctx2D.shadowColor = "#00000000"; // reset
@@ -124,13 +123,13 @@ export function renderDay(
       // ctx2D.fillStyle = "#FFFFFF88"; // reset
       if (layout.startsToday) {
         const path = new Path2D();
-        path.rect(layout.x, layout.y, layout.width - 5, layout.height);
+        path.rect(x, y, layout.width - 5, layout.height);
         ctx2D.save();
         ctx2D.clip(path);
-        ctx2D?.fillText(layout.displayText, layout.x + 6, layout.y + 4);
+        ctx2D?.fillText(layout.displayText, x + 6, y + 4);
         if (layout.height > 24) {
           ctx2D.fillStyle = scheme.fg;
-          ctx2D?.fillText(layout.displayTime, layout.x + 8, layout.y + 4 + 16);
+          ctx2D?.fillText(layout.displayTime, x + 8, y + 4 + 16);
           // ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
         ctx2D.restore();
@@ -140,48 +139,20 @@ export function renderDay(
   ops.map((fmap) => {
     fmap.map((f) => f());
   });
-  const utcDay = utcZeroDate(new Date(clip)).valueOf();
-  ctx2D.fillStyle = "red";
-  ctx2D.font = "16px bold";
-  ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
-  ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-  ctx2D.font = "12px bold Alte Haas Grotesk";
+  if (renderOpts.debug) {
+    const utcDay = utcZeroDate(new Date(clip)).valueOf();
+    ctx2D.fillStyle = "red";
+    ctx2D.font = "16px bold";
+    ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
+    ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
+    ctx2D.font = "12px bold Alte Haas Grotesk";
+  }
   return ctx2D;
-}
-
-// simple last in first out queue
-class LIFOQueue<T> {
-  func?: () => Promise<T>;
-  private running = false;
-  // private readonly cb: (arg: T) => any;
-  // constructor(cb: (arg: T) => any) {
-  //   this.cb = cb;
-  // }
-  async enqueue(func: () => Promise<T>) {
-    this.func = func;
-    if (!this.running) this.next();
-  }
-  private async next() {
-    if (this.running) return;
-    this.running = true;
-    try {
-      while (this.func) {
-        const curFunc = this.func;
-        this.func = undefined;
-        const res = await curFunc();
-        // await this.cb(res);
-      }
-    } finally {
-      this.running = false;
-    }
-  }
 }
 
 export class EventRenderer {
   canvas: OffscreenCanvas;
-  asyncCanvas: OffscreenCanvas;
   ctx2D: OffscreenCanvasRenderingContext2D;
-  asyncCtx2D: OffscreenCanvasRenderingContext2D;
   transform: Transform = {
     dayPx: 100,
     hourPx: 25,
@@ -192,21 +163,15 @@ export class EventRenderer {
   layoutMap = new Map<number, DayLayout>();
   cache = new Map<number, Set<string>>(); // unsorted
   dirty = new Set<number>();
-  partialQueue = new LIFOQueue<ImageBitmap>();
   theme: Theme = "light";
   worker: boolean;
   constructor(worker: boolean) {
     this.worker = worker;
     this.canvas = new OffscreenCanvas(100, 100);
-    this.asyncCanvas = new OffscreenCanvas(100, 100);
     // Regular ctx for transfering entire canvas bitmap
     const ctx = this.canvas.getContext("2d");
     if (!ctx) throw new Error("Failed to get 2D Canvas Context");
     this.ctx2D = ctx;
-    // Async canvas for small ops
-    const asyncCtx2D = this.asyncCanvas.getContext("2d");
-    if (!asyncCtx2D) throw new Error("Failed to get 2D Canvas Context");
-    this.asyncCtx2D = asyncCtx2D;
     if (worker) {
       self.addEventListener("message", this.onMessage);
     }
@@ -216,9 +181,6 @@ export class EventRenderer {
     this.canvas.width = this.transform.dayPx * this.transform.scale;
     this.canvas.height = this.transform.hourPx * 25 * this.transform.scale;
     this.ctx2D.scale(this.transform.scale, this.transform.scale);
-    this.asyncCanvas.width = this.transform.dayPx * this.transform.scale;
-    this.asyncCanvas.height = this.transform.hourPx * 25 * this.transform.scale;
-    this.asyncCtx2D.scale(this.transform.scale, this.transform.scale);
   }
   onMessage = (message: MessageEvent) => {
     if (message.data.type === "config") {
@@ -246,31 +208,7 @@ export class EventRenderer {
       const utcDay = utcZeroDate(new Date(clip)).valueOf();
       self.postMessage({ type: "reflow", date: utcDay, layout });
     }
-    if (message.data.type === "region") {
-      const { date, region } = message.data;
-      this.handleRegionMessage(date, region);
-    }
   };
-  handleRegionMessage(date: any, region: any) {
-    if (typeof date !== "number") {
-      throw new Error('worker message type "cluster" called with bad args');
-    }
-    this.partialQueue.enqueue(() => {
-      return this.renderRegion(date, region).then((bitmap) => {
-        self.postMessage(
-          {
-            type: "region",
-            date: date,
-            region,
-            bitmap,
-            regionType: "hover",
-          },
-          [bitmap],
-        );
-        return bitmap;
-      });
-    });
-  }
   render() {
     // TODO: This could be a smarter queue, we're always rendering
     requestAnimationFrame(() => {
@@ -312,25 +250,6 @@ export class EventRenderer {
   }
   renderDay(layout: DayLayout, clip: number, theme = this.theme) {
     return renderDay(this.ctx2D, layout, clip, { theme });
-  }
-  async renderRegion(date: number, region: Rect) {
-    const layout = this.layoutMap.get(date);
-    if (!layout) {
-      console.warn(`Cant rerender layout region ${date}`);
-      return Promise.reject();
-    }
-    renderDay(this.asyncCtx2D, layout, date, {
-      theme: "light",
-      region,
-      shadows: true,
-    });
-    return createImageBitmap(
-      this.asyncCanvas,
-      region.x * this.transform.scale,
-      region.y * this.transform.scale,
-      region.width * this.transform.scale,
-      region.height * this.transform.scale,
-    );
   }
   updateCache(events: any[], cacheRange: [number, number]) {
     this.range = cacheRange;
