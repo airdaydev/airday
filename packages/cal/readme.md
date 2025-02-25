@@ -30,14 +30,18 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Solidify clipspace api
 - [x] Quadtree collision detection (wip)
 - [x] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move (not worth it, draw calls too exxy - webgpu/gl the path)
-- [] hover style for events
-- [] hover style optimisation - we can discard z vals above current and/or clip render
-- [] drag to highlight neat area (15min factor) (to create new event)
-- [] tap to highlight neat 15min interval (to create new event)
-- [] "Day" view highlights today, must have minimum size
+- [x] hover style for events
+- [] Click event to bring to front
+- [] Multi-select events
+- [] Drag select events
 - [] Drag and drop calendar events
+- [] tap to highlight neat 15min interval (to create new event)
+- [] drag to highlight neat area (15min factor) (to create new event)
+- [] "Day" view highlights today, must have minimum size
 - [] Click/drag to shorten/lengthen event each direction
 - [] Labels that register as objects with behaviour
+- [] Click & context click events
+- [] Select events
 
 ## Polish
 - [] Items over 24hrs long get put in day area
@@ -53,6 +57,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] word wrap event
 - [] buffer events to the left too
 - [] Transform cleanup
+- [] hover style optimisation - we can discard z vals above current and/or clip render
 
 ## Data
 - [] Repeating events

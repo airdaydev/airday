@@ -22,7 +22,7 @@ function randomTitle() {
   ][Math.floor(Math.random() * 3)];
 }
 
-const duration = [15, 60, 120, 240];
+const duration = [15, 60, 120];
 
 function getDuration() {
   return duration[Math.floor(Math.random() * duration.length)] * 1000 * 60;
@@ -56,7 +56,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
 }
 
 const start = new Date(new Date().setDate(new Date().getDate() - 365));
-const events = dummyEvents(start, 365 * 2, 10000);
+const events = dummyEvents(start, 365 * 2, 20000);
 
 const db = new EventDB();
 db.loadEvents(events);

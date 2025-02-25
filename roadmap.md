@@ -244,3 +244,4 @@
 - https://klim.co.nz/buy/soehne/
 - https://alexharri.com/blog/clipboard
 - https://developer.mozilla.org/en-US/docs/Web/Manifest/share_target pwa share target
+- https://selfhst.store/
