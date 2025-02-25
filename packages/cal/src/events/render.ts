@@ -61,6 +61,7 @@ export function renderDay(
     else ops[segment].push(op);
   }
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
+  ctx2D.textBaseline = "top";
   dayLayout.map.forEach((layout) => {
     // Skip events outside region
     if (region && !rectIntersection(layout, region)) return;
@@ -148,9 +149,39 @@ export function renderDay(
   return ctx2D;
 }
 
+// simple last in first out queue
+class LIFOQueue<T> {
+  func?: () => Promise<T>;
+  private running = false;
+  // private readonly cb: (arg: T) => any;
+  // constructor(cb: (arg: T) => any) {
+  //   this.cb = cb;
+  // }
+  async enqueue(func: () => Promise<T>) {
+    this.func = func;
+    if (!this.running) this.next();
+  }
+  private async next() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      while (this.func) {
+        const curFunc = this.func;
+        this.func = undefined;
+        const res = await curFunc();
+        // await this.cb(res);
+      }
+    } finally {
+      this.running = false;
+    }
+  }
+}
+
 export class EventRenderer {
-  _canvas?: OffscreenCanvas;
-  _ctx2D?: OffscreenCanvasRenderingContext2D;
+  canvas: OffscreenCanvas;
+  asyncCanvas: OffscreenCanvas;
+  ctx2D: OffscreenCanvasRenderingContext2D;
+  asyncCtx2D: OffscreenCanvasRenderingContext2D;
   transform: Transform = {
     dayPx: 100,
     hourPx: 25,
@@ -161,33 +192,33 @@ export class EventRenderer {
   layoutMap = new Map<number, DayLayout>();
   cache = new Map<number, Set<string>>(); // unsorted
   dirty = new Set<number>();
+  partialQueue = new LIFOQueue<ImageBitmap>();
   theme: Theme = "light";
   worker: boolean;
   constructor(worker: boolean) {
     this.worker = worker;
-    this._canvas = new OffscreenCanvas(100, 100);
-    const ctx = this._canvas.getContext("2d");
+    this.canvas = new OffscreenCanvas(100, 100);
+    this.asyncCanvas = new OffscreenCanvas(100, 100);
+    // Regular ctx for transfering entire canvas bitmap
+    const ctx = this.canvas.getContext("2d");
     if (!ctx) throw new Error("Failed to get 2D Canvas Context");
-    this._ctx2D = ctx;
+    this.ctx2D = ctx;
+    // Async canvas for small ops
+    const asyncCtx2D = this.asyncCanvas.getContext("2d");
+    if (!asyncCtx2D) throw new Error("Failed to get 2D Canvas Context");
+    this.asyncCtx2D = asyncCtx2D;
     if (worker) {
       self.addEventListener("message", this.onMessage);
     }
     this.render();
   }
-  get ctx2D() {
-    if (!this._ctx2D) throw new Error("Failed to get 2D Canvas Context");
-    return this._ctx2D;
-  }
-  get canvas() {
-    if (!this._canvas) throw new Error("Failed to get canvas");
-    return this._canvas;
-  }
   offscreenScale() {
     this.canvas.width = this.transform.dayPx * this.transform.scale;
     this.canvas.height = this.transform.hourPx * 25 * this.transform.scale;
     this.ctx2D.scale(this.transform.scale, this.transform.scale);
-    this.ctx2D.textBaseline = "top";
-    this.ctx2D.font = "09px Departure Mono";
+    this.asyncCanvas.width = this.transform.dayPx * this.transform.scale;
+    this.asyncCanvas.height = this.transform.hourPx * 25 * this.transform.scale;
+    this.asyncCtx2D.scale(this.transform.scale, this.transform.scale);
   }
   onMessage = (message: MessageEvent) => {
     if (message.data.type === "config") {
@@ -217,27 +248,28 @@ export class EventRenderer {
     }
     if (message.data.type === "region") {
       const { date, region } = message.data;
-      // TODO: Parse region!
-      if (typeof date !== "number") {
-        throw new Error('worker message type "cluster" called with bad args');
-      }
-      this.renderRegion(date, region)
-        .then((bitmap) => {
-          self.postMessage(
-            {
-              type: "region",
-              date: date,
-              region,
-              bitmap,
-            },
-            [bitmap],
-          );
-        })
-        .catch((error) => {
-          console.warn("unable to render cluster");
-        });
+      this.handleRegionMessage(date, region);
     }
   };
+  handleRegionMessage(date: any, region: any) {
+    if (typeof date !== "number") {
+      throw new Error('worker message type "cluster" called with bad args');
+    }
+    this.partialQueue.enqueue(() =>
+      this.renderRegion(date, region).then((bitmap) => {
+        self.postMessage(
+          {
+            type: "region",
+            date: date,
+            region,
+            bitmap,
+          },
+          [bitmap],
+        );
+        return bitmap;
+      }),
+    );
+  }
   render() {
     // TODO: This could be a smarter queue, we're always rendering
     requestAnimationFrame(() => {
@@ -286,13 +318,13 @@ export class EventRenderer {
       console.warn(`Cant rerender layout region ${date}`);
       return Promise.reject();
     }
-    renderDay(this.ctx2D, layout, date, {
+    renderDay(this.asyncCtx2D, layout, date, {
       theme: "light",
       region,
       shadows: false,
     });
     return createImageBitmap(
-      this.canvas,
+      this.asyncCanvas,
       region.x * this.transform.scale,
       region.y * this.transform.scale,
       region.width * this.transform.scale,
