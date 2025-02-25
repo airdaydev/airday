@@ -64,6 +64,7 @@ export function renderDay(
   }
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   ctx2D.textBaseline = "top";
+
   dayLayout.map.forEach((layout) => {
     // Skip events outside region
     if (region && !rectIntersection(layout, region)) return;
@@ -136,9 +137,19 @@ export function renderDay(
       }
     });
   });
+  // if (region) {
+  //   console.log("yoooo", region);
+  //   ctx2D.save();
+  //   ctx2D.beginPath();
+  //   ctx2D.rect(region.x + , region.y, region.width, region.height);
+  //   ctx2D.clip();
+  // }
   ops.map((fmap) => {
     fmap.map((f) => f());
   });
+  // if (region) {
+  //   ctx2D.restore();
+  // }
   if (renderOpts.debug) {
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
     ctx2D.fillStyle = "red";

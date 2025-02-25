@@ -31,6 +31,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Quadtree collision detection (wip)
 - [x] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move (not worth it, draw calls too exxy - webgpu/gl the path)
 - [] hover style for events
+- [] hover style optimisation - we can discard z vals above current and/or clip render
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] tap to highlight neat 15min interval (to create new event)
 - [] "Day" view highlights today, must have minimum size
