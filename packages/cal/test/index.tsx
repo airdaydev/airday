@@ -22,10 +22,10 @@ function randomTitle() {
   ][Math.floor(Math.random() * 3)];
 }
 
-const duration = [15, 60, 120, 240, 480];
+const duration = [15, 60, 120, 240];
 
 function getDuration() {
-  return duration[Math.round(Math.random() * 4)] * 1000 * 60;
+  return duration[Math.floor(Math.random() * duration.length)] * 1000 * 60;
 }
 
 function dummyEvents(startDate: Date, days = 14, n = 100) {
