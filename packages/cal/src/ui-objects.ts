@@ -49,6 +49,7 @@ export class CalUIObjects {
     rendered: boolean;
     region: Rect;
     date: number;
+    id: string;
   } | null = null;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
@@ -91,6 +92,7 @@ export class CalUIObjects {
             rendered: false,
             date: localDate,
             region: normaliseRect(hit),
+            id: hit.data.id,
           };
           this.hit = hit.data;
         }

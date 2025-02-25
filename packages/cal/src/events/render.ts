@@ -44,6 +44,7 @@ interface RenderOptions {
   theme?: Theme;
   debug?: boolean;
   offset?: [number, number];
+  highlightId?: string;
 }
 
 export function renderDay(
@@ -64,6 +65,7 @@ export function renderDay(
   }
   if (!ctx2D) throw new Error("offscreen ctx2d not ready");
   ctx2D.textBaseline = "top";
+  const offset = renderOpts.offset || [0, 0];
 
   dayLayout.map.forEach((layout) => {
     // Skip events outside region
@@ -79,7 +81,7 @@ export function renderDay(
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
     addOp(layout.segment, () => {
-      const offset = renderOpts.offset;
+      ctx2D.font = "12px 'Alte Haas Grotesk'";
       let x = offset ? layout.x + offset[0] : layout.x;
       let y = offset ? layout.y + offset[1] : layout.y;
       if (shadows) {
@@ -107,13 +109,17 @@ export function renderDay(
       );
       ctx2D.fill();
       ctx2D.closePath();
+      // Main
       ctx2D.beginPath();
       ctx2D.fillStyle = scheme.bg;
       ctx2D.roundRect(x, y, layout.width - 5, layout.height, cornerRadii);
+      if (layout.id === renderOpts.highlightId) {
+        ctx2D.fillStyle = "#ffdc68"; // light
+      }
       ctx2D.fill();
       ctx2D.closePath();
+      // Pill
       ctx2D.beginPath();
-      // ctx2D.fillStyle = "#ffdc68"; // light
       ctx2D.fillStyle = scheme.fg;
       const pillRadii = [layout.startsToday ? 2 : 0, 0, 0, 2];
       ctx2D.roundRect(x, y, 3, layout.height, pillRadii);
@@ -137,26 +143,30 @@ export function renderDay(
       }
     });
   });
-  // if (region) {
-  //   console.log("yoooo", region);
-  //   ctx2D.save();
-  //   ctx2D.beginPath();
-  //   ctx2D.rect(region.x + , region.y, region.width, region.height);
-  //   ctx2D.clip();
-  // }
+  if (region) {
+    ctx2D.save();
+    ctx2D.beginPath();
+    ctx2D.rect(
+      region.x + offset[0],
+      region.y + offset[1],
+      region.width,
+      region.height,
+    );
+    ctx2D.clip();
+  }
   ops.map((fmap) => {
     fmap.map((f) => f());
   });
-  // if (region) {
-  //   ctx2D.restore();
-  // }
+  if (region) {
+    ctx2D.restore();
+  }
   if (renderOpts.debug) {
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
     ctx2D.fillStyle = "red";
     ctx2D.font = "16px bold";
     ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
     ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);
-    ctx2D.font = "12px bold Alte Haas Grotesk";
+    ctx2D.font = "12px 'Alte Haas Grotesk'";
   }
   return ctx2D;
 }

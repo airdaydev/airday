@@ -93,8 +93,6 @@ export class CalRenderer {
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.ctx2D = ctx2D;
-    this.canvas.style.transform = "translateZ(0)"; // TODO: Maybe pointless
-    this.ctx2D.imageSmoothingEnabled = false; // TODO: Maybe pointless
     this.resizeCal();
     this.frame();
     // TODO: Destroy
@@ -231,19 +229,6 @@ export class CalRenderer {
     // this.interactions();
     this.timeNow();
     // this.debug(this.clipspace.dates, this.clipspace.startPx);
-    // Moving event canvas
-    // this.eventCtx2D.imageSmoothingEnabled = false;
-    // this.eventCtx2D.imageSmoothingQuality = "high";
-    // this.eventCtx2D.globalCompositeOperation = "copy";
-    // this.eventCtx2D.drawImage(
-    //   this.eventCtx2D.canvas,
-    //   this.clipspace.diff,
-    //   0,
-    //   this.canvas.width / 2,
-    //   this.canvas.height / 2,
-    // );
-    // // reset back to normal for subsequent operations.
-    // this.eventCtx2D.globalCompositeOperation = "source-over";
   }
   frame() {
     requestAnimationFrame(() => {
@@ -356,7 +341,6 @@ export class CalRenderer {
       this.canvas.offsetHeight,
     );
     this.ctx2D.clip(path);
-    this.ctx2D.font = "8px Departure Mono";
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
@@ -384,6 +368,7 @@ export class CalRenderer {
           this.uiObjects.hover?.date,
           this.uiObjects.hover?.region,
           [offset, -this.transform.offset[1] + this.gridOffset[1]],
+          this.uiObjects.hover.id,
         );
       }
     });

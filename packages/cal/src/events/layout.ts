@@ -1,6 +1,7 @@
 import { getTime, timeToY } from "../time";
 
 export interface EventLayout {
+  id: string;
   startTime: number;
   endTime: number;
   width: number;
@@ -68,7 +69,7 @@ export function calcDayLayout(
   let maxSegments = 1;
   const clusters: Cluster[] = [];
 
-  function nextCluster2(posY: number, height: number, segment: number) {
+  function nextCluster(posY: number, height: number, segment: number) {
     const maxY = posY + height; // maxY for this event
     maxSegments = Math.max(maxSegments, segment); // max segment count for this cluster
     if (clusterMinY === null) {
@@ -99,8 +100,9 @@ export function calcDayLayout(
     const y = timeToY(new Date(startTime), hourHeight);
     const startsToday = event.start > clip;
     const segment = nextSegment(y, height);
-    const cluster = nextCluster2(y, height, segment);
+    const cluster = nextCluster(y, height, segment);
     layoutMap.set(id, {
+      id,
       startTime,
       endTime,
       width: 0, // unset yet

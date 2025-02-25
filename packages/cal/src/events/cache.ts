@@ -32,7 +32,12 @@ export class EventCache {
     });
   }
   // outgoing region
-  async renderRegion(date: number, region: Rect, offset?: [number, number]) {
+  async renderRegion(
+    date: number,
+    region: Rect,
+    offset?: [number, number],
+    highlightId?: string,
+  ) {
     const zeroDate = utcZeroDate(new Date(date)).valueOf();
     const layout = this.layoutMap.get(zeroDate);
     if (!layout) {
@@ -41,19 +46,12 @@ export class EventCache {
     }
     // TODO: Set canvas x/y
     renderDay(this.renderer.ctx2D, layout, date, {
-      theme: "light",
+      theme: this.renderer.theme,
       region,
       shadows: true,
       offset,
+      highlightId,
     });
-    // TODO: Consider holding onto OG in a temp buffer
-    // const bitmap = await createImageBitmap(
-    //   this.asyncCanvas,
-    //   region.x,
-    //   region.y,
-    //   region.width,
-    //   region.height,
-    // );
   }
   // outgoing
   reflowDay(clip: number) {
