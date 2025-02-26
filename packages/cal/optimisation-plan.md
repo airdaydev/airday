@@ -5,7 +5,7 @@
 4. If day affected by event is in visible clipspace, mark it as dirty
 5. When worker is ready (via promise with trx id), send next batch (been collecting while workers are busy)
 5a. Optionally, or indepedently! recalculate layout - required if no layout exists obviously!
-6. Rerender areas of day affected, pass back tiles (512x512) to main thread for rendering in next loop
+6. Rerender areas of day affected (check - which tiles do dirty events intersect with), pass back tiles (512x512) to main thread for rendering in next loop
 6a. Can we prioritise onscreen tiles?
 6b. prevent tile rerendering if tile content hasn't changed nor viewport has moved
 
