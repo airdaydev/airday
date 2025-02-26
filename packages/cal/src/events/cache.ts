@@ -155,6 +155,15 @@ export class EventWorkerComms {
       }
     });
   }
+  optimalWorkerCount() {
+    const min = 2;
+    const max = 8;
+    const cpuCount = navigator.hardwareConcurrency || 4;
+    let workerCount = Math.floor(cpuCount * 0.75);
+    workerCount = Math.max(min, workerCount);
+    workerCount = Math.min(max, workerCount);
+    return workerCount;
+  }
   resize() {
     // Resized to width/height of grid only
     const s = scale();
