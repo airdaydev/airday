@@ -39,19 +39,22 @@ function normaliseRect(rect: Rect): Rect {
   };
 }
 
+interface Hover {
+  rendered: boolean;
+  region: Rect;
+  date: number;
+  id: string;
+  ts: number; // timestamp it first appeared
+}
+
 /* Manages interaction */
 export class CalUIObjects {
   renderer: CalRenderer;
   quads = new Map<number, Quadtree<Rectangle<EventUIData>>>();
   hits: Rectangle<EventUIData>[] = [];
   hit?: EventUIData | undefined;
-  hover: {
-    rendered: boolean;
-    region: Rect;
-    date: number;
-    id: string;
-    ts: number;
-  } | null = null;
+  hover: Hover | null = null;
+  selected = new Map<string, Hover>();
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
   }
@@ -83,6 +86,10 @@ export class CalUIObjects {
       } else {
         // Skip if hit is same
         if (!this.hit || this.hit.id !== hit.data?.id) {
+          if (!hit.data) {
+            console.warn("No hit data found", hit);
+            return;
+          }
           const day = this.renderer.eventCache.layoutMap.get(utcDay);
           if (!day) return console.warn("no day found in hit test");
           const event = day.map.get(hit.data.id);
@@ -96,6 +103,7 @@ export class CalUIObjects {
             id: hit.data.id,
             ts: performance.now(),
           };
+          this.selected.set(hit.data.id, this.hover);
           this.hit = hit.data;
         }
       }

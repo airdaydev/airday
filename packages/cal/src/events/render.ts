@@ -123,7 +123,6 @@ export function renderDay(
             scheme.bg.highlight(),
             Math.max(0.5, (performance.now() - renderOpts.fadeTs) / 75),
           );
-          console.log((performance.now() - renderOpts.fadeTs) / 250);
         }
         ctx2D.fillStyle = color.toString(); // light
       }
@@ -236,10 +235,15 @@ export class EventRenderer {
         this.transform.dayPx,
       );
       this.layoutMap.set(clip, layout);
-      // const [utcDay, bitmap] = this.renderDay(layout, clip, "light");
       const utcDay = utcZeroDate(new Date(clip)).valueOf();
       self.postMessage({ type: "reflow", date: utcDay, layout });
     }
+    // if (message.data.type === 'rerender') {
+    //   const clip = message.data.clip;
+    //   const layout = this.layoutMap.get(clip);
+    //   const utcDay = utcZeroDate(new Date(clip)).valueOf();
+    //   self.postMessage({ type: "reflow", date: utcDay, layout });
+    // }
   };
   render() {
     // TODO: This could be a smarter queue, we're always rendering
