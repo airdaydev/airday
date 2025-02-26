@@ -210,8 +210,9 @@ export class CalRenderer {
   get gridOffset() {
     return [50, this.headerHeight + this.allDayRowHeight];
   }
+  // TODO: Tidy & cache this function
   recalcClipspace(): void {
-    const [startDayPx, relStartDay] = this.transform.clipspaceOriginX(); // TODO: memoise
+    const [startDayPx, relStartDay] = this.transform.clipspaceOriginX();
     this.clipspace.update(startDayPx, relStartDay);
   }
   draw() {

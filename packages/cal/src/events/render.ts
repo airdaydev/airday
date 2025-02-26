@@ -282,6 +282,7 @@ export class EventRenderer {
           ] as any);
         });
       }
+      console.log("b", performance.now());
       this.render();
     });
   }
