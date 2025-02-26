@@ -31,48 +31,49 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Quadtree collision detection (wip)
 - [x] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move (not worth it, draw calls too exxy - webgpu/gl the path)
 - [x] hover style for events
-- [] Click event to bring to front
-- [] Multi-select events
-- [] Drag select events
+- [] hover style event extends to next day as needed
+- [] Click event to select / bring to front
 - [] Drag and drop calendar events
 - [] tap to highlight neat 15min interval (to create new event)
 - [] drag to highlight neat area (15min factor) (to create new event)
 - [] "Day" view highlights today, must have minimum size
+- [] Touch pan x
 - [] Click/drag to shorten/lengthen event each direction
-- [] Labels that register as objects with behaviour
-- [] Click & context click events
-- [] Select events
+- [] Click/Context click consumer events
+- [] hover style optimisation - we can discard z vals above current and/or clip render
 
-## Polish
-- [] Items over 24hrs long get put in day area
-- [] Tap to highlight day area
-- [] Change time zone
-- [] Add time zone
-- [] custom scroller, snap to date or week when active scrolling stops
+## All-day events
+- [] Items over 24hrs long get moved into all-day event
+- [] And regular all-day events
+- [] Tap to highlight day area (?)
 - [] Hover over date to see full date
 - [] Jump to date/today button
 - [] Move between weeks/days
 - [] Month/Year that shows up on pan
-- [] Change between 12/24hr time
-- [] word wrap event
-- [] buffer events to the left too
-- [] Transform cleanup
-- [] hover style optimisation - we can discard z vals above current and/or clip render
+- [] word wrap event for longer events
 
-## Data
+## Times & time zones
+- [] Change between 12/24hr time
+- [] Change time zone
+- [] Add time zone
+- [] Events falling on DST borders... events disappearing in different zones?
+
+## Repeating events
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
-- [] Events falling on DST borders... events disappearing in different zones?
 - [] Add all day events
 - [] Expand all day events
 
-## final optimisations / quality udpates
+## final optimisations / quality udpates / future plans
+- [] buffer events to the left too
 - [] event/worker tests
 - [] Tile vertically, even horizontally if needed
 - [] only re-render interaction day that changes (as opposed to spitting bmps again)
-
-## Future plans
 - [] True monthly view
+- [] Wgpu version
+- [] Multi-select events with single click
+- [] Drag to multiselect
+- [] custom scroller, snap to date or week when active scrolling stops
 
 ## Handling concurring events UI
 - Simplest is side by side (create groups of overlapping events & split side-by-side)
