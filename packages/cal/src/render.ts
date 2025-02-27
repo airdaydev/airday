@@ -28,7 +28,6 @@ export class CalRenderer {
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   theme: Theme = "dark";
-  dayPx = 100;
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
   transform: CalendarTransform;
@@ -96,9 +95,11 @@ export class CalRenderer {
     const x = event.x - this.canvasBounds.left;
     const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS+Linux/FF)
     const day = this.transform.xToDay(x); // TODO: Are we doing too much work here!?
-    const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
+    const relDay = Math.floor(
+      (event.x - this.clipspace.startPx) / this.transform.dayPx,
+    );
     const absDay = this.clipspace.dates[relDay];
-    const xDay = (event.x - this.clipspace.startPx) % this.dayPx;
+    const xDay = (event.x - this.clipspace.startPx) % this.transform.dayPx;
     if (!absDay)
       return console.warn(
         "TODO: no absDay available, dev stink to be resolved",
@@ -112,7 +113,9 @@ export class CalRenderer {
   }
   mouseDown(event: MouseEvent) {
     // TODO: Are we in grid space!?
-    const relDay = Math.floor((event.x - this.clipspace.startPx) / this.dayPx);
+    const relDay = Math.floor(
+      (event.x - this.clipspace.startPx) / this.transform.dayPx,
+    );
     const day = this.clipspace.dates[relDay];
     this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
@@ -164,10 +167,10 @@ export class CalRenderer {
   // TODO: Consider debouncing
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
-    const approxDay = this.transform.offset[0] / this.dayPx;
-    this.dayPx =
+    const approxDay = this.transform.offset[0] / this.transform.dayPx;
+    this.transform.dayPx =
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
-    this.transform.offset[0] = approxDay * this.dayPx;
+    this.transform.offset[0] = approxDay * this.transform.dayPx;
     this.eventWorkerComms.resize();
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
@@ -280,14 +283,14 @@ export class CalRenderer {
     );
     this.ctx2D.clip(path);
     dates.map((date, index) => {
-      const offset = index * this.dayPx + offsetPx;
+      const offset = index * this.transform.dayPx + offsetPx;
       if (isWeekend(date)) {
         // Weekend shading
         this.ctx2D.fillStyle = this.colourScheme.shade;
         this.ctx2D.fillRect(
           offset,
           this.headerHeight,
-          this.dayPx,
+          this.transform.dayPx,
           this.canvas.offsetHeight,
         );
       }
@@ -311,7 +314,7 @@ export class CalRenderer {
     this.ctx2D.textAlign = "left";
     this.ctx2D.textBaseline = "top";
     dates.map((date, index) => {
-      const offset = index * this.dayPx + offsetPx;
+      const offset = index * this.transform.dayPx + offsetPx;
       const image = this.eventCache.bitmapMap.get(date.valueOf());
       if (image) {
         if (!this.firstRender) this.firstRender = performance.now();
@@ -324,7 +327,7 @@ export class CalRenderer {
           image,
           offset,
           -this.transform.offset[1] + this.gridOffset[1],
-          this.dayPx,
+          this.transform.dayPx,
           this.transform.hourPx * 25,
         );
         this.ctx2D.globalAlpha = 1;
@@ -348,13 +351,15 @@ export class CalRenderer {
     const [relDay, time] = this.hover;
     if (time < 0 || time > 25) return;
     const x =
-      this.gridOffset[0] - this.transform.offset[0] + relDay * this.dayPx;
+      this.gridOffset[0] -
+      this.transform.offset[0] +
+      relDay * this.transform.dayPx;
     const y =
       time * this.transform.hourPx -
       this.transform.offset[1] +
       this.gridOffset[1];
     // this.ctx2D.fillStyle = "#00009944";
-    // this.ctx2D.rect(x, y, this.dayPx, 50);
+    // this.ctx2D.rect(x, y, this.transform.dayPx, 50);
     // this.ctx2D.fill();
     // Hits
     // this.ctx2D.beginPath();
@@ -400,7 +405,7 @@ export class CalRenderer {
     const text = getDateUTC(date);
     this.ctx2D.textAlign = "left";
     const textWidth = this.ctx2D.measureText(text).width;
-    const padding = (this.dayPx - textWidth) / 2;
+    const padding = (this.transform.dayPx - textWidth) / 2;
     if (isTodayUTC(date)) {
       this.ctx2D.fillStyle = "red";
       this.ctx2D.roundRect(offset + padding - 4, 14, textWidth + 8, 25, 2);

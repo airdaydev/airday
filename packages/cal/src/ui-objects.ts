@@ -60,7 +60,7 @@ export class CalUIObjects {
   }
   updateDay(utcDay: number, objects: Rectangle<EventUIData>[]) {
     const tree = new Quadtree<Rectangle<EventUIData>>({
-      width: this.renderer.dayPx, // get dayPx
+      width: this.renderer.transform.dayPx, // get dayPx
       height: this.renderer.transform.hourPx * 25, // get FullHeight
     });
     objects.map((event) => tree.insert(event));
@@ -73,7 +73,7 @@ export class CalUIObjects {
         new Rectangle({
           x: coords[0],
           y: coords[1],
-          width: this.renderer.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
+          width: this.renderer.transform.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
           height: 1,
         }),
       );

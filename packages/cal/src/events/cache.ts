@@ -175,7 +175,7 @@ export class EventWorkerComms {
       width,
       scale: s,
       hourPx: this.calRenderer.transform.hourPx,
-      dayPx: this.calRenderer.dayPx,
+      dayPx: this.calRenderer.transform.dayPx,
       theme: this.calRenderer.theme,
     };
     this.worker.postMessage({ type: "config", params: configParams });
