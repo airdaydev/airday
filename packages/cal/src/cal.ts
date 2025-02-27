@@ -16,7 +16,7 @@ document.body.appendChild(stats.dom);
 
 type TimeFormat = "24hr" | "12hr";
 
-export class CalRenderer {
+export class AirdayCal {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;

@@ -1,5 +1,5 @@
 import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
-import { CalRenderer } from "./render";
+import { AirdayCal } from "./cal";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
 import { Theme } from "./colours";
@@ -13,10 +13,10 @@ interface CalendarProps {
 
 export function CalSolidWrapper(props: CalendarProps) {
   let domContainer: HTMLDivElement | undefined;
-  let cal: CalRenderer;
+  let cal: AirdayCal;
   onMount(() => {
     if (domContainer) {
-      cal = new CalRenderer(domContainer, props.db);
+      cal = new AirdayCal(domContainer, props.db);
     }
   });
   createEffect(() => {

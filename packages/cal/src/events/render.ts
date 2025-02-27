@@ -181,7 +181,7 @@ export function renderDay(
   return ctx2D;
 }
 
-export class EventRenderer {
+export class EventairdayCal {
   canvas: OffscreenCanvas;
   ctx2D: OffscreenCanvasRenderingContext2D;
   transform: Transform = {

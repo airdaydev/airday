@@ -1,5 +1,5 @@
 export { CalSolidWrapper } from "./solid";
-export { CalRenderer } from "./render";
+export { AirdayCal } from "./cal";
 export {
   type CalendarEvent,
   type CalendarEventConstructorProps,

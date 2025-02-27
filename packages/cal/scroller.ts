@@ -1,8 +1,8 @@
-import { CalRenderer } from "./render";
+import { AirdayCal } from "./render";
 
 // Custom scrolling trial
 export class CalScroller {
-  renderer: CalRenderer;
+  airdayCal: AirdayCal;
   mode = "week"; // 'week' or 'day'
   animationDuration = 300; // ms
   scrollThreshold = 50; // px needed to trigger scroll
@@ -12,14 +12,14 @@ export class CalScroller {
   scrollDelta = 0;
   lastTimestamp = 0;
   scrollDirection = null;
-  constructor(renderer: CalRenderer) {
-    this.renderer = renderer;
-    this.renderer.canvas.addEventListener("wheel", this.handleWheel, {
+  constructor(airdayCal: AirdayCal) {
+    this.airdayCal = airdayCal;
+    this.airdayCal.canvas.addEventListener("wheel", this.handleWheel, {
       passive: false,
     });
-    this.renderer.canvas.addEventListener("touchstart", this.handleTouchStart);
-    this.renderer.canvas.addEventListener("touchmove", this.handleTouchMove);
-    this.renderer.canvas.addEventListener("touchend", this.handleTouchEnd);
+    this.airdayCal.canvas.addEventListener("touchstart", this.handleTouchStart);
+    this.airdayCal.canvas.addEventListener("touchmove", this.handleTouchMove);
+    this.airdayCal.canvas.addEventListener("touchend", this.handleTouchEnd);
   }
 
   handleWheel(event: WheelEvent) {
@@ -125,12 +125,15 @@ export class CalScroller {
   }
 
   destroy() {
-    this.renderer.canvas.removeEventListener("wheel", this.handleWheel);
-    this.renderer.canvas.removeEventListener(
+    this.airdayCal.canvas.removeEventListener("wheel", this.handleWheel);
+    this.airdayCal.canvas.removeEventListener(
       "touchstart",
       this.handleTouchStart,
     );
-    this.renderer.canvas.removeEventListener("touchmove", this.handleTouchMove);
-    this.renderer.canvas.removeEventListener("touchend", this.handleTouchEnd);
+    this.airdayCal.canvas.removeEventListener(
+      "touchmove",
+      this.handleTouchMove,
+    );
+    this.airdayCal.canvas.removeEventListener("touchend", this.handleTouchEnd);
   }
 }

@@ -1,52 +1,52 @@
-import { CalRenderer } from "../render";
+import { AirdayCal } from "../cal";
 import { utcZeroDate } from "../time";
 
 export function eventComposition(
-  renderer: CalRenderer,
+  airdayCal: AirdayCal,
   dates: Date[],
   offsetPx: number,
 ) {
-  const ctx2D = renderer.ctx2D;
+  const ctx2D = airdayCal.ctx2D;
   ctx2D.save();
   const path = new Path2D();
   path.rect(
-    renderer.gridOffset[0],
-    renderer.gridOffset[1],
-    renderer.canvas.offsetWidth,
-    renderer.canvas.offsetHeight,
+    airdayCal.gridOffset[0],
+    airdayCal.gridOffset[1],
+    airdayCal.canvas.offsetWidth,
+    airdayCal.canvas.offsetHeight,
   );
   ctx2D.clip(path);
   ctx2D.textAlign = "left";
   ctx2D.textBaseline = "top";
   dates.map((date, index) => {
-    const offset = index * renderer.transform.dayPx + offsetPx;
-    const image = renderer.eventCache.bitmapMap.get(date.valueOf());
+    const offset = index * airdayCal.transform.dayPx + offsetPx;
+    const image = airdayCal.eventCache.bitmapMap.get(date.valueOf());
     if (image) {
-      if (!renderer.firstRender) renderer.firstRender = performance.now();
-      if (renderer.firstRender) {
-        const diff = performance.now() - renderer.firstRender;
+      if (!airdayCal.firstRender) airdayCal.firstRender = performance.now();
+      if (airdayCal.firstRender) {
+        const diff = performance.now() - airdayCal.firstRender;
         ctx2D.globalAlpha = diff < 150 ? diff / 150 : 1;
-        if (diff < 150) renderer.act();
+        if (diff < 150) airdayCal.act();
       }
       ctx2D.drawImage(
         image,
         offset,
-        -renderer.transform.offset[1] + renderer.gridOffset[1],
-        renderer.transform.dayPx,
-        renderer.transform.hourPx * 25,
+        -airdayCal.transform.offset[1] + airdayCal.gridOffset[1],
+        airdayCal.transform.dayPx,
+        airdayCal.transform.hourPx * 25,
       );
       ctx2D.globalAlpha = 1;
     }
     const zero = utcZeroDate(
-      new Date(renderer.uiObjects.hover?.date),
+      new Date(airdayCal.uiObjects.hover?.date),
     ).valueOf();
     if (date.valueOf() === zero) {
-      renderer.eventCache.renderRegion(
-        renderer.uiObjects.hover?.date,
-        renderer.uiObjects.hover?.region,
-        [offset, -renderer.transform.offset[1] + renderer.gridOffset[1]],
-        renderer.uiObjects.hover.id,
-        renderer.uiObjects.hover.ts,
+      airdayCal.eventCache.renderRegion(
+        airdayCal.uiObjects.hover?.date,
+        airdayCal.uiObjects.hover?.region,
+        [offset, -airdayCal.transform.offset[1] + airdayCal.gridOffset[1]],
+        airdayCal.uiObjects.hover.id,
+        airdayCal.uiObjects.hover.ts,
       );
     }
   });

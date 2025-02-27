@@ -1,3 +1,3 @@
-import { EventRenderer } from "./render";
+import { EventairdayCal } from "./render";
 
-new EventRenderer(true);
+new EventairdayCal(true);

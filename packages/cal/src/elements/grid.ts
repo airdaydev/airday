@@ -1,78 +1,78 @@
-import { CalRenderer } from "../render";
+import { AirdayCal } from "../cal";
 import { isWeekend } from "../time";
 import { dayLabel, hzLine, vtLine } from "./label";
 
 export function times(
-  renderer: CalRenderer,
+  airdayCal: AirdayCal,
   firstHour: number,
   firstHourPx: number,
 ) {
-  const ctx2D = renderer.ctx2D;
+  const ctx2D = airdayCal.ctx2D;
   ctx2D.textAlign = "right";
   ctx2D.textBaseline = "middle";
-  ctx2D.font = `${renderer.TIME_FONT_SIZE}px Alte Haas Grotesk`;
-  let pxOffset = firstHourPx + renderer.gridOffset[1];
+  ctx2D.font = `${airdayCal.TIME_FONT_SIZE}px Alte Haas Grotesk`;
+  let pxOffset = firstHourPx + airdayCal.gridOffset[1];
   ctx2D.save();
   const path = new Path2D();
   path.rect(
     0,
-    renderer.gridOffset[1],
-    renderer.canvas.offsetWidth,
-    renderer.canvas.offsetHeight,
+    airdayCal.gridOffset[1],
+    airdayCal.canvas.offsetWidth,
+    airdayCal.canvas.offsetHeight,
   );
   ctx2D.clip(path);
   const now = new Date();
-  const y = renderer.transform.timeToY(now);
-  ctx2D.fillStyle = renderer.colourScheme.labels.toString();
+  const y = airdayCal.transform.timeToY(now);
+  ctx2D.fillStyle = airdayCal.colourScheme.labels.toString();
   for (
     let i = firstHour;
     i <=
     firstHour +
-      renderer.transform.hoursVisible(renderer.scrollable.offsetHeight);
+      airdayCal.transform.hoursVisible(airdayCal.scrollable.offsetHeight);
     i++
   ) {
     if (i >= 1 && i <= 24) {
-      if (Math.abs(pxOffset - y) < renderer.TIME_FONT_SIZE) {
+      if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
         // Hides time if obscured by current hour
       } else {
         ctx2D.fillText(
           `${i.toString().padStart(2, "0")}:00`,
-          renderer.gridOffset[0] - renderer.margin,
+          airdayCal.gridOffset[0] - airdayCal.margin,
           pxOffset,
         );
       }
-      hzLine(renderer, pxOffset);
+      hzLine(airdayCal, pxOffset);
     }
-    pxOffset += renderer.transform.hourPx;
+    pxOffset += airdayCal.transform.hourPx;
   }
   ctx2D.restore();
 }
 
-export function days(renderer: CalRenderer, dates: Date[], offsetPx: number) {
-  const ctx2D = renderer.ctx2D;
+export function days(airdayCal: AirdayCal, dates: Date[], offsetPx: number) {
+  const ctx2D = airdayCal.ctx2D;
   ctx2D.save();
   const path = new Path2D();
   path.rect(
-    renderer.gridOffset[0],
+    airdayCal.gridOffset[0],
     0,
-    renderer.canvas.offsetWidth,
-    renderer.canvas.offsetHeight,
+    airdayCal.canvas.offsetWidth,
+    airdayCal.canvas.offsetHeight,
   );
   ctx2D.clip(path);
   dates.map((date, index) => {
-    const offset = index * renderer.transform.dayPx + offsetPx;
+    const offset = index * airdayCal.transform.dayPx + offsetPx;
     if (isWeekend(date)) {
       // Weekend shading
-      ctx2D.fillStyle = renderer.colourScheme.shade.toString();
+      ctx2D.fillStyle = airdayCal.colourScheme.shade.toString();
       ctx2D.fillRect(
         offset,
-        renderer.headerHeight,
-        renderer.transform.dayPx,
-        renderer.canvas.offsetHeight,
+        airdayCal.headerHeight,
+        airdayCal.transform.dayPx,
+        airdayCal.canvas.offsetHeight,
       );
     }
-    vtLine(renderer, offset, renderer.headerHeight);
-    dayLabel(renderer, date, offset);
+    vtLine(airdayCal, offset, airdayCal.headerHeight);
+    dayLabel(airdayCal, date, offset);
   });
   ctx2D.restore();
 }

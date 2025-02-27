@@ -1,5 +1,5 @@
 import { describe, test } from "vitest";
-import { EventRenderer } from "./render";
+import { EventairdayCal } from "./render";
 import { localMidnight } from "../time";
 
 process.env.TZ = "Australia/Sydney";
@@ -9,7 +9,7 @@ describe("updateCache", () => {
   const today = localMidnight(new Date()).valueOf();
   const yesterday = today - 864e5;
   const tomorrow = today + 864e5;
-  const renderer = new EventRenderer(true);
+  const airdayCal = new EventairdayCal(true);
   test("events end up in correct buckets", (t) => {
     const a = {
       id: (Math.random() * 1000000).toFixed(),
@@ -29,12 +29,12 @@ describe("updateCache", () => {
       start: now,
       end: now + 864e5,
     };
-    renderer.updateCache(
+    airdayCal.updateCache(
       [a, b, c],
       [yesterday - 864e5 * 4, tomorrow + 864e5 * 4],
     );
-    t.expect(renderer.cache.size).toBe(3); // yesterday, today, tomorrow
-    t.expect(Array.isArray(renderer.cache.get(today))).to.be.true;
-    t.expect(renderer.cache.get(today)?.size).toBe(3);
+    t.expect(airdayCal.cache.size).toBe(3); // yesterday, today, tomorrow
+    t.expect(Array.isArray(airdayCal.cache.get(today))).to.be.true;
+    t.expect(airdayCal.cache.get(today)?.size).toBe(3);
   });
 });

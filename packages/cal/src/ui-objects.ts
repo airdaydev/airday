@@ -1,5 +1,5 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
-import { CalRenderer } from "./render";
+import { AirdayCal } from "./cal";
 import { localZeroDate } from "./time";
 import { Rect } from "./canvas";
 
@@ -49,19 +49,19 @@ interface Hover {
 
 /* Manages interaction */
 export class CalUIObjects {
-  renderer: CalRenderer;
+  airdayCal: AirdayCal;
   quads = new Map<number, Quadtree<Rectangle<EventUIData>>>();
   hits: Rectangle<EventUIData>[] = [];
   hit?: EventUIData | undefined;
   hover: Hover | null = null;
   selected = new Map<string, Hover>();
-  constructor(renderer: CalRenderer) {
-    this.renderer = renderer;
+  constructor(airdayCal: AirdayCal) {
+    this.airdayCal = airdayCal;
   }
   updateDay(utcDay: number, objects: Rectangle<EventUIData>[]) {
     const tree = new Quadtree<Rectangle<EventUIData>>({
-      width: this.renderer.transform.dayPx, // get dayPx
-      height: this.renderer.transform.hourPx * 25, // get FullHeight
+      width: this.airdayCal.transform.dayPx, // get dayPx
+      height: this.airdayCal.transform.hourPx * 25, // get FullHeight
     });
     objects.map((event) => tree.insert(event));
     this.quads.set(utcDay, tree);
@@ -73,7 +73,7 @@ export class CalUIObjects {
         new Rectangle({
           x: coords[0],
           y: coords[1],
-          width: this.renderer.transform.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
+          width: this.airdayCal.transform.dayPx * 2, // TODO: investigate quadtree results - dayPx should cover with, but doesn't
           height: 1,
         }),
       );
@@ -90,12 +90,12 @@ export class CalUIObjects {
             console.warn("No hit data found", hit);
             return;
           }
-          const day = this.renderer.eventCache.layoutMap.get(utcDay);
+          const day = this.airdayCal.eventCache.layoutMap.get(utcDay);
           if (!day) return console.warn("no day found in hit test");
           const event = day.map.get(hit.data.id);
           if (!event) return console.warn("no event found");
           const localDate = localZeroDate(new Date(utcDay)).valueOf();
-          // this.renderer.eventCache.renderRegion(localDate, normaliseRect(hit));
+          // this.airdayCal.eventCache.renderRegion(localDate, normaliseRect(hit));
           this.hover = {
             rendered: false,
             date: localDate,

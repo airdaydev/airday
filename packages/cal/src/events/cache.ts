@@ -1,4 +1,4 @@
-import { CalRenderer } from "../render";
+import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { EventDB } from "../state";
 import { Rect, scale } from "../canvas";
@@ -8,10 +8,10 @@ import { Rectangle } from "@timohausmann/quadtree-ts";
 import { EventUIData } from "../ui-objects";
 import { renderDay } from "./render";
 
-// EventRenderer runs in a webworker & handles retrieval, indexing & rendering of events
+// EventairdayCal runs in a webworker & handles retrieval, indexing & rendering of events
 // It renders a day at a time, marking days as dirty as required
 export class EventCache {
-  renderer: CalRenderer;
+  airdayCal: AirdayCal;
   db: EventDB;
   bitmapMap = new Map<number, ImageBitmap>();
   layoutMap = new Map<number, DayLayout>();
@@ -19,13 +19,13 @@ export class EventCache {
   transformMap = new Map<string, { x: number; y: number }>();
   range: DayRange | null = null;
   arr: CalendarEvent[] = []; // temp array of all events
-  constructor(renderer: CalRenderer, db: EventDB) {
-    this.renderer = renderer;
+  constructor(airdayCal: AirdayCal, db: EventDB) {
+    this.airdayCal = airdayCal;
     this.db = db;
   }
   private loadEvents(events: CalendarEvent[]) {
     if (!this.range) throw new Error("No range in loadEvents");
-    this.renderer.eventWorkerComms.worker.postMessage({
+    this.airdayCal.eventWorkerComms.worker.postMessage({
       type: "load",
       events: events.map((e) => e.transfer()), // TODO: Date to number
       range: [this.range.localStart.valueOf(), this.range.localEnd.valueOf()],
@@ -46,8 +46,8 @@ export class EventCache {
       return;
     }
     // TODO: Set canvas x/y
-    renderDay(this.renderer.ctx2D, layout, date, {
-      theme: this.renderer.theme,
+    renderDay(this.airdayCal.ctx2D, layout, date, {
+      theme: this.airdayCal.theme,
       region,
       shadows: true,
       offset,
@@ -57,7 +57,7 @@ export class EventCache {
   }
   // outgoing
   reflowDay(clip: number) {
-    this.renderer.eventWorkerComms.worker.postMessage({
+    this.airdayCal.eventWorkerComms.worker.postMessage({
       type: "reflow",
       clip,
     });
@@ -81,7 +81,7 @@ export class EventCache {
         }),
       );
     }
-    this.renderer.uiObjects.updateDay(date, objs);
+    this.airdayCal.uiObjects.updateDay(date, objs);
   }
   updateRange(range: DayRange) {
     const lastRange = this.range;
@@ -131,11 +131,11 @@ export class EventCache {
 
 // Performance test: translate vs rerender
 export class EventWorkerComms {
-  calRenderer: CalRenderer;
+  AirdayCal: AirdayCal;
   worker: Worker;
-  constructor(calRenderer: CalRenderer) {
+  constructor(AirdayCal: AirdayCal) {
     // get grid size from parent, must connect to resize event from parent
-    this.calRenderer = calRenderer;
+    this.AirdayCal = AirdayCal;
     this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
       type: "module",
     });
@@ -144,14 +144,14 @@ export class EventWorkerComms {
     };
     this.worker.addEventListener("message", (event) => {
       if (event.data.type === "day") {
-        this.calRenderer.eventCache.bitmapMap.set(
+        this.AirdayCal.eventCache.bitmapMap.set(
           event.data.date,
           event.data.bitmap,
         );
-        this.calRenderer.act();
+        this.AirdayCal.act();
       }
       if (event.data.type === "reflow") {
-        this.calRenderer.eventCache.reflow(event.data.date, event.data.layout);
+        this.AirdayCal.eventCache.reflow(event.data.date, event.data.layout);
       }
     });
   }
@@ -168,20 +168,19 @@ export class EventWorkerComms {
     // Resized to width/height of grid only
     const s = scale();
     const width =
-      (this.calRenderer.canvas.offsetWidth - this.calRenderer.gridOffset[0]) *
-      s;
+      (this.AirdayCal.canvas.offsetWidth - this.AirdayCal.gridOffset[0]) * s;
     s;
     const configParams = {
       width,
       scale: s,
-      hourPx: this.calRenderer.transform.hourPx,
-      dayPx: this.calRenderer.transform.dayPx,
-      theme: this.calRenderer.theme,
+      hourPx: this.AirdayCal.transform.hourPx,
+      dayPx: this.AirdayCal.transform.dayPx,
+      theme: this.AirdayCal.theme,
     };
     this.worker.postMessage({ type: "config", params: configParams });
   }
   updateDay() {
-    // day renderering
+    // day airdayCaling
     //       // this.eventCache.arr.map((event, index) => {
     //   // if (index > 1000) return false;
     //   const transform = this.eventCache.transformMap.get(event.id);
