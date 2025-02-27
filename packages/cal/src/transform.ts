@@ -32,6 +32,9 @@ export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   hourPx = 50; // 1 hour grid height
   dayPx = 100; // 1 day grid width
+  headerHeight = 50; // aka header height
+  allDayRowHeight = 50;
+  margin = 10;
   airdayCal: AirdayCal;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -55,12 +58,12 @@ export class CalendarTransform {
     const r = minXClip % this.dayPx;
     const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
     const relStartDay = Math.round((firstDayPx + this.offset[0]) / this.dayPx);
-    return [firstDayPx + this.airdayCal.gridOffset[0], relStartDay];
+    return [firstDayPx + this.gridOffset[0], relStartDay];
   }
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
     const min = (date.getMinutes() * this.hourPx) / 60;
-    return hours + min - this.offset[1] + this.airdayCal.gridOffset[1];
+    return hours + min - this.offset[1] + this.gridOffset[1];
   }
   maxYOffset() {
     return Math.max(
@@ -81,16 +84,17 @@ export class CalendarTransform {
     }
   }
   xStart(x: number) {
-    const r = (x % this.airdayCal.gridOffset[0]) + this.offset[0];
+    const r = (x % this.gridOffset[0]) + this.offset[0];
     return x - r;
   }
   yToTime(y: number) {
-    return (y + this.offset[1] - this.airdayCal.gridOffset[1]) / this.hourPx;
+    return (y + this.offset[1] - this.gridOffset[1]) / this.hourPx;
   }
   xToDay(x: number) {
-    return Math.floor(
-      (x - this.airdayCal.gridOffset[0] + this.offset[0]) / this.dayPx,
-    );
+    return Math.floor((x - this.gridOffset[0] + this.offset[0]) / this.dayPx);
+  }
+  get gridOffset() {
+    return [50, this.headerHeight + this.allDayRowHeight];
   }
   dateToX(date: Date) {
     const normalisedDate = new Date(date);
@@ -103,7 +107,7 @@ export class CalendarTransform {
         864e5) *
         this.dayPx -
       this.offset[0] +
-      this.airdayCal.gridOffset[0]
+      this.gridOffset[0]
     );
   }
 }

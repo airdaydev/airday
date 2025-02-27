@@ -10,8 +10,8 @@ export function eventComposition(
   ctx2D.save();
   const path = new Path2D();
   path.rect(
-    airdayCal.gridOffset[0],
-    airdayCal.gridOffset[1],
+    airdayCal.transform.gridOffset[0],
+    airdayCal.transform.gridOffset[1],
     airdayCal.canvas.offsetWidth,
     airdayCal.canvas.offsetHeight,
   );
@@ -31,7 +31,7 @@ export function eventComposition(
       ctx2D.drawImage(
         image,
         offset,
-        -airdayCal.transform.offset[1] + airdayCal.gridOffset[1],
+        -airdayCal.transform.offset[1] + airdayCal.transform.gridOffset[1],
         airdayCal.transform.dayPx,
         airdayCal.transform.hourPx * 25,
       );
@@ -44,7 +44,10 @@ export function eventComposition(
       airdayCal.eventCache.renderRegion(
         airdayCal.uiObjects.hover?.date,
         airdayCal.uiObjects.hover?.region,
-        [offset, -airdayCal.transform.offset[1] + airdayCal.gridOffset[1]],
+        [
+          offset,
+          -airdayCal.transform.offset[1] + airdayCal.transform.gridOffset[1],
+        ],
         airdayCal.uiObjects.hover.id,
         airdayCal.uiObjects.hover.ts,
       );

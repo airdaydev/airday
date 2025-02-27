@@ -131,11 +131,11 @@ export class EventCache {
 
 // Performance test: translate vs rerender
 export class EventWorkerComms {
-  AirdayCal: AirdayCal;
+  airdayCal: AirdayCal;
   worker: Worker;
-  constructor(AirdayCal: AirdayCal) {
+  constructor(airdayCal: AirdayCal) {
     // get grid size from parent, must connect to resize event from parent
-    this.AirdayCal = AirdayCal;
+    this.airdayCal = airdayCal;
     this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
       type: "module",
     });
@@ -144,14 +144,14 @@ export class EventWorkerComms {
     };
     this.worker.addEventListener("message", (event) => {
       if (event.data.type === "day") {
-        this.AirdayCal.eventCache.bitmapMap.set(
+        this.airdayCal.eventCache.bitmapMap.set(
           event.data.date,
           event.data.bitmap,
         );
-        this.AirdayCal.act();
+        this.airdayCal.act();
       }
       if (event.data.type === "reflow") {
-        this.AirdayCal.eventCache.reflow(event.data.date, event.data.layout);
+        this.airdayCal.eventCache.reflow(event.data.date, event.data.layout);
       }
     });
   }
@@ -168,14 +168,16 @@ export class EventWorkerComms {
     // Resized to width/height of grid only
     const s = scale();
     const width =
-      (this.AirdayCal.canvas.offsetWidth - this.AirdayCal.gridOffset[0]) * s;
+      (this.airdayCal.canvas.offsetWidth -
+        this.airdayCal.transform.gridOffset[0]) *
+      s;
     s;
     const configParams = {
       width,
       scale: s,
-      hourPx: this.AirdayCal.transform.hourPx,
-      dayPx: this.AirdayCal.transform.dayPx,
-      theme: this.AirdayCal.theme,
+      hourPx: this.airdayCal.transform.hourPx,
+      dayPx: this.airdayCal.transform.dayPx,
+      theme: this.airdayCal.theme,
     };
     this.worker.postMessage({ type: "config", params: configParams });
   }

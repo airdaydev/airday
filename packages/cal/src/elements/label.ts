@@ -10,8 +10,8 @@ export function allDayLabel(airdayCal: AirdayCal) {
   ctx2D.fillStyle = airdayCal.colourScheme.labels.toString();
   ctx2D.fillText(
     "All day",
-    airdayCal.gridOffset[0] - airdayCal.margin,
-    airdayCal.headerHeight + airdayCal.allDayRowHeight / 2,
+    airdayCal.transform.gridOffset[0] - airdayCal.transform.margin,
+    airdayCal.transform.headerHeight + airdayCal.transform.allDayRowHeight / 2,
   );
 }
 
@@ -28,7 +28,7 @@ export function hzLine(
     opts.strokeStyle || airdayCal.colourScheme.hzLine.toString();
   ctx2D.beginPath();
   ctx2D.lineWidth = opts.lineWidth || 1;
-  ctx2D.moveTo(airdayCal.gridOffset[0], yOffset);
+  ctx2D.moveTo(airdayCal.transform.gridOffset[0], yOffset);
   ctx2D.lineTo(airdayCal.canvas?.offsetWidth, yOffset);
   ctx2D.stroke();
 }
@@ -74,7 +74,7 @@ export function timeNow(airdayCal: AirdayCal) {
   ctx2D.fillStyle = "#ff0000cc";
   ctx2D.fillText(
     `${nowHour.toString()}`,
-    airdayCal.gridOffset[0] - airdayCal.margin,
+    airdayCal.transform.gridOffset[0] - airdayCal.transform.margin,
     y,
   );
 }

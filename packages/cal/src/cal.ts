@@ -17,11 +17,8 @@ export class AirdayCal {
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   theme: Theme = "dark";
-  headerHeight = 50; // aka header height
-  allDayRowHeight = 50;
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
-  margin = 10;
   daysVisible = 7;
   daysBuffer = 2;
   resized = false;
@@ -98,7 +95,7 @@ export class AirdayCal {
       ); //
     this.uiObjects.testCollision(absDay.valueOf(), [
       xDay,
-      y - this.gridOffset[1] + this.transform.offset[1],
+      y - this.transform.gridOffset[1] + this.transform.offset[1],
     ]);
     this.hover = [day, this.transform.yToTime(y)];
     this.act();
@@ -148,7 +145,9 @@ export class AirdayCal {
   };
   get scrollHeight() {
     return (
-      this.transform.hourPx * 24 + this.gridOffset[1] + this.TIME_FONT_SIZE
+      this.transform.hourPx * 24 +
+      this.transform.gridOffset[1] +
+      this.TIME_FONT_SIZE
     );
   }
   act = () => (this.lastAction = performance.now());
@@ -170,9 +169,6 @@ export class AirdayCal {
     // TODO: Debounce this (or reevaluate entire cache mgmt):
     this.eventCache.range = null;
   };
-  get gridOffset() {
-    return [50, this.headerHeight + this.allDayRowHeight];
-  }
   // TODO: Tidy & cache this function
   recalcClipspace(): void {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX();
@@ -190,8 +186,8 @@ export class AirdayCal {
     times(this, firstHour, firstHourPx);
     // Start Header
     allDayLabel(this);
-    hzLine(this, this.headerHeight);
-    hzLine(this, this.gridOffset[1]);
+    hzLine(this, this.transform.headerHeight);
+    hzLine(this, this.transform.gridOffset[1]);
     // End Header
     eventComposition(this, this.clipspace.dates, this.clipspace.startPx);
     // interactions();

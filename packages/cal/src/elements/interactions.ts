@@ -7,13 +7,13 @@ export function interactions(airdayCal: AirdayCal) {
   const [relDay, time] = airdayCal.hover;
   if (time < 0 || time > 25) return;
   const x =
-    airdayCal.gridOffset[0] -
+    airdayCal.transform.gridOffset[0] -
     airdayCal.transform.offset[0] +
     relDay * airdayCal.transform.dayPx;
   const y =
     time * airdayCal.transform.hourPx -
     airdayCal.transform.offset[1] +
-    airdayCal.gridOffset[1];
+    airdayCal.transform.gridOffset[1];
   // ctx2D.fillStyle = "#00009944";
   // ctx2D.rect(x, y, airdayCal.transform.dayPx, 50);
   // ctx2D.fill();
@@ -24,7 +24,7 @@ export function interactions(airdayCal: AirdayCal) {
   //   // TODO: clip!
   //   ctx2D.rect(
   //     x + obj.x,
-  //     obj.y + airdayCal.gridOffset[1] - airdayCal.transform.offset[1],
+  //     obj.y + airdayCal.transform.gridOffset[1] - airdayCal.transform.offset[1],
   //     obj.width,
   //     obj.height,
   //   );
@@ -37,7 +37,7 @@ export function interactions(airdayCal: AirdayCal) {
   //   ctx2D.fillStyle = "#ff009944";
   //   ctx2D.rect(
   //     x + hit.x,
-  //     hit.y + airdayCal.gridOffset[1] - airdayCal.transform.offset[1],
+  //     hit.y + airdayCal.transform.gridOffset[1] - airdayCal.transform.offset[1],
   //     hit.width,
   //     hit.height,
   //   );
