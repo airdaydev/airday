@@ -26,6 +26,11 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Resizing calendar retains same middle via offset change
 - [x] Bug: Layout edge case - final events in each cluster can still start at x = dayWidth
 
+## Optimisations
+- [] Cache clipspace
+- [] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
+- [] Run through rendering optimisation plan
+
 ## Interactions
 - [x] Solidify clipspace api
 - [x] Quadtree collision detection (wip)

@@ -1,4 +1,32 @@
 import { CalRenderer } from "./render";
+import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
+
+const startOfWeekUTC = getStartOfWeekUTC(new Date());
+
+export class Clipspace {
+  originDate = startOfWeekUTC;
+  startPx: number = 0;
+  dates: Date[] = [];
+  calRenderer: CalRenderer;
+  range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
+  constructor(calRenderer: CalRenderer) {
+    this.calRenderer = calRenderer;
+  }
+  get size() {
+    return this.dates.length;
+  }
+  update(startPx: number, relStartDay: number) {
+    this.startPx = startPx;
+    const clipStartDayAbs = new Date(
+      this.originDate.valueOf() + relStartDay * 864e5,
+    );
+    this.dates = getDateArray(
+      clipStartDayAbs.valueOf(),
+      this.calRenderer.clipDays + 5,
+    );
+    this.range = new DayRange(this.dates[0], this.calRenderer.clipDays + 5);
+  }
+}
 
 export class CalendarTransform {
   offset = [0, 0]; // Scroll offset

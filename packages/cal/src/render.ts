@@ -1,14 +1,12 @@
 import { EventCache, EventWorkerComms } from "./events/cache";
-import { CalendarTransform } from "./transform";
+import { CalendarTransform, Clipspace } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import {
   getStartOfWeekUTC,
   getDateUTC,
-  getDateArray,
   isWeekend,
-  DayRange,
   isTodayUTC,
   localZeroDate,
   utcZeroDate,
@@ -23,38 +21,6 @@ document.body.appendChild(stats.dom);
 type TimeFormat = "24hr" | "12hr";
 
 const TIME_FONT_SIZE = 11;
-
-// Virtual calendar view: Reset origin at each DAY_BUFFER days start day
-// Reset origin RESET_POINT days out either direction
-// scroll auto snaps to nearest day
-const startOfWeekUTC = getStartOfWeekUTC(new Date());
-
-class Clipspace {
-  originDate = startOfWeekUTC;
-  startPx: number = 0;
-  diff = 0;
-  dates: Date[] = [];
-  calRenderer: CalRenderer;
-  range: DayRange = new DayRange(new Date(startOfWeekUTC), 10);
-  constructor(calRenderer: CalRenderer) {
-    this.calRenderer = calRenderer;
-  }
-  get size() {
-    return this.dates.length;
-  }
-  update(startPx: number, relStartDay: number) {
-    this.diff = startPx - this.startPx;
-    this.startPx = startPx;
-    const clipStartDayAbs = new Date(
-      this.originDate.valueOf() + relStartDay * 864e5,
-    );
-    this.dates = getDateArray(
-      clipStartDayAbs.valueOf(),
-      this.calRenderer.clipDays + 5,
-    );
-    this.range = new DayRange(this.dates[0], this.calRenderer.clipDays + 5);
-  }
-}
 
 export class CalRenderer {
   scrollable: HTMLDivElement;
