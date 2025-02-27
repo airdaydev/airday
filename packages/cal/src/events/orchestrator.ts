@@ -81,7 +81,6 @@ export class Orchestrator {
     // Updates processed by day a time (OR MORE !?)
     // Continue until
   }
-
   processMessage() {
     // Processes incoming message (comprising layouts and or tiles)
   }
