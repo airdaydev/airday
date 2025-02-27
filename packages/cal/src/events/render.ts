@@ -203,6 +203,7 @@ export class EventRenderer {
     const ctx = this.canvas.getContext("2d");
     if (!ctx) throw new Error("Failed to get 2D Canvas Context");
     this.ctx2D = ctx;
+    this.ctx2D.imageSmoothingEnabled = false;
     if (worker) {
       self.addEventListener("message", this.onMessage);
     }
