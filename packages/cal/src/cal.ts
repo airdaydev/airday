@@ -157,14 +157,13 @@ export class AirdayCal {
   get clipDays() {
     return this.daysVisible + 3;
   }
-  // TODO: Consider debouncing
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
     const approxDay = this.transform.offset[0] / this.transform.dayPx;
     this.transform.dayPx =
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
     this.transform.offset[0] = approxDay * this.transform.dayPx;
-    this.eventWorkerComms.resize();
+    this.eventWorkerComms.resize(); // TODO: BATCH THIS EVENT!
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
     this.eventCache.range = null;
@@ -174,24 +173,26 @@ export class AirdayCal {
     const [startDayPx, relStartDay] = this.transform.clipspaceOriginX();
     this.clipspace.update(startDayPx, relStartDay);
   }
+  // Main draw loop; run inside a request animation frame
   draw() {
     if (this.resized) {
       this.resizeCal();
     }
+    // TODO: Late stage optimisation: only clear dirty areas per element area
     clearCanvas(this.canvas);
-    this.recalcClipspace();
-    const [firstHour, firstHourPx] = this.transform.getVisibleHours();
-    this.eventCache.updateRange(this.clipspace.range);
-    days(this, this.clipspace.dates, this.clipspace.startPx);
-    times(this, firstHour, firstHourPx);
-    // Start Header
-    allDayLabel(this);
-    hzLine(this, this.transform.headerHeight);
-    hzLine(this, this.transform.gridOffset[1]);
+    this.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
+    const [firstHour, firstHourPx] = this.transform.getVisibleHours(); // TODO: same with this
+    this.eventCache.updateRange(this.clipspace.range); // TODO: same with this and this
+    days(this, this.clipspace.dates, this.clipspace.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
+    times(this, firstHour, firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
+    // Start Header (no need for update unless x val changes)
+    allDayLabel(this); // only moves if day area is expanded
+    hzLine(this, this.transform.headerHeight); // only moves if day area is expanded
+    hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
-    eventComposition(this, this.clipspace.dates, this.clipspace.startPx);
+    eventComposition(this, this.clipspace.dates, this.clipspace.startPx); // days only update when dirty - or x/y updated
     // interactions();
-    timeNow(this);
+    timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {
     requestAnimationFrame(() => {
