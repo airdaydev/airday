@@ -10,6 +10,36 @@ function optimalWorkerCount() {
   return workerCount;
 }
 
+interface workloadOpts {
+  utcDay: number;
+  layout: boolean;
+  bitmap: boolean;
+  // TODO: Tile/region
+}
+
+export class UIWorker {
+  id: number;
+  worker: Worker;
+  working: boolean = false;
+  orchestrator: Orchestrator;
+  constructor(orchestrator: Orchestrator) {
+    this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
+      type: "module",
+    });
+    this.worker.addEventListener("error", (error) => {
+      console.error("Worker error:", error);
+    });
+    this.orchestrator = orchestrator;
+  }
+  sendWork(opts: workloadOpts) {
+    this.working = true;
+  }
+  receiveWork(workload: any) {
+    this.working = false;
+    this.orchestrator.workComplete(this.id);
+  }
+}
+
 export class CacheEntry<T> {
   data: T;
   fresh: boolean = true;
@@ -24,7 +54,7 @@ type UIEvent = any;
 // The goal being to render a day, region & or layout when a change occurs
 export class Orchestrator {
   events: UIEvent[] = []; // Event queue
-  workers: Worker[] = [];
+  workers: UIWorker[] = [];
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   tileCache = new Map<number, CacheEntry<ImageBitmap[]>>(); // TODO: Calculate if tile will be affected in advance, or simply day level at first?
   // TODO: Keep track of cache freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
@@ -32,30 +62,26 @@ export class Orchestrator {
   createWorkerPool() {
     const count = optimalWorkerCount();
     for (let i = 0; i < count; i++) {
-      const worker = new Worker(
-        new URL("./worker.ts?worker", import.meta.url),
-        {
-          type: "module",
-        },
-      );
-      worker.addEventListener("error", (error) => {
-        console.error("Worker error:", error);
-      });
-      this.workers.push(worker);
+      this.workers.push(new UIWorker(this));
     }
   }
   addEvent(event: UIEvent) {
     this.events.push(event);
   }
-  batchProcess(limit = 1000) {
-    // The goal here is to look at en event and see if it invalidates a cache - but for rendering - potentially limits the y extents of the change
+  batchProcess(maxMs = 16, maxEvents = 1000) {
+    while (this.events.length > 0) {
+      // TODO: and time/event conditions
+    }
+    // The goal here is to look at an event and see if it invalidates a cache - but for rendering - potentially limits the y extents of the change
     // We can look for changes in the viewport
     // Event changes - affects layout for entire day(s) in viewport
     // Clipspace change - new days in clipspace - may require layout or render if nothing in cache
     // View parameters change - in general, rerender only (but layout required if time px changes)
     // Selected items - layout stays - however z-index changes, so render code must change
-    // Updates processed by day a time
+    // Updates processed by day a time (OR MORE !?)
+    // Continue until
   }
+
   processMessage() {
     // Processes incoming message (comprising layouts and or tiles)
   }
@@ -64,5 +90,8 @@ export class Orchestrator {
   }
   processLayout() {
     // Caches new layouts
+  }
+  workComplete() {
+    //
   }
 }
