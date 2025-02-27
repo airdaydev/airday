@@ -8,7 +8,12 @@ import {
 } from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
 import * as dat from "dat.gui";
+import Stats from "stats.js";
 import { Theme } from "../src/colours";
+
+const stats = new Stats();
+stats.showPanel(0);
+document.body.appendChild(stats.dom);
 
 const root = document.getElementById("root");
 
@@ -68,7 +73,7 @@ render(
       style={{ background: theme[0]() === "dark" ? "black" : "white" }}
     >
       <h1>@airday/cal demo</h1>
-      <CalSolidWrapper theme={theme[0]} db={db} />
+      <CalSolidWrapper theme={theme[0]} db={db} stats={stats} />
     </div>
   ),
   root!,

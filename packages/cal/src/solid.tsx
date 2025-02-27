@@ -9,6 +9,7 @@ interface CalendarProps {
   theme: Accessor<Theme>;
   parentElement: HTMLElement;
   db: EventDB;
+  stats?: Stats;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
@@ -16,7 +17,7 @@ export function CalSolidWrapper(props: CalendarProps) {
   let cal: AirdayCal;
   onMount(() => {
     if (domContainer) {
-      cal = new AirdayCal(domContainer, props.db);
+      cal = new AirdayCal(domContainer, props.db, props.stats);
     }
   });
   createEffect(() => {

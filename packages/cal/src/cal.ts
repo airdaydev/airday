@@ -5,14 +5,9 @@ import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import { getStartOfWeekUTC, localZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
-import Stats from "stats.js";
 import { allDayLabel, hzLine, timeNow } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { eventComposition } from "./elements/event-composition";
-
-var stats = new Stats();
-stats.showPanel(0);
-document.body.appendChild(stats.dom);
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -42,7 +37,9 @@ export class AirdayCal {
   eventWorkerComms: EventWorkerComms;
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
-  constructor(container: HTMLDivElement, db: EventDB) {
+  stats?: Stats;
+  constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
+    if (stats) this.stats = stats;
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
     this.eventWorkerComms = new EventWorkerComms(this);
@@ -202,12 +199,12 @@ export class AirdayCal {
   }
   frame() {
     requestAnimationFrame(() => {
-      stats.begin();
+      this.stats?.begin();
       if (performance.now() - this.lastAction < 100) {
         this.draw();
       }
       this.frame();
-      stats.end();
+      this.stats?.end();
     });
   }
   cleanUp() {}
