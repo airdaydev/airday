@@ -3,24 +3,18 @@ import { CalendarTransform, Clipspace } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
-import {
-  getStartOfWeekUTC,
-  getDateUTC,
-  isWeekend,
-  isTodayUTC,
-  localZeroDate,
-  utcZeroDate,
-} from "./time";
+import { getStartOfWeekUTC, localZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import Stats from "stats.js";
+import { allDayLabel, hzLine, timeNow } from "./elements/label";
+import { days, times } from "./elements/grid";
+import { eventComposition } from "./elements/event-composition";
 
 var stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
 type TimeFormat = "24hr" | "12hr";
-
-const TIME_FONT_SIZE = 11;
 
 export class CalRenderer {
   scrollable: HTMLDivElement;
@@ -36,6 +30,7 @@ export class CalRenderer {
   daysVisible = 7;
   daysBuffer = 2;
   resized = false;
+  TIME_FONT_SIZE = 11;
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
@@ -155,7 +150,9 @@ export class CalRenderer {
     this.act();
   };
   get scrollHeight() {
-    return this.transform.hourPx * 24 + this.gridOffset[1] + TIME_FONT_SIZE;
+    return (
+      this.transform.hourPx * 24 + this.gridOffset[1] + this.TIME_FONT_SIZE
+    );
   }
   act = () => (this.lastAction = performance.now());
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
@@ -192,13 +189,16 @@ export class CalRenderer {
     this.recalcClipspace();
     const [firstHour, firstHourPx] = this.transform.getVisibleHours();
     this.eventCache.updateRange(this.clipspace.range);
-    this.days(this.clipspace.dates, this.clipspace.startPx);
-    this.times(firstHour, firstHourPx);
-    this.header();
-    this.events(this.clipspace.dates, this.clipspace.startPx);
-    // this.interactions();
-    this.timeNow();
-    // this.debug(this.clipspace.dates, this.clipspace.startPx);
+    days(this, this.clipspace.dates, this.clipspace.startPx);
+    times(this, firstHour, firstHourPx);
+    // Start Header
+    allDayLabel(this);
+    hzLine(this, this.headerHeight);
+    hzLine(this, this.gridOffset[1]);
+    // End Header
+    eventComposition(this, this.clipspace.dates, this.clipspace.startPx);
+    // interactions();
+    timeNow(this);
   }
   frame() {
     requestAnimationFrame(() => {
@@ -210,236 +210,5 @@ export class CalRenderer {
       stats.end();
     });
   }
-  header() {
-    // bg optional
-    // this.ctx2D.fillStyle = this.colourScheme.bg;
-    // this.ctx2D.fillRect(0, 0, this.canvas.width, this.gridOffset[1]);
-    this.allDayLabel();
-    this.hzLine(this.headerHeight);
-    this.hzLine(this.gridOffset[1]);
-  }
-  timeNow() {
-    const now = new Date();
-    const y = this.transform.timeToY(now);
-    const nowHour = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
-    this.ctx2D.textAlign = "right";
-    this.ctx2D.textBaseline = "middle";
-    this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
-    this.hzLine(y, { strokeStyle: "#ff0000cc", lineWidth: 0.5 });
-    this.ctx2D.fillStyle = "#ff0000cc";
-    this.ctx2D.fillText(
-      `${nowHour.toString()}`,
-      this.gridOffset[0] - this.margin,
-      y,
-    );
-  }
-  times(firstHour: number, firstHourPx: number) {
-    this.ctx2D.textAlign = "right";
-    this.ctx2D.textBaseline = "middle";
-    this.ctx2D.font = `${TIME_FONT_SIZE}px Alte Haas Grotesk`;
-    let pxOffset = firstHourPx + this.gridOffset[1];
-    this.ctx2D.save();
-    const path = new Path2D();
-    path.rect(
-      0,
-      this.gridOffset[1],
-      this.canvas.offsetWidth,
-      this.canvas.offsetHeight,
-    );
-    this.ctx2D.clip(path);
-    const now = new Date();
-    const y = this.transform.timeToY(now);
-    this.ctx2D.fillStyle = this.colourScheme.labels;
-    for (
-      let i = firstHour;
-      i <=
-      firstHour + this.transform.hoursVisible(this.scrollable.offsetHeight);
-      i++
-    ) {
-      if (i >= 1 && i <= 24) {
-        if (Math.abs(pxOffset - y) < TIME_FONT_SIZE) {
-          // Hides time if obscured by current hour
-        } else {
-          this.ctx2D.fillText(
-            `${i.toString().padStart(2, "0")}:00`,
-            this.gridOffset[0] - this.margin,
-            pxOffset,
-          );
-        }
-        this.hzLine(pxOffset);
-      }
-      pxOffset += this.transform.hourPx;
-    }
-    this.ctx2D.restore();
-  }
-  days(dates: Date[], offsetPx: number) {
-    this.ctx2D.save();
-    const path = new Path2D();
-    path.rect(
-      this.gridOffset[0],
-      0,
-      this.canvas.offsetWidth,
-      this.canvas.offsetHeight,
-    );
-    this.ctx2D.clip(path);
-    dates.map((date, index) => {
-      const offset = index * this.transform.dayPx + offsetPx;
-      if (isWeekend(date)) {
-        // Weekend shading
-        this.ctx2D.fillStyle = this.colourScheme.shade;
-        this.ctx2D.fillRect(
-          offset,
-          this.headerHeight,
-          this.transform.dayPx,
-          this.canvas.offsetHeight,
-        );
-      }
-      this.vtLine(offset, this.headerHeight);
-      this.dayLabel(date, offset);
-    });
-    this.ctx2D.restore();
-  }
-  // TODO: Potential optimisation, only re-render image when delivered, otherwise use a transform
-  // Also: Tile regions
-  events(dates: Date[], offsetPx: number) {
-    this.ctx2D.save();
-    const path = new Path2D();
-    path.rect(
-      this.gridOffset[0],
-      this.gridOffset[1],
-      this.canvas.offsetWidth,
-      this.canvas.offsetHeight,
-    );
-    this.ctx2D.clip(path);
-    this.ctx2D.textAlign = "left";
-    this.ctx2D.textBaseline = "top";
-    dates.map((date, index) => {
-      const offset = index * this.transform.dayPx + offsetPx;
-      const image = this.eventCache.bitmapMap.get(date.valueOf());
-      if (image) {
-        if (!this.firstRender) this.firstRender = performance.now();
-        if (this.firstRender) {
-          const diff = performance.now() - this.firstRender;
-          this.ctx2D.globalAlpha = diff < 150 ? diff / 150 : 1;
-          if (diff < 150) this.act();
-        }
-        this.ctx2D.drawImage(
-          image,
-          offset,
-          -this.transform.offset[1] + this.gridOffset[1],
-          this.transform.dayPx,
-          this.transform.hourPx * 25,
-        );
-        this.ctx2D.globalAlpha = 1;
-      }
-      const zero = utcZeroDate(new Date(this.uiObjects.hover?.date)).valueOf();
-      if (date.valueOf() === zero) {
-        this.eventCache.renderRegion(
-          this.uiObjects.hover?.date,
-          this.uiObjects.hover?.region,
-          [offset, -this.transform.offset[1] + this.gridOffset[1]],
-          this.uiObjects.hover.id,
-          this.uiObjects.hover.ts,
-        );
-      }
-    });
-    this.ctx2D.restore();
-  }
-  // TODO: Start from interactions
-  interactions() {
-    if (!this.hover) return;
-    const [relDay, time] = this.hover;
-    if (time < 0 || time > 25) return;
-    const x =
-      this.gridOffset[0] -
-      this.transform.offset[0] +
-      relDay * this.transform.dayPx;
-    const y =
-      time * this.transform.hourPx -
-      this.transform.offset[1] +
-      this.gridOffset[1];
-    // this.ctx2D.fillStyle = "#00009944";
-    // this.ctx2D.rect(x, y, this.transform.dayPx, 50);
-    // this.ctx2D.fill();
-    // Hits
-    // this.ctx2D.beginPath();
-    // this.uiObjects.hits.map((obj) => {
-    //   // TODO: x offset!
-    //   // TODO: clip!
-    //   this.ctx2D.rect(
-    //     x + obj.x,
-    //     obj.y + this.gridOffset[1] - this.transform.offset[1],
-    //     obj.width,
-    //     obj.height,
-    //   );
-    // });
-    // this.ctx2D.fill();
-    // this.ctx2D.closePath();
-    // const hit = this.uiObjects.hit;
-    // if (hit) {
-    //   this.ctx2D.beginPath();
-    //   this.ctx2D.fillStyle = "#ff009944";
-    //   this.ctx2D.rect(
-    //     x + hit.x,
-    //     hit.y + this.gridOffset[1] - this.transform.offset[1],
-    //     hit.width,
-    //     hit.height,
-    //   );
-    //   this.ctx2D.fill();
-    //   this.ctx2D.closePath();
-    // }
-  }
-  allDayLabel() {
-    this.ctx2D.fillStyle = this.colourScheme.color;
-    this.ctx2D.font = "12px Alte Haas Grotesk";
-    this.ctx2D.textAlign = "right";
-    this.ctx2D.textBaseline = "middle";
-    this.ctx2D.fillStyle = this.colourScheme.labels;
-    this.ctx2D.fillText(
-      "All day",
-      this.gridOffset[0] - this.margin,
-      this.headerHeight + this.allDayRowHeight / 2,
-    );
-  }
-  dayLabel(date: Date, offset: number) {
-    const text = getDateUTC(date);
-    this.ctx2D.textAlign = "left";
-    const textWidth = this.ctx2D.measureText(text).width;
-    const padding = (this.transform.dayPx - textWidth) / 2;
-    if (isTodayUTC(date)) {
-      this.ctx2D.fillStyle = "red";
-      this.ctx2D.roundRect(offset + padding - 4, 14, textWidth + 8, 25, 2);
-      this.ctx2D.fill();
-      this.ctx2D.font = "bold 12px Alte Haas Grotesk";
-      this.ctx2D.fillStyle = "white";
-    } else {
-      this.ctx2D.fillStyle = this.colourScheme.labels;
-      this.ctx2D.font = "12px Alte Haas Grotesk";
-    }
-    this.ctx2D.fillText(text, offset + padding, 25);
-  }
-  hzLine(
-    yOffset: number,
-    opts: {
-      strokeStyle?: string;
-      lineWidth?: number;
-    } = {},
-  ) {
-    this.ctx2D.strokeStyle = opts.strokeStyle || this.colourScheme.hzLine;
-    this.ctx2D.beginPath();
-    this.ctx2D.lineWidth = opts.lineWidth || 1;
-    this.ctx2D.moveTo(this.gridOffset[0], yOffset);
-    this.ctx2D.lineTo(this.canvas?.offsetWidth, yOffset);
-    this.ctx2D.stroke();
-  }
-  vtLine(xOffset: number, yStart: number) {
-    this.ctx2D.strokeStyle = this.colourScheme.vtLine;
-    this.ctx2D.beginPath();
-    this.ctx2D.lineWidth = 0.75;
-    this.ctx2D.moveTo(xOffset, yStart);
-    this.ctx2D.lineTo(xOffset, this.canvas?.offsetHeight);
-    this.ctx2D.stroke();
-  }
-  debug() {}
   cleanUp() {}
 }

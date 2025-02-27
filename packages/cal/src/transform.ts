@@ -30,8 +30,8 @@ export class Clipspace {
 
 export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
-  hourPx = 50; // 1 hour = 50px
-  dayPx = 100; // 1 day = 100px wide
+  hourPx = 50; // 1 hour grid height
+  dayPx = 100; // 1 day grid width
   renderer: CalRenderer;
   constructor(renderer: CalRenderer) {
     this.renderer = renderer;
