@@ -167,10 +167,9 @@ export class AirdayCal {
     // TODO: Late stage optimisation: only clear dirty areas per element area
     clearCanvas(this.canvas);
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
-    const [firstHour, firstHourPx] = this.transform.getVisibleHours(); // TODO: same with this
-    this.eventCache.updateRange(this.transform.range); // TODO: same with this and this
+    this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the orchestrator!
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
-    times(this, firstHour, firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
+    times(this, this.transform.firstHour, this.transform.firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
     // Start Header (no need for update unless x val changes)
     allDayLabel(this); // only moves if day area is expanded
     hzLine(this, this.transform.headerHeight); // only moves if day area is expanded

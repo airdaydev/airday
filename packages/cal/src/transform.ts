@@ -16,9 +16,12 @@ export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   daysVisible = 7; // qty. days to fit into view space
   originDate = startOfWeekUTC; // day at x = 0
+  // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
   dates: Date[] = []; // TODO: Should be more of a cache based on range!
+  firstHour: number = 0;
+  firstHourPx: number = 0;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
   }
@@ -40,11 +43,13 @@ export class CalendarTransform {
     // Hours visible outside view in each direction (-/+)
     return this.hourPx * 2;
   }
-  getVisibleHours() {
+  calcVisibleHours() {
     const minYClip = this.offset[1] - this.hourViewBuffer;
     const r = minYClip % this.hourPx;
     const firstHourPx = this.hourPx - r; // The first hour position within clip space
     const firstHour = (minYClip + firstHourPx) / this.hourPx;
+    this.firstHour = firstHour;
+    this.firstHourPx = firstHourPx - this.hourViewBuffer;
     return [firstHour, firstHourPx - this.hourViewBuffer];
   }
   hoursVisible(viewportHeight: number) {
