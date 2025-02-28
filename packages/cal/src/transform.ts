@@ -54,6 +54,11 @@ export class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
+  // TODO: Tidy & cache this function
+  recalcClipspace(): void {
+    const [startDayPx, relStartDay] = this.clipspaceOriginX();
+    this.airdayCal.clipspace.update(startDayPx, relStartDay);
+  }
   clipspaceOriginX() {
     const minXClip = this.offset[0] - this.dayPx; // 1 day buffer behind offset in screen space
     const r = minXClip % this.dayPx;

@@ -20,7 +20,6 @@ export class AirdayCal {
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   daysVisible = 7;
-  daysBuffer = 2;
   resized = false;
   TIME_FONT_SIZE = 11;
   lastAction: number = performance.now();
@@ -160,16 +159,11 @@ export class AirdayCal {
     this.transform.dayPx =
       (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
     this.transform.offset[0] = approxDay * this.transform.dayPx;
-    this.eventWorkerComms.resize(); // TODO: BATCH THIS EVENT!
+    this.eventWorkerComms.resize(); // TODO: This event will be removed when switching to new render coordinator
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
     this.eventCache.range = null;
   };
-  // TODO: Tidy & cache this function
-  recalcClipspace(): void {
-    const [startDayPx, relStartDay] = this.transform.clipspaceOriginX();
-    this.clipspace.update(startDayPx, relStartDay);
-  }
   // Main draw loop; run inside a request animation frame
   draw() {
     if (this.resized) {
@@ -177,7 +171,7 @@ export class AirdayCal {
     }
     // TODO: Late stage optimisation: only clear dirty areas per element area
     clearCanvas(this.canvas);
-    this.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
+    this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
     const [firstHour, firstHourPx] = this.transform.getVisibleHours(); // TODO: same with this
     this.eventCache.updateRange(this.clipspace.range); // TODO: same with this and this
     days(this, this.clipspace.dates, this.clipspace.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
