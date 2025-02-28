@@ -1,5 +1,7 @@
 import { AirdayCal } from "../cal";
+import { scale } from "../canvas";
 import { CalendarEvent } from "../model";
+import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
 
 function optimalWorkerCount() {
@@ -24,25 +26,28 @@ export class UIWorker {
   worker: Worker;
   busy: boolean = false;
   coordinator: EventRenderCoordinator;
-  constructor(coordinator: EventRenderCoordinator) {
+  constructor(id: number, coordinator: EventRenderCoordinator) {
+    this.coordinator = coordinator;
+    this.id = id;
     this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
       type: "module",
     });
     this.worker.addEventListener("error", (error) => {
       console.error("Worker error:", error);
     });
-    this.coordinator = coordinator;
+    this.worker.addEventListener("message", (message) => this.receive(message));
   }
-  send(opts: workloadOpts) {
+  send(workload: Workload) {
     if (this.busy) {
       console.warn("Worker busy, cannot complete work");
       return;
     }
     this.busy = true;
+    this.worker.postMessage(workload);
   }
-  receive(workload: any) {
+  receive(message: any) {
     this.busy = false;
-    this.coordinator.workComplete(this.id);
+    this.coordinator.processMessage(message);
   }
 }
 
@@ -62,23 +67,28 @@ interface UIEvent {
   utcDay: number;
 }
 
+interface Workload {
+  utcDate: number;
+}
+
 // Processes UI events, manages workers, caches layouts and bitmaps
 // TODO: Break days down into tiles
 export class EventRenderCoordinator {
   airdayCal: AirdayCal;
   events: UIEvent[] = []; // Event queue
   workers: UIWorker[] = [];
-  dataCache = new Map<number, CacheEntry<CalendarEvent>>();
+  dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   bitmapCache = new Map<number, CacheEntry<ImageBitmap>>();
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
+    this.createWorkerPool();
   }
   createWorkerPool() {
     const count = optimalWorkerCount();
     for (let i = 0; i < count; i++) {
-      this.workers.push(new UIWorker(this));
+      this.workers.push(new UIWorker(i, this));
     }
   }
   addEvent(event: UIEvent) {
@@ -111,12 +121,40 @@ export class EventRenderCoordinator {
         default:
       }
     }
-    // From utc date range (start in the middle and fanning out), find stale dates & assign work to all workers
+    // TODO: Start with internal regions, then buffer.
+    for (let date of this.airdayCal.transform.dates) {
+      const data = this.dataCache.get(date.valueOf());
+      if (!data || !data.fresh) {
+        const localZero = localZeroDate(date);
+        const events = this.airdayCal.db.getEvents(
+          localZero,
+          new Date(localZero.valueOf() + 864e5),
+        );
+        this.dataCache.set(date.valueOf(), new CacheEntry(events));
+        this.assignWork({
+          type: "next",
+          date,
+          events: events.map((e) => e.transfer()),
+          transform: [
+            this.airdayCal.transform.dayPx,
+            this.airdayCal.transform.hourPx,
+            scale(),
+          ],
+        });
+      }
+      // TODO: Same with layout, bitmap
+    }
     // this.airdayCal
     // TODO: Consider too - assigning some work to main thread (but how to prioritise?)
   }
-  processMessage() {
+  processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
+    const data = message.data;
+    console.log("incoming message", data);
+    this.bitmapCache.set(
+      message.data.date.valueOf(),
+      new CacheEntry(message.data.bitmap),
+    );
   }
   processBitmaps() {
     // Caches latest bitmaps
@@ -126,8 +164,11 @@ export class EventRenderCoordinator {
   }
   assignWork(work: Workload[]) {
     for (let worker of this.workers) {
-      if (worker.busy) return;
+      if (worker.busy) continue;
       worker.send(work);
+      return;
     }
   }
+  // For immediate updates only!
+  mainThreadRender() {}
 }

@@ -41,11 +41,10 @@ export interface DayLayout {
  * TODO: Check assumption that events have been sorted chronologically!
  */
 export function calcDayLayout(
-  eventCache: Map<string, any>,
-  events: Set<string>,
+  events: any[],
   clip: number,
-  hourHeight: number,
   dayPx: number,
+  hourHeight: number,
 ): DayLayout {
   const layoutMap = new Map<string, EventLayout>();
   const segPosMap = new Map<number, number>(); // segment, lastYPos
@@ -92,8 +91,7 @@ export function calcDayLayout(
     return clusterIndex;
   }
 
-  events.forEach((id) => {
-    const event = eventCache.get(id);
+  events.forEach((event) => {
     const startTime = event.start < clip ? clip : event.start;
     const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
     const height = Math.max((endTime - startTime) / 1000 / 60, 22);
@@ -101,8 +99,8 @@ export function calcDayLayout(
     const startsToday = event.start > clip;
     const segment = nextSegment(y, height);
     const cluster = nextCluster(y, height, segment);
-    layoutMap.set(id, {
-      id,
+    layoutMap.set(event.id, {
+      id: event.id,
       startTime,
       endTime,
       width: 0, // unset yet

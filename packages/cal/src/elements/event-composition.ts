@@ -20,8 +20,8 @@ export function eventComposition(
   ctx2D.textBaseline = "top";
   dates.map((date, index) => {
     const offset = index * airdayCal.transform.dayPx + offsetPx;
-    const image = airdayCal.eventCache.bitmapMap.get(date.valueOf());
-    if (image) {
+    const cache = airdayCal.coordinator.bitmapCache.get(date.valueOf());
+    if (cache?.data) {
       if (!airdayCal.firstRender) airdayCal.firstRender = performance.now();
       if (airdayCal.firstRender) {
         const diff = performance.now() - airdayCal.firstRender;
@@ -29,7 +29,7 @@ export function eventComposition(
         if (diff < 150) airdayCal.act();
       }
       ctx2D.drawImage(
-        image,
+        cache?.data,
         offset,
         -airdayCal.transform.offset[1] + airdayCal.transform.gridOffset[1],
         airdayCal.transform.dayPx,

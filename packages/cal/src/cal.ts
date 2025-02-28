@@ -19,6 +19,7 @@ export class AirdayCal {
   canvas: HTMLCanvasElement;
   ctx2D: CanvasRenderingContext2D;
   theme: Theme = "dark";
+  db: EventDB;
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
   resized = false;
@@ -38,6 +39,7 @@ export class AirdayCal {
     if (stats) this.stats = stats;
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
+    this.db = db;
     this.eventWorkerComms = new EventWorkerComms(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -167,7 +169,7 @@ export class AirdayCal {
       this.resizeCal();
     }
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
-    this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the event orchestrator now!
+    // this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the event orchestrator now!
     this.coordinator.tick(); // TODO: This replaces eventCache
     clearCanvas(this.canvas); // TODO: Late stage optimisation: only clear dirty areas per element area
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always

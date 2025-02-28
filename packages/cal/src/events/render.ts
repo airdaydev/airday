@@ -225,6 +225,24 @@ export class EventairdayCal {
     if (message.data.type === "load") {
       this.updateCache(message.data.events, message.data.range);
     }
+    if (message.data.type === "next") {
+      const { date, events, transform } = message.data;
+      this.transform.dayPx = transform[0];
+      this.transform.hourPx = transform[1];
+      this.transform.scale = transform[2];
+      this.offscreenScale();
+      const layout = calcDayLayout(events, date, transform[0], transform[1]);
+      this.renderDay(layout, date);
+      const bitmap = this.canvas.transferToImageBitmap();
+      self.postMessage(
+        {
+          type: "next",
+          bitmap,
+          date,
+        },
+        [bitmap],
+      );
+    }
     if (message.data.type === "reflow") {
       const clip = message.data.clip;
       const events = this.cache.get(clip) || new Set(); // Get day's events
