@@ -3,6 +3,7 @@ import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
+// Clipspace and day/time to x/y transform concerns
 export class CalendarTransform {
   airdayCal: AirdayCal;
   // Start dimensions

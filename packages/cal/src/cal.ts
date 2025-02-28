@@ -11,6 +11,7 @@ import { eventComposition } from "./elements/event-composition";
 
 type TimeFormat = "24hr" | "12hr";
 
+// Primary Calendar component, mounts to a DOM element
 export class AirdayCal {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
