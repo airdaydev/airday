@@ -15,9 +15,9 @@ export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   daysVisible = 7; // qty. days to fit into view space
   originDate = startOfWeekUTC; // day at x = 0
-  startPx: number = 0; // slight confusing - does this take into account offset or?
+  startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
-  dates: Date[] = []; // TODO: Should be more of a cache
+  dates: Date[] = []; // TODO: Should be more of a cache based on range!
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
   }
