@@ -1,5 +1,5 @@
 import { EventCache, EventWorkerComms } from "./events/cache";
-import { CalendarTransform, Clipspace } from "./transform";
+import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
@@ -25,7 +25,6 @@ export class AirdayCal {
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
-  clipspace = new Clipspace(this);
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   startDay?: Date;
@@ -84,10 +83,10 @@ export class AirdayCal {
     const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS+Linux/FF)
     const day = this.transform.xToDay(x); // TODO: Are we doing too much work here!?
     const relDay = Math.floor(
-      (event.x - this.clipspace.startPx) / this.transform.dayPx,
+      (event.x - this.transform.startPx) / this.transform.dayPx,
     );
-    const absDay = this.clipspace.dates[relDay];
-    const xDay = (event.x - this.clipspace.startPx) % this.transform.dayPx;
+    const absDay = this.transform.dates[relDay];
+    const xDay = (event.x - this.transform.startPx) % this.transform.dayPx;
     if (!absDay)
       return console.warn(
         "TODO: no absDay available, dev stink to be resolved",
@@ -102,9 +101,9 @@ export class AirdayCal {
   mouseDown(event: MouseEvent) {
     // TODO: Are we in grid space!?
     const relDay = Math.floor(
-      (event.x - this.clipspace.startPx) / this.transform.dayPx,
+      (event.x - this.transform.startPx) / this.transform.dayPx,
     );
-    const day = this.clipspace.dates[relDay];
+    const day = this.transform.dates[relDay];
     this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
   mount = (container: HTMLElement) => {
@@ -151,7 +150,7 @@ export class AirdayCal {
   }
   act = () => (this.lastAction = performance.now());
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
-    this.clipspace.originDate = date.valueOf();
+    this.transform.originDate = date.valueOf();
   };
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
@@ -173,15 +172,15 @@ export class AirdayCal {
     clearCanvas(this.canvas);
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
     const [firstHour, firstHourPx] = this.transform.getVisibleHours(); // TODO: same with this
-    this.eventCache.updateRange(this.clipspace.range); // TODO: same with this and this
-    days(this, this.clipspace.dates, this.clipspace.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
+    this.eventCache.updateRange(this.transform.range); // TODO: same with this and this
+    days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
     times(this, firstHour, firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
     // Start Header (no need for update unless x val changes)
     allDayLabel(this); // only moves if day area is expanded
     hzLine(this, this.transform.headerHeight); // only moves if day area is expanded
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
-    eventComposition(this, this.clipspace.dates, this.clipspace.startPx); // days only update when dirty - or x/y updated
+    eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
     // interactions();
     timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }

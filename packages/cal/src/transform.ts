@@ -3,20 +3,26 @@ import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
-export class Clipspace {
+export class CalendarTransform {
+  offset = [0, 0]; // Scroll offset
+  hourPx = 50; // 1 hour grid height
+  dayPx = 100; // 1 day grid width
+  headerHeight = 50; // aka header height
+  allDayRowHeight = 50;
+  margin = 10;
   originDate = startOfWeekUTC;
   startPx: number = 0;
   dates: Date[] = [];
-  airdayCal: AirdayCal;
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
+  airdayCal: AirdayCal;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
   }
-  get size() {
+  get clipspaceSize() {
     return this.dates.length;
   }
   // TODO: We should be buffering backwards properly - also this whole thing needs to be explored properly because it seems cooked
-  update(startPx: number, relStartDay: number) {
+  updateClipspace(startPx: number, relStartDay: number) {
     this.startPx = startPx;
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
@@ -26,19 +32,6 @@ export class Clipspace {
       this.airdayCal.daysVisible + 5,
     );
     this.range = new DayRange(this.dates[0], this.airdayCal.daysVisible + 5);
-  }
-}
-
-export class CalendarTransform {
-  offset = [0, 0]; // Scroll offset
-  hourPx = 50; // 1 hour grid height
-  dayPx = 100; // 1 day grid width
-  headerHeight = 50; // aka header height
-  allDayRowHeight = 50;
-  margin = 10;
-  airdayCal: AirdayCal;
-  constructor(airdayCal: AirdayCal) {
-    this.airdayCal = airdayCal;
   }
   get hourViewBuffer() {
     // Hours visible outside view in each direction (-/+)
@@ -57,7 +50,7 @@ export class CalendarTransform {
   // TODO: Tidy & cache this function
   recalcClipspace(): void {
     const [startDayPx, relStartDay] = this.clipspaceOriginX();
-    this.airdayCal.clipspace.update(startDayPx, relStartDay);
+    this.updateClipspace(startDayPx, relStartDay);
   }
   clipspaceOriginX() {
     const minXClip = this.offset[0] - this.dayPx; // 1 day buffer behind offset in screen space
@@ -108,9 +101,7 @@ export class CalendarTransform {
     normalisedDate.setMinutes(0);
     normalisedDate.setSeconds(0);
     return (
-      ((normalisedDate.valueOf() -
-        this.airdayCal.clipspace.originDate.valueOf()) /
-        864e5) *
+      ((normalisedDate.valueOf() - this.originDate.valueOf()) / 864e5) *
         this.dayPx -
       this.offset[0] +
       this.gridOffset[0]
