@@ -21,6 +21,11 @@ export class CalendarTransform {
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
   }
+  fitCalWidth(canvasWidth: number) {
+    const approxDay = this.offset[0] / this.dayPx; // Get existing day
+    this.dayPx = (canvasWidth - this.hourPx) / this.daysVisible;
+    this.offset[0] = approxDay * this.dayPx;
+  }
   // TODO: We should be buffering backwards properly - also this whole thing needs to be explored properly because it seems cooked
   updateClipspace(startPx: number, relStartDay: number) {
     this.startPx = startPx;
