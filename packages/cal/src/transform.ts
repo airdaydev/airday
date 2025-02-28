@@ -59,6 +59,7 @@ export class CalendarTransform {
   recalcClipspace(): void {
     const [startDayPx, relStartDay] = this.clipspaceOriginX();
     this.updateClipspace(startDayPx, relStartDay);
+    this.calcVisibleHours();
   }
   clipspaceOriginX() {
     const minXClip = this.offset[0] - this.dayPx; // 1 day buffer behind offset in screen space

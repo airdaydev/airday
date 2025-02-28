@@ -8,6 +8,7 @@ import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine, timeNow } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { eventComposition } from "./elements/event-composition";
+import { EventRenderCoordinator } from "./events/coordinator";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -27,6 +28,7 @@ export class AirdayCal {
   firstRender: number | null = null; // Used to fade in first events
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
+  coordinator = new EventRenderCoordinator(this);
   eventCache: EventCache;
   eventWorkerComms: EventWorkerComms;
   canvasBounds: DOMRect;
@@ -164,10 +166,10 @@ export class AirdayCal {
     if (this.resized) {
       this.resizeCal();
     }
-    // TODO: Late stage optimisation: only clear dirty areas per element area
-    clearCanvas(this.canvas);
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
-    this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the orchestrator!
+    this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the event orchestrator now!
+    this.coordinator.tick(); // TODO: This replaces eventCache
+    clearCanvas(this.canvas); // TODO: Late stage optimisation: only clear dirty areas per element area
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
     times(this, this.transform.firstHour, this.transform.firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
     // Start Header (no need for update unless x val changes)
