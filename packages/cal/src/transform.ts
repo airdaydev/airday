@@ -4,23 +4,22 @@ import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
 export class CalendarTransform {
-  offset = [0, 0]; // Scroll offset
+  airdayCal: AirdayCal;
+  // Start dimensions
   hourPx = 50; // 1 hour grid height
   dayPx = 100; // 1 day grid width
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
   margin = 10;
-  daysVisible = 7;
-  originDate = startOfWeekUTC;
-  startPx: number = 0;
-  dates: Date[] = [];
+  // End dimensions
+  offset = [0, 0]; // Scroll offset
+  daysVisible = 7; // qty. days to fit into view space
+  originDate = startOfWeekUTC; // day at x = 0
+  startPx: number = 0; // slight confusing - does this take into account offset or?
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
-  airdayCal: AirdayCal;
+  dates: Date[] = []; // TODO: Should be more of a cache
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
-  }
-  get clipspaceSize() {
-    return this.dates.length;
   }
   // TODO: We should be buffering backwards properly - also this whole thing needs to be explored properly because it seems cooked
   updateClipspace(startPx: number, relStartDay: number) {
