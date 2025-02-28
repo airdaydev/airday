@@ -10,6 +10,7 @@ export class CalendarTransform {
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
   margin = 10;
+  daysVisible = 7;
   originDate = startOfWeekUTC;
   startPx: number = 0;
   dates: Date[] = [];
@@ -27,11 +28,8 @@ export class CalendarTransform {
     const clipStartDayAbs = new Date(
       this.originDate.valueOf() + relStartDay * 864e5,
     );
-    this.dates = getDateArray(
-      clipStartDayAbs.valueOf(),
-      this.airdayCal.daysVisible + 5,
-    );
-    this.range = new DayRange(this.dates[0], this.airdayCal.daysVisible + 5);
+    this.dates = getDateArray(clipStartDayAbs.valueOf(), this.daysVisible + 5);
+    this.range = new DayRange(this.dates[0], this.daysVisible + 5);
   }
   get hourViewBuffer() {
     // Hours visible outside view in each direction (-/+)

@@ -19,7 +19,6 @@ export class AirdayCal {
   theme: Theme = "dark";
   transform: CalendarTransform;
   timeFormat: TimeFormat = "24hr";
-  daysVisible = 7;
   resized = false;
   TIME_FONT_SIZE = 11;
   lastAction: number = performance.now();
@@ -27,7 +26,6 @@ export class AirdayCal {
   firstRender: number | null = null; // Used to fade in first events
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
-  startDay?: Date;
   eventCache: EventCache;
   eventWorkerComms: EventWorkerComms;
   canvasBounds: DOMRect;
