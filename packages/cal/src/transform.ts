@@ -7,14 +7,15 @@ export class Clipspace {
   originDate = startOfWeekUTC;
   startPx: number = 0;
   dates: Date[] = [];
-  AirdayCal: AirdayCal;
+  airdayCal: AirdayCal;
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
-  constructor(AirdayCal: AirdayCal) {
-    this.AirdayCal = AirdayCal;
+  constructor(airdayCal: AirdayCal) {
+    this.airdayCal = airdayCal;
   }
   get size() {
     return this.dates.length;
   }
+  // TODO: We should be buffering backwards properly - also this whole thing needs to be explored properly because it seems cooked
   update(startPx: number, relStartDay: number) {
     this.startPx = startPx;
     const clipStartDayAbs = new Date(
@@ -22,9 +23,9 @@ export class Clipspace {
     );
     this.dates = getDateArray(
       clipStartDayAbs.valueOf(),
-      this.AirdayCal.clipDays + 5,
+      this.airdayCal.daysVisible + 5,
     );
-    this.range = new DayRange(this.dates[0], this.AirdayCal.clipDays + 5);
+    this.range = new DayRange(this.dates[0], this.airdayCal.daysVisible + 5);
   }
 }
 

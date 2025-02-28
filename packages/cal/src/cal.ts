@@ -154,9 +154,6 @@ export class AirdayCal {
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
     this.clipspace.originDate = date.valueOf();
   };
-  get clipDays() {
-    return this.daysVisible + 3;
-  }
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
     const approxDay = this.transform.offset[0] / this.transform.dayPx;

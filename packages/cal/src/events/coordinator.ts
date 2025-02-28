@@ -112,6 +112,7 @@ export class EventRenderCoordinator {
       }
     }
     // From utc date range (start in the middle and fanning out), find stale dates & assign work to all workers
+    // this.airdayCal
     // TODO: Consider too - assigning some work to main thread (but how to prioritise?)
   }
   processMessage() {
