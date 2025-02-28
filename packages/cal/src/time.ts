@@ -28,16 +28,21 @@ export function isTodayUTC(utcDate: Date) {
   );
 }
 
-// Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
-export function localZeroDate(date: Date) {
+export function validateUTCMidnight(date: Date) {
   const hours = date.getHours();
-  if (date.getMinutes() || date.getSeconds() || date.getMilliseconds()) {
+  if (date.valueOf() % (24 * 60 * 60 * 1000) !== 0) {
     throw new Error("localZeroDate expects 0:00:00 timestamp");
   }
   const tzOffset = date.getTimezoneOffset();
   if (hours !== Math.abs(tzOffset / 60)) {
     throw new Error("localZeroDate did not received UTC 0hrs");
   }
+  return true;
+}
+
+// Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
+export function localZeroDate(date: Date) {
+  validateUTCMidnight(date); // throw if not valid UTC midnight timestamp
   const newDate = new Date();
   newDate.setMilliseconds(0);
   newDate.setSeconds(0);
