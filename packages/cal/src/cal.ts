@@ -154,7 +154,8 @@ export class AirdayCal {
     resizeCanvas2D(this.canvas);
     const approxDay = this.transform.offset[0] / this.transform.dayPx;
     this.transform.dayPx =
-      (this.canvas.offsetWidth - this.transform.hourPx) / this.daysVisible;
+      (this.canvas.offsetWidth - this.transform.hourPx) /
+      this.transform.daysVisible;
     this.transform.offset[0] = approxDay * this.transform.dayPx;
     this.eventWorkerComms.resize(); // TODO: This event will be removed when switching to new render coordinator
     this.resized = false;
