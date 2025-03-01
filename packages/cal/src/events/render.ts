@@ -27,12 +27,6 @@ function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
   }
 }
 
-// Loop through range
-// Skip dirty days
-// Set positions
-// Collect render calls in segment order
-// Render each segment 0-n
-
 function parseColourScheme(colour: any): "yellow" | "blue" {
   if (typeof colour !== "string") return "blue";
   if (colour !== "blue" && colour !== "yellow") return "blue";
@@ -207,7 +201,6 @@ export class EventairdayCal {
     if (worker) {
       self.addEventListener("message", this.onMessage);
     }
-    this.render();
   }
   offscreenScale() {
     this.canvas.width = this.transform.dayPx * this.transform.scale;
@@ -241,83 +234,8 @@ export class EventairdayCal {
         [bitmap],
       );
     }
-    if (message.data.type === "reflow") {
-      const clip = message.data.clip;
-      const events = this.cache.get(clip) || new Set(); // Get day's events
-      const layout = calcDayLayout(
-        this.idCache,
-        events,
-        clip,
-        this.transform.hourPx,
-        this.transform.dayPx,
-      );
-      this.layoutMap.set(clip, layout);
-      const utcDay = utcZeroDate(new Date(clip)).valueOf();
-      self.postMessage({ type: "reflow", date: utcDay, layout });
-    }
-    // if (message.data.type === 'rerender') {
-    //   const clip = message.data.clip;
-    //   const layout = this.layoutMap.get(clip);
-    //   const utcDay = utcZeroDate(new Date(clip)).valueOf();
-    //   self.postMessage({ type: "reflow", date: utcDay, layout });
-    // }
   };
-  render() {
-    // TODO: This could be a smarter queue, we're always rendering
-    requestAnimationFrame(() => {
-      if (this.dirty.size) {
-        const map = new Map<number, ImageBitmap>();
-        for (
-          let clip = this.range[0];
-          clip <= this.range[1];
-          clip = addDaysNumber(clip, 1)
-        ) {
-          if (!this.dirty.has(clip)) {
-            // Only rerender days marked as dirty
-            continue;
-          }
-          const events = this.cache.get(clip) || new Set(); // Get day's events
-          const layout = calcDayLayout(
-            this.idCache,
-            events,
-            clip,
-            this.transform.hourPx,
-            this.transform.dayPx,
-          );
-          this.layoutMap.set(clip, layout);
-          this.renderDay(layout, clip);
-          const bitmap = this.canvas.transferToImageBitmap();
-          const utcDay = utcZeroDate(new Date(clip)).valueOf();
-          map.set(utcDay, bitmap);
-          this.dirty.delete(clip);
-          self.postMessage({ type: "reflow", date: utcDay, layout });
-        }
-        Array.from(map).forEach((val) => {
-          self.postMessage({ type: "day", date: val[0], bitmap: val[1] }, [
-            val[1],
-          ] as any);
-        });
-      }
-      this.render();
-    });
-  }
   renderDay(layout: DayLayout, clip: number, theme = this.theme) {
     return renderDay(this.ctx2D, layout, clip, { theme });
-  }
-  updateCache(events: any[], cacheRange: [number, number]) {
-    this.range = cacheRange;
-    events.forEach((event) => {
-      const start = Math.max(event.start, this.range[0] as number);
-      const end = Math.min(event.end, this.range[1] as number);
-      const startDay = localMidnight(new Date(start)).valueOf();
-      const endDay = localMidnight(new Date(end)).valueOf();
-      const days = Math.ceil((endDay - startDay) / 864e5) + 1;
-      for (let i = 0; i < days; i++) {
-        const day = addDaysNumber(startDay, i); // utc start day
-        this.idCache.set(event.id, event);
-        addMapSet(this.cache, day, event.id);
-        this.dirty.add(day);
-      }
-    });
   }
 }
