@@ -14,7 +14,7 @@ export class CalendarTransform {
   margin = 10;
   // End dimensions
   offset = [0, 0]; // Scroll offset
-  daysVisible = 7; // qty. days to fit into view space
+  daysVisible = 28; // qty. days to fit into view space
   originDate = startOfWeekUTC; // day at x = 0
   // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range

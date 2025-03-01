@@ -37,11 +37,12 @@ export function eventComposition(
       );
       ctx2D.globalAlpha = 1;
     }
+    // TODO: This should be an event with a high priority!
     const zero = utcZeroDate(
       new Date(airdayCal.uiObjects.hover?.date),
     ).valueOf();
     if (date.valueOf() === zero) {
-      airdayCal.eventCache.renderRegion(
+      airdayCal.coordinator.renderRegion(
         airdayCal.uiObjects.hover?.date,
         airdayCal.uiObjects.hover?.region,
         [

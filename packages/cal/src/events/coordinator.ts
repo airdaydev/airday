@@ -1,8 +1,11 @@
+import { Rectangle } from "@timohausmann/quadtree-ts";
 import { AirdayCal } from "../cal";
-import { scale } from "../canvas";
+import { Rect, scale } from "../canvas";
 import { CalendarEvent } from "../model";
-import { localZeroDate } from "../time";
+import { localZeroDate, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
+import { EventUIData } from "../ui-objects";
+import { renderDay } from "./render";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -123,7 +126,8 @@ export class EventRenderCoordinator {
     }
     // TODO: Start with internal regions, then buffer.
     for (let date of this.airdayCal.transform.dates) {
-      const data = this.dataCache.get(date.valueOf());
+      const dateVal = date.valueOf();
+      const data = this.dataCache.get(dateVal);
       if (!data || !data.fresh) {
         const localZero = localZeroDate(date);
         const events = this.airdayCal.db.getEvents(
@@ -141,6 +145,23 @@ export class EventRenderCoordinator {
             scale(),
           ],
         });
+        return;
+      }
+      const bitmap = this.bitmapCache.get(dateVal);
+      if (!bitmap) {
+        const events = this.dataCache.get(dateVal);
+        if (!events || !events.data) return; // However, this means we want a blank bitmap!
+        // TODO: We may already have layout though!
+        this.assignWork({
+          type: "next",
+          date,
+          events: events.data.map((e) => e.transfer()),
+          transform: [
+            this.airdayCal.transform.dayPx,
+            this.airdayCal.transform.hourPx,
+            scale(),
+          ],
+        });
       }
       // TODO: Same with layout, bitmap
     }
@@ -150,17 +171,29 @@ export class EventRenderCoordinator {
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
     const data = message.data;
-    console.log("incoming message", data);
-    this.bitmapCache.set(
-      message.data.date.valueOf(),
-      new CacheEntry(message.data.bitmap),
-    );
-  }
-  processBitmaps() {
-    // Caches latest bitmaps
-  }
-  processLayout() {
-    // Caches new layouts
+    if (data.bitmap) {
+      this.bitmapCache.set(data.date.valueOf(), new CacheEntry(data.bitmap));
+    }
+    if (data.layout) {
+      this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
+      const objs: Rectangle<EventUIData>[] = [];
+      for (let [id, event] of data.layout.map.entries()) {
+        objs.push(
+          new Rectangle<EventUIData>({
+            x: event.x,
+            width: event.width,
+            y: event.y,
+            height: event.height,
+            data: {
+              type: 0,
+              id,
+              z: event.segment,
+            },
+          }),
+        );
+      }
+      this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
+    }
   }
   assignWork(work: Workload[]) {
     for (let worker of this.workers) {
@@ -168,7 +201,31 @@ export class EventRenderCoordinator {
       worker.send(work);
       return;
     }
+    this.airdayCal.act(); // There's still work left! (TODO: This is imperfect - try to pan across with 100 days viewing)
   }
   // For immediate updates only!
   mainThreadRender() {}
+  async renderRegion(
+    date: number,
+    region: Rect,
+    offset?: [number, number],
+    highlightId?: string,
+    ts?: number,
+  ) {
+    const zeroDate = utcZeroDate(new Date(date)).valueOf(); // TODO: Necessary?
+    const layout = this.layoutCache.get(zeroDate);
+    if (!layout) {
+      console.warn(`Cant rerender layout region ${date}`);
+      return;
+    }
+    // TODO: Set canvas x/y
+    renderDay(this.airdayCal.ctx2D, layout.data, date, {
+      theme: this.airdayCal.theme,
+      region,
+      shadows: true,
+      offset,
+      highlightId,
+      fadeTs: ts,
+    });
+  }
 }

@@ -1,9 +1,8 @@
-import { EventCache } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
-import { getStartOfWeekUTC, localZeroDate } from "./time";
+import { getStartOfWeekUTC } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine, timeNow } from "./elements/label";
 import { days, times } from "./elements/grid";
@@ -30,14 +29,12 @@ export class AirdayCal {
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
-  eventCache: EventCache;
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
   stats?: Stats;
   constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
     if (stats) this.stats = stats;
     this.transform = new CalendarTransform(this);
-    this.eventCache = new EventCache(this, db);
     this.db = db;
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
@@ -105,7 +102,6 @@ export class AirdayCal {
       (event.x - this.transform.startPx) / this.transform.dayPx,
     );
     const day = this.transform.dates[relDay];
-    this.eventCache.reflowDay(localZeroDate(day).valueOf());
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
@@ -137,8 +133,6 @@ export class AirdayCal {
   };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
-    this.eventCache.bitmapMap.clear();
-    this.eventCache.range = null;
     this.act();
   };
   get scrollHeight() {
@@ -157,7 +151,6 @@ export class AirdayCal {
     this.transform.fitCalWidth(this.canvas.offsetWidth);
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
-    this.eventCache.range = null;
   };
   // Main draw loop; run inside a request animation frame
   draw() {
@@ -165,7 +158,6 @@ export class AirdayCal {
       this.resizeCal();
     }
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
-    // this.eventCache.updateRange(this.transform.range); // TODO: This belongs in the event orchestrator now!
     this.coordinator.tick(); // TODO: This replaces eventCache
     clearCanvas(this.canvas); // TODO: Late stage optimisation: only clear dirty areas per element area
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always

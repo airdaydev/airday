@@ -90,12 +90,12 @@ export class CalUIObjects {
             console.warn("No hit data found", hit);
             return;
           }
-          const day = this.airdayCal.eventCache.layoutMap.get(utcDay);
+          const day = this.airdayCal.coordinator.layoutCache.get(utcDay);
           if (!day) return console.warn("no day found in hit test");
-          const event = day.map.get(hit.data.id);
+          const event = day.data.map.get(hit.data.id);
           if (!event) return console.warn("no event found");
           const localDate = localZeroDate(new Date(utcDay)).valueOf();
-          // this.airdayCal.eventCache.renderRegion(localDate, normaliseRect(hit));
+          console.log(hit);
           this.hover = {
             rendered: false,
             date: localDate,

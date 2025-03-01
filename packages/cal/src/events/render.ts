@@ -236,6 +236,7 @@ export class EventairdayCal {
           type: "next",
           bitmap,
           date,
+          layout,
         },
         [bitmap],
       );
