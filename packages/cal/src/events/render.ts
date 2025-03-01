@@ -222,7 +222,7 @@ export class EventairdayCal {
       this.transform.scale = transform[2];
       this.offscreenScale();
       const layout = calcDayLayout(events, date, transform[0], transform[1]);
-      this.renderDay(layout, date);
+      this.renderDay(layout, date, "dark");
       const bitmap = this.canvas.transferToImageBitmap();
       self.postMessage(
         {
