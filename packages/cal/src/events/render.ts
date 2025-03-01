@@ -222,9 +222,6 @@ export class EventairdayCal {
       this.theme = message.data.params.theme;
       this.offscreenScale();
     }
-    if (message.data.type === "load") {
-      this.updateCache(message.data.events, message.data.range);
-    }
     if (message.data.type === "next") {
       const { date, events, transform } = message.data;
       this.transform.dayPx = transform[0];

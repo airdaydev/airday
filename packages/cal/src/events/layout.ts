@@ -1,4 +1,4 @@
-import { getTime, timeToY } from "../time";
+import { getTime, localZeroDate, timeToY } from "../time";
 
 export interface EventLayout {
   id: string;
@@ -42,10 +42,11 @@ export interface DayLayout {
  */
 export function calcDayLayout(
   events: any[],
-  clip: number,
+  utcDate: number,
   dayPx: number,
   hourHeight: number,
 ): DayLayout {
+  const clip = localZeroDate(new Date(utcDate)).valueOf();
   const layoutMap = new Map<string, EventLayout>();
   const segPosMap = new Map<number, number>(); // segment, lastYPos
   function nextSegment(posY: number, height: number) {

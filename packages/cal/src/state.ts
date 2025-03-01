@@ -3,8 +3,7 @@ import IntervalTree, { NumericTuple } from "@flatten-js/interval-tree";
 
 export class EventDB {
   idMap = new Map<string, CalendarEvent>();
-  tree = new IntervalTree(); // TODO: Split per calendar?
-  scene = new Set<CalendarEvent>();
+  tree = new IntervalTree();
   constructor() {}
   indexEvent(event: CalendarEvent) {
     const range: NumericTuple = [event.start.valueOf(), event.end.valueOf()];
@@ -27,43 +26,4 @@ export class EventDB {
     });
     return arr;
   }
-}
-
-function startOfDay(date: Date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
-export function eventsToDateMap(
-  arr: CalendarEvent[],
-  startDate: number,
-  endDate: number,
-) {
-  const map = new Map<Date, Set<CalendarEvent>>();
-  arr.forEach((event) => {
-    // change to ternaries
-    let min = startDate;
-    const eventStartDay = startOfDay(event.start);
-    if (eventStartDay.valueOf() > startDate) {
-      min = eventStartDay.valueOf();
-    }
-    let max = endDate;
-    const eventEndDay = startOfDay(event.end);
-    if (eventEndDay.valueOf() > endDate) {
-      max = eventEndDay.valueOf();
-    }
-    let cur = min;
-    while (cur < max) {
-      const curDate = new Date(cur);
-      const d = map.get(curDate);
-      if (!d) {
-        map.set(curDate, new Set([event]));
-      } else {
-        d.add(event);
-      }
-      cur += 864e5;
-    }
-  });
-  return map;
 }
