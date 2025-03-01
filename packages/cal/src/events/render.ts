@@ -1,5 +1,5 @@
 import { DayLayout, calcDayLayout } from "./layout";
-import { localMidnight, addDaysNumber, utcZeroDate } from "../time";
+import { utcZeroDate } from "../time";
 import {
   darkScheme,
   lightScheme,
@@ -15,16 +15,6 @@ interface Transform {
   dayPx: number;
   hourPx: number;
   scale: number;
-}
-
-function addMapSet<K, V>(map: Map<K, Set<V>>, key: K, val: V) {
-  const set = map.get(key);
-  if (!set) {
-    const newSet = new Set([val]);
-    map.set(key, newSet);
-  } else {
-    set.add(val);
-  }
 }
 
 function parseColourScheme(colour: any): "yellow" | "blue" {
