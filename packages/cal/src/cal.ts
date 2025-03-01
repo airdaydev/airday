@@ -1,4 +1,4 @@
-import { EventCache, EventWorkerComms } from "./events/cache";
+import { EventCache } from "./events/cache";
 import { CalendarTransform } from "./transform";
 import { lightScheme, darkScheme, Theme } from "./colours";
 import { EventDB } from "./state";
@@ -31,7 +31,6 @@ export class AirdayCal {
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
   eventCache: EventCache;
-  eventWorkerComms: EventWorkerComms;
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
   stats?: Stats;
@@ -40,7 +39,6 @@ export class AirdayCal {
     this.transform = new CalendarTransform(this);
     this.eventCache = new EventCache(this, db);
     this.db = db;
-    this.eventWorkerComms = new EventWorkerComms(this);
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
     this.scrollable = scrollable;
     this.canvas = canvas;
@@ -139,7 +137,6 @@ export class AirdayCal {
   };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
-    this.eventWorkerComms.resize();
     this.eventCache.bitmapMap.clear();
     this.eventCache.range = null;
     this.act();
@@ -158,7 +155,6 @@ export class AirdayCal {
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
     this.transform.fitCalWidth(this.canvas.offsetWidth);
-    this.eventWorkerComms.resize(); // TODO: This event will be removed when switching to new render coordinator
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
     this.eventCache.range = null;
