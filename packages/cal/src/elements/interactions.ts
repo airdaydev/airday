@@ -14,9 +14,10 @@ export function interactions(airdayCal: AirdayCal) {
     time * airdayCal.transform.hourPx -
     airdayCal.transform.offset[1] +
     airdayCal.transform.gridOffset[1];
-  ctx2D.fillStyle = "#00009944";
-  ctx2D.rect(x, y, airdayCal.transform.dayPx, 50);
-  ctx2D.fill();
+  // Show 50px block beneath mouse pointer aligned to day
+  // ctx2D.fillStyle = "#00009944";
+  // ctx2D.rect(x, y, airdayCal.transform.dayPx, 50);
+  // ctx2D.fill();
   // Hits
   // ctx2D.beginPath();
   // airdayCal.uiObjects.hits.map((obj) => {

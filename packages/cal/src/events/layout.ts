@@ -92,9 +92,11 @@ export function calcDayLayout(
     return clusterIndex;
   }
 
+  const tomorrow = clip + 864e5;
+
   events.forEach((event) => {
     const startTime = event.start < clip ? clip : event.start;
-    const endTime = event.end > clip + 864e5 ? clip + 864e5 : event.end;
+    const endTime = event.end > tomorrow ? tomorrow : event.end;
     const height = Math.max((endTime - startTime) / 1000 / 60, 22);
     const y = timeToY(new Date(startTime), hourHeight);
     const startsToday = event.start > clip;

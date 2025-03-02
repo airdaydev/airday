@@ -60,11 +60,15 @@ export class UIWorker {
 export class CacheEntry<T> {
   data: T;
   fresh: boolean = true;
+  pending = false;
   constructor(data: T) {
     this.data = data;
   }
   markStale() {
     this.fresh = false;
+  }
+  markPending() {
+    this.pending = true;
   }
 }
 
@@ -140,21 +144,31 @@ export class EventRenderCoordinator {
           localZero,
           new Date(localZero.valueOf() + 864e5),
         );
-        this.dataCache.set(date.valueOf(), new CacheEntry(events));
-        this.assignWork({
+        this.dataCache.set(dateVal, new CacheEntry(events));
+        const assigned = this.assignWork({
           type: "next",
           date,
           events: events.map((e) => e.transfer()),
+          theme: this.airdayCal.theme,
           transform: [
             this.airdayCal.transform.dayPx,
             this.airdayCal.transform.hourPx,
             scale(),
           ],
         });
+        // TODO: Slightly ugly, but basically this means a bitmap is incoming so skip it
+        // Without this, we could potentially ask for a bitmap 2x over successive ticks, as one would be incoming without a cache entry
+        if (assigned) {
+          const bitmapCache = this.bitmapCache.get(dateVal);
+          if (bitmapCache) {
+            bitmapCache.markPending();
+          }
+        }
         return;
       }
+      // TODO: Important possible issue! We need to let our workers know coordinate know that we are ALREADY fetching dates
       const bitmap = this.bitmapCache.get(dateVal);
-      if (!bitmap) {
+      if (!bitmap || bitmap.pending) {
         const events = this.dataCache.get(dateVal);
         if (!events || !events.data) return; // However, this means we want a blank bitmap!
         // TODO: We may already have layout though!
@@ -206,9 +220,10 @@ export class EventRenderCoordinator {
     for (let worker of this.workers) {
       if (worker.busy) continue;
       worker.send(work);
-      return;
+      return true;
     }
     this.airdayCal.act(); // There's still work left! (TODO: This is imperfect - try to pan across with 100 days viewing)
+    return false;
   }
   // For immediate updates only!
   mainThreadRender() {}
