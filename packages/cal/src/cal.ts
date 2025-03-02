@@ -32,6 +32,8 @@ export class AirdayCal {
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
   stats?: Stats;
+  // Interactions
+  dragSelect = false;
   constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
     if (stats) this.stats = stats;
     this.transform = new CalendarTransform(this);
@@ -76,32 +78,54 @@ export class AirdayCal {
     if (this.theme === "light") return lightScheme;
     else return darkScheme;
   }
-  mouseMove(event: MouseEvent) {
-    const x = event.x - this.canvasBounds.left;
+  // TODO: Reevaluate and annotate
+  getMousePos(event: MouseEvent) {
+    // Time
     const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS+Linux/FF)
-    const day = this.transform.xToDay(x); // TODO: Are we doing too much work here!?
+    const timeY = this.transform.yToTime(y);
+    // Day
+    const x = event.x - this.canvasBounds.left;
+    const day = this.transform.xToDay(x);
     const relDay = Math.floor(
       (event.x - this.transform.startPx) / this.transform.dayPx,
     );
     const absDay = this.transform.dates[relDay];
     const xDay = (event.x - this.transform.startPx) % this.transform.dayPx;
-    if (!absDay)
+    if (!absDay) {
       return console.warn(
         "TODO: no absDay available, dev stink to be resolved",
-      ); //
-    this.uiObjects.testCollision(absDay.valueOf(), [
+      );
+    }
+    this.hover = [day, timeY];
+    return {
+      day,
       xDay,
-      y - this.transform.gridOffset[1] + this.transform.offset[1],
+      absDay,
+      y,
+      yOffset: y - this.transform.gridOffset[1] + this.transform.offset[1],
+      timeY,
+    };
+  }
+  mouseMove(event: MouseEvent) {
+    const pos = this.getMousePos(event);
+    if (!pos) return;
+    this.hover = [pos.day, pos.timeY];
+    this.uiObjects.testCollision(pos.absDay.valueOf(), [
+      pos.xDay,
+      pos.y - this.transform.gridOffset[1] + this.transform.offset[1],
     ]);
-    this.hover = [day, this.transform.yToTime(y)];
     this.act();
   }
   mouseDown(event: MouseEvent) {
-    // TODO: Are we in grid space!?
-    const relDay = Math.floor(
-      (event.x - this.transform.startPx) / this.transform.dayPx,
-    );
-    const day = this.transform.dates[relDay];
+    if (event.shiftKey) {
+      // TODO: Start drag select
+      this.dragSelect = true;
+      // on mouse up
+    }
+    // TODO: Regular drag (drag time slot)
+    // Regular drag of event
+    // Regular drag of event top edge
+    // Regular drag of event bottom edge
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
@@ -158,8 +182,8 @@ export class AirdayCal {
       this.resizeCal();
     }
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
-    this.coordinator.tick(); // TODO: This replaces eventCache
-    clearCanvas(this.canvas); // TODO: Late stage optimisation: only clear dirty areas per element area
+    this.coordinator.tick();
+    clearCanvas(this.canvas);
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
     times(this, this.transform.firstHour, this.transform.firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
     // Start Header (no need for update unless x val changes)

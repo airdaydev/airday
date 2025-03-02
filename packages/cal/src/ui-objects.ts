@@ -95,7 +95,6 @@ export class CalUIObjects {
           const event = day.data.map.get(hit.data.id);
           if (!event) return console.warn("no event found");
           const localDate = localZeroDate(new Date(utcDay)).valueOf();
-          console.log(hit);
           this.hover = {
             rendered: false,
             date: localDate,
