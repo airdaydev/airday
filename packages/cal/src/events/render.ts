@@ -61,7 +61,7 @@ export function renderDay(
     // If event ends after today, event end time is end of day
     // If event ends today, event end time is end time
     addOp(layout.segment, () => {
-      ctx2D.font = "12px 'Alte Haas Grotesk'";
+      ctx2D.font = "10px 'Alte Haas Grotesk'";
       let x = offset ? layout.x + offset[0] : layout.x;
       let y = offset ? layout.y + offset[1] : layout.y;
       if (shadows) {
