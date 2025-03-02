@@ -150,7 +150,7 @@ export function renderDay(
   }
   if (renderOpts.debug) {
     const utcDay = utcZeroDate(new Date(clip)).valueOf();
-    ctx2D.fillStyle = "red";
+    ctx2D.fillStyle = "#f7204b";
     ctx2D.font = "16px bold";
     ctx2D.fillText(`clip:${new Date(clip).getDate()}`, 0, 0);
     ctx2D.fillText(`zero:${new Date(utcDay).getUTCDate()}`, 0, 32);

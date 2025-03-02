@@ -46,11 +46,12 @@ export function vtLine(airdayCal: AirdayCal, xOffset: number, yStart: number) {
 export function dayLabel(airdayCal: AirdayCal, date: Date, offset: number) {
   const ctx2D = airdayCal.ctx2D;
   const text = getDateUTC(date);
+  const nowCol = airdayCal.colourScheme.now.toString();
   ctx2D.textAlign = "left";
   const textWidth = ctx2D.measureText(text).width;
   const padding = (airdayCal.transform.dayPx - textWidth) / 2;
   if (isTodayUTC(date)) {
-    ctx2D.fillStyle = "red";
+    ctx2D.fillStyle = nowCol;
     ctx2D.roundRect(offset + padding - 4, 14, textWidth + 8, 25, 2);
     ctx2D.fill();
     ctx2D.font = "bold 12px Alte Haas Grotesk";
@@ -66,12 +67,13 @@ export function timeNow(airdayCal: AirdayCal) {
   const ctx2D = airdayCal.ctx2D;
   const now = new Date();
   const y = airdayCal.transform.timeToY(now);
+  const nowCol = airdayCal.colourScheme.now.toString();
   const nowHour = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
   ctx2D.textAlign = "right";
   ctx2D.textBaseline = "middle";
   ctx2D.font = `${airdayCal.TIME_FONT_SIZE}px Alte Haas Grotesk`;
-  hzLine(airdayCal, y, { strokeStyle: "#ff0000cc", lineWidth: 0.5 });
-  ctx2D.fillStyle = "#ff0000cc";
+  hzLine(airdayCal, y, { strokeStyle: nowCol, lineWidth: 0.5 });
+  ctx2D.fillStyle = nowCol;
   ctx2D.fillText(
     `${nowHour.toString()}`,
     airdayCal.transform.gridOffset[0] - airdayCal.transform.margin,

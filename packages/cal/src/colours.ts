@@ -89,6 +89,7 @@ export interface ColourScheme {
   color: RGBA;
   labels: RGBA;
   shade: RGBA | string; // Kept as string for alpha values
+  now: RGBA;
 }
 
 export const lightScheme: ColourScheme = {
@@ -98,6 +99,7 @@ export const lightScheme: ColourScheme = {
   hzLine: new RGBA(238, 238, 238), // #eee
   vtLine: new RGBA(221, 221, 221), // #ddd
   shade: new RGBA(247, 247, 247), // #f7f7f7
+  now: new RGBA(247, 32, 75, 1),
 };
 
 export const darkScheme: ColourScheme = {
@@ -107,6 +109,7 @@ export const darkScheme: ColourScheme = {
   hzLine: new RGBA(34, 34, 34), // #222
   vtLine: new RGBA(34, 34, 34), // #222
   shade: new RGBA(17, 17, 17, 0.67), // Converted from "#111111aa"
+  now: new RGBA(247, 32, 75, 1),
 };
 
 interface EventColorScheme {
@@ -120,7 +123,7 @@ const yellowDark: EventColorScheme = {
   text: new RGBA(152, 136, 102),
   bg: new RGBA(64, 60, 48),
   fg: new RGBA(122, 106, 76),
-  shadow: new RGBA(0, 0, 0, 0.067), // Converted from "#00000011"
+  shadow: new RGBA(0, 0, 0, 0.02), // Converted from "#00000011"
 };
 
 // TODO: Fix LLM generated colours
