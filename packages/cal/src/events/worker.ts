@@ -50,7 +50,6 @@ export class EventUIWorker {
     }
     if (message.data.type === "next") {
       const { date, events, transform, theme = "light" } = message.data;
-      console.log(new Date(date), "next"); // TODO: Multiple renders!!!!!
       this.transform.dayPx = transform[0];
       this.transform.hourPx = transform[1];
       this.transform.scale = transform[2];
