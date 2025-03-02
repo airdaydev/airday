@@ -118,15 +118,25 @@ export class AirdayCal {
     this.act();
   }
   mouseDown(event: MouseEvent) {
+    // TODO: This may have to go in interactions/ui-objects - or just check if we've hit something
     if (event.shiftKey) {
       // TODO: Start drag select
       this.dragSelect = true;
-      // on mouse up
+      // we need to place an origin for the selection box, after a few px movement we can start a 1x1 outlined box
+      // and update with each frame from origin
+      // add a mouse up event here too (or maybe it's just active all the time) and kill the dragSelect when finished
     }
-    // TODO: Regular drag (drag time slot)
-    // Regular drag of event
-    // Regular drag of event top edge
-    // Regular drag of event bottom edge
+    if (!event.shiftKey) {
+      // && no event
+      // TODO: Regular drag (drag time slot)
+    }
+    if (!event.shiftKey) {
+      // && event!
+      // Regular drag of event (everything internal, except the edges!)
+      // Regular drag of event internal adjacent to top edge - drag start of event (can invert to end of event)
+      // Regular drag of event internal adjacent to bottom edge - drag end of event (can invert to start of event)
+      // - nb. ghost event stays in place, while opaque event gets dragged
+    }
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
