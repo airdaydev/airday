@@ -8,6 +8,7 @@ import { allDayLabel, hzLine, timeNow } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { eventComposition } from "./elements/event-composition";
 import { EventRenderCoordinator } from "./events/coordinator";
+import { interactions } from "./elements/interactions";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -157,6 +158,7 @@ export class AirdayCal {
   };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
+    this.coordinator.clearBitmapCache();
     this.act();
   };
   get scrollHeight() {
@@ -191,8 +193,8 @@ export class AirdayCal {
     hzLine(this, this.transform.headerHeight); // only moves if day area is expanded
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
+    interactions(this);
     eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
-    // interactions();
     timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {

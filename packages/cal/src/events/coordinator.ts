@@ -32,9 +32,12 @@ export class UIWorker {
   constructor(id: number, coordinator: EventRenderCoordinator) {
     this.coordinator = coordinator;
     this.id = id;
-    this.worker = new Worker(new URL("./worker.ts?worker", import.meta.url), {
-      type: "module",
-    });
+    this.worker = new Worker(
+      new URL("./worker-instance.ts?worker", import.meta.url),
+      {
+        type: "module",
+      },
+    );
     this.worker.addEventListener("error", (error) => {
       console.error("Worker error:", error);
     });
@@ -97,6 +100,9 @@ export class EventRenderCoordinator {
   addEvent(event: UIEvent) {
     this.events.push(event);
   }
+  clearBitmapCache() {
+    this.bitmapCache.clear();
+  }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
   // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
   // TODO: Calculate affected tiles (?)
@@ -156,6 +162,7 @@ export class EventRenderCoordinator {
           type: "next",
           date,
           events: events.data.map((e) => e.transfer()),
+          theme: this.airdayCal.theme,
           transform: [
             this.airdayCal.transform.dayPx,
             this.airdayCal.transform.hourPx,
