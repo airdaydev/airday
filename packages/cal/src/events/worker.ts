@@ -50,11 +50,14 @@ export class EventUIWorker {
     }
     if (message.data.type === "next") {
       const { date, events, transform, theme = "light" } = message.data;
+      console.log(new Date(date), "next"); // TODO: Multiple renders!!!!!
       this.transform.dayPx = transform[0];
       this.transform.hourPx = transform[1];
       this.transform.scale = transform[2];
       this.offscreenScale();
-      const layout = calcDayLayout(events, date, transform[0], transform[1]);
+      const layout =
+        message.data.layout ||
+        calcDayLayout(events, date, transform[0], transform[1]);
       this.renderDay(layout, date, theme);
       const bitmap = this.canvas.transferToImageBitmap();
       self.postMessage(

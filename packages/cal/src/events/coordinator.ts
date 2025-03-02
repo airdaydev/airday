@@ -167,6 +167,7 @@ export class EventRenderCoordinator {
         return;
       }
       // TODO: Important possible issue! We need to let our workers know coordinate know that we are ALREADY fetching dates
+      // TODO: Layout!
       const bitmap = this.bitmapCache.get(dateVal);
       if (!bitmap || bitmap.pending) {
         const events = this.dataCache.get(dateVal);
