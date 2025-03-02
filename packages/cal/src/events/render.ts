@@ -19,7 +19,6 @@ function parseColourScheme(colour: any): "yellow" | "blue" {
 
 interface RenderOptions {
   region?: Rect;
-  shadows?: boolean;
   theme?: Theme;
   debug?: boolean;
   offset?: [number, number];
@@ -35,7 +34,6 @@ export function renderDay(
 ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
   // Customise
   const theme = renderOpts.theme || "dark";
-  const shadows = renderOpts.shadows ?? true;
   const region = renderOpts.region;
   // Render
   let ops: (() => void)[][] = [];
@@ -64,12 +62,6 @@ export function renderDay(
       ctx2D.font = "10px 'Alte Haas Grotesk'";
       let x = offset ? layout.x + offset[0] : layout.x;
       let y = offset ? layout.y + offset[1] : layout.y;
-      if (shadows) {
-        ctx2D.shadowColor = scheme.shadow.toString();
-        ctx2D.shadowBlur = 3;
-        ctx2D.shadowOffsetX = 2;
-        ctx2D.shadowOffsetY = 2;
-      }
       ctx2D.beginPath();
       const cornerRadii = [
         layout.startsToday ? 2 : 0,
@@ -113,7 +105,6 @@ export function renderDay(
       ctx2D.roundRect(x, y, 3, layout.height, pillRadii);
       ctx2D.fill();
       ctx2D.closePath();
-      ctx2D.shadowColor = "#00000000"; // reset
       ctx2D.fillStyle = scheme.text.toString();
       // ctx2D.fillStyle = "#FFFFFF88"; // reset
       if (layout.startsToday) {

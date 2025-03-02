@@ -245,7 +245,6 @@ export class EventRenderCoordinator {
     renderDay(this.airdayCal.ctx2D, layout.data, date, {
       theme: this.airdayCal.theme,
       region,
-      shadows: true,
       offset,
       highlightId,
       fadeTs: ts,
