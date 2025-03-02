@@ -105,6 +105,7 @@ export function renderDay(
       ctx2D.roundRect(x, y, 3, layout.height, pillRadii);
       ctx2D.fill();
       ctx2D.closePath();
+      const textStart = x + 6;
       ctx2D.fillStyle = scheme.text.toString();
       // ctx2D.fillStyle = "#FFFFFF88"; // reset
       if (layout.startsToday) {
@@ -112,10 +113,10 @@ export function renderDay(
         path.rect(x, y, layout.width - 5, layout.height);
         ctx2D.save();
         ctx2D.clip(path);
-        ctx2D?.fillText(layout.displayText, x + 6, y + 4);
+        ctx2D?.fillText(layout.displayText, textStart, y + 4);
         if (layout.height > 24) {
           ctx2D.fillStyle = scheme.fg.toString();
-          ctx2D?.fillText(layout.displayTime, x + 8, y + 4 + 16);
+          ctx2D?.fillText(layout.displayTime, textStart, y + 4 + 16);
           // ctx2D?.fillText(`${ddmm(event.start)}`, x + 8, layout.y + 4 + 32);
         }
         ctx2D.restore();

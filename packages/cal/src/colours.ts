@@ -129,15 +129,15 @@ const yellowDark: EventColorScheme = {
 // TODO: Fix LLM generated colours
 const yellowLight: EventColorScheme = {
   text: new RGBA(89, 76, 48), // Darker yellow-brown for readable text
-  bg: new RGBA(253, 248, 233), // Very light cream/yellow background
-  fg: new RGBA(227, 208, 152), // Muted golden yellow foreground
+  bg: new RGBA(246, 234, 203), // Very light cream/yellow background
+  fg: new RGBA(251, 243, 185), // Muted golden yellow foreground
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
 
 const blueLight: EventColorScheme = {
   text: new RGBA(56, 84, 112), // Deeper pastel blue for text
-  bg: new RGBA(241, 247, 253), // Soft sky blue background
-  fg: new RGBA(176, 206, 233), // Gentle pastel blue foreground
+  bg: new RGBA(230, 249, 252), // Soft sky blue background
+  fg: new RGBA(209, 233, 246), // Gentle pastel blue foreground
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
 

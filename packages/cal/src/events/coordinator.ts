@@ -105,7 +105,10 @@ export class EventRenderCoordinator {
     this.events.push(event);
   }
   clearBitmapCache() {
-    this.bitmapCache.clear();
+    this.bitmapCache.forEach((val, key) => {
+      console.log("yooo", val);
+      val.markStale();
+    });
   }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
   // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
@@ -169,7 +172,8 @@ export class EventRenderCoordinator {
       // TODO: Important possible issue! We need to let our workers know coordinate know that we are ALREADY fetching dates
       // TODO: Layout!
       const bitmap = this.bitmapCache.get(dateVal);
-      if (!bitmap || bitmap.pending) {
+      if (!bitmap || (bitmap && bitmap.pending) || !bitmap.fresh) {
+        if (bitmap) bitmap.markPending();
         const events = this.dataCache.get(dateVal);
         if (!events || !events.data) return; // However, this means we want a blank bitmap!
         // TODO: We may already have layout though!
