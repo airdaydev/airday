@@ -55,6 +55,7 @@ export class CalUIObjects {
   hit?: EventUIData | undefined;
   hover: Hover | null = null;
   selected = new Map<string, Hover>();
+  dragOrigin: [number, number] | null = null;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
   }
@@ -107,6 +108,9 @@ export class CalUIObjects {
         }
       }
     }
+  }
+  startDrag(origin: [number, number]) {
+    this.dragOrigin = origin;
   }
   clear() {
     this.quads.clear();
