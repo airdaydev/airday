@@ -25,11 +25,7 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Last simultaneous event bug (starting at x = 0)
 - [x] Resizing calendar retains same middle via offset change
 - [x] Bug: Layout edge case - final events in each cluster can still start at x = dayWidth
-
-## Optimisations
-- [] Cache clipspace
-- [] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
-- [] Run through rendering optimisation plan
+- [x] Run through rendering optimisation plan
 
 ## Interactions
 - [x] Solidify clipspace api
@@ -79,6 +75,8 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Multi-select events with single click
 - [] Drag to multiselect
 - [] custom scroller, snap to date or week when active scrolling stops
+- [] Cache clipspace
+- [] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
 
 ## Handling concurring events UI
 - Simplest is side by side (create groups of overlapping events & split side-by-side)
@@ -118,9 +116,6 @@ GetTZOffset for UTC time and subtract to get relevant range and also display dat
 e.g. UTC = 00:00 = 11:00 - tzOffset = 00:00 local TZ
 
 for cache, index in localTZ day start, because this aligns with our day display
-
-
-
 
 # UX optimisation in xcal
 * the first encounter will push the event a fixed length (3ish em (or 2px in week view)) away. But any further nesting will divide into segments.
