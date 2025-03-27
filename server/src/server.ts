@@ -15,3 +15,5 @@
 // rx initial sync
 // rx since vector clocks + checks
 // tx pending updates
+
+console.log("welcome to our deno backend");
