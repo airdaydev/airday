@@ -6,7 +6,6 @@ import { getStartOfWeekUTC } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine, timeNow } from "./elements/label";
 import { days, times } from "./elements/grid";
-import { eventComposition } from "./elements/event-composition";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { interactions } from "./elements/interactions";
 
@@ -203,7 +202,7 @@ export class AirdayCal {
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
     interactions(this);
-    eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
+    // eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
     timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {
