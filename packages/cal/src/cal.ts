@@ -4,10 +4,11 @@ import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import { getStartOfWeekUTC } from "./time";
 import { CalUIObjects } from "./ui-objects";
-import { allDayLabel, hzLine, timeNow } from "./elements/label";
+import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { interactions } from "./elements/interactions";
+import { EventsRendererDOM } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -31,6 +32,7 @@ export class AirdayCal {
   coordinator = new EventRenderCoordinator(this);
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
+  eventsRendererDOM = new EventsRendererDOM(this);
   stats?: Stats;
   // Interactions
   dragSelect = false;
@@ -55,6 +57,11 @@ export class AirdayCal {
     });
     resizeObserver.observe(canvas);
     scrollable.addEventListener("scroll", (event) => {
+      // delta between each scroll event / time = velocity
+      // current spot = limit of movement
+      // this would introduce a slight lag but may look much better on safari ios for example, where the scroll event is fired at a slow rate.
+      // while scrolling calculate
+      // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
       this.act();
@@ -142,16 +149,18 @@ export class AirdayCal {
     const scrollable = document.createElement("div");
     scrollable.id = "airday_scrollable";
     scrollable.style.position = "absolute";
-    scrollable.style.top = "0";
-    scrollable.style.left = "0";
-    scrollable.style.width = "100%";
-    scrollable.style.height = "100%";
+    scrollable.style.top = "6em";
+    scrollable.style.left = "3em";
+    scrollable.style.width = "calc(100% - 3em)";
+    scrollable.style.height = "calc(100% - 6em)";
     scrollable.style.overflowY = "scroll";
     scrollable.style.zIndex = "2";
+    scrollable.style.background = "#ffff000f";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
     scrollChild.style.width = "100%";
+    scrollChild.style.background = "linear-gradient(red, blue)";
     // Canvas (sits behind)
     const { canvas, ctx2D } = createCanvasLayer();
     // Attach everything
@@ -202,8 +211,9 @@ export class AirdayCal {
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
     interactions(this);
+    this.eventsRendererDOM.reconcile(); // clip events above, below, left, right
     // eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
-    timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
+    // timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {
     requestAnimationFrame(() => {

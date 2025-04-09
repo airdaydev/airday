@@ -87,9 +87,9 @@ export class CalendarTransform {
     );
     // TODO: allow overscroll but automatically swing back
     // this.offset[1] = this.offset[1] + y;
-    if (y !== 0) {
-      this.airdayCal.scrollable.scrollTo(0, this.offset[1]);
-    }
+    // if (y !== 0) {
+    //   this.airdayCal.scrollable.scrollTo(0, this.offset[1]);
+    // }
   }
   xStart(x: number) {
     const r = (x % this.gridOffset[0]) + this.offset[0];

@@ -63,6 +63,7 @@ export function dayLabel(airdayCal: AirdayCal, date: Date, offset: number) {
   ctx2D.fillText(text, offset + padding, 25);
 }
 
+// This is a horizontal red line rendered in canvas to show today's across the screen, but will be replaced with DOM element in canvas rendering
 export function timeNow(airdayCal: AirdayCal) {
   const ctx2D = airdayCal.ctx2D;
   const now = new Date();
