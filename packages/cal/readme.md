@@ -1,6 +1,6 @@
 ## @airday/cal
 
-Calendar front-end powering Airday's calendar - single canvas for main board with a native scroll container, DOM for overlays etc
+Calendar front-end powering Airday's calendar, canvas background with DOM for events. Plan to port to webgpu. Currently monthly view only.
 
 ## Roadmap
 - [x] Idle render check to save battery etc
@@ -26,8 +26,10 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [x] Resizing calendar retains same middle via offset change
 - [x] Bug: Layout edge case - final events in each cluster can still start at x = dayWidth
 - [x] Run through rendering optimisation plan
+- [x] Remove canvas events layer
+- [] Establish DOM events layer
 
-## Interactions
+## Canvas Interactions
 - [x] Solidify clipspace api
 - [x] Quadtree collision detection (wip)
 - [x] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move (not worth it, draw calls too exxy - webgpu/gl the path)
@@ -71,12 +73,13 @@ Calendar front-end powering Airday's calendar - single canvas for main board wit
 - [] Tile vertically, even horizontally if needed
 - [] only re-render interaction day that changes (as opposed to spitting bmps again)
 - [] True monthly view
-- [] Wgpu version
 - [] Multi-select events with single click
 - [] Drag to multiselect
 - [] custom scroller, snap to date or week when active scrolling stops
 - [] Cache clipspace
 - [] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
+
+## Webgpu port
 
 ## Handling concurring events UI
 - Simplest is side by side (create groups of overlapping events & split side-by-side)
