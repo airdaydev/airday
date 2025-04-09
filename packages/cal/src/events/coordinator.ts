@@ -129,10 +129,12 @@ export class EventRenderCoordinator {
         });
         return;
       }
+      const layout = this.layoutCache.get(dateVal);
+      // if no layout?
       const domData = this.domCache.get(dateVal);
-      if (!domData || !domData?.fresh) {
-        console.log("render me", date);
-        this.domCache.set(dateVal, new CacheEntry(true));
+      if ((!domData || !domData?.fresh) && layout) {
+        // TODO: Map between scrollChild & date e.g. diff between date & origin date or more complex
+        this.domCache.set(dateVal, new CacheEntry(true)); // TODO: Hold reference to day dom element
       }
     }
     // TODO: Cleanup domcache
@@ -158,7 +160,7 @@ export class EventRenderCoordinator {
           }),
         );
       }
-      this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
+      // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
   }
   assignWork(work: Workload[]) {

@@ -44,6 +44,7 @@ export class AirdayCal {
     this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
+    this.scrollable.scrollTo(50000, 0);
     this.ctx2D = ctx2D;
     this.resizeCal();
     this.frame();
@@ -62,9 +63,10 @@ export class AirdayCal {
       // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
+      this.transform.offset[0] = this.scrollable.scrollLeft;
       this.act();
     });
-    scrollable.addEventListener("wheel", (event: WheelEvent) => {
+    this.canvas.addEventListener("wheel", (event: WheelEvent) => {
       this.transform.addDelta(event.deltaX, event.deltaY);
       this.mouseMove(event);
       this.act();
@@ -157,7 +159,7 @@ export class AirdayCal {
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
-    scrollChild.style.width = "100%";
+    scrollChild.style.width = "100000px";
     scrollChild.style.background = "linear-gradient(red, blue)";
     // Canvas (sits behind)
     const { canvas, ctx2D } = createCanvasLayer();

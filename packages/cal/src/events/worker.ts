@@ -20,6 +20,9 @@ export class EventUIWorker {
   worker: boolean;
   constructor(worker: boolean) {
     this.worker = worker;
+    if (worker) {
+      self.addEventListener("message", this.onMessage);
+    }
   }
   onMessage = (message: MessageEvent) => {
     if (message.data.type === "config") {
