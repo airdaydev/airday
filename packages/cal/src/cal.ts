@@ -8,7 +8,6 @@ import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { interactions } from "./elements/interactions";
-import { EventsRendererDOM } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -32,7 +31,6 @@ export class AirdayCal {
   coordinator = new EventRenderCoordinator(this);
   canvasBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
-  eventsRendererDOM = new EventsRendererDOM(this);
   stats?: Stats;
   // Interactions
   dragSelect = false;
@@ -211,8 +209,6 @@ export class AirdayCal {
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
     interactions(this);
-    this.eventsRendererDOM.reconcile(); // clip events above, below, left, right
-    // eventComposition(this, this.transform.dates, this.transform.startPx); // days only update when dirty - or x/y updated
     // timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {

@@ -5,6 +5,7 @@ import { CalendarEvent } from "../model";
 import { localZeroDate, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { EventUIData } from "../ui-objects";
+import { CacheEntry } from "../utils/cache";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -49,21 +50,6 @@ export class UIWorker {
   }
 }
 
-export class CacheEntry<T> {
-  data: T;
-  fresh: boolean = true;
-  pending = false;
-  constructor(data: T) {
-    this.data = data;
-  }
-  markStale() {
-    this.fresh = false;
-  }
-  markPending() {
-    this.pending = true;
-  }
-}
-
 interface UIEvent {
   type: "data" | "layout";
   utcDay: number;
@@ -81,6 +67,7 @@ export class EventRenderCoordinator {
   workers: UIWorker[] = [];
   dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
+  domCache = new Map<number, CacheEntry<Boolean>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -108,10 +95,12 @@ export class EventRenderCoordinator {
         case "data":
           this.dataCache.get(event.utcDay)?.markStale();
           this.layoutCache.get(event.utcDay)?.markStale();
+          this.domCache.get(event.utcDay)?.markStale();
           break;
         case "layout":
           // mostly viewport changes (due to changing time height for example)
           this.layoutCache.get(event.utcDay)?.markStale();
+          this.domCache.get(event.utcDay)?.markStale();
           break;
         default:
       }
@@ -140,7 +129,13 @@ export class EventRenderCoordinator {
         });
         return;
       }
+      const domData = this.domCache.get(dateVal);
+      if (!domData || !domData?.fresh) {
+        console.log("render me", date);
+        this.domCache.set(dateVal, new CacheEntry(true));
+      }
     }
+    // TODO: Cleanup domcache
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
