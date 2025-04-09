@@ -168,7 +168,6 @@ export class AirdayCal {
   };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
-    this.coordinator.clearBitmapCache();
     this.act();
   };
   get scrollHeight() {

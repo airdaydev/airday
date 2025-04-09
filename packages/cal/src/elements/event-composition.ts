@@ -20,23 +20,6 @@ export function eventComposition(
   ctx2D.textBaseline = "top";
   dates.map((date, index) => {
     const offset = index * airdayCal.transform.dayPx + offsetPx;
-    const cache = airdayCal.coordinator.bitmapCache.get(date.valueOf());
-    if (cache?.data) {
-      if (!airdayCal.firstRender) airdayCal.firstRender = performance.now();
-      if (airdayCal.firstRender) {
-        const diff = performance.now() - airdayCal.firstRender;
-        ctx2D.globalAlpha = diff < 150 ? diff / 150 : 1;
-        if (diff < 150) airdayCal.act();
-      }
-      ctx2D.drawImage(
-        cache?.data,
-        offset,
-        -airdayCal.transform.offset[1] + airdayCal.transform.gridOffset[1],
-        airdayCal.transform.dayPx,
-        airdayCal.transform.hourPx * 25,
-      );
-      ctx2D.globalAlpha = 1;
-    }
     // TODO: This should be an event with a high priority!
     const zero = utcZeroDate(
       new Date(airdayCal.uiObjects.hover?.date),

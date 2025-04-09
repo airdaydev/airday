@@ -5,7 +5,6 @@ import { CalendarEvent } from "../model";
 import { localZeroDate, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { EventUIData } from "../ui-objects";
-import { renderDay } from "./render";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -15,13 +14,6 @@ function optimalWorkerCount() {
   workerCount = Math.max(min, workerCount);
   workerCount = Math.min(max, workerCount);
   return workerCount;
-}
-
-interface workloadOpts {
-  utcDay: number;
-  layout: boolean;
-  bitmap: boolean;
-  // TODO: Tile/region
 }
 
 export class UIWorker {
@@ -73,7 +65,7 @@ export class CacheEntry<T> {
 }
 
 interface UIEvent {
-  type: "data" | "layout" | "bitmap";
+  type: "data" | "layout";
   utcDay: number;
 }
 
@@ -81,7 +73,7 @@ interface Workload {
   utcDate: number;
 }
 
-// Processes UI events, manages workers, caches layouts and bitmaps
+// Processes UI events, manages workers, caches layouts
 // TODO: Break days down into tiles
 export class EventRenderCoordinator {
   airdayCal: AirdayCal;
@@ -89,7 +81,6 @@ export class EventRenderCoordinator {
   workers: UIWorker[] = [];
   dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
-  bitmapCache = new Map<number, CacheEntry<ImageBitmap>>();
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -104,12 +95,6 @@ export class EventRenderCoordinator {
   addEvent(event: UIEvent) {
     this.events.push(event);
   }
-  clearBitmapCache() {
-    this.bitmapCache.forEach((val, key) => {
-      console.log("yooo", val);
-      val.markStale();
-    });
-  }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
   // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
   // TODO: Calculate affected tiles (?)
@@ -123,16 +108,10 @@ export class EventRenderCoordinator {
         case "data":
           this.dataCache.get(event.utcDay)?.markStale();
           this.layoutCache.get(event.utcDay)?.markStale();
-          this.bitmapCache.get(event.utcDay)?.markStale();
           break;
         case "layout":
           // mostly viewport changes (due to changing time height for example)
           this.layoutCache.get(event.utcDay)?.markStale();
-          this.bitmapCache.get(event.utcDay)?.markStale();
-          break;
-        case "bitmap":
-          // e.g. selecting events
-          this.bitmapCache.get(event.utcDay)?.markStale();
           break;
         default:
       }
@@ -159,47 +138,13 @@ export class EventRenderCoordinator {
             scale(),
           ],
         });
-        // TODO: Slightly ugly, but basically this means a bitmap is incoming so skip it
-        // Without this, we could potentially ask for a bitmap 2x over successive ticks, as one would be incoming without a cache entry
-        if (assigned) {
-          const bitmapCache = this.bitmapCache.get(dateVal);
-          if (bitmapCache) {
-            bitmapCache.markPending();
-          }
-        }
         return;
       }
-      // TODO: Important possible issue! We need to let our workers know coordinate know that we are ALREADY fetching dates
-      // TODO: Layout!
-      const bitmap = this.bitmapCache.get(dateVal);
-      if (!bitmap || (bitmap && bitmap.pending) || !bitmap.fresh) {
-        if (bitmap) bitmap.markPending();
-        const events = this.dataCache.get(dateVal);
-        if (!events || !events.data) return; // However, this means we want a blank bitmap!
-        // TODO: We may already have layout though!
-        this.assignWork({
-          type: "next",
-          date,
-          events: events.data.map((e) => e.transfer()),
-          theme: this.airdayCal.theme,
-          transform: [
-            this.airdayCal.transform.dayPx,
-            this.airdayCal.transform.hourPx,
-            scale(),
-          ],
-        });
-      }
-      // TODO: Same with layout, bitmap
     }
-    // this.airdayCal
-    // TODO: Consider too - assigning some work to main thread (but how to prioritise?)
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
     const data = message.data;
-    if (data.bitmap) {
-      this.bitmapCache.set(data.date.valueOf(), new CacheEntry(data.bitmap));
-    }
     if (data.layout) {
       this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
       const objs: Rectangle<EventUIData>[] = [];
@@ -232,26 +177,4 @@ export class EventRenderCoordinator {
   }
   // For immediate updates only!
   mainThreadRender() {}
-  async renderRegion(
-    date: number,
-    region: Rect,
-    offset?: [number, number],
-    highlightId?: string,
-    ts?: number,
-  ) {
-    const zeroDate = utcZeroDate(new Date(date)).valueOf(); // TODO: Necessary?
-    const layout = this.layoutCache.get(zeroDate);
-    if (!layout) {
-      console.warn(`Cant rerender layout region ${date}`);
-      return;
-    }
-    // TODO: Set canvas x/y
-    renderDay(this.airdayCal.ctx2D, layout.data, date, {
-      theme: this.airdayCal.theme,
-      region,
-      offset,
-      highlightId,
-      fadeTs: ts,
-    });
-  }
 }
