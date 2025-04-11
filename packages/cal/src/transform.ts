@@ -19,7 +19,7 @@ export class CalendarTransform {
   daysVisible = 14; // qty. days to fit into view space
   originDate = startOfWeekUTC; // day at x = 0
   scrollChildWidth = defaultScrollChildWidth;
-  originOffset = Math.floor(defaultScrollChildWidth / 2);
+  scrollOffsetX = Math.floor(defaultScrollChildWidth / 2);
   // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
@@ -28,6 +28,9 @@ export class CalendarTransform {
   firstHourPx: number = 0;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
+  }
+  get scrollStart() {
+    return this.scrollOffsetX + this.startPx + this.offset[0];
   }
   fitCalWidth(canvasWidth: number) {
     const approxDay = this.offset[0] / this.dayPx; // Get existing day

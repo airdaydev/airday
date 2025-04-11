@@ -28,15 +28,5 @@ export function CalSolidWrapper(props: CalendarProps) {
       cal.cleanUp();
     }
   });
-  return (
-    <div
-      ref={domContainer}
-      style={`position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;`}
-    />
-  );
+  return <div ref={domContainer} />;
 }

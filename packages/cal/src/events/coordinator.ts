@@ -6,6 +6,7 @@ import { localZeroDate, utcZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { EventUIData } from "../ui-objects";
 import { CacheEntry } from "../utils/cache";
+import { DayEl } from "./dom";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -67,7 +68,7 @@ export class EventRenderCoordinator {
   workers: UIWorker[] = [];
   dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
-  domCache = new Map<number, CacheEntry<Boolean>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
+  domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -106,7 +107,12 @@ export class EventRenderCoordinator {
       }
     }
     // TODO: Start with internal regions, then buffer.
+    let i = 0;
     for (let date of this.airdayCal.transform.dates) {
+      const domPx =
+        this.airdayCal.transform.scrollStart +
+        i * this.airdayCal.transform.dayPx;
+      i++;
       const dateVal = date.valueOf();
       const data = this.dataCache.get(dateVal);
       if (!data || !data.fresh) {
@@ -132,8 +138,11 @@ export class EventRenderCoordinator {
       const layout = this.layoutCache.get(dateVal);
       // if no layout?
       const domData = this.domCache.get(dateVal);
-      if ((!domData || !domData?.fresh) && layout) {
-        this.domCache.set(dateVal, new CacheEntry(true)); // TODO: Hold reference to day dom element
+      if ((!domData || !domData?.fresh) && layout && layout.data) {
+        const dayEl = DayEl(layout.data, domPx);
+        // dayEl.innerText = date.toString();
+        this.airdayCal.scrollChild.appendChild(dayEl);
+        this.domCache.set(dateVal, new CacheEntry(dayEl)); // TODO: Hold reference to day dom element
       }
     }
     // TODO: Cleanup domcache

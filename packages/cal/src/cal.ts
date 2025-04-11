@@ -8,11 +8,15 @@ import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { interactions } from "./elements/interactions";
+import { createCalStyleTag } from "./css";
 
 type TimeFormat = "24hr" | "12hr";
 
+let globalIndex = 0; // track id
+
 // Primary Calendar component, mounts to a DOM element
 export class AirdayCal {
+  id: string;
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;
@@ -36,6 +40,9 @@ export class AirdayCal {
   dragSelect = false;
   constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
     if (stats) this.stats = stats;
+    this.id = `airday-cal-${globalIndex}`;
+    globalIndex++;
+    createCalStyleTag(this.id);
     this.transform = new CalendarTransform(this);
     this.db = db;
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
@@ -44,7 +51,7 @@ export class AirdayCal {
     this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    // this.scrollable.scrollTo(0, 0);
+    this.scrollable.scrollTo(this.transform.scrollOffsetX, 0);
     this.ctx2D = ctx2D;
     this.resizeCal();
     this.frame();
@@ -63,7 +70,8 @@ export class AirdayCal {
       // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
-      this.transform.offset[0] = this.scrollable.scrollLeft;
+      this.transform.offset[0] =
+        this.scrollable.scrollLeft - this.transform.scrollOffsetX;
       this.act();
     });
     this.canvas.addEventListener("wheel", (event: WheelEvent) => {
@@ -146,6 +154,7 @@ export class AirdayCal {
   }
   mount = (container: HTMLElement) => {
     // Scrollable area
+    container.id = this.id;
     const scrollable = document.createElement("div");
     scrollable.id = "airday_scrollable";
     scrollable.style.position = "absolute";
@@ -160,7 +169,6 @@ export class AirdayCal {
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
     scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
-    scrollChild.style.background = "linear-gradient(red, blue)";
     // Canvas (sits behind)
     const { canvas, ctx2D } = createCanvasLayer();
     // Attach everything
