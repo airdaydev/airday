@@ -14,6 +14,12 @@ export function createCalStyleTag(instanceId: string) {
       font-size: 10px;
       position: absolute;
       color: white;
+      user-select: none;
+      border-radius: 2px;
+      transition: background 0.05s;
+    }
+    #${instanceId} .event:hover {
+      background: lightgray !important;
     }
   `;
   document.head.appendChild(style);

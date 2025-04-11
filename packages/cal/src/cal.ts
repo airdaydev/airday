@@ -164,7 +164,6 @@ export class AirdayCal {
     scrollable.style.height = "calc(100% - 6em)";
     scrollable.style.overflowY = "scroll";
     scrollable.style.zIndex = "2";
-    scrollable.style.background = "#ffff000f";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
