@@ -7,7 +7,7 @@ import {
   EventDB,
 } from "../src/index";
 import { createSignal, createUniqueId } from "solid-js";
-import * as dat from "dat.gui";
+import { Pane } from "tweakpane";
 import Stats from "stats.js";
 import { Theme } from "../src/colours";
 
@@ -89,15 +89,16 @@ class guiModifier {
   toggleDarkMode() {
     theme[1]((v) => (v === "light" ? "dark" : "light"));
   }
-  gui = (gui: dat.GUI) => {
-    const folder = gui.addFolder(this.id);
-    folder.add(this, "toggleDarkMode").name("Toggle dark mode");
-    folder.open();
+  pane = (pane: Pane) => {
+    const folder = pane.addFolder({ title: "Main", expanded: true });
+    // pane.addBinding(this, "toggleDarkMode", { label: "Toggle dark mode" });
+    const button = pane.addButton({ title: "Toggle", label: "Theme" });
+    button.on("click", this.toggleDarkMode);
   };
 }
 
-const gui = new dat.GUI();
-(document.querySelector(".dg.ac") as HTMLElement).style.zIndex = "10";
+const gui = new Pane();
+// (document.querySelector(".dg.ac") as HTMLElement).style.zIndex = "10";
 // const contextFolder = gui.addFolder("Context");
 // contextFolder.open();
 // contextFolder
@@ -120,4 +121,4 @@ const gui = new dat.GUI();
 
 const guiA = new guiModifier("Calendar");
 
-guiA.gui(gui);
+guiA.pane(gui);

@@ -16,8 +16,9 @@
     "@types/stats": "^0.16.30"
   },
   "devDependencies": {
-    "dat.gui": "0.7.9",
+    "@tweakpane/core": "2.0.5",
     "stats.js": "^0.17.0",
+    "tweakpane": "4.0.5",
     "typescript": "~5.6.2",
     "vite": "^6.0.1",
     "vite-plugin-solid": "^2.11.0",
