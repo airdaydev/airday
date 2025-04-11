@@ -30,7 +30,9 @@ export class CalendarTransform {
     this.airdayCal = airdayCal;
   }
   get scrollStart() {
-    return this.scrollOffsetX + this.startPx + this.offset[0];
+    return (
+      this.scrollOffsetX + this.startPx + this.offset[0] - this.gridOffset[0]
+    );
   }
   fitCalWidth(canvasWidth: number) {
     const approxDay = this.offset[0] / this.dayPx; // Get existing day

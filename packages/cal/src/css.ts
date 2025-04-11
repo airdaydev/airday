@@ -1,6 +1,7 @@
 export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
-  style.id = style.textContent = `
+  style.id = instanceId;
+  style.textContent = `
     #${instanceId} {
       position: relative;
       display: flex;
@@ -17,6 +18,7 @@ export function createCalStyleTag(instanceId: string) {
       user-select: none;
       border-radius: 2px;
       transition: background 0.05s;
+      overflow: hidden;
     }
     #${instanceId} .event:hover {
       background: lightgray !important;
