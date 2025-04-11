@@ -133,7 +133,6 @@ export class EventRenderCoordinator {
       // if no layout?
       const domData = this.domCache.get(dateVal);
       if ((!domData || !domData?.fresh) && layout) {
-        // TODO: Map between scrollChild & date e.g. diff between date & origin date or more complex
         this.domCache.set(dateVal, new CacheEntry(true)); // TODO: Hold reference to day dom element
       }
     }

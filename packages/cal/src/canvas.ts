@@ -1,4 +1,3 @@
-export const defaultContainerWidth = 100000;
 export const scale = () => window.devicePixelRatio || 1;
 
 // function overloads to determine correct type

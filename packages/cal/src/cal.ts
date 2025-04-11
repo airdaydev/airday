@@ -44,7 +44,7 @@ export class AirdayCal {
     this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    this.scrollable.scrollTo(50000, 0);
+    // this.scrollable.scrollTo(0, 0);
     this.ctx2D = ctx2D;
     this.resizeCal();
     this.frame();
@@ -159,7 +159,7 @@ export class AirdayCal {
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
-    scrollChild.style.width = "100000px";
+    scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     scrollChild.style.background = "linear-gradient(red, blue)";
     // Canvas (sits behind)
     const { canvas, ctx2D } = createCanvasLayer();

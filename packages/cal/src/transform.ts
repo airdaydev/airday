@@ -3,6 +3,8 @@ import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
+const defaultScrollChildWidth = 100000;
+
 // Clipspace and day/time to x/y transform concerns
 export class CalendarTransform {
   airdayCal: AirdayCal;
@@ -16,6 +18,8 @@ export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   daysVisible = 14; // qty. days to fit into view space
   originDate = startOfWeekUTC; // day at x = 0
+  scrollChildWidth = defaultScrollChildWidth;
+  originOffset = Math.floor(defaultScrollChildWidth / 2);
   // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
