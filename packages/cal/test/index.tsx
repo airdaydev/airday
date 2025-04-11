@@ -86,14 +86,21 @@ class guiModifier {
   constructor(id: string) {
     this.id = id;
   }
-  toggleDarkMode() {
-    theme[1]((v) => (v === "light" ? "dark" : "light"));
+  get theme() {
+    return theme[0]();
+  }
+  set theme(themeStr: "dark" | "light") {
+    theme[1](() => themeStr);
   }
   pane = (pane: Pane) => {
-    const folder = pane.addFolder({ title: "Main", expanded: true });
-    // pane.addBinding(this, "toggleDarkMode", { label: "Toggle dark mode" });
-    const button = pane.addButton({ title: "Toggle", label: "Theme" });
-    button.on("click", this.toggleDarkMode);
+    const folder = pane.addFolder({ title: "@airday/cal", expanded: true });
+    folder.addBinding(this, "theme", {
+      label: "Theme",
+      options: {
+        dark: "dark",
+        light: "light",
+      },
+    });
   };
 }
 
