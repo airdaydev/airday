@@ -81,19 +81,18 @@ render(
   root!,
 );
 
-class guiModifier {
+class modifierPane {
   id: string;
+  pane?: Pane;
   constructor(id: string) {
     this.id = id;
   }
-  get theme() {
-    return theme[0]();
-  }
-  set theme(themeStr: "dark" | "light") {
-    theme[1](() => themeStr);
-  }
-  pane = (pane: Pane) => {
-    const folder = pane.addFolder({ title: "@airday/cal", expanded: true });
+  init() {
+    this.pane = new Pane();
+    const folder = this.pane.addFolder({
+      title: "@airday/cal",
+      expanded: true,
+    });
     folder.addBinding(this, "theme", {
       label: "Theme",
       options: {
@@ -101,31 +100,14 @@ class guiModifier {
         light: "light",
       },
     });
-  };
+  }
+  get theme() {
+    return theme[0]();
+  }
+  set theme(themeStr: "dark" | "light") {
+    theme[1](() => themeStr);
+  }
 }
 
-const gui = new Pane();
-// (document.querySelector(".dg.ac") as HTMLElement).style.zIndex = "10";
-// const contextFolder = gui.addFolder("Context");
-// contextFolder.open();
-// contextFolder
-//   .add(context, "mode", {
-//     ["Custom Drag"]: "custom",
-//     ["HTML Native Drag"]: "native",
-//   })
-//   .name("Drag Mode")
-//   .onChange((value) => {
-//     switch (value) {
-//       case "native":
-//         dndContext.mode[1]("native");
-//         break;
-//       case "custom":
-//         dndContext.mode[1]("custom");
-//         break;
-//       default:
-//     }
-//   });
-
-const guiA = new guiModifier("Calendar");
-
-guiA.pane(gui);
+const pane = new modifierPane("Calendar");
+pane.init();
