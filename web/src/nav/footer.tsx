@@ -103,7 +103,6 @@ export const Footer = () => {
           <Key key="/" />
           CMD
         </button>
-        <span>SYD 09:55</span>
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>
