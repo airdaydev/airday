@@ -4,7 +4,6 @@ import {
   darkEventSchemes,
   lightEventSchemes,
   Theme,
-  RGBA,
 } from "../colours";
 import { DayLayout, EventLayout } from "./layout";
 
@@ -58,6 +57,8 @@ export function DayEl(
   // Create events
   layout.map.forEach((eventLayout) => {
     const scheme = colourScheme[parseColourScheme(eventLayout.color)];
+    console.log(scheme);
+    console.log(globalScheme);
     const el = EventEl(eventLayout);
     dayEl.appendChild(el);
   });

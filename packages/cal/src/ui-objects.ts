@@ -79,7 +79,7 @@ export class CalUIObjects {
         }),
       );
       const hit = this.hits
-        .sort((a, b) => b.data.z - a.data.z)
+        .sort((a, b) => (b?.data?.z || 0) - (a?.data?.z || 0))
         .find((hit) => hitTest(hit, [coords[0], coords[1]]));
       if (!hit) {
         this.hit = undefined;

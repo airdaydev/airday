@@ -45,7 +45,7 @@ export function renderDay(
   ctx2D.textBaseline = "top";
   const offset = renderOpts.offset || [0, 0];
 
-  dayLayout.map.forEach((layout) => {
+  dayLayout.map.forEach((layout: any) => {
     // Skip events outside region
     if (region && !rectIntersection(layout, region)) return;
     // Render

@@ -1,8 +1,8 @@
 import { Rectangle } from "@timohausmann/quadtree-ts";
 import { AirdayCal } from "../cal";
-import { Rect, scale } from "../canvas";
+import { scale } from "../canvas";
 import { CalendarEvent } from "../model";
-import { localZeroDate, utcZeroDate } from "../time";
+import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { EventUIData } from "../ui-objects";
 import { CacheEntry } from "../utils/cache";
@@ -57,7 +57,12 @@ interface UIEvent {
 }
 
 interface Workload {
-  utcDate: number;
+  date: Date;
+  type: string;
+  utcDate?: number;
+  events: any;
+  theme: any;
+  transform: any;
 }
 
 // Processes UI events, manages workers, caches layouts
@@ -122,7 +127,7 @@ export class EventRenderCoordinator {
           new Date(localZero.valueOf() + 864e5),
         );
         this.dataCache.set(dateVal, new CacheEntry(events));
-        const assigned = this.assignWork({
+        this.assignWork({
           type: "next",
           date,
           events: events.map((e) => e.transfer()),
@@ -171,7 +176,7 @@ export class EventRenderCoordinator {
       // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
   }
-  assignWork(work: Workload[]) {
+  assignWork(work: Workload) {
     for (let worker of this.workers) {
       if (worker.busy) continue;
       worker.send(work);

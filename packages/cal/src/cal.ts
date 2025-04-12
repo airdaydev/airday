@@ -7,7 +7,7 @@ import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
-import { interactions } from "./elements/interactions";
+// import { interactions } from "./elements/interactions";
 import { createCalStyleTag } from "./css";
 
 type TimeFormat = "24hr" | "12hr";
@@ -217,7 +217,7 @@ export class AirdayCal {
     hzLine(this, this.transform.headerHeight); // only moves if day area is expanded
     hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
     // End Header
-    interactions(this);
+    // interactions(this);
     // timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {
