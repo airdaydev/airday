@@ -1,3 +1,5 @@
+import { EventSchemes } from "./colours";
+
 export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
   style.id = instanceId;
@@ -24,6 +26,35 @@ export function createCalStyleTag(instanceId: string) {
       background: lightgray !important;
     }
   `;
+  document.head.appendChild(style);
+  return style;
+}
+
+export function createColoursStyleTag(
+  instanceId: string,
+  lightScheme: EventSchemes,
+  darkScheme: EventSchemes,
+) {
+  const style = document.createElement("style");
+  style.id = `${instanceId}-colours`;
+  let eventColoursCSS = "";
+  for (let key of Object.keys(lightScheme)) {
+    let scheme = lightScheme[key as keyof EventSchemes];
+    eventColoursCSS =
+      eventColoursCSS.concat(`#${instanceId}.light .event.${key} {
+      background: ${scheme.bg};
+      color: ${scheme.text};
+    }`);
+  }
+  for (let key of Object.keys(darkScheme)) {
+    let scheme = darkScheme[key as keyof EventSchemes];
+    eventColoursCSS =
+      eventColoursCSS.concat(`#${instanceId}.dark .event.${key} {
+      background: ${scheme.bg};
+      color: ${scheme.text};
+    }`);
+  }
+  style.textContent = eventColoursCSS;
   document.head.appendChild(style);
   return style;
 }

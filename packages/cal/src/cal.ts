@@ -1,5 +1,11 @@
 import { CalendarTransform } from "./transform";
-import { lightScheme, darkScheme, Theme } from "./colours";
+import {
+  lightScheme,
+  darkScheme,
+  Theme,
+  lightEventSchemes,
+  darkEventSchemes,
+} from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import { getStartOfWeekUTC } from "./time";
@@ -8,7 +14,7 @@ import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 // import { interactions } from "./elements/interactions";
-import { createCalStyleTag } from "./css";
+import { createCalStyleTag, createColoursStyleTag } from "./css";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -17,6 +23,7 @@ let globalIndex = 0; // track id
 // Primary Calendar component, mounts to a DOM element
 export class AirdayCal {
   id: string;
+  container: HTMLDivElement;
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
   canvas: HTMLCanvasElement;
@@ -41,8 +48,10 @@ export class AirdayCal {
   constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
     if (stats) this.stats = stats;
     this.id = `airday-cal-${globalIndex}`;
+    this.container = container;
     globalIndex++;
     createCalStyleTag(this.id);
+    createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
     this.transform = new CalendarTransform(this);
     this.db = db;
     const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
@@ -183,6 +192,7 @@ export class AirdayCal {
   };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
+    this.container.className = theme;
     this.act();
   };
   get scrollHeight() {

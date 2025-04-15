@@ -16,13 +16,11 @@ interface RenderOptions {
 
 function EventEl(layout: EventLayout) {
   const div = document.createElement("div");
-  div.className = "event";
+  div.classList = `event ${layout.color}`;
   div.style.top = `${layout.y}px`;
   div.style.left = `${layout.x}px`;
   div.style.height = `${layout.height}px`;
   div.style.width = `${layout.width}px`;
-  div.style.color = `white`;
-  div.style.background = `grey`;
   if (!layout.startsToday) {
     div.style.borderRadius = "0 0 2px 2px";
   }
@@ -57,8 +55,6 @@ export function DayEl(
   // Create events
   layout.map.forEach((eventLayout) => {
     const scheme = colourScheme[parseColourScheme(eventLayout.color)];
-    console.log(scheme);
-    console.log(globalScheme);
     const el = EventEl(eventLayout);
     dayEl.appendChild(el);
   });

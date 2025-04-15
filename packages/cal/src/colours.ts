@@ -112,7 +112,7 @@ export const darkScheme: ColourScheme = {
   now: new RGBA(247, 32, 75, 1),
 };
 
-interface EventColorScheme {
+export interface EventColorScheme {
   text: RGBA;
   bg: RGBA;
   fg: RGBA;
@@ -148,7 +148,7 @@ const blueDark: EventColorScheme = {
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
 
-interface EventSchemes {
+export interface EventSchemes {
   yellow: EventColorScheme;
   blue: EventColorScheme;
 }
