@@ -10,9 +10,9 @@ function EventEl(layout: EventLayout) {
   const div = document.createElement("div");
   div.classList.add("event", layout.color);
   div.style.top = `${layout.y}px`;
-  div.style.left = `${layout.x}px`;
+  div.style.left = `${layout.x * 100}%`;
   div.style.height = `${layout.height}px`;
-  div.style.width = `${layout.width}px`;
+  div.style.width = `${layout.width * 100}%`;
   div.style.zIndex = layout.segment.toString();
   if (!layout.startsToday) {
     div.style.borderRadius = "0 0 2px 2px";
@@ -25,11 +25,12 @@ function EventEl(layout: EventLayout) {
   return div;
 }
 
-export function DayEl(layout: DayLayout, xPos: number) {
+export function DayEl(layout: DayLayout, xPos: number, dayPx: number) {
   // Setup theme
   const dayEl = document.createElement("div");
-  dayEl.style.position = "absolute"; // TODO: class based
-  dayEl.style.transform = `translate(${xPos}px)`;
+  dayEl.className = "day";
+  dayEl.style.transform = `translate(${xPos + 2}px)`; // TODO: 2 is a magic number!
+  dayEl.style.width = `${dayPx}px`;
   // Create events
   layout.map.forEach((eventLayout) => {
     const el = EventEl(eventLayout);

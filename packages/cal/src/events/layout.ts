@@ -43,7 +43,6 @@ export interface DayLayout {
 export function calcDayLayout(
   events: any[],
   utcDate: number,
-  dayPx: number,
   hourHeight: number,
 ): DayLayout {
   const clip = localZeroDate(new Date(utcDate)).valueOf();
@@ -120,10 +119,9 @@ export function calcDayLayout(
   });
   layoutMap.forEach((layout) => {
     const cluster = clusters[layout.cluster];
-    const segmentSize = (dayPx - 3) / cluster.segments;
+    const segmentSize = 1 / cluster.segments;
     const x = segmentSize * layout.segment;
-    const width =
-      cluster.segments == 1 ? dayPx : Math.min(dayPx - x, dayPx * 0.8);
+    const width = cluster.segments == 1 ? 1 : 1 - x;
     Object.assign(layout, { width, x });
   });
   return {

@@ -12,9 +12,13 @@ export function createCalStyleTag(instanceId: string) {
       height: 100%;
       box-sizing: border-box;
     }
+    #${instanceId} .day {
+      position: absolute;
+    }
     #${instanceId} .event {
       font-family: 'Alte Haas Grotesk';
       font-size: 10px;
+      box-sizing: border-box;
       position: absolute;
       color: white;
       user-select: none;

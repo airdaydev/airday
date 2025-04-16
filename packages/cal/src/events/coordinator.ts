@@ -94,6 +94,15 @@ export class EventRenderCoordinator {
   addEvent(event: UIEvent) {
     this.events.push(event);
   }
+  resize() {
+    console.log("resizing");
+    for (let entry of this.domCache.entries()) {
+      const [date, cache] = entry;
+      // 1. get new x val from date
+      // 2. get new width from date
+      // 3. update!
+    }
+  }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
   // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
   // TODO: Calculate affected tiles (?)
@@ -151,7 +160,7 @@ export class EventRenderCoordinator {
       // if no layout?
       const domData = this.domCache.get(dateVal);
       if ((!domData || !domData?.fresh) && layout && layout.data) {
-        const dayEl = DayEl(layout.data, domPx);
+        const dayEl = DayEl(layout.data, domPx, this.airdayCal.transform.dayPx);
         // dayEl.innerText = date.toString();
         this.airdayCal.scrollChild.appendChild(dayEl);
         this.domCache.set(dateVal, new CacheEntry(dayEl)); // TODO: Hold reference to day dom element
@@ -182,6 +191,7 @@ export class EventRenderCoordinator {
       }
       // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
+    this.airdayCal.act(); // TODO: A little blunt
   }
   startWorkQueue() {
     if (this.queueRunning) return;
@@ -200,6 +210,6 @@ export class EventRenderCoordinator {
     this.work.push(work);
     this.startWorkQueue();
   }
-  // For immediate updates only!
+  // For immediate recalcs of layers
   mainThreadRender() {}
 }

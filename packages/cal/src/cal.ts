@@ -216,6 +216,7 @@ export class AirdayCal {
   draw() {
     if (this.resized) {
       this.resizeCal();
+      this.coordinator.resize();
     }
     this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
     this.coordinator.tick();

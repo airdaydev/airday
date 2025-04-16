@@ -36,8 +36,7 @@ export class EventUIWorker {
       this.transform.hourPx = transform[1];
       this.transform.scale = transform[2];
       const layout =
-        message.data.layout ||
-        calcDayLayout(events, date, transform[0], transform[1]);
+        message.data.layout || calcDayLayout(events, date, transform[1]);
       self.postMessage({
         type: "next",
         date,
