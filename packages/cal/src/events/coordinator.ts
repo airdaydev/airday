@@ -36,6 +36,7 @@ export class UIWorker {
       console.error("Worker error:", error);
     });
     this.worker.addEventListener("message", (message) => this.receive(message));
+    this.coordinator.idleWorkers.add(this);
   }
   send(workload: Workload) {
     if (this.busy) {
@@ -43,10 +44,12 @@ export class UIWorker {
       return;
     }
     this.busy = true;
+    this.coordinator.idleWorkers.delete(this);
     this.worker.postMessage(workload);
   }
   receive(message: any) {
     this.busy = false;
+    this.coordinator.idleWorkers.add(this);
     this.coordinator.processMessage(message);
   }
 }
@@ -71,6 +74,9 @@ export class EventRenderCoordinator {
   airdayCal: AirdayCal;
   events: UIEvent[] = []; // Event queue
   workers: UIWorker[] = [];
+  idleWorkers: Set<UIWorker> = new Set();
+  work: Workload[] = [];
+  queueRunning = false;
   dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
@@ -92,6 +98,7 @@ export class EventRenderCoordinator {
   // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
   // TODO: Calculate affected tiles (?)
   tick(maxMs = 16) {
+    if (!this.airdayCal.db.ready) return;
     // Process events
     const start = performance.now();
     while (this.events.length > 0) {
@@ -176,14 +183,22 @@ export class EventRenderCoordinator {
       // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
   }
-  assignWork(work: Workload) {
-    for (let worker of this.workers) {
-      if (worker.busy) continue;
-      worker.send(work);
-      return true;
+  startWorkQueue() {
+    if (this.queueRunning) return;
+    this.queueRunning = true;
+    // TODO: We could stop the queue while all workers are busy
+    while (this.work.length && this.idleWorkers.size) {
+      for (let worker of this.idleWorkers) {
+        if (worker.busy) continue;
+        const work = this.work.shift();
+        if (work) worker.send(work);
+      }
     }
-    this.airdayCal.act(); // There's still work left! (TODO: This is imperfect - try to pan across with 100 days viewing)
-    return false;
+    this.queueRunning = false;
+  }
+  assignWork(work: Workload) {
+    this.work.push(work);
+    this.startWorkQueue();
   }
   // For immediate updates only!
   mainThreadRender() {}

@@ -65,6 +65,7 @@ const events = dummyEvents(start, 365 * 2, 20000);
 
 const db = new EventDB();
 db.loadEvents(events);
+db.ready = true;
 
 render(
   () => (
