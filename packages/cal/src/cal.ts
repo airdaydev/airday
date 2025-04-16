@@ -197,9 +197,7 @@ export class AirdayCal {
   };
   get scrollHeight() {
     return (
-      this.transform.hourPx * 24 +
-      this.transform.margin * 2 +
-      this.TIME_FONT_SIZE
+      this.transform.hourPx * 24 + this.transform.margin + this.TIME_FONT_SIZE
     );
   }
   act = () => (this.lastAction = performance.now());

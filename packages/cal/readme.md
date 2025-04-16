@@ -26,24 +26,24 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 - [x] Resizing calendar retains same middle via offset change
 - [x] Bug: Layout edge case - final events in each cluster can still start at x = dayWidth
 - [x] Run through rendering optimisation plan
-- [x] Remove canvas events layer
-- [] Establish DOM events layer
-
-## Canvas Interactions
 - [x] Solidify clipspace api
 - [x] Quadtree collision detection (wip)
 - [x] Try to massively optimise by rendering on main thread cluster at a time, using native cal transform to move (not worth it, draw calls too exxy - webgpu/gl the path)
 - [x] hover style for events
+- [x] Remove canvas events layer
+- [x] Establish DOM events layer
+- [] Fix DOM resize issues (translate/change width for each day)
+
+## Cal Interactions
 - [] hover style event extends to next day as needed
 - [] Click event to select / bring to front
 - [] Drag and drop calendar events
 - [] tap to highlight neat 15min interval (to create new event)
 - [] drag to highlight neat area (15min factor) (to create new event)
-- [] "Day" view highlights today, must have minimum size
-- [] Touch pan x
 - [] Click/drag to shorten/lengthen event each direction
 - [] Click/Context click consumer events
 - [] hover style optimisation - we can discard z vals above current and/or clip render
+- [] Drag to multiselect
 
 ## All-day events
 - [] Items over 24hrs long get moved into all-day event
@@ -70,11 +70,8 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 ## final optimisations / quality udpates / future plans
 - [] buffer events to the left too
 - [] event/worker tests
-- [] Tile vertically, even horizontally if needed
-- [] only re-render interaction day that changes (as opposed to spitting bmps again)
 - [] True monthly view
 - [] Multi-select events with single click
-- [] Drag to multiselect
 - [] custom scroller, snap to date or week when active scrolling stops
 - [] Cache clipspace
 - [] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
