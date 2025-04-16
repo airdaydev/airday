@@ -198,7 +198,7 @@ export class AirdayCal {
   get scrollHeight() {
     return (
       this.transform.hourPx * 24 +
-      this.transform.gridOffset[1] +
+      this.transform.margin * 2 +
       this.TIME_FONT_SIZE
     );
   }
