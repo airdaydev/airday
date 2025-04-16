@@ -18,12 +18,16 @@ export function createCalStyleTag(instanceId: string) {
       position: absolute;
       color: white;
       user-select: none;
-      border-radius: 2px;
+      border-radius: 4px;
       transition: background 0.05s;
       overflow: hidden;
+      padding: 0.25em;
     }
-    #${instanceId} .event:hover {
-      background: lightgray !important;
+    #${instanceId}.dark .event {
+      border: 1px solid #242424;
+    }
+    #${instanceId}.light .event {
+      border: 1px solid #fdfdfd;
     }
   `;
   document.head.appendChild(style);
@@ -44,7 +48,7 @@ export function createColoursStyleTag(
       eventColoursCSS.concat(`#${instanceId}.light .event.${key} {
       background: ${scheme.bg};
       color: ${scheme.text};
-    }`);
+    }  #${instanceId}.light .event.${key}:hover { background: ${scheme.fg} }`);
   }
   for (let key of Object.keys(darkScheme)) {
     let scheme = darkScheme[key as keyof EventSchemes];
@@ -52,7 +56,7 @@ export function createColoursStyleTag(
       eventColoursCSS.concat(`#${instanceId}.dark .event.${key} {
       background: ${scheme.bg};
       color: ${scheme.text};
-    }`);
+    } #${instanceId}.dark .event.${key}:hover { background: ${scheme.fg} }`);
   }
   style.textContent = eventColoursCSS;
   document.head.appendChild(style);
