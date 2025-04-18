@@ -17,7 +17,7 @@ document.body.appendChild(stats.dom);
 
 const root = document.getElementById("root");
 
-const theme = createSignal<Theme>("dark");
+const theme = createSignal<Theme>("light");
 
 function randomTitle() {
   return [

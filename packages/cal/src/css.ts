@@ -33,6 +33,12 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.light .event {
       border: 1px solid #fdfdfd;
     }
+    #${instanceId} .date-debug {
+      background: yellow;
+      opacity: 0.5;
+      position: relative;
+      z-index: 1000;
+    }
   `;
   document.head.appendChild(style);
   return style;

@@ -3,7 +3,8 @@ import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
-const defaultScrollChildWidth = 100000;
+// const defaultScrollChildWidth = 1000000; // 1mil = @ 300px per day approx 10 years (we could recalc to fit days in exactly)
+const defaultScrollChildWidth = 50000; // 1mil = @ 300px per day approx 10 years (we could recalc to fit days in exactly)
 
 // Clipspace and day/time to x/y transform concerns
 export class CalendarTransform {
@@ -17,36 +18,35 @@ export class CalendarTransform {
   // End dimensions
   offset = [0, 0]; // Scroll offset
   daysVisible = 14; // qty. days to fit into view space
-  originDate = startOfWeekUTC; // day at x = 0
+  originDate: number = 0; // day at x = 0
   scrollChildWidth = defaultScrollChildWidth;
-  scrollOffsetX = Math.floor(defaultScrollChildWidth / 2);
   // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
   dates: Date[] = []; // TODO: Should be more of a cache based on range!
   firstHour: number = 0;
   firstHourPx: number = 0;
+  clipspace: [number, number] | null = null;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
+    this.originDate = this.calcOriginDate();
+  }
+  // Origin date at x = 0 of container
+  // In a canvas implementation origin date = now, but I'm doing DOM-based instead of date-biased
+  // Target date is that which is targeted to be in approximately the center of the scrollable component
+  calcOriginDate() {
+    return (
+      startOfWeekUTC -
+      Math.floor((0.5 * this.scrollChildWidth) / this.dayPx) * 864e5
+    );
   }
   get scrollStart() {
-    return (
-      this.scrollOffsetX + this.startPx + this.offset[0] - this.gridOffset[0]
-    );
+    return this.startPx + this.offset[0] - this.gridOffset[0];
   }
   fitCalWidth(canvasWidth: number) {
     const approxDay = this.offset[0] / this.dayPx; // Get existing day
     this.dayPx = (canvasWidth - this.hourPx) / this.daysVisible;
     this.offset[0] = approxDay * this.dayPx;
-  }
-  // TODO: We should be buffering backwards properly - also this whole thing needs to be explored properly because it seems cooked
-  updateClipspace(startPx: number, relStartDay: number) {
-    this.startPx = startPx;
-    const clipStartDayAbs = new Date(
-      this.originDate.valueOf() + relStartDay * 864e5,
-    );
-    this.dates = getDateArray(clipStartDayAbs.valueOf(), this.daysVisible + 5);
-    this.range = new DayRange(this.dates[0], this.daysVisible + 5);
   }
   get hourViewBuffer() {
     // Hours visible outside view in each direction (-/+)
@@ -64,12 +64,16 @@ export class CalendarTransform {
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
-  // TODO: Tidy & cache this function
-  recalcClipspace(): void {
-    const [startDayPx, relStartDay] = this.clipspaceOriginX();
-    this.updateClipspace(startDayPx, relStartDay);
-    this.calcVisibleHours();
+
+  updateClipspace() {
+    const start = this.offset[0] - (this.offset[0] % this.dayPx); // nearest start
+    const startDayInt = start / this.dayPx - 5;
+    this.clipspace = [start, startDayInt];
+    const startDayVal = this.originDate.valueOf() + startDayInt * 864e5;
+    this.dates = getDateArray(startDayVal, this.daysVisible + 10);
+    this.range = new DayRange(this.dates[0], this.daysVisible + 10);
   }
+
   clipspaceOriginX() {
     const minXClip = this.offset[0] - this.dayPx; // 1 day buffer behind offset in screen space
     const r = minXClip % this.dayPx;
@@ -77,6 +81,7 @@ export class CalendarTransform {
     const relStartDay = Math.round((firstDayPx + this.offset[0]) / this.dayPx);
     return [firstDayPx + this.gridOffset[0], relStartDay];
   }
+
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
     const min = (date.getMinutes() * this.hourPx) / 60;
@@ -113,16 +118,11 @@ export class CalendarTransform {
   get gridOffset() {
     return [50, this.headerHeight + this.allDayRowHeight];
   }
-  dateToX(date: Date) {
+  // TODO: Expects UTC date (validate?)
+  dateToX(date: number) {
     const normalisedDate = new Date(date);
-    normalisedDate.setHours(0);
-    normalisedDate.setMinutes(0);
-    normalisedDate.setSeconds(0);
-    return (
-      ((normalisedDate.valueOf() - this.originDate.valueOf()) / 864e5) *
-        this.dayPx -
-      this.offset[0] +
-      this.gridOffset[0]
-    );
+    const delta =
+      (normalisedDate.valueOf() - this.originDate.valueOf()) / 864e5;
+    return delta * this.dayPx;
   }
 }

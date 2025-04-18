@@ -1,11 +1,5 @@
 import { DayLayout, EventLayout } from "./layout";
 
-interface RenderOptions {
-  debug?: boolean;
-  // highlightId?: string;
-  // fadeTs?: number;
-}
-
 function EventEl(layout: EventLayout) {
   const div = document.createElement("div");
   div.classList.add("event", layout.color);
@@ -25,12 +19,22 @@ function EventEl(layout: EventLayout) {
   return div;
 }
 
-export function DayEl(layout: DayLayout, xPos: number, dayPx: number) {
+export function DayEl(
+  date: number,
+  layout: DayLayout,
+  xPos: number,
+  dayPx: number,
+) {
   // Setup theme
   const dayEl = document.createElement("div");
   dayEl.className = "day";
-  dayEl.style.transform = `translate(${xPos + 2}px)`; // TODO: 2 is a magic number!
+  dayEl.setAttribute("data-date", date.toString());
+  dayEl.style.transform = `translate(${xPos}px)`; // TODO: 2 is a magic number!
   dayEl.style.width = `${dayPx}px`;
+  const debugLabel = document.createElement("div");
+  debugLabel.className = "date-debug";
+  debugLabel.innerText = new Date(date).toUTCString();
+  dayEl.appendChild(debugLabel);
   // Create events
   layout.map.forEach((eventLayout) => {
     const el = EventEl(eventLayout);
@@ -38,3 +42,5 @@ export function DayEl(layout: DayLayout, xPos: number, dayPx: number) {
   });
   return dayEl;
 }
+
+export function GridEl() {}

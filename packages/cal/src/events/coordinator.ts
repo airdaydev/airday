@@ -95,10 +95,13 @@ export class EventRenderCoordinator {
     this.events.push(event);
   }
   resize() {
-    console.log("resizing");
     for (let entry of this.domCache.entries()) {
       const [date, cache] = entry;
+      const x = this.airdayCal.transform.dateToX(date);
+      // console.log("changing", new Date(date), `translate(${x}px)`, cache.data);
       // 1. get new x val from date
+      cache.data.style.transform = `translate(${x}px)`;
+      cache.data.style.width = `${this.airdayCal.transform.dayPx}px`;
       // 2. get new width from date
       // 3. update!
     }
@@ -130,9 +133,7 @@ export class EventRenderCoordinator {
     // TODO: Start with internal regions, then buffer.
     let i = 0;
     for (let date of this.airdayCal.transform.dates) {
-      const domPx =
-        this.airdayCal.transform.scrollStart +
-        i * this.airdayCal.transform.dayPx;
+      const domPx = this.airdayCal.transform.dateToX(date.valueOf());
       i++;
       const dateVal = date.valueOf();
       const data = this.dataCache.get(dateVal);
@@ -160,7 +161,12 @@ export class EventRenderCoordinator {
       // if no layout?
       const domData = this.domCache.get(dateVal);
       if ((!domData || !domData?.fresh) && layout && layout.data) {
-        const dayEl = DayEl(layout.data, domPx, this.airdayCal.transform.dayPx);
+        const dayEl = DayEl(
+          dateVal,
+          layout.data,
+          domPx,
+          this.airdayCal.transform.dayPx,
+        );
         // dayEl.innerText = date.toString();
         this.airdayCal.scrollChild.appendChild(dayEl);
         this.domCache.set(dateVal, new CacheEntry(dayEl)); // TODO: Hold reference to day dom element

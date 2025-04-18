@@ -60,7 +60,7 @@ export class AirdayCal {
     this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    this.scrollable.scrollTo(this.transform.scrollOffsetX, 0);
+    this.scrollable.scrollTo(0, 0); // TODO: Scroll to middle
     this.ctx2D = ctx2D;
     this.resizeCal();
     this.frame();
@@ -79,8 +79,7 @@ export class AirdayCal {
       // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
-      this.transform.offset[0] =
-        this.scrollable.scrollLeft - this.transform.scrollOffsetX;
+      this.transform.offset[0] = this.scrollable.scrollLeft;
       this.act();
     });
     this.canvas.addEventListener("wheel", (event: WheelEvent) => {
@@ -96,7 +95,7 @@ export class AirdayCal {
     });
     this.resizeCal();
     this.frame();
-    this.goToDate();
+    // this.goToDate();
   }
   get colourScheme() {
     if (this.theme === "light") return lightScheme;
@@ -201,8 +200,10 @@ export class AirdayCal {
     );
   }
   act = () => (this.lastAction = performance.now());
+  // TODO: Redo
   goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
-    this.transform.originDate = date.valueOf();
+    console.log("go to date");
+    // this.transform.originDate = date.valueOf();
   };
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
@@ -216,7 +217,7 @@ export class AirdayCal {
       this.resizeCal();
       this.coordinator.resize();
     }
-    this.transform.recalcClipspace(); // TODO: This makes sense to calc during render loop - but update dependent vals prior
+    this.transform.updateClipspace();
     this.coordinator.tick();
     clearCanvas(this.canvas);
     days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
