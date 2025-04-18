@@ -8,7 +8,7 @@ import {
 } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
-import { getStartOfWeekUTC } from "./time";
+import { getStartOfWeekUTC, utcMidnight } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
@@ -60,10 +60,9 @@ export class AirdayCal {
     this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    this.scrollable.scrollTo(0, 0); // TODO: Scroll to middle
     this.ctx2D = ctx2D;
     this.resizeCal();
-    this.frame();
+    this.transform.originDate = this.transform.calcOriginDate(); // TODO: Note that this is necessary
     // TODO: Destroy
     const resizeObserver = new ResizeObserver(() => {
       this.canvasBounds = this.canvas.getBoundingClientRect();
@@ -95,7 +94,10 @@ export class AirdayCal {
     });
     this.resizeCal();
     this.frame();
-    // this.goToDate();
+    this.scrollable.scrollTo(
+      this.transform.dateToX(utcMidnight(new Date())),
+      0,
+    );
   }
   get colourScheme() {
     if (this.theme === "light") return lightScheme;
@@ -207,7 +209,9 @@ export class AirdayCal {
   };
   resizeCal = () => {
     resizeCanvas2D(this.canvas);
-    this.transform.fitCalWidth(this.canvas.offsetWidth);
+    const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
+    this.scrollable.scrollTo(nearestDayX, 0);
+    this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
   };

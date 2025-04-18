@@ -1,3 +1,4 @@
+import { AirdayCal } from "../cal";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout) {
@@ -20,19 +21,19 @@ function EventEl(layout: EventLayout) {
 }
 
 export function DayEl(
+  airday: AirdayCal,
   date: number,
   layout: DayLayout,
   xPos: number,
-  dayPx: number,
 ) {
   // Setup theme
   const dayEl = document.createElement("div");
   dayEl.className = "day";
   dayEl.setAttribute("data-date", date.toString());
-  dayEl.style.transform = `translate(${xPos}px)`; // TODO: 2 is a magic number!
-  dayEl.style.width = `${dayPx}px`;
+  dayEl.style.transform = `translate(${xPos}px)`;
+  dayEl.style.width = `${airday.transform.dayPx}px`;
   const debugLabel = document.createElement("div");
-  debugLabel.className = "date-debug";
+  debugLabel.className = "debug-date";
   debugLabel.innerText = new Date(date).toUTCString();
   dayEl.appendChild(debugLabel);
   // Create events

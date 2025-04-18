@@ -1,10 +1,7 @@
 import { AirdayCal } from "./cal";
-import { getStartOfWeekUTC, getDateArray, DayRange } from "./time";
+import { getStartOfWeekUTC, getDateArray, DayRange, utcMidnight } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
-
-// const defaultScrollChildWidth = 1000000; // 1mil = @ 300px per day approx 10 years (we could recalc to fit days in exactly)
-const defaultScrollChildWidth = 50000; // 1mil = @ 300px per day approx 10 years (we could recalc to fit days in exactly)
 
 // Clipspace and day/time to x/y transform concerns
 export class CalendarTransform {
@@ -19,7 +16,7 @@ export class CalendarTransform {
   offset = [0, 0]; // Scroll offset
   daysVisible = 14; // qty. days to fit into view space
   originDate: number = 0; // day at x = 0
-  scrollChildWidth = defaultScrollChildWidth;
+  scrollChildWidth = 0;
   // Cached items that depend on offset/dayPx
   startPx: number = 0; // startPx of currently visible date range
   range: DayRange = new DayRange(new Date(startOfWeekUTC), 10).buffer(2); // range in view
@@ -29,24 +26,14 @@ export class CalendarTransform {
   clipspace: [number, number] | null = null;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
-    this.originDate = this.calcOriginDate();
   }
-  // Origin date at x = 0 of container
-  // In a canvas implementation origin date = now, but I'm doing DOM-based instead of date-biased
-  // Target date is that which is targeted to be in approximately the center of the scrollable component
+
+  // Origin date is the date at x=0, equal to utc midnight minus the days that fit between it & 0
   calcOriginDate() {
     return (
-      startOfWeekUTC -
+      utcMidnight(new Date()) -
       Math.floor((0.5 * this.scrollChildWidth) / this.dayPx) * 864e5
     );
-  }
-  get scrollStart() {
-    return this.startPx + this.offset[0] - this.gridOffset[0];
-  }
-  fitCalWidth(canvasWidth: number) {
-    const approxDay = this.offset[0] / this.dayPx; // Get existing day
-    this.dayPx = (canvasWidth - this.hourPx) / this.daysVisible;
-    this.offset[0] = approxDay * this.dayPx;
   }
   get hourViewBuffer() {
     // Hours visible outside view in each direction (-/+)
@@ -65,21 +52,22 @@ export class CalendarTransform {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
 
+  // called on resize
+  refitCal(viewWidth: number) {
+    const nearestDay = Math.round(this.offset[0] / this.dayPx); // prior to changing this.dayPx
+    this.dayPx = viewWidth / this.daysVisible;
+    this.scrollChildWidth = this.dayPx * 365 * 10;
+    return nearestDay * this.dayPx;
+  }
+
+  // called each frame
   updateClipspace() {
     const start = this.offset[0] - (this.offset[0] % this.dayPx); // nearest start
     const startDayInt = start / this.dayPx - 5;
     this.clipspace = [start, startDayInt];
-    const startDayVal = this.originDate.valueOf() + startDayInt * 864e5;
+    const startDayVal = this.originDate + startDayInt * 864e5;
     this.dates = getDateArray(startDayVal, this.daysVisible + 10);
     this.range = new DayRange(this.dates[0], this.daysVisible + 10);
-  }
-
-  clipspaceOriginX() {
-    const minXClip = this.offset[0] - this.dayPx; // 1 day buffer behind offset in screen space
-    const r = minXClip % this.dayPx;
-    const firstDayPx = minXClip - r - this.offset[0]; // The first day position within clip space
-    const relStartDay = Math.round((firstDayPx + this.offset[0]) / this.dayPx);
-    return [firstDayPx + this.gridOffset[0], relStartDay];
   }
 
   timeToY(date: Date) {
@@ -99,11 +87,6 @@ export class CalendarTransform {
       Math.max(this.offset[1] + y, 0),
       this.maxYOffset(),
     );
-    // TODO: allow overscroll but automatically swing back
-    // this.offset[1] = this.offset[1] + y;
-    // if (y !== 0) {
-    //   this.airdayCal.scrollable.scrollTo(0, this.offset[1]);
-    // }
   }
   xStart(x: number) {
     const r = (x % this.gridOffset[0]) + this.offset[0];
@@ -121,8 +104,7 @@ export class CalendarTransform {
   // TODO: Expects UTC date (validate?)
   dateToX(date: number) {
     const normalisedDate = new Date(date);
-    const delta =
-      (normalisedDate.valueOf() - this.originDate.valueOf()) / 864e5;
+    const delta = (normalisedDate.valueOf() - this.originDate) / 864e5;
     return delta * this.dayPx;
   }
 }
