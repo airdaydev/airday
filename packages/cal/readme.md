@@ -32,8 +32,10 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 - [x] hover style for events
 - [x] Remove canvas events layer
 - [x] Establish DOM events layer
-- [] Kill canvas layer & simplify mathematics
-- [] Fix DOM resize issues (translate/change width for each day)
+- [x] Kill canvas layer & simplify mathematics
+- [x] Fix DOM resize issues (translate/change width for each day)
+- [] Correct theme colours
+- [] All-day events section
 - [] Scroll snap type
 
 ## Cal Interactions

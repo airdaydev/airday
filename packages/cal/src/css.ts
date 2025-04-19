@@ -35,7 +35,6 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .day {
       position: absolute;
-      border-right: 1px solid #e1e1e1;
       height: 100%;
     }
     #${instanceId} .event {
@@ -85,16 +84,26 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .time-gridlines {
       position: sticky;
-      background: red;
       left: 0;
       z-index: 0;
     }
     #${instanceId} .time-grid-lines {
       position: absolute;
       top: 50px;
-      background-color: rgb(119, 119, 119);
       height: 1px;
       width: 100%;
+    }
+    #${instanceId}.light .time-grid-lines {
+      background-color: #e1e1e1;
+    }
+    #${instanceId}.dark .time-grid-lines {
+      background-color: #363636;
+    }
+    #${instanceId}.light .day {
+      border-right: 1px solid #e1e1e1;
+    }
+    #${instanceId}.dark .day {
+      border-right: 1px solid #363636;
     }
   `;
   document.head.appendChild(style);

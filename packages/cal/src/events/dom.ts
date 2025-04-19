@@ -74,7 +74,6 @@ export function TimesEl(airdayCal: AirdayCal) {
       const hz = document.createElement("div");
       hz.className = "time-grid-lines";
       hz.style.top = `${pxOffset}px`;
-      hz.style.backgroundColor = airdayCal.colourScheme.labels.toString();
       gridlines.appendChild(hz);
     }
     pxOffset += airdayCal.transform.hourPx;
