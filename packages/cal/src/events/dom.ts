@@ -48,7 +48,7 @@ export function GridEl() {}
 
 export function TimesEl(airdayCal: AirdayCal) {
   const timesContainer = document.createElement("div");
-  timesContainer.className = "times-container";
+  timesContainer.className = "time-grid";
   timesContainer.style.position = "sticky";
   timesContainer.style.left = "0";
   timesContainer.style.width = `24px`;
@@ -65,7 +65,7 @@ export function TimesEl(airdayCal: AirdayCal) {
         // Hides time if obscured by current hour
       } else {
         const timeLabel = document.createElement("div");
-        timeLabel.className = "time-col";
+        timeLabel.className = "time-grid-label";
         timeLabel.textContent = `${i.toString().padStart(2, "0")}:00`;
         timeLabel.style.right = `${airdayCal.transform.margin}px`;
         timeLabel.style.top = `${pxOffset}px`;
@@ -74,14 +74,9 @@ export function TimesEl(airdayCal: AirdayCal) {
 
       // Horizontal line for the hour
       const hourLine = document.createElement("div");
-      hourLine.className = "hour-line";
-      hourLine.style.position = "absolute";
-      hourLine.style.left = "0";
-      hourLine.style.right = "0";
+      hourLine.className = "time-grid-hour";
       hourLine.style.top = `${pxOffset}px`;
-      hourLine.style.height = "1px";
       hourLine.style.backgroundColor = airdayCal.colourScheme.labels.toString();
-      hourLine.style.opacity = "0.2";
       timesContainer.appendChild(hourLine);
     }
     pxOffset += airdayCal.transform.hourPx;

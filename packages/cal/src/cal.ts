@@ -170,7 +170,7 @@ export class AirdayCal {
     scrollable.className = "scrollable";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
-    scrollChild.id = "airday_scroll_child";
+    scrollChild.className = "scroll-child";
     scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     // Canvas (sits behind)
     const { canvas, ctx2D } = createCanvasLayer();

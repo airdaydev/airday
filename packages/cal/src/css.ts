@@ -21,6 +21,9 @@ export function createCalStyleTag(instanceId: string) {
       overflow-y: scroll;
       z-index: 2;
     }
+    #${instanceId} .scroll-child {
+      position: absolute;
+    }
     #${instanceId} .day {
       position: absolute;
     }
@@ -47,10 +50,22 @@ export function createCalStyleTag(instanceId: string) {
       position: relative;
       z-index: 1000;
     }
-    #${instanceId} .time-col {
+    #${instanceId} .time-grid {
       position: sticky;
+      left: 0;
       z-index: 1000;
       font-size: 10px;
+    }
+    #${instanceId} .time-grid-label {
+      position: absolute;
+      transform: translateY(-25%);
+    }
+    #${instanceId} .time-grid-hour {
+      position: absolute;
+      left: 0;
+      height: 1px;
+      opacity: 0.2;
+      color: black;
     }
   `;
   document.head.appendChild(style);
