@@ -12,11 +12,19 @@ export function createCalStyleTag(instanceId: string) {
       height: 100%;
       box-sizing: border-box;
     }
+    #${instanceId} .scrollable {
+      position: absolute;
+      top: 6em;
+      left: 3em;
+      width: calc(100% - 3em);
+      height: calc(100% - 6em);
+      overflow-y: scroll;
+      z-index: 2;
+    }
     #${instanceId} .day {
       position: absolute;
     }
     #${instanceId} .event {
-      font-family: 'Alte Haas Grotesk';
       font-size: 10px;
       box-sizing: border-box;
       position: absolute;
@@ -38,6 +46,11 @@ export function createCalStyleTag(instanceId: string) {
       opacity: 0.5;
       position: relative;
       z-index: 1000;
+    }
+    #${instanceId} .time-col {
+      position: sticky;
+      z-index: 1000;
+      font-size: 10px;
     }
   `;
   document.head.appendChild(style);

@@ -39,6 +39,7 @@ export class CalendarTransform {
     // Hours visible outside view in each direction (-/+)
     return this.hourPx * 2;
   }
+  // TODO: Remove
   calcVisibleHours() {
     const minYClip = this.offset[1] - this.hourViewBuffer;
     const r = minYClip % this.hourPx;
@@ -48,6 +49,7 @@ export class CalendarTransform {
     this.firstHourPx = firstHourPx - this.hourViewBuffer;
     return [firstHour, firstHourPx - this.hourViewBuffer];
   }
+  // TODO: Remove
   hoursVisible(viewportHeight: number) {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }

@@ -8,13 +8,14 @@ import {
 } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
-import { getStartOfWeekUTC, utcMidnight } from "./time";
+import { getStartOfWeekUTC, utcMidnight, utcZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine } from "./elements/label";
 import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 // import { interactions } from "./elements/interactions";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
+import { TimesEl } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -95,7 +96,7 @@ export class AirdayCal {
     this.resizeCal();
     this.frame();
     this.scrollable.scrollTo(
-      this.transform.dateToX(utcMidnight(new Date())),
+      this.transform.dateToX(utcZeroDate(new Date()).valueOf()),
       0,
     );
   }
@@ -166,14 +167,7 @@ export class AirdayCal {
     // Scrollable area
     container.id = this.id;
     const scrollable = document.createElement("div");
-    scrollable.id = "airday_scrollable";
-    scrollable.style.position = "absolute";
-    scrollable.style.top = "6em";
-    scrollable.style.left = "3em";
-    scrollable.style.width = "calc(100% - 3em)";
-    scrollable.style.height = "calc(100% - 6em)";
-    scrollable.style.overflowY = "scroll";
-    scrollable.style.zIndex = "2";
+    scrollable.className = "scrollable";
     // Scrolling content (empty)
     const scrollChild = document.createElement("div");
     scrollChild.id = "airday_scroll_child";
@@ -184,6 +178,7 @@ export class AirdayCal {
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
     container.appendChild(canvas);
+    scrollable.appendChild(TimesEl(this));
     return {
       scrollable,
       scrollChild,

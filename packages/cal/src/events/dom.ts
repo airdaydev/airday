@@ -45,3 +45,47 @@ export function DayEl(
 }
 
 export function GridEl() {}
+
+export function TimesEl(airdayCal: AirdayCal) {
+  const timesContainer = document.createElement("div");
+  timesContainer.className = "times-container";
+  timesContainer.style.position = "sticky";
+  timesContainer.style.left = "0";
+  timesContainer.style.width = `24px`;
+  timesContainer.style.height = `100%`;
+  timesContainer.style.overflow = "hidden";
+
+  let pxOffset = 0;
+  const now = new Date();
+  const y = airdayCal.transform.timeToY(now);
+
+  for (let i = 0; i <= 24; i++) {
+    if (i >= 1 && i <= 24) {
+      if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
+        // Hides time if obscured by current hour
+      } else {
+        const timeLabel = document.createElement("div");
+        timeLabel.className = "time-col";
+        timeLabel.textContent = `${i.toString().padStart(2, "0")}:00`;
+        timeLabel.style.right = `${airdayCal.transform.margin}px`;
+        timeLabel.style.top = `${pxOffset}px`;
+        timesContainer.appendChild(timeLabel);
+      }
+
+      // Horizontal line for the hour
+      const hourLine = document.createElement("div");
+      hourLine.className = "hour-line";
+      hourLine.style.position = "absolute";
+      hourLine.style.left = "0";
+      hourLine.style.right = "0";
+      hourLine.style.top = `${pxOffset}px`;
+      hourLine.style.height = "1px";
+      hourLine.style.backgroundColor = airdayCal.colourScheme.labels.toString();
+      hourLine.style.opacity = "0.2";
+      timesContainer.appendChild(hourLine);
+    }
+    pxOffset += airdayCal.transform.hourPx;
+  }
+
+  return timesContainer;
+}
