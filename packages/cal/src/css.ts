@@ -15,8 +15,8 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .scrollable {
       position: absolute;
       top: 6em;
-      left: 3em;
-      width: calc(100% - 3em);
+      left: 0;
+      width: 100%;
       height: calc(100% - 6em);
       overflow-y: scroll;
       z-index: 2;
@@ -26,6 +26,8 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .day {
       position: absolute;
+      border-right: 1px solid #e1e1e1;
+      height: 100%;
     }
     #${instanceId} .event {
       font-size: 10px;
@@ -45,16 +47,20 @@ export function createCalStyleTag(instanceId: string) {
       border: 1px solid #fdfdfd;
     }
     #${instanceId} .debug-date {
+      position: sticky;
+      top: 0;
       background: yellow;
       opacity: 0.5;
-      position: relative;
       z-index: 1000;
     }
-    #${instanceId} .time-grid {
+    #${instanceId} .time-grid-labels {
       position: sticky;
       left: 0;
+      width: 36px;
       z-index: 1000;
       font-size: 10px;
+      height: 1221px; /* TODO: make dynamic */
+      background: white;
     }
     #${instanceId} .time-grid-label {
       position: absolute;
@@ -66,6 +72,20 @@ export function createCalStyleTag(instanceId: string) {
       height: 1px;
       opacity: 0.2;
       color: black;
+      background: white;
+    }
+    #${instanceId} .time-gridlines {
+      position: sticky;
+      background: red;
+      left: 0;
+      z-index: 0;
+    }
+    #${instanceId} .time-grid-lines {
+      position: absolute;
+      top: 50px;
+      background-color: rgb(119, 119, 119);
+      height: 1px;
+      width: 100%;
     }
   `;
   document.head.appendChild(style);

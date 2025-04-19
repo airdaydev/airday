@@ -47,13 +47,11 @@ export function DayEl(
 export function GridEl() {}
 
 export function TimesEl(airdayCal: AirdayCal) {
-  const timesContainer = document.createElement("div");
-  timesContainer.className = "time-grid";
-  timesContainer.style.position = "sticky";
-  timesContainer.style.left = "0";
-  timesContainer.style.width = `24px`;
-  timesContainer.style.height = `100%`;
-  timesContainer.style.overflow = "hidden";
+  const gridlines = document.createElement("div");
+  gridlines.className = "time-gridlines";
+
+  const labels = document.createElement("div");
+  labels.className = "time-grid-labels";
 
   let pxOffset = 0;
   const now = new Date();
@@ -64,23 +62,26 @@ export function TimesEl(airdayCal: AirdayCal) {
       if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
         // Hides time if obscured by current hour
       } else {
-        const timeLabel = document.createElement("div");
-        timeLabel.className = "time-grid-label";
-        timeLabel.textContent = `${i.toString().padStart(2, "0")}:00`;
-        timeLabel.style.right = `${airdayCal.transform.margin}px`;
-        timeLabel.style.top = `${pxOffset}px`;
-        timesContainer.appendChild(timeLabel);
+        const label = document.createElement("div");
+        label.className = "time-grid-label";
+        label.textContent = `${i.toString().padStart(2, "0")}:00`;
+        label.style.right = `${airdayCal.transform.margin}px`;
+        label.style.top = `${pxOffset}px`;
+        labels.appendChild(label);
       }
 
       // Horizontal line for the hour
-      const hourLine = document.createElement("div");
-      hourLine.className = "time-grid-hour";
-      hourLine.style.top = `${pxOffset}px`;
-      hourLine.style.backgroundColor = airdayCal.colourScheme.labels.toString();
-      timesContainer.appendChild(hourLine);
+      const hz = document.createElement("div");
+      hz.className = "time-grid-lines";
+      hz.style.top = `${pxOffset}px`;
+      hz.style.backgroundColor = airdayCal.colourScheme.labels.toString();
+      gridlines.appendChild(hz);
     }
     pxOffset += airdayCal.transform.hourPx;
   }
 
-  return timesContainer;
+  return {
+    labels,
+    gridlines,
+  };
 }

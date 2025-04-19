@@ -8,10 +8,9 @@ import {
 } from "./colours";
 import { EventDB } from "./state";
 import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
-import { getStartOfWeekUTC, utcMidnight, utcZeroDate } from "./time";
+import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { allDayLabel, hzLine } from "./elements/label";
-import { days, times } from "./elements/grid";
 import { EventRenderCoordinator } from "./events/coordinator";
 // import { interactions } from "./elements/interactions";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
@@ -178,7 +177,9 @@ export class AirdayCal {
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
     container.appendChild(canvas);
-    scrollable.appendChild(TimesEl(this));
+    const { gridlines, labels } = TimesEl(this);
+    scrollable.appendChild(gridlines);
+    scrollable.appendChild(labels);
     return {
       scrollable,
       scrollChild,
@@ -218,16 +219,6 @@ export class AirdayCal {
     }
     this.transform.updateClipspace();
     this.coordinator.tick();
-    clearCanvas(this.canvas);
-    days(this, this.transform.dates, this.transform.startPx); // TODO: for labels, only updates if x val changes, however for grid lines maybe always
-    times(this, this.transform.firstHour, this.transform.firstHourPx); // TODO: This only needs to update if y val changes, however for grid lines - always
-    // Start Header (no need for update unless x val changes)
-    allDayLabel(this); // only moves if day area is expanded
-    hzLine(this, this.transform.headerHeight); // only moves if day area is expanded
-    hzLine(this, this.transform.gridOffset[1]); // only moves if day area is expanded
-    // End Header
-    // interactions(this);
-    // timeNow(this); // this sits over everything - but only needs to update once per minute when idle!
   }
   frame() {
     requestAnimationFrame(() => {
