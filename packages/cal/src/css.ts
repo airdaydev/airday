@@ -12,6 +12,13 @@ export function createCalStyleTag(instanceId: string) {
       height: 100%;
       box-sizing: border-box;
     }
+    #${instanceId} .events-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
     #${instanceId} .scrollable {
       position: absolute;
       top: 6em;
@@ -23,6 +30,8 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .scroll-child {
       position: absolute;
+      top: 0;
+      left: 0;
     }
     #${instanceId} .day {
       position: absolute;

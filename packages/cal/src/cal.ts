@@ -24,6 +24,7 @@ export class AirdayCal {
   container: HTMLDivElement;
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
+  eventsContainer: HTMLDivElement;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -36,7 +37,6 @@ export class AirdayCal {
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
-  scrollBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
   stats?: Stats;
   // Interactions
@@ -50,15 +50,15 @@ export class AirdayCal {
     createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
     this.transform = new CalendarTransform(this);
     this.db = db;
-    const { scrollable, scrollChild } = this.mount(container);
+    const { scrollable, scrollChild, eventsContainer } = this.mount(container);
     this.scrollable = scrollable;
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
+    this.eventsContainer = eventsContainer;
     this.resizeCal();
     this.transform.originDate = this.transform.calcOriginDate(); // TODO: Note that this is necessary
     // TODO: Destroy
     const resizeObserver = new ResizeObserver(() => {
-      this.scrollBounds = this.scrollable.getBoundingClientRect();
       this.resized = true;
       this.act();
     });
@@ -124,15 +124,20 @@ export class AirdayCal {
     const scrollChild = document.createElement("div");
     scrollChild.className = "scroll-child";
     scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
+    // Events container
+    const eventsContainer = document.createElement("div");
+    eventsContainer.className = "events-container";
     // Attach everything
-    scrollable.append(scrollChild);
     const { gridlines, labels } = TimesEl(this);
-    container.appendChild(scrollable);
     scrollable.appendChild(gridlines);
+    scrollable.append(scrollChild);
+    container.appendChild(scrollable);
+    scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);
     return {
       scrollable,
       scrollChild,
+      eventsContainer,
     };
   };
   changeTheme = (theme: Theme) => {

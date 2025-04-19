@@ -161,7 +161,7 @@ export class EventRenderCoordinator {
       if ((!domData || !domData?.fresh) && layout && layout.data) {
         const dayEl = DayEl(this.airdayCal, dateVal, layout.data, domPx);
         // dayEl.innerText = date.toString();
-        this.airdayCal.scrollChild.appendChild(dayEl);
+        this.airdayCal.eventsContainer.appendChild(dayEl);
         this.domCache.set(dateVal, new CacheEntry(dayEl)); // TODO: Hold reference to day dom element
       }
     }
