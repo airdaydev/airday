@@ -7,10 +7,8 @@ import {
   darkEventSchemes,
 } from "./colours";
 import { EventDB } from "./state";
-import { resizeCanvas2D, clearCanvas, createCanvasLayer } from "./canvas";
 import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
-import { allDayLabel, hzLine } from "./elements/label";
 import { EventRenderCoordinator } from "./events/coordinator";
 // import { interactions } from "./elements/interactions";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
@@ -26,8 +24,6 @@ export class AirdayCal {
   container: HTMLDivElement;
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
-  canvas: HTMLCanvasElement;
-  ctx2D: CanvasRenderingContext2D;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -40,7 +36,7 @@ export class AirdayCal {
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
-  canvasBounds: DOMRect;
+  scrollBounds: DOMRect;
   uiObjects = new CalUIObjects(this);
   stats?: Stats;
   // Interactions
@@ -54,22 +50,19 @@ export class AirdayCal {
     createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
     this.transform = new CalendarTransform(this);
     this.db = db;
-    const { scrollable, scrollChild, canvas, ctx2D } = this.mount(container);
+    const { scrollable, scrollChild } = this.mount(container);
     this.scrollable = scrollable;
-    this.canvas = canvas;
-    this.canvasBounds = this.canvas.getBoundingClientRect();
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    this.ctx2D = ctx2D;
     this.resizeCal();
     this.transform.originDate = this.transform.calcOriginDate(); // TODO: Note that this is necessary
     // TODO: Destroy
     const resizeObserver = new ResizeObserver(() => {
-      this.canvasBounds = this.canvas.getBoundingClientRect();
+      this.scrollBounds = this.scrollable.getBoundingClientRect();
       this.resized = true;
       this.act();
     });
-    resizeObserver.observe(canvas);
+    resizeObserver.observe(scrollable);
     scrollable.addEventListener("scroll", (event) => {
       // delta between each scroll event / time = velocity
       // current spot = limit of movement
@@ -79,11 +72,6 @@ export class AirdayCal {
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
       this.transform.offset[0] = this.scrollable.scrollLeft;
-      this.act();
-    });
-    this.canvas.addEventListener("wheel", (event: WheelEvent) => {
-      this.transform.addDelta(event.deltaX, event.deltaY);
-      this.mouseMove(event);
       this.act();
     });
     scrollable.addEventListener("mousemove", (event: MouseEvent) => {
@@ -103,42 +91,7 @@ export class AirdayCal {
     if (this.theme === "light") return lightScheme;
     else return darkScheme;
   }
-  // TODO: Reevaluate and annotate
-  getMousePos(event: MouseEvent) {
-    // Time
-    const y = event.y - this.canvasBounds.top - 1; // TODO: not entirely sure why this is 1px off (as tested on MacOS+Linux/FF)
-    const timeY = this.transform.yToTime(y);
-    // Day
-    const x = event.x - this.canvasBounds.left;
-    const day = this.transform.xToDay(x);
-    const relDay = Math.floor(
-      (event.x - this.transform.startPx) / this.transform.dayPx,
-    );
-    const absDay = this.transform.dates[relDay];
-    const xDay = (event.x - this.transform.startPx) % this.transform.dayPx;
-    if (!absDay) {
-      return console.warn(
-        "TODO: no absDay available, dev stink to be resolved",
-      );
-    }
-    this.hover = [day, timeY];
-    return {
-      day,
-      xDay,
-      absDay,
-      y,
-      yOffset: y - this.transform.gridOffset[1] + this.transform.offset[1],
-      timeY,
-    };
-  }
   mouseMove(event: MouseEvent) {
-    const pos = this.getMousePos(event);
-    if (!pos) return;
-    this.hover = [pos.day, pos.timeY];
-    this.uiObjects.testCollision(pos.absDay.valueOf(), [
-      pos.xDay,
-      pos.y - this.transform.gridOffset[1] + this.transform.offset[1],
-    ]);
     this.act();
   }
   mouseDown(event: MouseEvent) {
@@ -171,20 +124,15 @@ export class AirdayCal {
     const scrollChild = document.createElement("div");
     scrollChild.className = "scroll-child";
     scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
-    // Canvas (sits behind)
-    const { canvas, ctx2D } = createCanvasLayer();
     // Attach everything
     scrollable.append(scrollChild);
-    container.appendChild(scrollable);
-    container.appendChild(canvas);
     const { gridlines, labels } = TimesEl(this);
+    container.appendChild(scrollable);
     scrollable.appendChild(gridlines);
     scrollable.appendChild(labels);
     return {
       scrollable,
       scrollChild,
-      canvas,
-      ctx2D,
     };
   };
   changeTheme = (theme: Theme) => {
@@ -204,7 +152,6 @@ export class AirdayCal {
     // this.transform.originDate = date.valueOf();
   };
   resizeCal = () => {
-    resizeCanvas2D(this.canvas);
     const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
     this.scrollable.scrollTo(nearestDayX, 0);
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;

@@ -1,6 +1,5 @@
 import { Rectangle } from "@timohausmann/quadtree-ts";
 import { AirdayCal } from "../cal";
-import { scale } from "../canvas";
 import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
@@ -152,7 +151,6 @@ export class EventRenderCoordinator {
           transform: [
             this.airdayCal.transform.dayPx,
             this.airdayCal.transform.hourPx,
-            scale(),
           ],
         });
         return;
