@@ -14,6 +14,7 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       height: 100%;
       box-sizing: border-box;
+      font-size: 12px;
     }
     #${instanceId} .events-container {
       position: absolute;
@@ -60,7 +61,9 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .date-label {
       position: sticky;
       top: 0;
-      z-index: 1000;
+      z-index: 100;
+      padding: 0.5em 0;
+      text-align: center;
     }
     #${instanceId} .debug-date {
       display: none;
@@ -68,7 +71,7 @@ export function createCalStyleTag(instanceId: string) {
       top: 0;
       background: yellow;
       opacity: 0.5;
-      z-index: 1000;
+      z-index: 100;
     }
     #${instanceId} .time-label-col {
       position: sticky;

@@ -13,11 +13,13 @@ function EventEl(layout: EventLayout) {
   if (!layout.startsToday) {
     div.style.borderRadius = "0 0 2px 2px";
   }
-  const title = document.createElement("div");
-  title.innerText = layout.displayText;
-  const time = document.createElement("div");
-  time.innerText = layout.displayTime;
-  div.append(title, time);
+  if (layout.startsToday) {
+    const title = document.createElement("div");
+    title.innerText = layout.displayText;
+    const time = document.createElement("div");
+    time.innerText = layout.displayTime;
+    div.append(title, time);
+  }
   return div;
 }
 
@@ -33,6 +35,10 @@ export function DayEl(
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
+  // Event container
+  const dayEvents = document.createElement("div");
+  dayEvents.className = "day-events";
+  dayEl.appendChild(dayEvents);
   // Date label
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
@@ -47,7 +53,7 @@ export function DayEl(
   // Create events
   layout.map.forEach((eventLayout) => {
     const el = EventEl(eventLayout);
-    dayEl.appendChild(el);
+    dayEvents.appendChild(el);
   });
   return dayEl;
 }

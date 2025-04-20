@@ -5,6 +5,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  font-family: Alte haas grotesk;
+}
+
 #root {
   display: flex;
   flex-direction: column;
