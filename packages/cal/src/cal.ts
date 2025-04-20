@@ -12,7 +12,7 @@ import { CalUIObjects } from "./ui-objects";
 import { EventRenderCoordinator } from "./events/coordinator";
 // import { interactions } from "./elements/interactions";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
-import { TimesEl } from "./events/dom";
+import { AllDayLabelEl, TimesEl } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -135,6 +135,8 @@ export class AirdayCal {
     eventsContainer.className = "events-container";
     // Attach everything
     const { gridlines, labels } = TimesEl(this);
+    const allDayLabel = AllDayLabelEl();
+    scrollable.appendChild(allDayLabel);
     scrollable.appendChild(gridlines);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);

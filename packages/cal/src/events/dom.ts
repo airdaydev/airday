@@ -58,7 +58,12 @@ export function DayEl(
   return dayEl;
 }
 
-export function GridEl() {}
+export function AllDayLabelEl() {
+  const label = document.createElement("div");
+  label.className = "all-day-label";
+  label.innerText = "All Day";
+  return label;
+}
 
 export function TimesEl(airdayCal: AirdayCal) {
   const gridlines = document.createElement("div");

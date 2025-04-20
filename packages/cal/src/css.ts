@@ -73,6 +73,8 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 100;
       padding: 0.5em 0;
       text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
     }
     #${instanceId} .debug-date {
       display: none;
@@ -89,6 +91,11 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 1000;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
+      text-align: center;
+      box-sizing: content-box;
+      padding: 0 4px;
+      user-select: none;
+      -webkit-user-select: none;
     }
     #${instanceId} .time-grid-label {
       position: absolute;
@@ -111,6 +118,9 @@ export function createCalStyleTag(instanceId: string) {
       top: 50px;
       height: 1px;
       width: 100%;
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
     }
     #${instanceId}.light .time-grid-lines {
       background-color: #e1e1e1;
@@ -140,6 +150,14 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId}.dark .date-label {
       background: var(--black);
+    }
+    #${instanceId} .all-day-label {
+      top: 0;
+      left: 0;
+      position: sticky;
+      background: white;
+      z-index: 10000;
+      width: fit-content;
     }
   `;
   document.head.appendChild(style);
