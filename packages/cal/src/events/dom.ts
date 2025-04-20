@@ -35,10 +35,6 @@ export function DayEl(
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
-  // Event container
-  const dayEvents = document.createElement("div");
-  dayEvents.className = "day-events";
-  dayEl.appendChild(dayEvents);
   // Date label
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
@@ -50,6 +46,10 @@ export function DayEl(
   debugLabel.className = "debug-date";
   debugLabel.innerText = new Date(date).toUTCString();
   dayEl.appendChild(debugLabel);
+  // Event container
+  const dayEvents = document.createElement("div");
+  dayEvents.className = "day-events";
+  dayEl.appendChild(dayEvents);
   // Create events
   layout.map.forEach((eventLayout) => {
     const el = EventEl(eventLayout);

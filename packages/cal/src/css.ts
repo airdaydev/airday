@@ -118,10 +118,14 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.dark .time-grid-lines {
       background-color: #363636;
     }
-    #${instanceId}.light .day {
+    #${instanceId} .day-events {
+      width: 100%;
+      height: 100%;
+    }
+    #${instanceId}.light .day-events {
       border-right: 1px solid #e1e1e1;
     }
-    #${instanceId}.dark .day {
+    #${instanceId}.dark .day-events {
       border-right: 1px solid #363636;
     }
     #${instanceId}.light .time-label-col {

@@ -152,9 +152,7 @@ export class AirdayCal {
     this.act();
   };
   get scrollHeight() {
-    return (
-      this.transform.hourPx * 24 + this.transform.margin + this.TIME_FONT_SIZE
-    );
+    return this.transform.hourPx * 24;
   }
   act = () => (this.lastAction = performance.now());
   // TODO: Redo
