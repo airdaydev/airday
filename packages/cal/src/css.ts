@@ -68,13 +68,16 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .date-label {
       position: sticky;
+      display: flex;
       top: -0.5px; /* covers top of scroll container as items that scroll up show in a gap - maybe related to sticky positioning */
       width: calc(100% + 1px); /* similar to top val, ensuring no gap on either side */
       z-index: 10;
-      padding: 0.5em 0;
       text-align: center;
       user-select: none;
       -webkit-user-select: none;
+      height: 24px;
+      align-items: center;
+      justify-content: center;
     }
     #${instanceId} .debug-date {
       display: none;
@@ -87,13 +90,12 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .time-label-col {
       position: sticky;
       left: 0;
-      width: 36px;
+      width: 50px;
       z-index: 10;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
       text-align: center;
       box-sizing: content-box;
-      padding: 0 4px;
       user-select: none;
       -webkit-user-select: none;
     }
@@ -158,9 +160,8 @@ export function createCalStyleTag(instanceId: string) {
       background: white;
       z-index: 20;
       height: 54px;
+      width: 50px;
       font-size: 10px;
-      padding: 0 4px;
-      width: 36px;
       white-space: nowrap;
     }
     #${instanceId} .event-title {
@@ -168,6 +169,20 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .event-time {
       font-family: monospace;
+    }
+    #${instanceId} .tz-button {
+      width: 100%;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #${instanceId} .all-day-label {
+      width: 100%;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
   `;

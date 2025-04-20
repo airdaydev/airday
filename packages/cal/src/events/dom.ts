@@ -63,10 +63,12 @@ export function AnchorEl() {
   const anchor = document.createElement("div");
   anchor.className = "top-left-anchor";
   const tz = document.createElement("div");
+  tz.className = "tz-button";
   tz.innerText = "AEST";
   anchor.appendChild(tz);
   const allDay = document.createElement("div");
   allDay.innerText = "All Day";
+  allDay.className = "all-day-label";
   anchor.appendChild(allDay);
   return anchor;
 }
