@@ -172,7 +172,10 @@ export class EventRenderCoordinator {
       const domData = this.domCache.get(dateVal);
       const rendered = this.renderedCache.get(dateVal);
       if ((!rendered || !rendered.data) && domData && layout && layout.data) {
-        appendDayLayout(domData.data, layout.data);
+        appendDayLayout(
+          domData.data.getElementsByClassName("day-events")[0], // TODO: eh enumeration/text match look up...
+          layout.data,
+        );
         this.renderedCache.set(dateVal, new CacheEntry(true));
       }
     }

@@ -14,6 +14,10 @@ import { Theme } from "../src/colours";
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
+stats.dom.style.top = "";
+stats.dom.style.left = "";
+stats.dom.style.right = "0.5em";
+stats.dom.style.bottom = "0.5em";
 
 const root = document.getElementById("root");
 

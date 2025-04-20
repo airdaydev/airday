@@ -136,7 +136,7 @@ export class AirdayCal {
     // Attach everything
     const { gridlines, labels } = TimesEl(this);
     const allDayLabel = AllDayLabelEl();
-    scrollable.appendChild(allDayLabel);
+    container.appendChild(allDayLabel);
     scrollable.appendChild(gridlines);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);

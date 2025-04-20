@@ -35,8 +35,11 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 - [x] Kill canvas layer & simplify mathematics
 - [x] Fix DOM resize issues (translate/change width for each day)
 - [x] Correct theme colours
-- [] Render empty days immediately, then events
+- [x] Render empty days immediately, then events
 - [] All-day events section
+- [] Items over 24hrs long get moved into all-day event
+- [] Change number of days to render via tweakpane
+- [] Expand all day events
 - [] Scroll snap type
 
 ## Cal Interactions
@@ -51,8 +54,6 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 - [] Drag to multiselect
 
 ## All-day events
-- [] Items over 24hrs long get moved into all-day event
-- [] And regular all-day events
 - [] Tap to highlight day area (?)
 - [] Hover over date to see full date
 - [] Jump to date/today button
@@ -69,8 +70,6 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 ## Repeating events
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
-- [] Add all day events
-- [] Expand all day events
 
 ## final optimisations / quality udpates / future plans
 - [] buffer events to the left too
