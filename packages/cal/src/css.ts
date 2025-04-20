@@ -92,7 +92,7 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .time-grid-label {
       position: absolute;
-      transform: translateY(-25%);
+      transform: translateY(-50%);
     }
     #${instanceId} .time-grid-hour {
       position: absolute;
