@@ -164,6 +164,12 @@ export function createCalStyleTag(instanceId: string) {
       font-size: 10px;
       white-space: nowrap;
     }
+    #${instanceId}.light .top-left-anchor {
+      background: var(--white);
+    }
+    #${instanceId}.dark .top-left-anchor {
+      background: var(--black);
+    }
     #${instanceId} .event-title {
       font-weight: 500;
     }
