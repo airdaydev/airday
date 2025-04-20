@@ -18,6 +18,7 @@ function EventEl(layout: EventLayout) {
     title.className = "event-title";
     title.innerText = layout.displayText;
     const time = document.createElement("div");
+    time.className = "event-time";
     time.innerText = layout.displayTime;
     div.append(title, time);
   }

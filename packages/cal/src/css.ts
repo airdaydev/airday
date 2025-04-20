@@ -52,7 +52,6 @@ export function createCalStyleTag(instanceId: string) {
       height: 100%;
     }
     #${instanceId} .event {
-      font-size: 10px;
       box-sizing: border-box;
       position: absolute;
       user-select: none;
@@ -159,12 +158,16 @@ export function createCalStyleTag(instanceId: string) {
       background: white;
       z-index: 20;
       height: 54px;
-      width: fit-content;
       font-size: 10px;
-      padding: 0 0.5em;
+      padding: 0 4px;
+      width: 36px;
+      white-space: nowrap;
     }
     #${instanceId} .event-title {
       font-weight: 500;
+    }
+    #${instanceId} .event-time {
+      font-family: monospace;
     }
 
   `;
