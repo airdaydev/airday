@@ -1,5 +1,5 @@
 import { AirdayCal } from "../cal";
-import { getDateUTC } from "../time";
+import { getDateUTC, isWeekend } from "../time";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout) {
@@ -43,22 +43,25 @@ export function GridLines(airdayCal: AirdayCal) {
 }
 
 export function DayEl(airday: AirdayCal, date: number, xPos: number) {
+  const jsDate = new Date(date);
+  const weekend = isWeekend(jsDate);
   // Setup theme
   const dayEl = document.createElement("div");
   dayEl.className = "day";
+  if (weekend) dayEl.classList.add("weekend");
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
   // Date label
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
-  const text = getDateUTC(new Date(date));
+  const text = getDateUTC(jsDate);
   dateLabel.innerText = text;
   dayEl.appendChild(dateLabel);
   // Debug label
   const debugLabel = document.createElement("div");
   debugLabel.className = "debug-date";
-  debugLabel.innerText = new Date(date).toUTCString();
+  debugLabel.innerText = jsDate.toUTCString();
   dayEl.appendChild(debugLabel);
   // Event container
   const dayEventsEl = document.createElement("div");
