@@ -58,7 +58,7 @@ export function appendDayLayout(container: HTMLElement, layout: DayLayout) {
   container.append(...events);
 }
 
-export function AllDayLabelEl() {
+export function AnchorEl() {
   const anchor = document.createElement("div");
   anchor.className = "top-left-anchor";
   const tz = document.createElement("div");

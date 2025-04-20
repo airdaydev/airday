@@ -89,7 +89,6 @@ export function createCalStyleTag(instanceId: string) {
       left: 0;
       width: 36px;
       z-index: 10;
-      margin-top: ${ALL_DAY_MARGIN}px;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
       text-align: center;
@@ -113,11 +112,9 @@ export function createCalStyleTag(instanceId: string) {
       position: sticky;
       left: 0;
       z-index: 0;
-      margin-top: 55px;
     }
     #${instanceId} .time-grid-lines {
       position: absolute;
-      top: 50px;
       height: 1px;
       width: 100%;
       user-select: none;
@@ -155,10 +152,12 @@ export function createCalStyleTag(instanceId: string) {
       background: var(--black);
     }
     #${instanceId} .top-left-anchor {
+      top: 0;
       left: 0;
-      position: absolute;
+      position: sticky;
       background: white;
-      z-index: 10;
+      z-index: 20;
+      height: 54px;
       width: fit-content;
       font-size: 10px;
       padding: 0 0.5em;

@@ -79,6 +79,7 @@ render(
         background: theme[0]() === "dark" ? "rgba(20, 20, 21, 1)" : "white",
       }}
     >
+      <h1>@airday/cal</h1>
       <CalSolidWrapper theme={theme[0]} db={db} stats={stats} />
     </div>
   ),
