@@ -10,7 +10,6 @@ import { EventDB } from "./state";
 import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { CalUIObjects } from "./ui-objects";
 import { EventRenderCoordinator } from "./events/coordinator";
-// import { interactions } from "./elements/interactions";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
 import { AnchorEl, TimesEl } from "./events/dom";
 
@@ -134,10 +133,9 @@ export class AirdayCal {
     const eventsContainer = document.createElement("div");
     eventsContainer.className = "events-container";
     // Attach everything
-    const { gridlines, labels } = TimesEl(this);
+    const labels = TimesEl(this);
     const anchor = AnchorEl();
     scrollable.appendChild(anchor);
-    scrollable.appendChild(gridlines);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
     scrollChild.appendChild(eventsContainer);

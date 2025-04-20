@@ -25,6 +25,23 @@ function EventEl(layout: EventLayout) {
   return div;
 }
 
+export function GridLines(airdayCal: AirdayCal) {
+  const gridlines = document.createElement("div");
+  gridlines.className = "time-gridlines";
+  let pxOffset = 0;
+  for (let i = 0; i <= 24; i++) {
+    if (i >= 1 && i <= 24) {
+      // Horizontal line for the hour
+      const hz = document.createElement("div");
+      hz.className = "time-grid-lines";
+      hz.style.top = `${pxOffset}px`;
+      gridlines.appendChild(hz);
+    }
+    pxOffset += airdayCal.transform.hourPx;
+  }
+  return gridlines;
+}
+
 export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   // Setup theme
   const dayEl = document.createElement("div");
@@ -47,6 +64,9 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   const dayEventsEl = document.createElement("div");
   dayEventsEl.className = "day-events";
   dayEl.appendChild(dayEventsEl);
+  // GridLines
+  const gridLines = GridLines(airday);
+  dayEl.appendChild(gridLines);
   return dayEl;
 }
 
@@ -74,9 +94,6 @@ export function AnchorEl() {
 }
 
 export function TimesEl(airdayCal: AirdayCal) {
-  const gridlines = document.createElement("div");
-  gridlines.className = "time-gridlines";
-
   const labels = document.createElement("div");
   labels.className = "time-label-col";
 
@@ -96,18 +113,8 @@ export function TimesEl(airdayCal: AirdayCal) {
         label.style.top = `${pxOffset}px`;
         labels.appendChild(label);
       }
-
-      // Horizontal line for the hour
-      const hz = document.createElement("div");
-      hz.className = "time-grid-lines";
-      hz.style.top = `${pxOffset}px`;
-      gridlines.appendChild(hz);
     }
     pxOffset += airdayCal.transform.hourPx;
   }
-
-  return {
-    labels,
-    gridlines,
-  };
+  return labels;
 }

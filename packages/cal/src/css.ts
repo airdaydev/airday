@@ -1,6 +1,6 @@
 import { EventSchemes } from "./colours";
 
-const ALL_DAY_MARGIN = 28;
+const ALL_DAY_MARGIN = 50;
 
 export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
@@ -111,9 +111,12 @@ export function createCalStyleTag(instanceId: string) {
       background: white;
     }
     #${instanceId} .time-gridlines {
-      position: sticky;
+      position: absolute;
+      top: ${ALL_DAY_MARGIN}px;
       left: 0;
       z-index: 0;
+      height: 100%;
+      width: 100%;
     }
     #${instanceId} .time-grid-lines {
       position: absolute;
@@ -130,10 +133,11 @@ export function createCalStyleTag(instanceId: string) {
       background-color: #222;
     }
     #${instanceId} .day-events {
+      position: absolute;
       width: 100%;
       height: 100%;
-      position: relative;
       top: ${ALL_DAY_MARGIN}px;
+      z-index: 2;
     }
     #${instanceId}.light .day-events {
       border-right: 1px solid #e1e1e1;
@@ -159,7 +163,7 @@ export function createCalStyleTag(instanceId: string) {
       position: sticky;
       background: white;
       z-index: 20;
-      height: 54px;
+      height: ${ALL_DAY_MARGIN}px;
       width: 50px;
       font-size: 10px;
       white-space: nowrap;

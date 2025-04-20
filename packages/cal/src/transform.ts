@@ -75,20 +75,7 @@ export class CalendarTransform {
   timeToY(date: Date) {
     const hours = date.getHours() * this.hourPx;
     const min = (date.getMinutes() * this.hourPx) / 60;
-    return hours + min - this.offset[1] + this.gridOffset[1];
-  }
-  maxYOffset() {
-    return Math.max(
-      0,
-      this.airdayCal.scrollHeight - this.airdayCal.canvas.clientHeight,
-    );
-  }
-  addDelta(x: number, y: number) {
-    this.offset[0] = this.offset[0] + x;
-    this.offset[1] = Math.min(
-      Math.max(this.offset[1] + y, 0),
-      this.maxYOffset(),
-    );
+    return hours + min;
   }
   xStart(x: number) {
     const r = (x % this.gridOffset[0]) + this.offset[0];
