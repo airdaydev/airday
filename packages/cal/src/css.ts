@@ -4,8 +4,9 @@ export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
   style.id = instanceId;
   style.textContent = `
-    #${instanceId}.dark {
-      color: white;
+    :root {
+      --black: #121212;
+      --white: #ffffff;
     }
     #${instanceId} {
       position: relative;
@@ -15,6 +16,14 @@ export function createCalStyleTag(instanceId: string) {
       height: 100%;
       box-sizing: border-box;
       font-size: 12px;
+    }
+    #${instanceId}.light {
+      color: black;
+      background: var(--white);
+    }
+    #${instanceId}.dark {
+      color: white;
+      background: var(--black);
     }
     #${instanceId} .events-container {
       position: absolute;
@@ -53,10 +62,10 @@ export function createCalStyleTag(instanceId: string) {
       padding: 0.25em;
     }
     #${instanceId}.dark .event {
-      border: 1px solid #242424;
+      border: 1px solid var(--black);
     }
     #${instanceId}.light .event {
-      border: 1px solid #fdfdfd;
+      border: 1px solid var(--white);
     }
     #${instanceId} .date-label {
       position: sticky;
@@ -116,17 +125,17 @@ export function createCalStyleTag(instanceId: string) {
       border-right: 1px solid #363636;
     }
     #${instanceId}.light .time-label-col {
-      background: white;
+      background: var(--white);
     }
     #${instanceId}.dark .time-label-col {
       color: white;
-      background: black;
+      background: var(--black);
     }
     #${instanceId}.light .date-label {
-      background: white;
+      background: var(--white);
     }
     #${instanceId}.dark .date-label {
-      background: black;
+      background: var(--black);
     }
   `;
   document.head.appendChild(style);
