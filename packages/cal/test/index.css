@@ -6,7 +6,16 @@
 }
 
 body {
-  font-family: Alte haas grotesk;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
 }
 
 #root {

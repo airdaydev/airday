@@ -15,6 +15,7 @@ function EventEl(layout: EventLayout) {
   }
   if (layout.startsToday) {
     const title = document.createElement("div");
+    title.className = "event-title";
     title.innerText = layout.displayText;
     const time = document.createElement("div");
     time.innerText = layout.displayTime;

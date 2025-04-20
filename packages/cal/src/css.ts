@@ -156,6 +156,9 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 10;
       width: fit-content;
     }
+    #${instanceId} .event-title {
+      font-weight: 500;
+    }
   `;
   document.head.appendChild(style);
   return style;
