@@ -1,5 +1,7 @@
 import { EventSchemes } from "./colours";
 
+const ALL_DAY_MARGIN = 28;
+
 export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
   style.id = instanceId;
@@ -87,6 +89,7 @@ export function createCalStyleTag(instanceId: string) {
       left: 0;
       width: 36px;
       z-index: 10;
+      margin-top: ${ALL_DAY_MARGIN}px;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
       text-align: center;
@@ -110,6 +113,7 @@ export function createCalStyleTag(instanceId: string) {
       position: sticky;
       left: 0;
       z-index: 0;
+      margin-top: 55px;
     }
     #${instanceId} .time-grid-lines {
       position: absolute;
@@ -129,6 +133,8 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .day-events {
       width: 100%;
       height: 100%;
+      position: relative;
+      top: ${ALL_DAY_MARGIN}px;
     }
     #${instanceId}.light .day-events {
       border-right: 1px solid #e1e1e1;
@@ -148,17 +154,19 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.dark .date-label {
       background: var(--black);
     }
-    #${instanceId} .all-day-label {
-      top: 0;
+    #${instanceId} .top-left-anchor {
       left: 0;
-      position: sticky;
+      position: absolute;
       background: white;
       z-index: 10;
       width: fit-content;
+      font-size: 10px;
+      padding: 0 0.5em;
     }
     #${instanceId} .event-title {
       font-weight: 500;
     }
+
   `;
   document.head.appendChild(style);
   return style;

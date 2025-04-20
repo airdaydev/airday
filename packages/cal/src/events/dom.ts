@@ -59,10 +59,15 @@ export function appendDayLayout(container: HTMLElement, layout: DayLayout) {
 }
 
 export function AllDayLabelEl() {
-  const label = document.createElement("div");
-  label.className = "all-day-label";
-  label.innerText = "All Day";
-  return label;
+  const anchor = document.createElement("div");
+  anchor.className = "top-left-anchor";
+  const tz = document.createElement("div");
+  tz.innerText = "AEST";
+  anchor.appendChild(tz);
+  const allDay = document.createElement("div");
+  allDay.innerText = "All Day";
+  anchor.appendChild(allDay);
+  return anchor;
 }
 
 export function TimesEl(airdayCal: AirdayCal) {
