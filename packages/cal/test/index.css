@@ -39,3 +39,7 @@ h1 {
     max-height: 100%;
   }
 }
+
+.tp-dfwv {
+  z-index: 1000;
+}

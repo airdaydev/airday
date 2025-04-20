@@ -18,11 +18,11 @@ export function createCalStyleTag(instanceId: string) {
       font-size: 12px;
     }
     #${instanceId}.light {
-      color: black;
+      color: #5c5c5c;
       background: var(--white);
     }
     #${instanceId}.dark {
-      color: white;
+      color: #a0a0a0;
       background: var(--black);
     }
     #${instanceId} .events-container {
@@ -34,10 +34,9 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .scrollable {
       position: absolute;
-      top: 6em;
       left: 0;
       width: 100%;
-      height: calc(100% - 6em);
+      height: 100%;
       overflow-y: scroll;
       z-index: 2;
     }
@@ -54,7 +53,6 @@ export function createCalStyleTag(instanceId: string) {
       font-size: 10px;
       box-sizing: border-box;
       position: absolute;
-      color: white;
       user-select: none;
       border-radius: 4px;
       transition: background 0.05s;
@@ -70,7 +68,7 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .date-label {
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 10;
       padding: 0.5em 0;
       text-align: center;
       user-select: none;
@@ -82,13 +80,13 @@ export function createCalStyleTag(instanceId: string) {
       top: 0;
       background: yellow;
       opacity: 0.5;
-      z-index: 100;
+      z-index: 10;
     }
     #${instanceId} .time-label-col {
       position: sticky;
       left: 0;
       width: 36px;
-      z-index: 1000;
+      z-index: 10;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
       text-align: center;
@@ -142,7 +140,6 @@ export function createCalStyleTag(instanceId: string) {
       background: var(--white);
     }
     #${instanceId}.dark .time-label-col {
-      color: white;
       background: var(--black);
     }
     #${instanceId}.light .date-label {
@@ -156,7 +153,7 @@ export function createCalStyleTag(instanceId: string) {
       left: 0;
       position: sticky;
       background: white;
-      z-index: 10000;
+      z-index: 10;
       width: fit-content;
     }
   `;
