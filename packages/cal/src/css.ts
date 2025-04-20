@@ -4,6 +4,9 @@ export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
   style.id = instanceId;
   style.textContent = `
+    #${instanceId}.dark {
+      color: white;
+    }
     #${instanceId} {
       position: relative;
       display: flex;
@@ -57,7 +60,6 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .date-label {
       position: sticky;
       top: 0;
-      background: white;
       z-index: 1000;
     }
     #${instanceId} .debug-date {
@@ -85,7 +87,6 @@ export function createCalStyleTag(instanceId: string) {
       left: 0;
       height: 1px;
       opacity: 0.2;
-      color: black;
       background: white;
     }
     #${instanceId} .time-gridlines {
@@ -116,6 +117,12 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId}.dark .time-label-col {
       color: white;
+      background: black;
+    }
+    #${instanceId}.light .date-label {
+      background: white;
+    }
+    #${instanceId}.dark .date-label {
       background: black;
     }
   `;
