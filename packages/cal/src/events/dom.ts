@@ -23,12 +23,7 @@ function EventEl(layout: EventLayout) {
   return div;
 }
 
-export function DayEl(
-  airday: AirdayCal,
-  date: number,
-  layout: DayLayout,
-  xPos: number,
-) {
+export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   // Setup theme
   const dayEl = document.createElement("div");
   dayEl.className = "day";
@@ -47,15 +42,19 @@ export function DayEl(
   debugLabel.innerText = new Date(date).toUTCString();
   dayEl.appendChild(debugLabel);
   // Event container
-  const dayEvents = document.createElement("div");
-  dayEvents.className = "day-events";
-  dayEl.appendChild(dayEvents);
-  // Create events
-  layout.map.forEach((eventLayout) => {
-    const el = EventEl(eventLayout);
-    dayEvents.appendChild(el);
-  });
+  const dayEventsEl = document.createElement("div");
+  dayEventsEl.className = "day-events";
+  dayEl.appendChild(dayEventsEl);
   return dayEl;
+}
+
+export function appendDayLayout(container: HTMLElement, layout: DayLayout) {
+  // Create events
+  const events: HTMLDivElement[] = [];
+  layout.map.forEach((eventLayout) => {
+    events.push(EventEl(eventLayout));
+  });
+  container.append(...events);
 }
 
 export function AllDayLabelEl() {

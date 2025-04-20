@@ -124,7 +124,7 @@ export function createCalStyleTag(instanceId: string) {
       background-color: #e1e1e1;
     }
     #${instanceId}.dark .time-grid-lines {
-      background-color: #363636;
+      background-color: #222;
     }
     #${instanceId} .day-events {
       width: 100%;

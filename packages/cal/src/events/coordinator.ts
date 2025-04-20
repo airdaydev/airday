@@ -5,7 +5,7 @@ import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { EventUIData } from "../ui-objects";
 import { CacheEntry } from "../utils/cache";
-import { DayEl } from "./dom";
+import { appendDayLayout, DayEl } from "./dom";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -79,6 +79,7 @@ export class EventRenderCoordinator {
   dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
+  renderedCache = new Map<number, CacheEntry<boolean>>();
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -129,11 +130,20 @@ export class EventRenderCoordinator {
         default:
       }
     }
-    // TODO: Start with internal regions, then buffer.
-    let i = 0;
+
+    // Setup containers
     for (let date of this.airdayCal.transform.dates) {
+      const dateVal = date.valueOf();
       const domPx = this.airdayCal.transform.dateToX(date.valueOf());
-      i++;
+      if (!this.domCache.get(dateVal)) {
+        const dayEl = DayEl(this.airdayCal, dateVal, domPx);
+        this.airdayCal.eventsContainer.appendChild(dayEl); // TODO: append at once
+        this.domCache.set(dateVal, new CacheEntry(dayEl));
+      }
+    }
+    // TODO: Start with internal regions, then buffer.
+    // TODO: Consider cleaning up a little bit
+    for (let date of this.airdayCal.transform.dates) {
       const dateVal = date.valueOf();
       const data = this.dataCache.get(dateVal);
       if (!data || !data.fresh) {
@@ -143,26 +153,27 @@ export class EventRenderCoordinator {
           new Date(localZero.valueOf() + 864e5),
         );
         this.dataCache.set(dateVal, new CacheEntry(events));
-        this.assignWork({
-          type: "next",
-          date,
-          events: events.map((e) => e.transfer()),
-          theme: this.airdayCal.theme,
-          transform: [
-            this.airdayCal.transform.dayPx,
-            this.airdayCal.transform.hourPx,
-          ],
-        });
+        if (events) {
+          this.assignWork({
+            type: "next",
+            date,
+            events: events.map((e) => e.transfer()),
+            theme: this.airdayCal.theme,
+            transform: [
+              this.airdayCal.transform.dayPx,
+              this.airdayCal.transform.hourPx,
+            ],
+          });
+        }
         return;
       }
       const layout = this.layoutCache.get(dateVal);
       // if no layout?
       const domData = this.domCache.get(dateVal);
-      if ((!domData || !domData?.fresh) && layout && layout.data) {
-        const dayEl = DayEl(this.airdayCal, dateVal, layout.data, domPx);
-        // dayEl.innerText = date.toString();
-        this.airdayCal.eventsContainer.appendChild(dayEl);
-        this.domCache.set(dateVal, new CacheEntry(dayEl)); // TODO: Hold reference to day dom element
+      const rendered = this.renderedCache.get(dateVal);
+      if ((!rendered || !rendered.data) && domData && layout && layout.data) {
+        appendDayLayout(domData.data, layout.data);
+        this.renderedCache.set(dateVal, new CacheEntry(true));
       }
     }
     // TODO: Cleanup domcache
