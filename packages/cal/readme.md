@@ -1,6 +1,6 @@
 ## @airday/cal
 
-Calendar front-end powering Airday's calendar, canvas background with DOM for events. Plan to port to webgpu. Currently monthly view only.
+Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently monthly view only. Plans to port to WGPU/GL for desktop/mobile view.
 
 ## Roadmap
 - [x] Idle render check to save battery etc
@@ -37,8 +37,10 @@ Calendar front-end powering Airday's calendar, canvas background with DOM for ev
 - [x] Correct theme colours
 - [x] Render empty days immediately, then events
 - [x] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
+- [] Sat/Sunday shading, have to move gridlines to each date
+- [] All-day events section spacing, additional gridlines
 - [] Button to randomly create +24hr event in tweakpane starting at middle day
-- [] All-day events section
+- [] All-day events +24hr events system!
 - [] Items over 24hrs long get moved into all-day event
 - [] Change number of days to render via tweakpane
 - [] Expand all day events
