@@ -46,6 +46,9 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Expand all day events
 - [] Scroll snap type
 - [] Jump to date/today button
+- [] Dragging 24hr events start/finish
+- [] Dragging 24hr events left/right
+- [] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
