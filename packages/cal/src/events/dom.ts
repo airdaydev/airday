@@ -1,4 +1,5 @@
 import { AirdayCal } from "../cal";
+import { getDateUTC } from "../time";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout) {
@@ -32,6 +33,13 @@ export function DayEl(
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
+  // Date label
+  const dateLabel = document.createElement("div");
+  dateLabel.className = "date-label";
+  const text = getDateUTC(new Date(date));
+  dateLabel.innerText = text;
+  dayEl.appendChild(dateLabel);
+  // Debug label
   const debugLabel = document.createElement("div");
   debugLabel.className = "debug-date";
   debugLabel.innerText = new Date(date).toUTCString();
@@ -51,7 +59,7 @@ export function TimesEl(airdayCal: AirdayCal) {
   gridlines.className = "time-gridlines";
 
   const labels = document.createElement("div");
-  labels.className = "time-grid-labels";
+  labels.className = "time-label-col";
 
   let pxOffset = 0;
   const now = new Date();

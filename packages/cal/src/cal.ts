@@ -72,6 +72,12 @@ export class AirdayCal {
       event.preventDefault();
       this.transform.offset[1] = this.scrollable.scrollTop;
       this.transform.offset[0] = this.scrollable.scrollLeft;
+      if (this.scrollable.scrollTop < 10) {
+        this.scrollable.style.overscrollBehaviorY = "none";
+      } else {
+        // TODO: Don't set this so frequently (does the browser optimise for this?)
+        this.scrollable.style.overscrollBehaviorY = "auto";
+      }
       this.act();
     });
     scrollable.addEventListener("mousemove", (event: MouseEvent) => {

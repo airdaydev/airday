@@ -54,21 +54,27 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.light .event {
       border: 1px solid #fdfdfd;
     }
+    #${instanceId} .date-label {
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 1000;
+    }
     #${instanceId} .debug-date {
+      display: none;
       position: sticky;
       top: 0;
       background: yellow;
       opacity: 0.5;
       z-index: 1000;
     }
-    #${instanceId} .time-grid-labels {
+    #${instanceId} .time-label-col {
       position: sticky;
       left: 0;
       width: 36px;
       z-index: 1000;
       font-size: 10px;
       height: 1221px; /* TODO: make dynamic */
-      background: white;
     }
     #${instanceId} .time-grid-label {
       position: absolute;
@@ -104,6 +110,13 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId}.dark .day {
       border-right: 1px solid #363636;
+    }
+    #${instanceId}.light .time-label-col {
+      background: white;
+    }
+    #${instanceId}.dark .time-label-col {
+      color: white;
+      background: black;
     }
   `;
   document.head.appendChild(style);
