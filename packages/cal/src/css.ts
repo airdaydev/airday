@@ -122,7 +122,7 @@ export function createCalStyleTag(instanceId: string) {
       pointer-events: none;
     }
     #${instanceId}.light .time-grid-lines {
-      background-color: #e1e1e1;
+      background-color: #f0f0f0;
     }
     #${instanceId}.dark .time-grid-lines {
       background-color: #222;
