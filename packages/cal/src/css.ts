@@ -69,7 +69,8 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .date-label {
       position: sticky;
-      top: 0;
+      top: -0.5px; /* covers top of scroll container as items that scroll up show in a gap - maybe related to sticky positioning */
+      width: calc(100% + 1px); /* similar to top val, ensuring no gap on either side */
       z-index: 10;
       padding: 0.5em 0;
       text-align: center;
