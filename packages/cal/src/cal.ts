@@ -48,11 +48,13 @@ export class AirdayCal {
     createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
     this.transform = new CalendarTransform(this);
     this.db = db;
-    const { scrollable, scrollChild, eventsContainer } = this.mount(container);
+    const { scrollable, scrollChild, eventsContainer, nowMarker } =
+      this.mount(container);
     this.scrollable = scrollable;
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
     this.eventsContainer = eventsContainer;
+    this.nowMarker = nowMarker;
     this.resizeCal();
     this.transform.originDate = this.transform.calcOriginDate(); // TODO: Note that this is necessary
     // TODO: Destroy
@@ -151,6 +153,7 @@ export class AirdayCal {
       scrollable,
       scrollChild,
       eventsContainer,
+      nowMarker,
     };
   };
   changeTheme = (theme: Theme) => {

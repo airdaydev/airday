@@ -16,6 +16,14 @@ export default defineConfig({
     },
     rollupOptions: {
       external: ["solid-js"],
+      output: {
+        manualChunks(id) {
+          // Optional: Customize chunk splitting
+          if (id.includes("worker")) {
+            return "worker";
+          }
+        },
+      },
     },
   },
 });
