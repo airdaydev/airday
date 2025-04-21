@@ -38,8 +38,8 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Render empty days immediately, then events
 - [x] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
 - [x] Sat/Sunday shading, have to move gridlines to each date
+- [x] All-day events section spacing, additional gridlines
 - [] Now line
-- [] All-day events section spacing, additional gridlines
 - [] Button to randomly create +24hr event in tweakpane starting at middle day
 - [] All-day events +24hr events system!
 - [] Items over 24hrs long get moved into all-day event
@@ -79,6 +79,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Overwriting repeated events (fuck)
 
 ## final optimisations / quality udpates / future plans
+- [] UX: Reconsider ALL events extending entire grid; consider opposite.
 - [] buffer events to the left too
 - [] event/worker tests
 - [] True monthly view
