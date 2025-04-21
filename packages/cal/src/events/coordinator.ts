@@ -1,9 +1,7 @@
-import { Rectangle } from "@timohausmann/quadtree-ts";
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
-import { EventUIData } from "../ui-objects";
 import { CacheEntry } from "../utils/cache";
 import { appendDayLayout, DayEl } from "./dom";
 
@@ -173,7 +171,7 @@ export class EventRenderCoordinator {
       const rendered = this.renderedCache.get(dateVal);
       if ((!rendered || !rendered.data) && domData && layout && layout.data) {
         appendDayLayout(
-          domData.data.getElementsByClassName("day-events")[0], // TODO: eh enumeration/text match look up...
+          domData.data.getElementsByClassName("day-events")[0] as HTMLElement, // TODO: eh enumeration/text match look up...
           layout.data,
         );
         this.renderedCache.set(dateVal, new CacheEntry(true));
@@ -186,22 +184,6 @@ export class EventRenderCoordinator {
     const data = message.data;
     if (data.layout) {
       this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
-      const objs: Rectangle<EventUIData>[] = [];
-      for (let [id, event] of data.layout.map.entries()) {
-        objs.push(
-          new Rectangle<EventUIData>({
-            x: event.x,
-            width: event.width,
-            y: event.y,
-            height: event.height,
-            data: {
-              type: 0,
-              id,
-              z: event.segment,
-            },
-          }),
-        );
-      }
       // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
     this.airdayCal.act(); // TODO: A little blunt

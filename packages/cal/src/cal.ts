@@ -7,8 +7,7 @@ import {
   darkEventSchemes,
 } from "./colours";
 import { EventDB } from "./state";
-import { getStartOfWeekUTC, utcZeroDate } from "./time";
-import { CalUIObjects } from "./ui-objects";
+import { utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
 import { AnchorEl, TimesEl } from "./events/dom";
@@ -36,7 +35,6 @@ export class AirdayCal {
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
-  uiObjects = new CalUIObjects(this);
   stats?: Stats;
   // Interactions
   dragSelect = false;
@@ -97,6 +95,7 @@ export class AirdayCal {
     else return darkScheme;
   }
   mouseMove(event: MouseEvent) {
+    console.log(event);
     this.act();
   }
   mouseDown(event: MouseEvent) {
@@ -160,10 +159,10 @@ export class AirdayCal {
   }
   act = () => (this.lastAction = performance.now());
   // TODO: Redo
-  goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
-    console.log("go to date");
-    // this.transform.originDate = date.valueOf();
-  };
+  // goToDate = (date: Date = new Date(getStartOfWeekUTC(new Date()))) => {
+  //   console.log("go to date");
+  //   // this.transform.originDate = date.valueOf();
+  // };
   resizeCal = () => {
     const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
     this.scrollable.scrollTo(nearestDayX, 0);

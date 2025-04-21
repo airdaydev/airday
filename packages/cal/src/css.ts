@@ -17,7 +17,7 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       height: 100%;
       box-sizing: border-box;
-      font-size: 12px;
+      font-size: 11px;
     }
     #${instanceId}.light {
       color: #5c5c5c;
