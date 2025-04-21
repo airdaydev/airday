@@ -121,29 +121,29 @@ export interface EventColorScheme {
 
 const yellowDark: EventColorScheme = {
   text: new RGBA(152, 136, 102),
-  bg: new RGBA(64, 60, 48),
-  fg: new RGBA(122, 106, 76),
+  bg: new RGBA(69, 67, 60),
+  fg: new RGBA(179, 172, 158),
   shadow: new RGBA(0, 0, 0, 0.02), // Converted from "#00000011"
 };
 
 // TODO: Fix LLM generated colours
 const yellowLight: EventColorScheme = {
   text: new RGBA(89, 76, 48), // Darker yellow-brown for readable text
-  bg: new RGBA(246, 234, 203), // Very light cream/yellow background
+  bg: new RGBA(255, 251, 217), // Very light cream/yellow background
   fg: new RGBA(251, 243, 185), // Muted golden yellow foreground
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
 
 const blueLight: EventColorScheme = {
   text: new RGBA(56, 84, 112), // Deeper pastel blue for text
-  bg: new RGBA(230, 249, 252), // Soft sky blue background
+  bg: new RGBA(213, 245, 255), // Soft sky blue background
   fg: new RGBA(209, 233, 246), // Gentle pastel blue foreground
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
 
 const blueDark: EventColorScheme = {
-  text: new RGBA(132, 156, 182), // Muted blue-gray for text
-  bg: new RGBA(48, 56, 64), // Dark blue-gray background
+  text: new RGBA(157, 184, 214, 1), // Muted blue-gray for text
+  bg: new RGBA(45, 57, 69), // Dark blue-gray background
   fg: new RGBA(76, 96, 116), // Darker muted blue foreground
   shadow: new RGBA(0, 0, 0, 0.067), // Same subtle shadow
 };
