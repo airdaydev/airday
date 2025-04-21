@@ -226,6 +226,15 @@ export function createCalStyleTag(instanceId: string) {
       padding-top: 28px;
       top: 0;
     }
+    #${instanceId} .now-marker {
+      position: absolute;
+      width: 100%;
+      top: 55px;
+      z-index: 10;
+      height: 1px;
+      background: #ff8a8a;
+      pointer-events: none;
+    }
   `;
   document.head.appendChild(style);
   return style;

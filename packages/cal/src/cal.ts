@@ -10,7 +10,7 @@ import { EventDB } from "./state";
 import { utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
-import { AnchorEl, TimesEl } from "./events/dom";
+import { AnchorEl, NowMarker, TimesEl } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -23,6 +23,7 @@ export class AirdayCal {
   scrollable: HTMLDivElement;
   scrollChild: HTMLDivElement;
   eventsContainer: HTMLDivElement;
+  nowMarker: HTMLDivElement;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -134,12 +135,15 @@ export class AirdayCal {
     // All day events container
     const allDay = document.createElement("div");
     allDay.className = "all-day-events";
+    // Now horizontal line marker
+    const nowMarker = NowMarker(this);
     // Attach everything
     const labels = TimesEl(this);
     const anchor = AnchorEl();
     scrollable.appendChild(anchor);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
+    scrollChild.appendChild(nowMarker);
     scrollChild.appendChild(allDay);
     scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);

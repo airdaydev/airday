@@ -130,3 +130,12 @@ export function TimesEl(airdayCal: AirdayCal) {
   }
   return labels;
 }
+
+export function NowMarker(airday: AirdayCal) {
+  const nowMarker = document.createElement("div");
+  nowMarker.className = "now-marker";
+  const now = new Date();
+  const y = airday.transform.timeToY(now);
+  nowMarker.style.top = `${y}px`;
+  return nowMarker;
+}
