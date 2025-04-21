@@ -52,12 +52,21 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
+  // sticky header
+  const header = document.createElement("div");
+  header.className = "day-header";
   // Date label
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
   const text = getDateUTC(jsDate);
   dateLabel.innerText = text;
-  dayEl.appendChild(dateLabel);
+  header.appendChild(dateLabel);
+  // All day area
+  const allDayArea = document.createElement("div");
+  allDayArea.className = "all-day";
+  header.appendChild(allDayArea);
+  // append header
+  dayEl.appendChild(header);
   // Debug label
   const debugLabel = document.createElement("div");
   debugLabel.className = "debug-date";

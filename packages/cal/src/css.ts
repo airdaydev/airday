@@ -72,12 +72,29 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.light .event {
       border: 1px solid var(--white);
     }
-    #${instanceId} .date-label {
+    #${instanceId} .day-header {
       position: sticky;
-      display: flex;
       top: -0.5px; /* covers top of scroll container as items that scroll up show in a gap - maybe related to sticky positioning */
       width: calc(100% + 1px); /* similar to top val, ensuring no gap on either side */
       z-index: 10;
+    }
+    #${instanceId} .all-day {
+      height: 26px;
+    }
+    #${instanceId}.light .all-day {
+      background: var(--white);
+      border-top: 1px solid #f0f0f0;
+      border-left: 1px solid #f0f0f0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    #${instanceId}.dark .all-day {
+        background: var(--black);
+        border-top: 1px solid #222;
+        border-left: 1px solid #222;
+        border-bottom: 1px solid #222;
+    }
+    #${instanceId} .date-label {
+      display: flex;
       text-align: center;
       user-select: none;
       -webkit-user-select: none;
@@ -200,7 +217,15 @@ export function createCalStyleTag(instanceId: string) {
       align-items: center;
       justify-content: center;
     }
-
+    #${instanceId} .all-day-events {
+      position: sticky;
+      background: #ffafaf78;
+      height: 28px;
+      width: 100%;
+      z-index: 10;
+      padding-top: 28px;
+      top: 0;
+    }
   `;
   document.head.appendChild(style);
   return style;

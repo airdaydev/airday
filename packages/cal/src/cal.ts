@@ -132,12 +132,16 @@ export class AirdayCal {
     // Events container
     const eventsContainer = document.createElement("div");
     eventsContainer.className = "events-container";
+    // All day events container
+    const allDay = document.createElement("div");
+    allDay.className = "all-day-events";
     // Attach everything
     const labels = TimesEl(this);
     const anchor = AnchorEl();
     scrollable.appendChild(anchor);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
+    scrollChild.appendChild(allDay);
     scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);
     return {
