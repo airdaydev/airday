@@ -236,6 +236,9 @@ export function createCalStyleTag(instanceId: string) {
       background: #ff8a8a;
       pointer-events: none;
     }
+    #${instanceId} .today .day-header {
+      color: red;
+    }
   `;
   document.head.appendChild(style);
   return style;

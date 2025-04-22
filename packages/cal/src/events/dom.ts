@@ -1,5 +1,5 @@
 import { AirdayCal } from "../cal";
-import { getDateUTC, isWeekend } from "../time";
+import { getDateUTC, isTodayUTC, isWeekend } from "../time";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout) {
@@ -48,10 +48,13 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   // Setup theme
   const dayEl = document.createElement("div");
   dayEl.className = "day";
-  if (weekend) dayEl.classList.add("weekend");
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
+  if (weekend) dayEl.classList.add("weekend");
+  if (isTodayUTC(jsDate)) {
+    dayEl.classList.add("today");
+  }
   // sticky header
   const header = document.createElement("div");
   header.className = "day-header";
