@@ -115,8 +115,6 @@ export class AirdayCal {
     this.frame();
     this.resizeCal();
     this.scrollTo(new Date());
-    this.nearestDayX = this.transform.getNearestDay();
-    // console.log(this.nearestDayX);
   };
   scrollTo(date: Date) {
     const x =
@@ -181,11 +179,15 @@ export class AirdayCal {
   // };
   resizeCal = () => {
     // Taking initial scroll position into account
+    const nearestDayX = this.transform.getNearestDay();
     this.transform.refitCal(
       this.scrollable.offsetWidth - this.transform.timeColWidth,
     );
-    this.scrollTo(new Date());
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
+    this.scrollable.scrollTo(
+      nearestDayX * this.transform.dayPx - this.transform.timeColWidth,
+      0,
+    );
     this.resized = false;
   };
   // Main draw loop; run inside a request animation frame
