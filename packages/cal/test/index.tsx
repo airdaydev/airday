@@ -108,8 +108,10 @@ class modifierPane {
       },
     });
     folder.addBinding(this, "days", {
-      label: "test",
+      label: "Days",
       step: 1,
+      min: 1,
+      max: 100,
     });
   }
   get theme() {
@@ -118,10 +120,13 @@ class modifierPane {
   set theme(themeStr: "dark" | "light") {
     theme[1](() => themeStr);
   }
-  // get days() {
-  //   // return cal
-  // }
-  // set days() {}
+  get days() {
+    // return cal
+    return cal.transform.daysVisible;
+  }
+  set days(count: number) {
+    cal.daysVisible(count);
+  }
 }
 
 const pane = new modifierPane("Calendar");

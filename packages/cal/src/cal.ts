@@ -155,12 +155,13 @@ export class AirdayCal {
     if (this.container) this.container.className = theme;
     this.act();
   };
-  changeDayCount(count = 7) {
+  daysVisible(count = 7) {
     if (count > 100) {
       console.warn(`Count cannot be greater than 100, count=${count}`);
       return;
     }
     this.transform.daysVisible = count;
+    this.resized = true;
     this.act();
     // TODO: Provoke a resize via coordinator
   }
