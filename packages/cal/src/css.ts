@@ -103,7 +103,7 @@ export function createCalStyleTag(instanceId: string) {
       justify-content: center;
     }
     #${instanceId} .debug-date {
-      display: block;
+      display: none;
       position: sticky;
       top: 0;
       background: yellow;
@@ -160,6 +160,7 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       height: 100%;
       top: ${ALL_DAY_MARGIN}px;
+      overflow-y: hidden;
       z-index: 2;
     }
     #${instanceId}.light .day-events {

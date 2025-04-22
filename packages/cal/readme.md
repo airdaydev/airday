@@ -44,8 +44,8 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Bug when changing day count to 1 causes scroll offset to move to far left, then future positions to be incorrect
 - [x] Bug is due to lack of cleanup! - need to remove day els not in view or they will extend way beyond view
 - [x] Mock some 24hr events too
+- [x] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
 - [] Today date label style
-- [] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
 - [] All-day events +24hr events system!
 - [] Now line
 - [] Worker fix in build
@@ -55,6 +55,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Jump to date/today button
 - [] Dragging 24hr events start/finish
 - [] Dragging 24hr events left/right
+- [] Filter by multiple calendars, colour
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
