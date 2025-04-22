@@ -42,6 +42,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Change number of days to render via tweakpane
 - [x] Horizontal sizing and positioning correct (adjust due to time col)
 - [] Bug when changing day count to 1 causes scroll offset to move to far left, then future positions to be incorrect
+- [] Bug is due to lack of cleanup! - need to remove day els not in view or they will extend way beyond view
 - [] Now line
 - [] Worker fix in build
 - [] Button to randomly create +24hr event in tweakpane starting at middle day
