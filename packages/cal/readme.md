@@ -39,12 +39,12 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Use UTC date + day integer offset for all fundamental calculations, in general, clean up date calcs
 - [x] Sat/Sunday shading, have to move gridlines to each date
 - [x] All-day events section spacing, additional gridlines
-- [] Worker fix in build
+- [] Change number of days to render via tweakpane
 - [] Now line
+- [] Worker fix in build
 - [] Button to randomly create +24hr event in tweakpane starting at middle day
 - [] All-day events +24hr events system!
 - [] Items over 24hrs long get moved into all-day event
-- [] Change number of days to render via tweakpane
 - [] Expand all day events
 - [] Scroll snap type
 - [] Jump to date/today button

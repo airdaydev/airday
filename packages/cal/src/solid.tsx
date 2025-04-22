@@ -8,16 +8,28 @@ interface CalendarProps {
   events: Signal<CalendarEvent[]>;
   theme: Accessor<Theme>;
   parentElement: HTMLElement;
-  db: EventDB;
+  db?: EventDB;
+  cal?: AirdayCal;
   stats?: Stats;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
   let domContainer: HTMLDivElement | undefined;
   let cal: AirdayCal;
+  if (props.cal && props.db)
+    throw new Error("If providing cal instance, assign db outside component.");
+  if (!props.cal) {
+    if (!props.db) throw new Error("DB must be provided if cal not provided");
+    cal = new AirdayCal(props.db);
+  } else {
+    cal = props.cal;
+  }
   onMount(() => {
     if (domContainer) {
-      cal = new AirdayCal(domContainer, props.db, props.stats);
+      if (props.stats) {
+        cal.enableStats(props.stats);
+      }
+      cal.mount(domContainer);
     }
   });
   createEffect(() => {

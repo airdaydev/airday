@@ -105,6 +105,10 @@ class modifierPane {
         light: "light",
       },
     });
+    folder.addBinding(this, "days", {
+      label: "test",
+      step: 1,
+    });
   }
   get theme() {
     return theme[0]();
@@ -112,6 +116,10 @@ class modifierPane {
   set theme(themeStr: "dark" | "light") {
     theme[1](() => themeStr);
   }
+  // get days() {
+  //   // return cal
+  // }
+  // set days() {}
 }
 
 const pane = new modifierPane("Calendar");

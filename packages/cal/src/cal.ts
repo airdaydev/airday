@@ -19,11 +19,11 @@ let globalIndex = 0; // track id
 // Primary Calendar component, mounts to a DOM element
 export class AirdayCal {
   id: string;
-  container: HTMLDivElement;
-  scrollable: HTMLDivElement;
-  scrollChild: HTMLDivElement;
-  eventsContainer: HTMLDivElement;
-  nowMarker: HTMLDivElement;
+  container?: HTMLDivElement;
+  scrollable?: HTMLDivElement;
+  scrollChild?: HTMLDivElement;
+  eventsContainer?: HTMLDivElement;
+  nowMarker?: HTMLDivElement;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -39,17 +39,42 @@ export class AirdayCal {
   stats?: Stats;
   // Interactions
   dragSelect = false;
-  constructor(container: HTMLDivElement, db: EventDB, stats?: Stats) {
-    if (stats) this.stats = stats;
+  constructor(db: EventDB) {
     this.id = `airday-cal-${globalIndex}`;
-    this.container = container;
     globalIndex++;
     createCalStyleTag(this.id);
     createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
     this.transform = new CalendarTransform(this);
     this.db = db;
-    const { scrollable, scrollChild, eventsContainer, nowMarker } =
-      this.mount(container);
+  }
+  mount = (container: HTMLDivElement) => {
+    this.container = container;
+    // Scrollable area
+    container.id = this.id;
+    const scrollable = document.createElement("div");
+    scrollable.className = "scrollable";
+    // Scrolling content (empty)
+    const scrollChild = document.createElement("div");
+    scrollChild.className = "scroll-child";
+    scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
+    // Events container
+    const eventsContainer = document.createElement("div");
+    eventsContainer.className = "events-container";
+    // All day events container
+    const allDay = document.createElement("div");
+    allDay.className = "all-day-events";
+    // Now horizontal line marker
+    const nowMarker = NowMarker(this);
+    // Attach everything
+    const labels = TimesEl(this);
+    const anchor = AnchorEl();
+    scrollable.appendChild(anchor);
+    scrollable.append(scrollChild);
+    container.appendChild(scrollable);
+    scrollChild.appendChild(nowMarker);
+    scrollChild.appendChild(allDay);
+    scrollChild.appendChild(eventsContainer);
+    scrollable.appendChild(labels);
     this.scrollable = scrollable;
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
@@ -63,20 +88,20 @@ export class AirdayCal {
       this.act();
     });
     resizeObserver.observe(scrollable);
-    scrollable.addEventListener("scroll", (event) => {
+    scrollable.addEventListener("scroll", (event: Event) => {
       // delta between each scroll event / time = velocity
       // current spot = limit of movement
       // this would introduce a slight lag but may look much better on safari ios for example, where the scroll event is fired at a slow rate.
       // while scrolling calculate
       // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
-      this.transform.offset[1] = this.scrollable.scrollTop;
-      this.transform.offset[0] = this.scrollable.scrollLeft;
-      if (this.scrollable.scrollTop < 10) {
-        this.scrollable.style.overscrollBehaviorY = "none";
+      this.transform.offset[1] = event.target.scrollTop;
+      this.transform.offset[0] = event.target.scrollLeft;
+      if (event.target.scrollTop < 10) {
+        event.target.style.overscrollBehaviorY = "none";
       } else {
         // TODO: Don't set this so frequently (does the browser optimise for this?)
-        this.scrollable.style.overscrollBehaviorY = "auto";
+        event.target.style.overscrollBehaviorY = "auto";
       }
       this.act();
     });
@@ -92,6 +117,9 @@ export class AirdayCal {
       this.transform.dateToX(utcZeroDate(new Date()).valueOf()),
       0,
     );
+  };
+  enableStats(stats: Stats) {
+    this.stats = stats;
   }
   get colourScheme() {
     if (this.theme === "light") return lightScheme;
@@ -122,45 +150,20 @@ export class AirdayCal {
       // - nb. ghost event stays in place, while opaque event gets dragged
     }
   }
-  mount = (container: HTMLElement) => {
-    // Scrollable area
-    container.id = this.id;
-    const scrollable = document.createElement("div");
-    scrollable.className = "scrollable";
-    // Scrolling content (empty)
-    const scrollChild = document.createElement("div");
-    scrollChild.className = "scroll-child";
-    scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
-    // Events container
-    const eventsContainer = document.createElement("div");
-    eventsContainer.className = "events-container";
-    // All day events container
-    const allDay = document.createElement("div");
-    allDay.className = "all-day-events";
-    // Now horizontal line marker
-    const nowMarker = NowMarker(this);
-    // Attach everything
-    const labels = TimesEl(this);
-    const anchor = AnchorEl();
-    scrollable.appendChild(anchor);
-    scrollable.append(scrollChild);
-    container.appendChild(scrollable);
-    scrollChild.appendChild(nowMarker);
-    scrollChild.appendChild(allDay);
-    scrollChild.appendChild(eventsContainer);
-    scrollable.appendChild(labels);
-    return {
-      scrollable,
-      scrollChild,
-      eventsContainer,
-      nowMarker,
-    };
-  };
   changeTheme = (theme: Theme) => {
     this.theme = theme;
-    this.container.className = theme;
+    if (this.container) this.container.className = theme;
     this.act();
   };
+  changeDayCount(count = 7) {
+    if (count > 100) {
+      console.warn(`Count cannot be greater than 100, count=${count}`);
+      return;
+    }
+    this.transform.daysVisible = count;
+    this.act();
+    // TODO: Provoke a resize via coordinator
+  }
   get scrollHeight() {
     return this.transform.hourPx * 24;
   }
