@@ -70,7 +70,9 @@ function dummyEvents(
 
 const start = new Date(new Date().setDate(new Date().getDate() - 365));
 const events = dummyEvents(start, [15, 60, 120], 365 * 2, 20000);
-const events24hrs = dummyEvents(start, [60 * 24], 365, 100);
+
+const startHalf = new Date(new Date().setDate(new Date().getDate() - 365 / 2));
+const events24hrs = dummyEvents(startHalf, [60 * 24], 365, 100);
 
 const db = new EventDB();
 db.loadEvents(events);
