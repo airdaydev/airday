@@ -40,6 +40,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Sat/Sunday shading, have to move gridlines to each date
 - [x] All-day events section spacing, additional gridlines
 - [x] Change number of days to render via tweakpane
+- [] Horizontal sizing and positioning correct (adjust due to time col)
 - [] Now line
 - [] Worker fix in build
 - [] Button to randomly create +24hr event in tweakpane starting at middle day
