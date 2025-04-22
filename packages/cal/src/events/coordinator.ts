@@ -96,17 +96,11 @@ export class EventRenderCoordinator {
     for (let entry of this.domCache.entries()) {
       const [date, cache] = entry;
       const x = this.airdayCal.transform.dateToX(date);
-      // console.log("changing", new Date(date), `translate(${x}px)`, cache.data);
-      // 1. get new x val from date
       cache.data.style.transform = `translate(${x}px)`;
       cache.data.style.width = `${this.airdayCal.transform.dayPx}px`;
-      // 2. get new width from date
-      // 3. update!
     }
   }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
-  // TODO: May need to vary event processing time based on actual render time (TODO: Measure with performance.mark)
-  // TODO: Calculate affected tiles (?)
   tick(maxMs = 16) {
     if (!this.airdayCal.db.ready) return;
     // Process events
@@ -201,7 +195,6 @@ export class EventRenderCoordinator {
     const data = message.data;
     if (data.layout) {
       this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
-      // this.airdayCal.uiObjects.updateDay(data.date.valueOf(), objs);
     }
     this.airdayCal.act(); // TODO: A little blunt
   }

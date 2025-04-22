@@ -174,9 +174,7 @@ export class AirdayCal {
   // };
   resizeCal = () => {
     // Taking initial scroll position into account
-    const nearestDayX = this.transform.refitCal(
-      this.scrollable.offsetWidth - this.transform.timeColWidth,
-    );
+    const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
     this.scrollable.scrollTo(nearestDayX - this.transform.timeColWidth, 0);
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     this.resized = false;

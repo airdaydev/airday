@@ -57,7 +57,9 @@ export class CalendarTransform {
 
   // called on resize
   refitCal(viewWidth: number) {
-    const nearestDay = Math.round(this.offset[0] / this.dayPx); // prior to changing this.dayPx
+    const nearestDay = Math.round(
+      (this.offset[0] + this.timeColWidth) / this.dayPx,
+    ); // prior to changing this.dayPx
     this.dayPx = viewWidth / this.daysVisible;
     this.scrollChildWidth = this.dayPx * 365 * 10;
     return nearestDay * this.dayPx;
