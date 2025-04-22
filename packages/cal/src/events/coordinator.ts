@@ -177,7 +177,24 @@ export class EventRenderCoordinator {
         this.renderedCache.set(dateVal, new CacheEntry(true));
       }
     }
-    // TODO: Cleanup domcache
+    const minDate = this.airdayCal.transform.dates[0].valueOf();
+    const maxDate =
+      this.airdayCal.transform.dates[
+        this.airdayCal.transform.dates.length - 1
+      ].valueOf();
+    this.domCache.forEach((cache) => {
+      const date = Number(cache.data.getAttribute("data-date"));
+      if (date < minDate) {
+        cache.data.parentNode?.removeChild(cache.data);
+        this.domCache.delete(date);
+        this.renderedCache.delete(date);
+      }
+      if (date > maxDate) {
+        cache.data.parentNode?.removeChild(cache.data);
+        this.domCache.delete(date);
+        this.renderedCache.delete(date);
+      }
+    });
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)

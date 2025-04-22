@@ -103,7 +103,7 @@ export function createCalStyleTag(instanceId: string) {
       justify-content: center;
     }
     #${instanceId} .debug-date {
-      display: none;
+      display: block;
       position: sticky;
       top: 0;
       background: yellow;
