@@ -12,6 +12,7 @@ export class CalendarTransform {
   headerHeight = 50; // aka header height
   allDayRowHeight = 50;
   margin = 10;
+  timeColWidth = 50;
   // End dimensions
   offset = [0, 0]; // Scroll offset
   daysVisible = 14; // qty. days to fit into view space

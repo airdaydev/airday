@@ -111,7 +111,6 @@ export class AirdayCal {
     scrollable.addEventListener("mousedown", (event: MouseEvent) => {
       this.mouseDown(event);
     });
-    this.resizeCal();
     this.frame();
     this.scrollable.scrollTo(
       this.transform.dateToX(utcZeroDate(new Date()).valueOf()),
@@ -126,7 +125,6 @@ export class AirdayCal {
     else return darkScheme;
   }
   mouseMove(event: MouseEvent) {
-    console.log(event);
     this.act();
   }
   mouseDown(event: MouseEvent) {
@@ -175,8 +173,11 @@ export class AirdayCal {
   //   // this.transform.originDate = date.valueOf();
   // };
   resizeCal = () => {
-    const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
-    this.scrollable.scrollTo(nearestDayX, 0);
+    // Taking initial scroll position into account
+    const nearestDayX = this.transform.refitCal(
+      this.scrollable.offsetWidth - this.transform.timeColWidth,
+    );
+    this.scrollable.scrollTo(nearestDayX - this.transform.timeColWidth, 0);
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     this.resized = false;
     // TODO: Debounce this (or reevaluate entire cache mgmt):
