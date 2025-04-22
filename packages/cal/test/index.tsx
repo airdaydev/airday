@@ -32,13 +32,16 @@ function randomTitle() {
   ][Math.floor(Math.random() * 3)];
 }
 
-const duration = [15, 60, 120];
-
-function getDuration() {
-  return duration[Math.floor(Math.random() * duration.length)] * 1000 * 60;
+function getDuration(durations: number[]) {
+  return durations[Math.floor(Math.random() * durations.length)] * 1000 * 60;
 }
 
-function dummyEvents(startDate: Date, days = 14, n = 100) {
+function dummyEvents(
+  startDate: Date,
+  durations = [15, 60, 120],
+  days = 14,
+  n = 100,
+) {
   const zeroStartDate = new Date(startDate);
   const endDate = new Date(zeroStartDate);
   endDate.setDate(zeroStartDate.getDate() + days);
@@ -48,7 +51,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     const random = Math.random() * range;
     const r = random % 15;
     const roundedRandom = random - r + zeroStartDate.valueOf();
-    const duration = getDuration();
+    const duration = getDuration(durations);
     const color = Math.random() > 0.5 ? "blue" : "yellow";
     const date = new Date(roundedRandom);
     date.setSeconds(0);
@@ -66,10 +69,12 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
 }
 
 const start = new Date(new Date().setDate(new Date().getDate() - 365));
-const events = dummyEvents(start, 365 * 2, 20000);
+const events = dummyEvents(start, [15, 60, 120], 365 * 2, 20000);
+const events24hrs = dummyEvents(start, [60 * 24], 365, 100);
 
 const db = new EventDB();
 db.loadEvents(events);
+db.loadEvents(events24hrs);
 db.ready = true;
 const cal = new AirdayCal(db);
 

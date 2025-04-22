@@ -43,17 +43,18 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Horizontal sizing and positioning correct (adjust due to time col)
 - [x] Bug when changing day count to 1 causes scroll offset to move to far left, then future positions to be incorrect
 - [x] Bug is due to lack of cleanup! - need to remove day els not in view or they will extend way beyond view
+- [x] Mock some 24hr events too
+- [] Today date label style
+- [] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
+- [] All-day events +24hr events system!
 - [] Now line
 - [] Worker fix in build
-- [] Button to randomly create +24hr event in tweakpane starting at middle day
-- [] All-day events +24hr events system!
 - [] Items over 24hrs long get moved into all-day event
 - [] Expand all day events
 - [] Scroll snap type
 - [] Jump to date/today button
 - [] Dragging 24hr events start/finish
 - [] Dragging 24hr events left/right
-- [] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
