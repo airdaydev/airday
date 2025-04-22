@@ -55,14 +55,14 @@ export class CalendarTransform {
     return Math.floor((viewportHeight + this.hourViewBuffer * 2) / this.hourPx);
   }
 
+  getNearestDay() {
+    return Math.round((this.offset[0] + this.timeColWidth) / this.dayPx);
+  }
+
   // called on resize
   refitCal(viewWidth: number) {
-    const nearestDay = Math.round(
-      (this.offset[0] + this.timeColWidth) / this.dayPx,
-    ); // prior to changing this.dayPx
     this.dayPx = viewWidth / this.daysVisible;
     this.scrollChildWidth = this.dayPx * 365 * 10;
-    return nearestDay * this.dayPx;
   }
 
   // called each frame

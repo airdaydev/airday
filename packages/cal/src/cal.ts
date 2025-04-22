@@ -33,6 +33,7 @@ export class AirdayCal {
   lastAction: number = performance.now();
   autoscrolling = false;
   firstRender: number | null = null; // Used to fade in first events
+  nearestDayX = 0;
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
@@ -112,11 +113,17 @@ export class AirdayCal {
       this.mouseDown(event);
     });
     this.frame();
-    this.scrollable.scrollTo(
-      this.transform.dateToX(utcZeroDate(new Date()).valueOf()),
-      0,
-    );
+    this.resizeCal();
+    this.scrollTo(new Date());
+    this.nearestDayX = this.transform.getNearestDay();
+    // console.log(this.nearestDayX);
   };
+  scrollTo(date: Date) {
+    const x =
+      this.transform.dateToX(utcZeroDate(date).valueOf()) -
+      this.transform.timeColWidth;
+    this.scrollable?.scrollTo(x, 0);
+  }
   enableStats(stats: Stats) {
     this.stats = stats;
   }
@@ -153,7 +160,8 @@ export class AirdayCal {
     if (this.container) this.container.className = theme;
     this.act();
   };
-  daysVisible(count = 7) {
+  setDaysVisible(count = 7) {
+    this.nearestDayX = this.transform.getNearestDay();
     if (count > 100) {
       console.warn(`Count cannot be greater than 100, count=${count}`);
       return;
@@ -161,7 +169,6 @@ export class AirdayCal {
     this.transform.daysVisible = count;
     this.resized = true;
     this.act();
-    // TODO: Provoke a resize via coordinator
   }
   get scrollHeight() {
     return this.transform.hourPx * 24;
@@ -174,11 +181,12 @@ export class AirdayCal {
   // };
   resizeCal = () => {
     // Taking initial scroll position into account
-    const nearestDayX = this.transform.refitCal(this.scrollable.offsetWidth);
-    this.scrollable.scrollTo(nearestDayX - this.transform.timeColWidth, 0);
+    this.transform.refitCal(
+      this.scrollable.offsetWidth - this.transform.timeColWidth,
+    );
+    this.scrollTo(new Date());
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     this.resized = false;
-    // TODO: Debounce this (or reevaluate entire cache mgmt):
   };
   // Main draw loop; run inside a request animation frame
   draw() {

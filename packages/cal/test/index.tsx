@@ -125,7 +125,7 @@ class modifierPane {
     return cal.transform.daysVisible;
   }
   set days(count: number) {
-    cal.daysVisible(count);
+    cal.setDaysVisible(count);
   }
 }
 
