@@ -2,6 +2,7 @@
 import { render } from "solid-js/web";
 import "./index.css";
 import {
+  AirdayCal,
   CalSolidWrapper,
   CalendarEventConstructorProps,
   EventDB,
@@ -70,6 +71,7 @@ const events = dummyEvents(start, 365 * 2, 20000);
 const db = new EventDB();
 db.loadEvents(events);
 db.ready = true;
+const cal = new AirdayCal(db);
 
 render(
   () => (
@@ -80,7 +82,7 @@ render(
       }}
     >
       <h1>@airday/cal</h1>
-      <CalSolidWrapper theme={theme[0]} db={db} stats={stats} />
+      <CalSolidWrapper cal={cal} theme={theme[0]} stats={stats} />
     </div>
   ),
   root!,

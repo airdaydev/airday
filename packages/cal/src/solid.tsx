@@ -16,8 +16,9 @@ interface CalendarProps {
 export function CalSolidWrapper(props: CalendarProps) {
   let domContainer: HTMLDivElement | undefined;
   let cal: AirdayCal;
-  if (props.cal && props.db)
-    throw new Error("If providing cal instance, assign db outside component.");
+  if (props.cal && props.db) {
+    console.warn("CalSolidWrapper ignoring props.db as cal is provided");
+  }
   if (!props.cal) {
     if (!props.db) throw new Error("DB must be provided if cal not provided");
     cal = new AirdayCal(props.db);
