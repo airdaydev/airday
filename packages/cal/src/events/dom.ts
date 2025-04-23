@@ -1,5 +1,5 @@
 import { AirdayCal } from "../cal";
-import { getDateUTC, isTodayUTC, isWeekend } from "../time";
+import { getDateUTC, getTime, isTodayUTC, isWeekend } from "../time";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout) {
@@ -134,11 +134,31 @@ export function TimesEl(airdayCal: AirdayCal) {
   return labels;
 }
 
-export function NowMarker(airday: AirdayCal) {
-  const nowMarker = document.createElement("div");
-  nowMarker.className = "now-marker";
-  const now = new Date();
-  const y = airday.transform.timeToY(now);
-  nowMarker.style.top = `${y}px`;
-  return nowMarker;
+// TODO: Only display now marker when view has current date
+// TODO: Don't update unless time actually changes
+// - might be better to use set interval instead of updating on tick
+export class NowMarker {
+  airday: AirdayCal;
+  container: HTMLDivElement;
+  label: HTMLDivElement;
+  constructor(airday: AirdayCal) {
+    this.airday = airday;
+    const container = document.createElement("div");
+    this.container = container;
+    container.className = "now-container";
+    const label = document.createElement("div");
+    label.className = "now-label";
+    this.label = label;
+    const marker = document.createElement("div");
+    marker.className = "now-marker";
+    this.update();
+    container.append(label, marker);
+    return this;
+  }
+  update() {
+    const now = new Date();
+    this.label.innerText = getTime(now.valueOf());
+    const y = this.airday.transform.timeToY(now);
+    this.container.style.top = `${y}px`; // TODO: 50 is dynamic
+  }
 }

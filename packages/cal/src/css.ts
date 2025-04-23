@@ -229,14 +229,26 @@ export function createCalStyleTag(instanceId: string) {
       padding-top: 28px;
       top: 0;
     }
-    #${instanceId} .now-marker {
+    #${instanceId} .now-container {
       position: absolute;
       width: 100%;
-      top: 55px;
+      pointer-events: none;
+    }
+    #${instanceId} .now-marker {
+      position: absolute;
+      width: 100vw;
+      left: 100%;
       z-index: 10;
       height: 1px;
       background: #ff8a8a;
-      pointer-events: none;
+    }
+    #${instanceId} .now-label {
+      position: absolute;
+      z-index: 13;
+      right: 10px;
+      color: red;
+      transform: translateY(-50%);
+      font-weight: 600;
     }
     #${instanceId} .today .day-header {
       color: red;

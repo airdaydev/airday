@@ -23,7 +23,7 @@ export class AirdayCal {
   scrollable?: HTMLDivElement;
   scrollChild?: HTMLDivElement;
   eventsContainer?: HTMLDivElement;
-  nowMarker?: HTMLDivElement;
+  nowMarker?: NowMarker;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -61,26 +61,26 @@ export class AirdayCal {
     // Events container
     const eventsContainer = document.createElement("div");
     eventsContainer.className = "events-container";
+    this.eventsContainer = eventsContainer;
     // All day events container
     const allDay = document.createElement("div");
     allDay.className = "all-day-events";
     // Now horizontal line marker
-    const nowMarker = NowMarker(this);
+    const nowMarker = new NowMarker(this);
+    this.nowMarker = nowMarker;
     // Attach everything
     const labels = TimesEl(this);
     const anchor = AnchorEl();
     scrollable.appendChild(anchor);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
-    scrollChild.appendChild(nowMarker);
+    labels.appendChild(nowMarker.container);
     scrollChild.appendChild(allDay);
     scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);
     this.scrollable = scrollable;
     this.scrollChild = scrollChild;
     this.scrollChild.style.height = `${this.scrollHeight}px`; // Additional px to display 24:00
-    this.eventsContainer = eventsContainer;
-    this.nowMarker = nowMarker;
     this.resizeCal();
     this.transform.originDate = this.transform.calcOriginDate(); // TODO: Note that this is necessary
     // TODO: Destroy
@@ -197,6 +197,7 @@ export class AirdayCal {
       this.coordinator.resize();
     }
     this.transform.updateClipspace();
+    this.nowMarker?.update();
     this.coordinator.tick();
   }
   frame() {
