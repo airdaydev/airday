@@ -251,6 +251,7 @@ export function createCalStyleTag(instanceId: string) {
       font-weight: 600;
     }
     #${instanceId} .today .day-header {
+      font-weight: 600;
       color: red;
     }
   `;

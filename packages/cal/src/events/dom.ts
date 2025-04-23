@@ -120,6 +120,7 @@ export function TimesEl(airdayCal: AirdayCal) {
     if (i >= 1 && i <= 24) {
       if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
         // Hides time if obscured by current hour
+        // TODO: This needs to be updated at least every global minute interval
       } else {
         const label = document.createElement("div");
         label.className = "time-grid-label";
