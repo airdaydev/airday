@@ -90,7 +90,7 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.dark .all-day {
         background: var(--black);
         border-top: 1px solid #222;
-        border-left: 1px solid #222;
+        border-right: 1px solid #222;
         border-bottom: 1px solid #222;
     }
     #${instanceId} .date-label {
