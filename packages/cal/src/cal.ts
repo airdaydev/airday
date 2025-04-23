@@ -7,7 +7,7 @@ import {
   darkEventSchemes,
 } from "./colours";
 import { EventDB } from "./state";
-import { utcZeroDate } from "./time";
+import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
 import { AnchorEl, NowMarker, TimesEl } from "./events/dom";
@@ -114,7 +114,7 @@ export class AirdayCal {
     });
     this.frame();
     this.resizeCal();
-    this.scrollTo(new Date());
+    this.scrollTo(new Date(getStartOfWeekUTC(new Date())));
   };
   scrollTo(date: Date) {
     const x =

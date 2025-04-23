@@ -48,14 +48,15 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Today date label style
 - [x] Correct now line (move to time container)
 - [] All-day events +24hr events system!
-- [] Worker fix in build
 - [] Items over 24hrs long get moved into all-day event
-- [] Expand all day events
-- [] Scroll snap type
-- [] Jump to date/today button
+- [] Expand all day events if there are multiple
 - [] Dragging 24hr events start/finish
 - [] Dragging 24hr events left/right
+- [] Worker fix in build
+- [] Scroll snap type (?)
+- [] Jump to date/today button in tweakpane
 - [] Filter by multiple calendars, colour
+- [] Make layout calcs faster, calculate multiple at a time
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
