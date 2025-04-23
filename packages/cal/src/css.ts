@@ -250,13 +250,13 @@ export function createCalStyleTag(instanceId: string) {
       position: absolute;
       z-index: 13;
       right: 10px;
-      color: red;
+      color: #ff7878;
       transform: translateY(-50%);
       font-weight: 600;
     }
     #${instanceId} .today .day-header {
       font-weight: 600;
-      color: red;
+      color: #ff7878;
     }
   `;
   document.head.appendChild(style);
