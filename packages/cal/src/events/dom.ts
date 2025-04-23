@@ -64,7 +64,7 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   const text = getDateUTC(jsDate);
   dateLabel.innerText = text;
   header.appendChild(dateLabel);
-  // All day area
+  // All day area (covers offset scroll area)
   const allDayArea = document.createElement("div");
   allDayArea.className = "all-day";
   header.appendChild(allDayArea);
@@ -120,7 +120,7 @@ export function TimesEl(airdayCal: AirdayCal) {
     if (i >= 1 && i <= 24) {
       if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
         // Hides time if obscured by current hour
-        // TODO: This needs to be updated at least every global minute interval
+        // TODO: This needs to be updated at least ever
       } else {
         const label = document.createElement("div");
         label.className = "time-grid-label";
@@ -162,4 +162,13 @@ export class NowMarker {
     const y = this.airday.transform.timeToY(now);
     this.container.style.top = `${y}px`; // TODO: 50 is dynamic
   }
+}
+
+export function AllDayArea() {
+  const allDayArea = document.createElement("div");
+  allDayArea.className = "all-day-area";
+  const allDayEvents = document.createElement("div");
+  allDayEvents.className = "all-day-events";
+  allDayArea.append(allDayEvents);
+  return allDayArea;
 }

@@ -75,7 +75,7 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .day-header {
       position: sticky;
       top: -0.5px; /* covers top of scroll container as items that scroll up show in a gap - maybe related to sticky positioning */
-      width: calc(100% + 1px); /* similar to top val, ensuring no gap on either side */
+      width: 100%;
       z-index: 10;
     }
     #${instanceId} .all-day {
@@ -84,7 +84,7 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.light .all-day {
       background: var(--white);
       border-top: 1px solid #f0f0f0;
-      border-left: 1px solid #f0f0f0;
+      border-right: 1px solid #f0f0f0;
       border-bottom: 1px solid #f0f0f0;
     }
     #${instanceId}.dark .all-day {
@@ -220,14 +220,18 @@ export function createCalStyleTag(instanceId: string) {
       align-items: center;
       justify-content: center;
     }
-    #${instanceId} .all-day-events {
+    #${instanceId} .all-day-area {
       position: sticky;
-      background: #ffafaf78;
+      width: 100%;
+      z-index: 10;
+      top: 0;
+    }
+    #${instanceId} .all-day-events {
+      position: absolute;
       height: 28px;
       width: 100%;
       z-index: 10;
-      padding-top: 28px;
-      top: 0;
+      top: 24px;
     }
     #${instanceId} .now-container {
       position: absolute;
