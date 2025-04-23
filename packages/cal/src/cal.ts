@@ -119,7 +119,7 @@ export class AirdayCal {
     const x =
       this.transform.dateToX(utcZeroDate(date).valueOf()) -
       this.transform.timeColWidth;
-    this.scrollable?.scrollTo(x, 0);
+    this.scrollable?.scrollTo(x, this.scrollable.scrollTop);
   }
   enableStats(stats: Stats) {
     this.stats = stats;
@@ -185,7 +185,7 @@ export class AirdayCal {
     this.scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     this.scrollable.scrollTo(
       nearestDayX * this.transform.dayPx - this.transform.timeColWidth,
-      0,
+      this.scrollable.scrollTop,
     );
     this.resized = false;
   };
