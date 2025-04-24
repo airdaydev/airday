@@ -47,7 +47,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Limit height of event containers - while allowing shading of weekend to extend to very bottom of cal
 - [x] Today date label style
 - [x] Correct now line (move to time container)
-- [] Make layout calcs faster, calculate multiple at a time
+- [x] Make layout calcs faster, calculate multiple at a time (fuck yes)
 - [] All-day events +24hr events system!
 - [] Items over 24hrs long get moved into all-day event
 - [] Expand all day events if there are multiple
