@@ -20,7 +20,7 @@ function EventEl(layout: EventLayout, event: CalendarEvent) {
     title.innerText = event.title;
     const time = document.createElement("div");
     time.className = "event-time";
-    time.innerText = event.start;
+    time.innerText = getTime(event.start.valueOf()); // TODO: Consider caching
     div.append(title, time);
   }
   return div;

@@ -150,7 +150,6 @@ export class EventRenderCoordinator {
         });
         this.dataCache.set(dateVal, new CacheEntry(eventIdMap));
         // TODO: Separate function & compress further
-        // TODO: batch transfer
         const transfer = [];
         eventIdMap.forEach((event) => {
           transfer.push({
@@ -170,8 +169,8 @@ export class EventRenderCoordinator {
               this.airdayCal.transform.hourPx,
             ],
           });
+          continue;
         }
-        return;
       }
       const layout = this.layoutCache.get(dateVal);
       // if no layout?
@@ -218,6 +217,7 @@ export class EventRenderCoordinator {
     if (data.layout) {
       this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
     }
+    this.startWorkQueue();
     this.airdayCal.act(); // TODO: A little blunt
   }
   startWorkQueue() {
