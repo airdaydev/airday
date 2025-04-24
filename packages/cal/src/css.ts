@@ -160,10 +160,10 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       height: 100%;
       top: ${ALL_DAY_MARGIN}px;
-      overflow-y: hidden;
       z-index: 2;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow-x: visible;
+      overflow-y: hidden;
     }
     #${instanceId}.light .day-events {
       border-right: 1px solid #e1e1e1;
