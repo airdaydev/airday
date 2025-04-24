@@ -1,10 +1,11 @@
 import { AirdayCal } from "../cal";
+import { CalendarEvent } from "../model";
 import { getDateUTC, getTime, isTodayUTC, isWeekend } from "../time";
 import { DayLayout, EventLayout } from "./layout";
 
-function EventEl(layout: EventLayout) {
+function EventEl(layout: EventLayout, event: CalendarEvent) {
   const div = document.createElement("div");
-  div.classList.add("event", layout.color);
+  div.classList.add("event", event.color);
   div.style.top = `${layout.y}px`;
   div.style.left = `${layout.x * 100}%`;
   div.style.height = `${layout.height}px`;
@@ -16,10 +17,10 @@ function EventEl(layout: EventLayout) {
   if (layout.startsToday) {
     const title = document.createElement("div");
     title.className = "event-title";
-    title.innerText = layout.displayText;
+    title.innerText = event.title;
     const time = document.createElement("div");
     time.className = "event-time";
-    time.innerText = layout.displayTime;
+    time.innerText = event.start;
     div.append(title, time);
   }
   return div;
@@ -85,11 +86,17 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   return dayEl;
 }
 
-export function appendDayLayout(container: HTMLElement, layout: DayLayout) {
+export function appendDayLayout(
+  container: HTMLElement,
+  layout: DayLayout,
+  data: Map<string, CalendarEvent>,
+) {
+  // console.log("wtf", data);
   // Create events
   const events: HTMLDivElement[] = [];
   layout.map.forEach((eventLayout) => {
-    events.push(EventEl(eventLayout));
+    const event = data.get(eventLayout.id);
+    events.push(EventEl(eventLayout, event));
   });
   container.append(...events);
 }

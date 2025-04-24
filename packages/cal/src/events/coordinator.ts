@@ -74,7 +74,7 @@ export class EventRenderCoordinator {
   idleWorkers: Set<UIWorker> = new Set();
   work: Workload[] = [];
   queueRunning = false;
-  dataCache = new Map<number, CacheEntry<CalendarEvent[]>>();
+  dataCache = new Map<number, CacheEntry<Map<string, CalendarEvent>>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
   renderedCache = new Map<number, CacheEntry<boolean>>();
@@ -144,7 +144,21 @@ export class EventRenderCoordinator {
           localZero,
           new Date(localZero.valueOf() + 864e5),
         );
-        this.dataCache.set(dateVal, new CacheEntry(events));
+        const eventIdMap = new Map<string, CalendarEvent>();
+        events.forEach((event) => {
+          eventIdMap.set(event.id, event);
+        });
+        this.dataCache.set(dateVal, new CacheEntry(eventIdMap));
+        // TODO: Separate function & compress further
+        // TODO: batch transfer
+        const transfer = [];
+        eventIdMap.forEach((event) => {
+          transfer.push({
+            id: event.id,
+            start: event.start,
+            end: event.end,
+          });
+        });
         if (events) {
           this.assignWork({
             type: "next",
@@ -161,12 +175,20 @@ export class EventRenderCoordinator {
       }
       const layout = this.layoutCache.get(dateVal);
       // if no layout?
+      const idData = this.dataCache.get(dateVal);
       const domData = this.domCache.get(dateVal);
       const rendered = this.renderedCache.get(dateVal);
-      if ((!rendered || !rendered.data) && domData && layout && layout.data) {
+      if (
+        (!rendered || !rendered.data) &&
+        domData &&
+        layout &&
+        layout.data &&
+        idData
+      ) {
         appendDayLayout(
           domData.data.getElementsByClassName("day-events")[0] as HTMLElement, // TODO: eh enumeration/text match look up...
           layout.data,
+          idData.data,
         );
         this.renderedCache.set(dateVal, new CacheEntry(true));
       }
