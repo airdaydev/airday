@@ -162,7 +162,7 @@ export function createCalStyleTag(instanceId: string) {
       top: ${ALL_DAY_MARGIN}px;
       z-index: 2;
       box-sizing: border-box;
-      overflow-x: visible;
+      overflow-x: hidden; /* TODO: Debug later but this is creating scrollbars even with it set to visible */
       overflow-y: hidden;
     }
     #${instanceId}.light .day-events {

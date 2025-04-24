@@ -1,4 +1,4 @@
-import { getTime, localZeroDate, timeToY } from "../time";
+import { localZeroDate, timeToY } from "../time";
 
 export interface EventLayout {
   id: string;
@@ -9,9 +9,6 @@ export interface EventLayout {
   startsToday: boolean;
   segment: number;
   cluster: number;
-  // displayText: string;
-  // displayTime: string;
-  // color: string;
 }
 
 // class EventLayoutTransfer {
@@ -101,8 +98,6 @@ export function calcDayLayout(
     const cluster = nextCluster(y, height, segment);
     layoutMap.set(event.id, {
       id: event.id,
-      // startTime,
-      // endTime,
       width: 0, // unset yet
       height,
       x: 0, // unset yet
@@ -110,9 +105,6 @@ export function calcDayLayout(
       startsToday,
       segment,
       cluster,
-      // displayText: `${event.title};c${cluster};s${segment}`,
-      // displayTime: getTime(event.start),
-      // color: event.color,
     });
   });
   layoutMap.forEach((layout) => {
