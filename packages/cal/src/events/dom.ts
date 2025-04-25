@@ -179,6 +179,7 @@ export class AllDayEvents {
   airdayCal: AirdayCal;
   region: HTMLDivElement;
   container: HTMLDivElement;
+  expanded = false;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
     const region = document.createElement("div");
@@ -189,5 +190,14 @@ export class AllDayEvents {
     this.region = region;
     this.container = container;
     return this;
+  }
+  render() {
+    // 1.
+  }
+  expand() {
+    this.expanded = true;
+  }
+  collapse() {
+    this.expanded = false;
   }
 }

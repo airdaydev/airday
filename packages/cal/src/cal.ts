@@ -24,6 +24,7 @@ export class AirdayCal {
   scrollChild?: HTMLDivElement;
   eventsContainer?: HTMLDivElement;
   nowMarker?: NowMarker;
+  allDayEvents?: AllDayEvents;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -63,7 +64,8 @@ export class AirdayCal {
     eventsContainer.className = "events-container";
     this.eventsContainer = eventsContainer;
     // All day events container (TODO: Move to DOM.ts)
-    const allDay = new AllDayEvents(this);
+    const allDayEvents = new AllDayEvents(this);
+    this.allDayEvents = allDayEvents;
     // Now horizontal line marker
     const nowMarker = new NowMarker(this);
     this.nowMarker = nowMarker;
@@ -74,7 +76,7 @@ export class AirdayCal {
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
     labels.appendChild(nowMarker.container);
-    scrollChild.appendChild(allDay.region);
+    scrollChild.appendChild(allDayEvents.region);
     scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);
     this.scrollable = scrollable;

@@ -74,7 +74,7 @@ export class EventRenderCoordinator {
   idleWorkers: Set<UIWorker> = new Set();
   work: Workload[] = [];
   queueRunning = false;
-  allDayCache = new Map<string, CalendarEvent>(new Map());
+  allDayCache = new CacheEntry<Map<string, CalendarEvent>>(new Map());
   dataCache = new Map<number, CacheEntry<Map<string, CalendarEvent>>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
@@ -154,7 +154,8 @@ export class EventRenderCoordinator {
             event.end.valueOf() - event.start.valueOf() >=
             24 * 60 * 60 * 1000
           ) {
-            this.allDayCache.set(event.id, event);
+            this.allDayCache.data.set(event.id, event);
+            this.allDayCache.markStale();
             return false;
           }
           return true;
@@ -221,6 +222,13 @@ export class EventRenderCoordinator {
         this.renderedCache.delete(date);
       }
     });
+    if (!this.allDayCache.fresh && this.airdayCal.allDayEvents) {
+      //
+      this.allDayCache.fresh = true;
+    }
+    // if (this.airdayCal.allDayEvents) {
+    //   console.log("allDayEvents");
+    // }
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
