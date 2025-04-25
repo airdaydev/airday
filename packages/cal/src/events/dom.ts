@@ -96,7 +96,11 @@ export function appendDayLayout(
   const events: HTMLDivElement[] = [];
   layout.map.forEach((eventLayout) => {
     const event = data.get(eventLayout.id);
-    events.push(EventEl(eventLayout, event));
+    if (event) {
+      events.push(EventEl(eventLayout, event));
+    } else {
+      console.warn(`Event ${eventLayout.id} not found in data cache`);
+    }
   });
   container.append(...events);
 }
@@ -171,11 +175,19 @@ export class NowMarker {
   }
 }
 
-export function AllDayArea() {
-  const allDayArea = document.createElement("div");
-  allDayArea.className = "all-day-area";
-  const allDayEvents = document.createElement("div");
-  allDayEvents.className = "all-day-events";
-  allDayArea.append(allDayEvents);
-  return allDayArea;
+export class AllDayEvents {
+  airdayCal: AirdayCal;
+  region: HTMLDivElement;
+  container: HTMLDivElement;
+  constructor(airdayCal: AirdayCal) {
+    this.airdayCal = airdayCal;
+    const region = document.createElement("div");
+    region.className = "all-day-area";
+    const container = document.createElement("div");
+    container.className = "all-day-events";
+    region.append(container);
+    this.region = region;
+    this.container = container;
+    return this;
+  }
 }

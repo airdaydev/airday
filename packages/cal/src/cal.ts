@@ -10,7 +10,7 @@ import { EventDB } from "./state";
 import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
-import { AllDayArea, AnchorEl, NowMarker, TimesEl } from "./events/dom";
+import { AllDayEvents, AnchorEl, NowMarker, TimesEl } from "./events/dom";
 
 type TimeFormat = "24hr" | "12hr";
 
@@ -63,7 +63,7 @@ export class AirdayCal {
     eventsContainer.className = "events-container";
     this.eventsContainer = eventsContainer;
     // All day events container (TODO: Move to DOM.ts)
-    const allDay = AllDayArea();
+    const allDay = new AllDayEvents(this);
     // Now horizontal line marker
     const nowMarker = new NowMarker(this);
     this.nowMarker = nowMarker;
@@ -74,7 +74,7 @@ export class AirdayCal {
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
     labels.appendChild(nowMarker.container);
-    scrollChild.appendChild(allDay);
+    scrollChild.appendChild(allDay.region);
     scrollChild.appendChild(eventsContainer);
     scrollable.appendChild(labels);
     this.scrollable = scrollable;

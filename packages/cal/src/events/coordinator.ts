@@ -74,6 +74,7 @@ export class EventRenderCoordinator {
   idleWorkers: Set<UIWorker> = new Set();
   work: Workload[] = [];
   queueRunning = false;
+  allDayCache = new Map<string, CalendarEvent>(new Map());
   dataCache = new Map<number, CacheEntry<Map<string, CalendarEvent>>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
@@ -148,6 +149,16 @@ export class EventRenderCoordinator {
         events.forEach((event) => {
           eventIdMap.set(event.id, event);
         });
+        const shortTermEvents = events.filter((event) => {
+          if (
+            event.end.valueOf() - event.start.valueOf() >=
+            24 * 60 * 60 * 1000
+          ) {
+            this.allDayCache.set(event.id, event);
+            return false;
+          }
+          return true;
+        });
         this.dataCache.set(dateVal, new CacheEntry(eventIdMap));
         // TODO: Separate function & compress further
         const transfer = [];
@@ -158,11 +169,11 @@ export class EventRenderCoordinator {
             end: event.end,
           });
         });
-        if (events) {
+        if (shortTermEvents) {
           this.assignWork({
             type: "next",
             date,
-            events: events.map((e) => e.transfer()),
+            events: shortTermEvents.map((e) => e.transfer()),
             theme: this.airdayCal.theme,
             transform: [
               this.airdayCal.transform.dayPx,
