@@ -59,6 +59,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Jump to date/today button in tweakpane
 - [] Filter by multiple calendars, colour
 - [] Bug: Sometimes the overflow events first thing in the morning sit above succeeding events
+- [] Maybe show month (3 day version) for every monday, and every 1st, so context is extremely obvious
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
