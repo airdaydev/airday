@@ -244,6 +244,7 @@ export function createCalStyleTag(instanceId: string) {
       align-items: center;
       padding-left: 0.5em;
       box-sizing: border-box;
+      user-select: none;
     }
     #${instanceId} .now-container {
       position: absolute;
