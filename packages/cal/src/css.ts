@@ -233,6 +233,18 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 10;
       top: 24px;
     }
+    #${instanceId} .all-day-event {
+      position: absolute;
+      background: #fffbd9;
+      height: 25px;
+      top: 1px;
+      left: 1px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      padding-left: 0.5em;
+      box-sizing: border-box;
+    }
     #${instanceId} .now-container {
       position: absolute;
       width: 100%;

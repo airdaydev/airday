@@ -1,5 +1,3 @@
-import { Signal, createSignal, createUniqueId } from "solid-js";
-
 export interface CalendarEventConstructorProps {
   id?: string;
   title?: string;
@@ -16,22 +14,22 @@ export interface EventSignalProps {
   end: Date;
 }
 
+let idx = 0; // TODO: better id func
+
 export class CalendarEvent {
   id: string;
   title: string;
   start: Date;
   end: Date;
   color: string;
-  signal: Signal<EventSignalProps & ReturnType<this["serialise"]>>;
   constructor(props: CalendarEventConstructorProps) {
-    this.id = props.id || createUniqueId();
+    this.id = props.id || (idx++).toString(); // TODO: better id func
     this.title = props.title || "";
     this.start = props.start || new Date();
     this.color = props.color;
     this.end =
       props.end ||
       new Date(new Date().setMinutes(new Date().getMinutes() + 15));
-    this.signal = createSignal(this.toJSON());
   }
   serialise(): any | undefined {
     return undefined;

@@ -10,7 +10,8 @@ import { EventDB } from "./state";
 import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
-import { AllDayEvents, AnchorEl, NowMarker, TimesEl } from "./events/dom";
+import { AnchorEl, NowMarker, TimesEl } from "./events/dom";
+import { AllDayEvents } from "./events/all-day";
 
 type TimeFormat = "24hr" | "12hr";
 
