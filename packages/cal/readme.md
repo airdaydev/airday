@@ -49,6 +49,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Correct now line (move to time container)
 - [x] Make layout calcs faster, calculate multiple at a time (fuck yes)
 - [] All-day events +24hr events system!
+- [] Move now marker line back into events container as in the mornings it rises above the cal header
 - [] Items over 24hrs long get moved into all-day event
 - [] Expand all day events if there are multiple
 - [] Dragging 24hr events start/finish

@@ -191,8 +191,18 @@ export class AllDayEvents {
     this.container = container;
     return this;
   }
-  render() {
-    // 1.
+  renderExpanded() {
+    // For each event
+    // sort by earliest, then longest.
+    // Earliest at the top, then if the next event intersects, place below, create next lane,
+    // for next event start at the top and find first lane with no intersection
+  }
+  renderContracted() {
+    // Based on days in view
+    // Make a Map<date, set<id>>()
+    // layout =
+    // for days with 1 event, look forward, if no intersection, render whole event
+    // if there is an intersection, render the event count for that day
   }
   expand() {
     this.expanded = true;
