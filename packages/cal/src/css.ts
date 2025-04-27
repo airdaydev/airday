@@ -205,6 +205,8 @@ export function createCalStyleTag(instanceId: string) {
       background: var(--black);
     }
     #${instanceId} .event-title {
+      word-break: break-word;
+      hyphens: auto;
       font-weight: 500;
     }
     #${instanceId} .event-time {
