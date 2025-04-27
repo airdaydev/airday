@@ -54,15 +54,13 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] All-day event layout calcs offloaded to worker
 - [x] word wrap event for longer events
 - [x] buffer events to the left too
-- [] Move now marker line back into events container as in the mornings it rises above the cal header
+- [x] Move now marker line back into events container as in the mornings it rises above the cal header
 - [] All-day view expands & contracts to arbitrary height px
 - [] All-day expanded rendering
 - [] Expand all day events if there are multiple
 - [] Worker fix in built version
 - [] Jump to date/today button in tweakpane
-- [] Maybe show month (3 day version) for every monday, and every 1st, so context is extremely obvious
 - [] Filter by multiple calendars, colour
-- [] Consider: Hover over date to see full date ?
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
@@ -89,6 +87,10 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 ## Repeating events
 - [] Repeating events
 - [] Overwriting repeated events (fuck)
+
+## Orientation
+- [] Consider: Hover over date to see full date ?
+- [] Maybe show month (3 day version) for every monday, and every 1st, so context is extremely obvious
 
 ## final optimisations / quality udpates / future plans
 - [] Bug: Sometimes the overflow events first thing in the morning sit above succeeding events

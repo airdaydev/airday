@@ -283,7 +283,6 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .day-header {
       height: 50px;
-      background: red;
     }
     #${instanceId} .cal-header-col {
       position: absolute;
