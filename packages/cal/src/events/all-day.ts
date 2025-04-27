@@ -2,6 +2,10 @@ import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { utcMidnight } from "../time";
 
+// function incrMapCount(map: Map<number, number>, key: number, val: number) {
+//   map.set(key, number);
+// }
+
 export class AllDayEvents {
   airdayCal: AirdayCal;
   region: HTMLDivElement;
@@ -30,7 +34,7 @@ export class AllDayEvents {
   }
   // TODO: Layout to be done in a worker
   renderExpanded(cache: Map<string, CalendarEvent>) {
-    console.log("render expanded");
+    console.log("rendering expanded");
     // For each event
     // sort by earliest, then longest.
     // Earliest at the top, then if the next event intersects, place below, create next lane,
@@ -38,42 +42,48 @@ export class AllDayEvents {
   }
   // TODO: Layout to be done in a worker
   // TODO: Test the shit out of this function
+  // TODO: copy only necessary data
   renderContracted(cache: Map<number, Set<CalendarEvent>>) {
-    console.log("render contracted", cache);
+    console.log("rendering contracted", cache);
     // We already have counts, we just need to check if there are events WITHOUT intersections
     let curSolo: CalendarEvent | undefined; // current event without intersections
-    let curSoloIdx: number | undefined = undefined;
-    const toRender: CalendarEvent[] = [];
-    const layout: number[] = []; // count, or false
+    let curSoloDates: number[] = [];
+    const toRender: (CalendarEvent & { dayLength: number })[] = [];
+    const layout = new Map<number, number>(); // date, event count to display (0 = no display)
     let idx = 0;
     cache.forEach((vals, key) => {
-      layout.push(vals.size);
+      layout.set(key, vals.size);
       if (vals.size === 0 && curSolo) {
         // render this start to finish
-        toRender.push(curSolo);
-        for (let i = curSoloIdx as number; i < idx; i++) {
-          layout[i] = 0;
-        }
+        toRender.push(
+          Object.assign(curSolo, { dayLength: curSoloDates.length }),
+        );
+        curSoloDates.forEach((date) => {
+          layout.delete(date);
+        });
       }
       if (vals.size === 1) {
         const val = vals.values().next().value as CalendarEvent;
         if (!curSolo) {
           // assign new event
           curSolo = val;
-          curSoloIdx = idx;
+          curSoloDates = [key];
         }
         if (curSolo && curSolo.id !== val.id) {
-          toRender.push(curSolo);
+          toRender.push(
+            Object.assign(curSolo, { dayLength: curSoloDates.length }),
+          );
           curSolo = val;
-          curSoloIdx = idx;
+          curSoloDates = [key];
         }
         if (curSolo && curSolo.id === val.id) {
-          // do nothing because it's a continuation
+          curSoloDates.push(key);
         }
       }
       if (vals.size > 1) {
+        // More than one date = reset
         curSolo = undefined;
-        curSoloIdx = undefined;
+        curSoloDates = [];
       }
       idx++;
     });
@@ -83,12 +93,28 @@ export class AllDayEvents {
       const div = document.createElement("div");
       div.classList.add("all-day-event", `col_${event.color}`);
       div.style.transform = `translate(${x}px)`;
-      div.style.width = `${this.airdayCal.transform.dayPx * 2 - 2}px`; // TODO: We need to actually vary it!
+      div.style.width = `${this.airdayCal.transform.dayPx * event.dayLength - 2}px`; // TODO: We need to actually vary it!
       div.innerText = event.title;
       return div;
     });
+    // Render events:
+    // TODO: Track dom refs & remove as needed
+    this.container.innerHTML = "";
     this.container.append(...divs);
-    // TODO: Render these!!
+    // TODO: Render event qties:
+    const countDivs: HTMLDivElement[] = [];
+    this.airdayCal.transform.dates.forEach((date) => {
+      const count = layout.get(date.valueOf());
+      if (count) {
+        const div = document.createElement("div");
+        div.classList.add("all-day-event");
+        const x = this.airdayCal.transform.dateToX(date.valueOf());
+        div.style.transform = `translate(${x}px)`;
+        div.innerText = `${count} event${count > 1 ? "s" : ""}`;
+        countDivs.push(div);
+      }
+    });
+    this.container.append(...countDivs);
   }
   expand() {
     this.expanded = true;

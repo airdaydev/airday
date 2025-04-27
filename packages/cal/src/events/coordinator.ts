@@ -193,7 +193,7 @@ export class EventRenderCoordinator {
         }
       }
       const layout = this.layoutCache.get(dateVal);
-      // if no layout?
+      // TODO: if no layout?
       const idData = this.dataCache.get(dateVal);
       const domData = this.domCache.get(dateVal);
       const rendered = this.renderedCache.get(dateVal);
@@ -237,9 +237,6 @@ export class EventRenderCoordinator {
       );
       this.allDayRendered = true;
     }
-    // if (this.airdayCal.allDayEvents) {
-    //   console.log("allDayEvents");
-    // }
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
