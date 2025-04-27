@@ -74,7 +74,6 @@ export class EventRenderCoordinator {
   idleWorkers: Set<UIWorker> = new Set();
   work: Workload[] = [];
   queueRunning = false;
-  allDayRendered = false;
   allDayCache = new CacheEntry<Map<number, Set<CalendarEvent>>>(new Map());
   allDayIdCache = new CacheEntry<Map<string, CalendarEvent>>(new Map());
   dataCache = new Map<number, CacheEntry<Map<string, CalendarEvent>>>();
@@ -163,7 +162,6 @@ export class EventRenderCoordinator {
             } else {
               this.allDayCache.data.set(dateVal, new Set([event]));
             }
-            this.allDayRendered = false;
             return false;
           }
           return true;
@@ -230,12 +228,12 @@ export class EventRenderCoordinator {
         this.renderedCache.delete(date);
       }
     });
-    if (!this.allDayRendered && this.airdayCal.allDayEvents) {
+    if (this.airdayCal.allDayEvents) {
+      // TODO: Only render this when date changes
       this.airdayCal.allDayEvents.render(
         this.allDayCache.data,
         this.allDayIdCache.data,
       );
-      this.allDayRendered = true;
     }
   }
   processMessage(message: any) {

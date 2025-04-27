@@ -44,15 +44,13 @@ export class AllDayEvents {
   // TODO: Test the shit out of this function
   // TODO: copy only necessary data
   renderContracted(cache: Map<number, Set<CalendarEvent>>) {
+    console.log("rendering contracted");
     let trackedEvent: CalendarEvent | undefined; // Event we're looking at
     let trackedEventDates: number[] = []; // Each day that tracked event spans
     const toRender: (CalendarEvent & { dayLength: number })[] = []; // Each calendar event to render in full
     const layout = new Map<number, number>(); // date, event count to display (0 = no display)
 
     // Loop through dates
-    cache.forEach((val, key) => {
-      console.log(new Date(key), val);
-    });
     this.airdayCal.transform.dates.forEach((date) => {
       const dateVal = date.valueOf();
       const dateCache = cache.get(dateVal); // get date val
@@ -62,7 +60,6 @@ export class AllDayEvents {
       // Case 1: next date has no events, but there is an event tracked
       // No intersections, render this date & clear dates tracked so far
       if (size === 0 && trackedEvent) {
-        console.log("date", date, "size", size, trackedEvent);
         toRender.push(
           Object.assign(trackedEvent, {
             dayLength: trackedEventDates.length,
@@ -75,7 +72,6 @@ export class AllDayEvents {
         trackedEventDates = [];
       }
       if (size === 1) {
-        console.log("date", date, "size", size, trackedEvent);
         // no intersection possible
         const val = dateCache.values().next().value as CalendarEvent;
         // Case 2: next date has 1 event, the tracked event, continue and store date
@@ -90,6 +86,9 @@ export class AllDayEvents {
               dayLength: trackedEventDates.length,
             }),
           );
+          trackedEventDates.forEach((d) => {
+            layout.set(d, 0);
+          });
           trackedEvent = val;
           trackedEventDates = [dateVal];
         }
@@ -137,7 +136,7 @@ export class AllDayEvents {
         div.classList.add("all-day-event");
         const x = this.airdayCal.transform.dateToX(date.valueOf());
         div.style.transform = `translate(${x}px)`;
-        div.innerText = `${count} event${count > 1 ? "s" : ""} ${getDate(date)}`;
+        div.innerText = `${count} event${count > 1 ? "s" : ""}`;
         countDivs.push(div);
       }
     });
