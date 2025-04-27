@@ -49,23 +49,25 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Correct now line (move to time container)
 - [x] Make layout calcs faster, calculate multiple at a time (fuck yes)
 - [x] All-day events +24hr events system!
-- [] All-day events shouldn't rerender every animation frame, only when window (or data) has changed
-- [] All-day expanded rendering view
-- [] All-day event layout calcs offloaded to worker
+- [x] Items over 24hrs long get moved into all-day event
+- [x] All-day events shouldn't rerender every animation frame, only when window (or data) has changed
+- [x] All-day event layout calcs offloaded to worker
+- [x] word wrap event for longer events
+- [x] buffer events to the left too
 - [] Move now marker line back into events container as in the mornings it rises above the cal header
-- [] Items over 24hrs long get moved into all-day event
+- [] All-day view expands & contracts to arbitrary height px
+- [] All-day expanded rendering
 - [] Expand all day events if there are multiple
-- [] Dragging 24hr events start/finish
-- [] Dragging 24hr events left/right
-- [] Worker fix in build
-- [] Scroll snap type (?)
+- [] Worker fix in built version
 - [] Jump to date/today button in tweakpane
-- [] Filter by multiple calendars, colour
-- [] Bug: Sometimes the overflow events first thing in the morning sit above succeeding events
 - [] Maybe show month (3 day version) for every monday, and every 1st, so context is extremely obvious
+- [] Filter by multiple calendars, colour
+- [] Consider: Hover over date to see full date ?
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
+- [] Dragging 24hr events left/right
+- [] Dragging 24hr events start/finish
 - [] Click event to select / bring to front
 - [] Drag and drop calendar events
 - [] tap to highlight neat 15min interval (to create new event)
@@ -75,11 +77,8 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Drag (+ shift) on blank area to multiselect
 
 ## All-day events
-- [] Tap to highlight day area (?)
-- [] Hover over date to see full date
-- [] Move between weeks/days
+- [] Move between weeks/days with a button
 - [] Month/Year that shows up on pan
-- [] word wrap event for longer events
 
 ## Times & time zones
 - [] Change between 12/24hr time
@@ -92,11 +91,12 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Overwriting repeated events (fuck)
 
 ## final optimisations / quality udpates / future plans
+- [] Bug: Sometimes the overflow events first thing in the morning sit above succeeding events
 - [] UX: Reconsider ALL events extending entire grid; consider opposite.
-- [] buffer events to the left too
 - [] event/worker tests
-- [] True monthly view
+- [] True monthly, annual view
 - [] Multi-select events with single click
 - [] custom scroller, snap to date or week when active scrolling stops
+- [] Scroll snap type (?)
 
 ## Future: Port to webgpu
