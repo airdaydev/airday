@@ -81,7 +81,7 @@ export class AllDayEvents {
     const divs = toRender.map((event) => {
       const x = this.airdayCal.transform.dateToX(utcMidnight(event.start));
       const div = document.createElement("div");
-      div.className = "all-day-event";
+      div.classList.add("all-day-event", `col_${event.color}`);
       div.style.transform = `translate(${x}px)`;
       div.style.width = `${this.airdayCal.transform.dayPx * 2 - 2}px`; // TODO: We need to actually vary it!
       div.innerText = event.title;

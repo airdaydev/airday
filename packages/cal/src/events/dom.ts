@@ -5,7 +5,7 @@ import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout, event: CalendarEvent) {
   const div = document.createElement("div");
-  div.classList.add("event", event.color);
+  div.classList.add("event", `col_${event.color}`);
   div.style.top = `${layout.y}px`;
   div.style.left = `${layout.x * 100}%`;
   div.style.height = `${layout.height}px`;

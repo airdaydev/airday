@@ -235,7 +235,6 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .all-day-event {
       position: absolute;
-      background: #fffbd9;
       height: 25px;
       top: 1px;
       left: 1px;
@@ -286,19 +285,17 @@ export function createColoursStyleTag(
   let eventColoursCSS = "";
   for (let key of Object.keys(lightScheme)) {
     let scheme = lightScheme[key as keyof EventSchemes];
-    eventColoursCSS =
-      eventColoursCSS.concat(`#${instanceId}.light .event.${key} {
+    eventColoursCSS = eventColoursCSS.concat(`#${instanceId}.light .col_${key} {
       background: ${scheme.bg};
       color: ${scheme.text};
-    }  #${instanceId}.light .event.${key}:hover { background: ${scheme.fg} }`);
+    }  #${instanceId}.light .col_${key}:hover { background: ${scheme.fg} }`);
   }
   for (let key of Object.keys(darkScheme)) {
     let scheme = darkScheme[key as keyof EventSchemes];
-    eventColoursCSS =
-      eventColoursCSS.concat(`#${instanceId}.dark .event.${key} {
+    eventColoursCSS = eventColoursCSS.concat(`#${instanceId}.dark .col_${key} {
       background: ${scheme.bg};
       color: ${scheme.text};
-    } #${instanceId}.dark .event.${key}:hover { background: ${scheme.fg} }`);
+    } #${instanceId}.dark .col_${key}:hover { background: ${scheme.fg} }`);
   }
   style.textContent = eventColoursCSS;
   document.head.appendChild(style);
