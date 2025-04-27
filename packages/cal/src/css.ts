@@ -80,6 +80,9 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       z-index: 10;
     }
+    #${instanceId} .all-day {
+      height: 25px;
+    }
     #${instanceId}.light .all-day {
       background: var(--white);
       border-top: 1px solid #f0f0f0;

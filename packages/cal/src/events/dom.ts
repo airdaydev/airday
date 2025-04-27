@@ -43,6 +43,13 @@ export function GridLines(airdayCal: AirdayCal) {
   return gridlines;
 }
 
+// function debugDate(date: Date) {
+//   const debugLabel = document.createElement("div");
+//   debugLabel.className = "debug-date";
+//   debugLabel.innerText = date.toUTCString();
+//   return debugLabel;
+// }
+
 export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   const jsDate = new Date(date);
   const weekend = isWeekend(jsDate);
@@ -56,22 +63,6 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   if (isTodayUTC(jsDate)) {
     dayEl.classList.add("today");
   }
-  // sticky header
-  const header = document.createElement("div");
-  header.className = "day-header";
-  // Date label
-  const dateLabel = document.createElement("div");
-  dateLabel.className = "date-label";
-  const text = getDateUTC(jsDate);
-  dateLabel.innerText = text;
-  header.appendChild(dateLabel);
-  // append header
-  dayEl.appendChild(header);
-  // Debug label
-  const debugLabel = document.createElement("div");
-  debugLabel.className = "debug-date";
-  debugLabel.innerText = jsDate.toUTCString();
-  dayEl.appendChild(debugLabel);
   // Event container
   const dayEventsEl = document.createElement("div");
   dayEventsEl.className = "day-events";
@@ -103,12 +94,17 @@ export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
   col.className = "cal-header-col";
   col.setAttribute("data-date", date.toString());
   col.style.transform = `translate(${xPos}px)`;
+  // Date Label
   const jsDate = new Date(date);
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
   const text = getDateUTC(jsDate);
   dateLabel.innerText = text;
   col.appendChild(dateLabel);
+  // All day area
+  const allDay = document.createElement("div");
+  allDay.className = "all-day";
+  col.appendChild(allDay);
   return col;
 }
 
