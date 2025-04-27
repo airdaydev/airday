@@ -80,9 +80,6 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       z-index: 10;
     }
-    #${instanceId} .all-day {
-      height: 26px;
-    }
     #${instanceId}.light .all-day {
       background: var(--white);
       border-top: 1px solid #f0f0f0;
@@ -226,11 +223,13 @@ export function createCalStyleTag(instanceId: string) {
       align-items: center;
       justify-content: center;
     }
-    #${instanceId} .all-day-area {
+    #${instanceId} .cal-header {
       position: sticky;
       width: 100%;
       z-index: 10;
       top: 0;
+      height: 50px;
+      background: white;
     }
     #${instanceId} .all-day-events {
       position: absolute;
@@ -260,11 +259,12 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .now-marker {
       position: absolute;
-      width: 100vw;
-      left: 100%;
+      left: 0;
+      width: 100%;
       z-index: 10;
       height: 1px;
       background: #ff8a8a;
+      margin-top: 50px;
     }
     #${instanceId} .now-label {
       position: absolute;
@@ -277,6 +277,13 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId} .today .day-header {
       font-weight: 600;
       color: #ff7878;
+    }
+    #${instanceId} .day-header {
+      height: 50px;
+      background: red;
+    }
+    #${instanceId} .cal-header-col {
+      position: absolute;
     }
   `;
   document.head.appendChild(style);

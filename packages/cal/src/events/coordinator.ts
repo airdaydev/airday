@@ -3,7 +3,7 @@ import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { CacheEntry } from "../utils/cache";
-import { appendDayLayout, DayEl } from "./dom";
+import { appendDayLayout, CalHeaderCol, DayEl } from "./dom";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -140,6 +140,9 @@ export class EventRenderCoordinator {
       const domPx = this.airdayCal.transform.dateToX(date.valueOf());
       if (!this.domCache.get(dateVal)) {
         const dayEl = DayEl(this.airdayCal, dateVal, domPx);
+        // TODO: Clean up headerCell!
+        const headerCell = CalHeaderCol(this.airdayCal, dateVal, domPx);
+        this.airdayCal.dayHeader.appendChild(headerCell); // TODO: append at once
         this.airdayCal.eventsContainer.appendChild(dayEl); // TODO: append at once
         this.domCache.set(dateVal, new CacheEntry(dayEl));
       }
@@ -224,6 +227,7 @@ export class EventRenderCoordinator {
       this.airdayCal.transform.dates[
         this.airdayCal.transform.dates.length - 1
       ].valueOf();
+    // dom cache cleanup (TODO: evaluate need for dom cache cleanup)
     this.domCache.forEach((cache) => {
       const date = Number(cache.data.getAttribute("data-date"));
       if (date < minDate) {
@@ -233,6 +237,20 @@ export class EventRenderCoordinator {
       }
       if (date > maxDate) {
         cache.data.parentNode?.removeChild(cache.data);
+        this.domCache.delete(date);
+        this.renderedCache.delete(date);
+      }
+    });
+    // header cell cleanup
+    this.airdayCal.dayHeader?.childNodes.forEach((cell) => {
+      const date = Number(cell.getAttribute("data-date"));
+      if (date < minDate) {
+        cell.parentNode?.removeChild(cell);
+        this.domCache.delete(date);
+        this.renderedCache.delete(date);
+      }
+      if (date > maxDate) {
+        cell.parentNode?.removeChild(cell);
         this.domCache.delete(date);
         this.renderedCache.delete(date);
       }

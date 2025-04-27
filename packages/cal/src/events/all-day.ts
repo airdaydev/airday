@@ -8,17 +8,12 @@ import { getDate, utcZeroDate } from "../time";
 
 export class AllDayEvents {
   airdayCal: AirdayCal;
-  region: HTMLDivElement;
   container: HTMLDivElement;
   expanded = false;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
-    const region = document.createElement("div");
-    region.className = "all-day-area";
     const container = document.createElement("div");
     container.className = "all-day-events";
-    region.append(container);
-    this.region = region;
     this.container = container;
     return this;
   }

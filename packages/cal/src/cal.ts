@@ -10,7 +10,13 @@ import { EventDB } from "./state";
 import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
-import { AnchorEl, NowMarker, TimesEl } from "./events/dom";
+import {
+  AnchorEl,
+  CalHeader,
+  EventsContainer,
+  NowMarker,
+  TimesEl,
+} from "./events/dom";
 import { AllDayEvents } from "./events/all-day";
 
 type TimeFormat = "24hr" | "12hr";
@@ -24,6 +30,8 @@ export class AirdayCal {
   scrollable?: HTMLDivElement;
   scrollChild?: HTMLDivElement;
   eventsContainer?: HTMLDivElement;
+  header?: HTMLDivElement;
+  dayHeader?: HTMLDivElement;
   nowMarker?: NowMarker;
   allDayEvents?: AllDayEvents;
   theme: Theme = "dark";
@@ -61,9 +69,10 @@ export class AirdayCal {
     scrollChild.className = "scroll-child";
     scrollChild.style.width = `${this.transform.scrollChildWidth}px`;
     // Events container
-    const eventsContainer = document.createElement("div");
-    eventsContainer.className = "events-container";
-    this.eventsContainer = eventsContainer;
+    const { header, dayHeader } = CalHeader();
+    this.header = header;
+    this.dayHeader = dayHeader;
+    this.eventsContainer = EventsContainer();
     // All day events container (TODO: Move to DOM.ts)
     const allDayEvents = new AllDayEvents(this);
     this.allDayEvents = allDayEvents;
@@ -76,9 +85,11 @@ export class AirdayCal {
     scrollable.appendChild(anchor);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
-    labels.appendChild(nowMarker.container);
-    scrollChild.appendChild(allDayEvents.region);
-    scrollChild.appendChild(eventsContainer);
+    labels.appendChild(nowMarker.label);
+    scrollChild.appendChild(nowMarker.marker);
+    header.appendChild(allDayEvents.container);
+    scrollChild.appendChild(this.header);
+    scrollChild.appendChild(this.eventsContainer);
     scrollable.appendChild(labels);
     this.scrollable = scrollable;
     this.scrollChild = scrollChild;

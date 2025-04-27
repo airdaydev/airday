@@ -65,10 +65,6 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   const text = getDateUTC(jsDate);
   dateLabel.innerText = text;
   header.appendChild(dateLabel);
-  // All day area (covers offset scroll area)
-  const allDayArea = document.createElement("div");
-  allDayArea.className = "all-day";
-  header.appendChild(allDayArea);
   // append header
   dayEl.appendChild(header);
   // Debug label
@@ -86,12 +82,41 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   return dayEl;
 }
 
+export function CalHeader() {
+  const header = document.createElement("div");
+  header.className = "cal-header";
+  const dayHeader = document.createElement("div");
+  dayHeader.className = "day-header";
+  header.appendChild(dayHeader);
+  return { header, dayHeader };
+}
+
+export function EventsContainer() {
+  const container = document.createElement("div");
+  container.className = "events-container";
+  return container;
+}
+
+export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
+  const col = document.createElement("div");
+  col.style.width = `${airday.transform.dayPx}px`;
+  col.className = "cal-header-col";
+  col.setAttribute("data-date", date.toString());
+  col.style.transform = `translate(${xPos}px)`;
+  const jsDate = new Date(date);
+  const dateLabel = document.createElement("div");
+  dateLabel.className = "date-label";
+  const text = getDateUTC(jsDate);
+  dateLabel.innerText = text;
+  col.appendChild(dateLabel);
+  return col;
+}
+
 export function appendDayLayout(
   container: HTMLElement,
   layout: DayLayout,
   data: Map<string, CalendarEvent>,
 ) {
-  // console.log("wtf", data);
   // Create events
   const events: HTMLDivElement[] = [];
   layout.map.forEach((eventLayout) => {
@@ -151,26 +176,24 @@ export function TimesEl(airdayCal: AirdayCal) {
 // - might be better to use set interval instead of updating on tick
 export class NowMarker {
   airday: AirdayCal;
-  container: HTMLDivElement;
   label: HTMLDivElement;
+  marker: HTMLDivElement;
   constructor(airday: AirdayCal) {
     this.airday = airday;
-    const container = document.createElement("div");
-    this.container = container;
-    container.className = "now-container";
     const label = document.createElement("div");
     label.className = "now-label";
     this.label = label;
     const marker = document.createElement("div");
     marker.className = "now-marker";
+    this.marker = marker;
     this.update();
-    container.append(label, marker);
     return this;
   }
   update() {
     const now = new Date();
     this.label.innerText = getTime(now.valueOf());
     const y = this.airday.transform.timeToY(now);
-    this.container.style.top = `${y}px`; // TODO: 50 is dynamic
+    this.label.style.top = `${y}px`; // TODO: 50 is dynamic
+    this.marker.style.top = `${y}px`; // TODO: 50 is dynamic
   }
 }
