@@ -22,7 +22,6 @@ export class AllDayEvents {
     this.container = container;
     return this;
   }
-  // TODO: Layout to be done in a worker
   renderExpanded(cache: Map<string, CalendarEvent>) {
     console.log("rendering expanded");
     // For each event
@@ -30,10 +29,9 @@ export class AllDayEvents {
     // Earliest at the top, then if the next event intersects, place below, create next lane,
     // for next event start at the top and find first lane with no intersection
   }
-  // TODO: Layout to be done in a worker
   // TODO: Test the shit out of this function
   // TODO: copy only necessary data
-  renderContracted(events, labels) {
+  renderContracted(events: [], labels: Map<number, number>) {
     const divs = events.map((event) => {
       const x = this.airdayCal.transform.dateToX(
         utcZeroDate(event.start).valueOf(),
@@ -46,10 +44,8 @@ export class AllDayEvents {
       return div;
     });
     // Render events:
-    // TODO: Track dom refs & remove as needed
     this.container.innerHTML = "";
     this.container.append(...divs);
-    // TODO: Render event qties:
     const countDivs: HTMLDivElement[] = [];
     this.airdayCal.transform.dates.forEach((date) => {
       const count = labels.get(date.valueOf());

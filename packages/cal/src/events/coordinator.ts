@@ -88,6 +88,7 @@ export class EventRenderCoordinator {
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
   renderedCache = new Map<number, CacheEntry<boolean>>();
+  lastView?: string;
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -236,8 +237,9 @@ export class EventRenderCoordinator {
         this.renderedCache.delete(date);
       }
     });
-    // TODO: ONLY do this when dates have changed
-    if (this.airdayCal.allDayEvents) {
+    // All day events, rendered when view changes
+    const view = `${this.airdayCal.transform.dates[0]}_${this.airdayCal.transform.dates.length}`;
+    if (this.airdayCal.allDayEvents && this.lastView !== view) {
       if (!this.airdayCal.allDayEvents.expanded) {
         const work: AllDaySmlWorkload = {
           type: "all-day-sml",
@@ -247,6 +249,7 @@ export class EventRenderCoordinator {
         this.assignWork(work);
       }
     }
+    this.lastView = view;
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
@@ -258,7 +261,6 @@ export class EventRenderCoordinator {
       }
     }
     if (type === "all-day-sml") {
-      console.log(message.data);
       this.airdayCal.allDayEvents?.renderContracted(
         message.data.events,
         message.data.labels,
