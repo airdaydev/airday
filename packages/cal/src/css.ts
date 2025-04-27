@@ -61,6 +61,8 @@ export function createCalStyleTag(instanceId: string) {
       box-sizing: border-box;
       position: absolute;
       user-select: none;
+      -webkit-user-select: none;
+      cursor: default;
       border-radius: 4px;
       transition: background 0.05s;
       overflow: hidden;
@@ -98,6 +100,7 @@ export function createCalStyleTag(instanceId: string) {
       text-align: center;
       user-select: none;
       -webkit-user-select: none;
+      cursor: default;
       height: 24px;
       align-items: center;
       justify-content: center;
@@ -121,6 +124,7 @@ export function createCalStyleTag(instanceId: string) {
       box-sizing: content-box;
       user-select: none;
       -webkit-user-select: none;
+      cursor: default;
     }
     #${instanceId} .time-grid-label {
       position: absolute;
@@ -244,6 +248,8 @@ export function createCalStyleTag(instanceId: string) {
       padding-left: 0.5em;
       box-sizing: border-box;
       user-select: none;
+      -webkit-user-select: none;
+      cursor: default;
     }
     #${instanceId} .now-container {
       position: absolute;
