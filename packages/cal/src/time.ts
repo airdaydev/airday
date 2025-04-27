@@ -6,6 +6,7 @@ export const getStartOfWeekUTC = (date: Date) => {
   return utcMidnight(mondayDate);
 };
 
+// Warning: this is the UTC date midnight (i.e. the 0th millisecond of the day, of the UTC moment of the day)
 export function utcMidnight(date: Date) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
