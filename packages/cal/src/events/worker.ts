@@ -1,22 +1,15 @@
-import { DayLayout, calcDayLayout } from "./layout";
+import { calcAllDayContracted, calcDayLayout } from "./layout";
 
 interface Transform {
   dayPx: number;
   hourPx: number;
-  scale: number;
 }
 
 export class EventUIWorker {
   transform: Transform = {
     dayPx: 100,
     hourPx: 25,
-    scale: 1,
   };
-  range = [0, 0];
-  idCache = new Map<string, any>();
-  layoutMap = new Map<number, DayLayout>();
-  cache = new Map<number, Set<string>>(); // unsorted
-  dirty = new Set<number>();
   worker: boolean;
   constructor(worker: boolean) {
     this.worker = worker;
@@ -25,23 +18,28 @@ export class EventUIWorker {
     }
   }
   onMessage = (message: MessageEvent) => {
-    if (message.data.type === "config") {
-      this.transform.dayPx = message.data.params.dayPx || 100;
-      this.transform.hourPx = message.data.params.hourPx;
-      this.transform.scale = message.data.params.scale;
-    }
-    if (message.data.type === "next") {
+    if (message.data.type === "day") {
       const { date, events, transform } = message.data;
       this.transform.dayPx = transform[0];
       this.transform.hourPx = transform[1];
-      this.transform.scale = transform[2];
       const layout =
         message.data.layout || calcDayLayout(events, date, transform[1]);
       self.postMessage({
-        type: "next",
+        type: "day",
         date,
         layout,
       });
+    }
+    if (message.data.type === "all-day-sml") {
+      const { cache, dates } = message.data;
+      const layout = calcAllDayContracted(cache, dates);
+      self.postMessage({
+        type: "all-day-sml",
+        ...layout,
+      });
+    }
+    if (message.data.type === "all-day-lrg") {
+      // TODO: DOES NOT EXIST YET
     }
   };
 }

@@ -57,12 +57,20 @@ interface UIEvent {
 }
 
 interface Workload {
-  date: Date;
   type: string;
-  utcDate?: number;
+}
+
+interface DayWorkload extends Workload {
+  type: "day";
+  date: Date;
   events: any;
-  theme: any;
   transform: any;
+}
+
+interface AllDaySmlWorkload extends Workload {
+  type: "all-day-sml";
+  dates: Date[];
+  cache: Map<number, Set<CalendarEvent>>;
 }
 
 // Processes UI events, manages workers, caches layouts
@@ -177,16 +185,16 @@ export class EventRenderCoordinator {
           });
         });
         if (shortTermEvents) {
-          this.assignWork({
-            type: "next",
+          const work: DayWorkload = {
+            type: "day",
             date,
             events: shortTermEvents.map((e) => e.transfer()),
-            theme: this.airdayCal.theme,
             transform: [
               this.airdayCal.transform.dayPx,
               this.airdayCal.transform.hourPx,
             ],
-          });
+          };
+          this.assignWork(work);
           continue;
         }
       }
@@ -228,19 +236,33 @@ export class EventRenderCoordinator {
         this.renderedCache.delete(date);
       }
     });
+    // TODO: ONLY do this when dates have changed
     if (this.airdayCal.allDayEvents) {
-      // TODO: Only render this when date changes
-      this.airdayCal.allDayEvents.render(
-        this.allDayCache.data,
-        this.allDayIdCache.data,
-      );
+      if (!this.airdayCal.allDayEvents.expanded) {
+        const work: AllDaySmlWorkload = {
+          type: "all-day-sml",
+          dates: this.airdayCal.transform.dates, // TODO: Just serialise first + length
+          cache: this.allDayCache.data,
+        };
+        this.assignWork(work);
+      }
     }
   }
   processMessage(message: any) {
     // Processes incoming message (comprising layouts and or bitmaps)
-    const data = message.data;
-    if (data.layout) {
-      this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
+    const type = message.data.type;
+    if (type === "day") {
+      const data = message.data;
+      if (data.layout) {
+        this.layoutCache.set(data.date.valueOf(), new CacheEntry(data.layout));
+      }
+    }
+    if (type === "all-day-sml") {
+      console.log(message.data);
+      this.airdayCal.allDayEvents?.renderContracted(
+        message.data.events,
+        message.data.labels,
+      );
     }
     this.startWorkQueue();
     this.airdayCal.act(); // TODO: A little blunt

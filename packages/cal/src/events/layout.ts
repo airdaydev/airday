@@ -1,4 +1,5 @@
-import { localZeroDate, timeToY } from "../time";
+import { CalendarEvent } from "../model";
+import { localZeroDate, timeToY, utcZeroDate } from "../time";
 
 export interface EventLayout {
   id: string;
@@ -117,5 +118,82 @@ export function calcDayLayout(
   return {
     map: layoutMap,
     clusters,
+  };
+}
+
+export function calcAllDayContracted(
+  cache: Map<number, Set<CalendarEvent>>,
+  dates: number[],
+) {
+  let trackedEvent: CalendarEvent | undefined; // Event we're looking at
+  let trackedEventDates: number[] = []; // Each day that tracked event spans
+  const events: (CalendarEvent & { dayLength: number })[] = []; // Each calendar event to render in full
+  const labels = new Map<number, number>(); // date, event count to display (0 = no display)
+
+  // Loop through dates
+  dates.forEach((date) => {
+    const dateVal = date.valueOf();
+    const dateCache = cache.get(dateVal); // get date val
+    const size = dateCache?.size || 0; // amount of events on each date
+    labels.set(dateVal, size); // Assume that all dates have sizes, then removed when we replace with an event
+
+    // Case 1: next date has no events, but there is an event tracked
+    // No intersections, render this date & clear dates tracked so far
+    if (size === 0 && trackedEvent) {
+      events.push(
+        Object.assign(trackedEvent, {
+          dayLength: trackedEventDates.length,
+        }),
+      );
+      trackedEvent = undefined;
+      trackedEventDates.forEach((d) => {
+        labels.set(d, 0);
+      });
+      trackedEventDates = [];
+    }
+    if (size === 1) {
+      // no intersection possible
+      const val = dateCache?.values().next().value as CalendarEvent;
+      // Case 2: next date has 1 event, the tracked event, continue and store date
+      if (trackedEvent && trackedEvent.id === val.id) {
+        trackedEventDates.push(dateVal);
+      }
+      // Case 3: next date has 1 event, not the tracked event, render & start with swapped event
+      // Note we can be sure that the event started today, as it would have intersected with an event previously
+      if (trackedEvent && trackedEvent.id !== val.id) {
+        events.push(
+          Object.assign(trackedEvent, {
+            dayLength: trackedEventDates.length,
+          }),
+        );
+        trackedEventDates.forEach((d) => {
+          labels.set(d, 0);
+        });
+        trackedEvent = val;
+        trackedEventDates = [dateVal];
+      }
+      // Case 4: No tracked event
+      // Case 4: One event; we start tracking it, if it started today
+      if (
+        !trackedEvent &&
+        utcZeroDate(val.start).valueOf() === date.valueOf()
+      ) {
+        trackedEvent = val;
+        trackedEventDates.forEach((d) => {
+          labels.set(d, 0);
+        });
+        trackedEventDates = [dateVal];
+      }
+    }
+    // Case 5: next date has multiple events - INTERSECTION
+    if (size > 1) {
+      // More than one date = reset
+      trackedEvent = undefined;
+      trackedEventDates = [];
+    }
+  });
+  return {
+    events,
+    labels,
   };
 }
