@@ -89,9 +89,11 @@ export function EventsContainer() {
 }
 
 export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
+  const weekend = isWeekend(new Date(date)); // TODO: Consider pulling this up to renderer controller
   const col = document.createElement("div");
   col.style.width = `${airday.transform.dayPx}px`;
   col.className = "cal-header-col";
+  if (weekend) col.classList.add("weekend");
   col.setAttribute("data-date", date.toString());
   col.style.transform = `translate(${xPos}px)`;
   // Date Label

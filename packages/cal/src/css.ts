@@ -57,6 +57,12 @@ export function createCalStyleTag(instanceId: string) {
     #${instanceId}.dark .day.weekend {
       background-color: #0f0f0f;
     }
+    #${instanceId}.light .cal-header-col.weekend .all-day {
+      background-color: #fbfbfb;
+    }
+    #${instanceId}.dark .cal-header-col.weekend .all-day {
+      background-color: #0f0f0f;
+    }
     #${instanceId} .event {
       box-sizing: border-box;
       position: absolute;
