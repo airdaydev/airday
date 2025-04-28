@@ -60,9 +60,6 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   dayEl.style.transform = `translate(${xPos}px)`;
   dayEl.style.width = `${airday.transform.dayPx}px`;
   if (weekend) dayEl.classList.add("weekend");
-  if (isTodayUTC(jsDate)) {
-    dayEl.classList.add("today");
-  }
   // Event container
   const dayEventsEl = document.createElement("div");
   dayEventsEl.className = "day-events";
@@ -89,15 +86,18 @@ export function EventsContainer() {
 }
 
 export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
-  const weekend = isWeekend(new Date(date)); // TODO: Consider pulling this up to renderer controller
+  const jsDate = new Date(date);
+  const weekend = isWeekend(jsDate); // TODO: Consider pulling this up to renderer controller
   const col = document.createElement("div");
   col.style.width = `${airday.transform.dayPx}px`;
   col.className = "cal-header-col";
   if (weekend) col.classList.add("weekend");
+  if (isTodayUTC(jsDate)) {
+    col.classList.add("today");
+  }
   col.setAttribute("data-date", date.toString());
   col.style.transform = `translate(${xPos}px)`;
   // Date Label
-  const jsDate = new Date(date);
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
   const text = getDateUTC(jsDate);

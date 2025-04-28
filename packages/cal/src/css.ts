@@ -283,7 +283,7 @@ export function createCalStyleTag(instanceId: string) {
       transform: translateY(-50%);
       font-weight: 600;
     }
-    #${instanceId} .today .day-header {
+    #${instanceId} .today .date-label {
       font-weight: 600;
       color: #ff7878;
     }
