@@ -1,7 +1,7 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
-import { DayLayout } from "./layout";
+import { calcExpandedAllDayLayout, DayLayout } from "./layout";
 import { CacheEntry } from "../utils/cache";
 import { appendDayLayout, CalHeaderCol, DayEl } from "./dom";
 
@@ -265,6 +265,10 @@ export class EventRenderCoordinator {
           cache: this.allDayCache.data,
         };
         this.assignWork(work);
+      } else {
+        const layout = this.airdayCal.allDayEvents.renderExpanded(
+          this.allDayIdCache.data,
+        );
       }
     }
     this.lastView = view;

@@ -197,3 +197,11 @@ export function calcAllDayContracted(
     labels,
   };
 }
+
+export function calcExpandedAllDayLayout(cache) {
+  console.log(cache);
+  // For each event
+  // sort by earliest, then longest.
+  // Earliest at the top, then if the next event intersects, place below, create next lane,
+  // for next event start at the top and find first lane with no intersection
+}

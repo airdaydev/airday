@@ -57,6 +57,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Move now marker line back into events container as in the mornings it rises above the cal header
 - [] All-day view expands & contracts to arbitrary height px
 - [] All-day expanded rendering
+- [] All-day: Update not if dates change, but if data changes
 - [] Expand all day events if there are multiple
 - [] Worker fix in built version
 - [] Jump to date/today button in tweakpane

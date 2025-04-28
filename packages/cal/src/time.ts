@@ -1,3 +1,5 @@
+export const oneDayMs = 864e5;
+
 export const getStartOfWeekUTC = (date: Date) => {
   const dayOfWeek = date.getDay();
   const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -73,7 +75,7 @@ export const getDate = (date: Date) => {
 };
 
 const relativeDay = (dateVal: number, relativeDays: number) => {
-  return new Date(dateVal + relativeDays * 864e5);
+  return new Date(dateVal + relativeDays * oneDayMs);
 };
 
 export const getDateArray = (startDate: number, dayCount: number): Date[] => {
@@ -96,10 +98,10 @@ export class DayRange {
     this.days = days;
   }
   get end() {
-    return new Date(this.start.valueOf() + 864e5 * this.days);
+    return new Date(this.start.valueOf() + oneDayMs * this.days);
   }
   buffer(days: number = 3) {
-    this.start = new Date(this.start.valueOf() - 864e5 * days);
+    this.start = new Date(this.start.valueOf() - oneDayMs * days);
     this.days = this.days + days;
     return this;
   }
