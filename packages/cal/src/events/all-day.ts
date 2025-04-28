@@ -21,7 +21,7 @@ export class AllDayEvents {
   }
   updateRowCount(count: number) {
     // TODO: Update row count
-    this.rows = count;
+    this.rows = count || 1; // Ensure minimum is 1, even if no rows in layout
     this.airdayCal.container?.style.setProperty("--rows", this.rows.toFixed());
   }
   renderExpanded(cache: Map<string, CalendarEvent>) {
