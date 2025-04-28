@@ -56,6 +56,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] buffer events to the left too
 - [x] Move now marker line back into events container as in the mornings it rises above the cal header
 - [x] All-day view expands & contracts to arbitrary height px
+- [] Consider placing event count in pre-existing space to avoid having to give each event count dayPx width
 - [] Click button or event count label to expand & contract all-day view
 - [] All-day expanded rendering (almost done, needs to select events in view)
 - [] All-day: Update not if dates change, but if data changes

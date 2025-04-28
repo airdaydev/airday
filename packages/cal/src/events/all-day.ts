@@ -1,10 +1,6 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
-import { getDate, oneDayMs, utcZeroDate } from "../time";
-
-// function incrMapCount(map: Map<number, number>, key: number, val: number) {
-//   map.set(key, number);
-// }
+import { oneDayMs, utcZeroDate } from "../time";
 
 export class AllDayEvents {
   airdayCal: AirdayCal;
@@ -61,7 +57,7 @@ export class AllDayEvents {
         div.classList.add("all-day-event", `col_${event.color}`);
         div.style.transform = `translate(${x}px) translateY(${y}px)`;
         div.style.width = `${this.airdayCal.transform.dayPx * event.durationDays - 3}px`; // TODO: We need to actually vary it!
-        div.innerText = event.id;
+        div.innerText = event.title;
         divs.push(div);
       });
     });
