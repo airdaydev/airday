@@ -58,6 +58,7 @@
 ## 2025 Q1
 - [] Calendar
 - [] Canvas bg resets WHENEVER container size changes (change made for list but component needs rebuilding)
+- [] Canvas doesn't render constantly
 - [] Editing text inline cursor set correctly.
 - [] Deleting items
 - [] Add new item
