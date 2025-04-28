@@ -34,7 +34,7 @@ export class AllDayEvents {
       const div = document.createElement("div");
       div.classList.add("all-day-event", `col_${event.color}`);
       div.style.transform = `translate(${x}px)`;
-      div.style.width = `${this.airdayCal.transform.dayPx * event.dayLength}px`; // TODO: We need to actually vary it!
+      div.style.width = `${this.airdayCal.transform.dayPx * event.dayLength - 3}px`; // TODO: We need to actually vary it!
       div.innerText = event.id;
       return div;
     });

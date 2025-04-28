@@ -87,7 +87,7 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 10;
     }
     #${instanceId} .all-day {
-      height: 25px;
+      height: 26px;
     }
     #${instanceId}.light .all-day {
       background: var(--white);
@@ -237,19 +237,18 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       z-index: 10;
       top: 0;
-      height: 50px;
+      height: 26px;
       background: white;
     }
     #${instanceId} .all-day-events {
       position: absolute;
-      height: 28px;
       width: 100%;
       z-index: 10;
-      top: 24px;
+      top: 25px;
     }
     #${instanceId} .all-day-event {
       position: absolute;
-      height: 25px;
+      height: 24px;
       top: 1px;
       left: 1px;
       border-radius: 3px;
