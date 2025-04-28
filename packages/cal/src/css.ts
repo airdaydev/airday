@@ -273,7 +273,8 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 10;
       height: 1px;
       background: #ff8a8a;
-      margin-top: 50px;
+      margin-top: calc(26px * (var(--rows) + 1));
+      transition: 0.2s margin-top;
     }
     #${instanceId} .now-label {
       position: absolute;
