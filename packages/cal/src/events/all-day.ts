@@ -12,11 +12,10 @@ export class AllDayEvents {
   expanded = false;
   rows = 1;
   constructor(airdayCal: AirdayCal) {
-    // TODO: airdayCal id for this var
-    document.documentElement.style.setProperty("--rows", this.rows.toFixed());
     this.airdayCal = airdayCal;
     const container = document.createElement("div");
     container.className = "all-day-events";
+    this.airdayCal.container?.style.setProperty("--rows", this.rows.toFixed());
     this.container = container;
     return this;
   }
