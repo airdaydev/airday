@@ -44,7 +44,7 @@ export class AllDayEvents {
     const layout: any[][] = []; // lane, top to bottom
     arr.forEach((event) => {
       const laneIndex = layoutMax.findIndex(
-        (max) => (event.endZero || 0) > max,
+        (max) => (event.startZero || 0) > max,
       );
       const lane = laneIndex === -1 ? layoutMax.length : laneIndex;
       layoutMax[lane] = event.endZero;
@@ -52,6 +52,7 @@ export class AllDayEvents {
     });
     // render expanded layout
     const divs: HTMLDivElement[] = [];
+    console.log(layout);
     layout.forEach((lane, laneIndex) => {
       lane.forEach((event) => {
         const x = this.airdayCal.transform.dateToX(event.startZero);

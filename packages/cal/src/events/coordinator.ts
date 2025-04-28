@@ -1,7 +1,7 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
-import { calcExpandedAllDayLayout, DayLayout } from "./layout";
+import { DayLayout } from "./layout";
 import { CacheEntry } from "../utils/cache";
 import { appendDayLayout, CalHeaderCol, DayEl } from "./dom";
 
