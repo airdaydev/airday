@@ -261,6 +261,19 @@ export function createCalStyleTag(instanceId: string) {
       -webkit-user-select: none;
       cursor: default;
     }
+    #${instanceId} .all-day-event-count {
+      position: absolute;
+      height: 24px;
+      top: 1px;
+      left: 1px;
+      display: flex;
+      align-items: center;
+      padding-left: 0.5em;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
     #${instanceId} .now-container {
       position: absolute;
       width: 100%;

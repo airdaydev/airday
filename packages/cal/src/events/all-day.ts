@@ -9,7 +9,7 @@ import { getDate, oneDayMs, utcZeroDate } from "../time";
 export class AllDayEvents {
   airdayCal: AirdayCal;
   container: HTMLDivElement;
-  expanded = true;
+  expanded = false;
   rows = 1;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -71,7 +71,7 @@ export class AllDayEvents {
   }
   // TODO: Test the shit out of this function
   // TODO: copy only necessary data
-  renderContracted(events: [], labels: Map<number, number>) {
+  renderContracted(events: CalendarEvent[], labels: Map<number, number>) {
     const divs = events.map((event) => {
       const x = this.airdayCal.transform.dateToX(
         utcZeroDate(event.start).valueOf(),
@@ -80,10 +80,12 @@ export class AllDayEvents {
       div.classList.add("all-day-event", `col_${event.color}`);
       div.style.transform = `translate(${x}px)`;
       div.style.width = `${this.airdayCal.transform.dayPx * event.dayLength - 3}px`; // TODO: We need to actually vary it!
-      div.innerText = event.id;
+      div.innerText = event.title;
       return div;
     });
+
     // Render events:
+
     this.container.innerHTML = "";
     this.container.append(...divs);
     const countDivs: HTMLDivElement[] = [];
@@ -91,10 +93,13 @@ export class AllDayEvents {
       const count = labels.get(date.valueOf());
       if (count) {
         const div = document.createElement("div");
-        div.classList.add("all-day-event");
+        div.classList.add("all-day-event-count");
         const x = this.airdayCal.transform.dateToX(date.valueOf());
         div.style.transform = `translate(${x}px)`;
         div.innerText = `${count} event${count > 1 ? "s" : ""}`;
+        div.addEventListener("click", () =>
+          this.airdayCal.allDayEvents?.expand(),
+        );
         countDivs.push(div);
       }
     });
@@ -102,6 +107,7 @@ export class AllDayEvents {
   }
   expand() {
     this.expanded = true;
+    console.log("expanding");
   }
   collapse() {
     this.expanded = false;
