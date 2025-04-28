@@ -10,12 +10,19 @@ export class AllDayEvents {
   airdayCal: AirdayCal;
   container: HTMLDivElement;
   expanded = false;
+  rows = 1;
   constructor(airdayCal: AirdayCal) {
+    // TODO: airdayCal id for this var
+    document.documentElement.style.setProperty("--rows", this.rows.toFixed());
     this.airdayCal = airdayCal;
     const container = document.createElement("div");
     container.className = "all-day-events";
     this.container = container;
     return this;
+  }
+  updateRowCount(count: number) {
+    // TODO: Update row count
+    this.rows = count;
   }
   renderExpanded(cache: Map<string, CalendarEvent>) {
     console.log("rendering expanded");

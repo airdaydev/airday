@@ -1,7 +1,5 @@
 import { EventSchemes } from "./colours";
 
-const ALL_DAY_MARGIN = 50;
-
 export function createCalStyleTag(instanceId: string) {
   const style = document.createElement("style");
   style.id = instanceId;
@@ -87,7 +85,7 @@ export function createCalStyleTag(instanceId: string) {
       z-index: 10;
     }
     #${instanceId} .all-day {
-      height: 26px;
+      height: calc(26px * var(--rows));
     }
     #${instanceId}.light .all-day {
       background: var(--white);
@@ -145,7 +143,7 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .time-gridlines {
       position: absolute;
-      top: ${ALL_DAY_MARGIN}px;
+      top: calc(26px * (var(--rows) + 1));
       left: 0;
       z-index: 0;
       height: 100%;
@@ -169,7 +167,7 @@ export function createCalStyleTag(instanceId: string) {
       position: absolute;
       width: 100%;
       height: 100%;
-      top: ${ALL_DAY_MARGIN}px;
+      top: calc(26px * (var(--rows) + 1));
       z-index: 2;
       box-sizing: border-box;
       overflow-x: hidden; /* TODO: Debug later but this is creating scrollbars even with it set to visible */
@@ -199,7 +197,7 @@ export function createCalStyleTag(instanceId: string) {
       position: sticky;
       background: white;
       z-index: 20;
-      height: ${ALL_DAY_MARGIN}px;
+      height: calc(26px * (var(--rows) + 1));
       width: 50px;
       font-size: 10px;
       white-space: nowrap;
@@ -237,7 +235,6 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       z-index: 10;
       top: 0;
-      height: 26px;
       background: white;
     }
     #${instanceId} .all-day-events {
