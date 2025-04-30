@@ -83,7 +83,6 @@ export class EventRenderCoordinator {
   work: Workload[] = [];
   queueRunning = false;
   allDayCache = new CacheEntry<Map<number, Set<CalendarEvent>>>(new Map());
-  allDayIdCache = new CacheEntry<Map<string, CalendarEvent>>(new Map());
   dataCache = new Map<number, CacheEntry<Map<string, CalendarEvent>>>();
   layoutCache = new Map<number, CacheEntry<DayLayout>>();
   domCache = new Map<number, CacheEntry<HTMLDivElement>>(); // has the thing rendered or nah, also TODO: we need to clean up anything outside current vals!
@@ -167,7 +166,6 @@ export class EventRenderCoordinator {
             event.end.valueOf() - event.start.valueOf() >=
             24 * 60 * 60 * 1000
           ) {
-            this.allDayIdCache.data.set(event.id, event);
             const day = this.allDayCache.data.get(dateVal);
             if (day) {
               day.add(event);
@@ -271,9 +269,15 @@ export class EventRenderCoordinator {
         this.assignWork(work);
       } else {
         // TODO: Move this to worker
-        const layout = this.airdayCal.allDayEvents.renderExpanded(
-          this.allDayIdCache.data,
-        );
+        const eventIdMap = new Map<string, CalendarEvent>();
+        for (let date of this.airdayCal.transform.dates) {
+          const set = this.allDayCache.data.get(date.valueOf());
+          set?.forEach((event) => {
+            if (eventIdMap.get(event.id)) return;
+            else eventIdMap.set(event.id, event);
+          });
+        }
+        this.airdayCal.allDayEvents.renderExpanded(eventIdMap);
       }
     }
     this.lastView = view;
