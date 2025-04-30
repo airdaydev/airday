@@ -260,6 +260,8 @@ export function createCalStyleTag(instanceId: string) {
       user-select: none;
       -webkit-user-select: none;
       cursor: default;
+      white-space: pre;
+      overflow-x: hidden;
     }
     #${instanceId} .all-day-event-count {
       position: absolute;
