@@ -57,10 +57,11 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Move now marker line back into events container as in the mornings it rises above the cal header
 - [x] All-day view expands & contracts to arbitrary height px
 - [x] Consider placing event count in pre-existing space to avoid having to give each event count dayPx width (haven't done this but have added a TODO)
-- [] Events only showing up in contracted view - apparently disppearing on expand - happens to the left of center point
+- [x] All-day expanded rendering
+- [] All-day expanded rendering: select events in view only
+- [] Events only showing up in contracted view - apparently disppearing on expand - happens to the left of center point - perhaps the layout bug domes it without ever placing them!
 - [] Move expanded all-day layout to worker
 - [] Click button or event count label to expand & contract all-day view
-- [] All-day expanded rendering (almost done, needs to select events in view)
 - [] All-day: Update not if dates change, but if data changes
 - [] Expand all day events if there are multiple
 - [] Worker fix in built version
