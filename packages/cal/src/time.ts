@@ -44,16 +44,18 @@ export function validateUTCMidnight(date: Date) {
 }
 
 // Returns same date as provided UTC/GMT time, but moves to 00:00 in local time
+// This is useful for translating to calendar space to user local time
 export function localZeroDate(date: Date) {
   validateUTCMidnight(date); // throw if not valid UTC midnight timestamp
-  const newDate = new Date();
-  newDate.setMilliseconds(0);
-  newDate.setSeconds(0);
-  newDate.setMinutes(0);
-  newDate.setHours(0);
-  newDate.setFullYear(date.getUTCFullYear());
-  newDate.setMonth(date.getUTCMonth());
-  newDate.setDate(date.getUTCDate());
+  const newDate = new Date(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0,
+    0,
+    0,
+    0,
+  );
   return newDate;
 }
 

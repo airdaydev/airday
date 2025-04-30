@@ -60,15 +60,15 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] All-day expanded rendering
 - [x] All-day expanded rendering: select events in view only
 - [x] Move expanded all-day layout to worker
-- [] All day events, esp. to the left (?) seem to be selected from wrong dates
-- [] Expanded layout bug does not fill space efficiently (places contiguous events on next lane)
-- [] Expanded layout bug disappears events
-- [] Click button or event count label to expand & contract all-day view
-- [] All-day: Update not if dates change, but if data changes
-- [] Expand all day events if there are multiple
-- [] Worker fix in built version
+- [x] Expand all day events automatically if there are multiple
+- [x] All day events, esp. to the left (?) seem to be selected from wrong dates - turned out to be a localZeroDate issue!
+- [x] Expanded layout bug does not fill space efficiently (places contiguous events on next lane) - needed to compare greaterthan/equality! as start/end dates are teh same
+- [x] Expanded layout bug disappears events (a localZeroDate issue - march was becoming feb due to it being the end of the month! - wouldn't have caught that otherwise)
+- [x] Click button or event count label to expand & contract all-day view
+- [] Change UI of label when all-day view expanded contracted
 - [] Jump to date/today button in tweakpane
 - [] Filter by multiple calendars, colour
+- [] Worker fix in built version
 
 ## Cal Interactions
 - [] hover style event extends to next day as needed
@@ -109,5 +109,6 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Multi-select events with single click
 - [] custom scroller, snap to date or week when active scrolling stops
 - [] Scroll snap type (?)
+- [] All-day: Update not if dates change, but if data changes
 
 ## Future: Port to webgpu

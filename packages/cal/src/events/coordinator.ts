@@ -116,6 +116,7 @@ export class EventRenderCoordinator {
     }
   }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
+  // TODO: Stinky code
   tick(maxMs = 16) {
     if (!this.airdayCal.db.ready) return;
     // Process events
@@ -274,17 +275,19 @@ export class EventRenderCoordinator {
         this.assignWork(work);
       } else {
         // Select all events within period, noting there will be many doubles
-        const eventIdMap = new Map<string, CalendarEvent>();
+        // TODO: This is called eventIdMap2 as it conflicts with above eventIdMap2
+        // TODO: This is very smelly code
+        const eventIdMap2 = new Map<string, CalendarEvent>();
         for (let date of this.airdayCal.transform.dates) {
           const set = this.allDayCache.data.get(date.valueOf());
           set?.forEach((event) => {
-            if (eventIdMap.get(event.id)) return;
-            else eventIdMap.set(event.id, event);
+            if (eventIdMap2.get(event.id)) return;
+            else eventIdMap2.set(event.id, event);
           });
         }
         const work: AllDayLrgWorkload = {
           type: "all-day-lrg",
-          events: Array.from(eventIdMap.values()),
+          events: Array.from(eventIdMap2.values()),
         };
         this.assignWork(work);
       }
