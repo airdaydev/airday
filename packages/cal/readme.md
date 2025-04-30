@@ -65,6 +65,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Expanded layout bug does not fill space efficiently (places contiguous events on next lane) - needed to compare greaterthan/equality! as start/end dates are teh same
 - [x] Expanded layout bug disappears events (a localZeroDate issue - march was becoming feb due to it being the end of the month! - wouldn't have caught that otherwise)
 - [x] Click button or event count label to expand & contract all-day view
+- [] All-day rendering should not occur when message returns but on RAF!!!
 - [] Change UI of label when all-day view expanded contracted
 - [] Jump to date/today button in tweakpane
 - [] Filter by multiple calendars, colour
