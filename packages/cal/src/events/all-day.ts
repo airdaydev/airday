@@ -1,13 +1,15 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { utcZeroDate } from "../time";
-import { calcExpandedAllDayLayout, ExpandedEventLayoutSet } from "./layout";
+import { ExpandedEventLayoutSet } from "./layout";
+
+const defaultExpandedState = false;
 
 export class AllDayEvents {
   airdayCal: AirdayCal;
   container: HTMLDivElement;
-  expanded = false;
-  renderedExpanded = false;
+  expanded = defaultExpandedState;
+  renderedExpanded = defaultExpandedState;
   rows = 1;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;

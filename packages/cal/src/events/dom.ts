@@ -101,7 +101,7 @@ export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
   // Date Label
   const dateLabel = document.createElement("div");
   dateLabel.className = "date-label";
-  const text = getDateUTC(jsDate);
+  const text = getDateUTC(jsDate, true);
   dateLabel.innerText = text;
   col.appendChild(dateLabel);
   // All day area

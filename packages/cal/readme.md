@@ -60,8 +60,9 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] All-day expanded rendering
 - [x] All-day expanded rendering: select events in view only
 - [x] Move expanded all-day layout to worker
-- [] Expanded layout bug disappears events
+- [] All day events, esp. to the left (?) seem to be selected from wrong dates
 - [] Expanded layout bug does not fill space efficiently (places contiguous events on next lane)
+- [] Expanded layout bug disappears events
 - [] Click button or event count label to expand & contract all-day view
 - [] All-day: Update not if dates change, but if data changes
 - [] Expand all day events if there are multiple

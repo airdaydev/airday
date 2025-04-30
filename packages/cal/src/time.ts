@@ -57,13 +57,16 @@ export function localZeroDate(date: Date) {
   return newDate;
 }
 
-export const getDateUTC = (date: Date) => {
+export const getDateUTC = (date: Date, month = false) => {
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const day = days[date.getUTCDay()];
   const dateMonth = date.getUTCDate();
-  return `${day} ${dateMonth.toString().padStart(2, "0")}`;
-  // const mo = date.getUTCMonth();
-  // /${(mo + 1).toString().padStart(2, "0")}
+  const str = `${day} ${dateMonth.toString().padStart(2, "0")}`;
+  if (month) {
+    const mo = date.getUTCMonth();
+    return `${str}/${(mo + 1).toString().padStart(2, "0")}`;
+  }
+  return str;
 };
 
 export const getDate = (date: Date) => {
