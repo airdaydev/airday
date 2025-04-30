@@ -59,8 +59,9 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [x] Consider placing event count in pre-existing space to avoid having to give each event count dayPx width (haven't done this but have added a TODO)
 - [x] All-day expanded rendering
 - [x] All-day expanded rendering: select events in view only
-- [] Events only showing up in contracted view - apparently disppearing on expand - happens to the left of center point - perhaps the layout bug domes it without ever placing them!
-- [] Move expanded all-day layout to worker
+- [] Expanded layout bug disappears events
+- [] Expanded layout bug does not fill space efficiently (places contiguous events on next lane)
+- [] Move corrected expanded all-day layout to worker
 - [] Click button or event count label to expand & contract all-day view
 - [] All-day: Update not if dates change, but if data changes
 - [] Expand all day events if there are multiple
