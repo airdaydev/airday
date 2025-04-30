@@ -81,8 +81,6 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Click/drag to shorten/lengthen event each direction
 - [] Click/Context click consumer events
 - [] Drag (+ shift) on blank area to multiselect
-
-## All-day events
 - [] Move between weeks/days with a button
 - [] Month/Year that shows up on pan
 
@@ -90,7 +88,7 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Change between 12/24hr time
 - [] Change time zone
 - [] Add time zone
-- [] Events falling on DST borders... events disappearing in different zones?
+- [] Events falling on DST borders... move for recurring events..? or show that it's a fake or additional hour etc
 
 ## Repeating events
 - [] Repeating events (intial series)
@@ -111,4 +109,4 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Scroll snap type (?)
 - [] All-day: Update not if dates change, but if data changes
 
-## Future: Port to webgpu
+## Future: Port to webgl/gpu
