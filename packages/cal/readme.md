@@ -92,8 +92,9 @@ Calendar front-end powering Airday's calendar - DOM backed vanilla JS. Currently
 - [] Events falling on DST borders... events disappearing in different zones?
 
 ## Repeating events
-- [] Repeating events
-- [] Overwriting repeated events (fuck)
+- [] Repeating events (intial series)
+- [] Changing repeated events (future events, all events or only this event)
+- [] Overwriting repeated events (use indexed system)
 
 ## Orientation
 - [] Consider: Hover over date to see full date ?
