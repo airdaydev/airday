@@ -257,7 +257,11 @@ export class EventRenderCoordinator {
     });
     // All day events, rendered when view changes
     const view = `${this.airdayCal.transform.dates[0]}_${this.airdayCal.transform.dates.length}`;
-    if (this.airdayCal.allDayEvents && this.lastView !== view) {
+    if (
+      (this.airdayCal.allDayEvents && this.lastView !== view) ||
+      this.airdayCal.allDayEvents?.expanded !==
+        this.airdayCal.allDayEvents?.renderedExpanded
+    ) {
       if (!this.airdayCal.allDayEvents.expanded) {
         const work: AllDaySmlWorkload = {
           type: "all-day-sml",
@@ -266,6 +270,7 @@ export class EventRenderCoordinator {
         };
         this.assignWork(work);
       } else {
+        // TODO: Move this to worker
         const layout = this.airdayCal.allDayEvents.renderExpanded(
           this.allDayIdCache.data,
         );

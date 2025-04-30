@@ -270,7 +270,7 @@ export function createCalStyleTag(instanceId: string) {
       left: 1px;
       display: flex;
       align-items: center;
-      padding-left: 0.5em;
+      padding: 0.5em;
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;

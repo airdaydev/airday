@@ -6,6 +6,7 @@ export class AllDayEvents {
   airdayCal: AirdayCal;
   container: HTMLDivElement;
   expanded = false;
+  renderedExpanded = false;
   rows = 1;
   constructor(airdayCal: AirdayCal) {
     this.airdayCal = airdayCal;
@@ -21,6 +22,7 @@ export class AllDayEvents {
     this.airdayCal.container?.style.setProperty("--rows", this.rows.toFixed());
   }
   renderExpanded(cache: Map<string, CalendarEvent>) {
+    this.renderedExpanded = true;
     const arr = Array.from(cache.values())
       .map((event) => {
         const startZero = utcZeroDate(event.start).valueOf();
@@ -48,7 +50,6 @@ export class AllDayEvents {
     });
     // render expanded layout
     const divs: HTMLDivElement[] = [];
-    console.log(layout);
     layout.forEach((lane, laneIndex) => {
       lane.forEach((event) => {
         const x = this.airdayCal.transform.dateToX(event.startZero);
@@ -68,6 +69,7 @@ export class AllDayEvents {
   // TODO: Test the shit out of this function
   // TODO: copy only necessary data
   renderContracted(events: CalendarEvent[], labels: Map<number, number>) {
+    this.renderedExpanded = false;
     const divs = events.map((event) => {
       const x = this.airdayCal.transform.dateToX(
         utcZeroDate(event.start).valueOf(),
@@ -81,7 +83,6 @@ export class AllDayEvents {
     });
 
     // Render events:
-
     this.container.innerHTML = "";
     this.container.append(...divs);
     const countDivs: HTMLDivElement[] = [];
@@ -92,6 +93,8 @@ export class AllDayEvents {
         div.classList.add("all-day-event-count");
         const x = this.airdayCal.transform.dateToX(date.valueOf());
         div.style.transform = `translate(${x}px)`;
+        // TODO: Consider slotting these into the day header slot to avoid having to manually assign width
+        div.style.width = `${this.airdayCal.transform.dayPx}px`;
         div.innerText = `${count} event${count > 1 ? "s" : ""}`;
         div.addEventListener("click", () =>
           this.airdayCal.allDayEvents?.expand(),
@@ -103,9 +106,10 @@ export class AllDayEvents {
   }
   expand() {
     this.expanded = true;
-    console.log("expanding");
+    this.airdayCal.act();
   }
   collapse() {
     this.expanded = false;
+    this.airdayCal.act();
   }
 }
