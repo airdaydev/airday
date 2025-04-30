@@ -245,7 +245,6 @@ export function createCalStyleTag(instanceId: string) {
       width: 100%;
       z-index: 10;
       top: 0;
-      background: white;
     }
     #${instanceId} .all-day-events {
       position: absolute;
