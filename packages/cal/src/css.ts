@@ -144,8 +144,8 @@ export function createCalStyleTag(instanceId: string) {
     }
     #${instanceId} .time-gridlines {
       position: absolute;
-      top: calc(26px * (var(--rows) + 1));
-      transition: 0.2s top;
+      transform: translateY(calc(26px * (var(--rows) + 1)));
+      transition: 0.2s transform;
       left: 0;
       z-index: 0;
       height: 100%;
@@ -169,8 +169,8 @@ export function createCalStyleTag(instanceId: string) {
       position: absolute;
       width: 100%;
       height: 100%;
-      top: calc(26px * (var(--rows) + 1));
-      transition: 0.2s top;
+      transform: translateY(calc(26px * (var(--rows) + 1)));
+      transition: 0.2s transform;
       z-index: 2;
       box-sizing: border-box;
       overflow-x: hidden; /* TODO: Debug later but this is creating scrollbars even with it set to visible */
