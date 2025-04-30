@@ -1,6 +1,7 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { getDateUTC, getTime, isTodayUTC, isWeekend } from "../time";
+import { AllDayEvents } from "./all-day";
 import { DayLayout, EventLayout } from "./layout";
 
 function EventEl(layout: EventLayout, event: CalendarEvent) {
@@ -128,6 +129,18 @@ export function appendDayLayout(
   container.append(...events);
 }
 
+export function AllDayLabel(ctrler: AllDayEvents) {
+  const allDay = document.createElement("button");
+  allDay.innerText = "All Day";
+  allDay.className = "all-day-label";
+  allDay.addEventListener("click", () => {
+    if (ctrler.expanded) ctrler.collapse();
+    else ctrler.expand();
+  });
+  // TODO: React to expansion/collapse
+  return allDay;
+}
+
 export function AnchorEl() {
   const anchor = document.createElement("div");
   anchor.className = "top-left-anchor";
@@ -135,10 +148,6 @@ export function AnchorEl() {
   tz.className = "tz-button";
   tz.innerText = "AEST";
   anchor.appendChild(tz);
-  const allDay = document.createElement("div");
-  allDay.innerText = "All Day";
-  allDay.className = "all-day-label";
-  anchor.appendChild(allDay);
   return anchor;
 }
 

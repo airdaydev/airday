@@ -1,6 +1,7 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { oneDayMs, utcZeroDate } from "../time";
+import { AllDayLabel } from "./dom";
 
 export class AllDayEvents {
   airdayCal: AirdayCal;
@@ -110,6 +111,7 @@ export class AllDayEvents {
   }
   collapse() {
     this.expanded = false;
+    this.updateRowCount(1);
     this.airdayCal.act();
   }
 }

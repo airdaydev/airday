@@ -233,6 +233,12 @@ export function createCalStyleTag(instanceId: string) {
       display: flex;
       align-items: center;
       justify-content: center;
+      margin: 0;
+      background: none;
+      font-size: 10px;
+      font-family: inherit;
+      color: inherit;
+      border: none;
     }
     #${instanceId} .cal-header {
       position: sticky;

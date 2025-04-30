@@ -11,6 +11,7 @@ import { getStartOfWeekUTC, utcZeroDate } from "./time";
 import { EventRenderCoordinator } from "./events/coordinator";
 import { createCalStyleTag, createColoursStyleTag } from "./css";
 import {
+  AllDayLabel,
   AnchorEl,
   CalHeader,
   EventsContainer,
@@ -34,6 +35,7 @@ export class AirdayCal {
   dayHeader?: HTMLDivElement;
   nowMarker?: NowMarker;
   allDayEvents?: AllDayEvents;
+  anchor?: HTMLDivElement;
   theme: Theme = "dark";
   db: EventDB;
   transform: CalendarTransform;
@@ -82,6 +84,9 @@ export class AirdayCal {
     // Attach everything
     const labels = TimesEl(this);
     const anchor = AnchorEl();
+    this.anchor = anchor;
+    const allDayLabel = AllDayLabel(this.allDayEvents);
+    this.anchor.appendChild(allDayLabel);
     scrollable.appendChild(anchor);
     scrollable.append(scrollChild);
     container.appendChild(scrollable);
