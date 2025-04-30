@@ -1,4 +1,8 @@
-import { calcAllDayContracted, calcDayLayout } from "./layout";
+import {
+  calcAllDayContracted,
+  calcDayLayout,
+  calcExpandedAllDayLayout,
+} from "./layout";
 
 interface Transform {
   dayPx: number;
@@ -39,7 +43,12 @@ export class EventUIWorker {
       });
     }
     if (message.data.type === "all-day-lrg") {
-      // TODO: DOES NOT EXIST YET
+      const { events } = message.data;
+      const layout = calcExpandedAllDayLayout(events);
+      self.postMessage({
+        type: "all-day-lrg",
+        layout,
+      });
     }
   };
 }

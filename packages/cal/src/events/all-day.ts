@@ -1,7 +1,7 @@
 import { AirdayCal } from "../cal";
 import { CalendarEvent } from "../model";
-import { oneDayMs, utcZeroDate } from "../time";
-import { AllDayLabel } from "./dom";
+import { utcZeroDate } from "../time";
+import { calcExpandedAllDayLayout, ExpandedEventLayoutSet } from "./layout";
 
 export class AllDayEvents {
   airdayCal: AirdayCal;
@@ -22,33 +22,9 @@ export class AllDayEvents {
     this.rows = count || 1; // Ensure minimum is 1, even if no rows in layout
     this.airdayCal.container?.style.setProperty("--rows", this.rows.toFixed());
   }
-  renderExpanded(cache: Map<string, CalendarEvent>) {
+  // TODO: Consider using an allDay idCache to access events, rather than passing everything between workers
+  renderExpanded(layout: ExpandedEventLayoutSet) {
     this.renderedExpanded = true;
-    const arr = Array.from(cache.values())
-      .map((event) => {
-        const startZero = utcZeroDate(event.start).valueOf();
-        const endZero = utcZeroDate(event.end).valueOf() + oneDayMs;
-        const durationDays = (endZero - startZero) / oneDayMs;
-        return Object.assign(event, {
-          startZero,
-          endZero,
-          durationDays,
-        });
-      })
-      .sort((a, b) => {
-        return a.startZero - b.startZero;
-      });
-    // how many days
-    const layoutMax: number[] = []; // max x per lane
-    const layout: any[][] = []; // lane, top to bottom
-    arr.forEach((event) => {
-      const laneIndex = layoutMax.findIndex(
-        (max) => (event.startZero || 0) > max,
-      );
-      const lane = laneIndex === -1 ? layoutMax.length : laneIndex;
-      layoutMax[lane] = event.endZero;
-      layout[lane] ? layout[lane].push(event) : (layout[lane] = [event]);
-    });
     // render expanded layout
     const divs: HTMLDivElement[] = [];
     layout.forEach((lane, laneIndex) => {

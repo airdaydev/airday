@@ -73,6 +73,11 @@ interface AllDaySmlWorkload extends Workload {
   cache: Map<number, Set<CalendarEvent>>;
 }
 
+interface AllDayLrgWorkload extends Workload {
+  type: "all-day-lrg";
+  events: CalendarEvent[];
+}
+
 // Processes UI events, manages workers, caches layouts
 // TODO: Break days down into tiles
 export class EventRenderCoordinator {
@@ -268,7 +273,7 @@ export class EventRenderCoordinator {
         };
         this.assignWork(work);
       } else {
-        // TODO: Move this to worker
+        // Select all events within period, noting there will be many doubles
         const eventIdMap = new Map<string, CalendarEvent>();
         for (let date of this.airdayCal.transform.dates) {
           const set = this.allDayCache.data.get(date.valueOf());
@@ -277,7 +282,11 @@ export class EventRenderCoordinator {
             else eventIdMap.set(event.id, event);
           });
         }
-        this.airdayCal.allDayEvents.renderExpanded(eventIdMap);
+        const work: AllDayLrgWorkload = {
+          type: "all-day-lrg",
+          events: Array.from(eventIdMap.values()),
+        };
+        this.assignWork(work);
       }
     }
     this.lastView = view;
@@ -296,6 +305,9 @@ export class EventRenderCoordinator {
         message.data.events,
         message.data.labels,
       );
+    }
+    if (type === "all-day-lrg") {
+      this.airdayCal.allDayEvents?.renderExpanded(message.data.layout);
     }
     this.startWorkQueue();
     this.airdayCal.act(); // TODO: A little blunt

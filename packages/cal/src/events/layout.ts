@@ -1,5 +1,5 @@
 import { CalendarEvent } from "../model";
-import { localZeroDate, timeToY, utcZeroDate } from "../time";
+import { localZeroDate, oneDayMs, timeToY, utcZeroDate } from "../time";
 
 export interface EventLayout {
   id: string;
@@ -198,6 +198,42 @@ export function calcAllDayContracted(
   };
 }
 
-export function calcExpandedAllDayLayout(cache) {
+interface ExpandedEventLayout extends CalendarEvent {
+  id: string;
+  startZero: number;
+  endZero: number;
+  durationDays: number;
+}
+
+export type ExpandedEventLayoutSet = ExpandedEventLayout[][];
+
+// TODO: Reduce info passed to this
+export function calcExpandedAllDayLayout(cache: Map<string, CalendarEvent>) {
   // expanded view layout
+  const arr = Array.from(cache.values())
+    .map((event) => {
+      const startZero = utcZeroDate(event.start).valueOf();
+      const endZero = utcZeroDate(event.end).valueOf() + oneDayMs;
+      const durationDays = (endZero - startZero) / oneDayMs;
+      return Object.assign(event, {
+        startZero,
+        endZero,
+        durationDays,
+      });
+    })
+    .sort((a, b) => {
+      return a.startZero - b.startZero;
+    });
+  // how many days
+  const layoutMax: number[] = []; // max x per lane
+  const layout: ExpandedEventLayoutSet = []; // lane, top to bottom
+  arr.forEach((event) => {
+    const laneIndex = layoutMax.findIndex(
+      (max) => (event.startZero || 0) > max,
+    );
+    const lane = laneIndex === -1 ? layoutMax.length : laneIndex;
+    layoutMax[lane] = event.endZero;
+    layout[lane] ? layout[lane].push(event) : (layout[lane] = [event]);
+  });
+  return layout;
 }
