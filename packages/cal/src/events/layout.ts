@@ -209,7 +209,6 @@ export type ExpandedEventLayoutSet = ExpandedEventLayout[][];
 
 // TODO: Reduce info passed to this
 export function calcExpandedAllDayLayout(cache: Map<string, CalendarEvent>) {
-  console.log("expandedcache", cache);
   // expanded view layout
   const arr = Array.from(cache.values())
     .map((event) => {
@@ -225,7 +224,6 @@ export function calcExpandedAllDayLayout(cache: Map<string, CalendarEvent>) {
     .sort((a, b) => {
       return a.startZero - b.startZero;
     });
-  console.log("arr", arr);
   // how many days
   const layoutMax: number[] = []; // max x per lane
   const layout: ExpandedEventLayoutSet = []; // lane, top to bottom
@@ -237,6 +235,5 @@ export function calcExpandedAllDayLayout(cache: Map<string, CalendarEvent>) {
     layoutMax[lane] = event.endZero;
     layout[lane] ? layout[lane].push(event) : (layout[lane] = [event]);
   });
-  console.log("layout", layout);
   return layout;
 }
