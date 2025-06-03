@@ -1,4 +1,4 @@
-# Server exploration
+# Airday server exploration
 
 This is v0 of Airday's backend in Rust.
 
@@ -11,12 +11,14 @@ This is v0 of Airday's backend in Rust.
 - validator (validate requests)
 - uuid (id generation)
 - sqlx (sqlite)
+- automerge (maybe)
 
 ## Roadmap
 - [] core
 - [] basic auth
 - [] sqlite
 - [] e2e contacts
+- [] todo
 - [] hardcore auth
 - [] basic cal
 - [] hardcore cal
