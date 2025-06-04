@@ -7,16 +7,39 @@ use serde::Serialize;
 #[derive(Serialize)]
 pub struct JMAPSession {
     pub capabilities: AirdayCapabilities,
+    pub accounts: Account,
+    #[serde(rename(serialize = "primaryAccounts"))]
+    primary_accounts: String,
+    username: String,
+    #[serde(rename(serialize = "apiUrl"))]
+    api_url: String,
+    #[serde(rename(serialize = "downloadUrl"))]
+    download_url: String,
+    #[serde(rename(serialize = "uploadUrl"))]
+    upload_url: String,
+    #[serde(rename(serialize = "eventSourceUrl"))]
+    event_source_url: String,
+    state: String,
 }
 
 #[derive(Serialize)]
 pub struct AirdayCapabilities {
     #[serde(rename(serialize = "urn:ietf:params:jmap:core"))]
     pub core: CoreCapabilities,
-    pub accounts: String,
     // TODO: Contacts
     // TODO: Calendar
     // TODO: Tasks? (Maybe)
+}
+
+#[derive(Serialize)]
+pub struct Account {
+    name: String, // e.g. email
+    #[serde(rename(serialize = "isPersonal"))]
+    is_personal: bool,
+    #[serde(rename(serialize = "isReadOnly"))]
+    is_read_only: bool,
+    #[serde(rename(serialize = "accountCapabilities"))]
+    account_capabilities: String,
 }
 
 #[derive(Serialize)]
@@ -52,8 +75,20 @@ pub async fn session_handler() -> Json<JMAPSession> {
                 max_objects_in_set: 500,
                 collation_algorithms: vec![],
             },
-            accounts: String::from("TBC"),
         },
+        accounts: Account {
+            name: String::from("daniel@gormly.co"),
+            is_personal: true,
+            is_read_only: true,
+            account_capabilities: String::from("tbc"),
+        },
+        primary_accounts: String::from("tbc"),
+        username: String::from("daniel@gormly.co"),
+        api_url: String::from("localhost"),
+        download_url: String::from("localhost"),
+        upload_url: String::from("localhost"),
+        event_source_url: String::from("localhost"),
+        state: String::from("000"),
     };
     Json(session)
 }
