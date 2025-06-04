@@ -26,8 +26,10 @@ pub struct JMAPSession {
 pub struct AirdayCapabilities {
     #[serde(rename(serialize = "urn:ietf:params:jmap:core"))]
     pub core: CoreCapabilities,
-    // TODO: Contacts
-    // TODO: Calendar
+    #[serde(rename(serialize = "urn:ietf:params:jmap:contacts"))]
+    pub contacts: String,
+    #[serde(rename(serialize = "urn:ietf:params:jmap:calendar"))]
+    pub calendar: String,
     // TODO: Tasks? (Maybe)
 }
 
@@ -75,6 +77,8 @@ pub async fn session_handler() -> Json<JMAPSession> {
                 max_objects_in_set: 500,
                 collation_algorithms: vec![],
             },
+            contacts: String::from("tbc"),
+            calendar: String::from("tbc"),
         },
         accounts: Account {
             name: String::from("daniel@gormly.co"),
