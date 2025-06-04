@@ -1,5 +1,4 @@
-// use toml::Table;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct AirdayConfig {
@@ -19,9 +18,4 @@ impl AirdayConfig {
         };
         config
     }
-    // pub fn load_config() {
-    //     let value = "PORT = 3000".parse::<Table>().unwrap();
-    //     assert_eq!(value["PORT"].as_str(), Some("port"));
-    //     // AirdayConfig::new(value["PORT"]);
-    // }
 }
