@@ -5,6 +5,7 @@ This is v0 of Airday's backend in Rust.
 ## Likely dependencies
 - tokio (async runtime)
 - axum (web framework)
+- axum-extra (cookie extraction)
 - serde (serialisation, deserialisation)
 - chrono (tz package)
 - chrono-tz (tz extension?)
@@ -15,11 +16,13 @@ This is v0 of Airday's backend in Rust.
 
 ## Roadmap
 - [] core
-- [] basic auth
+- [] hardcoded auth
 - [] sqlite
 - [] e2e contacts
+- [] tracing
+- [] basic auth (front-end sign in, up, user management)
 - [] todo
-- [] hardcore auth
+- [] oauth
 - [] basic cal
 - [] hardcore cal
 - [] ical import/export

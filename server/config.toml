@@ -1,2 +1,10 @@
+# Listening ip/port
 host = "0.0.0.0"
 port = 3000
+
+# Allow new sign ups on this instance
+# allow_create_user = false
+
+# enable_contacts = false
+# enable_calendar = false
+# enable_tasks = false
