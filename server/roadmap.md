@@ -1,0 +1,12 @@
+## Roadmap
+- [] session auth (hardcoded username/password) with sqlite storage
+- [] jmap core
+- [] e2e contacts
+- [] tracing
+- [] basic auth (front-end sign in, up, user management)
+- [] todo
+- [] oauth
+- [] basic cal
+- [] hardcore cal
+- [] ical import/export
+- [] caldav

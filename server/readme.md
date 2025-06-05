@@ -14,20 +14,6 @@ This is v0 of Airday's backend in Rust.
 - sqlx (sqlite)
 - automerge (maybe)
 
-## Roadmap
-- [] core
-- [] hardcoded auth
-- [] sqlite
-- [] e2e contacts
-- [] tracing
-- [] basic auth (front-end sign in, up, user management)
-- [] todo
-- [] oauth
-- [] basic cal
-- [] hardcore cal
-- [] ical import/export
-- [] caldav
-
 ## Learning
 - [x] https://tokio.rs/tokio/tutorial
 - []
