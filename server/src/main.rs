@@ -1,5 +1,6 @@
+mod auth;
 mod config;
-mod core;
+mod jmap_core;
 mod server;
 use axum::{Router, routing::get};
 
@@ -10,7 +11,7 @@ async fn main() {
     println!("Airday server started at http://{}", host_str);
     let app = Router::new()
         .route("/", get(server::root_handler))
-        .route("/session", get(core::session_handler));
+        .route("/session", get(jmap_core::session_handler));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
         .unwrap();
