@@ -5,6 +5,7 @@ mod server;
 mod sql;
 use axum::{Router, middleware, routing::get};
 use sqlx::SqlitePool;
+use std::fs;
 use tower_cookies::CookieManagerLayer;
 
 #[derive(Clone)]
@@ -14,9 +15,8 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    let cfg = config::AirdayConfig::from_toml(
-        "port = 3000\nhost = '0.0.0.0'\nsqlite_host='sqlite:/home/daniel/.config/airday/airday.db'",
-    );
+    let raw_cfg = fs::read_to_string("config.toml").unwrap();
+    let cfg = config::AirdayConfig::from_toml(&raw_cfg);
     let host_str = format!("{}:{}", cfg.host, cfg.port);
 
     let pool = sql::connect_sqlite(&cfg).await;
