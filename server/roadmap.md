@@ -1,5 +1,5 @@
 ## Roadmap
-- [] session auth (hardcoded username/password) with sqlite storage
+- [] session auth (sqlx based username/password) with sqlite storage
 - [] jmap core
 - [] e2e contacts
 - [] tracing

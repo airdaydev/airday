@@ -2,6 +2,24 @@
 
 This is v0 of Airday's backend in Rust.
 
+## Development
+```bash
+pacman -Sy sqlite
+cargo install sqlx-cli
+cargo run
+
+mkdir ~/.config/airday
+export DATABASE_URL=sqlite:~/.config/airday/airday.db
+sqlx database create
+sqlx database reset
+sqlx migrate run
+
+sqlite3 /home/daniel/.config/airday/airday.db
+.databases
+.tables
+SELECT name, type, sql FROM sqlite_master;
+```
+
 ## Likely dependencies
 - tokio (async runtime)
 - axum (web framework)
@@ -12,8 +30,5 @@ This is v0 of Airday's backend in Rust.
 - validator (validate requests)
 - uuid (id generation)
 - sqlx (sqlite)
-- automerge (maybe)
-
-## Learning
-- [x] https://tokio.rs/tokio/tutorial
-- []
+- automerge (maybe, crdt lib)
+- clap (maybe, command line parser)
