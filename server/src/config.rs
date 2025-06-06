@@ -4,6 +4,7 @@ use serde::Deserialize;
 pub struct AirdayConfig {
     pub port: usize,
     pub host: String, // TODO: Use an IP address type
+    pub sqlite_host: String,
 }
 
 impl AirdayConfig {

@@ -1,12 +1,15 @@
 // TODO: This will initially handle session based authentication
 // via both a bearer token and cookie
 use axum::{
-    extract::Request, http::StatusCode, middleware::Next, response::Json, response::Response,
+    extract::Request, extract::State, http::StatusCode, middleware::Next, response::Json,
+    response::Response,
 };
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::Serialize;
 use tower_cookies::{Cookie, Cookies};
+
+use crate::AppState;
 
 fn gen_session_id() -> String {
     let mut rng = OsRng; // CSPRNG
@@ -49,8 +52,24 @@ pub async fn auth_middleware(
 ) -> Result<Response, StatusCode> {
     if let Some(session_cookie) = cookies.get("session_id") {
         // TODO: Check session validity
+        println!("{}", session_cookie);
         Ok(next.run(request).await)
     } else {
         Err(StatusCode::UNAUTHORIZED)
     }
+}
+
+#[derive(Serialize)]
+pub struct CreateUserResponse {
+    success: bool,
+}
+
+pub async fn create_user(State(state): State<AppState>) -> Json<CreateUserResponse> {
+    // let my_string = String::from("bill");
+    let res: String = sqlx::query_scalar!("SELECT 'hello world' AS greeting")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    println!("res, {}", res);
+    Json(CreateUserResponse { success: true })
 }

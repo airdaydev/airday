@@ -1,4 +1,7 @@
-# SQL UUID Extension installation
+# sqlite extensions
+See [docs](https://github.com/nalgeon/sqlean/blob/main/docs/uuid.md)
+
+## Installing uuid extension
 
 1. Download release for your platform
 [https://github.com/nalgeon/sqlean/releases/tag/0.27.2](https://github.com/nalgeon/sqlean/releases/tag/0.27.2)

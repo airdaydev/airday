@@ -1,5 +1,11 @@
 CREATE TABLE IF NOT EXISTS user (
   id UUID PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
-  pw_hash BLOB NOT NULL
+  pw_hash TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES user (id)
 );
