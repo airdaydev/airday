@@ -65,11 +65,26 @@ pub struct CreateUserResponse {
 }
 
 pub async fn create_user(State(state): State<AppState>) -> Json<CreateUserResponse> {
-    // let my_string = String::from("bill");
-    let res: String = sqlx::query_scalar!("SELECT 'hello world' AS greeting")
-        .fetch_one(&state.pool)
-        .await
-        .unwrap();
-    println!("res, {}", res);
+    let username = String::from("test");
+    sqlx::query!(
+        r#"
+INSERT INTO user (username) VALUES (?)
+"#,
+        username
+    )
+    .execute(&state.pool)
+    .await
+    .unwrap();
     Json(CreateUserResponse { success: true })
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+
+//     #[test]
+//     fn test_create_user() {
+//       let state = State
+//       create_user()
+//     }
+// }

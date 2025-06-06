@@ -3,7 +3,8 @@ mod config;
 mod jmap_core;
 mod server;
 mod sql;
-use axum::{Router, middleware, routing::get};
+use axum::routing::{get, post};
+use axum::{Router, middleware};
 use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
@@ -29,7 +30,7 @@ async fn main() {
         .route("/auth/pw", get(auth::password_authorisation))
         .route("/user", get(auth::create_user));
     let private = Router::new()
-        .route("/session", get(jmap_core::session_handler))
+        .route("/session", post(jmap_core::session_handler))
         .layer(middleware::from_fn(auth::auth_middleware));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
