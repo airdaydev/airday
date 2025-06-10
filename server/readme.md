@@ -9,7 +9,8 @@ cargo install sqlx-cli
 cargo run
 
 mkdir ~/.config/airday
-export DATABASE_URL=sqlite:~/.config/airday/airday.db
+echo "DATABASE_URL=sqlite:/home/daniel/.config/airday/airday.db" > .env
+# or export DATABASE_URL=sqlite:~/.config/airday/airday.db
 sqlx database create
 sqlx database reset
 sqlx migrate run
@@ -20,15 +21,11 @@ sqlite3 /home/daniel/.config/airday/airday.db
 SELECT name, type, sql FROM sqlite_master;
 ```
 
-## Likely dependencies
-- tokio (async runtime)
-- axum (web framework)
-- axum-extra (cookie extraction)
+## Additional deps to explore
 - serde (serialisation, deserialisation)
 - chrono (tz package)
 - chrono-tz (tz extension?)
 - validator (validate requests)
 - uuid (id generation)
-- sqlx (sqlite)
 - automerge (maybe, crdt lib)
 - clap (maybe, command line parser)
