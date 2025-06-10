@@ -1,6 +1,7 @@
 mod auth;
 mod config;
 mod jmap_core;
+mod model;
 mod server;
 mod sql;
 use axum::routing::{get, post};
@@ -8,6 +9,8 @@ use axum::{Router, middleware};
 use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
+#[cfg(test)]
+pub mod test_util;
 
 #[derive(Clone)]
 struct AppState {

@@ -1,5 +1,6 @@
 // TODO: This will initially handle session based authentication
 // via both a bearer token and cookie
+use crate::{AppState, model};
 use axum::{
     extract::Request, extract::State, http::StatusCode, middleware::Next, response::Json,
     response::Response,
@@ -8,8 +9,6 @@ use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::Serialize;
 use tower_cookies::{Cookie, Cookies};
-
-use crate::AppState;
 
 fn gen_session_id() -> String {
     let mut rng = OsRng; // CSPRNG
@@ -65,26 +64,7 @@ pub struct CreateUserResponse {
 }
 
 pub async fn create_user(State(state): State<AppState>) -> Json<CreateUserResponse> {
-    let username = String::from("test");
-    sqlx::query!(
-        r#"
-INSERT INTO user (username) VALUES (?)
-"#,
-        username
-    )
-    .execute(&state.pool)
-    .await
-    .unwrap();
+    let username = "test";
+    model::user::create(&state.pool, &username).await.unwrap();
     Json(CreateUserResponse { success: true })
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn test_create_user() {
-//       let state = State
-//       create_user()
-//     }
-// }
