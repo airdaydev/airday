@@ -14,3 +14,4 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "uuid"] }
 base64 = "0.22.1"
 rand = "0.9.1"
 tower-cookies = "0.11.0"
+argon2 = "0.5.3"
