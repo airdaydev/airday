@@ -1,6 +1,8 @@
 use sqlx::{Result, SqlitePool, sqlite::SqliteQueryResult};
 
-pub async fn create(pool: &SqlitePool, username: &str) -> Result<SqliteQueryResult> {
+use crate::error::AppError;
+
+pub async fn create(pool: &SqlitePool, username: &str) -> Result<SqliteQueryResult, AppError> {
     sqlx::query!(
         r#"
   INSERT INTO user (username, pw_hash) VALUES (?, "bzz")
@@ -9,6 +11,7 @@ pub async fn create(pool: &SqlitePool, username: &str) -> Result<SqliteQueryResu
     )
     .execute(pool)
     .await
+    .map_err(|e| AppError::ValidationError(e.to_string()))
     // TODO: UsernameExists Error!
 }
 

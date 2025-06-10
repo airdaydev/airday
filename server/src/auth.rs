@@ -1,6 +1,6 @@
 // TODO: This will initially handle session based authentication
 // via both a bearer token and cookie
-use crate::{AppState, model};
+use crate::{AppState, error::AppError, model};
 use axum::{
     extract::Request, extract::State, http::StatusCode, middleware::Next, response::Json,
     response::Response,
@@ -63,8 +63,10 @@ pub struct CreateUserResponse {
     success: bool,
 }
 
-pub async fn create_user(State(state): State<AppState>) -> Json<CreateUserResponse> {
+pub async fn create_user(
+    State(state): State<AppState>,
+) -> Result<Json<CreateUserResponse>, AppError> {
     let username = "test";
-    model::user::create(&state.pool, &username).await.unwrap();
-    Json(CreateUserResponse { success: true })
+    let res = model::user::create(&state.pool, &username).await;
+    res.map(|_| Json(CreateUserResponse { success: true }))
 }

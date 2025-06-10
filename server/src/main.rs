@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod error;
 mod jmap_core;
 mod model;
 mod server;
