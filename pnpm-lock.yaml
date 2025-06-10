@@ -44,9 +44,12 @@ importers:
 
   packages/client:
     dependencies:
+      toml-config:
+        specifier: ^1.1.4
+        version: 1.1.5
       typescript:
-        specifier: ^5.0.0
-        version: 5.6.3
+        specifier: ^5.8.3
+        version: 5.8.3
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -1483,6 +1486,9 @@ packages:
   toml-config@0.0.6:
     resolution: {integrity: sha512-L2ZAtBzg/MpBKznAqi9Ec5AwLxtft8TryI+9+Xy2DCfw52mQF3cf9QcrFKral8etDEW8+46O02KbAOuOjNZQDA==}
 
+  toml-config@1.1.5:
+    resolution: {integrity: sha512-41Wl+yVb3oHyh81rcme8Py2z+RfE+GvVJIs/EpVJtHq9ifFcv2PY3v5/IBE25xqiRuncpU4kXEXZCBNMloiyqQ==}
+
   toml@3.0.0:
     resolution: {integrity: sha512-y/mWCZinnvxjTKYhJ+pYxwD0mRLVvOtdS2Awbgxln6iEnt4rk0yBxeSBHkGJcPucRiG0e55mwWp+g/05rsrd6w==}
 
@@ -1516,6 +1522,11 @@ packages:
 
   typescript@5.6.3:
     resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  typescript@5.8.3:
+    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -2937,6 +2948,10 @@ snapshots:
     dependencies:
       toml: 3.0.0
 
+  toml-config@1.1.5:
+    dependencies:
+      toml: 3.0.0
+
   toml@3.0.0: {}
 
   tough-cookie@4.1.4:
@@ -2961,6 +2976,8 @@ snapshots:
   typescript@4.9.5: {}
 
   typescript@5.6.3: {}
+
+  typescript@5.8.3: {}
 
   undici-types@5.26.5: {}
 
