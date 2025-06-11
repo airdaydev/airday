@@ -7,7 +7,7 @@ pub struct APIRoot {
 }
 
 const API_ROOT: APIRoot = APIRoot {
-    version: "airday-research-0",
+    version: "airday-alpha-0",
 };
 
 pub async fn root_handler() -> Json<APIRoot> {

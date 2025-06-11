@@ -20,7 +20,7 @@ pub async fn create(
         Err(sqlx::Error::Database(db_err)) => {
             if db_err.is_unique_violation() {
                 Err(AppError::ValidationError(String::from(
-                    "A user with this uesrname already exists.",
+                    "A user with this email already exists.",
                 )))
             } else {
                 Err(AppError::DatabaseError(db_err.to_string()))

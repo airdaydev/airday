@@ -26,11 +26,30 @@ interface AirdayJSONResponse<T> {
 type ExtractEnsureType<T extends EnsureFunction<any>> =
   T extends EnsureFunction<infer U> ? U : never;
 
+interface ParseOpts {
+  debug: boolean;
+}
+
+// TODO: Error handling, tracing
 export async function validateJSONResponse<T extends EnsureFunction<any>>(
   response: Response,
   validator: T,
+  opts?: ParseOpts,
 ): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
   let body = await response.json();
+  const parseOpts = {
+    debug: false,
+    ...opts,
+  };
+  if (parseOpts.debug) {
+    console.log(response, body);
+  }
+  if (response.status !== 200) {
+    // TODO: Robust status handling
+    throw new Error(
+      `Status: ${response.status}, body: ${JSON.stringify(body)}`,
+    );
+  }
   const data = validator(body);
   return {
     response,

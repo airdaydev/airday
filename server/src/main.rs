@@ -42,7 +42,7 @@ async fn main() {
     let public = Router::new()
         .route("/", get(server::root_handler))
         .route("/auth/pw", get(auth::password_authorisation))
-        .route("/user", get(auth::create_user));
+        .route("/user", post(auth::create_user));
     let private = Router::new()
         .route("/session", post(jmap_core::session_handler))
         .layer(middleware::from_fn(auth::auth_middleware));

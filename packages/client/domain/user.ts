@@ -10,8 +10,7 @@ const createUserOptsSchema = APISchema(
 
 const createUserResSchema = APISchema(
   v.object({
-    email: v.string(),
-    password: v.string(),
+    id: v.string().required(),
   }),
 );
 
@@ -22,5 +21,9 @@ export function createUser(
   createUserOptsSchema.ensureFunc(opts);
   return fetch(client.endpoint("/user"), {
     method: "POST",
+    body: JSON.stringify(opts),
+    headers: {
+      "Content-Type": "application/json",
+    },
   }).then((res) => validateJSONResponse(res, createUserResSchema.ensureFunc));
 }

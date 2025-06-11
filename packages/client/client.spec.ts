@@ -19,10 +19,9 @@ test("getAPIRoot", async () => {
 });
 
 test("createUser", async () => {
-  const d = expect(
-    createUser(client, {
-      email: "daniel@gormly.co",
-      password: "fa09j20fiaj3fpaof",
-    }),
-  ).rejects.toThrowError();
+  const d = await createUser(client, {
+    email: "daniel@gormly.co",
+    password: "fa09j20fiaj3fpaof",
+  });
+  expect(d.data.id).toBeTypeOf("string");
 });

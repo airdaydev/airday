@@ -60,7 +60,7 @@ pub async fn auth_middleware(
 
 #[derive(Serialize)]
 pub struct CreateUserResponse {
-    success: bool,
+    id: String,
 }
 
 pub async fn create_user(
@@ -69,5 +69,9 @@ pub async fn create_user(
     let username = "test";
     let password = "test";
     let res = model::user::create(&state.pool, &username, &password).await;
-    res.map(|_| Json(CreateUserResponse { success: true }))
+    res.map(|_| {
+        Json(CreateUserResponse {
+            id: String::from("hi"),
+        })
+    })
 }
