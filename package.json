@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "",
   "scripts": {
-    "start": "pnpm --dir ./web start"
+    "start": "pnpm --dir ./web start",
+    "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml"
   },
   "keywords": [],
   "author": "",

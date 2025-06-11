@@ -7,6 +7,7 @@ mod server;
 mod sql;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
+use bpaf::Bpaf;
 use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
@@ -18,9 +19,18 @@ struct AppState {
     pool: SqlitePool,
 }
 
+#[derive(Bpaf, Debug, Clone)]
+#[bpaf(options, version)]
+struct AirdayOptions {
+    /// Speed in KPH
+    #[bpaf(fallback(String::from("config.toml")))]
+    config: String,
+}
+
 #[tokio::main]
 async fn main() {
-    let raw_cfg = fs::read_to_string("config.toml").unwrap();
+    let opts = airday_options().run();
+    let raw_cfg = fs::read_to_string(opts.config).unwrap();
     let cfg = config::AirdayConfig::from_toml(&raw_cfg);
     let host_str = format!("{}:{}", cfg.host, cfg.port);
 
