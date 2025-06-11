@@ -12,6 +12,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "suretype": "^3.3.1",
     "toml-config": "^1.1.4"
   }
 }
