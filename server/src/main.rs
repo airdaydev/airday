@@ -22,17 +22,23 @@ struct AppState {
 #[derive(Bpaf, Debug, Clone)]
 #[bpaf(options, version)]
 struct AirdayOptions {
-    /// Speed in KPH
+    /// Path to config file
     #[bpaf(fallback(String::from("config.toml")))]
     config: String,
+    /// Override database
+    sqlx_host: Option<String>,
 }
 
 #[tokio::main]
 async fn main() {
     let opts = airday_options().run();
     let raw_cfg = fs::read_to_string(opts.config).unwrap();
-    let cfg = config::AirdayConfig::from_toml(&raw_cfg);
+    let mut cfg = config::AirdayConfig::from_toml(&raw_cfg);
     let host_str = format!("{}:{}", cfg.host, cfg.port);
+
+    if let Some(db) = opts.sqlx_host {
+        cfg.sqlx_host = db.clone();
+    }
 
     let pool = sql::connect_sqlite(&cfg).await;
 
