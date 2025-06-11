@@ -1,4 +1,9 @@
-import { compile, v, type EnsureFunction } from "suretype";
+import {
+  type TypeOf,
+  compile,
+  type ObjectValidator,
+  type EnsureFunction,
+} from "suretype";
 
 export class AirdayClient {
   root = new URL("http://localhost:3000");
@@ -21,7 +26,7 @@ interface AirdayJSONResponse<T> {
 type ExtractEnsureType<T extends EnsureFunction<any>> =
   T extends EnsureFunction<infer U> ? U : never;
 
-async function validateJSONResponse<T extends EnsureFunction<any>>(
+export async function validateJSONResponse<T extends EnsureFunction<any>>(
   response: Response,
   validator: T,
 ): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
@@ -33,20 +38,14 @@ async function validateJSONResponse<T extends EnsureFunction<any>>(
   };
 }
 
-interface CreateUserOpts {
-  email: string;
-  password: string;
-}
-
-const createUserResponseSchema = v.object({
-  id: v.string(),
-  email: v.string(),
-});
-
-const validator = compile(createUserResponseSchema, { ensure: true });
-
-export function createUser(client: AirdayClient, opts: CreateUserOpts) {
-  return fetch(client.endpoint("/user"), {
-    method: "POST",
-  }).then((res) => validateJSONResponse(res, validator));
+export function APISchema<T extends ObjectValidator<any>>(
+  schema: T,
+): {
+  schema: T;
+  ensureFunc: EnsureFunction<TypeOf<T, false>>;
+} {
+  return {
+    schema,
+    ensureFunc: compile(schema, { ensure: true }),
+  };
 }
