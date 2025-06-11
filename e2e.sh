@@ -6,7 +6,9 @@ export DATABASE_URL="sqlite:/home/daniel/.config/airday/test.db"
 sqlx database reset -y --source=./server/migrations
 
 # Start server in background
-cargo run --manifest-path ./server/Cargo.toml -- --sqlx-host=sqlite:/home/daniel/.config/airday/test.db --config=./server/config.toml & SERVER_PID=$!
+cargo run --manifest-path ./server/Cargo.toml -- \
+  --sqlx-host=sqlite:/home/daniel/.config/airday/test.db \
+  --config=./server/config.toml & SERVER_PID=$!
 
 # Wait for server to be ready (adjust URL/port as needed)
 # echo "Waiting for server to start..."
@@ -15,15 +17,15 @@ cargo run --manifest-path ./server/Cargo.toml -- --sqlx-host=sqlite:/home/daniel
 # done
 
 # Run tests
-set +e # disable on error
+set +e # disable exit on error
 pnpm --dir ./packages/client test
 TEST_EXIT_CODE=$?
-set -e
+set -e # enable exit on error
 
-# Cleanup: kill the server
+# Cleanup server
 kill $SERVER_PID 2>/dev/null || true
 wait $SERVER_PID 2>/dev/null || true
 
-echo "Tests completed, server stopped"
+echo "Tests completed with code $TEST_EXIT_CODE, server stopped"
 
 exit $TEST_EXIT_CODE
