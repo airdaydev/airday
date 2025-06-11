@@ -2,6 +2,9 @@
   "name": "@airday/client",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "start": "bun run"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
