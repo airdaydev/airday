@@ -11,10 +11,10 @@ cargo run --manifest-path ./server/Cargo.toml -- \
   --config=./server/config.toml & SERVER_PID=$!
 
 # Wait for server to be ready (adjust URL/port as needed)
-# echo "Waiting for server to start..."
-# while ! curl -s http://localhost:8080/health > /dev/null 2>&1; do
-#     sleep 0.5
-# done
+echo "Waiting for server to start..."
+while ! curl -s http://localhost:3000/ > /dev/null 2>&1; do
+    sleep 0.5
+done
 
 # Run tests
 set +e # disable exit on error

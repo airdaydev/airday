@@ -4,14 +4,14 @@ use crate::error::AppError;
 
 pub async fn create(
     pool: &SqlitePool,
-    username: &str,
+    email: &str,
     _password: &str,
 ) -> Result<SqliteQueryResult, AppError> {
     let q = sqlx::query!(
         r#"
-  INSERT INTO user (username, pw_hash) VALUES (?, "bzz")
+  INSERT INTO user (email, pw_hash) VALUES (?, "bzz")
   "#,
-        username
+        email
     )
     .execute(pool)
     .await;

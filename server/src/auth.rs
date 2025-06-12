@@ -66,9 +66,9 @@ pub struct CreateUserResponse {
 pub async fn create_user(
     State(state): State<AppState>,
 ) -> Result<Json<CreateUserResponse>, AppError> {
-    let username = "test";
+    let email = "daniel@air.day";
     let password = "test";
-    let res = model::user::create(&state.pool, &username, &password).await;
+    let res = model::user::create(&state.pool, &email, &password).await;
     res.map(|_| {
         Json(CreateUserResponse {
             id: String::from("hi"),
