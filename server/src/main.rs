@@ -1,10 +1,14 @@
 mod auth;
-mod config;
-mod error;
-mod jmap_core;
+mod common {
+    pub mod config;
+    pub mod error;
+    pub mod sql;
+}
+mod jmap {
+    pub mod core;
+}
 mod model;
-mod server;
-mod sql;
+mod root;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
 use bpaf::Bpaf;
@@ -33,24 +37,25 @@ struct AirdayOptions {
 async fn main() {
     let opts = airday_options().run();
     let raw_cfg = fs::read_to_string(opts.config).unwrap();
-    let mut cfg = config::AirdayConfig::from_toml(&raw_cfg);
+    let mut cfg = common::config::AirdayConfig::from_toml(&raw_cfg);
     let host_str = format!("{}:{}", cfg.host, cfg.port);
 
     if let Some(db) = opts.sqlx_host {
         cfg.sqlx_host = db.clone();
     }
 
-    let pool = sql::connect_sqlite(&cfg).await;
+    let pool = common::sql::connect_sqlite(&cfg).await;
 
     let state = AppState { pool };
 
     println!("Airday server started at http://{}", host_str);
     let public = Router::new()
-        .route("/", get(server::root_handler))
+        .route("/", get(root::root_handler))
         .route("/auth/password", post(auth::password_authorisation))
         .route("/user", post(auth::create_user));
     let private = Router::new()
-        .route("/session", post(jmap_core::session_handler))
+        // .route("/user", post(auth::get_user));
+        .route("/jmap/session", post(jmap::core::session_handler))
         .layer(middleware::from_fn(auth::auth_middleware));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await

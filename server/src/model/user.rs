@@ -6,7 +6,7 @@ use serde::Serialize;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::common::error::AppError;
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct User {

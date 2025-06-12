@@ -2,7 +2,7 @@
 // via both a bearer token and cookie
 use crate::{
     AppState,
-    error::AppError,
+    common::error::AppError,
     model::{self, user::verify_login},
 };
 use axum::{

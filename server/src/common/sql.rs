@@ -1,6 +1,6 @@
 use sqlx::{Pool, Sqlite, sqlite::SqlitePool};
 
-use crate::config::AirdayConfig;
+use crate::common::config::AirdayConfig;
 
 pub async fn connect_sqlite(config: &AirdayConfig) -> Pool<Sqlite> {
     let pool_res = SqlitePool::connect(&config.sqlx_host).await;
