@@ -13,12 +13,12 @@ export const config = validateConfig(schema, rawConfig);
 
 const client = new AirdayClient(config.API_URL);
 
-test("getAPIRoot", async () => {
+test("API root url & version", async () => {
   const d = await getRoot(client);
   expect(d.data.version).toBeTypeOf("string");
 });
 
-test("createUser", async () => {
+test("Creating a user", async () => {
   const res = await createUser(client, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",
@@ -40,7 +40,7 @@ test("createUser", async () => {
   ).rejects.toThrow();
 });
 
-test("passwordAuth", async () => {
+test("Authorisation flow", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(client, {
