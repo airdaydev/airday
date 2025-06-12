@@ -5,7 +5,7 @@
   "scripts": {
     "start": "pnpm --dir ./web start",
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
-    "test": "sqlx database reset -y --source=./server/migrations && pnpm --dir ./packages/client test"
+    "test": "./e2e.sh"
   },
   "keywords": [],
   "author": "",
