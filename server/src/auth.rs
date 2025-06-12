@@ -30,7 +30,10 @@ impl Default for PwdAuthResponse {
     }
 }
 
-pub async fn password_authorisation(cookies: Cookies) -> Json<PwdAuthResponse> {
+pub async fn password_authorisation(
+    cookies: Cookies,
+    Json(payload): Json<CreateUserRequest>,
+) -> Json<PwdAuthResponse> {
     let session_id = gen_session_id();
     let cookie = Cookie::build(("session_id", session_id))
         .http_only(true)

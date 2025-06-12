@@ -25,6 +25,19 @@ test("createUser", async () => {
   });
   expect(res.data.id).toBeTypeOf("string");
   expect(res.data.id.length).toBe(36);
+  expect(
+    createUser(client, {
+      email: "daniel@air.day",
+      password: "fa09j20fiaj3fpaof",
+    }),
+    "Can't create another user with the same email",
+  ).rejects.toThrow();
+  expect(
+    createUser(client, {
+      email: "daniel@air.day",
+    }),
+    "Can't create a user without a password",
+  ).rejects.toThrow();
 });
 
 test("passwordAuth", async () => {

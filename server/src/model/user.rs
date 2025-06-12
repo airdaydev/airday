@@ -1,6 +1,6 @@
 use argon2::{
-    Argon2,
-    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
+    Argon2, PasswordVerifier,
+    password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
@@ -58,6 +58,23 @@ fn hash_password(password: &str) -> Result<String, AppError> {
         .map_err(|e| AppError::ServerError(format!("Password hashing failed: {}", e)))?;
 
     Ok(password_hash.to_string())
+}
+
+fn verify_password(password_hash: &str, password: &str) -> Result<(), AppError> {
+    let password: &[u8] = password.as_bytes();
+    // TODO: Forward system errors
+    let parsed_hash = PasswordHash::new(&password_hash)
+        .map_err(|e| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
+    let ok = Argon2::default()
+        .verify_password(password, &parsed_hash)
+        .is_ok();
+    if ok {
+        return Ok(());
+    } else {
+        return Err(AppError::ValidationError(String::from(
+            "Incorrect password",
+        )));
+    }
 }
 
 #[cfg(test)]
