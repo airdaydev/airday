@@ -7,8 +7,9 @@ const getRootResSchema = APISchema(
   }),
 );
 
-export function getRoot(client: AirdayClient) {
-  return fetch(client.endpoint("/"), {
+export async function getRoot(client: AirdayClient) {
+  const res = await fetch(client.endpoint("/"), {
     method: "GET",
-  }).then((res) => validateJSONResponse(res, getRootResSchema.ensureFunc));
+  });
+  return validateJSONResponse(res, getRootResSchema.ensureFunc);
 }
