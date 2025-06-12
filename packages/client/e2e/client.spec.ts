@@ -28,13 +28,21 @@ test("createUser", async () => {
 });
 
 test("passwordAuth", async () => {
+  const email = "daniel-pw@air.day";
+  const password = "fa09j20fiaj3fpaof";
+  await createUser(client, {
+    email,
+    password,
+  });
   const res = await passwordAuth(client, {
-    email: "daniel@air.day",
-    password: "fa09j20fiaj3fpaof",
+    email,
+    password,
   });
   const setCookieHeader0 = res.response.headers.getSetCookie()[0];
   const kv = setCookieHeader0.split(`;`).shift();
   expect(kv).toBeTypeOf("string");
-  expect(kv?.includes("session_id="), "Session id should be set").toBeTrue();
-  expect((kv as string).length).toBe("session_id=".length + 27);
+  expect(kv?.match(/^session_id=.+/), "Session id key correct").toBeTruthy();
+  expect((kv as string).length, "Returns valid session id").toBe(
+    "session_id=".length + 27,
+  );
 });

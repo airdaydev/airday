@@ -7,7 +7,7 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 
 fn gen_session_id() -> String {
@@ -57,6 +57,12 @@ pub async fn auth_middleware(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUserRequest {
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(Serialize)]
 pub struct CreateUserResponse {
     id: String,
@@ -64,9 +70,10 @@ pub struct CreateUserResponse {
 
 pub async fn create_user(
     State(state): State<AppState>,
+    Json(payload): Json<CreateUserRequest>,
 ) -> Result<Json<CreateUserResponse>, AppError> {
-    let email = "daniel@air.day";
-    let password = "test";
+    let email = payload.email;
+    let password = payload.password;
     let user = model::user::create(&state.pool, &email, &password).await;
     user.map(|u| {
         Json(CreateUserResponse {
