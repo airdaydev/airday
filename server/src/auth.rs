@@ -68,10 +68,10 @@ pub async fn create_user(
 ) -> Result<Json<CreateUserResponse>, AppError> {
     let email = "daniel@air.day";
     let password = "test";
-    let res = model::user::create(&state.pool, &email, &password).await;
-    res.map(|_| {
+    let user = model::user::create(&state.pool, &email, &password).await;
+    user.map(|u| {
         Json(CreateUserResponse {
-            id: String::from("hi"),
+            id: u.id.to_string(),
         })
     })
 }

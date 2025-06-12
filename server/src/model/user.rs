@@ -2,27 +2,35 @@ use argon2::{
     Argon2,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
-use sqlx::{Result as SQLXResult, SqlitePool, sqlite::SqliteQueryResult};
+use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
+use uuid::Uuid;
 
 use crate::error::AppError;
 
-pub async fn create(
-    pool: &SqlitePool,
-    email: &str,
-    password: &str,
-) -> SQLXResult<SqliteQueryResult, AppError> {
+#[derive(sqlx::FromRow, Debug)]
+pub struct User {
+    pub id: SqlxUuid,
+    pub email: String,
+    pub password_hash: String,
+}
+
+pub async fn create(pool: &SqlitePool, email: &str, password: &str) -> Result<User, AppError> {
     let password_hash = hash_password(password)?;
-    let q = sqlx::query!(
+    let uuid = Uuid::new_v4();
+    let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
+    let result = sqlx::query_as!(
+        User,
         r#"
-  INSERT INTO user (email, pw_hash) VALUES (?, ?)
+  INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?) RETURNING id as "id: Uuid", email, password_hash
   "#,
+        sqlx_uuid,
         email,
         password_hash
     )
-    .execute(pool)
+    .fetch_one(pool)
     .await;
-    match q {
-        Ok(result) => Ok(result),
+    match result {
+        Ok(user) => Ok(user),
         Err(sqlx::Error::Database(db_err)) => {
             if db_err.is_unique_violation() {
                 Err(AppError::ValidationError(String::from(
@@ -60,7 +68,12 @@ mod tests {
     #[tokio::test]
     async fn test_create_user() {
         let pool = test_util::create_test_pool().await;
-        let b = create(&pool, "test", "tite").await.unwrap();
-        assert!(b.last_insert_rowid() > 0);
+        let email = "daniel@air.day";
+        let password = "abcd12375kajsflaks";
+        let user = create(&pool, email, "abcd12375kajsflaks").await.unwrap();
+        assert_eq!(user.email, email);
+        assert!(!user.password_hash.is_empty());
+        assert_ne!(user.password_hash, password);
+        assert!(user.password_hash.starts_with("$argon2"));
     }
 }

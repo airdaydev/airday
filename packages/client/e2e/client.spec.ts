@@ -24,4 +24,5 @@ test.only("createUser", async () => {
     password: "fa09j20fiaj3fpaof",
   });
   expect(d.data.id).toBeTypeOf("string");
+  expect(d.data.id.length).toBe(36);
 });
