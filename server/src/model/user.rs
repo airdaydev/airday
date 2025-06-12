@@ -44,6 +44,40 @@ pub async fn create(pool: &SqlitePool, email: &str, password: &str) -> Result<Us
     }
 }
 
+pub async fn get_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, AppError> {
+    let result = sqlx::query_as!(
+        User,
+        r#"
+        SELECT id as "id: Uuid", email, password_hash
+        FROM user
+        WHERE email = ?
+        "#,
+        email
+    )
+    .fetch_optional(pool)
+    .await;
+
+    match result {
+        Ok(user) => Ok(user),
+        Err(e) => Err(AppError::DatabaseError(e.to_string())),
+    }
+}
+
+pub async fn verify_login(
+    pool: &SqlitePool,
+    email: &str,
+    password: &str,
+) -> Result<User, AppError> {
+    let user = get_by_email(pool, email).await?;
+    match user {
+        Some(user) => {
+            verify_password(&user.password_hash, password)?;
+            Ok(user)
+        }
+        None => Err(AppError::ValidationError(String::from("User not found"))),
+    }
+}
+
 fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
 
@@ -87,10 +121,20 @@ mod tests {
         let pool = test_util::create_test_pool().await;
         let email = "daniel@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&pool, email, "abcd12375kajsflaks").await.unwrap();
+        let user = create(&pool, email, password).await.unwrap();
         assert_eq!(user.email, email);
         assert!(!user.password_hash.is_empty());
         assert_ne!(user.password_hash, password);
         assert!(user.password_hash.starts_with("$argon2"));
+    }
+
+    #[tokio::test]
+    async fn test_verify_password() {
+        let pool = test_util::create_test_pool().await;
+        let email = "pw_test@air.day";
+        let password = "abcd12375kajsflaks";
+        let user = create(&pool, email, password).await.unwrap();
+        verify_password(&user.password_hash, password).unwrap();
+        assert!(verify_password(&user.password_hash, "wrongpassword").is_err())
     }
 }
