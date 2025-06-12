@@ -14,16 +14,44 @@ const createUserResSchema = APISchema(
   }),
 );
 
-export function createUser(
+export async function createUser(
   client: AirdayClient,
   opts: TypeOf<typeof createUserOptsSchema.schema>,
 ) {
   createUserOptsSchema.ensureFunc(opts);
-  return fetch(client.endpoint("/user"), {
+  const res = await fetch(client.endpoint("/user"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
       "Content-Type": "application/json",
     },
-  }).then((res) => validateJSONResponse(res, createUserResSchema.ensureFunc));
+  });
+  return validateJSONResponse(res, createUserResSchema.ensureFunc);
+}
+
+const passwordAuthSchema = APISchema(
+  v.object({
+    email: v.string(),
+    password: v.string(),
+  }),
+);
+
+const passwordAuthResponseSchema = APISchema(
+  v.object({
+    id: v.string(),
+  }),
+);
+
+export async function passwordAuth(
+  client: AirdayClient,
+  opts: TypeOf<typeof passwordAuthSchema.schema>,
+) {
+  const res = await fetch(client.endpoint("/auth/password"), {
+    method: "POST",
+    body: JSON.stringify(opts),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return validateJSONResponse(res, passwordAuthResponseSchema.ensureFunc);
 }

@@ -47,7 +47,7 @@ async fn main() {
     println!("Airday server started at http://{}", host_str);
     let public = Router::new()
         .route("/", get(server::root_handler))
-        .route("/auth/pw", get(auth::password_authorisation))
+        .route("/auth/password", post(auth::password_authorisation))
         .route("/user", post(auth::create_user));
     let private = Router::new()
         .route("/session", post(jmap_core::session_handler))

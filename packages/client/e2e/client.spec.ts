@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient } from "../index";
-import { createUser } from "../domain/user";
+import { createUser, passwordAuth } from "../domain/user";
 import { getRoot } from "../domain/root";
 
 const schema = {
@@ -18,11 +18,23 @@ test("getAPIRoot", async () => {
   expect(d.data.version).toBeTypeOf("string");
 });
 
-test.only("createUser", async () => {
-  const d = await createUser(client, {
+test("createUser", async () => {
+  const res = await createUser(client, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",
   });
-  expect(d.data.id).toBeTypeOf("string");
-  expect(d.data.id.length).toBe(36);
+  expect(res.data.id).toBeTypeOf("string");
+  expect(res.data.id.length).toBe(36);
+});
+
+test("passwordAuth", async () => {
+  const res = await passwordAuth(client, {
+    email: "daniel@air.day",
+    password: "fa09j20fiaj3fpaof",
+  });
+  const setCookieHeader0 = res.response.headers.getSetCookie()[0];
+  const kv = setCookieHeader0.split(`;`).shift();
+  expect(kv).toBeTypeOf("string");
+  expect(kv?.includes("session_id="), "Session id should be set").toBeTrue();
+  expect((kv as string).length).toBe("session_id=".length + 27);
 });

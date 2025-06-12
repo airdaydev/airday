@@ -32,7 +32,6 @@ impl Default for PwdAuthResponse {
 
 pub async fn password_authorisation(cookies: Cookies) -> Json<PwdAuthResponse> {
     let session_id = gen_session_id();
-    println!("Session ID: {}", session_id); // ~27 characters long
     let cookie = Cookie::build(("session_id", session_id))
         .http_only(true)
         // .secure(true)
