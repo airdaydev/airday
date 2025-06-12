@@ -5,17 +5,29 @@ import {
   type EnsureFunction,
 } from "suretype";
 
+enum AuthMode {
+  ImplicitCookie,
+  BearerToken,
+}
+
+interface AirdayClientOpts {
+  rootUrl: string;
+  authMode?: AuthMode;
+}
+
 export class AirdayClient {
   root = new URL("http://localhost:3000");
-  constructor(rootURL: string) {
-    this.root = new URL(rootURL);
+  authMode: AuthMode;
+  // TODO: Refresh token
+  constructor(opts: AirdayClientOpts) {
+    this.root = new URL(opts.rootUrl);
+    this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);
     url.pathname = pathName;
     return url;
   }
-  createUser() {}
 }
 
 interface AirdayJSONResponse<T> {

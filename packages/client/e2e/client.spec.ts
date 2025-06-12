@@ -11,7 +11,7 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-const client = new AirdayClient(config.API_URL);
+const client = new AirdayClient({ rootUrl: config.API_URL });
 
 test("API root url & version", async () => {
   const d = await getRoot(client);

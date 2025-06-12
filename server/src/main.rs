@@ -55,7 +55,7 @@ async fn main() {
         .route("/user", post(auth::create_user));
     let private = Router::new()
         // .route("/user", post(auth::get_user));
-        .route("/jmap/session", post(jmap::core::session_handler))
+        .route("/jmap/session", get(jmap::core::session_handler))
         .layer(middleware::from_fn(auth::auth_middleware));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
