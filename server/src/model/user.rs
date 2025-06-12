@@ -1,17 +1,24 @@
-use sqlx::{Result, SqlitePool, sqlite::SqliteQueryResult};
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
+};
+use sqlx::{Result as SQLXResult, SqlitePool, sqlite::SqliteQueryResult};
 
 use crate::error::AppError;
 
 pub async fn create(
     pool: &SqlitePool,
     email: &str,
-    _password: &str,
-) -> Result<SqliteQueryResult, AppError> {
+    password: &str,
+) -> SQLXResult<SqliteQueryResult, AppError> {
+    // TODO: hash password
+    let password_hash = hash_password(password)?;
     let q = sqlx::query!(
         r#"
-  INSERT INTO user (email, pw_hash) VALUES (?, "bzz")
+  INSERT INTO user (email, pw_hash) VALUES (?, ?)
   "#,
-        email
+        email,
+        password_hash
     )
     .execute(pool)
     .await;
@@ -28,6 +35,22 @@ pub async fn create(
         }
         Err(e) => Err(AppError::DatabaseError(e.to_string())),
     }
+}
+
+fn hash_password(password: &str) -> Result<String, AppError> {
+    let salt = SaltString::generate(&mut OsRng);
+
+    let password: &[u8] = password.as_bytes();
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    let password_hash = argon2
+        .hash_password(password, &salt)
+        .map_err(|e| AppError::ServerError(format!("Password hashing failed: {}", e)))?;
+
+    Ok(password_hash.to_string())
 }
 
 #[cfg(test)]
