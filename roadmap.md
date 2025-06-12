@@ -56,10 +56,10 @@
 - [x] Editing text inline
 
 ## 2025 Q1
-- [] Calendar
+- [x] Calendar front-end mvp
+- [] Canvas doesn't render constantly (todo list)
 - [] Canvas bg resets WHENEVER container size changes (change made for list but component needs rebuilding)
-- [] Canvas doesn't render constantly
-- [] Editing text inline cursor set correctly.
+- [] Editing text inline cursor set correctly
 - [] Deleting items
 - [] Add new item
 - [] Paste into app (strip `- []`)
@@ -168,7 +168,6 @@
 ## Sync/Data structure
 - [] E2EE - consider https://github.com/porridgewithraisins/e2ee.js/
 - [] E2EE study - https://cronokirby.com/posts/2021/06/e2e_in_the_browser/
-- [] Auth, consider https://next-auth.js.org/
 - [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
 - [] Undo/redo... in general, save granular outcomes & apply them (consider a changelog or something visible, otherwise just console)
 - [] Multiple users / tenancy is accounted for
