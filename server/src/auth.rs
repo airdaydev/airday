@@ -1,6 +1,10 @@
 // TODO: This will initially handle session based authentication
 // via both a bearer token and cookie
-use crate::{AppState, error::AppError, model};
+use crate::{
+    AppState,
+    error::AppError,
+    model::{self, user::verify_login},
+};
 use axum::{
     extract::Request, extract::State, http::StatusCode, middleware::Next, response::Json,
     response::Response,
@@ -30,10 +34,18 @@ impl Default for PwdAuthResponse {
     }
 }
 
+#[derive(Deserialize)]
+pub struct PasswordAuthorisationReq {
+    pub email: String,
+    pub password: String,
+}
+
 pub async fn password_authorisation(
+    State(state): State<AppState>,
     cookies: Cookies,
-    Json(payload): Json<CreateUserRequest>,
-) -> Json<PwdAuthResponse> {
+    Json(payload): Json<PasswordAuthorisationReq>,
+) -> Result<Json<PwdAuthResponse>, AppError> {
+    verify_login(&state.pool, &payload.email, &payload.password).await?;
     let session_id = gen_session_id();
     let cookie = Cookie::build(("session_id", session_id))
         .http_only(true)
@@ -43,7 +55,7 @@ pub async fn password_authorisation(
         .max_age(tower_cookies::cookie::time::Duration::hours(24))
         .build();
     cookies.add(cookie);
-    Json(PwdAuthResponse::default())
+    Ok(Json(PwdAuthResponse::default()))
 }
 
 pub async fn auth_middleware(

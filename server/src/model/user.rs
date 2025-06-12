@@ -2,6 +2,7 @@ use argon2::{
     Argon2, PasswordVerifier,
     password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
+use serde::Serialize;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
 
@@ -12,6 +13,21 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct PublicUser {
+    pub id: String,
+    pub email: String,
+}
+
+impl From<User> for PublicUser {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id.to_string(),
+            email: user.email,
+        }
+    }
 }
 
 pub async fn create(pool: &SqlitePool, email: &str, password: &str) -> Result<User, AppError> {

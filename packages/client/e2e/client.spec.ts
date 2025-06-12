@@ -47,6 +47,13 @@ test("passwordAuth", async () => {
     email,
     password,
   });
+  expect(
+    passwordAuth(client, {
+      email,
+      password: "hi",
+    }),
+    "Rejects bad passwords",
+  ).rejects.toThrow();
   const res = await passwordAuth(client, {
     email,
     password,

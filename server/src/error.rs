@@ -8,6 +8,7 @@ pub enum AppError {
     ValidationError(String),
     DatabaseError(String),
     ServerError(String),
+    JsonParseError(serde_json::Error),
 }
 
 impl IntoResponse for AppError {
@@ -16,10 +17,17 @@ impl IntoResponse for AppError {
             AppError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             AppError::ServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::JsonParseError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
         };
         let body = Json(json!({
           "error": error_message,
         }));
         (status, body).into_response()
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(err: serde_json::Error) -> Self {
+        AppError::JsonParseError(err)
     }
 }
