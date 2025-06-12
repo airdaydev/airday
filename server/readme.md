@@ -22,10 +22,7 @@ SELECT name, type, sql FROM sqlite_master;
 ```
 
 ## Additional deps to explore
-- serde (serialisation, deserialisation)
 - chrono (tz package)
 - chrono-tz (tz extension?)
 - validator (validate requests)
-- uuid (id generation)
 - automerge (maybe, crdt lib)
-- clap (maybe, command line parser)
