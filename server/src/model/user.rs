@@ -11,7 +11,6 @@ pub async fn create(
     email: &str,
     password: &str,
 ) -> SQLXResult<SqliteQueryResult, AppError> {
-    // TODO: hash password
     let password_hash = hash_password(password)?;
     let q = sqlx::query!(
         r#"
