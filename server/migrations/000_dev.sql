@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS user (
 );
 
 CREATE TABLE IF NOT EXISTS session (
-  id TEXT NOT NULL PRIMARY KEY,
+  id UUID NOT NULL PRIMARY KEY,
+  token TEXT UNIQUE NOT NULL,
   expires INTEGER NOT NULL,
   refresh_token TEXT NOT NULL,
   refresh_token_expires INTEGER NOT NULL,

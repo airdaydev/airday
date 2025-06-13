@@ -7,10 +7,11 @@ use uuid::Uuid;
 
 pub struct UserSession {
     pub id: String,
+    pub token: String,
     pub refresh_token: String,
 }
 
-pub fn gen_session_id() -> String {
+pub fn gen_token() -> String {
     let mut rng = OsRng; // CSPRNG
     let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
     rng.try_fill_bytes(&mut bytes).unwrap();
@@ -23,8 +24,8 @@ impl UserSession {
         user_id: Uuid,
         headers: &axum::http::HeaderMap,
     ) -> Result<Self, AppError> {
-        let session_id = gen_session_id();
-        let refresh_token = gen_session_id();
+        let token = gen_token();
+        let refresh_token = gen_token();
         let refresh_token_hash = user::hash_password(&refresh_token)?;
 
         // Extract user agent and IP from headers
@@ -51,13 +52,17 @@ impl UserSession {
 
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
+        let uuid = Uuid::new_v4();
+        let id = SqlxUuid::from_bytes(uuid.into_bytes());
+
         // Save session to database
         sqlx::query!(
             r#"
-            INSERT INTO session (id, expires, refresh_token, refresh_token_expires, user_id, user_agent, ip)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO session (id, token, expires, refresh_token, refresh_token_expires, user_id, user_agent, ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-            session_id,
+            id,
+            token,
             expires,
             refresh_token_hash,
             refresh_token_expires,
@@ -70,14 +75,15 @@ impl UserSession {
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         Ok(UserSession {
-            id: session_id,
+            id: id.to_string(),
+            token,
             refresh_token,
         })
     }
 
     pub async fn get_by_id(
         pool: &SqlitePool,
-        session_id: &str,
+        token: &str,
     ) -> Result<Option<UserSession>, AppError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -86,11 +92,11 @@ impl UserSession {
 
         let result = sqlx::query!(
             r#"
-            SELECT id, refresh_token
+            SELECT id as "id: Uuid", token, refresh_token
             FROM session
             WHERE id = ? AND expires > ?
             "#,
-            session_id,
+            token,
             now
         )
         .fetch_optional(pool)
@@ -99,7 +105,8 @@ impl UserSession {
 
         match result {
             Some(row) => Ok(Some(UserSession {
-                id: row.id,
+                id: row.id.to_string(),
+                token: row.id.to_string(),
                 refresh_token: row.refresh_token,
             })),
             None => Ok(None),

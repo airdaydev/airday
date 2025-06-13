@@ -55,3 +55,21 @@ export async function passwordAuth(
   });
   return validateJSONResponse(res, passwordAuthResponseSchema.ensureFunc);
 }
+
+const sessionsResponseSchema = APISchema(
+  v.object({
+    items: v.array(
+      v.object({
+        id: v.string(), // TODO: hmm we actually need a session id!
+      }),
+    ),
+  }),
+);
+
+export async function getUserSessions(client: AirdayClient) {
+  const res = await fetch(client.endpoint("/auth/sessions"), {
+    method: "GET",
+    headers: client.getHeaders(),
+  });
+  return validateJSONResponse(res, sessionsResponseSchema.ensureFunc);
+}
