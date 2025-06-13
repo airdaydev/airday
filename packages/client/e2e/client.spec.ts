@@ -61,7 +61,12 @@ test("Authorisation flow", async () => {
   const setCookieHeader0 = res.response.headers.getSetCookie()[0];
   const kv = setCookieHeader0.split(`;`).shift();
   expect(kv).toBeTypeOf("string");
-  expect(kv?.match(/^session_id=.+/), "Session id key correct").toBeTruthy();
+  const sessionSplit = kv?.match(/^session_id=(.+)/);
+  if (!sessionSplit || !sessionSplit[1]) {
+    throw new Error();
+  }
+  const sessionId = sessionSplit[1];
+  expect(sessionSplit, "Session id key correct").toBeTruthy();
   expect((kv as string).length, "Returns valid session id").toBe(
     "session_id=".length + 27,
   );

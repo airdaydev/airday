@@ -94,7 +94,7 @@ pub async fn verify_login(
     }
 }
 
-fn hash_password(password: &str) -> Result<String, AppError> {
+pub fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
 
     let password: &[u8] = password.as_bytes();
