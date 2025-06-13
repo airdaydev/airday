@@ -1,10 +1,23 @@
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+#[serde(default)]
 pub struct AirdayConfig {
     pub port: usize,
     pub host: String, // TODO: Use an IP address type
     pub sqlx_host: String,
+    pub secure_cookies: bool,
+}
+
+impl Default for AirdayConfig {
+    fn default() -> Self {
+        Self {
+            port: 8080,
+            host: String::from("localhost"),
+            sqlx_host: String::from("sqlite:default.db"),
+            secure_cookies: true,
+        }
+    }
 }
 
 impl AirdayConfig {

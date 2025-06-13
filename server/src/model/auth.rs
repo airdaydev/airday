@@ -1,5 +1,3 @@
-// TODO: This will initially handle session based authentication
-// via both a bearer token and cookie
 use crate::{
     AppState,
     common::error::AppError,
@@ -43,7 +41,7 @@ pub async fn password_authorisation(
     let session = model::session::UserSession::new(&state.pool, user_uuid, &headers).await?;
     let cookie = Cookie::build(("session_id", session.id))
         .http_only(true)
-        // .secure(true)
+        .secure(state.config.secure_cookies)
         .same_site(tower_cookies::cookie::SameSite::Strict)
         .path("/")
         .max_age(tower_cookies::cookie::time::Duration::hours(24))
@@ -51,7 +49,7 @@ pub async fn password_authorisation(
     cookies.add(cookie);
     let refresh_cookie = Cookie::build(("refresh_token", session.refresh_token))
         .http_only(true)
-        // .secure(true)
+        .secure(state.config.secure_cookies)
         .same_site(tower_cookies::cookie::SameSite::Strict)
         .path("/auth/refresh")
         .max_age(tower_cookies::cookie::time::Duration::days(120))

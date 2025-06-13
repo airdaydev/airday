@@ -112,4 +112,41 @@ impl UserSession {
             None => Ok(None),
         }
     }
+
+    pub async fn get_by_user(
+        pool: &SqlitePool,
+        user_id: String,
+    ) -> Result<Vec<UserSession>, AppError> {
+        let sqlx_user_id = SqlxUuid::parse_str(&user_id)
+            .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let results = sqlx::query!(
+            r#"
+        SELECT id as "id: Uuid", token, refresh_token
+        FROM session
+        WHERE user_id = ? AND expires > ?
+        "#,
+            sqlx_user_id,
+            now
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let sessions: Vec<UserSession> = results
+            .into_iter()
+            .map(|row| UserSession {
+                id: row.id.to_string(),
+                token: row.token,
+                refresh_token: row.refresh_token,
+            })
+            .collect();
+
+        Ok(sessions)
+    }
 }

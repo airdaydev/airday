@@ -60,7 +60,7 @@ const sessionsResponseSchema = APISchema(
   v.object({
     items: v.array(
       v.object({
-        id: v.string(), // TODO: hmm we actually need a session id!
+        id: v.string(),
       }),
     ),
   }),

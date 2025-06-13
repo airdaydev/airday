@@ -1,4 +1,3 @@
-mod auth;
 mod common {
     pub mod config;
     pub mod error;
@@ -15,12 +14,15 @@ use bpaf::Bpaf;
 use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
+
+use crate::common::config::AirdayConfig;
 #[cfg(test)]
 pub mod test_util;
 
 #[derive(Clone)]
 struct AppState {
     pool: SqlitePool,
+    config: AirdayConfig,
 }
 
 #[derive(Bpaf, Debug, Clone)]
@@ -46,19 +48,22 @@ async fn main() {
 
     let pool = common::sql::connect_sqlite(&cfg).await;
 
-    let state = AppState { pool };
+    let state = AppState {
+        pool,
+        config: cfg.clone(),
+    };
 
     println!("Airday server started at http://{}", host_str);
     let public = Router::new()
         .route("/", get(root::root_handler))
-        .route("/auth/password", post(auth::password_authorisation))
-        .route("/user", post(auth::create_user));
+        .route("/auth/password", post(model::auth::password_authorisation))
+        .route("/user", post(model::auth::create_user));
     let private = Router::new()
         // .route("/user", post(auth::get_user));
         .route("/jmap/session", get(jmap::core::session_handler))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth::auth_middleware,
+            model::auth::auth_middleware,
         ));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
