@@ -18,6 +18,8 @@ interface AirdayClientOpts {
 export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
+  sessionId?: string;
+  refreshToken?: string;
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);

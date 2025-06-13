@@ -40,6 +40,33 @@ test("Creating a user", async () => {
   ).rejects.toThrow();
 });
 
+function extractCookie(
+  headers: Headers,
+  cookieName: string,
+): string | undefined {
+  return headers
+    .getSetCookie()
+    .find((cookieEntry) => cookieEntry.includes(cookieName));
+}
+
+function parseCookieValue(
+  cookieString: string | undefined,
+  cookieName: string,
+): string {
+  if (!cookieString) {
+    throw new Error(`Cookie ${cookieName} not found`);
+  }
+  const kv = cookieString.split(`;`).shift();
+  if (!kv) {
+    throw new Error(`Invalid cookie format for ${cookieName}`);
+  }
+  const cookieMatch = kv.match(new RegExp(`^${cookieName}=(.+)`));
+  if (!cookieMatch || !cookieMatch[1]) {
+    throw new Error(`Could not parse ${cookieName} value`);
+  }
+  return cookieMatch[1];
+}
+
 test("Authorisation flow", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
@@ -58,16 +85,15 @@ test("Authorisation flow", async () => {
     email,
     password,
   });
-  const setCookieHeader0 = res.response.headers.getSetCookie()[0];
-  const kv = setCookieHeader0.split(`;`).shift();
-  expect(kv).toBeTypeOf("string");
-  const sessionSplit = kv?.match(/^session_id=(.+)/);
-  if (!sessionSplit || !sessionSplit[1]) {
-    throw new Error();
-  }
-  const sessionId = sessionSplit[1];
-  expect(sessionSplit, "Session id key correct").toBeTruthy();
-  expect((kv as string).length, "Returns valid session id").toBe(
-    "session_id=".length + 27,
-  );
+  const sessionSetCookie = extractCookie(res.response.headers, "session_id");
+  const sessionId = parseCookieValue(sessionSetCookie, "session_id");
+  expect(sessionId).toBeTypeOf("string");
+  expect(sessionId, "Session id key correct").toBeTruthy();
+  expect(sessionId.length, "Returns valid session id").toBe(27);
+  const refreshSetCookie = extractCookie(res.response.headers, "refresh_token");
+  const refreshToken = parseCookieValue(refreshSetCookie, "refresh_token");
+  expect(refreshToken).toBeTypeOf("string");
+  expect(refreshToken, "Refresh token correct").toBeTruthy();
+  expect(refreshToken.length, "Returns valid refresh token").toBe(27);
+  expect(refreshToken).not.toBe(sessionId);
 });
