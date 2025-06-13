@@ -1,10 +1,16 @@
+use crate::{AppState, model};
 use crate::{common::error::AppError, model::user};
+use axum::extract::{FromRef, FromRequestParts};
+use axum::http::StatusCode;
+use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
+use serde::Serialize;
 use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct UserSession {
     pub id: String,
     pub token: String,
@@ -150,3 +156,37 @@ impl UserSession {
         Ok(sessions)
     }
 }
+
+#[derive(Serialize)]
+pub struct GetUserSessionsResponse {
+    id: String,
+}
+
+// pub async fn get_user_sessions(
+//     State(state): State<AppState>,
+// ) -> Result<Json<GetUserSessionsResponse>, AppError> {
+//     let user = model::session::get_user_sessions(&state.pool, &email, &password).await;
+//     user.map(|u| {
+//         Json(GetUserSessionsResponse {
+//             id: u.id.to_string(),
+//         })
+//     })
+// }
+
+pub struct AuthenticatedSession {
+    pub session: model::session::UserSession,
+}
+
+// impl<S> FromRequestParts<S> for AuthenticatedSession
+// where
+//     S: Send + Sync,
+//     AppState: FromRef<S>,
+// {
+//     type Rejection = StatusCode;
+
+//     fn from_request_parts(
+//         parts: &mut Parts,
+//         state: &S,
+//     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+//     }
+// }
