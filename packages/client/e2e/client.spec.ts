@@ -3,6 +3,7 @@ import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient } from "../index";
 import { createUser, passwordAuth } from "../domain/user";
 import { getRoot } from "../domain/root";
+import { extractCookie, parseCookieValue } from "./utils.spec";
 
 const schema = {
   API_URL: { type: "string" },
@@ -39,33 +40,6 @@ test("Creating a user", async () => {
     "Can't create a user without a password",
   ).rejects.toThrow();
 });
-
-function extractCookie(
-  headers: Headers,
-  cookieName: string,
-): string | undefined {
-  return headers
-    .getSetCookie()
-    .find((cookieEntry) => cookieEntry.includes(cookieName));
-}
-
-function parseCookieValue(
-  cookieString: string | undefined,
-  cookieName: string,
-): string {
-  if (!cookieString) {
-    throw new Error(`Cookie ${cookieName} not found`);
-  }
-  const kv = cookieString.split(`;`).shift();
-  if (!kv) {
-    throw new Error(`Invalid cookie format for ${cookieName}`);
-  }
-  const cookieMatch = kv.match(new RegExp(`^${cookieName}=(.+)`));
-  if (!cookieMatch || !cookieMatch[1]) {
-    throw new Error(`Could not parse ${cookieName} value`);
-  }
-  return cookieMatch[1];
-}
 
 test("Authorisation flow", async () => {
   const email = "daniel-pw@air.day";

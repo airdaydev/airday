@@ -7,7 +7,7 @@ const getRootResSchema = APISchema(
   }),
 );
 
-export async function getRoot(client: AirdayClient) {
+export async function getSession(client: AirdayClient) {
   const res = await fetch(client.endpoint("/jmap"), {
     method: "GET",
   });

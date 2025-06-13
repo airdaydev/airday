@@ -18,8 +18,8 @@ interface AirdayClientOpts {
 export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
-  sessionId?: string;
-  refreshToken?: string;
+  private _sessionId?: string;
+  private _refreshToken?: string;
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
@@ -29,6 +29,24 @@ export class AirdayClient {
     const url = new URL(this.root);
     url.pathname = pathName;
     return url;
+  }
+  set sessionId(id: string) {
+    this._sessionId = id;
+  }
+  set refreshToken(token: string) {
+    this._refreshToken = token;
+  }
+  getInitOpts(init: RequestInit) {
+    if (this.authMode === AuthMode.BearerToken) {
+      if (!init.headers) {
+        init.headers = {
+          Authorization: `Bearer ${this._sessionId}`,
+        };
+      }
+    }
+    if (this.authMode == AuthMode.ImplicitCookie) {
+      init.credentials = "include";
+    }
   }
 }
 
