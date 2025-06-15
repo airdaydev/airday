@@ -1,6 +1,7 @@
 use crate::{AppState, model};
 use crate::{common::error::AppError, model::user};
-use axum::extract::{FromRef, FromRequestParts};
+use axum::Json;
+use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
@@ -9,11 +10,12 @@ use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct UserSession {
     pub id: String,
     pub token: String,
     pub refresh_token: String,
+    pub user_id: Uuid,
 }
 
 pub fn gen_token() -> String {
@@ -83,6 +85,7 @@ impl UserSession {
             id: id.to_string(),
             token,
             refresh_token,
+            user_id,
         })
     }
 
@@ -97,7 +100,7 @@ impl UserSession {
 
         let result = sqlx::query!(
             r#"
-            SELECT id as "id: Uuid", token, refresh_token
+            SELECT id as "id: Uuid", token, refresh_token, user_id as 'user_id: Uuid'
             FROM session
             WHERE token = ? AND expires > ?
             "#,
@@ -113,6 +116,7 @@ impl UserSession {
                 id: row.id.to_string(),
                 token: row.id.to_string(),
                 refresh_token: row.refresh_token,
+                user_id: row.user_id,
             })),
             None => Ok(None),
         }
@@ -132,7 +136,7 @@ impl UserSession {
 
         let results = sqlx::query!(
             r#"
-        SELECT id as "id: Uuid", token, refresh_token
+        SELECT id as "id: Uuid", token, refresh_token, user_id as 'user_id: Uuid'
         FROM session
         WHERE user_id = ? AND expires > ?
         "#,
@@ -149,6 +153,7 @@ impl UserSession {
                 id: row.id.to_string(),
                 token: row.token,
                 refresh_token: row.refresh_token,
+                user_id: row.user_id,
             })
             .collect();
 
@@ -158,19 +163,16 @@ impl UserSession {
 
 #[derive(Serialize)]
 pub struct GetUserSessionsResponse {
-    id: String,
+    data: Vec<UserSession>,
 }
 
-// pub async fn get_user_sessions(
-//     State(state): State<AppState>,
-// ) -> Result<Json<GetUserSessionsResponse>, AppError> {
-//     let user = model::session::get_user_sessions(&state.pool, &email, &password).await;
-//     user.map(|u| {
-//         Json(GetUserSessionsResponse {
-//             id: u.id.to_string(),
-//         })
-//     })
-// }
+pub async fn get_user_sessions(
+    State(state): State<AppState>,
+    session: UserSession,
+) -> Result<Json<GetUserSessionsResponse>, AppError> {
+    let sessions = UserSession::get_by_user(&state.pool, session.id).await?;
+    Ok(Json(GetUserSessionsResponse { data: sessions }))
+}
 
 fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
     parts
