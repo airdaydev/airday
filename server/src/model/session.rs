@@ -177,16 +177,69 @@ pub struct AuthenticatedSession {
     pub session: model::session::UserSession,
 }
 
-// impl<S> FromRequestParts<S> for AuthenticatedSession
-// where
-//     S: Send + Sync,
-//     AppState: FromRef<S>,
-// {
-//     type Rejection = StatusCode;
+fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
+    parts
+        .headers
+        .get("Authorization")
+        .and_then(|value| value.to_str().ok())
+        .filter(|auth| auth.starts_with("Bearer"))
+        .map(|auth| auth.trim_start_matches("Bearer ").trim().to_string())
+}
 
-//     fn from_request_parts(
-//         parts: &mut Parts,
-//         state: &S,
-//     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-//     }
-// }
+fn extract_cookie_token(cookies: &tower_cookies::Cookies) -> Option<String> {
+    cookies
+        .get("session_token")
+        .map(|cookie| cookie.value().to_string())
+}
+
+async fn extract_token<S>(parts: &mut Parts, state: &S) -> Option<String>
+where
+    S: Send + Sync,
+{
+    if let Some(token) = extract_bearer_token(parts) {
+        return Some(token);
+    }
+
+    let cookies_result = tower_cookies::Cookies::from_request_parts(parts, state).await;
+    if let Ok(cookies) = cookies_result {
+        if let Some(token) = extract_cookie_token(&cookies) {
+            return Some(token);
+        }
+    }
+
+    None
+}
+
+impl<S> FromRequestParts<S> for AuthenticatedSession
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = AppError;
+
+    fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        async move {
+            let app_state = AppState::from_ref(state);
+
+            let token = extract_token(parts, state)
+                .await
+                .ok_or(AppError::AuthorisationError(String::from(
+                    "no auth token found",
+                )))?;
+
+            let session = UserSession::get_by_id(&app_state.pool, &token)
+                .await
+                .map_err(|_| {
+                    AppError::ServerError(String::from("Failed to retrieve user session db error"))
+                })?
+                .ok_or(AppError::AuthorisationError(String::from(
+                    "no auth token found",
+                )))?;
+
+            Ok(AuthenticatedSession { session })
+        }
+    }
+}

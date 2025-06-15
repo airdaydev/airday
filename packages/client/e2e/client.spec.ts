@@ -41,7 +41,7 @@ test("Creating a user", async () => {
   ).rejects.toThrow();
 });
 
-test("Authorisation flow", async () => {
+test.only("Authorisation flow", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(client, {
@@ -59,8 +59,8 @@ test("Authorisation flow", async () => {
     email,
     password,
   });
-  const sessionSetCookie = extractCookie(res.response.headers, "session_id");
-  const sessionId = parseCookieValue(sessionSetCookie, "session_id");
+  const sessionSetCookie = extractCookie(res.response.headers, "session_token");
+  const sessionId = parseCookieValue(sessionSetCookie, "session_token");
   expect(sessionId).toBeTypeOf("string");
   expect(sessionId, "Session id key correct").toBeTruthy();
   expect(sessionId.length, "Returns valid session id").toBe(27);

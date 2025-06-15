@@ -39,7 +39,7 @@ pub async fn password_authorisation(
     let user = verify_login(&state.pool, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
     let session = model::session::UserSession::new(&state.pool, user_uuid, &headers).await?;
-    let cookie = Cookie::build(("session_id", session.id))
+    let cookie = Cookie::build(("session_token", session.token))
         .http_only(true)
         .secure(state.config.secure_cookies)
         .same_site(tower_cookies::cookie::SameSite::Strict)
