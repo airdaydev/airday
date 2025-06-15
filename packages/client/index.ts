@@ -5,7 +5,7 @@ import {
   type EnsureFunction,
 } from "suretype";
 
-enum AuthMode {
+export enum AuthMode {
   ImplicitCookie,
   BearerToken,
 }

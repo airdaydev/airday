@@ -2,6 +2,8 @@
 use axum::response::Json;
 use serde::Serialize;
 
+use crate::model::session::UserSession;
+
 /// Session Resource
 /// https://datatracker.ietf.org/doc/html/rfc8620#section-2
 #[derive(Serialize)]
@@ -64,8 +66,8 @@ pub struct CoreCapabilities {
     collation_algorithms: Vec<String>,
 }
 
-pub async fn session_handler() -> Json<JMAPSession> {
-    let session = JMAPSession {
+pub async fn session_handler(session: UserSession) -> Json<JMAPSession> {
+    let jmap_session = JMAPSession {
         capabilities: AirdayCapabilities {
             core: CoreCapabilities {
                 max_size_upload: 50_000_000,
@@ -94,5 +96,5 @@ pub async fn session_handler() -> Json<JMAPSession> {
         event_source_url: String::from("localhost"),
         state: String::from("000"),
     };
-    Json(session)
+    Json(jmap_session)
 }

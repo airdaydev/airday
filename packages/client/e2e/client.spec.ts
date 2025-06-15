@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
-import { AirdayClient } from "../index";
+import { AirdayClient, AuthMode } from "../index";
 import { createUser, passwordAuth } from "../domain/user";
 import { getRoot } from "../domain/root";
 import { extractCookie, parseCookieValue } from "./utils.spec";
+import { getSession } from "../domain/jmap";
 
 const schema = {
   API_URL: { type: "string" },
@@ -12,7 +13,10 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-const client = new AirdayClient({ rootUrl: config.API_URL });
+const client = new AirdayClient({
+  rootUrl: config.API_URL,
+  authMode: AuthMode.BearerToken,
+});
 
 test("API root url & version", async () => {
   const d = await getRoot(client);
@@ -71,4 +75,6 @@ test.only("Authorisation flow", async () => {
   expect(refreshToken.length, "Returns valid refresh token").toBe(27);
   expect(refreshToken).not.toBe(sessionToken);
   client.setSessionToken(sessionToken);
+  const session = await getSession(client);
+  console.log(session);
 });

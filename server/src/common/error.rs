@@ -24,6 +24,7 @@ impl IntoResponse for AppError {
         let body = Json(json!({
           "error": error_message,
         }));
+        println!("airday error: {}", error_message);
         (status, body).into_response()
     }
 }

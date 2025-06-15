@@ -60,11 +60,7 @@ async fn main() {
         .route("/user", post(model::auth::create_user));
     let private = Router::new()
         // .route("/user", post(auth::get_user));
-        .route("/jmap/session", get(jmap::core::session_handler))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            model::auth::auth_middleware,
-        ));
+        .route("/jmap/session", get(jmap::core::session_handler));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
         .unwrap();

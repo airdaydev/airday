@@ -1,7 +1,6 @@
 use crate::{AppState, model};
 use crate::{common::error::AppError, model::user};
 use axum::extract::{FromRef, FromRequestParts};
-use axum::http::StatusCode;
 use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
@@ -100,7 +99,7 @@ impl UserSession {
             r#"
             SELECT id as "id: Uuid", token, refresh_token
             FROM session
-            WHERE id = ? AND expires > ?
+            WHERE token = ? AND expires > ?
             "#,
             token,
             now
@@ -173,10 +172,6 @@ pub struct GetUserSessionsResponse {
 //     })
 // }
 
-pub struct AuthenticatedSession {
-    pub session: model::session::UserSession,
-}
-
 fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
     parts
         .headers
@@ -210,7 +205,7 @@ where
     None
 }
 
-impl<S> FromRequestParts<S> for AuthenticatedSession
+impl<S> FromRequestParts<S> for UserSession
 where
     S: Send + Sync,
     AppState: FromRef<S>,
@@ -223,7 +218,6 @@ where
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
         async move {
             let app_state = AppState::from_ref(state);
-
             let token = extract_token(parts, state)
                 .await
                 .ok_or(AppError::AuthorisationError(String::from(
@@ -236,10 +230,10 @@ where
                     AppError::ServerError(String::from("Failed to retrieve user session db error"))
                 })?
                 .ok_or(AppError::AuthorisationError(String::from(
-                    "no auth token found",
+                    "no user session found",
                 )))?;
 
-            Ok(AuthenticatedSession { session })
+            Ok(session)
         }
     }
 }
