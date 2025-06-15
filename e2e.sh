@@ -2,12 +2,12 @@
 set -e
 
 # Reset database
-export DATABASE_URL="sqlite:/home/daniel/.config/airday/test.db"
-sqlx database reset -y --source=./server/migrations
+export DATABASE_URL="sqlite:$HOME/.config/airday/test.db"
+sqlx database reset -y
 
 # Start server in background
 cargo run --manifest-path ./server/Cargo.toml -- \
-  --sqlx-host=sqlite:/home/daniel/.config/airday/test.db \
+  --sqlx-host=$DATABASE_URL \
   --config=./server/config.toml & SERVER_PID=$!
 
 # Wait for server to be ready (adjust URL/port as needed)

@@ -1,4 +1,4 @@
 packages:
-  - "./web"
-  - "./api"
-  - "./packages/*"
+  - ./web
+  - ./api
+  - ./packages/*
