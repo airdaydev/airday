@@ -66,7 +66,7 @@ pub struct CoreCapabilities {
     collation_algorithms: Vec<String>,
 }
 
-pub async fn session_handler(session: UserSession) -> Json<JMAPSession> {
+pub async fn session_handler(_: UserSession) -> Json<JMAPSession> {
     let jmap_session = JMAPSession {
         capabilities: AirdayCapabilities {
             core: CoreCapabilities {

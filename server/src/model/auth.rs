@@ -3,10 +3,7 @@ use crate::{
     common::error::AppError,
     model::{self, user::verify_login},
 };
-use axum::{
-    extract::Request, extract::State, http::StatusCode, middleware::Next, response::Json,
-    response::Response,
-};
+use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
@@ -56,23 +53,6 @@ pub async fn password_authorisation(
         .build();
     cookies.add(refresh_cookie);
     Ok(Json(PwdAuthResponse::default()))
-}
-
-pub async fn auth_middleware(
-    State(state): State<AppState>,
-    cookies: Cookies,
-    request: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    if let Some(session_cookie) = cookies.get("session_id") {
-        match model::session::UserSession::get_by_id(&state.pool, session_cookie.value()).await {
-            Ok(Some(_session)) => Ok(next.run(request).await),
-            Ok(None) => Err(StatusCode::UNAUTHORIZED),
-            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-        }
-    } else {
-        Err(StatusCode::UNAUTHORIZED)
-    }
 }
 
 #[derive(Deserialize)]

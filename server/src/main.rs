@@ -8,8 +8,8 @@ mod jmap {
 }
 mod model;
 mod root;
+use axum::Router;
 use axum::routing::{get, post};
-use axum::{Router, middleware};
 use bpaf::Bpaf;
 use sqlx::SqlitePool;
 use std::fs;

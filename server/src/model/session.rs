@@ -1,4 +1,4 @@
-use crate::{AppState, model};
+use crate::AppState;
 use crate::{common::error::AppError, model::user};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
