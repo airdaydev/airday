@@ -60,14 +60,15 @@ test.only("Authorisation flow", async () => {
     password,
   });
   const sessionSetCookie = extractCookie(res.response.headers, "session_token");
-  const sessionId = parseCookieValue(sessionSetCookie, "session_token");
-  expect(sessionId).toBeTypeOf("string");
-  expect(sessionId, "Session id key correct").toBeTruthy();
-  expect(sessionId.length, "Returns valid session id").toBe(27);
+  const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
+  expect(sessionToken).toBeTypeOf("string");
+  expect(sessionToken, "Session id key correct").toBeTruthy();
+  expect(sessionToken.length, "Returns valid session id").toBe(27);
   const refreshSetCookie = extractCookie(res.response.headers, "refresh_token");
   const refreshToken = parseCookieValue(refreshSetCookie, "refresh_token");
   expect(refreshToken).toBeTypeOf("string");
   expect(refreshToken, "Refresh token correct").toBeTruthy();
   expect(refreshToken.length, "Returns valid refresh token").toBe(27);
-  expect(refreshToken).not.toBe(sessionId);
+  expect(refreshToken).not.toBe(sessionToken);
+  client.setSessionToken(sessionToken);
 });

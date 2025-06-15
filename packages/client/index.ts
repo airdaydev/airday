@@ -15,11 +15,16 @@ interface AirdayClientOpts {
   authMode?: AuthMode;
 }
 
+// TODO: This queue should run instantly, unless the session token is about to expire
+// In that case, it should place refresh at the top of the queue and continue
+// If the refresh token fails, it should fire an event that the user is logged out
 export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
   private _sessionToken?: string;
+  private _sessionTokenExpiry?: Date;
   private _refreshToken?: string;
+  private _refreshTokenExpiry?: Date;
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
@@ -30,11 +35,13 @@ export class AirdayClient {
     url.pathname = pathName;
     return url;
   }
-  set sessionId(id: string) {
-    this._sessionToken = id;
+  setSessionToken(token: string, expiry?: Date) {
+    this._sessionToken = token;
+    this._sessionTokenExpiry = expiry;
   }
-  set refreshToken(token: string) {
+  setRefreshToken(token: string, expiry?: Date) {
     this._refreshToken = token;
+    this._refreshTokenExpiry = expiry;
   }
   getHeaders(json: boolean = true) {
     const headers: Record<string, string> = {};
