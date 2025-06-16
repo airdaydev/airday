@@ -3,6 +3,7 @@ use crate::model::auth::{build_refresh_token, build_session_token};
 use crate::{common::error::AppError, model::user};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
+use axum::http::HeaderMap;
 use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
@@ -317,9 +318,8 @@ pub async fn refresh_session(
     Ok(Json(RefreshSessionResponse { id: session.id }))
 }
 
-fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
-    parts
-        .headers
+fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
+    headers
         .get("Authorization")
         .and_then(|value| value.to_str().ok())
         .filter(|auth| auth.starts_with("Bearer"))
@@ -334,7 +334,7 @@ async fn extract_token<S>(parts: &mut Parts, state: &S) -> Option<String>
 where
     S: Send + Sync,
 {
-    if let Some(token) = extract_bearer_token(parts) {
+    if let Some(token) = extract_bearer_token(&parts.headers) {
         return Some(token);
     }
 
