@@ -1,6 +1,6 @@
 use crate::{
     AppState,
-    common::error::AppError,
+    common::{config::AirdayConfig, error::AppError},
     model::{self, user::verify_login},
 };
 use axum::{extract::State, response::Json};
@@ -27,6 +27,26 @@ pub struct PasswordAuthorisationReq {
     pub password: String,
 }
 
+fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'static> {
+    Cookie::build(("session_token", token))
+        .http_only(true)
+        .secure(config.secure_cookies.clone())
+        .same_site(tower_cookies::cookie::SameSite::Strict)
+        .path("/")
+        .max_age(tower_cookies::cookie::time::Duration::hours(24))
+        .build()
+}
+
+fn build_refresh_token(config: AirdayConfig, token: String) -> Cookie<'static> {
+    Cookie::build(("refresh_token", token))
+        .http_only(true)
+        .secure(config.secure_cookies.clone())
+        .same_site(tower_cookies::cookie::SameSite::Strict)
+        .path("/")
+        .max_age(tower_cookies::cookie::time::Duration::days(120))
+        .build()
+}
+
 pub async fn password_authorisation(
     State(state): State<AppState>,
     cookies: Cookies,
@@ -36,21 +56,9 @@ pub async fn password_authorisation(
     let user = verify_login(&state.pool, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
     let session = model::session::UserSession::new(&state.pool, user_uuid, &headers).await?;
-    let cookie = Cookie::build(("session_token", session.token))
-        .http_only(true)
-        .secure(state.config.secure_cookies)
-        .same_site(tower_cookies::cookie::SameSite::Strict)
-        .path("/")
-        .max_age(tower_cookies::cookie::time::Duration::hours(24))
-        .build();
-    cookies.add(cookie);
-    let refresh_cookie = Cookie::build(("refresh_token", session.refresh_token))
-        .http_only(true)
-        .secure(state.config.secure_cookies)
-        .same_site(tower_cookies::cookie::SameSite::Strict)
-        .path("/auth/refresh")
-        .max_age(tower_cookies::cookie::time::Duration::days(120))
-        .build();
+    let session_cookie = build_session_token(state.config.clone(), session.token);
+    cookies.add(session_cookie);
+    let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
     cookies.add(refresh_cookie);
     Ok(Json(PwdAuthResponse::default()))
 }

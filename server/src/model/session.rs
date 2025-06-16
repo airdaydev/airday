@@ -8,6 +8,7 @@ use rand::{TryRngCore, rngs::OsRng};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
+use tower_cookies::Cookies;
 use uuid::Uuid;
 
 #[derive(Clone, Serialize)]
@@ -55,7 +56,7 @@ impl UserSession {
             .unwrap()
             .as_secs() as i64;
         let expires = now + (24 * 60 * 60); // 24 hours
-        let refresh_token_expires = now + (30 * 24 * 60 * 60); // 30 days
+        let refresh_expires = now + (30 * 24 * 60 * 60); // 30 days
 
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
@@ -65,14 +66,14 @@ impl UserSession {
         // Save session to database
         sqlx::query!(
             r#"
-            INSERT INTO session (id, token, expires, refresh_token, refresh_token_expires, user_id, user_agent, ip)
+            INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             id,
             token,
             expires,
             refresh_token_hash,
-            refresh_token_expires,
+            refresh_expires,
             sqlx_user_id,
             user_agent,
             ip
@@ -103,6 +104,39 @@ impl UserSession {
             SELECT id as "id: Uuid", token, refresh_token, user_id as 'user_id: Uuid'
             FROM session
             WHERE token = ? AND expires > ?
+            "#,
+            token,
+            now
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match result {
+            Some(row) => Ok(Some(UserSession {
+                id: row.id.to_string(),
+                token: row.id.to_string(),
+                refresh_token: row.refresh_token,
+                user_id: row.user_id,
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn get_by_refresh_token(
+        pool: &SqlitePool,
+        token: &str,
+    ) -> Result<Option<UserSession>, AppError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let result = sqlx::query!(
+            r#"
+            SELECT id as "id: Uuid", token, refresh_token, refresh_expires, user_id as 'user_id: Uuid'
+            FROM session
+            WHERE refresh_token = ? AND refresh_expires > ?
             "#,
             token,
             now
@@ -174,6 +208,27 @@ pub async fn get_user_sessions(
     Ok(Json(GetUserSessionsResponse { data: sessions }))
 }
 
+#[derive(Serialize)]
+pub struct RefreshSessionResponse {
+    data: Vec<UserSession>,
+}
+
+// pub async fn refresh_session(
+//     State(state): State<AppState>,
+//     cookies: Cookies,
+// ) -> Result<Json<RefreshSessionResponse>, AppError> {
+//     let refresh_cookie = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
+//         AppError::AuthorisationError(String::from("No refresh token")),
+//     )?;
+//     let session = UserSession::get_by_refresh_token(&state.pool, &refresh_cookie).await?;
+//     // Update session + refresh cookie
+//     // let session_cookie = build_session_token(state.config.clone(), session.token);
+//     // cookies.add(session_cookie);
+//     // let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
+//     // cookies.add(refresh_cookie);
+//     Ok(Json(RefreshSessionResponse { data: sessions }))
+// }
+
 fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
     parts
         .headers
@@ -183,10 +238,8 @@ fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
         .map(|auth| auth.trim_start_matches("Bearer ").trim().to_string())
 }
 
-fn extract_cookie_token(cookies: &tower_cookies::Cookies) -> Option<String> {
-    cookies
-        .get("session_token")
-        .map(|cookie| cookie.value().to_string())
+fn extract_cookie(cookies: &tower_cookies::Cookies, name: String) -> Option<String> {
+    cookies.get(&name).map(|cookie| cookie.value().to_string())
 }
 
 async fn extract_token<S>(parts: &mut Parts, state: &S) -> Option<String>
@@ -199,7 +252,7 @@ where
 
     let cookies_result = tower_cookies::Cookies::from_request_parts(parts, state).await;
     if let Ok(cookies) = cookies_result {
-        if let Some(token) = extract_cookie_token(&cookies) {
+        if let Some(token) = extract_cookie(&cookies, String::from("session_token")) {
             return Some(token);
         }
     }

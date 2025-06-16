@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS session (
   token TEXT UNIQUE NOT NULL,
   expires INTEGER NOT NULL,
   refresh_token TEXT NOT NULL,
-  refresh_token_expires INTEGER NOT NULL,
+  refresh_expires INTEGER NOT NULL,
   user_id UUID NOT NULL,
   user_agent TEXT NOT NULL,
   ip TEXT NOT NULL,
