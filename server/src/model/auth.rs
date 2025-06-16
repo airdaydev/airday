@@ -49,7 +49,8 @@ pub async fn password_authorisation(
 ) -> Result<Json<PwdAuthResponse>, AppError> {
     let user = verify_login(&state.pool, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
-    let session = model::session::UserSession::new(&state.pool, user_uuid, &headers).await?;
+    let client_meta = model::session::get_client_meta(&headers);
+    let session = model::session::UserSession::new(&state.pool, user_uuid, client_meta).await?;
     let session_cookie = build_session_token(state.config.clone(), session.token);
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);

@@ -29,29 +29,36 @@ pub fn gen_token() -> String {
     general_purpose::URL_SAFE_NO_PAD.encode(&bytes) // Base64 encoded
 }
 
+pub struct ClientMeta {
+    ip: String,
+    user_agent: String,
+}
+
+pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("Unknown")
+        .to_string();
+
+    let ip = headers
+        .get("x-forwarded-for")
+        .or_else(|| headers.get("x-real-ip"))
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("Unknown")
+        .to_string();
+    return ClientMeta { user_agent, ip };
+}
+
 impl UserSession {
     pub async fn new(
         pool: &SqlitePool,
         user_id: Uuid,
-        headers: &axum::http::HeaderMap,
+        client_meta: ClientMeta,
     ) -> Result<Self, AppError> {
         let token = gen_token();
         let refresh_token = gen_token();
         let refresh_token_hash = user::hash_password(&refresh_token)?;
-
-        // Extract user agent and IP from headers
-        let user_agent = headers
-            .get("user-agent")
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("Unknown")
-            .to_string();
-
-        let ip = headers
-            .get("x-forwarded-for")
-            .or_else(|| headers.get("x-real-ip"))
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("Unknown")
-            .to_string();
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
         let now = std::time::SystemTime::now()
@@ -78,8 +85,8 @@ impl UserSession {
             refresh_token_hash,
             refresh_expires,
             sqlx_user_id,
-            user_agent,
-            ip
+            client_meta.user_agent,
+            client_meta.ip
         )
         .execute(pool)
         .await
@@ -306,6 +313,7 @@ pub async fn refresh_session(
     let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
         .or_else(|| extract_bearer_token(&headers))
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
+    // println!("{:?}", payload.id);
     let old_session = match UserSession::get_by_id(&state.pool, &payload.id).await? {
         Some(session) => session,
         None => {
@@ -314,7 +322,6 @@ pub async fn refresh_session(
             ));
         }
     };
-    println!("{:?}", old_session);
     let refresh_token: &[u8] = refresh_token.as_bytes();
     let parsed_hash = PasswordHash::new(&old_session.refresh_token)
         .map_err(|_| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
@@ -392,5 +399,17 @@ where
 
             Ok(session)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util;
+
+    #[tokio::test]
+    async fn test_session_crud() {
+        let pool = test_util::create_test_pool().await;
+        // UserSession::new(&pool, user_id, headers)
     }
 }
