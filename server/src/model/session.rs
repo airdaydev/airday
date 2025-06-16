@@ -30,8 +30,8 @@ pub fn gen_token() -> String {
 }
 
 pub struct ClientMeta {
-    ip: String,
-    user_agent: String,
+    pub ip: String,
+    pub user_agent: String,
 }
 
 pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
@@ -405,11 +405,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util;
+    use crate::test_util::{self, mock_session};
 
     #[tokio::test]
     async fn test_session_crud() {
         let pool = test_util::create_test_pool().await;
-        // UserSession::new(&pool, user_id, headers)
+        let user = test_util::mock_user(&pool, "test_session_crud@air.day".to_string()).await;
+        let session = mock_session(&pool, user.id).await;
     }
 }
