@@ -20,3 +20,7 @@ cp .sqliterc ~ # loads automatically
 # confirm automatically loaded
 sqlite3 <<< "select uuid4();"
 ```
+
+## Example queries
+- `SELECT uuid4();`
+- `SELECT uuid_str(id) FROM session;`

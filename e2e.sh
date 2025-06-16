@@ -2,7 +2,8 @@
 set -e
 
 # Reset database
-export DATABASE_URL="sqlite:$HOME/.config/airday/test.db"
+DATABASE_PATH="$HOME/.config/airday/test.db"
+export DATABASE_URL="sqlite:$DATABASE_PATH"
 sqlx database reset -y
 
 # Start server in background
@@ -27,5 +28,6 @@ kill $SERVER_PID 2>/dev/null || true
 wait $SERVER_PID 2>/dev/null || true
 
 echo "Tests completed with code $TEST_EXIT_CODE, server stopped"
+echo "sqlite3 $DATABASE_PATH"
 
 exit $TEST_EXIT_CODE
