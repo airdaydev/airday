@@ -27,7 +27,7 @@ pub struct PasswordAuthorisationReq {
     pub password: String,
 }
 
-fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'static> {
+pub fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'static> {
     Cookie::build(("session_token", token))
         .http_only(true)
         .secure(config.secure_cookies.clone())
@@ -37,7 +37,7 @@ fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'static> {
         .build()
 }
 
-fn build_refresh_token(config: AirdayConfig, token: String) -> Cookie<'static> {
+pub fn build_refresh_token(config: AirdayConfig, token: String) -> Cookie<'static> {
     Cookie::build(("refresh_token", token))
         .http_only(true)
         .secure(config.secure_cookies.clone())

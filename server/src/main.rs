@@ -59,6 +59,7 @@ async fn main() {
         .route("/auth/password", post(model::auth::password_authorisation))
         .route("/user", post(model::auth::create_user));
     let private = Router::new()
+        .route("/session/refresh", get(model::session::refresh_session))
         .route("/user/sessions", post(model::session::get_user_sessions))
         .route("/jmap/session", get(jmap::core::session_handler));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))

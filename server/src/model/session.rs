@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::model::auth::{build_refresh_token, build_session_token};
 use crate::{common::error::AppError, model::user};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
@@ -156,6 +157,85 @@ impl UserSession {
         }
     }
 
+    pub async fn refresh(
+        pool: &SqlitePool,
+        old_session: UserSession,
+        headers: &axum::http::HeaderMap,
+    ) -> Result<Self, AppError> {
+        // Generate new tokens
+        let token = gen_token();
+        let new_refresh_token = gen_token();
+        let refresh_token_hash = user::hash_password(&new_refresh_token)?;
+
+        // Extract user agent and IP from headers
+        let user_agent = headers
+            .get("user-agent")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("Unknown")
+            .to_string();
+
+        let ip = headers
+            .get("x-forwarded-for")
+            .or_else(|| headers.get("x-real-ip"))
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("Unknown")
+            .to_string();
+
+        // Calculate expiration times (24 hours for session, 30 days for refresh token)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let expires = now + (24 * 60 * 60); // 24 hours
+        let refresh_expires = now + (30 * 24 * 60 * 60); // 30 days
+
+        let sqlx_user_id = SqlxUuid::from_bytes(old_session.user_id.into_bytes());
+
+        let uuid = Uuid::new_v4();
+        let id = SqlxUuid::from_bytes(uuid.into_bytes());
+
+        // Save new session to database
+        sqlx::query!(
+            r#"
+            INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+            id,
+            token,
+            expires,
+            refresh_token_hash,
+            refresh_expires,
+            sqlx_user_id,
+            user_agent,
+            ip
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Invalidate the old refresh token to prevent reuse
+        // We keep the session active but invalidate the refresh token
+        sqlx::query!(
+            r#"
+            UPDATE session
+            SET refresh_expires = ?
+            WHERE id = ?
+            "#,
+            now, // Set to current time to expire it
+            old_session.id
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(UserSession {
+            id: id.to_string(),
+            token,
+            refresh_token: new_refresh_token,
+            user_id: old_session.user_id,
+        })
+    }
+
     pub async fn get_by_user(
         pool: &SqlitePool,
         user_id: String,
@@ -210,24 +290,32 @@ pub async fn get_user_sessions(
 
 #[derive(Serialize)]
 pub struct RefreshSessionResponse {
-    data: Vec<UserSession>,
+    id: String,
 }
 
-// pub async fn refresh_session(
-//     State(state): State<AppState>,
-//     cookies: Cookies,
-// ) -> Result<Json<RefreshSessionResponse>, AppError> {
-//     let refresh_cookie = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
-//         AppError::AuthorisationError(String::from("No refresh token")),
-//     )?;
-//     let session = UserSession::get_by_refresh_token(&state.pool, &refresh_cookie).await?;
-//     // Update session + refresh cookie
-//     // let session_cookie = build_session_token(state.config.clone(), session.token);
-//     // cookies.add(session_cookie);
-//     // let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
-//     // cookies.add(refresh_cookie);
-//     Ok(Json(RefreshSessionResponse { data: sessions }))
-// }
+pub async fn refresh_session(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<RefreshSessionResponse>, AppError> {
+    let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
+        AppError::AuthorisationError(String::from("No refresh token")),
+    )?;
+    let old_session = match UserSession::get_by_refresh_token(&state.pool, &refresh_token).await? {
+        Some(session) => session,
+        None => {
+            return Err(AppError::AuthorisationError(
+                "Invalid refresh token".to_string(),
+            ));
+        }
+    };
+    let session = UserSession::refresh(&state.pool, old_session, &headers).await?;
+    let session_cookie = build_session_token(state.config.clone(), session.token);
+    cookies.add(session_cookie);
+    let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
+    cookies.add(refresh_cookie);
+    Ok(Json(RefreshSessionResponse { id: session.id }))
+}
 
 fn extract_bearer_token(parts: &mut Parts) -> Option<String> {
     parts
