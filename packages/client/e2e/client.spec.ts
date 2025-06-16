@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient, AuthMode } from "../index";
-import { createUser, passwordAuth } from "../domain/user";
-import { getRoot } from "../domain/root";
+import { createUser, passwordAuth } from "../src/user";
+import { getRoot } from "../src/root";
 import { extractCookie, parseCookieValue } from "./utils.spec";
-import { getSession } from "../domain/jmap";
+import { getSession } from "../src/jmap";
 
 const schema = {
   API_URL: { type: "string" },

@@ -1,19 +1,20 @@
 use crate::AppState;
 use crate::model::auth::{build_refresh_token, build_session_token};
 use crate::{common::error::AppError, model::user};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::HeaderMap;
 use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
 use rand::{TryRngCore, rngs::OsRng};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug)]
 pub struct UserSession {
     pub id: String,
     pub token: String,
@@ -92,7 +93,7 @@ impl UserSession {
         })
     }
 
-    pub async fn get_by_id(
+    pub async fn get_by_token(
         pool: &SqlitePool,
         token: &str,
     ) -> Result<Option<UserSession>, AppError> {
@@ -125,10 +126,7 @@ impl UserSession {
         }
     }
 
-    pub async fn get_by_refresh_token(
-        pool: &SqlitePool,
-        token: &str,
-    ) -> Result<Option<UserSession>, AppError> {
+    pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<Option<UserSession>, AppError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -138,9 +136,9 @@ impl UserSession {
             r#"
             SELECT id as "id: Uuid", token, refresh_token, refresh_expires, user_id as 'user_id: Uuid'
             FROM session
-            WHERE refresh_token = ? AND refresh_expires > ?
+            WHERE id = ? AND refresh_expires > ?
             "#,
-            token,
+            id,
             now
         )
         .fetch_optional(pool)
@@ -294,22 +292,38 @@ pub struct RefreshSessionResponse {
     id: String,
 }
 
+#[derive(Deserialize)]
+pub struct RefreshSessionReq {
+    pub id: String,
+}
+
 pub async fn refresh_session(
     State(state): State<AppState>,
     cookies: Cookies,
     headers: axum::http::HeaderMap,
+    Json(payload): Json<RefreshSessionReq>,
 ) -> Result<Json<RefreshSessionResponse>, AppError> {
     let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
         .or_else(|| extract_bearer_token(&headers))
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
-    let old_session = match UserSession::get_by_refresh_token(&state.pool, &refresh_token).await? {
+    let old_session = match UserSession::get_by_id(&state.pool, &payload.id).await? {
         Some(session) => session,
         None => {
             return Err(AppError::AuthorisationError(
-                "Invalid refresh token".to_string(),
+                "Invalid session id".to_string(),
             ));
         }
     };
+    println!("{:?}", old_session);
+    let refresh_token: &[u8] = refresh_token.as_bytes();
+    let parsed_hash = PasswordHash::new(&old_session.refresh_token)
+        .map_err(|_| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
+    let ok = Argon2::default()
+        .verify_password(refresh_token, &parsed_hash)
+        .is_ok();
+    if !ok {
+        return Err(AppError::ValidationError(String::from("Invalid token")));
+    }
     let session = UserSession::refresh(&state.pool, old_session, &headers).await?;
     let session_cookie = build_session_token(state.config.clone(), session.token);
     cookies.add(session_cookie);
@@ -367,7 +381,7 @@ where
                     "no auth token found",
                 )))?;
 
-            let session = UserSession::get_by_id(&app_state.pool, &token)
+            let session = UserSession::get_by_token(&app_state.pool, &token)
                 .await
                 .map_err(|_| {
                     AppError::ServerError(String::from("Failed to retrieve user session db error"))

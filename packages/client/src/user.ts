@@ -1,4 +1,4 @@
-import { APISchema, validateJSONResponse, AirdayClient } from "..";
+import { APISchema, validateJSONResponse, AirdayClient } from "./client";
 import { type TypeOf, v } from "suretype";
 
 const createUserOptsSchema = APISchema(
