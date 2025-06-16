@@ -63,6 +63,25 @@ export class AirdayClient {
       init.credentials = "include";
     }
   }
+  async refresh() {
+    // TODO: Gracefully log out
+    if (!this._refreshToken) throw new Error("No refresh token");
+    const headers: Record<string, string> = {
+      "Accept-Content": "application/JSON",
+    };
+    if (this.authMode === AuthMode.BearerToken) {
+      headers["refresh_token"] = this._refreshToken;
+    }
+    const res = await fetch(this.endpoint("/auth/refresh"), {
+      method: "GET",
+      headers,
+      credentials:
+        this.authMode === AuthMode.ImplicitCookie ? "include" : "omit",
+    });
+    return res;
+    // TODO: Confirm successsuccess
+    // or logout, or retry/back-off
+  }
 }
 
 interface AirdayJSONResponse<T> {

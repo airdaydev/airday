@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient, AuthMode } from "../index";
-import { createUser, passwordAuth } from "../domain/user";
+import { createUser, passwordAuth, refreshSession } from "../domain/user";
 import { getRoot } from "../domain/root";
 import { extractCookie, parseCookieValue } from "./utils.spec";
 import { getSession } from "../domain/jmap";
@@ -75,6 +75,11 @@ test.only("Authorisation flow", async () => {
   expect(refreshToken.length, "Returns valid refresh token").toBe(27);
   expect(refreshToken).not.toBe(sessionToken);
   client.setSessionToken(sessionToken);
+  client.setRefreshToken(refreshToken);
   const session = await getSession(client);
-  console.log(session);
+  expect(session.response.status).toBe(200);
+  const refresh = await client.refresh();
+  expect(refresh.status).toBe(200);
+  const sessionSetCookie2 = extractCookie(refresh.headers, "session_token");
+  expect(sessionSetCookie2).toBeTypeOf("string");
 });
