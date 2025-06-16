@@ -38,7 +38,7 @@ const passwordAuthSchema = APISchema(
 
 const passwordAuthResponseSchema = APISchema(
   v.object({
-    id: v.string(),
+    id: v.string().required(),
   }),
 );
 
@@ -69,7 +69,7 @@ const sessionsResponseSchema = APISchema(
 export async function getUserSessions(client: AirdayClient) {
   const res = await fetch(client.endpoint("/auth/sessions"), {
     method: "GET",
-    headers: client.getHeaders(),
+    headers: client.getAuthenticatedHeaders(),
   });
   return validateJSONResponse(res, sessionsResponseSchema.ensureFunc);
 }

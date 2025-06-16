@@ -15,16 +15,21 @@ interface AirdayClientOpts {
   authMode?: AuthMode;
 }
 
+interface Session {
+  id: string;
+  token?: string;
+  tokenExpiry: Date;
+  refreshToken?: string;
+  refreshExpiry: Date;
+}
+
 // TODO: This queue should run instantly, unless the session token is about to expire
 // In that case, it should place refresh at the top of the queue and continue
 // If the refresh token fails, it should fire an event that the user is logged out
 export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
-  private _sessionToken?: string;
-  private _sessionTokenExpiry?: Date;
-  private _refreshToken?: string;
-  private _refreshTokenExpiry?: Date;
+  private session?: Session;
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
@@ -35,18 +40,14 @@ export class AirdayClient {
     url.pathname = pathName;
     return url;
   }
-  setSessionToken(token: string, expiry?: Date) {
-    this._sessionToken = token;
-    this._sessionTokenExpiry = expiry;
+  setSession(session: Session) {
+    this.session = session;
   }
-  setRefreshToken(token: string, expiry?: Date) {
-    this._refreshToken = token;
-    this._refreshTokenExpiry = expiry;
-  }
-  getHeaders(json: boolean = true) {
+  getAuthenticatedHeaders(json: boolean = true) {
+    if (!this.session) throw new Error("User is not authenticated");
     const headers: Record<string, string> = {};
     if (this.authMode === AuthMode.BearerToken) {
-      headers["Authorization"] = `Bearer ${this._sessionToken}`;
+      headers["Authorization"] = `Bearer ${this.session.token}`;
     }
     if (json) {
       headers["Accept-Content"] = "application/JSON";
@@ -65,15 +66,15 @@ export class AirdayClient {
   }
   async refresh() {
     // TODO: Gracefully log out
-    if (!this._refreshToken) throw new Error("No refresh token");
+    if (!this.session?.refreshToken) throw new Error("No refresh token");
     const headers: Record<string, string> = {
       "Accept-Content": "application/JSON",
     };
     if (this.authMode === AuthMode.BearerToken) {
-      headers["refresh_token"] = this._refreshToken;
+      headers["Authorization"] = `Bearer ${this.session?.refreshToken}`;
     }
     const res = await fetch(this.endpoint("/auth/refresh"), {
-      method: "GET",
+      method: "POST",
       headers,
       credentials:
         this.authMode === AuthMode.ImplicitCookie ? "include" : "omit",

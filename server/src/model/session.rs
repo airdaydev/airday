@@ -299,9 +299,9 @@ pub async fn refresh_session(
     cookies: Cookies,
     headers: axum::http::HeaderMap,
 ) -> Result<Json<RefreshSessionResponse>, AppError> {
-    let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
-        AppError::AuthorisationError(String::from("No refresh token")),
-    )?;
+    let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
+        .or_else(|| extract_bearer_token(&headers))
+        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
     let old_session = match UserSession::get_by_refresh_token(&state.pool, &refresh_token).await? {
         Some(session) => session,
         None => {

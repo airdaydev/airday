@@ -10,15 +10,9 @@ use uuid::Uuid;
 
 #[derive(Serialize)]
 pub struct PwdAuthResponse {
-    result: &'static str,
-}
-
-impl Default for PwdAuthResponse {
-    fn default() -> Self {
-        Self {
-            result: "Authorized",
-        }
-    }
+    id: String,
+    // tokenExpiry: Date,
+    // refreshTokenExpiry: Date,
 }
 
 #[derive(Deserialize)]
@@ -60,7 +54,7 @@ pub async fn password_authorisation(
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
     cookies.add(refresh_cookie);
-    Ok(Json(PwdAuthResponse::default()))
+    Ok(Json(PwdAuthResponse { id: session.id }))
 }
 
 #[derive(Deserialize)]

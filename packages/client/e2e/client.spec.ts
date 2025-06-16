@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient, AuthMode } from "../index";
-import { createUser, passwordAuth, refreshSession } from "../domain/user";
+import { createUser, passwordAuth } from "../domain/user";
 import { getRoot } from "../domain/root";
 import { extractCookie, parseCookieValue } from "./utils.spec";
 import { getSession } from "../domain/jmap";
@@ -63,6 +63,7 @@ test.only("Authorisation flow", async () => {
     email,
     password,
   });
+  // TODO: I should provide an alternate route that returns via JSON for bearer token clients
   const sessionSetCookie = extractCookie(res.response.headers, "session_token");
   const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
   expect(sessionToken).toBeTypeOf("string");
@@ -74,8 +75,13 @@ test.only("Authorisation flow", async () => {
   expect(refreshToken, "Refresh token correct").toBeTruthy();
   expect(refreshToken.length, "Returns valid refresh token").toBe(27);
   expect(refreshToken).not.toBe(sessionToken);
-  client.setSessionToken(sessionToken);
-  client.setRefreshToken(refreshToken);
+  client.setSession({
+    id: res.data.id,
+    token: sessionToken,
+    tokenExpiry: new Date(),
+    refreshToken: refreshToken,
+    refreshExpiry: new Date(),
+  });
   const session = await getSession(client);
   expect(session.response.status).toBe(200);
   const refresh = await client.refresh();
