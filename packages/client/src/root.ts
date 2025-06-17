@@ -1,4 +1,9 @@
-import { APISchema, validateJSONResponse, AirdayClient } from "./client";
+import {
+  APISchema,
+  parseJSONResponse,
+  valJSONRes,
+  AirdayClient,
+} from "./client";
 import { v } from "suretype";
 
 const getRootResSchema = APISchema(
@@ -11,5 +16,6 @@ export async function getRoot(client: AirdayClient) {
   const res = await fetch(client.endpoint("/"), {
     method: "GET",
   });
-  return validateJSONResponse(res, getRootResSchema.ensureFunc);
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, getRootResSchema.ensureFunc);
 }

@@ -4,6 +4,7 @@ import {
   type ObjectValidator,
   type EnsureFunction,
 } from "suretype";
+import { passwordAuth, passwordAuthSchema } from "./user";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -85,6 +86,18 @@ export class AirdayClient {
     // TODO: Confirm successsuccess
     // or logout, or retry/back-off
   }
+  async loginWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
+    const res = await passwordAuth(this, opts);
+    if (opts.type === "bearer") {
+    }
+    // this.setSession({
+    //   id: res.data.id,
+    //   token: sessionToken,
+    //   tokenExpiry: new Date(),
+    //   refreshToken: refreshToken,
+    //   refreshExpiry: new Date(),
+    // });
+  }
 }
 
 interface AirdayJSONResponse<T> {
@@ -100,11 +113,10 @@ interface ParseOpts {
 }
 
 // TODO: Error handling, tracing
-export async function validateJSONResponse<T extends EnsureFunction<any>>(
+export async function parseJSONResponse(
   response: Response,
-  validator: T,
   opts?: ParseOpts,
-): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
+): Promise<AirdayJSONResponse<any>> {
   let body = await response.json();
   const parseOpts = {
     debug: false,
@@ -119,9 +131,19 @@ export async function validateJSONResponse<T extends EnsureFunction<any>>(
       `Status: ${response.status}, body: ${JSON.stringify(body)}`,
     );
   }
-  const data = validator(body);
   return {
     response,
+    data: body,
+  };
+}
+
+export async function valJSONRes<T extends EnsureFunction<any>>(
+  response: AirdayJSONResponse<any>,
+  validator: T,
+): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
+  const data = await validator(response.data);
+  return {
+    response: response.response,
     data,
   };
 }

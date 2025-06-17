@@ -1,4 +1,9 @@
-import { APISchema, validateJSONResponse, AirdayClient } from "./client";
+import {
+  APISchema,
+  parseJSONResponse,
+  AirdayClient,
+  valJSONRes,
+} from "./client";
 import { type TypeOf, v } from "suretype";
 
 const createUserOptsSchema = APISchema(
@@ -26,13 +31,15 @@ export async function createUser(
       "Content-Type": "application/json",
     },
   });
-  return validateJSONResponse(res, createUserResSchema.ensureFunc);
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, createUserResSchema.ensureFunc);
 }
 
-const passwordAuthSchema = APISchema(
+export const passwordAuthSchema = APISchema(
   v.object({
-    email: v.string(),
-    password: v.string(),
+    email: v.string().required(),
+    password: v.string().required(),
+    type: v.string().const("bearer"),
   }),
 );
 
@@ -53,7 +60,8 @@ export async function passwordAuth(
       "Content-Type": "application/json",
     },
   });
-  return validateJSONResponse(res, passwordAuthResponseSchema.ensureFunc);
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, passwordAuthResponseSchema.ensureFunc);
 }
 
 const sessionsResponseSchema = APISchema(
@@ -71,5 +79,6 @@ export async function getUserSessions(client: AirdayClient) {
     method: "GET",
     headers: client.getAuthenticatedHeaders(),
   });
-  return validateJSONResponse(res, sessionsResponseSchema.ensureFunc);
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, sessionsResponseSchema.ensureFunc);
 }
