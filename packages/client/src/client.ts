@@ -4,7 +4,12 @@ import {
   type ObjectValidator,
   type EnsureFunction,
 } from "suretype";
-import { passwordAuth, passwordAuthSchema } from "./user";
+import {
+  passwordAuth,
+  passwordAuthSchema,
+  refreshBearer,
+  refreshCookie,
+} from "./user";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -30,7 +35,7 @@ interface Session {
 export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
-  private session?: Session;
+  session?: Session;
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
@@ -66,30 +71,23 @@ export class AirdayClient {
     }
   }
   async refresh() {
-    // TODO: Gracefully log out
-    if (!this.session?.refreshToken) throw new Error("No refresh token");
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Accept-Content": "application/json",
-    };
     if (this.authMode === AuthMode.BearerToken) {
-      headers["Authorization"] = `Bearer ${this.session?.refreshToken}`;
+      return this.refreshBearer();
     }
-    const res = await fetch(this.endpoint("/auth/refresh"), {
-      method: "POST",
-      headers,
-      credentials:
-        this.authMode === AuthMode.ImplicitCookie ? "include" : "omit",
-      body: JSON.stringify({ id: this.session.id }),
-    });
-    return res;
-    // TODO: Confirm successsuccess
-    // or logout, or retry/back-off
+    return this.refreshCookie();
   }
-  async loginWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuth(this, opts);
-    if (opts.type === "bearer") {
-    }
+  // TODO: Confirm success
+  // or logout, or retry/back-off
+  async refreshCookie() {
+    const cookieRes = refreshCookie(this);
+    this.setSession({
+      id: res.data.id,
+      tokenExpiry: new Date(),
+      refreshExpiry: new Date(),
+    });
+  }
+  async refreshBearer() {
+    const res = refreshBearer(this);
     // this.setSession({
     //   id: res.data.id,
     //   token: sessionToken,
@@ -97,6 +95,16 @@ export class AirdayClient {
     //   refreshToken: refreshToken,
     //   refreshExpiry: new Date(),
     // });
+  }
+  async loginWithPasswordCookie(
+    opts: TypeOf<typeof passwordAuthSchema.schema>,
+  ) {
+    const res = await passwordAuth(this, opts);
+  }
+  async loginWithPasswordBearer(
+    opts: TypeOf<typeof passwordAuthSchema.schema>,
+  ) {
+    const res = await passwordAuth(this, opts);
   }
 }
 
