@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 #[derive(Clone, Serialize, Debug)]
 pub struct UserSession {
-    pub id: String,
+    pub id: Uuid,
     pub token: String,
     pub refresh_token: String,
     pub user_id: Uuid,
@@ -93,7 +93,7 @@ impl UserSession {
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         Ok(UserSession {
-            id: id.to_string(),
+            id,
             token,
             refresh_token,
             user_id,
@@ -124,7 +124,7 @@ impl UserSession {
 
         match result {
             Some(row) => Ok(Some(UserSession {
-                id: row.id.to_string(),
+                id: row.id,
                 token: row.id.to_string(),
                 refresh_token: row.refresh_token,
                 user_id: row.user_id,
@@ -133,7 +133,7 @@ impl UserSession {
         }
     }
 
-    pub async fn get_by_id(pool: &SqlitePool, id: &str) -> Result<Option<UserSession>, AppError> {
+    pub async fn get_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<UserSession>, AppError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -154,7 +154,7 @@ impl UserSession {
 
         match result {
             Some(row) => Ok(Some(UserSession {
-                id: row.id.to_string(),
+                id: row.id,
                 token: row.id.to_string(),
                 refresh_token: row.refresh_token,
                 user_id: row.user_id,
@@ -163,29 +163,11 @@ impl UserSession {
         }
     }
 
-    pub async fn refresh(
-        pool: &SqlitePool,
-        old_session: UserSession,
-        headers: &axum::http::HeaderMap,
-    ) -> Result<Self, AppError> {
+    pub async fn refresh(pool: &SqlitePool, old_session: UserSession) -> Result<Self, AppError> {
         // Generate new tokens
         let token = gen_token();
         let new_refresh_token = gen_token();
         let refresh_token_hash = user::hash_password(&new_refresh_token)?;
-
-        // Extract user agent and IP from headers
-        let user_agent = headers
-            .get("user-agent")
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("Unknown")
-            .to_string();
-
-        let ip = headers
-            .get("x-forwarded-for")
-            .or_else(|| headers.get("x-real-ip"))
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("Unknown")
-            .to_string();
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
         let now = std::time::SystemTime::now()
@@ -195,47 +177,25 @@ impl UserSession {
         let expires = now + (24 * 60 * 60); // 24 hours
         let refresh_expires = now + (30 * 24 * 60 * 60); // 30 days
 
-        let sqlx_user_id = SqlxUuid::from_bytes(old_session.user_id.into_bytes());
-
-        let uuid = Uuid::new_v4();
-        let id = SqlxUuid::from_bytes(uuid.into_bytes());
-
-        // Save new session to database
+        // Update existing session with new tokens
         sqlx::query!(
             r#"
-            INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            UPDATE session
+            SET token = ?, expires = ?, refresh_token = ?, refresh_expires = ?
+            WHERE id = ?
             "#,
-            id,
             token,
             expires,
             refresh_token_hash,
             refresh_expires,
-            sqlx_user_id,
-            user_agent,
-            ip
-        )
-        .execute(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Invalidate the old refresh token to prevent reuse
-        // We keep the session active but invalidate the refresh token
-        sqlx::query!(
-            r#"
-            UPDATE session
-            SET refresh_expires = ?
-            WHERE id = ?
-            "#,
-            now, // Set to current time to expire it
-            old_session.id
+            old_session.id,
         )
         .execute(pool)
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         Ok(UserSession {
-            id: id.to_string(),
+            id: old_session.id,
             token,
             refresh_token: new_refresh_token,
             user_id: old_session.user_id,
@@ -244,11 +204,8 @@ impl UserSession {
 
     pub async fn get_by_user(
         pool: &SqlitePool,
-        user_id: String,
+        user_id: Uuid,
     ) -> Result<Vec<UserSession>, AppError> {
-        let sqlx_user_id = SqlxUuid::parse_str(&user_id)
-            .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
-
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -260,7 +217,7 @@ impl UserSession {
         FROM session
         WHERE user_id = ? AND expires > ?
         "#,
-            sqlx_user_id,
+            user_id,
             now
         )
         .fetch_all(pool)
@@ -270,7 +227,7 @@ impl UserSession {
         let sessions: Vec<UserSession> = results
             .into_iter()
             .map(|row| UserSession {
-                id: row.id.to_string(),
+                id: row.id,
                 token: row.token,
                 refresh_token: row.refresh_token,
                 user_id: row.user_id,
@@ -313,12 +270,13 @@ pub async fn refresh_session(
     let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
         .or_else(|| extract_bearer_token(&headers))
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
-    // println!("{:?}", payload.id);
-    let old_session = match UserSession::get_by_id(&state.pool, &payload.id).await? {
+    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
+        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+    let old_session = match UserSession::get_by_id(&state.pool, sqlx_user_id).await? {
         Some(session) => session,
         None => {
             return Err(AppError::AuthorisationError(
-                "Invalid session id".to_string(),
+                "Invalid session id errr".to_string(),
             ));
         }
     };
@@ -331,12 +289,14 @@ pub async fn refresh_session(
     if !ok {
         return Err(AppError::ValidationError(String::from("Invalid token")));
     }
-    let session = UserSession::refresh(&state.pool, old_session, &headers).await?;
+    let session = UserSession::refresh(&state.pool, old_session).await?;
     let session_cookie = build_session_token(state.config.clone(), session.token);
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
     cookies.add(refresh_cookie);
-    Ok(Json(RefreshSessionResponse { id: session.id }))
+    Ok(Json(RefreshSessionResponse {
+        id: session.id.to_string(),
+    }))
 }
 
 fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
@@ -412,5 +372,11 @@ mod tests {
         let pool = test_util::create_test_pool().await;
         let user = test_util::mock_user(&pool, "test_session_crud@air.day".to_string()).await;
         let session = mock_session(&pool, user.id).await;
+        let refreshed_session = UserSession::refresh(&pool, session.clone()).await.unwrap();
+        assert_eq!(session.id, refreshed_session.id);
+        assert_ne!(session.token, refreshed_session.token);
+        assert_ne!(session.refresh_token, refreshed_session.refresh_token);
+        let existing_session = UserSession::get_by_id(&pool, session.id).await.unwrap();
+        assert!(existing_session.is_some());
     }
 }

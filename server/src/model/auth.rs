@@ -55,7 +55,9 @@ pub async fn password_authorisation(
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
     cookies.add(refresh_cookie);
-    Ok(Json(PwdAuthResponse { id: session.id }))
+    Ok(Json(PwdAuthResponse {
+        id: session.id.to_string(),
+    }))
 }
 
 #[derive(Deserialize)]
