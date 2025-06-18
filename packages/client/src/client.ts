@@ -5,7 +5,8 @@ import {
   type EnsureFunction,
 } from "suretype";
 import {
-  passwordAuth,
+  passwordAuthBearer,
+  passwordAuthCookie,
   passwordAuthSchema,
   refreshBearer,
   refreshCookie,
@@ -105,12 +106,12 @@ export class AirdayClient {
   async loginWithPasswordCookie(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
-    const res = await passwordAuth(this, opts);
+    const res = await passwordAuthCookie(this, opts);
   }
   async loginWithPasswordBearer(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
-    const res = await passwordAuth(this, opts);
+    const res = await passwordAuthBearer(this, opts);
   }
 }
 
