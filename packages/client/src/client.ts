@@ -25,9 +25,10 @@ interface AirdayClientOpts {
 interface Session {
   id: string;
   token?: string;
-  tokenExpiry: Date;
+  expires: Date;
   refreshToken?: string;
-  refreshExpiry: Date;
+  refreshExpires: Date;
+  userId: string;
 }
 
 // TODO: This queue should run instantly, unless the session token is about to expire
@@ -86,11 +87,12 @@ export class AirdayClient {
   // TODO: Confirm success
   // or logout, or retry/back-off
   async refreshCookie() {
-    const res = refreshCookie(this);
+    const res = await refreshCookie(this);
     this.setSession({
       id: res.data.id,
-      tokenExpiry: new Date(),
-      refreshExpiry: new Date(),
+      expires: new Date(),
+      refreshExpires: new Date(),
+      userId: res.data.userId,
     });
   }
   async refreshBearer() {
@@ -98,9 +100,9 @@ export class AirdayClient {
     // this.setSession({
     //   id: res.data.id,
     //   token: sessionToken,
-    //   tokenExpiry: new Date(),
+    //   expires: new Date(),
     //   refreshToken: refreshToken,
-    //   refreshExpiry: new Date(),
+    //   refreshExpires: new Date(),
     // });
   }
   async loginWithPasswordCookie(
@@ -109,8 +111,9 @@ export class AirdayClient {
     const res = await passwordAuthCookie(this, opts);
     this.setSession({
       id: res.data.id,
-      tokenExpiry: new Date(),
-      refreshExpiry: new Date(),
+      expires: new Date(res.data.expires),
+      refreshExpires: new Date(res.data.refreshExpires),
+      userId: res.data.userId,
     });
   }
   async loginWithPasswordBearer(
@@ -120,10 +123,12 @@ export class AirdayClient {
     this.setSession({
       id: res.data.id,
       token: res.data.token,
-      tokenExpiry: new Date(),
+      expires: new Date(res.data.expires),
       refreshToken: res.data.refreshToken,
-      refreshExpiry: new Date(),
+      refreshExpires: new Date(res.data.refreshExpires),
+      userId: res.data.userId,
     });
+    return res;
   }
 }
 

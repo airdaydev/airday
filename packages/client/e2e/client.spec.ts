@@ -45,47 +45,47 @@ test.only("Creating a user", async () => {
   ).rejects.toThrow();
 });
 
-// test("Authorisation flow", async () => {
-//   const email = "daniel-pw@air.day";
-//   const password = "fa09j20fiaj3fpaof";
-//   await createUser(client, {
-//     email,
-//     password,
-//   });
-//   expect(
-//     passwordAuth(client, {
-//       email,
-//       password: "hi",
-//     }),
-//     "Rejects bad passwords",
-//   ).rejects.toThrow();
-//   const res = await passwordAuth(client, {
-//     email,
-//     password,
-//   });
-//   // TODO: I should provide an alternate route that returns via JSON for bearer token clients
-//   const sessionSetCookie = extractCookie(res.response.headers, "session_token");
-//   const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
-//   expect(sessionToken).toBeTypeOf("string");
-//   expect(sessionToken, "Session id key correct").toBeTruthy();
-//   expect(sessionToken.length, "Returns valid session id").toBe(27);
-//   const refreshSetCookie = extractCookie(res.response.headers, "refresh_token");
-//   const refreshToken = parseCookieValue(refreshSetCookie, "refresh_token");
-//   expect(refreshToken).toBeTypeOf("string");
-//   expect(refreshToken, "Refresh token correct").toBeTruthy();
-//   expect(refreshToken.length, "Returns valid refresh token").toBe(27);
-//   expect(refreshToken).not.toBe(sessionToken);
-//   client.setSession({
-//     id: res.data.id,
-//     token: sessionToken,
-//     tokenExpiry: new Date(),
-//     refreshToken: refreshToken,
-//     refreshExpiry: new Date(),
-//   });
-//   const session = await getSession(client);
-//   expect(session.response.status).toBe(200);
-//   const refresh = await client.refresh();
-//   expect(refresh.status).toBe(200);
-//   const sessionSetCookie2 = extractCookie(refresh.headers, "session_token");
-//   expect(sessionSetCookie2).toBeTypeOf("string");
-// });
+test("Cookie authorisation", async () => {
+  // const sessionSetCookie = extractCookie(res.response.headers, "session_token");
+  // const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
+  // expect(sessionToken).toBeTypeOf("string");
+  // expect(sessionToken, "Session id key correct").toBeTruthy();
+  // expect(sessionToken.length, "Returns valid session id").toBe(27);
+  // const refreshSetCookie = extractCookie(res.response.headers, "refresh_token");
+  // const refreshToken = parseCookieValue(refreshSetCookie, "refresh_token");
+  // expect(refreshToken).toBeTypeOf("string");
+  // expect(refreshToken, "Refresh token correct").toBeTruthy();
+  // expect(refreshToken.length, "Returns valid refresh token").toBe(27);
+  // expect(refreshToken).not.toBe(sessionToken);
+});
+
+test.only("Bearer authorisation", async () => {
+  const email = "daniel-pw@air.day";
+  const password = "fa09j20fiaj3fpaof";
+  await createUser(client, {
+    email,
+    password,
+  });
+  expect(
+    client.loginWithPasswordBearer({
+      email,
+      password: "hi",
+    }),
+    "Rejects bad passwords",
+  ).rejects.toThrow();
+  const res = await client.loginWithPasswordBearer({
+    email,
+    password,
+  });
+  expect(client.session?.expires instanceof Date).toBeTrue();
+  expect(client.session?.refreshExpires instanceof Date).toBeTrue();
+  expect(client.session?.token).toBeTypeOf("string");
+  expect(client.session?.refreshToken).toBeTypeOf("string");
+  expect(client.session?.userId).toBeTypeOf("string");
+  const session = await getSession(client);
+  expect(session.response.status).toBe(200);
+  // const refresh = await client.refresh();
+  // expect(refresh.status).toBe(200);
+  // const sessionSetCookie2 = extractCookie(refresh.headers, "session_token");
+  // expect(sessionSetCookie2).toBeTypeOf("string");
+});
