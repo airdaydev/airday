@@ -67,10 +67,13 @@ async fn main() {
         )
         .route("/user", post(model::auth::create_user));
     let private = Router::new()
-        .route("/auth/refresh", post(model::session::refresh_session))
+        .route(
+            "/auth/refresh",
+            post(model::session::refresh_session_cookie),
+        )
         .route(
             "/auth/refresh/bearer",
-            post(model::session::refresh_session),
+            post(model::session::refresh_session_bearer),
         )
         .route("/auth/sessions", post(model::session::get_user_sessions))
         .route("/jmap/session", get(jmap::core::session_handler));
