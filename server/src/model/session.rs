@@ -1,6 +1,6 @@
 use crate::AppState;
 use crate::common::datetime::serialize_datetime_iso;
-use crate::model::auth::{build_refresh_token, build_session_token};
+use crate::model::auth::{build_refresh_cookie, build_session_cookie};
 use crate::{common::error::AppError, model::user};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::Json;
@@ -316,9 +316,9 @@ pub async fn refresh_session(
         return Err(AppError::ValidationError(String::from("Invalid token")));
     }
     let session = UserSession::refresh(&state.pool, old_session).await?;
-    let session_cookie = build_session_token(state.config.clone(), session.token);
+    let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
     cookies.add(refresh_cookie);
     Ok(Json(RefreshSessionResponse {
         id: session.id.to_string(),

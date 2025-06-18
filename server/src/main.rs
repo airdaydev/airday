@@ -57,10 +57,21 @@ async fn main() {
     println!("Airday server started at http://{}", host_str);
     let public = Router::new()
         .route("/", get(root::root_handler))
-        .route("/auth/password", post(model::auth::password_authorisation))
+        .route(
+            "/auth/password",
+            post(model::auth::password_authorisation_cookie),
+        )
+        .route(
+            "/auth/password/bearer",
+            post(model::auth::password_authorisation_bearer),
+        )
         .route("/user", post(model::auth::create_user));
     let private = Router::new()
         .route("/auth/refresh", post(model::session::refresh_session))
+        .route(
+            "/auth/refresh/bearer",
+            post(model::session::refresh_session),
+        )
         .route("/auth/sessions", post(model::session::get_user_sessions))
         .route("/jmap/session", get(jmap::core::session_handler));
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))

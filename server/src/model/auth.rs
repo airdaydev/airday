@@ -1,10 +1,11 @@
 use crate::{
     AppState,
     common::{config::AirdayConfig, error::AppError},
-    model::{self, user::verify_login},
+    model::{self, session::UserSession, user::verify_login},
 };
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
 
@@ -21,8 +22,8 @@ pub struct PasswordAuthorisationReq {
     pub password: String,
 }
 
-pub fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'static> {
-    Cookie::build(("session_token", token))
+pub fn build_session_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
+    Cookie::build(("session_token", String::from(token)))
         .http_only(true)
         .secure(config.secure_cookies.clone())
         .same_site(tower_cookies::cookie::SameSite::Strict)
@@ -31,8 +32,8 @@ pub fn build_session_token(config: AirdayConfig, token: String) -> Cookie<'stati
         .build()
 }
 
-pub fn build_refresh_token(config: AirdayConfig, token: String) -> Cookie<'static> {
-    Cookie::build(("refresh_token", token))
+pub fn build_refresh_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
+    Cookie::build(("refresh_token", String::from(token)))
         .http_only(true)
         .secure(config.secure_cookies.clone())
         .same_site(tower_cookies::cookie::SameSite::Strict)
@@ -42,22 +43,39 @@ pub fn build_refresh_token(config: AirdayConfig, token: String) -> Cookie<'stati
 }
 
 pub async fn password_authorisation(
+    pool: &SqlitePool,
+    headers: axum::http::HeaderMap,
+    payload: PasswordAuthorisationReq,
+) -> Result<UserSession, AppError> {
+    let user = verify_login(pool, &payload.email, &payload.password).await?;
+    let user_uuid = Uuid::from_bytes(user.id.into_bytes());
+    let client_meta = model::session::get_client_meta(&headers);
+    let session = model::session::UserSession::new(pool, user_uuid, client_meta).await?;
+    Ok(session)
+}
+
+pub async fn password_authorisation_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
     headers: axum::http::HeaderMap,
     Json(payload): Json<PasswordAuthorisationReq>,
-) -> Result<Json<PwdAuthResponse>, AppError> {
-    let user = verify_login(&state.pool, &payload.email, &payload.password).await?;
-    let user_uuid = Uuid::from_bytes(user.id.into_bytes());
-    let client_meta = model::session::get_client_meta(&headers);
-    let session = model::session::UserSession::new(&state.pool, user_uuid, client_meta).await?;
-    let session_cookie = build_session_token(state.config.clone(), session.token);
+) -> Result<Json<UserSession>, AppError> {
+    let session = password_authorisation(&state.pool, headers, payload).await?;
+    let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_token(state.config.clone(), session.refresh_token);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
     cookies.add(refresh_cookie);
-    Ok(Json(PwdAuthResponse {
-        id: session.id.to_string(),
-    }))
+    // TODO: Remove tokens from cookie sessions
+    Ok(Json(session))
+}
+
+pub async fn password_authorisation_bearer(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(payload): Json<PasswordAuthorisationReq>,
+) -> Result<Json<UserSession>, AppError> {
+    let session = password_authorisation(&state.pool, headers, payload).await?;
+    Ok(Json(session))
 }
 
 #[derive(Deserialize)]
