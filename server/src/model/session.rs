@@ -17,6 +17,7 @@ use tower_cookies::Cookies;
 use uuid::Uuid;
 
 #[derive(Clone, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct UserSession {
     pub id: Uuid,
     pub token: String,

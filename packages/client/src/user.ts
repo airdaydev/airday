@@ -5,6 +5,7 @@ import {
   valJSONRes,
 } from "./client";
 import { type TypeOf, v } from "suretype";
+import { v_session_bearer, v_session_cookie } from "./types";
 
 const createUserOpts = APISchema(
   v.object({
@@ -43,12 +44,7 @@ export const passwordAuthSchema = APISchema(
   }),
 );
 
-const passwordAuthCookieRes = APISchema(
-  v.object({
-    id: v.string().required(),
-    expiry: v.string().required(),
-  }),
-);
+const passwordAuthCookieRes = APISchema(v_session_cookie);
 
 export async function passwordAuthCookie(
   client: AirdayClient,
@@ -65,11 +61,7 @@ export async function passwordAuthCookie(
   return valJSONRes(untyped, passwordAuthCookieRes.ensureFunc);
 }
 
-const passwordAuthBearerRes = APISchema(
-  v.object({
-    id: v.string().required(),
-  }),
-);
+const passwordAuthBearerRes = APISchema(v_session_bearer);
 
 export async function passwordAuthBearer(
   client: AirdayClient,

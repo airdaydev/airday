@@ -107,11 +107,23 @@ export class AirdayClient {
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
     const res = await passwordAuthCookie(this, opts);
+    this.setSession({
+      id: res.data.id,
+      tokenExpiry: new Date(),
+      refreshExpiry: new Date(),
+    });
   }
   async loginWithPasswordBearer(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
     const res = await passwordAuthBearer(this, opts);
+    this.setSession({
+      id: res.data.id,
+      token: res.data.token,
+      tokenExpiry: new Date(),
+      refreshToken: res.data.refreshToken,
+      refreshExpiry: new Date(),
+    });
   }
 }
 
