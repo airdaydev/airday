@@ -287,18 +287,13 @@ pub struct RefreshSessionReq {
     pub id: String,
 }
 
-pub async fn refresh_session(
-    State(state): State<AppState>,
-    cookies: Cookies,
-    headers: axum::http::HeaderMap,
-    Json(payload): Json<RefreshSessionReq>,
-) -> Result<Json<RefreshSessionResponse>, AppError> {
-    let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
-        .or_else(|| extract_bearer_token(&headers))
-        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
-    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
-    let old_session = match UserSession::get_by_id(&state.pool, sqlx_user_id).await? {
+async fn refresh_if_valid(
+    pool: &SqlitePool,
+    user_id: Uuid,
+    refresh_token: &str,
+) -> Result<UserSession, AppError> {
+    let refresh_token: &[u8] = refresh_token.as_bytes();
+    let old_session = match UserSession::get_by_id(pool, user_id).await? {
         Some(session) => session,
         None => {
             return Err(AppError::AuthorisationError(
@@ -306,7 +301,6 @@ pub async fn refresh_session(
             ));
         }
     };
-    let refresh_token: &[u8] = refresh_token.as_bytes();
     let parsed_hash = PasswordHash::new(&old_session.refresh_token)
         .map_err(|_| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
     let ok = Argon2::default()
@@ -315,14 +309,39 @@ pub async fn refresh_session(
     if !ok {
         return Err(AppError::ValidationError(String::from("Invalid token")));
     }
-    let session = UserSession::refresh(&state.pool, old_session).await?;
+    let session = UserSession::refresh(pool, old_session).await?;
+    Ok(session)
+}
+
+pub async fn refresh_session_bearer(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(payload): Json<RefreshSessionReq>,
+) -> Result<Json<UserSession>, AppError> {
+    let refresh_token = extract_bearer_token(&headers)
+        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
+    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
+        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+    let session = refresh_if_valid(&state.pool, sqlx_user_id, &refresh_token).await?;
+    Ok(Json(session))
+}
+
+pub async fn refresh_session_cookie(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    Json(payload): Json<RefreshSessionReq>,
+) -> Result<Json<UserSession>, AppError> {
+    let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
+        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
+    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
+        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+    let session = refresh_if_valid(&state.pool, sqlx_user_id, &refresh_token).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
     cookies.add(refresh_cookie);
-    Ok(Json(RefreshSessionResponse {
-        id: session.id.to_string(),
-    }))
+    // TODO: Omit tokens
+    Ok(Json(session))
 }
 
 fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
