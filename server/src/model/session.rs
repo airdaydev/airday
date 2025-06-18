@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::common::datetime::serialize_datetime_iso;
 use crate::model::auth::{build_refresh_token, build_session_token};
 use crate::{common::error::AppError, model::user};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
@@ -7,6 +8,7 @@ use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::HeaderMap;
 use axum::http::request::Parts;
 use base64::{Engine as _, engine::general_purpose};
+use chrono::{DateTime, Utc};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -18,7 +20,11 @@ use uuid::Uuid;
 pub struct UserSession {
     pub id: Uuid,
     pub token: String,
+    #[serde(serialize_with = "serialize_datetime_iso")]
+    pub expires: DateTime<Utc>,
     pub refresh_token: String,
+    #[serde(serialize_with = "serialize_datetime_iso")]
+    pub refresh_expires: DateTime<Utc>,
     pub user_id: Uuid,
 }
 
@@ -27,6 +33,25 @@ pub fn gen_token() -> String {
     let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
     rng.try_fill_bytes(&mut bytes).unwrap();
     general_purpose::URL_SAFE_NO_PAD.encode(&bytes) // Base64 encoded
+}
+
+fn get_current_timestamp() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+}
+
+fn calculate_session_expiry(now: i64) -> i64 {
+    now + (24 * 60 * 60) // 24 hours
+}
+
+fn calculate_refresh_expiry(now: i64) -> i64 {
+    now + (30 * 24 * 60 * 60) // 30 days
+}
+
+fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
+    DateTime::from_timestamp(timestamp, 0).unwrap()
 }
 
 pub struct ClientMeta {
@@ -61,12 +86,11 @@ impl UserSession {
         let refresh_token_hash = user::hash_password(&refresh_token)?;
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let expires = now + (24 * 60 * 60); // 24 hours
-        let refresh_expires = now + (30 * 24 * 60 * 60); // 30 days
+        let now = get_current_timestamp();
+        let expires = calculate_session_expiry(now);
+        let expires_datetime = timestamp_to_datetime(expires);
+        let refresh_expires = calculate_refresh_expiry(now);
+        let refresh_expires_datetime = timestamp_to_datetime(refresh_expires);
 
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
@@ -95,7 +119,9 @@ impl UserSession {
         Ok(UserSession {
             id,
             token,
+            expires: expires_datetime,
             refresh_token,
+            refresh_expires: refresh_expires_datetime,
             user_id,
         })
     }
@@ -104,14 +130,13 @@ impl UserSession {
         pool: &SqlitePool,
         token: &str,
     ) -> Result<Option<UserSession>, AppError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = get_current_timestamp();
 
         let result = sqlx::query!(
             r#"
-            SELECT id as "id: Uuid", token, refresh_token, user_id as 'user_id: Uuid'
+            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>",
+            user_id as 'user_id: Uuid'
             FROM session
             WHERE token = ? AND expires > ?
             "#,
@@ -125,8 +150,10 @@ impl UserSession {
         match result {
             Some(row) => Ok(Some(UserSession {
                 id: row.id,
+                expires: row.expires,
                 token: row.id.to_string(),
                 refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
                 user_id: row.user_id,
             })),
             None => Ok(None),
@@ -134,14 +161,12 @@ impl UserSession {
     }
 
     pub async fn get_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<UserSession>, AppError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = get_current_timestamp();
 
         let result = sqlx::query!(
             r#"
-            SELECT id as "id: Uuid", token, refresh_token, refresh_expires, user_id as 'user_id: Uuid'
+            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
             FROM session
             WHERE id = ? AND refresh_expires > ?
             "#,
@@ -155,8 +180,10 @@ impl UserSession {
         match result {
             Some(row) => Ok(Some(UserSession {
                 id: row.id,
-                token: row.id.to_string(),
+                token: row.token,
+                expires: row.expires,
                 refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
                 user_id: row.user_id,
             })),
             None => Ok(None),
@@ -170,12 +197,9 @@ impl UserSession {
         let refresh_token_hash = user::hash_password(&new_refresh_token)?;
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let expires = now + (24 * 60 * 60); // 24 hours
-        let refresh_expires = now + (30 * 24 * 60 * 60); // 30 days
+        let now = get_current_timestamp();
+        let expires = calculate_session_expiry(now);
+        let refresh_expires = calculate_refresh_expiry(now);
 
         // Update existing session with new tokens
         sqlx::query!(
@@ -197,7 +221,9 @@ impl UserSession {
         Ok(UserSession {
             id: old_session.id,
             token,
+            expires: timestamp_to_datetime(expires),
             refresh_token: new_refresh_token,
+            refresh_expires: timestamp_to_datetime(refresh_expires),
             user_id: old_session.user_id,
         })
     }
@@ -206,14 +232,12 @@ impl UserSession {
         pool: &SqlitePool,
         user_id: Uuid,
     ) -> Result<Vec<UserSession>, AppError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = get_current_timestamp();
 
         let results = sqlx::query!(
             r#"
-        SELECT id as "id: Uuid", token, refresh_token, user_id as 'user_id: Uuid'
+        SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+        refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
         FROM session
         WHERE user_id = ? AND expires > ?
         "#,
@@ -229,7 +253,9 @@ impl UserSession {
             .map(|row| UserSession {
                 id: row.id,
                 token: row.token,
+                expires: row.expires,
                 refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
                 user_id: row.user_id,
             })
             .collect();

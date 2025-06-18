@@ -6,7 +6,7 @@ import {
 } from "./client";
 import { v } from "suretype";
 
-const getSessionSchema = APISchema(
+const getSessionRes = APISchema(
   v.object({
     version: v.string(),
   }),
@@ -15,9 +15,9 @@ const getSessionSchema = APISchema(
 export async function getSession(client: AirdayClient) {
   const res = await fetch(client.endpoint("/jmap/session"), {
     method: "GET",
-    credentials: "include",
-    headers: client.getAuthenticatedHeaders(),
+    credentials: client.credentials(),
+    headers: client.headers(),
   });
   const untyped = await parseJSONResponse(res);
-  return valJSONRes(untyped, getSessionSchema.ensureFunc);
+  return valJSONRes(untyped, getSessionRes.ensureFunc);
 }

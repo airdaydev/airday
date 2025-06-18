@@ -6,14 +6,14 @@ import {
 } from "./client";
 import { type TypeOf, v } from "suretype";
 
-const createUserOptsSchema = APISchema(
+const createUserOpts = APISchema(
   v.object({
     email: v.string(),
     password: v.string(),
   }),
 );
 
-const createUserResSchema = APISchema(
+const createUserRes = APISchema(
   v.object({
     id: v.string().required(),
   }),
@@ -21,9 +21,9 @@ const createUserResSchema = APISchema(
 
 export async function createUser(
   client: AirdayClient,
-  opts: TypeOf<typeof createUserOptsSchema.schema>,
+  opts: TypeOf<typeof createUserOpts.schema>,
 ) {
-  createUserOptsSchema.ensureFunc(opts);
+  createUserOpts.ensureFunc(opts);
   const res = await fetch(client.endpoint("/user"), {
     method: "POST",
     body: JSON.stringify(opts),
@@ -32,7 +32,7 @@ export async function createUser(
     },
   });
   const untyped = await parseJSONResponse(res);
-  return valJSONRes(untyped, createUserResSchema.ensureFunc);
+  return valJSONRes(untyped, createUserRes.ensureFunc);
 }
 
 export const passwordAuthSchema = APISchema(
@@ -43,9 +43,10 @@ export const passwordAuthSchema = APISchema(
   }),
 );
 
-const passwordAuthResponseSchema = APISchema(
+const passwordAuthCookieRes = APISchema(
   v.object({
     id: v.string().required(),
+    expiry: v.string().required(),
   }),
 );
 
@@ -61,8 +62,14 @@ export async function passwordAuthCookie(
     },
   });
   const untyped = await parseJSONResponse(res);
-  return valJSONRes(untyped, passwordAuthResponseSchema.ensureFunc);
+  return valJSONRes(untyped, passwordAuthCookieRes.ensureFunc);
 }
+
+const passwordAuthBearerRes = APISchema(
+  v.object({
+    id: v.string().required(),
+  }),
+);
 
 export async function passwordAuthBearer(
   client: AirdayClient,
@@ -76,10 +83,10 @@ export async function passwordAuthBearer(
     },
   });
   const untyped = await parseJSONResponse(res);
-  return valJSONRes(untyped, passwordAuthResponseSchema.ensureFunc);
+  return valJSONRes(untyped, passwordAuthBearerRes.ensureFunc);
 }
 
-const sessionsResponseSchema = APISchema(
+const sessionsRes = APISchema(
   v.object({
     items: v.array(
       v.object({
@@ -92,10 +99,11 @@ const sessionsResponseSchema = APISchema(
 export async function getUserSessions(client: AirdayClient) {
   const res = await fetch(client.endpoint("/auth/sessions"), {
     method: "GET",
-    headers: client.getAuthenticatedHeaders(),
+    credentials: client.credentials(),
+    headers: client.headers(),
   });
   const untyped = await parseJSONResponse(res);
-  return valJSONRes(untyped, sessionsResponseSchema.ensureFunc);
+  return valJSONRes(untyped, sessionsRes.ensureFunc);
 }
 
 export async function refreshCookie(client: AirdayClient) {

@@ -49,7 +49,7 @@ export class AirdayClient {
   setSession(session: Session) {
     this.session = session;
   }
-  getAuthenticatedHeaders(json: boolean = true) {
+  headers(json: boolean = true) {
     if (!this.session) throw new Error("User is not authenticated");
     const headers: Record<string, string> = {};
     if (this.authMode === AuthMode.BearerToken) {
@@ -59,6 +59,12 @@ export class AirdayClient {
       headers["Accept-Content"] = "application/json";
     }
     return headers;
+  }
+  credentials(): RequestCredentials {
+    if (this.authMode === AuthMode.BearerToken) {
+      return "omit";
+    }
+    return "include";
   }
   getInitOpts(init: RequestInit) {
     if (this.authMode === AuthMode.BearerToken) {
@@ -79,7 +85,7 @@ export class AirdayClient {
   // TODO: Confirm success
   // or logout, or retry/back-off
   async refreshCookie() {
-    const cookieRes = refreshCookie(this);
+    const res = refreshCookie(this);
     this.setSession({
       id: res.data.id,
       tokenExpiry: new Date(),

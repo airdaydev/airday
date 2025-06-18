@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient, AuthMode } from "../index";
-import { createUser, passwordAuth } from "../src/user";
+import { createUser } from "../src/user";
 import { getRoot } from "../src/root";
 import { extractCookie, parseCookieValue } from "./utils.spec";
 import { getSession } from "../src/jmap";
