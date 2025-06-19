@@ -23,7 +23,7 @@ test("API root url & version", async () => {
   expect(d.data.version).toBeTypeOf("string");
 });
 
-test.only("Creating a user", async () => {
+test("Creating a user", async () => {
   const res = await createUser(client, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",
@@ -82,10 +82,25 @@ test.only("Bearer authorisation", async () => {
   expect(client.session?.token).toBeTypeOf("string");
   expect(client.session?.refreshToken).toBeTypeOf("string");
   expect(client.session?.userId).toBeTypeOf("string");
+  const firstToken = client.session?.token;
+  const firstRefreshToken = client.session?.refreshToken;
   const session = await getSession(client);
   expect(session.response.status).toBe(200);
-  // const refresh = await client.refresh();
-  // expect(refresh.status).toBe(200);
-  // const sessionSetCookie2 = extractCookie(refresh.headers, "session_token");
-  // expect(sessionSetCookie2).toBeTypeOf("string");
+  expect(client.session?.token?.length, "Valid session token").toBe(27);
+  expect(client.session?.refreshToken?.length, "Valid refresh token").toBe(27);
+  const refresh = await client.refreshBearer();
+  expect(refresh.response.status, "refresh api call succeeded").toBe(200);
+  expect(refresh.data.token, "client set refresh token").toBe(
+    client.session?.token as string,
+  );
+  expect(
+    client.session?.token,
+    "client token has rotated after refresh",
+  ).not.toBe(firstToken as string);
+  expect(refresh.data.refreshToken, "refresh token has set from api call").toBe(
+    client.session?.refreshToken as string,
+  );
+  expect(client.session?.refreshToken, "refresh token has rotated").not.toBe(
+    firstRefreshToken as string,
+  );
 });

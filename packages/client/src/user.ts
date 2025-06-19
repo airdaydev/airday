@@ -98,6 +98,9 @@ export async function getUserSessions(client: AirdayClient) {
   return valJSONRes(untyped, sessionsRes.ensureFunc);
 }
 
+const refreshCookieRes = APISchema(v_session_cookie);
+const refreshBearerRes = APISchema(v_session_bearer);
+
 export async function refreshCookie(client: AirdayClient) {
   if (!client.session) throw new Error("No existing session");
   const headers: Record<string, string> = {
@@ -110,7 +113,8 @@ export async function refreshCookie(client: AirdayClient) {
     credentials: "include",
     body: JSON.stringify({ id: client.session.id }),
   });
-  return res;
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, refreshCookieRes.ensureFunc);
 }
 
 export async function refreshBearer(client: AirdayClient) {
@@ -127,5 +131,6 @@ export async function refreshBearer(client: AirdayClient) {
     credentials: "include",
     body: JSON.stringify({ id: client.session.id }),
   });
-  return res;
+  const untyped = await parseJSONResponse(res);
+  return valJSONRes(untyped, refreshBearerRes.ensureFunc);
 }

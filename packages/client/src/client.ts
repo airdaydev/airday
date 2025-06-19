@@ -90,20 +90,23 @@ export class AirdayClient {
     const res = await refreshCookie(this);
     this.setSession({
       id: res.data.id,
-      expires: new Date(),
-      refreshExpires: new Date(),
+      expires: new Date(res.data.expires),
+      refreshExpires: new Date(res.data.refreshExpires),
       userId: res.data.userId,
     });
+    return res;
   }
   async refreshBearer() {
-    const res = refreshBearer(this);
-    // this.setSession({
-    //   id: res.data.id,
-    //   token: sessionToken,
-    //   expires: new Date(),
-    //   refreshToken: refreshToken,
-    //   refreshExpires: new Date(),
-    // });
+    const res = await refreshBearer(this);
+    this.setSession({
+      id: res.data.id,
+      token: res.data.token,
+      expires: new Date(res.data.expires),
+      refreshToken: res.data.refreshToken,
+      refreshExpires: new Date(res.data.refreshExpires),
+      userId: res.data.userId,
+    });
+    return res;
   }
   async loginWithPasswordCookie(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
