@@ -78,6 +78,26 @@ pub async fn get_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>
     }
 }
 
+pub async fn get_by_id(pool: &SqlitePool, id: &Uuid) -> Result<Option<User>, AppError> {
+    let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
+    let result = sqlx::query_as!(
+        User,
+        r#"
+        SELECT id as "id: Uuid", email, password_hash
+        FROM user
+        WHERE id = ?
+        "#,
+        sqlx_uuid
+    )
+    .fetch_optional(pool)
+    .await;
+
+    match result {
+        Ok(user) => Ok(user),
+        Err(e) => Err(AppError::DatabaseError(e.to_string())),
+    }
+}
+
 pub async fn verify_login(
     pool: &SqlitePool,
     email: &str,
@@ -146,5 +166,26 @@ mod tests {
         let user = create(&pool, email, password).await.unwrap();
         verify_password(&user.password_hash, password).unwrap();
         assert!(verify_password(&user.password_hash, "wrongpassword").is_err())
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_id() {
+        let pool = test_util::create_test_pool().await;
+        let email = "id_test@air.day";
+        let password = "abcd12375kajsflaks";
+        let user = create(&pool, email, password).await.unwrap();
+
+        let user_id = Uuid::from_bytes(user.id.into_bytes());
+        let found_user = get_by_id(&pool, &user_id).await.unwrap();
+
+        assert!(found_user.is_some());
+        let found_user = found_user.unwrap();
+        assert_eq!(found_user.id, user.id);
+        assert_eq!(found_user.email, email);
+
+        // Test with non-existent ID
+        let non_existent_id = Uuid::new_v4();
+        let not_found = get_by_id(&pool, &non_existent_id).await.unwrap();
+        assert!(not_found.is_none());
     }
 }
