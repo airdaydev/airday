@@ -44,9 +44,11 @@ export function createBearerClient() {
 }
 
 export async function authenticateClient(client: AirdayClient, email: string) {
+  const password = "fa09j20fiaj3fpaof";
   await createUser(client, {
     email,
-    password: "fa09j20fiaj3fpaof",
+    password,
   });
+  await client.loginWithPasswordBearer({ email, password });
   return client;
 }
