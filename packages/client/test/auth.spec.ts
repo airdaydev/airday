@@ -51,7 +51,7 @@ test("Cookie authorisation", async () => {
   // expect(refreshToken).not.toBe(sessionToken);
 });
 
-test("Bearer authorisation", async () => {
+test("Bearer authorisation & refreshing sessions with bearer tokens", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(client, {
