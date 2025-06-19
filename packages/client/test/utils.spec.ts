@@ -1,3 +1,7 @@
+import { loadToml, validateConfig } from "toml-config";
+import { AirdayClient, AuthMode } from "../src/client";
+import { createUser } from "../src/user";
+
 export function extractCookie(
   headers: Headers,
   cookieName: string,
@@ -23,4 +27,26 @@ export function parseCookieValue(
     throw new Error(`Could not parse ${cookieName} value`);
   }
   return cookieMatch[1];
+}
+
+const schema = {
+  API_URL: { type: "string" },
+} as const;
+
+const rawConfig = loadToml(import.meta.url, "../config.toml");
+export const config = validateConfig(schema, rawConfig);
+
+export function createBearerClient() {
+  return new AirdayClient({
+    rootUrl: config.API_URL,
+    authMode: AuthMode.BearerToken,
+  });
+}
+
+export async function authenticateClient(client: AirdayClient, email: string) {
+  await createUser(client, {
+    email,
+    password: "fa09j20fiaj3fpaof",
+  });
+  return client;
 }

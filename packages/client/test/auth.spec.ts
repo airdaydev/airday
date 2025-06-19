@@ -1,22 +1,14 @@
 import { expect, test } from "bun:test";
-import { loadToml, validateConfig } from "toml-config";
-import { AirdayClient, AuthMode } from "../index";
 import { createUser } from "../src/user";
 import { getRoot } from "../src/root";
-import { extractCookie, parseCookieValue } from "./utils.spec";
+import {
+  createBearerClient,
+  extractCookie,
+  parseCookieValue,
+} from "./utils.spec";
 import { getSession } from "../src/jmap";
 
-const schema = {
-  API_URL: { type: "string" },
-} as const;
-
-const rawConfig = loadToml(import.meta.url, "../config.toml");
-export const config = validateConfig(schema, rawConfig);
-
-const client = new AirdayClient({
-  rootUrl: config.API_URL,
-  authMode: AuthMode.BearerToken,
-});
+const client = createBearerClient();
 
 test("API root url & version", async () => {
   const d = await getRoot(client);
@@ -59,7 +51,7 @@ test("Cookie authorisation", async () => {
   // expect(refreshToken).not.toBe(sessionToken);
 });
 
-test.only("Bearer authorisation", async () => {
+test("Bearer authorisation", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(client, {
