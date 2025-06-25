@@ -8,7 +8,7 @@ beforeAll(async () => {
   await authenticateClient(client, "jmap@airday.com");
 });
 
-test.only("Get JMAP Session", async () => {
+test("Get JMAP Session", async () => {
   const session = await getSession(client);
   console.log(session.data);
 });
