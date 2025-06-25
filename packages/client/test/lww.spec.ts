@@ -1,5 +1,5 @@
-import { expect, test, beforeAll } from "bun:test";
-import { LWWRegister, LWWTimestamp, LWWTimestampGenerator } from "../src/lww";
+import { expect, test } from "bun:test";
+import { LWWRegister, LWWTimestampGenerator } from "../src/lww";
 
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;
