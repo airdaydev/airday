@@ -10,5 +10,4 @@ beforeAll(async () => {
 
 test("Get JMAP Session", async () => {
   const session = await getSession(client);
-  console.log(session.data);
 });
