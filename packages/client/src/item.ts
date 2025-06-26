@@ -30,13 +30,13 @@ interface Message {
 
 type ObserverFunc = (action: Action) => void;
 
-class ItemSubAPI {
+class ItemAPI {
   airdayClient: AirdayClient;
   queue: Action[] = [];
   pendingMessages = new Map<string, Message>();
   running = true;
   maxBatch = 10;
-  maxPending = 5;
+  maxPendingMessages = 5;
   timeout = 10000;
   retries = 3;
   observers = new Set<ObserverFunc>();
@@ -50,15 +50,19 @@ class ItemSubAPI {
   // TODO: This assumes you are WALing this!
   enqueueBatch(actions: Action[]) {
     this.queue.concat(actions);
+    this.next();
   }
   enqueue(action: Action) {
     this.queue.push(action);
   }
   next() {
-    if (this.pendingMessages.size > this.maxPending) {
+    if (
+      this.running === false ||
+      this.pendingMessages.size > this.maxPendingMessages
+    ) {
       return; // Wait until pending messages are done
     }
-    const batch = this.queue.slice(0, this.maxPending);
+    const batch = this.queue.slice(0, this.maxPendingMessages);
     this.wsSend(batch);
   }
   async wsSend(actions: Action[]) {
@@ -72,13 +76,18 @@ class ItemSubAPI {
     Promise.resolve(message).then((message) => {
       this.pendingMessages.delete(message.traceId);
       this.onBatchCompletion(message.actions);
+      this.next();
     });
   }
   stop() {
     this.running = false;
   }
+  start() {
+    this.running = true;
+    this.next();
+  }
   drain() {
-    // TODO: implement
+    // TODO: implement if needed
   }
   // TODO: Backoff
   onBatchCompletion(actions: Action[]) {
