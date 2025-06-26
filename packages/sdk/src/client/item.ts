@@ -66,6 +66,7 @@ export class ItemClient {
     this.queue.push(action);
   }
   next() {
+    console.log("next!!!");
     if (
       this.running === false ||
       this.pendingMessages.size > this.maxPendingMessages
