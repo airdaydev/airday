@@ -17,5 +17,8 @@ test("Item sync", async () => {
     text: itemClient.lww.from("test item"),
   });
   const action = addItemAction(newItem);
-  itemClient.enqueueBatch([action]);
+  itemClient.subscribe((test) => {
+    console.log(test);
+  });
+  itemClient.enqueueActions([action]);
 });

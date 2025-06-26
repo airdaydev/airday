@@ -63,7 +63,7 @@ export class ItemClient {
   }
   // TODO: This assumes you are WALing this!
   enqueueActions(actions: Action[]) {
-    this.queue.concat(actions);
+    this.queue.push(...actions);
     this.next();
   }
   // An atomic batch must be played back together
@@ -73,7 +73,7 @@ export class ItemClient {
   next() {
     const messageQueueFull =
       this.pendingMessages.size > this.maxPendingMessages;
-    if (this.running === false || messageQueueFull || this.queue.length === 0) {
+    if (!this.running || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
     const batch: Action[] = [];
@@ -98,7 +98,7 @@ export class ItemClient {
       this.next();
     }
   }
-  async wsSend(actions: Array<QueueItem>) {
+  async wsSend(actions: Array<Action>) {
     // TODO: encode and wsSend
     // TODO: Validate returned action
     // TODO: We need a timeout and ask to put back on the queue
