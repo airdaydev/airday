@@ -1,4 +1,3 @@
-import "fake-indexeddb/auto";
 import { expect, test, beforeAll } from "bun:test";
 import { authenticateClient, createBearerClient } from "./utils.spec";
 import { ItemClient, AirdayItem, addItemAction } from "../src/index";

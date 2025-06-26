@@ -1,3 +1,4 @@
+import "fake-indexeddb/auto";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayClient, AuthMode } from "../src/index";
 import { createUser } from "../src/index";

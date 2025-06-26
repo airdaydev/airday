@@ -11,6 +11,7 @@ import {
   refreshBearer,
   refreshCookie,
 } from "./auth";
+import { AirdayIDB } from "../storage/idb";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -38,6 +39,7 @@ export class AirdayClient {
   root = new URL("http://localhost:3000");
   authMode: AuthMode;
   session?: Session;
+  db = new AirdayIDB();
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);

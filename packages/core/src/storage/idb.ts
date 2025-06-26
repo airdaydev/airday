@@ -44,4 +44,7 @@ export class AirdayIDB {
       },
     });
   };
+  isReady = async (): Promise<boolean> => {
+    return this.db !== null;
+  };
 }
