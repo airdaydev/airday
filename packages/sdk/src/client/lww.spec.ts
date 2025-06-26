@@ -6,10 +6,7 @@ test("LWWRegister parsing", async () => {
   const pid = 1750820210000;
   const manualTS = `${utc}/${pid}/0`;
   const data = "hello";
-  const lww = LWWRegister.fromJSON({
-    data,
-    timestamp: manualTS,
-  });
+  const lww = LWWRegister.fromJSON([manualTS, data]);
   expect(lww.timestamp.pid).toBe(pid);
   expect(lww.timestamp.utc).toBe(utc);
   expect(lww.data).toBe(data);

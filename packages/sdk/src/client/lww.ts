@@ -70,18 +70,18 @@ export class LWWRegister<T> {
     this.data = opts.data;
   }
   static fromJSON<T>(json: any): LWWRegister<T> {
-    if (!Array.isArray(json) && json.length === 2)
+    if (!Array.isArray(json) || json.length !== 2)
       throw new Error("Invalid LWWRegister format");
     // TODO: Replace with validator for complex objects
     if (
-      typeof json.data !== "string" &&
-      typeof json.data !== "boolean" &&
-      typeof json.data !== "number"
+      typeof json[1] !== "string" &&
+      typeof json[1] !== "boolean" &&
+      typeof json[1] !== "number"
     ) {
       throw new Error("LWWRegister only handles strings, booleans and numbers");
     }
     const timestamp = LWWTimestamp.fromString(json[0]);
-    return new LWWRegister({ timestamp, data: json[1] });
+    return new LWWRegister<T>({ timestamp, data: json[1] as unknown as T });
   }
   toJSON(): SerialisedLWWRegister<T> {
     return [this.timestamp.serialise(), this.data];
