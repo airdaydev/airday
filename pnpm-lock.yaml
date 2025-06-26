@@ -77,6 +77,9 @@ importers:
 
   packages/sdk:
     dependencies:
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
       suretype:
         specifier: ^3.3.1
         version: 3.3.1

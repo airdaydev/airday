@@ -32,7 +32,7 @@ export const addItemAction = (item: AirdayItem): AddItemAction => ({
   payload: item.toJSON(),
 });
 
-type Action = AddItemAction;
+export type Action = AddItemAction;
 
 interface Message {
   traceId: string;
