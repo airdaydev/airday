@@ -5,6 +5,7 @@
   "scripts": {
     "start": "pnpm --dir ./web start",
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
+    "db": "sqlx database reset -y --source sqlite/migrations",
     "test": "./e2e.sh"
   },
   "keywords": [],

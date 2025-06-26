@@ -1,4 +1,6 @@
-# sqlite extensions
+## sqlite setup
+
+## sqlite uuid extensions
 See [docs](https://github.com/nalgeon/sqlean/blob/main/docs/uuid.md)
 
 ## Installing uuid extension

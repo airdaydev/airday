@@ -4,7 +4,7 @@ set -e
 # Reset database
 DATABASE_PATH="$HOME/.config/airday/test.db"
 export DATABASE_URL="sqlite:$DATABASE_PATH"
-sqlx database reset -y
+sqlx database reset -y --source sqlite/migrations
 
 # Start server in background
 cargo run --manifest-path ./server/Cargo.toml -- \
