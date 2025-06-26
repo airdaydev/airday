@@ -1,4 +1,4 @@
-import type { AirdayItem } from "../model/item";
+import type { AirdayItem } from "../types/item";
 import type { AirdayClient } from "./client";
 import { LWW, type SerialisedLWWRegister } from "./lww";
 
