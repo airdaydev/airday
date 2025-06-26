@@ -1,7 +1,7 @@
 // A batched protocol over websockets for creating, deleting, updating items
 // Items are based on a custom LWW-Register CRDT - there is really isn't much to it
 
-export const pid = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+export const genPid = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 
 interface TimestampConstructorOps {
   utc?: number;
@@ -55,10 +55,7 @@ export class LWWTimestamp {
   }
 }
 
-type SerialisedLWWRegister<T> = {
-  timestamp: string;
-  data: T;
-};
+export type SerialisedLWWRegister<T> = [string, T];
 
 interface LWWRegisterConstructorOpts<T> {
   timestamp: LWWTimestamp;
@@ -73,10 +70,8 @@ export class LWWRegister<T> {
     this.data = opts.data;
   }
   static fromJSON<T>(json: any): LWWRegister<T> {
-    if (typeof json !== "object") throw new Error("Invalid LWWRegister format");
-    if (!json.hasOwnProperty("timestamp") || !json.hasOwnProperty("data")) {
+    if (!Array.isArray(json) && json.length === 2)
       throw new Error("Invalid LWWRegister format");
-    }
     // TODO: Replace with validator for complex objects
     if (
       typeof json.data !== "string" &&
@@ -85,14 +80,11 @@ export class LWWRegister<T> {
     ) {
       throw new Error("LWWRegister only handles strings, booleans and numbers");
     }
-    const timestamp = LWWTimestamp.fromString(json.timestamp);
-    return new LWWRegister({ timestamp, data: json.data });
+    const timestamp = LWWTimestamp.fromString(json[0]);
+    return new LWWRegister({ timestamp, data: json[1] });
   }
   toJSON(): SerialisedLWWRegister<T> {
-    return {
-      timestamp: this.timestamp.serialise(),
-      data: this.data,
-    };
+    return [this.timestamp.serialise(), this.data];
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
     if (this.timestamp.equals(other.timestamp)) {
@@ -106,14 +98,14 @@ export class LWWRegister<T> {
   }
 }
 
-export class LWWTimestampGenerator {
+export class LWW {
   private pid: number;
   private lastUtc: number = 0;
   private tick: number = 0;
-  constructor(pid: number) {
+  constructor(pid: number = genPid()) {
     this.pid = pid;
   }
-  next(): LWWTimestamp {
+  timestamp(): LWWTimestamp {
     const now = Date.now();
     if (now === this.lastUtc) {
       this.tick++;
@@ -125,6 +117,12 @@ export class LWWTimestampGenerator {
       utc: this.lastUtc,
       pid: this.pid,
       tick: this.tick,
+    });
+  }
+  from<T>(data: T) {
+    return new LWWRegister<T>({
+      timestamp: this.timestamp(),
+      data,
     });
   }
 }

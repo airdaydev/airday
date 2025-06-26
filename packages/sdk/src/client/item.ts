@@ -1,27 +1,36 @@
+import type { AirdayItem } from "../types/item";
 import type { AirdayClient } from "./client";
+import { LWW, type SerialisedLWWRegister } from "./lww";
+
+export enum ActionType {
+  addItem = "addItem",
+  updateItem = "updateItem",
+  deleteItem = "deleteItem",
+}
 
 interface BaseAction {
   state: "pending" | "completed" | "failed";
-  type: String;
+  type: ActionType;
   payload: any;
 }
 
-interface AddAction extends BaseAction {
-  type: "add";
-  payload: any;
+interface SerialisedAirdayItem {
+  id: string;
+  text: SerialisedLWWRegister<string>;
 }
 
-interface UpdateAction extends BaseAction {
-  type: "update";
-  payload: any;
+interface AddItemAction extends BaseAction {
+  type: ActionType.addItem;
+  payload: SerialisedAirdayItem;
 }
 
-interface Sync extends BaseAction {
-  type: "pull";
-  payload: any;
-}
+export const addItem = (item: AirdayItem): AddItemAction => ({
+  state: "pending",
+  type: ActionType.addItem,
+  payload: item.toJSON(),
+});
 
-type Action = AddAction | UpdateAction | Sync;
+type Action = AddItemAction;
 
 interface Message {
   traceId: string;
@@ -30,8 +39,9 @@ interface Message {
 
 type ObserverFunc = (action: Action) => void;
 
-class ItemAPI {
+export class ItemClient {
   airdayClient: AirdayClient;
+  lww = new LWW(); // TODO: Retain PID if exists
   queue: Action[] = [];
   pendingMessages = new Map<string, Message>();
   running = true;
