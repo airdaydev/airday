@@ -37,15 +37,19 @@ interface Message {
   actions: Action[];
 }
 
+type QueueItem = Action | Action[];
+
+// TODO: batched items that rely on order need to be placed in same batch...
+
 type ObserverFunc = (action: Action) => void;
 
 export class ItemClient {
   airdayClient: AirdayClient;
   lww = new LWW(); // TODO: Retain PID if exists
-  queue: Action[] = [];
+  queue: Array<QueueItem> = [];
   pendingMessages = new Map<string, Message>();
   running = true;
-  maxBatch = 10;
+  maxBatch = 50;
   maxPendingMessages = 5;
   timeout = 10000;
   retries = 3;
@@ -58,25 +62,43 @@ export class ItemClient {
     return () => this.observers.delete(observerFn);
   }
   // TODO: This assumes you are WALing this!
-  enqueueBatch(actions: Action[]) {
+  enqueueActions(actions: Action[]) {
     this.queue.concat(actions);
     this.next();
   }
-  enqueue(action: Action) {
-    this.queue.push(action);
+  // An atomic batch must be played back together
+  enqueueAtomicBatch(AtomicBatch: Action[]) {
+    this.queue.push(AtomicBatch);
   }
   next() {
-    if (
-      this.running === false ||
-      this.pendingMessages.size > this.maxPendingMessages ||
-      this.queue.length === 0
-    ) {
+    const messageQueueFull =
+      this.pendingMessages.size > this.maxPendingMessages;
+    if (this.running === false || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
-    const batch = this.queue.splice(0, this.maxBatch);
+    const batch: Action[] = [];
+
+    while (batch.length < this.maxBatch && this.queue.length > 0) {
+      const item = this.queue[0];
+      if (Array.isArray(item)) {
+        // batched items that have to go together
+        if (batch.length > 0 && batch.length + item.length > this.maxBatch) {
+          // if the batch is a bigg'n, go next batch
+          break;
+        }
+        batch.push(...item);
+        this.queue.shift();
+      } else {
+        this.queue.shift();
+        batch.push(item);
+      }
+    }
     this.wsSend(batch);
+    if (!messageQueueFull && this.queue.length > 0) {
+      this.next();
+    }
   }
-  async wsSend(actions: Action[]) {
+  async wsSend(actions: Array<QueueItem>) {
     // TODO: encode and wsSend
     // TODO: Validate returned action
     // TODO: We need a timeout and ask to put back on the queue
