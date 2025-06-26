@@ -56,12 +56,12 @@ export class ItemClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  enqueueActions(actions: Action[]) {
+  async enqueueActions(actions: Action[]) {
     this.queue.push(...actions);
     this.next();
   }
-  enqueueAtomicBatch(AtomicBatch: Action[]) {
-    this.queue.push(AtomicBatch);
+  enqueueAtomicBatch(batch: Action[]) {
+    this.queue.push(batch);
   }
   next() {
     const messageQueueFull =

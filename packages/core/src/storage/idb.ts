@@ -1,5 +1,5 @@
 import { type DBSchema, type IDBPDatabase, openDB, deleteDB } from "idb";
-import { type WALEntry } from "./wal";
+import { WAL, type WALEntry } from "./wal";
 
 interface AirdayDBSchema extends DBSchema {
   wal: {
@@ -30,6 +30,7 @@ export type AirdayIDBPDatabase = IDBPDatabase<AirdayDBSchema>;
 // Front-end persistent storage for Airday JS apps
 export class AirdayIDB {
   private db: AirdayIDBPDatabase | null = null;
+  wal = new WAL();
   constructor() {}
   connect = async () => {
     this.db = await openDB("test", 1, {
@@ -43,6 +44,7 @@ export class AirdayIDB {
         const container = db.createObjectStore("container", { keyPath: "id" });
       },
     });
+    this.wal.setDB(this.db);
   };
   isReady = async (): Promise<boolean> => {
     return this.db !== null;

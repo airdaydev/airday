@@ -19,7 +19,7 @@ function ActionWALEntry(action: Action | Action[]): WALEntry {
 export class WAL {
   private db: AirdayIDBPDatabase | null = null;
   // TODO: Use account
-  constructor(db: AirdayIDBPDatabase) {
+  setDB(db: AirdayIDBPDatabase) {
     this.db = db;
   }
   async write(action: Action | Action[]): Promise<WALEntry> {
