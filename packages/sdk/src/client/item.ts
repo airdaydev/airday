@@ -8,8 +8,10 @@ export enum ActionType {
   deleteItem = "deleteItem",
 }
 
+type ActionState = "pending" | "completed" | "failed";
+
 interface BaseAction {
-  state: "pending" | "completed" | "failed";
+  state: ActionState;
   type: ActionType;
   payload: any;
 }

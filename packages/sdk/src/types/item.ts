@@ -16,9 +16,11 @@ export class AirdayItem {
     // TODO: If a server came back with a greater timestamp...
     const updatePayloads = [];
     if (fields.text) {
-      // TODO: We should test if the update succeeded and only add it to update object if so
-      this.text.merge(fields.text);
-      updatePayloads.push(["text", fields.text]); // TODO Something like this
+      const text = this.text.merge(fields.text);
+      if (text !== this.text) {
+        // Something like this
+        updatePayloads.push(["text", fields.text]);
+      }
     }
     return updatePayloads;
   }
