@@ -1,6 +1,6 @@
 ## Airday
 
-[Airday](https://air.day/) monorepo
+[Airday](https://air.day/) calender & tasks app monorepo
 
 ## Development
 - ./server: Rust based server
@@ -8,8 +8,8 @@
 
 ## Requirements
 - Rust
-- Bun
 - Node
+- Bun
 - pnpm
 - `cargo install sqlx-cli`
 
