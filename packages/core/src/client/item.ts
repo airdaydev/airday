@@ -1,6 +1,6 @@
-import type { AirdayItem } from "../types/item";
-import type { AirdayClient } from "./client";
-import { LWW, type SerialisedLWWRegister } from "./lww";
+import type { AirdayItem } from "../model/item";
+import type { AirdayClient } from "./main";
+import { LWW, type SerialisedLWWRegister } from "../crdt/lww";
 
 export enum ActionType {
   addItem = "addItem",

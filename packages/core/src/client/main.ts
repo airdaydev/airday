@@ -10,7 +10,7 @@ import {
   passwordAuthSchema,
   refreshBearer,
   refreshCookie,
-} from "./user";
+} from "./auth";
 
 export enum AuthMode {
   ImplicitCookie,

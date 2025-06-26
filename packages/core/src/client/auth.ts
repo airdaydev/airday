@@ -1,9 +1,4 @@
-import {
-  APISchema,
-  parseJSONResponse,
-  AirdayClient,
-  valJSONRes,
-} from "./client";
+import { APISchema, parseJSONResponse, AirdayClient, valJSONRes } from "./main";
 import { type TypeOf, v } from "suretype";
 import { v_session_bearer, v_session_cookie } from "./types";
 

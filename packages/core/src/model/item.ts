@@ -1,4 +1,4 @@
-import type { LWW, LWWRegister } from "../client/lww";
+import type { LWW, LWWRegister } from "../crdt/lww";
 
 interface AirdayItemParams {
   id: string;

@@ -1,9 +1,4 @@
-import {
-  APISchema,
-  parseJSONResponse,
-  valJSONRes,
-  AirdayClient,
-} from "./client";
+import { APISchema, parseJSONResponse, valJSONRes, AirdayClient } from "./main";
 import { v } from "suretype";
 
 const getRootResSchema = APISchema(
