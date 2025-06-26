@@ -42,6 +42,25 @@ importers:
         specifier: ^2.0.5
         version: 2.1.9(@types/node@20.12.7)(jsdom@24.1.3)
 
+  packages/core:
+    dependencies:
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
+      suretype:
+        specifier: ^3.3.1
+        version: 3.3.1
+      toml-config:
+        specifier: ^1.1.4
+        version: 1.1.5
+    devDependencies:
+      '@types/bun':
+        specifier: latest
+        version: 1.2.17
+      fake-indexeddb:
+        specifier: 6.0.1
+        version: 6.0.1
+
   packages/keyboard: {}
 
   packages/list:
@@ -1006,6 +1025,10 @@ packages:
   expect-type@1.2.1:
     resolution: {integrity: sha512-/kP8CAwxzLVEeFrMm4kMmy4CCDlpipyA7MYLVrdJIkV0fYF0UaigQHRsxHiuY/GEea+bh4KSv3TIlgr+2UL6bw==}
     engines: {node: '>=12.0.0'}
+
+  fake-indexeddb@6.0.1:
+    resolution: {integrity: sha512-He2AjQGHe46svIFq5+L2Nx/eHDTI1oKgoevBP+TthnjymXiKkeJQ3+ITeWey99Y5+2OaPFbI1qEsx/5RsGtWnQ==}
+    engines: {node: '>=18'}
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
@@ -2307,6 +2330,8 @@ snapshots:
       '@types/estree': 1.0.6
 
   expect-type@1.2.1: {}
+
+  fake-indexeddb@6.0.1: {}
 
   fast-deep-equal@3.1.3: {}
 
