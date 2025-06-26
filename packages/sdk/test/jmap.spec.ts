@@ -1,5 +1,5 @@
 import { expect, test, beforeAll } from "bun:test";
-import { getSession } from "../src/jmap";
+import { getJMAPSession } from "../src/index";
 import { authenticateClient, createBearerClient } from "./utils.spec";
 
 const client = createBearerClient();
@@ -9,5 +9,5 @@ beforeAll(async () => {
 });
 
 test("Get JMAP Session", async () => {
-  const session = await getSession(client);
+  const session = await getJMAPSession(client);
 });

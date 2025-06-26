@@ -1,6 +1,6 @@
 import { loadToml, validateConfig } from "toml-config";
-import { AirdayClient, AuthMode } from "../src/client";
-import { createUser } from "../src/user";
+import { AirdayClient, AuthMode } from "../src/index";
+import { createUser } from "../src/index";
 
 export function extractCookie(
   headers: Headers,

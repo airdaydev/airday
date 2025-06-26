@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { LWWRegister, LWWTimestampGenerator } from "../src/lww";
+import { LWWRegister, LWW } from "./lww";
 
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;
@@ -16,13 +16,13 @@ test("LWWRegister parsing", async () => {
 });
 
 test("LWWRegister automatic + merge", async () => {
-  const gen = new LWWTimestampGenerator(1234);
+  const gen = new LWW(1234);
   const lww = new LWWRegister({
-    timestamp: gen.next(),
+    timestamp: gen.timestamp(),
     data: "hello",
   });
   const lww2 = new LWWRegister({
-    timestamp: gen.next(),
+    timestamp: gen.timestamp(),
     data: "newVal",
   });
   const res = lww.merge(lww2);

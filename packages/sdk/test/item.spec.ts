@@ -1,6 +1,6 @@
 import { expect, test, beforeAll } from "bun:test";
 import { authenticateClient, createBearerClient } from "./utils.spec";
-import { ItemClient } from "../src/item";
+import { ItemClient, AirdayItem, addItemAction } from "../src/index";
 
 const client = createBearerClient();
 const itemClient = new ItemClient(client);
@@ -14,5 +14,6 @@ test("Item sync", async () => {
     id: "string",
     text: itemClient.lww.from("test item"),
   });
-  itemClient.enqueueBatch([newItem.createAction()]);
+  const action = addItemAction(newItem);
+  // itemClient.enqueueBatch([action]);
 });

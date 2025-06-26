@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
-import { createUser } from "../src/user";
-import { getRoot } from "../src/root";
+import { createUser } from "../src/index";
+import { getRoot } from "../src/index";
 import {
   createBearerClient,
   extractCookie,
   parseCookieValue,
 } from "./utils.spec";
-import { getSession } from "../src/jmap";
+import { getJMAPSession } from "../src/index";
 
 const client = createBearerClient();
 
@@ -76,7 +76,7 @@ test("Bearer authorisation & refreshing sessions with bearer tokens", async () =
   expect(client.session?.userId).toBeTypeOf("string");
   const firstToken = client.session?.token;
   const firstRefreshToken = client.session?.refreshToken;
-  const session = await getSession(client);
+  const session = await getJMAPSession(client);
   expect(session.response.status).toBe(200);
   expect(client.session?.token?.length, "Valid session token").toBe(27);
   expect(client.session?.refreshToken?.length, "Valid refresh token").toBe(27);

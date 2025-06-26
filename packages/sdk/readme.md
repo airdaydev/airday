@@ -1,3 +1,3 @@
-## @airday/client
+## @airday/sdk
 
-Airday JavaScript client lib
+Airday JavaScript types and API

@@ -24,7 +24,7 @@ interface AddItemAction extends BaseAction {
   payload: SerialisedAirdayItem;
 }
 
-export const addItem = (item: AirdayItem): AddItemAction => ({
+export const addItemAction = (item: AirdayItem): AddItemAction => ({
   state: "pending",
   type: ActionType.addItem,
   payload: item.toJSON(),

@@ -12,7 +12,7 @@ const getSessionRes = APISchema(
   }),
 );
 
-export async function getSession(client: AirdayClient) {
+export async function getJMAPSession(client: AirdayClient) {
   const res = await fetch(client.endpoint("/jmap/session"), {
     method: "GET",
     credentials: client.credentials(),
