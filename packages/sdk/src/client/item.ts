@@ -66,14 +66,14 @@ export class ItemClient {
     this.queue.push(action);
   }
   next() {
-    console.log("next!!!");
     if (
       this.running === false ||
-      this.pendingMessages.size > this.maxPendingMessages
+      this.pendingMessages.size > this.maxPendingMessages ||
+      this.queue.length === 0
     ) {
       return; // Wait until pending messages are done
     }
-    const batch = this.queue.slice(0, this.maxPendingMessages);
+    const batch = this.queue.splice(0, this.maxBatch);
     this.wsSend(batch);
   }
   async wsSend(actions: Action[]) {
