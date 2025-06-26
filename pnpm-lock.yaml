@@ -53,6 +53,9 @@ importers:
       toml-config:
         specifier: ^1.1.4
         version: 1.1.5
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -93,25 +96,6 @@ importers:
       vite-plugin-solid:
         specifier: ^2.10.2
         version: 2.11.6(solid-js@1.9.7)(vite@5.4.19(@types/node@20.12.7))
-
-  packages/sdk:
-    dependencies:
-      idb:
-        specifier: ^8.0.3
-        version: 8.0.3
-      suretype:
-        specifier: ^3.3.1
-        version: 3.3.1
-      toml-config:
-        specifier: ^1.1.4
-        version: 1.1.5
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-    devDependencies:
-      '@types/bun':
-        specifier: latest
-        version: 1.2.17
 
   web:
     dependencies:

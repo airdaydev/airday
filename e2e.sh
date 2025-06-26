@@ -19,7 +19,7 @@ done
 
 # Run tests
 set +e # disable exit on error
-pnpm --dir ./packages/sdk test
+pnpm --dir ./packages/core test
 TEST_EXIT_CODE=$?
 set -e # enable exit on error
 
