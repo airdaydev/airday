@@ -1,4 +1,4 @@
-import type { AirdayItem } from "../model/item";
+import type { AirdayItem, SerialisedAirdayItem } from "../model/item";
 import type { AirdayClient } from "./main";
 import { LWW, type SerialisedLWWRegister } from "../crdt/lww";
 
@@ -14,11 +14,6 @@ interface BaseAction {
   state: ActionState;
   type: ActionType;
   payload: any;
-}
-
-interface SerialisedAirdayItem {
-  id: string;
-  text: SerialisedLWWRegister<string>;
 }
 
 interface AddItemAction extends BaseAction {
@@ -41,8 +36,6 @@ interface Message {
 
 type QueueItem = Action | Action[];
 
-// TODO: batched items that rely on order need to be placed in same batch...
-
 type ObserverFunc = (action: Action) => void;
 
 export class ItemClient {
@@ -63,12 +56,10 @@ export class ItemClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  // TODO: This assumes you are WALing this!
   enqueueActions(actions: Action[]) {
     this.queue.push(...actions);
     this.next();
   }
-  // An atomic batch must be played back together
   enqueueAtomicBatch(AtomicBatch: Action[]) {
     this.queue.push(AtomicBatch);
   }

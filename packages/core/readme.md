@@ -1,3 +1,3 @@
 ## @airday/core
 
-Airday JavaScript types and API
+Airday JavaScript Sync Client

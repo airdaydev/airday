@@ -1,8 +1,13 @@
-import type { LWW, LWWRegister } from "../crdt/lww";
+import type { LWW, LWWRegister, SerialisedLWWRegister } from "../crdt/lww";
 
 interface AirdayItemParams {
   id: string;
   text: LWWRegister<string>;
+}
+
+export interface SerialisedAirdayItem {
+  id: string;
+  text: SerialisedLWWRegister<string>;
 }
 
 export class AirdayItem {
