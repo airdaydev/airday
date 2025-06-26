@@ -54,8 +54,6 @@
 - [x] Escape key should cancel drag
 - [x] Dragging item over navbar goes below it!
 - [x] Editing text inline
-
-## 2025 Q1
 - [x] Calendar front-end mvp
 - [] Canvas doesn't render constantly (todo list)
 - [] Canvas bg resets WHENEVER container size changes (change made for list but component needs rebuilding)
@@ -94,7 +92,7 @@
 - [ ] open priority list (added by reference, no move!)
 - [ ] Limit open lists, ensure destruction
 - [] Drag list headers to drag & drop open views (closing the existing view in favour!)
-- [] Up Next board
+- [] Up Next board (referenced items)
 - [] Drag items into list nav
 - [] Repetitive tasks (shuffle)
 - [] Repetitive tasks (in order)
@@ -111,17 +109,16 @@
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
-- [] Workspace management
-- [] Up Next board (naming?)
+- [] Workspace i.e. account management
 - [] Trash items (yes & ability to remove)
 - [] Empty trash
 - [] Delete containers
-- [] Habit items = set target + smiley
+- [] Repeat items
+- [] Series
 - [] Filter for habit tracking with sorting (worst/best)
 - [] When dragging while holding down command, duplicate
 - [] Add search
 - [] Persist views (per device)
-- [] Load 200 items at a time
 - [] Handle loader validation failure, types
 - [] Remove SVGs from JS or at least include in diff bundle
 
@@ -141,12 +138,9 @@
 - Rich text https://docs.slatejs.org/ ?
 - [] Show completed item in og list for 5 seconds before disappearing (progress bar follows checkbox border)
 - [] Rename container in sidenav
-- [] Toast notification whenever an item disappears from current context e.g. moves to done, or inbox (MAYBE)
-- [] Consider https://github.com/csstools/postcss-plugins/tree/main/plugins/postcss-nesting
 - [] Ensure selection is cleared on edit
 - [] Edit selected items via 'enter' key (vim?)
 - [] List loading animation
-- [] Change list icons!
 - [] Context menu for many items
 - [] Timeline index
 - [] Add now playing (ref list) list, allow dragging items to now playing list
@@ -155,30 +149,23 @@
 - [] Nice empty list states
 - [] Export data markdown, json, csv
 - [] Import markdown, json, things 3 etc
-- [] Split view 4+ ways
-- [] AI roadmap
+- [] Reconsider split view, explore multi-windows, tabs
 
 ## Stickers
 - [x] Sticker system
 - [] Reinstate sticker system
-- [] First full sticker set
+- [] First full sticker set (llm based? or artist)
 - [] Dynamic storage
 - [] Custom stickers
 
 ## Sync/Data structure
-- [] E2EE - consider https://github.com/porridgewithraisins/e2ee.js/
-- [] E2EE study - https://cronokirby.com/posts/2021/06/e2e_in_the_browser/
-- [] Build & evaluate CRDT prototype for all operations, considering undo/redo for editing, sorting
-- [] Undo/redo... in general, save granular outcomes & apply them (consider a changelog or something visible, otherwise just console)
+- [x] Build & evaluate CRDT prototypes
+- [] Build todo list sync
+- [] Tiered e2ee for most text
+- [] Undo/redo... in general, save granular outcomes & apply them
 - [] Multiple users / tenancy is accounted for
-- [] Client-side encrypted sync server
-- [] Persistence strategy (Clickhouse...? Something easier to scale, partitioning should be simple)
-- [] CRDT: How will sorting work (see LSEQ - or automerge's implementation)
-- [] CRDT: Define all data structures
-- [] Update strategy (anticipate changes)
-- [] Add new item adds saves item into store
-- [] Full jmap support (calendar) https://jmap.io/spec-calendars.html
-- [] Readonly CalDAV support
+- [] Full jmap calendar support
+- [] CalDAV support
 
 ## Predeploy, meta app
 - [] Verify keyboard only, accessibility
@@ -194,7 +181,7 @@
 - [] Korean localisation
 
 ## Marketing, community
-- [] Website
+- [] Website (Astro)
 - [] Consider Zulip/matrix+element/discord (chat)
 - [] Consider https://motion.dev/ (Animation library)
 - [] Consider https://www.screen.studio/ (Screen recordings)
@@ -203,45 +190,47 @@
 - Pricing https://www.principlesofpricing.com/the-customer
 
 ## Multiplatform
-- [] Launch - PWA
-- [] See Tauri
-- [] MacOS Tauri release
+- [] PWA
 - [] Linux Tauri release
-- [] iOS Tauri app POC
-- [] Android Tauri app POC
-- [] iOS release
-- [] Android release
-- [] Explore Webview as partial fallback
+- [] MacOS Tauri release
+- [] Native iOS release
+- [] Native Android release
+- [] Explore Webview for cal as partial fallback
 
 ## Future goals
 - [x] List animations (v1)
 - [x] Canvas list
-- [] air - experiment with sounds
+- [] Experiment with sounds (e.g. speaking llm prompts)
+- [] List cal view
 - [] Monthly cal view
 - [] Annual cal view
 - [] Kanban board
 - [] Webgl shadows/pickup
 - [] Markdown descriptions
-- [] Pin Lock
+- [] LLM Prompting / MCP
 - [] Secrets
-- [] Code snippets... maybe just ` and ```
-- [] Auto plan suggestions/AI story
-- [] "It wouldn't be very good for a very long time, but organizing tasks has always felt like a chore and an inaccurate one at that." <- AI conversations about your todos
-- [] Natural looking cross outs? Consider tick seed, underline length
 - [] Custom fields
 - [] consider flexsearch
-- [] Pages
-- [] Themes incl. Departure Mono
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
 - [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
 - [] Maybe: show active pane border highlighted, then fade
 
+## Reliability
+Attribute-level CRDTs but not on object collections and potentially unreliable websocket message dissemination means things can still go out of sync. Checksums, state token count checks (that may include checksum, counts and timestamps), age-based resyncs, list-independence natural shards and smaller more incremental checks.
+
+## Production phase 1:
+- Postgresql single-region cluster (can I upgrade later without downtime?)
+- 3 nodes with docker swarm or nomad in Australia
+- lb to any node, some sort of health indicator so lb can stop routing to dead nodes
+- users can be in conceptually the same room but in different regions, thus message broker must exist between ws servers, redis streams is fine.
+
+## Production part 2:
+- Postgresql multi-region cluster (write in US) (no sharding necessary)
+- 1+ websocket server per region
+
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
-- https://keystatic.com/docs/installation-astro
-- https://klim.co.nz/buy/soehne/
 - https://alexharri.com/blog/clipboard
 - https://developer.mozilla.org/en-US/docs/Web/Manifest/share_target pwa share target
-- https://selfhst.store/
