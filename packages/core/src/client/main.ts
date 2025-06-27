@@ -36,7 +36,7 @@ interface Session {
 // In that case, it should place refresh at the top of the queue and continue
 // If the refresh token fails, it should fire an event that the user is logged out
 export class AirdayClient {
-  root = new URL("http://localhost:3000");
+  root: URL;
   authMode: AuthMode;
   session?: Session;
   db = new AirdayIDB();

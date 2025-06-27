@@ -14,8 +14,6 @@ beforeAll(async () => {
   airdayItemSync.setDB(client.db);
 });
 
-// TODO: test to ensure item is created server side before client update
-
 test.only("Item sync", async () => {
   const newItem = new AirdayItem({
     id: "string",

@@ -75,6 +75,7 @@ export class AirdayItemSync {
     // TODO: So we need our sync client to subscribe to all item updates!
     // When the item is synced, we need to kill its WAL entry (and maybe mark the live item as synced)
     // We could do this ultra granular (callbacks) or just a one off (permanent subscription)
+    // TODO: test to ensure item is created server side before client update!
     await tx.done;
   }
 }
