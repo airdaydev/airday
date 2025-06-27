@@ -4,13 +4,16 @@ mod common {
     pub mod error;
     pub mod sql;
 }
+mod sync {
+    pub mod websocket;
+}
 mod jmap {
     pub mod core;
 }
 mod model;
 mod root;
 use axum::Router;
-use axum::routing::{get, post};
+use axum::routing::{any, get, post};
 use bpaf::Bpaf;
 use sqlx::SqlitePool;
 use std::fs;
@@ -81,7 +84,9 @@ async fn main() {
             post(model::session::refresh_session_bearer),
         )
         .route("/auth/sessions", post(model::session::get_user_sessions))
-        .route("/jmap/session", get(jmap::core::session_handler));
+        .route("/jmap/session", get(jmap::core::session_handler))
+        .route("/ws", any(sync::websocket::handler));
+
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
         .unwrap();
