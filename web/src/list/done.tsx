@@ -14,7 +14,6 @@ import { TreeContext, SolidListContext, Tree } from "@airday/list";
 import styles from "./list.module.css";
 import { ListColumnHeaders } from "./list-col-head";
 import { listOptions, ListOptionsContext } from "./list-options";
-import { Timeline } from "./timeline";
 
 export const Done = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
@@ -55,7 +54,6 @@ export const Done = (props: { view: DataView }) => {
             />
           </div>
         </SolidListContext.Provider>
-        <Timeline />
       </section>
     </ListOptionsContext.Provider>
   );

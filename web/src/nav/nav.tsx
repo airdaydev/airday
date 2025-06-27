@@ -97,13 +97,13 @@ export function AirNav() {
             ref={props.ref}
             selected={props.selected}
           >
-            <CheckSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
+            <CheckSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
             <span>Done</span>
           </button>
         )}
       />
       <button class={styles["nav-text-button"]} tabindex="-1">
-        <TrashSVG style="width: 1.25em; stroke-width: 1.25px; color: var(--body-tint);" />
+        <TrashSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
         <span>Trash</span>
       </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />

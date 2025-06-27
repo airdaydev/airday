@@ -33,11 +33,11 @@
 }
 
 .nav-text-button.active {
-  border: 1px solid var(--blue-tint);
+  background: var(--mid-shade);
 }
 
 [data-theme="dark"] .nav-text-button.active {
-  border: 1px solid var(--body-tint);
+  background: var(--mid-shade);
 }
 
 .nav-text-button span {
@@ -45,7 +45,7 @@
 }
 
 .nav-text-button:hover {
-  background: var(--mid-shade);
+  border: 1px solid var(--mid-shade);
 }
 
 @keyframes fadeIn {

@@ -155,8 +155,8 @@
   display: flex;
   padding: 0 0.5em;
   color: var(--body-tint);
-  border-bottom: 1px solid var(--border);
-  border-top: 1px solid var(--border);
+  background: var(--shade);
+  border-radius: 3px;
 }
 
 .list-col-head-item {

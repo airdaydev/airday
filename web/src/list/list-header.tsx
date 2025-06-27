@@ -97,7 +97,7 @@ export const DoneListHeader = (props: ListHeaderProps) => {
       <div class={styles["primary"]}>
         <button class={styles["list-head-button"]}>
           <CheckSVG
-            style="width: 1.25em; height: 1.25em; stroke-width: 1.25px; color: var(--body-tint); position: relative;
+            style="width: 1.25em; height: 1.25em; stroke-width: 1.5px; color: var(--body-tint); position: relative;
             left: -3px; padding-right: 0.25em;"
           />
           <span>Done</span>
@@ -116,7 +116,7 @@ export const CalendarHeader = (props: ListHeaderProps) => {
       <div class={styles["primary"]}>
         <button class={styles["list-head-button"]}>
           <CalendarSVG
-            style="width: 1.25em; height: 1.25em; stroke-width: 1.25px; color: var(--body-tint); position: relative;
+            style="width: 1.25em; height: 1.25em; stroke-width: 1.5px; color: var(--body-tint); position: relative;
             left: -3px; padding-right: 0.25em;"
           />
           <span>Calendar</span>
@@ -135,7 +135,7 @@ export const UpNextHeader = (props: ListHeaderProps) => {
       <div class={styles["primary"]}>
         <button class={styles["list-head-button"]}>
           <ArrowRightSVG
-            style="width: 1.25em; height: 1.25em; stroke-width: 1.25px; color: var(--body-tint); position: relative;
+            style="width: 1.25em; height: 1.25em; stroke-width: 1.5px; color: var(--body-tint); position: relative;
             left: -3px; padding-right: 0.25em;"
           />
           <span>Up Next</span>
