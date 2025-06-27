@@ -1,1 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM40,56H92.69l16,16H40ZM216,200H40V88H216Z"></path></svg>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>folder</title>
+    <defs>
+        <linearGradient x1="50%" y1="69.0859921%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#F6EAD8" offset="0%"></stop>
+            <stop stop-color="#EBDBC2" offset="100%"></stop>
+        </linearGradient>
+        <rect id="path-2" x="0" y="3" width="16" height="13" rx="2"></rect>
+        <filter x="-9.4%" y="-11.5%" width="118.8%" height="123.1%" filterUnits="objectBoundingBox" id="filter-3">
+            <feOffset dx="0" dy="0" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0.562528306   0 0 0 0 0.562528306   0 0 0 0 0.562528306  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="folder" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-17" transform="translate(1, 1)">
+            <path d="M2,0 C3.06624595,0 4.1324919,0 5.19873785,0 C6.50282426,0 5.90262015,1.69135889 6.67489876,1.69135889 C9.11659917,1.69135889 11.5582996,1.69135889 14,1.69135889 C15.1045695,1.69135889 16,2.58678939 16,3.69135889 L16,14 C16,15.1045695 15.1045695,16 14,16 L2,16 C0.8954305,16 0,15.1045695 0,14 L-4.4408921e-16,2 C-4.4408921e-16,0.8954305 0.8954305,2.22044605e-16 2,0 Z" id="Rectangle" fill="#C2BAA3"></path>
+            <g id="Rectangle">
+                <use fill="black" fill-opacity="1" filter="url(#filter-3)" xlink:href="#path-2"></use>
+                <use fill="url(#linearGradient-1)" fill-rule="evenodd" xlink:href="#path-2"></use>
+            </g>
+        </g>
+    </g>
+</svg>

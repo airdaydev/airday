@@ -43,7 +43,7 @@ export const FolderNodeComponent: NodeComponentType<ContainerFolderNode> = (
         }}
       >
         {/* <ListIcon container={node()} /> */}
-        <FolderSVG style={"width: 1em; height: 1em;"} />
+        <FolderSVG style={"width: 1.25em; height: 1.25em;"} />
         <span style="overflow-x: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-y: hidden;">
           {node().name}
         </span>
