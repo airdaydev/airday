@@ -1,10 +1,10 @@
 import { expect, test, beforeAll } from "bun:test";
 import { authenticateClient, createBearerClient } from "./utils.spec";
-import { ItemClient, AirdayItem, addItemAction } from "../src/index";
+import { SyncClient, AirdayItem } from "../src/index";
 import { AirdayIDB } from "../src/storage/idb";
 
 const client = createBearerClient();
-const itemClient = new ItemClient(client);
+const syncClient = new SyncClient(client);
 
 beforeAll(async () => {
   await authenticateClient(client, `${Math.random()}@airday.com}`);
@@ -15,13 +15,13 @@ beforeAll(async () => {
 test("Item sync", async () => {
   const newItem = new AirdayItem({
     id: "string",
-    text: itemClient.lww.from("test item"),
+    text: syncClient.lww.from("test item"),
   });
   const action = addItemAction(newItem);
-  itemClient.subscribe((test) => {
+  syncClient.subscribe((test) => {
     console.log(test);
   });
-  itemClient.enqueueActions([action]);
+  syncClient.enqueueActions([action]);
 });
 
 test.only("idb mock test", async () => {

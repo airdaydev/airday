@@ -1,6 +1,15 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { Action } from "../client/item";
-import type { AirdayIDBPDatabase } from "./idb";
+import {
+  openDB,
+  type DBSchema,
+  type IDBPDatabase,
+  type IDBPTransaction,
+} from "idb";
+import type { Action } from "../client/sync";
+import type {
+  AirdayDBSchema,
+  AirdayIDBPDatabase,
+  AirdayStoreNames,
+} from "./idb";
 
 export interface WALEntry {
   id: string;
@@ -16,21 +25,31 @@ function ActionWALEntry(action: Action | Action[]): WALEntry {
   };
 }
 
+export type WALTx<T extends AirdayStoreNames[]> = IDBPTransaction<
+  AirdayDBSchema,
+  ["wal", ...T],
+  "readwrite"
+>;
+
 export class WAL {
-  private db: AirdayIDBPDatabase | null = null;
+  private idb: AirdayIDBPDatabase | null = null;
   // TODO: Use account
-  setDB(db: AirdayIDBPDatabase) {
-    this.db = db;
+  setDB(idb: AirdayIDBPDatabase) {
+    this.idb = idb;
   }
-  async write(action: Action | Action[]): Promise<WALEntry> {
-    const entry: WALEntry = ActionWALEntry(action);
-    await this.db!.add("wal", entry);
-    return entry;
+  writeTx<T extends AirdayStoreNames[]>(
+    storeNames: T,
+    action: Action | Action[],
+  ): WALTx<T> {
+    const stores: ["wal", ...T] = ["wal", ...storeNames];
+    const tx = this.idb!.transaction(stores, "readwrite");
+    tx.objectStore("wal").add(ActionWALEntry(action));
+    return tx;
   }
   async complete(entryId: string): Promise<void> {
-    await this.db!.delete("wal", entryId);
+    await this.idb!.delete("wal", entryId);
   }
   async getPendingEntries(): Promise<WALEntry[]> {
-    return this.db!.getAll("wal");
+    return this.idb!.getAll("wal");
   }
 }

@@ -1,7 +1,13 @@
-import { type DBSchema, type IDBPDatabase, openDB, deleteDB } from "idb";
+import {
+  type DBSchema,
+  type IDBPDatabase,
+  openDB,
+  deleteDB,
+  type StoreNames,
+} from "idb";
 import { WAL, type WALEntry } from "./wal";
 
-interface AirdayDBSchema extends DBSchema {
+export interface AirdayDBSchema extends DBSchema {
   wal: {
     key: string;
     value: WALEntry;
@@ -26,14 +32,15 @@ interface AirdayDBSchema extends DBSchema {
 }
 
 export type AirdayIDBPDatabase = IDBPDatabase<AirdayDBSchema>;
+export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 
 // Front-end persistent storage for Airday JS apps
 export class AirdayIDB {
-  private db: AirdayIDBPDatabase | null = null;
+  handle: AirdayIDBPDatabase | null = null;
   wal = new WAL();
   constructor() {}
   connect = async () => {
-    this.db = await openDB("test", 1, {
+    this.handle = await openDB("test", 1, {
       upgrade(db) {
         const store = db.createObjectStore("wal", { keyPath: "id" });
         store.createIndex("timestamp", "timestamp");
@@ -44,9 +51,9 @@ export class AirdayIDB {
         const container = db.createObjectStore("container", { keyPath: "id" });
       },
     });
-    this.wal.setDB(this.db);
+    this.wal.setDB(this.handle);
   };
   isReady = async (): Promise<boolean> => {
-    return this.db !== null;
+    return this.handle !== null;
   };
 }
