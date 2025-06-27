@@ -1,6 +1,13 @@
 ## @airday/core
 
-Airday JavaScript Sync Client
+Airday JavaScript Client handling
+- Auth & account management APIs
+- Core data types
+- Sync w/cross-tab management over WS with WAL persistence
+- Persistent cache backed by indexedb
+- Undo/redo
+- TODO: E2EE management
+- TODO: JMAP calendar management
 
 ## Undo/redo notes
 something like this
