@@ -19,7 +19,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
   return (
     <ContextMenu close={props.close} offset={props.offset}>
       <button disabled>
-        <span>Add to up next</span>
+        <span>Add to next</span>
       </button>
       <button disabled>
         <span>Add date</span>

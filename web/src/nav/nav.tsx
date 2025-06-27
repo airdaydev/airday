@@ -49,7 +49,7 @@ export function AirNav() {
             height: 1.5em;
             color: var(--body-tint);"
           />
-          <span>Up next</span>
+          <span>Next</span>
         </button>
         <SoloNode
           dndContext={session.workspace.containerStore.dndContext}

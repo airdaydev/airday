@@ -92,7 +92,7 @@
 - [ ] open priority list (added by reference, no move!)
 - [ ] Limit open lists, ensure destruction
 - [] Drag list headers to drag & drop open views (closing the existing view in favour!)
-- [] Up Next board (referenced items)
+- [] Next board (referenced items)
 - [] Drag items into list nav
 - [] Repetitive tasks (shuffle)
 - [] Repetitive tasks (in order)

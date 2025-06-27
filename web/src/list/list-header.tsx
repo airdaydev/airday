@@ -138,7 +138,7 @@ export const UpNextHeader = (props: ListHeaderProps) => {
             style="width: 1.25em; height: 1.25em; stroke-width: 1.5px; color: var(--body-tint); position: relative;
             left: -3px; padding-right: 0.25em;"
           />
-          <span>Up Next</span>
+          <span>Next</span>
           <KeyboardMarker view={props.view} />
         </button>
         <div

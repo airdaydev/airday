@@ -1,7 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>list-icon-red</title>
-    <g id="list-icon-red" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <rect id="Rectangle" fill="#F1E1E1" x="0" y="0" width="16" height="16" rx="0.5"></rect>
+    <title>list-icon-blue</title>
+    <g id="list-icon-blue" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle" fill="#E1E7F1" x="0" y="0" width="16" height="16" rx="0.5"></rect>
         <path d="M2,12.3349088 L2.6684886,12.9257407 C2.70987061,12.9623154 2.77306707,12.9584184 2.80964183,12.9170364 C2.81216487,12.9141817 2.81452272,12.9111852 2.81670383,12.9080615 L3.75,11.5714286 L3.75,11.5714286" id="Path-2" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></path>
         <line x1="6.375" y1="11.7563519" x2="12.3750009" y2="11.7574233" id="Path-3" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></line>
         <path d="M2,8.04919455 L2.6684886,8.64002639 C2.70987061,8.67660115 2.77306707,8.6727041 2.80964183,8.63132209 C2.81216487,8.62846743 2.81452272,8.62547091 2.81670383,8.6223472 L3.75,7.28571429 L3.75,7.28571429" id="Path-2" stroke="#5E5C71" stroke-width="0.5" stroke-linecap="round"></path>

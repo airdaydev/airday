@@ -255,7 +255,7 @@ export class UpNextView extends ViewNode {
     super(viewState);
   }
   get title() {
-    return "Up Next";
+    return "Next";
   }
   duplicate() {
     return new UpNextView(this.viewState);
