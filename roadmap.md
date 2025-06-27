@@ -214,6 +214,7 @@
 
 ## Server
 - e2e tests could run on server with different port so we can run a dev server at the same time
+- protobuf/similar comms
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
