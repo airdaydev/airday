@@ -53,7 +53,4 @@ export class AirdayIDB {
     });
     this.wal.setDB(this.handle);
   };
-  isReady = async (): Promise<boolean> => {
-    return this.handle !== null;
-  };
 }

@@ -35,6 +35,7 @@ export class WAL {
   private idb: AirdayIDBPDatabase | null = null;
   // TODO: Use account
   setDB(idb: AirdayIDBPDatabase) {
+    console.log("setting that handle", !!idb);
     this.idb = idb;
   }
   writeTx<T extends AirdayStoreNames[]>(
