@@ -212,6 +212,9 @@
 - [] Custom fields
 - [] consider flexsearch
 
+## Server
+- e2e tests could run on server with different port so we can run a dev server at the same time
+
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
 - [] moving solo list item should not count as a click! e.g. try to move it into a dead zone

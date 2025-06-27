@@ -34,6 +34,7 @@ struct AirdayOptions {
     config: String,
     /// Override database
     sqlx_host: Option<String>,
+    port: Option<usize>,
 }
 
 #[tokio::main]
@@ -45,6 +46,10 @@ async fn main() {
 
     if let Some(db) = opts.sqlx_host {
         cfg.sqlx_host = db.clone();
+    }
+
+    if let Some(port) = opts.port {
+        cfg.port = port;
     }
 
     let pool = common::sql::connect_sqlite(&cfg).await;
