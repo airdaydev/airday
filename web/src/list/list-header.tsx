@@ -7,7 +7,7 @@ import { ListIcon } from "./list-icon";
 import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
 import CheckSVG from "../icons/check.svg?component-solid";
-import ArrowRightSVG from "../icons/arrow-right.svg?component-solid";
+import NextListSVG from "../icons/list-icon-sun.svg?component-solid";
 
 interface ListHeaderProps {
   container: AirContainer;
@@ -134,7 +134,7 @@ export const UpNextHeader = (props: ListHeaderProps) => {
     <div class={styles["list-header"]}>
       <div class={styles["primary"]}>
         <button class={styles["list-head-button"]}>
-          <ArrowRightSVG
+          <NextListSVG
             style="width: 1.25em; height: 1.25em; stroke-width: 1.5px; color: var(--body-tint); position: relative;
             left: -3px; padding-right: 0.25em;"
           />

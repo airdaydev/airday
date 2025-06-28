@@ -1,7 +1,7 @@
 import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import ArrowRight from "../icons/arrow-right.svg?component-solid";
+import NextIconSVG from "../icons/list-icon-sun.svg?component-solid";
 import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import CheckSVG from "../icons/check-hand.svg?component-solid";
@@ -41,7 +41,7 @@ export function AirNav() {
           tabindex="-1"
           onClick={session.viewState.openUpNextView}
         >
-          <ArrowRight
+          <NextIconSVG
             style="position: relative;
             width: 1.25em;
             stroke-width: 0.75px;
