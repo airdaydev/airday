@@ -1,11 +1,11 @@
 import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import NextIconSVG from "../icons/list-icon-sun.svg?component-solid";
-import PulseSVG from "../icons/pulse.svg?component-solid";
+import NextIconSVG from "../icons/next-icon.svg?component-solid";
+import PulseSVG from "../icons/graph.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
-import CheckSVG from "../icons/check-hand.svg?component-solid";
-import TrashSVG from "../icons/trash.svg?component-solid";
+import DoneSVG from "../icons/done.svg?component-solid";
+import TrashSVG from "../icons/bin.png";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
@@ -97,13 +97,16 @@ export function AirNav() {
             ref={props.ref}
             selected={props.selected}
           >
-            <CheckSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+            <DoneSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
             <span>Done</span>
           </button>
         )}
       />
       <button class={styles["nav-text-button"]} tabindex="-1">
-        <TrashSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+        <img
+          src={TrashSVG}
+          style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);"
+        />
         <span>Trash</span>
       </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
