@@ -7,7 +7,7 @@ import { ListIcon } from "./list-icon";
 import { sessionContext } from "../store/context";
 import { NavItemContextMenu } from "../nav/context-menus";
 import CheckSVG from "../icons/check.svg?component-solid";
-import NextListSVG from "../icons/list-icon-sun.svg?component-solid";
+import NextListSVG from "../icons/next-icon.svg?component-solid";
 
 interface ListHeaderProps {
   container: AirContainer;
