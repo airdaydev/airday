@@ -1,7 +1,7 @@
 import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
-import NextIconSVG from "../icons/next-icon.svg?component-solid";
+import NextIconSVG from "../icons/infinity.svg?component-solid";
 import PulseSVG from "../icons/graph.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import DoneSVG from "../icons/done.svg?component-solid";
