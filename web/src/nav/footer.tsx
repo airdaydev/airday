@@ -101,7 +101,6 @@ export const Footer = () => {
           style={"line-height: 0rem;"}
         >
           <Key key="/" />
-          CMD
         </button>
       </div>
       <div class={styles["nav-section"]}>
