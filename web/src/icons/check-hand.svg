@@ -1,6 +1,6 @@
-<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>check</title>
-    <g id="check" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-opacity="0.663434222">
-        <path d="M1,7.73586686 C4.09924351,15.8820157 2.62257297,11.4642013 11.6421926,2" id="Path-12" stroke="currentColor" stroke-width="1.5"></path>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>check-hand</title>
+    <g id="check-hand" stroke="none" fill="none" stroke-linecap="round" stroke-width="1.75">
+        <path d="M5,10.5886935 C7.62100045,17.1056126 6.37219437,13.5713611 14,6" id="Path-12" stroke="currentColor"></path>
     </g>
 </svg>

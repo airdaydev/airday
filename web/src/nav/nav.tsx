@@ -2,7 +2,7 @@ import { useContext } from "solid-js";
 import { Stickers } from "./stickers";
 import styles from "./nav.module.css";
 import NextIconSVG from "../icons/next-icon.svg?component-solid";
-import PulseSVG from "../icons/activity.svg?component-solid";
+import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import DoneSVG from "../icons/check-hand.svg?component-solid";
 import TrashSVG from "../icons/bin-desaturated.png";
@@ -97,7 +97,7 @@ export function AirNav() {
             ref={props.ref}
             selected={props.selected}
           >
-            <DoneSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body);" />
+            <DoneSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
             <span>Done</span>
           </button>
         )}
