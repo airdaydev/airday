@@ -1,4 +1,5 @@
 import styles from "./check.module.css";
+import DoneSVG from "../icons/check-hand.svg?component-solid";
 
 interface CheckboxProps {
   checked: boolean;
@@ -18,7 +19,9 @@ export function Checkbox(props: CheckboxProps) {
           [styles["check"]]: true,
           [styles["checked"]]: !!props.checked,
         }}
-      ></div>
+      >
+        {props.checked && <DoneSVG />}
+      </div>
     </button>
   );
 }

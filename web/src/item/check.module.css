@@ -13,12 +13,17 @@
   width: 0.9em;
   height: 0.9em;
   border: 1px solid #00000021;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
-.checked {
-  background: #a5a5ff;
-  border-color: #a5a5ff;
+.checked.check svg {
+  position: relative;
+  top: -4px;
+  left: -2px;
+}
+
+.checked.check::after {
+  opacity: 1;
 }
 
 [data-theme="dark"] .check {

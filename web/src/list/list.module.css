@@ -155,7 +155,7 @@
   display: flex;
   padding: 0 0.5em;
   color: var(--body-tint);
-  background: var(--shade);
+  background: var(--mid-shade);
   border-radius: 3px;
 }
 
