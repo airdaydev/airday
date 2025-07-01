@@ -1,8 +1,0 @@
-<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>graph</title>
-    <g id="graph" stroke="none" fill="none" fill-rule="evenodd" stroke-linejoin="round" stroke-width="1">
-        <rect id="Rectangle-2" stroke="#707FAB" fill="#707FAB" x="12.5" y="5" width="3" height="10"></rect>
-        <rect id="Rectangle-2" stroke="#A7B3D5" fill="#A7B3D5" x="7.5" y="7" width="3" height="8"></rect>
-        <rect id="Rectangle-2" stroke="#A7B3D5" fill="#A7B3D5" x="2.5" y="11" width="3" height="4"></rect>
-    </g>
-</svg>

@@ -1,9 +1,9 @@
 <svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <title>next-icon</title>
     <g id="next-icon" stroke="none" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
-        <g id="next" transform="translate(3, 5)" stroke="currentColor">
+        <g id="next" transform="translate(2, 5)" stroke="#50556B">
             <polyline id="Path" stroke-width="1.25" points="6 0 9 3 6 6"></polyline>
-            <path d="M-0.125,3 C1.43153962,3.04704676 2.74973569,3.04704676 3.82958824,3 C4.90944078,2.95295324 6.63291137,2.95295324 9,3" id="Path" stroke-width="1.25" fill="#50556B"></path>
+            <path d="M2,3 C3.19405779,3.04704676 4.2052767,3.04704676 5.03365673,3 C5.86203676,2.95295324 7.18415119,2.95295324 9,3" id="Path" stroke-width="1.25" fill="#50556B"></path>
         </g>
     </g>
 </svg>
