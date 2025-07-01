@@ -47,7 +47,7 @@ export function AirNav() {
             stroke-width: 0.75px;
             left: 2px;
             height: 1.5em;
-            color: var(--body);"
+            color: var(--body-tint);"
           />
           <span>Next</span>
         </button>
@@ -68,7 +68,7 @@ export function AirNav() {
               ref={props.ref}
               selected={props.selected}
             >
-              <CalendarSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
+              <CalendarSVG style="width: 1.25em; stroke-width: 1.5px;" />
               <span>Calendar</span>
             </button>
           )}
