@@ -18,8 +18,8 @@ struct CreateItemMessage {}
 async fn handle_socket(mut socket: WebSocket) {
     while let Some(msg) = socket.recv().await {
         let msg = if let Ok(msg) = msg {
-            println!("{:?}", msg);
-            msg
+            let z = msg.into_text();
+            z
         } else {
             // client disconnected
             return;

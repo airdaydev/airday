@@ -36,6 +36,7 @@
   --tint-shade: #262632;
   --glass: #1e1e1ee5;
   --body: rgb(227, 210, 210);
+  --body-tint: #cececee5;
 }
 
 html,
