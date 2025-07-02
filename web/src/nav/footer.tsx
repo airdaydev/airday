@@ -2,9 +2,7 @@ import { sessionContext } from "../store/context.js";
 import { createSignal, useContext } from "solid-js";
 import CloudOffSVG from "../icons/cloud-off.svg?component-solid";
 import SearchSVG from "../icons/search.svg?component-solid";
-import NewSVG from "../icons/new.svg?component-solid";
-import TerminalSVG from "../icons/terminal.svg?component-solid";
-import SidebarSVG from "../icons/rainbow.svg?component-solid";
+import NewSVG from "../icons/plus.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
 import { AirContextMenu, WorkspaceContextMenu } from "./context-menus";
@@ -119,7 +117,7 @@ export const Footer = () => {
           }}
         >
           <Key key="N" />
-          <NewSVG />
+          <NewSVG style="stroke-width: 2px;" />
         </button>
         <button
           tabIndex={-1}
