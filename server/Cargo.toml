@@ -23,3 +23,4 @@ argon2 = { version = "0.5.3", features = ["std"] }
 bpaf = { version = "0.9.20", features = ["derive"] }
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
 chrono = { version = "0.4.41", features = ["serde"] }
+futures-util = "0.3.31"

@@ -1,6 +1,6 @@
 import type { AirdayClient } from "./main";
 
-export class Websocket {
+export class WebsocketManager {
   client: AirdayClient;
   ws: WebSocket;
   authorised = false;

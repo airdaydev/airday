@@ -238,3 +238,7 @@ Attribute-level CRDTs but not on object collections and potentially unreliable w
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
 - https://alexharri.com/blog/clipboard
 - https://developer.mozilla.org/en-US/docs/Web/Manifest/share_target pwa share target
+
+## Fractional indexing
+- https://observablehq.com/@dgreensp/implementing-fractional-indexing
+- www.figma.com/blog/realtime-editing-of-ordered-sequences/

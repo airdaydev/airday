@@ -26,6 +26,7 @@ dependencies = [
  "base64",
  "bpaf",
  "chrono",
+ "futures-util",
  "rand 0.9.1",
  "serde",
  "serde_json",
