@@ -26,3 +26,15 @@ sqlite3 <<< "select uuid4();"
 ## Example queries
 - `SELECT uuid4();`
 - `SELECT uuid_str(id) FROM session;`
+
+## SQLite tooling
+```bash
+# Install sqlite
+pacman -Sy sqlite
+# Reset db
+sqlx database reset # drops, creates db & runs migrations
+sqlite3 $HOME/.config/airday/airday.db
+.databases
+.tables
+SELECT name, type, sql FROM sqlite_master;
+```
