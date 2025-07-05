@@ -26,5 +26,5 @@ test.only("Item sync", async () => {
   syncClient.subscribe((test) => {
     expect(test.payload.id).toBe("string");
   });
-  client.ws.send("hi");
+  const t = await client.ws.send("type");
 });

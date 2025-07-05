@@ -78,9 +78,15 @@ async fn read(mut receiver: SplitStream<WebSocket>) {
             Ok(Message::Binary(b)) => {
                 println!("Received binary message: {:?}", b.len());
             }
-            Ok(Message::Ping(_)) => {}
-            Ok(Message::Pong(_)) => {}
-            Ok(Message::Close(_)) => {}
+            Ok(Message::Ping(_)) => {
+                println!("Received ping")
+            }
+            Ok(Message::Pong(_)) => {
+                println!("Received pong")
+            }
+            Ok(Message::Close(_)) => {
+                println!("Closed")
+            }
             Err(e) => {
                 eprintln!("Error receiving message: {:?}", e);
                 // TODO: Disconnect client

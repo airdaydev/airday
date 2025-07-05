@@ -1,0 +1,43 @@
+// Serialisation for Airday custom syncing
+
+namespace air_fb;
+
+table LWWRegisterString {
+  timestamp: long;
+  value: string;
+}
+
+struct LWWRegisterUbyte {
+  timestamp: long;
+  value: ubyte;
+}
+
+struct LWWRegisterBool {
+  timestamp: long;
+  value: bool;
+}
+
+table Item {
+  id: LWWRegisterUbyte;
+  text: LWWRegisterString;
+  completed: LWWRegisterBool;
+}
+
+table DeleteMessage {
+  id: LWWRegisterUbyte;
+}
+
+table AddMessage {
+  item: Item;
+}
+
+union Message {
+  DeleteMessage,
+  AddMessage,
+}
+
+table RootMessage {
+  message: Message;
+}
+
+root_type RootMessage;

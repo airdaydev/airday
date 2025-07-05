@@ -28,7 +28,6 @@ export class WebsocketManager {
       token: this.client.session.token,
     });
   }
-  ping() {}
   send(data: any) {
     return this.ws.send(JSON.stringify(data));
   }
