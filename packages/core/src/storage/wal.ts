@@ -1,29 +1,11 @@
-import {
-  openDB,
-  type DBSchema,
-  type IDBPDatabase,
-  type IDBPTransaction,
-} from "idb";
-import type { Action } from "../client/sync";
+import { type IDBPTransaction } from "idb";
+import type { MessageWrapper } from "../client/sync";
 import type {
   AirdayDBSchema,
   AirdayIDBPDatabase,
   AirdayStoreNames,
 } from "./idb";
-
-export interface WALEntry {
-  id: string;
-  timestamp: number;
-  action: any;
-}
-
-function ActionWALEntry(action: Action | Action[]): WALEntry {
-  return {
-    id: crypto.randomUUID(),
-    timestamp: Date.now(),
-    action,
-  };
-}
+import type { Message } from "../air-fb";
 
 export type WALTx<T extends AirdayStoreNames[]> = IDBPTransaction<
   AirdayDBSchema,
@@ -39,17 +21,17 @@ export class WAL {
   }
   writeTx<T extends AirdayStoreNames[]>(
     storeNames: T,
-    action: Action | Action[],
+    messageWrapper: MessageWrapper,
   ): WALTx<T> {
     const stores: ["wal", ...T] = ["wal", ...storeNames];
     const tx = this.idb!.transaction(stores, "readwrite");
-    tx.objectStore("wal").add(ActionWALEntry(action));
+    tx.objectStore("wal").add(messageWrapper);
     return tx;
   }
   async complete(entryId: string): Promise<void> {
     await this.idb!.delete("wal", entryId);
   }
-  async getPendingEntries(): Promise<WALEntry[]> {
+  async getPendingEntries(): Promise<MessageWrapper[]> {
     return this.idb!.getAll("wal");
   }
 }

@@ -59,6 +59,9 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.8.3
+      uuid:
+        specifier: 11.1.0
+        version: 11.1.0
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -1403,6 +1406,10 @@ packages:
   url-parse@1.5.10:
     resolution: {integrity: sha512-WypcfiRhfeUP9vvF0j6rw0J3hrWrw6iZv3+22h6iRMJ/8z1Tj6XfLP4DsUix5MhMPnXpiHDoKyoZ/bdCkwBCiQ==}
 
+  uuid@11.1.0:
+    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
+    hasBin: true
+
   validate-html-nesting@1.2.2:
     resolution: {integrity: sha512-hGdgQozCsQJMyfK5urgFcWEqsSSrK63Awe0t/IMR0bZ0QMtnuaiHzThW81guu3qx9abLi99NEuiaN6P9gVYsNg==}
 
@@ -2707,6 +2714,8 @@ snapshots:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
+
+  uuid@11.1.0: {}
 
   validate-html-nesting@1.2.2: {}
 

@@ -4,7 +4,7 @@ import { LWWRegister, LWW } from "./lww";
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;
   const pid = 1750820210000;
-  const manualTS = `${utc}/${pid}/0`;
+  const manualTS = [utc, pid, 0];
   const data = "hello";
   const lww = LWWRegister.fromJSON([manualTS, data]);
   expect(lww.timestamp.pid).toBe(pid);

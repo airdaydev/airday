@@ -1,3 +1,5 @@
+import { Builder } from "flatbuffers";
+import { LWWRegisterBool as LWWRegisterBoolFB } from "../air-fb";
 // A batched protocol over websockets for creating, deleting, updating items
 // Items are based on a custom LWW-Register CRDT - there is really isn't much to it
 
@@ -50,12 +52,13 @@ export class LWWTimestamp {
       tick,
     });
   }
-  serialise() {
-    return `${this.utc}/${this.pid}/${this.tick}`;
+  toArray(): LWWTimestampArr {
+    return [this.utc, this.pid, this.tick];
   }
 }
 
-export type SerialisedLWWRegister<T> = [string, T];
+export type LWWTimestampArr = [number, number, number];
+export type SerialisedLWWRegister<T> = [LWWTimestampArr, T];
 
 interface LWWRegisterConstructorOpts<T> {
   timestamp: LWWTimestamp;
@@ -84,7 +87,7 @@ export class LWWRegister<T> {
     return new LWWRegister<T>({ timestamp, data: json[1] as unknown as T });
   }
   toJSON(): SerialisedLWWRegister<T> {
-    return [this.timestamp.serialise(), this.data];
+    return [this.timestamp.toArray(), this.data];
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
     if (this.timestamp.equals(other.timestamp)) {
@@ -97,6 +100,17 @@ export class LWWRegister<T> {
     return other;
   }
 }
+
+// function toFlatBuffer() {
+//   let builder = new Builder(1024);
+//   LWWRegisterBoolFB.createLWWRegisterBool(
+//     builder,
+//     BigInt(this.timestamp.utc),
+//     BigInt(this.timestamp.pid),
+//     this.timestamp.tick,
+//     this.data,
+//   );
+// }
 
 export class LWW {
   private pid: number;

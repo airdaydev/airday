@@ -2,42 +2,55 @@
 
 namespace air_fb;
 
+struct LWWTimestamp {
+  utc: long;
+  pid: long;
+  tick: short;
+}
+
 table LWWRegisterString {
-  timestamp: long;
+  timestamp: LWWTimestamp;
   value: string;
 }
 
-struct LWWRegisterUbyte {
-  timestamp: long;
-  value: ubyte;
-}
-
 struct LWWRegisterBool {
-  timestamp: long;
+  timestamp: LWWTimestamp;
   value: bool;
 }
 
 table Item {
-  id: LWWRegisterUbyte;
+  id: [ubyte] (required);
   text: LWWRegisterString;
   completed: LWWRegisterBool;
 }
 
-table DeleteMessage {
-  id: LWWRegisterUbyte;
+table DeleteItemAction {
+  id: [ubyte];
 }
 
-table AddMessage {
+table AddItemAction {
   item: Item;
 }
 
-union Message {
-  DeleteMessage,
-  AddMessage,
+table JMAPMessage {
+  contents: string;
 }
 
-table RootMessage {
-  message: Message;
+union MessageData {
+  AddItemAction,
+  DeleteItemAction,
+  JMAPMessage,
 }
 
-root_type RootMessage;
+enum MessageType: byte {
+  AddItem = 0,
+  CreateList = 1,
+  JMAPMessage = 2,
+}
+
+table Message {
+  type: MessageType;
+  data: MessageData;
+}
+
+root_type Message;

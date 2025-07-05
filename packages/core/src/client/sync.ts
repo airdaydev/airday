@@ -1,22 +1,16 @@
 import type { AirdayClient } from "./main";
 import { LWW } from "../crdt/lww";
+import type { Message } from "../air-fb";
 
-type ActionState = "pending" | "completed" | "failed";
-
-export interface Action {
-  state: ActionState;
-  type: string;
-  payload: any;
-}
-
-interface Message {
+export interface MessageWrapper {
+  timestamp: number;
   traceId: string;
-  actions: Action[];
+  fb: Uint8Array;
 }
 
-type QueueItem = Action | Action[];
+type QueueItem = MessageWrapper | MessageWrapper[];
 
-type ObserverFunc = (action: Action) => void;
+type ObserverFunc = (action: Message) => void;
 
 export class SyncClient {
   airdayClient: AirdayClient;
@@ -36,11 +30,11 @@ export class SyncClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  async enqueueActions(actions: Action[]) {
+  async enqueueActions(actions: MessageWrapper[]) {
     this.queue.push(...actions);
     this.next();
   }
-  enqueueAtomicBatch(batch: Action[]) {
+  enqueueAtomicBatch(batch: MessageWrapper[]) {
     this.queue.push(batch);
   }
   next() {
@@ -49,7 +43,7 @@ export class SyncClient {
     if (!this.running || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
-    const batch: Action[] = [];
+    const batch: MessageWrapper[] = [];
 
     while (batch.length < this.maxBatch && this.queue.length > 0) {
       const item = this.queue[0];
@@ -71,19 +65,18 @@ export class SyncClient {
       this.next();
     }
   }
-  async wsSend(actions: Array<Action>) {
-    // TODO: encode and wsSend
+  async wsSend(batchInput: Array<MessageWrapper>) {
     // TODO: Validate returned action
     // TODO: We need a timeout and ask to put back on the queue
-    const message: Message = {
-      traceId: "1234",
-      actions,
-    };
-    Promise.resolve(message).then((message) => {
-      this.pendingMessages.delete(message.traceId);
-      this.onBatchCompletion(message.actions);
-      this.next();
-    });
+    // Promise.resolve(batchInput).then((batch) => {
+    //   this.pendingMessages.delete(batch.id);
+    //   this.onBatchCompletion(batch.actions);
+    //   this.next();
+    // });
+    // batchInput.forEach((messageWrapper) => {
+    //   this.airdayClient.ws.send(messageWrapper.fb);
+    //   this.pendingMessages.delete(key)
+    // });
   }
   stop() {
     this.running = false;
@@ -96,7 +89,7 @@ export class SyncClient {
     // TODO: implement if needed
   }
   // TODO: Backoff
-  onBatchCompletion(actions: Action[]) {
+  onBatchCompletion(actions: MessageWrapper[]) {
     actions.map((action) => {
       this.observers.forEach((fn) => {
         fn(action);
