@@ -9,6 +9,8 @@ import { MessageType } from "../air-fb/message-type";
 import { AddItemAction } from "../air-fb/add-item-action";
 import { MessageData } from "../air-fb/message-data";
 import { v4 } from "uuid";
+import { AirdayMessage } from "../air-fb/airday-message";
+import { AirdayAction } from "../air-fb/airday-action";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -33,18 +35,20 @@ export class AirdayItemSync {
     this.idb = idb;
     this.idbHandle = idb.handle;
   }
+  async createAirdayMessage() {
+    const id = v4();
+    const builder = new Builder(1024);
+    AirdayMessage.createAirdayMessage(builder);
+    return builder;
+  }
   async createItem(item: AirdayItem) {
-    const actionId = v4();
     const timestamp = Date.now();
     const builder = new Builder(1024);
     const itemOffset = item.toFlatBuffer(builder);
     const dataOffset = AddItemAction.createAddItemAction(builder, itemOffset);
-    Message.createMessage(
-      builder,
-      MessageType.AddItem,
-      MessageData.AddItemAction,
-      dataOffset,
-    );
+    Message.startMessage(builder);
+    Message.addType(builder, MessageType.Airday);
+    Message.addData(builder, dataOffset);
     const messageOffset = Message.endMessage(builder);
     builder.finish(messageOffset);
     const fb = builder.asUint8Array();

@@ -1,4 +1,4 @@
-// Serialisation for Airday custom syncing
+// Flatbuffer serialisation for Airday messages & objects
 
 namespace air_fb;
 
@@ -32,25 +32,36 @@ table AddItemAction {
   item: Item;
 }
 
+union AirdayAction {
+  DeleteItemAction,
+  AddItemAction,
+}
+
+// TODO: Do we need batching later?
+table AirdayMessage {
+  id: [ubyte] (required);
+  timestamp: number;
+  action: AirdayAction;
+}
+
+// Simply a wrapper for JSON encoded message
 table JMAPMessage {
   contents: string;
 }
 
 union MessageData {
-  AddItemAction,
-  DeleteItemAction,
+  AirdayMessage,
   JMAPMessage,
 }
 
 enum MessageType: byte {
-  AddItem = 0,
-  CreateList = 1,
-  JMAPMessage = 2,
+  Airday = 0,
+  JMAP = 1,
 }
 
 table Message {
   type: MessageType;
-  data: MessageData;
+  data: Message;
 }
 
 root_type Message;
