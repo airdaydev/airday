@@ -12,6 +12,7 @@ import {
   refreshCookie,
 } from "./auth";
 import { AirdayIDB } from "../storage/idb";
+import { WebsocketManager } from "./websocket";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -39,11 +40,13 @@ export class AirdayClient {
   root: URL;
   authMode: AuthMode;
   session?: Session;
+  ws: WebsocketManager;
   db = new AirdayIDB();
   // TODO: Refresh token
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
+    this.ws = new WebsocketManager(this);
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);
