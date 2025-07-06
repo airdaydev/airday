@@ -5,7 +5,7 @@ import {
   type LWW,
   type SerialisedLWWRegister,
 } from "../crdt/lww";
-import { Builder, ByteBuffer } from "flatbuffers";
+import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import { AddItemAction as AddItemActionFB } from "../proto/add-item-action";
 import { v4, parse } from "uuid";
 import { AirdayMessage } from "../proto/airday-message";
@@ -26,8 +26,8 @@ export interface SerialisedAirdayItem {
 
 class Action {
   id = v4();
-  addToFlatBuffer(build: Builder) {
-    console.warn("addToFlatBuffer not yet implemented");
+  addToFlatBuffer(build: Builder): Offset {
+    throw new Error("addToFlatBuffer not implemented");
   }
 }
 
@@ -128,20 +128,29 @@ export class AddItemAction extends Action {
 
 function createAirdayMessage(actions: Action[]) {
   const builder = new Builder(1024);
-  actions.forEach((action) => {
-    if (action instanceof AddItemAction) {
-    }
-  });
-  const actionOffset = AddItemActionFB.createAddItemAction(builder, itemOffset);
-  const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
-    builder,
-    AirdayAction.AddItemAction,
-    actionOffset,
-  );
+  const batchOffsets = actions
+    .map((action) => {
+      if (action instanceof AddItemAction) {
+        const itemOffset = action.addToFlatBuffer(builder);
+        const actionOffset = AddItemActionFB.createAddItemAction(
+          builder,
+          itemOffset,
+        );
+        const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
+          builder,
+          AirdayAction.AddItemAction,
+          actionOffset,
+        );
+        return batchOffset;
+      }
+      return null;
+    })
+    .filter((a) => a !== null);
   AirdayMessage.startAirdayMessage(builder);
-  const idOffset = AirdayMessage.createIdVector(builder, parse(this.id));
-  AirdayMessage.addId(builder, idOffset); // necessity
-  AirdayMessage.addBatch(builder, batchOffset);
+  // const uuidOffset = UUID.createUUID(builder, Array.from(parse(v4()))); // TODO... wait where does this go...?
+  batchOffsets.forEach((batchOffset) => {
+    AirdayMessage.addBatch(builder, batchOffset);
+  });
   AirdayMessage.endAirdayMessage(builder);
   return builder.asUint8Array();
 }
