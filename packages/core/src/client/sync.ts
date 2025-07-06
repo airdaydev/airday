@@ -1,21 +1,25 @@
 import type { AirdayClient } from "./main";
 import { LWW } from "../crdt/lww";
 import type { Message } from "../air-fb";
-
-export interface MessageWrapper {
-  timestamp: number;
-  traceId: string;
-  fb: Uint8Array;
-}
-
-type QueueItem = MessageWrapper | MessageWrapper[];
+import { ByteBuffer, type Builder } from "flatbuffers";
+import { MessageWrapper } from "../air-fb/message-wrapper";
 
 type ObserverFunc = (action: Message) => void;
+
+export enum Protocol {
+  Airday = 0,
+  JMAP = 1,
+}
+
+export type ActionBatch<T> = {
+  type: Protocol;
+  action: T[];
+};
 
 export class SyncClient {
   airdayClient: AirdayClient;
   lww = new LWW(); // TODO: Retain PID if exists
-  queue: Array<QueueItem> = [];
+  queue: Array<ActionBatch<any>> = [];
   pendingMessages = new Map<string, Message>();
   running = true;
   maxBatch = 50;
@@ -30,12 +34,25 @@ export class SyncClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  async enqueueActions(actions: MessageWrapper[]) {
-    this.queue.push(...actions);
+  wrapMessage(builder: Builder, type: Message, messageOffset: number) {
+    // TODO: Add span/trace/ctx
+    MessageWrapper.startMessageWrapper(builder);
+    MessageWrapper.addMessageType(builder, type);
+    MessageWrapper.addMessage(builder, messageOffset);
+    return builder;
+  }
+  enqueue(actions: ActionBatch<any>[]) {
+    if (Array.isArray(actions)) {
+      this.queue.push(...actions);
+    }
     this.next();
   }
-  enqueueAtomicBatch(batch: MessageWrapper[]) {
-    this.queue.push(batch);
+  enqueueAirdayAction(fb: Uint8Array) {
+    const action: ActionBatch<Uint8Array> = {
+      type: Protocol.Airday,
+      action: [fb],
+    };
+    this.enqueue([action]);
   }
   next() {
     const messageQueueFull =
@@ -43,24 +60,16 @@ export class SyncClient {
     if (!this.running || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
-    const batch: MessageWrapper[] = [];
-
-    while (batch.length < this.maxBatch && this.queue.length > 0) {
+    // TODO: Possible optimisation; count batch count towards pending messages count!
+    while (this.queue.length > 0) {
       const item = this.queue[0];
-      if (Array.isArray(item)) {
-        // batched items that have to go together
-        if (batch.length > 0 && batch.length + item.length > this.maxBatch) {
-          // if the batch is a bigg'n, go next batch
-          break;
-        }
-        batch.push(...item);
-        this.queue.shift();
+      this.queue.shift();
+      if (item.type === Protocol.Airday) {
+        // this.wsSend(item);
       } else {
-        this.queue.shift();
-        batch.push(item);
+        // discard for now
       }
     }
-    this.wsSend(batch);
     if (!messageQueueFull && this.queue.length > 0) {
       this.next();
     }

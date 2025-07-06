@@ -1,4 +1,4 @@
-import { SyncClient, type Action, type MessageWrapper } from "../client/sync";
+import { ActionType, SyncClient } from "../client/sync";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import type { AirdayItem } from "./model";
 import type { WALTx } from "../storage/wal";
@@ -11,6 +11,8 @@ import { MessageData } from "../air-fb/message-data";
 import { v4 } from "uuid";
 import { AirdayMessage } from "../air-fb/airday-message";
 import { AirdayAction } from "../air-fb/airday-action";
+import { MessageWrapper } from "../air-fb/message-wrapper";
+import { AirdayBatchComponent } from "../air-fb/airday-batch-component";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -23,6 +25,7 @@ const enum actionTypes {
   deleteItem = "deleteItem",
 }
 
+// Creates & serialises actions to pass to ws client
 export class AirdayItemSync {
   private idb: AirdayIDB | null = null;
   private idbHandle: AirdayIDBPDatabase | null = null;
@@ -35,32 +38,21 @@ export class AirdayItemSync {
     this.idb = idb;
     this.idbHandle = idb.handle;
   }
-  async createAirdayMessage() {
-    const id = v4();
-    const builder = new Builder(1024);
-    AirdayMessage.createAirdayMessage(builder);
-    return builder;
-  }
   async createItem(item: AirdayItem) {
+    const id = v4();
     const timestamp = Date.now();
     const builder = new Builder(1024);
     const itemOffset = item.toFlatBuffer(builder);
-    const dataOffset = AddItemAction.createAddItemAction(builder, itemOffset);
-    Message.startMessage(builder);
-    Message.addType(builder, MessageType.Airday);
-    Message.addData(builder, dataOffset);
-    const messageOffset = Message.endMessage(builder);
-    builder.finish(messageOffset);
-    const fb = builder.asUint8Array();
-
-    const msg: MessageWrapper = {
-      timestamp,
-      id: actionId,
-      fb,
-    };
-    const tx = this.idb!.wal.writeTx(["item"], msg);
+    const actionOffset = AddItemAction.createAddItemAction(builder, itemOffset);
+    AirdayBatchComponent.createAirdayBatchComponent(
+      builder,
+      AirdayAction.AddItemAction,
+      actionOffset,
+    );
+    const actionFB = builder.asUint8Array();
+    const tx = this.idb!.wal.writeTx(["item"], actionFB);
     tx.objectStore("item").add(item.toJSON());
-    this.syncClient?.enqueueActions([msg]);
+    this.syncClient?.enqueueAirdayAction(actionFB);
     // TODO: So we need our sync client to subscribe to all item updates!
     // When the item is synced, we need to kill its WAL entry (and maybe mark the live item as synced)
     // We could do this ultra granular (callbacks) or just a one off (permanent subscription)

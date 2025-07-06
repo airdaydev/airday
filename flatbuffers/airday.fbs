@@ -33,35 +33,38 @@ table AddItemAction {
 }
 
 union AirdayAction {
-  DeleteItemAction,
   AddItemAction,
+  DeleteItemAction,
 }
 
-// TODO: Do we need batching later?
-table AirdayMessage {
-  id: [ubyte] (required);
-  timestamp: number;
+table AirdayBatchComponent {
   action: AirdayAction;
 }
 
-// Simply a wrapper for JSON encoded message
-table JMAPMessage {
-  contents: string;
+table AirdayMessage {
+  batch: [AirdayBatchComponent];
 }
 
-union MessageData {
+// Currently, simply a wrapper for JSON encoded message
+table JMAPMessage {
+  payload: string;
+}
+
+union Message {
   AirdayMessage,
   JMAPMessage,
 }
 
-enum MessageType: byte {
-  Airday = 0,
-  JMAP = 1,
+table TraceContext {
+  trace_id: string;
+  span_id: string;
+  parent_span_id: string;
+  timestamp: uint64;
 }
 
-table Message {
-  type: MessageType;
-  data: Message;
+table MessageWrapper {
+  message: Message;
+  ctx: TraceContext;
 }
 
-root_type Message;
+root_type MessageWrapper;
