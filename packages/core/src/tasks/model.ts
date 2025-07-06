@@ -4,7 +4,7 @@ import { Builder } from "flatbuffers";
 import { AddMessage, Item, Message, RootMessage } from "../air-fb";
 
 export interface AirdayItemFields {
-  id: string;
+  id: Uint8Array;
   text: LWWRegister<string>;
 }
 
@@ -27,10 +27,10 @@ function uuidToBuffer(uuidStr: String) {
 }
 
 export class AirdayItem {
-  id: string;
+  id: Uint8Array;
   text: LWWRegister<string>;
   constructor(params: AirdayItemFields) {
-    this.id = params.id || v4();
+    this.id = params.id || parse(v4());
     this.text = params.text;
   }
   merge(fields: Partial<Omit<AirdayItemFields, "id">>) {

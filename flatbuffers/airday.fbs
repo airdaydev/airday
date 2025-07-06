@@ -8,6 +8,10 @@ struct LWWTimestamp {
   tick: short;
 }
 
+struct UUID {
+  bytes: [ubyte:16];
+}
+
 table LWWRegisterString {
   timestamp: LWWTimestamp;
   value: string;
@@ -19,7 +23,7 @@ struct LWWRegisterBool {
 }
 
 table Item {
-  id: string (required);
+  id: UUID (required);
   text: LWWRegisterString;
   completed: LWWRegisterBool;
 }

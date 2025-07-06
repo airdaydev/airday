@@ -15,7 +15,8 @@ import { AirdayMessage } from "../air-fb/airday-message";
 import { AirdayAction } from "../air-fb/airday-action";
 import { AirdayBatchComponent } from "../air-fb/airday-batch-component";
 import { DeleteItemAction } from "../air-fb/delete-item-action";
-import type { Item } from "../air-fb";
+import { Item } from "../air-fb";
+import { UUID } from "../air-fb/uuid";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -52,6 +53,16 @@ export function deserialiseAction(buffer: Uint8Array) {
   }
 }
 
+function getUuidBytes(id: UUID) {
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) {
+    let byte = id.bytes(i);
+    if (byte === null) throw new Error("UUID failed to parse from flatbuffer");
+    bytes[i] = byte;
+  }
+  return bytes;
+}
+
 export class AddItemAction extends Action {
   fields: Partial<AirdayItemFields> = {};
   constructor(fields: Partial<AirdayItemFields>) {
@@ -62,7 +73,7 @@ export class AddItemAction extends Action {
     const fields: Partial<AirdayItemFields> = {};
     const id = item.id();
     if (id) {
-      fields.id = id;
+      fields.id = getUuidBytes(id);
     }
     const text = item.text();
     const textTimestamp = item.text()?.timestamp();
@@ -86,9 +97,13 @@ export class AddItemAction extends Action {
     if (fields.text) fields.text = item.text;
     return new AddItemAction(fields);
   }
-  static toFlatBuffer() {
-    // TODO: Alternative would be to build Item from this!!!
-    const itemOffset = item.toFlatBuffer(builder);
+  addToFlatBuffer(builder: Builder) {
+    Item.startItem(builder);
+    if (!this.fields.id) throw new Error("id required");
+    UUID.createUUID(builder, Array.from(this.fields.id));
+    Item.addId(builder, idOffset);
+    if (this.fields.text) {
+    }
     const actionOffset = AddItemActionFB.createAddItemAction(
       builder,
       itemOffset,

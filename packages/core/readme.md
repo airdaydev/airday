@@ -15,6 +15,8 @@ Airday JavaScript Client handling
 - Msgpack
 - Protobufs
 
+TODO: Profile uuid string vs bytes representation
+
 ## Undo/redo notes
 something like this
 
