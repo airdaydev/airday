@@ -1,18 +1,84 @@
 import { SyncClient } from "../client/sync";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
-import type { AirdayItem } from "./model";
+import { AirdayItem, type AirdayItemFields } from "./model";
 import { AirdayWALEntry, type WALTx } from "../storage/wal";
 import type { SerialisedLWWRegister } from "../crdt/lww";
-import { Builder } from "flatbuffers";
-import { AddItemAction } from "../air-fb/add-item-action";
+import { Builder, ByteBuffer } from "flatbuffers";
+import { AddItemAction as AddItemActionFB } from "../air-fb/add-item-action";
 import { v4, parse } from "uuid";
 import { AirdayMessage } from "../air-fb/airday-message";
 import { AirdayAction } from "../air-fb/airday-action";
 import { AirdayBatchComponent } from "../air-fb/airday-batch-component";
+import { DeleteItemAction } from "../air-fb/delete-item-action";
+import type { Item } from "../air-fb";
 
 export interface SerialisedAirdayItem {
   id: string;
   text: SerialisedLWWRegister<string>;
+}
+
+class Action {
+  id = v4();
+}
+
+export class GetListsActions extends Action {
+  constructor(item: AirdayItem) {
+    super();
+  }
+  addToFlatBuffer(build: Builder) {}
+}
+
+export function deserialiseAction(buffer: Uint8Array) {
+  const bb = new ByteBuffer(buffer);
+  const component = AirdayBatchComponent.getRootAsAirdayBatchComponent(bb);
+  switch (component.actionType()) {
+    case AirdayAction.AddItemAction: {
+      const attributes = {};
+      const rObj = new AddItemActionFB();
+      const addAction = component.action(rObj);
+      const item = rObj.item(); // TODO: null vs non-existent
+      if (!item) throw new Error("Item could not be found");
+      return AddItemAction.fromItemFlatBuffer(item);
+    }
+    case AirdayAction.DeleteItemAction: {
+      const rObj = new DeleteItemAction();
+      const deleteAction = component.action(rObj);
+      break;
+    }
+  }
+}
+
+export class AddItemAction extends Action {
+  fields: Partial<AirdayItemFields> = {};
+  constructor() {
+    super();
+  }
+  static fromItemFlatBuffer(item: Item) {
+    const text = item.text();
+    if (text?.timestamp()) {
+      text.timestamp();
+    }
+    // !item.id();
+  }
+  static fromItem(item: AirdayItem) {
+    // TODO: Alternative would be to build Item from this!!!
+    const itemOffset = item.toFlatBuffer(builder);
+    const actionOffset = AddItemActionFB.createAddItemAction(
+      builder,
+      itemOffset,
+    );
+    const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
+      builder,
+      AirdayAction.AddItemAction,
+      actionOffset,
+    );
+    AirdayMessage.startAirdayMessage(builder);
+    const idOffset = AirdayMessage.createIdVector(builder, parse(this.id));
+    AirdayMessage.addId(builder, idOffset); // necessity
+    AirdayMessage.addBatch(builder, batchOffset);
+    AirdayMessage.endAirdayMessage(builder);
+    return builder.asUint8Array();
+  }
 }
 
 // Creates & serialises actions to pass to ws client
@@ -30,21 +96,6 @@ export class AirdayItemSync {
   }
   wrapAction() {}
   async createItem(item: AirdayItem) {
-    const actionId = v4();
-    const builder = new Builder(1024);
-    const itemOffset = item.toFlatBuffer(builder);
-    const actionOffset = AddItemAction.createAddItemAction(builder, itemOffset);
-    const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
-      builder,
-      AirdayAction.AddItemAction,
-      actionOffset,
-    );
-    AirdayMessage.startAirdayMessage(builder);
-    const idOffset = AirdayMessage.createIdVector(builder, parse(actionId));
-    AirdayMessage.addId(builder, idOffset);
-    AirdayMessage.addBatch(builder, batchOffset);
-    AirdayMessage.endAirdayMessage(builder);
-    const actionFB = builder.asUint8Array();
     const tx = this.idb!.wal.writeTx(
       ["item"],
       AirdayWALEntry(actionId, actionFB),

@@ -3,7 +3,7 @@ import type { LWW, LWWRegister } from "../crdt/lww";
 import { Builder } from "flatbuffers";
 import { AddMessage, Item, Message, RootMessage } from "../air-fb";
 
-interface AirdayItemParams {
+export interface AirdayItemFields {
   id: string;
   text: LWWRegister<string>;
 }
@@ -29,11 +29,11 @@ function uuidToBuffer(uuidStr: String) {
 export class AirdayItem {
   id: string;
   text: LWWRegister<string>;
-  constructor(params: AirdayItemParams) {
+  constructor(params: AirdayItemFields) {
     this.id = params.id || v4();
     this.text = params.text;
   }
-  merge(fields: Partial<Omit<AirdayItemParams, "id">>) {
+  merge(fields: Partial<Omit<AirdayItemFields, "id">>) {
     // TODO: If a server came back with a greater timestamp...
     const updatePayloads = [];
     if (fields.text) {
@@ -50,12 +50,5 @@ export class AirdayItem {
       id: this.id,
       text: this.text.toJSON(),
     };
-  }
-  toFlatBuffer(builder: Builder) {
-    Item.startItem(builder);
-    let idOffset = Item.createIdVector(builder, parse(this.id));
-    Item.addId(builder, idOffset);
-    const offset = Item.endItem(builder);
-    return offset;
   }
 }

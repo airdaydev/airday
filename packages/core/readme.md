@@ -9,6 +9,12 @@ Airday JavaScript Client handling
 - TODO: E2EE management
 - TODO: JMAP calendar management
 
+
+## Serialisation approaches
+- Flatbuffer (1 more day on this) - my justification = no sloppy json (manually checking each field is not a bad thing), smaller,
+- Msgpack
+- Protobufs
+
 ## Undo/redo notes
 something like this
 

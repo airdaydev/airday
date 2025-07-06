@@ -19,7 +19,7 @@ struct LWWRegisterBool {
 }
 
 table Item {
-  id: [ubyte] (required);
+  id: string (required);
   text: LWWRegisterString;
   completed: LWWRegisterBool;
 }
@@ -42,7 +42,6 @@ table AirdayBatchComponent {
 }
 
 table AirdayMessage {
-  id: [ubyte];
   batch: [AirdayBatchComponent];
 }
 
@@ -69,3 +68,4 @@ table MessageWrapper {
 }
 
 root_type MessageWrapper;
+root_type AirdayMessage;

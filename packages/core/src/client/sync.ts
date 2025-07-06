@@ -1,8 +1,9 @@
 import type { AirdayClient } from "./main";
 import { LWW } from "../crdt/lww";
-import type { Message } from "../air-fb";
-import { ByteBuffer, type Builder } from "flatbuffers";
+import { Message } from "../air-fb";
+import { Builder, ByteBuffer } from "flatbuffers";
 import { MessageWrapper } from "../air-fb/message-wrapper";
+import { AirdayMessage } from "../air-fb/airday-message";
 
 type ObserverFunc = (action: Message) => void;
 
@@ -11,16 +12,20 @@ export enum Protocol {
   JMAP = 1,
 }
 
-export type ActionBatch<T> = {
+export interface QueuedMessage {
   type: Protocol;
-  action: T[];
-};
+  message: Uint8Array;
+}
+
+export interface AirdayQueuedMessage extends QueuedMessage {
+  type: Protocol.Airday;
+}
 
 export class SyncClient {
   airdayClient: AirdayClient;
   lww = new LWW(); // TODO: Retain PID if exists
-  queue: Array<ActionBatch<any>> = [];
-  pendingMessages = new Map<string, Message>();
+  queue: Array<QueuedMessage> = [];
+  pendingMessages = new Map<string, QueuedMessage>();
   running = true;
   maxBatch = 50;
   maxPendingMessages = 5;
@@ -41,18 +46,16 @@ export class SyncClient {
     MessageWrapper.addMessage(builder, messageOffset);
     return builder;
   }
-  enqueue(actions: ActionBatch<any>[]) {
-    if (Array.isArray(actions)) {
-      this.queue.push(...actions);
-    }
+  enqueue(message: QueuedMessage) {
+    this.queue.push(message);
     this.next();
   }
-  enqueueAirdayAction(fb: Uint8Array) {
-    const action: ActionBatch<Uint8Array> = {
+  enqueueAirdayMessage(fb: Uint8Array) {
+    const message: QueuedMessage = {
       type: Protocol.Airday,
-      action: [fb],
+      message: fb,
     };
-    this.enqueue([action]);
+    this.enqueue(message);
   }
   next() {
     const messageQueueFull =
@@ -65,6 +68,11 @@ export class SyncClient {
       const item = this.queue[0];
       this.queue.shift();
       if (item.type === Protocol.Airday) {
+        const builder = new Builder(1024);
+        builder.createObjectOffset(item.message);
+        let buf = new ByteBuffer(item.message);
+        let msg = AirdayMessage.getRootAsAirdayMessage(buf);
+        this.wrapMessage(builder, Message.AirdayMessage);
         // this.wsSend(item);
       } else {
         // discard for now
@@ -98,11 +106,11 @@ export class SyncClient {
     // TODO: implement if needed
   }
   // TODO: Backoff
-  onBatchCompletion(actions: MessageWrapper[]) {
-    actions.map((action) => {
-      this.observers.forEach((fn) => {
-        fn(action);
-      });
-    });
-  }
+  // onBatchCompletion(actions: MessageWrapper[]) {
+  //   actions.map((action) => {
+  //     this.observers.forEach((fn) => {
+  //       fn(action);
+  //     });
+  //   });
+  // }
 }
