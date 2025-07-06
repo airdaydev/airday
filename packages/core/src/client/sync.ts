@@ -60,7 +60,7 @@ export class SyncClient {
     if (!this.running || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
-    // TODO: Possible optimisation; count batch count towards pending messages count!
+    // TODO: Possible optimisation; count batch count towards pending messages count! (separate from pendingMessages.size)
     while (this.queue.length > 0) {
       const item = this.queue[0];
       this.queue.shift();

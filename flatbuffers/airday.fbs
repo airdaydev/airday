@@ -42,6 +42,7 @@ table AirdayBatchComponent {
 }
 
 table AirdayMessage {
+  id: [ubyte];
   batch: [AirdayBatchComponent];
 }
 
