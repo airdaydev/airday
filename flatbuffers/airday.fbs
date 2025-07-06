@@ -3,8 +3,8 @@
 namespace air_fb;
 
 struct LWWTimestamp {
-  utc: long;
-  pid: long;
+  utc: double;
+  pid: double;
   tick: short;
 }
 

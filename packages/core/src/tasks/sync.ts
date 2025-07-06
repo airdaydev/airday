@@ -2,7 +2,12 @@ import { SyncClient } from "../client/sync";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AirdayItem, type AirdayItemFields } from "./model";
 import { AirdayWALEntry, type WALTx } from "../storage/wal";
-import type { SerialisedLWWRegister } from "../crdt/lww";
+import {
+  LWWRegister,
+  LWWTimestamp,
+  type LWW,
+  type SerialisedLWWRegister,
+} from "../crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { AddItemAction as AddItemActionFB } from "../air-fb/add-item-action";
 import { v4, parse } from "uuid";
@@ -33,7 +38,6 @@ export function deserialiseAction(buffer: Uint8Array) {
   const component = AirdayBatchComponent.getRootAsAirdayBatchComponent(bb);
   switch (component.actionType()) {
     case AirdayAction.AddItemAction: {
-      const attributes = {};
       const rObj = new AddItemActionFB();
       const addAction = component.action(rObj);
       const item = rObj.item(); // TODO: null vs non-existent
@@ -50,17 +54,39 @@ export function deserialiseAction(buffer: Uint8Array) {
 
 export class AddItemAction extends Action {
   fields: Partial<AirdayItemFields> = {};
-  constructor() {
+  constructor(fields: Partial<AirdayItemFields>) {
     super();
+    this.fields = fields;
   }
   static fromItemFlatBuffer(item: Item) {
-    const text = item.text();
-    if (text?.timestamp()) {
-      text.timestamp();
+    const fields: Partial<AirdayItemFields> = {};
+    const id = item.id();
+    if (id) {
+      fields.id = id;
     }
-    // !item.id();
+    const text = item.text();
+    const textTimestamp = item.text()?.timestamp();
+    if (text && textTimestamp) {
+      // TODO: Make this its own function
+      const timestamp = new LWWTimestamp({
+        utc: textTimestamp.utc(),
+        pid: textTimestamp.pid(),
+        tick: textTimestamp.tick(),
+      });
+      fields.text = new LWWRegister({
+        timestamp,
+        data: text.value() || "",
+      });
+    }
+    return new AddItemAction(fields);
   }
   static fromItem(item: AirdayItem) {
+    const fields: Partial<AirdayItemFields> = {};
+    fields.id = item.id;
+    if (fields.text) fields.text = item.text;
+    return new AddItemAction(fields);
+  }
+  static toFlatBuffer() {
     // TODO: Alternative would be to build Item from this!!!
     const itemOffset = item.toFlatBuffer(builder);
     const actionOffset = AddItemActionFB.createAddItemAction(
