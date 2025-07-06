@@ -1,7 +1,7 @@
 import { v4, parse } from "uuid";
 import type { LWW, LWWRegister } from "../crdt/lww";
 import { Builder } from "flatbuffers";
-import { AddMessage, Item, Message, RootMessage } from "../air-fb";
+import { AddMessage, Item, Message, RootMessage } from "../proto";
 
 export interface AirdayItemFields {
   id: Uint8Array;

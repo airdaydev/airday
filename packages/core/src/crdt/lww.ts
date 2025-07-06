@@ -1,5 +1,5 @@
 import { Builder } from "flatbuffers";
-import { LWWRegisterBool as LWWRegisterBoolFB } from "../air-fb";
+import { LWWRegisterBool as LWWRegisterBoolFB } from "../proto";
 // A batched protocol over websockets for creating, deleting, updating items
 // Items are based on a custom LWW-Register CRDT - there is really isn't much to it
 

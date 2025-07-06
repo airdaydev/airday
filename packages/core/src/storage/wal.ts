@@ -4,7 +4,7 @@ import type {
   AirdayIDBPDatabase,
   AirdayStoreNames,
 } from "./idb";
-import type { Message } from "../air-fb";
+import type { Message } from "../proto";
 import { v4 } from "uuid";
 
 export type WALTx<T extends AirdayStoreNames[]> = IDBPTransaction<

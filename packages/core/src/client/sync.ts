@@ -1,9 +1,9 @@
 import type { AirdayClient } from "./main";
 import { LWW } from "../crdt/lww";
-import { Message } from "../air-fb";
+import { Message } from "../proto";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { MessageWrapper } from "../air-fb/message-wrapper";
-import { AirdayMessage } from "../air-fb/airday-message";
+import { MessageWrapper } from "../proto/message-wrapper";
+import { AirdayMessage } from "../proto/airday-message";
 
 type ObserverFunc = (action: Message) => void;
 

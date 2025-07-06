@@ -6,14 +6,18 @@ import {
   type SerialisedLWWRegister,
 } from "../crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { AddItemAction as AddItemActionFB } from "../air-fb/add-item-action";
+import { AddItemAction as AddItemActionFB } from "../proto/add-item-action";
 import { v4, parse } from "uuid";
-import { AirdayMessage } from "../air-fb/airday-message";
-import { AirdayAction } from "../air-fb/airday-action";
-import { AirdayBatchComponent } from "../air-fb/airday-batch-component";
-import { DeleteItemAction } from "../air-fb/delete-item-action";
-import { Item, LWWRegisterString } from "../air-fb";
-import { UUID } from "../air-fb/uuid";
+import { AirdayMessage } from "../proto/airday-message";
+import { AirdayAction } from "../proto/airday-action";
+import { AirdayBatchComponent } from "../proto/airday-batch-component";
+import { DeleteItemAction } from "../proto/delete-item-action";
+import {
+  Item,
+  LWWRegisterString,
+  LWWTimestamp as LWWTimestampFB,
+} from "../proto";
+import { UUID } from "../proto/uuid";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -22,13 +26,15 @@ export interface SerialisedAirdayItem {
 
 class Action {
   id = v4();
+  addToFlatBuffer(build: Builder) {
+    console.warn("addToFlatBuffer not yet implemented");
+  }
 }
 
 export class GetListsActions extends Action {
   constructor(item: AirdayItem) {
     super();
   }
-  addToFlatBuffer(build: Builder) {}
 }
 
 export function deserialiseAction(buffer: Uint8Array) {
@@ -100,29 +106,42 @@ export class AddItemAction extends Action {
     const uuidOffset = UUID.createUUID(builder, Array.from(this.fields.id));
     Item.addId(builder, uuidOffset);
     if (this.fields.text) {
-      // TODO: standardised method
-      LWWTimestamp
-      LWWRegisterString.createLWWRegisterString(
+      // TODO: standardised method(s)!
+      const timestampOffset = LWWTimestampFB.createLWWTimestamp(
         builder,
-        ,
+        this.fields.text.timestamp.utc,
+        this.fields.text.timestamp.pid,
+        this.fields.text.timestamp.tick,
+      );
+      const valueOffset = builder.createString(this.fields.text.data);
+      const textOffset = LWWRegisterString.createLWWRegisterString(
+        builder,
+        timestampOffset,
         valueOffset,
       );
       Item.addText(builder, textOffset);
     }
-    const actionOffset = AddItemActionFB.createAddItemAction(
-      builder,
-      itemOffset,
-    );
-    const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
-      builder,
-      AirdayAction.AddItemAction,
-      actionOffset,
-    );
-    AirdayMessage.startAirdayMessage(builder);
-    const idOffset = AirdayMessage.createIdVector(builder, parse(this.id));
-    AirdayMessage.addId(builder, idOffset); // necessity
-    AirdayMessage.addBatch(builder, batchOffset);
-    AirdayMessage.endAirdayMessage(builder);
-    return builder.asUint8Array();
+    const actionOffset = Item.endItem(builder);
+    return actionOffset;
   }
+}
+
+function createAirdayMessage(actions: Action[]) {
+  const builder = new Builder(1024);
+  actions.forEach((action) => {
+    if (action instanceof AddItemAction) {
+    }
+  });
+  const actionOffset = AddItemActionFB.createAddItemAction(builder, itemOffset);
+  const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
+    builder,
+    AirdayAction.AddItemAction,
+    actionOffset,
+  );
+  AirdayMessage.startAirdayMessage(builder);
+  const idOffset = AirdayMessage.createIdVector(builder, parse(this.id));
+  AirdayMessage.addId(builder, idOffset); // necessity
+  AirdayMessage.addBatch(builder, batchOffset);
+  AirdayMessage.endAirdayMessage(builder);
+  return builder.asUint8Array();
 }

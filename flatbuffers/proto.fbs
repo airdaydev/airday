@@ -1,6 +1,6 @@
 // Flatbuffer serialisation for Airday messages & objects
 
-namespace air_fb;
+namespace proto;
 
 struct LWWTimestamp {
   utc: double;
