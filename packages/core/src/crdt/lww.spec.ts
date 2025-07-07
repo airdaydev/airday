@@ -30,17 +30,23 @@ test("LWWRegister automatic + merge", async () => {
   expect(res2.data).toBe("newVal");
 });
 
-test.only("LWWRegisterString flat buffer serialisation & deserialisation", async () => {
+test("LWWRegisterString flat buffer serialisation & deserialisation", async () => {
+  const data = "hello";
   const gen = new LWW(1234);
+  const timestamp = gen.timestamp();
   const lww = new LWWRegisterString({
-    timestamp: gen.timestamp(),
-    data: "hello",
+    timestamp,
+    data: data,
   });
+
   const builder = new Builder(1024);
   const lwwOffset = lww.addToFlatBuffer(builder);
   builder.finish(lwwOffset);
   const uint8 = builder.asUint8Array();
   let bb = new ByteBuffer(uint8);
   let parsedLWW = LWWRegisterStringProto.getRootAsLWWRegisterStringProto(bb);
-  console.log(parsedLWW.data());
+  expect(parsedLWW.data()).toBe(data);
+  expect(parsedLWW.timestamp()?.utc()).toBe(timestamp.utc);
+  expect(parsedLWW.timestamp()?.pid()).toBe(timestamp.pid);
+  expect(parsedLWW.timestamp()?.tick()).toBe(timestamp.tick);
 });
