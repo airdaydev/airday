@@ -20,6 +20,8 @@
 - [] Robust dummy data system
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
+- @airday/core - tracing
+- server - tracing
 
 ## Done board
 - [] Done board show which list item was from
