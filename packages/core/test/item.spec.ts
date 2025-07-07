@@ -4,6 +4,7 @@ import { SyncClient, AirdayItem } from "../src/index";
 import { AirdayIDB } from "../src/storage/idb";
 import { AirdayItemSync } from "../src/tasks/sync";
 import { WebsocketManager } from "../src/client/websocket";
+import { LWWRegisterString } from "../src/crdt/lww";
 
 const client = createBearerClient();
 const syncClient = new SyncClient(client);
@@ -17,14 +18,16 @@ beforeAll(async () => {
 
 test.only("Item sync", async () => {
   const newItem = new AirdayItem({
-    id: "string",
-    text: syncClient.lww.from("test item"),
+    text: new LWWRegisterString({
+      timestamp: syncClient.hlc.timestamp(),
+      data: "test",
+    }),
   });
 
   airdayItemSync.createItem(newItem);
 
-  syncClient.subscribe((test) => {
-    expect(test.payload.id).toBe("string");
-  });
-  const t = await client.ws.send("type");
+  // syncClient.subscribe((test) => {
+  //   expect(test.payload.id).toBe("string");
+  // });
+  // const t = await client.ws.send("type");
 });

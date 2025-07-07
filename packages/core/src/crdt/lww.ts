@@ -113,7 +113,7 @@ export class LWWRegisterString extends LWWRegister<string> {
   }
 }
 
-export class LWW {
+export class HLCProducer {
   private pid: number;
   private lastUtc: number = 0;
   private tick: number = 0;
@@ -132,12 +132,6 @@ export class LWW {
       utc: this.lastUtc,
       pid: this.pid,
       tick: this.tick,
-    });
-  }
-  from<T>(data: T) {
-    return new LWWRegister<T>({
-      timestamp: this.timestamp(),
-      data,
     });
   }
 }

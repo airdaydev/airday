@@ -19,7 +19,6 @@ use crate::AppState;
 // https://github.com/tokio-rs/axum/blob/main/examples/websockets/src/main.rs
 
 pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
-    println!("websocket handler lets goooo {}", state.config.host);
     // TODO: Unwrap cookie auth here
     ws.on_upgrade(handle_socket)
 }

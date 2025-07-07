@@ -1,5 +1,5 @@
 import type { AirdayClient } from "./main";
-import { LWW } from "../crdt/lww";
+import { HLCProducer } from "../crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
 import {
   MessageWrapperProto,
@@ -25,7 +25,7 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 
 export class SyncClient {
   airdayClient: AirdayClient;
-  lww = new LWW(); // TODO: Retain PID if exists
+  hlc = new HLCProducer(); // TODO: Retain PID if exists
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
   running = true;
