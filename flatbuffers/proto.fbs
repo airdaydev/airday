@@ -14,12 +14,12 @@ struct UUIDProto {
 
 table LWWRegisterStringProto {
   timestamp: LWWTimestampProto;
-  value: string;
+  data: string;
 }
 
 struct LWWRegisterBoolProto {
   timestamp: LWWTimestampProto;
-  value: bool;
+  data: bool;
 }
 
 table ItemProto {

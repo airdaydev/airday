@@ -1,14 +1,14 @@
 import { v4, parse } from "uuid";
-import type { LWW, LWWRegister } from "../crdt/lww";
+import type { LWWRegisterString } from "../crdt/lww";
 
 export interface AirdayItemFields {
   id: Uint8Array;
-  text: LWWRegister<string>;
+  text: LWWRegisterString;
 }
 
 export class AirdayItem {
   id: Uint8Array;
-  text: LWWRegister<string>;
+  text: LWWRegisterString;
   constructor(params: AirdayItemFields) {
     this.id = params.id || parse(v4());
     this.text = params.text;

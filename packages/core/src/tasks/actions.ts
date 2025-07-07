@@ -1,6 +1,6 @@
 import { AirdayItem, type AirdayItemFields } from "./model";
 import {
-  LWWRegister,
+  LWWRegisterString,
   LWWTimestamp,
   type LWW,
   type SerialisedLWWRegister,
@@ -18,7 +18,6 @@ import {
   DeleteItemActionProto,
 } from "../proto";
 import { getUuidBytes } from "../common";
-import { AirdayBatchComponent } from "../proto/airday-batch-component";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -85,9 +84,9 @@ export class AddItemAction extends Action {
         pid: textTimestamp.pid(),
         tick: textTimestamp.tick(),
       });
-      fields.text = new LWWRegister({
+      fields.text = new LWWRegisterString({
         timestamp,
-        data: text.value() || "",
+        data: text.data() || "",
       });
     }
     return new AddItemAction(fields);

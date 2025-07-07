@@ -1,7 +1,5 @@
 import { Builder } from "flatbuffers";
-import { LWWRegisterBoolProto, LWWTimestampProto } from "../proto";
-// A batched protocol over websockets for creating, deleting, updating items
-// Items are based on a custom LWW-Register CRDT - there is really isn't much to it
+import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
 
 export const genPid = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 
@@ -100,16 +98,20 @@ export class LWWRegister<T> {
   }
 }
 
-// function toFlatBuffer() {
-//   let builder = new Builder(1024);
-//   LWWRegisterBoolFB.createLWWRegisterBool(
-//     builder,
-//     BigInt(this.timestamp.utc),
-//     BigInt(this.timestamp.pid),
-//     this.timestamp.tick,
-//     this.data,
-//   );
-// }
+export class LWWRegisterString extends LWWRegister<string> {
+  constructor(opts: LWWRegisterConstructorOpts<string>) {
+    super(opts);
+  }
+  addToFlatBuffer(builder: Builder) {
+    const dataOffset = builder.createString(this.data);
+    const tsOffset = this.timestamp.addToFlatBuffer(builder);
+    return LWWRegisterStringProto.createLWWRegisterStringProto(
+      builder,
+      tsOffset,
+      dataOffset,
+    );
+  }
+}
 
 export class LWW {
   private pid: number;
