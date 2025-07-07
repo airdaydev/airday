@@ -76,6 +76,7 @@ async fn read(mut receiver: SplitStream<WebSocket>) {
                 println!("Received text: {}", text);
             }
             Ok(Message::Binary(b)) => {
+                println!("received binary message");
                 let c = root_as_message_wrapper_proto(&b).unwrap();
                 println!(
                     "Received binary message: {:?} {:?}",

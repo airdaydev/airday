@@ -127,8 +127,12 @@ export class AddItemAction extends Action {
   }
 }
 
+// TODO: Add message ids?
+// const uuidOffset = UUID.createUUID(builder, Array.from(parse(v4()))); // TODO... wait where does this go...?
 export function createAirdayMessage(actions: Action[]) {
   const builder = new Builder(1024);
+
+  // 1. Build action batch components
   const batchOffsets = actions
     .map((action) => {
       if (action instanceof AddItemAction) {
@@ -144,17 +148,18 @@ export function createAirdayMessage(actions: Action[]) {
       return null;
     })
     .filter((a) => a !== null);
+
+  // 2. Build AridayMessageProto (contains batches)
+  const batch = AirdayMessageProto.createBatchVector(builder, batchOffsets);
   AirdayMessageProto.startAirdayMessageProto(builder);
-  // const uuidOffset = UUID.createUUID(builder, Array.from(parse(v4()))); // TODO... wait where does this go...?
-  batchOffsets.forEach((batchOffset) => {
-    AirdayMessageProto.addBatch(builder, batchOffset);
-  });
+  AirdayMessageProto.addBatch(builder, batch);
   let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
+
+  // 3. Builds message wrapper (distinguihes it from JMAPMessageProto)
   MessageWrapperProto.startMessageWrapperProto(builder);
   MessageWrapperProto.addMessageType(builder, MessageProto.AirdayMessageProto);
   MessageWrapperProto.addMessage(builder, messageOffset);
-  let messageWrapperOffset =
-    MessageWrapperProto.endMessageWrapperProto(builder);
-  builder.finish(messageWrapperOffset);
+  let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
+  builder.finish(wrapper);
   return builder.asUint8Array();
 }
