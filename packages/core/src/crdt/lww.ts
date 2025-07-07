@@ -36,22 +36,6 @@ export class LWWTimestamp {
       this.tick === other.tick
     );
   }
-  static fromString(tsStr: string) {
-    const parts = tsStr.split("/");
-    if (parts.length !== 3)
-      throw new Error(`Invalid timestamp format ${tsStr}`);
-    const [utcRaw, pidRaw, tickRaw] = parts;
-    const pid = Number(pidRaw);
-    const utc = Number(utcRaw);
-    const tick = Number(tickRaw);
-    if (isNaN(utc) || isNaN(tick))
-      throw new Error(`Invalid timestamp format ${tsStr}`);
-    return new LWWTimestamp({
-      utc,
-      pid,
-      tick,
-    });
-  }
   addToFlatBuffer(builder: Builder) {
     return LWWTimestampProto.createLWWTimestampProto(
       builder,
@@ -62,6 +46,13 @@ export class LWWTimestamp {
   }
   toArray(): LWWTimestampArr {
     return [this.utc, this.pid, this.tick];
+  }
+  static fromArray(arr: LWWTimestampArr) {
+    return new LWWTimestamp({
+      utc: arr[0],
+      pid: arr[1],
+      tick: arr[2],
+    });
   }
 }
 
@@ -91,7 +82,7 @@ export class LWWRegister<T> {
     ) {
       throw new Error("LWWRegister only handles strings, booleans and numbers");
     }
-    const timestamp = LWWTimestamp.fromString(json[0]);
+    const timestamp = LWWTimestamp.fromArray(json[0]);
     return new LWWRegister<T>({ timestamp, data: json[1] as unknown as T });
   }
   toJSON(): SerialisedLWWRegister<T> {
