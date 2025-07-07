@@ -46,7 +46,6 @@
 - [] consider a flash or something more obvious when switching panes
 - [] Deselect nav bar items when leaving focus
 - [] list switcher to switch between open files (opt+tab)
-- [] Improve empty list state UI
 - [] Context click on list header
 - [] touch swipe gesture left /right to hide + show sidebar
 - [] Test if drag limit is below or above diagonal line on hover!
@@ -83,21 +82,16 @@
 - [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc
-- Rich text https://docs.slatejs.org/ ?
 - [] Show completed item in og list for 5 seconds before disappearing (progress bar follows checkbox border)
 - [] Rename container in sidenav
 - [] Ensure selection is cleared on edit
 - [] Edit selected items via 'enter' key (vim?)
-- [] List loading animation
 - [] Context menu for many items
 - [] Timeline index
-- [] Add now playing (ref list) list, allow dragging items to now playing list
-- [] Drag divider to change view size
+- [] Drag divider to change view size!
 - [] Focus mode (design)
 - [] Nice empty list states
-- [] Export data markdown, json, csv
-- [] Import markdown, json, things 3 etc
-- [] Reconsider split view, explore multi-windows, tabs
+- [] Reconsider split view, maybe do horizontal only
 
 ## Stickers
 - [x] Sticker system
@@ -110,7 +104,7 @@
 
 ## Sync/Data structure
 - [] Build todo list sync
-- [] Tiered e2ee for most text
+- [] Tiered e2ee for most text i.e. custodial vs non-custodial
 - [] Undo/redo... in general, save granular outcomes & apply them
 - [] Multiple users / tenancy is accounted for
 - [] Full jmap calendar support
@@ -162,10 +156,6 @@
 - [] Custom fields
 - [] JSON export
 - [] consider flexsearch
-
-## Server
-- e2e tests could run on server with different port so we can run a dev server at the same time
-- protobuf/similar comms
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
