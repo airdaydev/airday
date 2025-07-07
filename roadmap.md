@@ -1,61 +1,71 @@
 # Air Roadmap
 
-## Next
+## 2025 Q3 Working Alpha Prototype Sqlite
+- [] Personal workspace setup on account creation
+- [] @airday/core - create & update items
+- [] @airday/core - get items since last sync (~5min before)
+- [] @airday/core - delete items
+- [] @airday/core - create & update lists
+- [] @airday/core - delete lists
+- [] @airday/core - create subitems / sequence
+- [] @airday/core - repeat events
+- [] @airday/core - repeat events (shuffle)?
+- [] @airday/core - export database to flatbuffer
+- [] deal with orphaned items
+- [] UI - Create items
+- [] UI - Update items
+- [] UI - Delete items
+- [] UI - Settings
+- [] UI - Spanish
+- [] Robust dummy data system
+- [] Item List UI - build & respect fractional indexing system
+- [] Nav List UI - build & respect fractional indexing system
+
+## Done board
+- [] Done board show which list item was from
+- [] Done board show month heading?
+- [] Done board chronological index
+
+## 2025 Q4 Initial Release
+- [] Text encryption
+- [] Shared lists
+
+## Fixes
 - [] Canvas doesn't render constantly (todo list)
 - [] Canvas bg resets WHENEVER container size changes (change made for list but component needs rebuilding)
 - [] Editing text inline cursor set correctly
-- [] Deleting items
-- [] Add new item
 - [] Paste into app (strip `- []`)
-- [] Save/Load to JSON
 - [] Dragging out of Done should undo its done start
-- [] Dummy data - done items with varied dates over last 2 years (after import/export)
 - [] When items get deleted, ensure no latent references in selection sets, focus etc
-- [] Done board show from list
-- [] Done board month headings
-- [] Done board chronological index
 - [] Manually define height of list section (by dragging)
-- [] indexing system for nav
-- [] Remove many stickers
 - [] item links
-- [] Location/map
 - [] Clicking on a list in nav - look for existing list view before creating a new one
 - [] tooltip for closing a window that shows kb shortcut
 - [] tree backed indexing system to move between panes with numbers
 - [] host front-end on cloudflare pages initially (air-private + opentofu)
 - [] consider a flash or something more obvious when switching panes
 - [] Deselect nav bar items when leaving focus
-- [ ] list switcher to switch between open files (opt+tab)
-- [ ] empty list state nice
-- [ ] Context click on list header
-- [ ] touch swipe gesture left /right to hide + show sidebar
-- [ ] Test if drag limit is below or above diagonal line on hover!
-- [ ] on context click of nav item, select the list
-- [ ] Reevaluate keyboard + focus system (start with pen/paper or notes)
-- [ ] drag sidebar to resize
-- [ ] add initial habit item
-- [ ] open performance list, add filters/configuration
-- [ ] open priority list (added by reference, no move!)
-- [ ] Limit open lists, ensure destruction
+- [] list switcher to switch between open files (opt+tab)
+- [] Improve empty list state UI
+- [] Context click on list header
+- [] touch swipe gesture left /right to hide + show sidebar
+- [] Test if drag limit is below or above diagonal line on hover!
+- [] on context click of nav item, select the list
+- [] Reevaluate keyboard + focus system (start with pen/paper or notes)
+- [] drag sidebar to resize
+- [] add initial habit item
+- [] open performance list, add filters/configuration
+- [] Limit open lists, ensure destruction
 - [] Drag list headers to drag & drop open views (closing the existing view in favour!)
-- [] Next board (referenced items)
+- [] Next board (referenced items!)
 - [] Drag items into list nav
-- [] Repetitive tasks (shuffle)
-- [] Repetitive tasks (in order)
-- [] Sequences (one offs, projects)
 - [] Performance board
-- [] Begin back-end
-- [] Shared lists?
-- [] Loading pane
 - [] Save views (arrangements of panes)
 - [] Print styles
-- [] group lists (one level)
-- [] subitems (one level)
 - [] Locations/Map?
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
-- [] Workspace i.e. account management
 - [] Trash items (yes & ability to remove)
 - [] Empty trash
 - [] Delete containers
@@ -69,14 +79,6 @@
 - [] Remove SVGs from JS or at least include in diff bundle
 
 ## UI
-- [x] Context menus should not go past edge of screen (flipped)
-- [x] List should scroll up as you drag up
-- [x] Dark mode
-- [x] Autoscroll when dragging items at bottom/top of list
-- [x] Command+up/down keyboard resorts
-- [x] Context menu for one item
-- [x] Clear selection on 'esc' key (vim?)
-- [x] Show date finished on completed items
 - [] voice notes
 - [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
@@ -99,13 +101,14 @@
 
 ## Stickers
 - [x] Sticker system
+- [] Consider less abstract stickers (create sets with AI? artists?)
+- [] Remove many stickers
 - [] Reinstate sticker system
 - [] First full sticker set (llm based? or artist)
 - [] Dynamic storage
 - [] Custom stickers
 
 ## Sync/Data structure
-- [x] Build & evaluate CRDT prototypes
 - [] Build todo list sync
 - [] Tiered e2ee for most text
 - [] Undo/redo... in general, save granular outcomes & apply them
@@ -146,6 +149,7 @@
 ## Future goals
 - [x] List animations (v1)
 - [x] Canvas list
+- [] UI - Japanese
 - [] Experiment with sounds (e.g. speaking llm prompts)
 - [] List cal view
 - [] Monthly cal view
@@ -156,6 +160,7 @@
 - [] LLM Prompting / MCP
 - [] Secrets
 - [] Custom fields
+- [] JSON export
 - [] consider flexsearch
 
 ## Server
