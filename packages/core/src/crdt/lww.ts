@@ -1,5 +1,5 @@
 import { Builder } from "flatbuffers";
-import { LWWRegisterBool as LWWRegisterBoolFB } from "../proto";
+import { LWWRegisterBoolProto, LWWTimestampProto } from "../proto";
 // A batched protocol over websockets for creating, deleting, updating items
 // Items are based on a custom LWW-Register CRDT - there is really isn't much to it
 
@@ -51,6 +51,14 @@ export class LWWTimestamp {
       pid,
       tick,
     });
+  }
+  addToFlatBuffer(builder: Builder) {
+    return LWWTimestampProto.createLWWTimestampProto(
+      builder,
+      this.utc,
+      this.pid,
+      this.tick,
+    );
   }
   toArray(): LWWTimestampArr {
     return [this.utc, this.pid, this.tick];

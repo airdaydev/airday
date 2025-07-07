@@ -10,7 +10,6 @@ import { v4 } from "uuid";
 import {
   ItemProto,
   LWWRegisterStringProto,
-  LWWTimestampProto,
   UUIDProto,
   AddItemActionProto,
   AirdayMessageProto,
@@ -108,13 +107,8 @@ export class AddItemAction extends Action {
     );
     ItemProto.addId(builder, uuidOffset);
     if (this.fields.text) {
-      // TODO: standardised method(s)!
-      const timestampOffset = LWWTimestampProto.createLWWTimestampProto(
-        builder,
-        this.fields.text.timestamp.utc,
-        this.fields.text.timestamp.pid,
-        this.fields.text.timestamp.tick,
-      );
+      const timestampOffset =
+        this.fields.text.timestamp.addToFlatBuffer(builder);
       const valueOffset = builder.createString(this.fields.text.data);
       const textOffset = LWWRegisterStringProto.createLWWRegisterStringProto(
         builder,
