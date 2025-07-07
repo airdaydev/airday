@@ -25,6 +25,7 @@ test.only("Item sync", async () => {
   });
 
   airdayItemSync.createItem(newItem);
+  client.ws.ws.close();
 
   // syncClient.subscribe((test) => {
   //   expect(test.payload.id).toBe("string");
