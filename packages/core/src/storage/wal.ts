@@ -4,8 +4,6 @@ import type {
   AirdayIDBPDatabase,
   AirdayStoreNames,
 } from "./idb";
-import type { Message } from "../proto";
-import { v4 } from "uuid";
 
 export type WALTx<T extends AirdayStoreNames[]> = IDBPTransaction<
   AirdayDBSchema,
@@ -13,7 +11,7 @@ export type WALTx<T extends AirdayStoreNames[]> = IDBPTransaction<
   "readwrite"
 >;
 
-interface AirdayActionWALEntry {
+export interface AirdayActionWALEntry {
   id: string;
   timestamp: number;
   message: Uint8Array;

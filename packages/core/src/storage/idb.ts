@@ -5,12 +5,12 @@ import {
   deleteDB,
   type StoreNames,
 } from "idb";
-import { WAL, type WALEntry } from "./wal";
+import { WAL, type AirdayActionWALEntry } from "./wal";
 
 export interface AirdayDBSchema extends DBSchema {
   wal: {
     key: string;
-    value: WALEntry;
+    value: AirdayActionWALEntry;
     indexes: {
       timestamp: number;
     };

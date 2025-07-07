@@ -1,6 +1,5 @@
 -- notes on the data model
--- 👻 ghost = deletion marker aka 🪦 tombstone
--- ts = custom timestamp for lww-register ("{utc}/{pid}/{tick}")
+-- ts = custom timestamp for lww-register ("{utc}:{pid}:{tick}")
 -- utc = native utc timestamp
 -- TODO: item.type could be an enum (repeat, static, series, shuffle, playlist)
 -- TODO: repeat could be a property...
@@ -11,6 +10,22 @@ CREATE TABLE IF NOT EXISTS user (
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS workspace (
+  id UUID NOT NULL PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS user_workspace (
+  id UUID NOT NULL PRIMARY KEY,
+  user_id UUID NOT NULL,
+  workspace_id UUID NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE CASCADE,
+  UNIQUE(user_id, workspace_id)
+);
+
+-- TODO: All following tables to be created on a per workspace basis
+-- & appended with space_ e.g. workspace_{sqids}_item i.e. moved to code
 
 CREATE TABLE IF NOT EXISTS item (
   id UUID NOT NULL PRIMARY KEY,
@@ -25,7 +40,7 @@ CREATE TABLE IF NOT EXISTS item (
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS item_ghost (
+CREATE TABLE IF NOT EXISTS item_tombstone (
   id UUID NOT NULL PRIMARY KEY,
   container_id UUID NOT NULL,
   item_id UUID NOT NULL,
@@ -49,7 +64,7 @@ CREATE TABLE IF NOT EXISTS container_item (
   UNIQUE(container_id, item_id)
 );
 
-CREATE TABLE IF NOT EXISTS container_item_ghost (
+CREATE TABLE IF NOT EXISTS container_item_tombstone (
   id UUID NOT NULL PRIMARY KEY,
   container_id UUID NOT NULL,
   item_id UUID NOT NULL,
