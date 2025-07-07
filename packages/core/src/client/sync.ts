@@ -1,11 +1,13 @@
 import type { AirdayClient } from "./main";
 import { LWW } from "../crdt/lww";
-import { Message } from "../proto";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { MessageWrapper } from "../proto/message-wrapper";
-import { AirdayMessage } from "../proto/airday-message";
+import {
+  MessageWrapperProto,
+  AirdayMessageProto,
+  MessageProto,
+} from "../proto";
 
-type ObserverFunc = (action: Message) => void;
+type ObserverFunc = (action: MessageProto) => void;
 
 export enum Protocol {
   Airday = 0,
@@ -39,11 +41,11 @@ export class SyncClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  wrapMessage(builder: Builder, type: Message, messageOffset: number) {
+  wrapMessage(builder: Builder, type: MessageProto, messageOffset: number) {
     // TODO: Add span/trace/ctx
-    MessageWrapper.startMessageWrapper(builder);
-    MessageWrapper.addMessageType(builder, type);
-    MessageWrapper.addMessage(builder, messageOffset);
+    MessageWrapperProto.startMessageWrapperProto(builder);
+    MessageWrapperProto.addMessageType(builder, type);
+    MessageWrapperProto.addMessage(builder, messageOffset);
     return builder;
   }
   enqueue(message: QueuedMessage) {
@@ -68,11 +70,11 @@ export class SyncClient {
       const item = this.queue[0];
       this.queue.shift();
       if (item.type === Protocol.Airday) {
-        const builder = new Builder(1024);
-        builder.createObjectOffset(item.message);
-        let buf = new ByteBuffer(item.message);
-        let msg = AirdayMessage.getRootAsAirdayMessage(buf);
-        this.wrapMessage(builder, Message.AirdayMessage);
+        // const builder = new Builder(1024);
+        // builder.createObjectOffset(item.message);
+        // let buf = new ByteBuffer(item.message);
+        // let msg = AirdayMessageProto.getRootAsAirdayMessageProto(buf);
+        // this.wrapMessage(builder, MessageProto.AirdayMessageProto);
         // this.wsSend(item);
       } else {
         // discard for now
@@ -82,7 +84,7 @@ export class SyncClient {
       this.next();
     }
   }
-  async wsSend(batchInput: Array<MessageWrapper>) {
+  async wsSend(batchInput: Array<MessageWrapperProto>) {
     // TODO: Validate returned action
     // TODO: We need a timeout and ask to put back on the queue
     // Promise.resolve(batchInput).then((batch) => {
@@ -106,7 +108,7 @@ export class SyncClient {
     // TODO: implement if needed
   }
   // TODO: Backoff
-  // onBatchCompletion(actions: MessageWrapper[]) {
+  // onBatchCompletion(actions: MessageWrapperProto[]) {
   //   actions.map((action) => {
   //     this.observers.forEach((fn) => {
   //       fn(action);

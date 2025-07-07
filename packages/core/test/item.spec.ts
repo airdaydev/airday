@@ -2,7 +2,7 @@ import { expect, test, beforeAll } from "bun:test";
 import { authenticateClient, createBearerClient } from "./utils.spec";
 import { SyncClient, AirdayItem } from "../src/index";
 import { AirdayIDB } from "../src/storage/idb";
-import { AirdayItemSync } from "../src/model/item";
+import { AirdayItemSync } from "../src/tasks/sync";
 import { WebsocketManager } from "../src/client/websocket";
 
 const client = createBearerClient();
