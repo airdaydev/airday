@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { LWWRegister, LWW, LWWRegisterString } from "./lww";
+import { LWWRegister, TimestampProducer, LWWRegisterString } from "./lww";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { LWWRegisterStringProto } from "../proto";
 
@@ -15,7 +15,7 @@ test("LWWRegister parsing", async () => {
 });
 
 test("LWWRegister automatic + merge", async () => {
-  const gen = new LWW(1234);
+  const gen = new TimestampProducer(1234);
   const lww = new LWWRegister({
     timestamp: gen.timestamp(),
     data: "hello",
@@ -32,7 +32,7 @@ test("LWWRegister automatic + merge", async () => {
 
 test("LWWRegisterString flat buffer serialisation & deserialisation", async () => {
   const data = "hello";
-  const gen = new LWW(1234);
+  const gen = new TimestampProducer(1234);
   const timestamp = gen.timestamp();
   const lww = new LWWRegisterString({
     timestamp,
