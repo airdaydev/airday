@@ -1,11 +1,6 @@
 import type { AirdayClient } from "./main";
-import { HLCProducer } from "../crdt/lww";
-import { Builder, ByteBuffer } from "flatbuffers";
-import {
-  MessageWrapperProto,
-  AirdayMessageProto,
-  MessageProto,
-} from "../proto";
+import { TimestampProducer } from "../crdt/lww";
+import { MessageProto } from "../proto";
 
 type ObserverFunc = (action: MessageProto) => void;
 
@@ -26,7 +21,7 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 // TODO: Add time based message flushing
 export class SyncClient {
   airdayClient: AirdayClient;
-  hlc = new HLCProducer(); // TODO: Retain PID if exists
+  timestampProducer = new TimestampProducer(); // TODO: Retain PID if exists
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
   running = true;

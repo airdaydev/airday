@@ -113,7 +113,7 @@ export class LWWRegisterString extends LWWRegister<string> {
   }
 }
 
-export class HLCProducer {
+export class TimestampProducer {
   private pid: number;
   private lastUtc: number = 0;
   private tick: number = 0;

@@ -19,7 +19,7 @@ beforeAll(async () => {
 test.only("Item sync", async () => {
   const newItem = new AirdayItem({
     text: new LWWRegisterString({
-      timestamp: syncClient.hlc.timestamp(),
+      timestamp: syncClient.timestampProducer.timestamp(),
       data: "test",
     }),
   });

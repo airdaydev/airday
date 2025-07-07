@@ -1,5 +1,5 @@
 import { v4, parse } from "uuid";
-import { HLCProducer, LWWRegisterString } from "../crdt/lww";
+import { TimestampProducer, LWWRegisterString } from "../crdt/lww";
 
 export interface AirdayItemFields {
   id: Uint8Array;
