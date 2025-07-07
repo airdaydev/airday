@@ -2,6 +2,7 @@ use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 // use futures_util::SinkExt;
+use super::proto_generated::proto::root_as_message_wrapper_proto;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -75,7 +76,12 @@ async fn read(mut receiver: SplitStream<WebSocket>) {
                 println!("Received text: {}", text);
             }
             Ok(Message::Binary(b)) => {
-                println!("Received binary message: {:?}", b.len());
+                let c = root_as_message_wrapper_proto(&b).unwrap();
+                println!(
+                    "Received binary message: {:?} {:?}",
+                    b.len(),
+                    c.message_type()
+                );
             }
             Ok(Message::Ping(_)) => {
                 println!("Received ping")

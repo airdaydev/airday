@@ -72,4 +72,3 @@ table MessageWrapperProto {
 }
 
 root_type MessageWrapperProto;
-root_type AirdayMessageProto;
