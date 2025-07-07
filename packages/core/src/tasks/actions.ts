@@ -6,18 +6,20 @@ import {
   type SerialisedLWWRegister,
 } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
-import { AddItemAction as AddItemActionFB } from "../proto/add-item-action";
-import { v4, parse } from "uuid";
-import { AirdayMessage } from "../proto/airday-message";
-import { AirdayAction } from "../proto/airday-action";
-import { AirdayBatchComponent } from "../proto/airday-batch-component";
-import { DeleteItemAction } from "../proto/delete-item-action";
+import { v4 } from "uuid";
 import {
-  Item,
-  LWWRegisterString,
-  LWWTimestamp as LWWTimestampFB,
+  ItemProto,
+  LWWRegisterStringProto,
+  LWWTimestampProto,
+  UUIDProto,
+  AddItemActionProto,
+  AirdayMessageProto,
+  AirdayActionProto,
+  AirdayBatchComponentProto,
+  DeleteItemActionProto,
 } from "../proto";
-import { UUID } from "../proto/uuid";
+import { getUuidBytes } from "../common";
+import { AirdayBatchComponent } from "../proto/airday-batch-component";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -29,6 +31,12 @@ class Action {
   addToFlatBuffer(build: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
   }
+  toActionFlatBuffer(): Uint8Array {
+    const builder = new Builder(1024);
+    const actionOffset = this.addToFlatBuffer(builder);
+    builder.finish(actionOffset);
+    return builder.asUint8Array();
+  }
 }
 
 export class GetListsActions extends Action {
@@ -39,31 +47,22 @@ export class GetListsActions extends Action {
 
 export function deserialiseAction(buffer: Uint8Array) {
   const bb = new ByteBuffer(buffer);
-  const component = AirdayBatchComponent.getRootAsAirdayBatchComponent(bb);
+  const component =
+    AirdayBatchComponentProto.getRootAsAirdayBatchComponentProto(bb);
   switch (component.actionType()) {
-    case AirdayAction.AddItemAction: {
-      const rObj = new AddItemActionFB();
+    case AirdayActionProto.AddItemActionProto: {
+      const rObj = new AddItemActionProto();
       const addAction = component.action(rObj);
       const item = rObj.item(); // TODO: null vs non-existent
       if (!item) throw new Error("Item could not be found");
       return AddItemAction.fromItemFlatBuffer(item);
     }
-    case AirdayAction.DeleteItemAction: {
-      const rObj = new DeleteItemAction();
+    case AirdayActionProto.DeleteItemActionProto: {
+      const rObj = new DeleteItemActionProto();
       const deleteAction = component.action(rObj);
       break;
     }
   }
-}
-
-function getUuidBytes(id: UUID) {
-  const bytes = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    let byte = id.bytes(i);
-    if (byte === null) throw new Error("UUID failed to parse from flatbuffer");
-    bytes[i] = byte;
-  }
-  return bytes;
 }
 
 export class AddItemAction extends Action {
@@ -72,7 +71,7 @@ export class AddItemAction extends Action {
     super();
     this.fields = fields;
   }
-  static fromItemFlatBuffer(item: Item) {
+  static fromItemFlatBuffer(item: ItemProto) {
     const fields: Partial<AirdayItemFields> = {};
     const id = item.id();
     if (id) {
@@ -101,56 +100,60 @@ export class AddItemAction extends Action {
     return new AddItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
-    Item.startItem(builder);
+    ItemProto.startItemProto(builder);
     if (!this.fields.id) throw new Error("id required");
-    const uuidOffset = UUID.createUUID(builder, Array.from(this.fields.id));
-    Item.addId(builder, uuidOffset);
+    const uuidOffset = UUIDProto.createUUIDProto(
+      builder,
+      Array.from(this.fields.id),
+    );
+    ItemProto.addId(builder, uuidOffset);
     if (this.fields.text) {
       // TODO: standardised method(s)!
-      const timestampOffset = LWWTimestampFB.createLWWTimestamp(
+      const timestampOffset = LWWTimestampProto.createLWWTimestampProto(
         builder,
         this.fields.text.timestamp.utc,
         this.fields.text.timestamp.pid,
         this.fields.text.timestamp.tick,
       );
       const valueOffset = builder.createString(this.fields.text.data);
-      const textOffset = LWWRegisterString.createLWWRegisterString(
+      const textOffset = LWWRegisterStringProto.createLWWRegisterStringProto(
         builder,
         timestampOffset,
         valueOffset,
       );
-      Item.addText(builder, textOffset);
+      ItemProto.addText(builder, textOffset);
     }
-    const actionOffset = Item.endItem(builder);
+    const itemOffset = ItemProto.endItemProto(builder);
+    const actionOffset = AddItemActionProto.createAddItemActionProto(
+      builder,
+      itemOffset,
+    );
     return actionOffset;
   }
 }
 
-function createAirdayMessage(actions: Action[]) {
+export function createAirdayMessage(actions: Action[]) {
   const builder = new Builder(1024);
   const batchOffsets = actions
     .map((action) => {
       if (action instanceof AddItemAction) {
-        const itemOffset = action.addToFlatBuffer(builder);
-        const actionOffset = AddItemActionFB.createAddItemAction(
-          builder,
-          itemOffset,
-        );
-        const batchOffset = AirdayBatchComponent.createAirdayBatchComponent(
-          builder,
-          AirdayAction.AddItemAction,
-          actionOffset,
-        );
+        const actionOffset = action.addToFlatBuffer(builder);
+        const batchOffset =
+          AirdayBatchComponentProto.createAirdayBatchComponentProto(
+            builder,
+            AirdayActionProto.AddItemActionProto,
+            actionOffset,
+          );
         return batchOffset;
       }
       return null;
     })
     .filter((a) => a !== null);
-  AirdayMessage.startAirdayMessage(builder);
+  AirdayMessageProto.startAirdayMessageProto(builder);
   // const uuidOffset = UUID.createUUID(builder, Array.from(parse(v4()))); // TODO... wait where does this go...?
   batchOffsets.forEach((batchOffset) => {
-    AirdayMessage.addBatch(builder, batchOffset);
+    AirdayMessageProto.addBatch(builder, batchOffset);
   });
-  AirdayMessage.endAirdayMessage(builder);
+  AirdayMessageProto.endAirdayMessageProto(builder);
   return builder.asUint8Array();
 }

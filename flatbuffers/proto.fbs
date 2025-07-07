@@ -2,74 +2,74 @@
 
 namespace proto;
 
-struct LWWTimestamp {
+struct LWWTimestampProto {
   utc: double;
   pid: double;
   tick: short;
 }
 
-struct UUID {
+struct UUIDProto {
   bytes: [ubyte:16];
 }
 
-table LWWRegisterString {
-  timestamp: LWWTimestamp;
+table LWWRegisterStringProto {
+  timestamp: LWWTimestampProto;
   value: string;
 }
 
-struct LWWRegisterBool {
-  timestamp: LWWTimestamp;
+struct LWWRegisterBoolProto {
+  timestamp: LWWTimestampProto;
   value: bool;
 }
 
-table Item {
-  id: UUID (required);
-  text: LWWRegisterString;
-  completed: LWWRegisterBool;
+table ItemProto {
+  id: UUIDProto (required);
+  text: LWWRegisterStringProto;
+  completed: LWWRegisterBoolProto;
 }
 
-table DeleteItemAction {
+table DeleteItemActionProto {
   id: [ubyte];
 }
 
-table AddItemAction {
-  item: Item;
+table AddItemActionProto {
+  item: ItemProto;
 }
 
-union AirdayAction {
-  AddItemAction,
-  DeleteItemAction,
+union AirdayActionProto {
+  AddItemActionProto,
+  DeleteItemActionProto,
 }
 
-table AirdayBatchComponent {
-  action: AirdayAction;
+table AirdayBatchComponentProto {
+  action: AirdayActionProto;
 }
 
-table AirdayMessage {
-  batch: [AirdayBatchComponent];
+table AirdayMessageProto {
+  batch: [AirdayBatchComponentProto];
 }
 
 // Currently, simply a wrapper for JSON encoded message
-table JMAPMessage {
+table JMAPMessageProto {
   payload: string;
 }
 
-union Message {
-  AirdayMessage,
-  JMAPMessage,
+union MessageProto {
+  AirdayMessageProto,
+  JMAPMessageProto,
 }
 
-table TraceContext {
+table TraceContextProto {
   trace_id: string;
   span_id: string;
   parent_span_id: string;
   timestamp: uint64;
 }
 
-table MessageWrapper {
-  message: Message;
-  ctx: TraceContext;
+table MessageWrapperProto {
+  message: MessageProto;
+  ctx: TraceContextProto;
 }
 
-root_type MessageWrapper;
-root_type AirdayMessage;
+root_type MessageWrapperProto;
+root_type AirdayMessageProto;
