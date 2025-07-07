@@ -29,7 +29,7 @@ export class WebsocketManager {
     });
   }
   send(data: any) {
-    return this.ws.send(JSON.stringify(data));
+    return this.ws.send(data);
   }
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}

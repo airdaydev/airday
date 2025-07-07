@@ -16,6 +16,8 @@ import {
   AirdayActionProto,
   AirdayBatchComponentProto,
   DeleteItemActionProto,
+  MessageWrapperProto,
+  MessageProto,
 } from "../proto";
 import { getUuidBytes } from "../common";
 
@@ -147,6 +149,12 @@ export function createAirdayMessage(actions: Action[]) {
   batchOffsets.forEach((batchOffset) => {
     AirdayMessageProto.addBatch(builder, batchOffset);
   });
-  AirdayMessageProto.endAirdayMessageProto(builder);
+  let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
+  MessageWrapperProto.startMessageWrapperProto(builder);
+  MessageWrapperProto.addMessageType(builder, MessageProto.AirdayMessageProto);
+  MessageWrapperProto.addMessage(builder, messageOffset);
+  let messageWrapperOffset =
+    MessageWrapperProto.endMessageWrapperProto(builder);
+  builder.finish(messageWrapperOffset);
   return builder.asUint8Array();
 }

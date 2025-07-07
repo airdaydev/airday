@@ -23,6 +23,7 @@ export interface AirdayQueuedMessage extends QueuedMessage {
   type: Protocol.Airday;
 }
 
+// TODO: Add time based message flushing
 export class SyncClient {
   airdayClient: AirdayClient;
   hlc = new HLCProducer(); // TODO: Retain PID if exists
@@ -41,13 +42,6 @@ export class SyncClient {
     this.observers.add(observerFn);
     return () => this.observers.delete(observerFn);
   }
-  wrapMessage(builder: Builder, type: MessageProto, messageOffset: number) {
-    // TODO: Add span/trace/ctx
-    MessageWrapperProto.startMessageWrapperProto(builder);
-    MessageWrapperProto.addMessageType(builder, type);
-    MessageWrapperProto.addMessage(builder, messageOffset);
-    return builder;
-  }
   enqueue(message: QueuedMessage) {
     this.queue.push(message);
     this.next();
@@ -60,32 +54,31 @@ export class SyncClient {
     this.enqueue(message);
   }
   next() {
+    const batch: QueuedMessage[] = [];
     const messageQueueFull =
       this.pendingMessages.size > this.maxPendingMessages;
     if (!this.running || messageQueueFull || this.queue.length === 0) {
       return; // Wait until pending messages are done
     }
     // TODO: Possible optimisation; count batch count towards pending messages count! (separate from pendingMessages.size)
-    while (this.queue.length > 0) {
+    while (this.queue.length > 0 && batch.length < this.maxBatch) {
       const item = this.queue[0];
       this.queue.shift();
       if (item.type === Protocol.Airday) {
-        // const builder = new Builder(1024);
-        // builder.createObjectOffset(item.message);
-        // let buf = new ByteBuffer(item.message);
-        // let msg = AirdayMessageProto.getRootAsAirdayMessageProto(buf);
-        // this.wrapMessage(builder, MessageProto.AirdayMessageProto);
-        // this.wsSend(item);
+        batch.push(item);
       } else {
         // discard for now
       }
     }
+    this.wsSend(batch);
     if (!messageQueueFull && this.queue.length > 0) {
       this.next();
     }
   }
-  async wsSend(batchInput: Array<MessageWrapperProto>) {
-    // TODO: Validate returned action
+  async wsSend(batch: Array<QueuedMessage>) {
+    batch.map((item) => {
+      this.airdayClient.ws.send(item.message);
+    });
     // TODO: We need a timeout and ask to put back on the queue
     // Promise.resolve(batchInput).then((batch) => {
     //   this.pendingMessages.delete(batch.id);
