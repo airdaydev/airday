@@ -77,6 +77,8 @@ async fn read(mut receiver: SplitStream<WebSocket>) {
             }
             Ok(Message::Binary(b)) => {
                 let c = root_as_message_wrapper_proto(&b).unwrap();
+                // 1. Collect Airday actions & run through sequentially
+                // 2. Collect JMAP actions & run via JMAP engine, played back as demanded by jmap protocol
                 println!(
                     "Received binary message: {:?} {:?}",
                     b.len(),

@@ -8,14 +8,7 @@ Airday JavaScript Client handling
 - Undo/redo
 - TODO: E2EE management
 - TODO: JMAP calendar management
-
-
-## Serialisation approaches
-- Flatbuffer (1 more day on this) - my justification = no sloppy json (manually checking each field is not a bad thing), smaller,
-- Msgpack
-- Protobufs
-
-TODO: Profile uuid string vs bytes representation
+- TODO: Profile uuid string vs bytes representation
 
 ## Undo/redo notes
 something like this
