@@ -2,7 +2,6 @@ import { AirdayItem, type AirdayItemFields } from "./model";
 import {
   LWWRegisterString,
   LWWTimestamp,
-  type LW,
   type SerialisedLWWRegister,
 } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
@@ -101,10 +100,7 @@ export class AddItemAction extends Action {
   addToFlatBuffer(builder: Builder) {
     ItemProto.startItemProto(builder);
     if (!this.fields.id) throw new Error("id required");
-    ItemProto.startIdVector(builder, 16);
-    // TODO: Fix ID Vectors
-    const uuidOffset = NO;
-    ItemProto.addId(builder, uuidOffset);
+    ItemProto.createIdVector(builder, this.fields.id);
     if (this.fields.text) {
       const timestampOffset =
         this.fields.text.timestamp.addToFlatBuffer(builder);

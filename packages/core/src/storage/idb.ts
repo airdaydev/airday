@@ -1,10 +1,4 @@
-import {
-  type DBSchema,
-  type IDBPDatabase,
-  openDB,
-  deleteDB,
-  type StoreNames,
-} from "idb";
+import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { WAL, type AirdayActionWALEntry } from "./wal";
 
 export interface AirdayDBSchema extends DBSchema {
