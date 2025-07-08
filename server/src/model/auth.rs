@@ -60,7 +60,7 @@ pub async fn password_authorisation_cookie(
     headers: axum::http::HeaderMap,
     Json(payload): Json<PasswordAuthorisationReq>,
 ) -> Result<Json<UserSession>, AppError> {
-    let session = password_authorisation(&state.pool, headers, payload).await?;
+    let session = password_authorisation(&state.db, headers, payload).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);

@@ -13,20 +13,20 @@ mod jmap {
 }
 mod model;
 mod root;
+use crate::common::config::AirdayConfig;
+use crate::common::sql::Db;
 use axum::Router;
 use axum::routing::{any, get, post};
 use bpaf::Bpaf;
 use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
-
-use crate::common::config::AirdayConfig;
 #[cfg(test)]
 pub mod test_util;
 
 #[derive(Clone)]
 struct AppState {
-    pool: SqlitePool,
+    db: Db,
     config: AirdayConfig,
     ws_connection_map: sync::websocket::WSConnectionMap,
     ws_sub_map: sync::websocket::WSSubMap,
@@ -58,10 +58,11 @@ async fn main() {
         cfg.port = port;
     }
 
-    let pool = common::sql::connect_sqlite(&cfg).await;
+    // TODO: Match config to make correct connection (pg vs sql)
+    let db = common::sql::connect_sqlite(&cfg).await;
 
     let state = AppState {
-        pool,
+        db: db,
         config: cfg.clone(),
         ws_sub_map: sync::websocket::build_ws_sub_map(),
         ws_connection_map: sync::websocket::build_ws_conn_map(),

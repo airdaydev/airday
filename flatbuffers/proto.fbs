@@ -8,10 +8,6 @@ struct LWWTimestampProto {
   tick: short;
 }
 
-struct UUIDProto {
-  bytes: [ubyte:16];
-}
-
 table LWWRegisterStringProto {
   timestamp: LWWTimestampProto;
   data: string;
@@ -23,7 +19,7 @@ struct LWWRegisterBoolProto {
 }
 
 table ItemProto {
-  id: UUIDProto (required);
+  id: [ubyte] (required);
   text: LWWRegisterStringProto;
   completed: LWWRegisterBoolProto;
 }
