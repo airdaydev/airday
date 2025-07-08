@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
+    async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
 }
 
 pub struct UserModelSqlite {
@@ -29,6 +30,25 @@ impl UserModel for UserModelSqlite {
           WHERE email = ?
           "#,
             email
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        match result {
+            Ok(user) => Ok(user),
+            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+        }
+    }
+    async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError> {
+        let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
+        let result = sqlx::query_as!(
+            User,
+            r#"
+            SELECT id as "id: Uuid", email, password_hash
+            FROM user
+            WHERE id = ?
+            "#,
+            sqlx_uuid
         )
         .fetch_optional(&self.pool)
         .await;
@@ -101,26 +121,6 @@ impl From<User> for PublicUser {
     }
 }
 
-pub async fn get_by_id(pool: &SqlitePool, id: &Uuid) -> Result<Option<User>, AppError> {
-    let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
-    let result = sqlx::query_as!(
-        User,
-        r#"
-        SELECT id as "id: Uuid", email, password_hash
-        FROM user
-        WHERE id = ?
-        "#,
-        sqlx_uuid
-    )
-    .fetch_optional(pool)
-    .await;
-
-    match result {
-        Ok(user) => Ok(user),
-        Err(e) => Err(AppError::DatabaseError(e.to_string())),
-    }
-}
-
 pub async fn verify_login(db: &Db, email: &str, password: &str) -> Result<User, AppError> {
     let user = db.user.get_by_email(email).await?;
     match user {
@@ -170,7 +170,7 @@ mod tests {
         let db = test_util::create_test_db().await;
         let email = "daniel@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&db, email, password).await.unwrap();
+        let user = db.user.create(email, password).await.unwrap();
         assert_eq!(user.email, email);
         assert!(!user.password_hash.is_empty());
         assert_ne!(user.password_hash, password);
@@ -182,7 +182,7 @@ mod tests {
         let db = test_util::create_test_db().await;
         let email = "pw_test@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&db, email, password).await.unwrap();
+        let user = db.user.create(email, password).await.unwrap();
         verify_password(&user.password_hash, password).unwrap();
         assert!(verify_password(&user.password_hash, "wrongpassword").is_err())
     }
@@ -192,10 +192,10 @@ mod tests {
         let db = test_util::create_test_db().await;
         let email = "id_test@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&db, email, password).await.unwrap();
+        let user = db.user.create(email, password).await.unwrap();
 
         let user_id = Uuid::from_bytes(user.id.into_bytes());
-        let found_user = get_by_id(&db, &user_id).await.unwrap();
+        let found_user = db.user.get_by_id(&user_id).await.unwrap();
 
         assert!(found_user.is_some());
         let found_user = found_user.unwrap();
@@ -204,7 +204,7 @@ mod tests {
 
         // Test with non-existent ID
         let non_existent_id = Uuid::new_v4();
-        let not_found = get_by_id(&db, &non_existent_id).await.unwrap();
+        let not_found = db.user.get_by_id(&non_existent_id).await.unwrap();
         assert!(not_found.is_none());
     }
 }
