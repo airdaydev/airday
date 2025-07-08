@@ -127,6 +127,7 @@
 
 ## Marketing, community
 - [] Website (Astro)
+- [] Consider https://form-data.com/ for backend form (or just vibecode some bullshit)
 - [] Consider Zulip/matrix+element/discord (chat)
 - [] Consider https://motion.dev/ (Animation library)
 - [] Consider https://www.screen.studio/ (Screen recordings)
