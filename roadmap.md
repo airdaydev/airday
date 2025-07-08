@@ -1,6 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] get rust tests working again post db abstraction
+- [] get e2e test working again post flatbuffer id changes
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
