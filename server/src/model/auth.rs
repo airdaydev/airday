@@ -62,7 +62,7 @@ pub async fn password_authorisation(
     let user = verify_login(&db, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
     let client_meta = model::session::get_client_meta(&headers);
-    let session = model::session::UserSession::new(pool, user_uuid, client_meta).await?;
+    let session = model::session::UserSession::new(db, user_uuid, client_meta).await?;
     Ok(session)
 }
 

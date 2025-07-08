@@ -1,8 +1,10 @@
 use crate::AppState;
 use crate::common::datetime::serialize_datetime_iso;
+use crate::common::sql::Db;
 use crate::model::auth::{build_refresh_cookie, build_session_cookie};
 use crate::{common::error::AppError, model::user};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use async_trait::async_trait;
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::HeaderMap;
@@ -60,6 +62,56 @@ pub struct ClientMeta {
     pub user_agent: String,
 }
 
+struct InsertSessionParams {
+    id: Uuid,
+    token: String,
+    expires: i64,
+    refresh_token_hash: String,
+    refresh_expires: i64,
+    sqlx_user_id: SqlxUuid,
+    client_meta: ClientMeta,
+}
+
+#[async_trait]
+pub trait SessionModel: Send + Sync {
+    // TODO: Consider encapsulating these in struct
+    async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
+}
+
+pub struct SessionModelSqlite {
+    pool: SqlitePool,
+}
+
+impl SessionModelSqlite {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl SessionModel for SessionModelSqlite {
+    async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError> {
+        sqlx::query!(
+          r#"
+          INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          "#,
+          params.id,
+          params.token,
+          params.expires,
+          params.refresh_token_hash,
+          params.refresh_expires,
+          params.sqlx_user_id,
+          params.client_meta.user_agent,
+          params.client_meta.ip
+      )
+      .execute(&self.pool)
+      .await
+      .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+}
+
 pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
     let user_agent = headers
         .get("user-agent")
@@ -77,11 +129,7 @@ pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
 }
 
 impl UserSession {
-    pub async fn new(
-        pool: &SqlitePool,
-        user_id: Uuid,
-        client_meta: ClientMeta,
-    ) -> Result<Self, AppError> {
+    pub async fn new(db: &Db, user_id: Uuid, client_meta: ClientMeta) -> Result<Self, AppError> {
         let token = gen_token();
         let refresh_token = gen_token();
         let refresh_token_hash = user::hash_password(&refresh_token)?;
@@ -98,24 +146,17 @@ impl UserSession {
         let uuid = Uuid::new_v4();
         let id = SqlxUuid::from_bytes(uuid.into_bytes());
 
-        // Save session to database
-        sqlx::query!(
-            r#"
-            INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-            id,
-            token,
-            expires,
-            refresh_token_hash,
-            refresh_expires,
-            sqlx_user_id,
-            client_meta.user_agent,
-            client_meta.ip
-        )
-        .execute(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        db.session
+            .insert_session(InsertSessionParams {
+                id: id,
+                token: token.clone(),
+                expires: expires,
+                refresh_token_hash: refresh_token_hash,
+                refresh_expires: refresh_expires,
+                sqlx_user_id: sqlx_user_id,
+                client_meta: client_meta,
+            })
+            .await?;
 
         Ok(UserSession {
             id,
