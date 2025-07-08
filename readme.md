@@ -12,6 +12,7 @@
 - Bun
 - pnpm
 - `cargo install sqlx-cli`
+- flatbuffers
 
 ## Start
 ```bash
