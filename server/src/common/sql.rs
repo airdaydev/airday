@@ -28,7 +28,7 @@ pub struct Db {
 }
 
 impl Db {
-    fn from_sqlite_pool(pool: Pool<Sqlite>) -> Self {
+    pub fn from_sqlite_pool(pool: Pool<Sqlite>) -> Self {
         Db {
             pool: DatabasePool::Sqlite(pool.clone()),
             workspaces: Arc::new(WorkspaceModelSqlite::new(pool.clone())),

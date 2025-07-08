@@ -1,30 +1,33 @@
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::model::{
-    session::{ClientMeta, UserSession},
-    user::{self, User},
+use crate::{
+    common::sql::Db,
+    model::{
+        session::{ClientMeta, UserSession},
+        user::{self, User},
+    },
 };
 
-pub async fn create_test_pool() -> SqlitePool {
+pub async fn create_test_db() -> Db {
     let pool = SqlitePool::connect(":memory:")
         .await
         .expect("Failed to create test pool");
-    sqlx::migrate!("../migrations")
+    sqlx::migrate!("../sqlite/migrations")
         .run(&pool)
         .await
         .expect("Failed to run migrations");
 
-    pool
+    Db::from_sqlite_pool(pool)
 }
 
 pub async fn mock_user(pool: &SqlitePool, email: String) -> User {
     user::create(pool, &email, "test").await.unwrap()
 }
 
-pub async fn mock_session(pool: &SqlitePool, user_id: Uuid) -> UserSession {
+pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     UserSession::new(
-        &pool,
+        &db,
         user_id,
         ClientMeta {
             ip: "".to_string(),

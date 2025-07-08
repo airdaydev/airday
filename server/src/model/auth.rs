@@ -3,23 +3,10 @@ use crate::{
     common::{config::AirdayConfig, error::AppError, sql::Db},
     model::{self, session::UserSession, user::verify_login},
 };
-use async_trait::async_trait;
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
-
-// pub struct AuthModel {}
-
-// #[async_trait]
-// pub trait AuthModel: Send + Sync {
-//   async get_by_email(&self, email: String)
-// }
-
-// impl AuthModel {
-//   pub fn verify_login()
-// }
 
 #[derive(Serialize)]
 pub struct PwdAuthResponse {
@@ -86,7 +73,7 @@ pub async fn password_authorisation_bearer(
     headers: axum::http::HeaderMap,
     Json(payload): Json<PasswordAuthorisationReq>,
 ) -> Result<Json<UserSession>, AppError> {
-    let session = password_authorisation(&state.pool, headers, payload).await?;
+    let session = password_authorisation(&state.db, headers, payload).await?;
     Ok(Json(session))
 }
 
@@ -107,7 +94,7 @@ pub async fn create_user(
 ) -> Result<Json<CreateUserResponse>, AppError> {
     let email = payload.email;
     let password = payload.password;
-    let user = model::user::create(&state.pool, &email, &password).await;
+    let user = state.db.user.create(&email, &password).await;
     user.map(|u| {
         Json(CreateUserResponse {
             id: u.id.to_string(),

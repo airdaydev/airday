@@ -11,6 +11,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
+    async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
 }
 
 pub struct UserModelSqlite {
@@ -34,6 +35,35 @@ impl UserModel for UserModelSqlite {
 
         match result {
             Ok(user) => Ok(user),
+            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+        }
+    }
+    async fn create(&self, email: &str, password: &str) -> Result<User, AppError> {
+        let password_hash = hash_password(password)?;
+        let uuid = Uuid::new_v4();
+        let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
+        let result = sqlx::query_as!(
+            User,
+            r#"
+      INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?) RETURNING id as "id: Uuid", email, password_hash
+      "#,
+            sqlx_uuid,
+            email,
+            password_hash
+        )
+        .fetch_one(&self.pool)
+        .await;
+        match result {
+            Ok(user) => Ok(user),
+            Err(sqlx::Error::Database(db_err)) => {
+                if db_err.is_unique_violation() {
+                    Err(AppError::ValidationError(String::from(
+                        "A user with this email already exists.",
+                    )))
+                } else {
+                    Err(AppError::DatabaseError(db_err.to_string()))
+                }
+            }
             Err(e) => Err(AppError::DatabaseError(e.to_string())),
         }
     }
@@ -70,38 +100,6 @@ impl From<User> for PublicUser {
         }
     }
 }
-
-pub async fn create(pool: &SqlitePool, email: &str, password: &str) -> Result<User, AppError> {
-    let password_hash = hash_password(password)?;
-    let uuid = Uuid::new_v4();
-    let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
-    let result = sqlx::query_as!(
-        User,
-        r#"
-  INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?) RETURNING id as "id: Uuid", email, password_hash
-  "#,
-        sqlx_uuid,
-        email,
-        password_hash
-    )
-    .fetch_one(pool)
-    .await;
-    match result {
-        Ok(user) => Ok(user),
-        Err(sqlx::Error::Database(db_err)) => {
-            if db_err.is_unique_violation() {
-                Err(AppError::ValidationError(String::from(
-                    "A user with this email already exists.",
-                )))
-            } else {
-                Err(AppError::DatabaseError(db_err.to_string()))
-            }
-        }
-        Err(e) => Err(AppError::DatabaseError(e.to_string())),
-    }
-}
-
-pub async fn get_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, AppError> {}
 
 pub async fn get_by_id(pool: &SqlitePool, id: &Uuid) -> Result<Option<User>, AppError> {
     let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
@@ -169,10 +167,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user() {
-        let pool = test_util::create_test_pool().await;
+        let db = test_util::create_test_db().await;
         let email = "daniel@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&pool, email, password).await.unwrap();
+        let user = create(&db, email, password).await.unwrap();
         assert_eq!(user.email, email);
         assert!(!user.password_hash.is_empty());
         assert_ne!(user.password_hash, password);
@@ -181,23 +179,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_verify_password() {
-        let pool = test_util::create_test_pool().await;
+        let db = test_util::create_test_db().await;
         let email = "pw_test@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&pool, email, password).await.unwrap();
+        let user = create(&db, email, password).await.unwrap();
         verify_password(&user.password_hash, password).unwrap();
         assert!(verify_password(&user.password_hash, "wrongpassword").is_err())
     }
 
     #[tokio::test]
     async fn test_get_user_by_id() {
-        let pool = test_util::create_test_pool().await;
+        let db = test_util::create_test_db().await;
         let email = "id_test@air.day";
         let password = "abcd12375kajsflaks";
-        let user = create(&pool, email, password).await.unwrap();
+        let user = create(&db, email, password).await.unwrap();
 
         let user_id = Uuid::from_bytes(user.id.into_bytes());
-        let found_user = get_by_id(&pool, &user_id).await.unwrap();
+        let found_user = get_by_id(&db, &user_id).await.unwrap();
 
         assert!(found_user.is_some());
         let found_user = found_user.unwrap();
@@ -206,7 +204,7 @@ mod tests {
 
         // Test with non-existent ID
         let non_existent_id = Uuid::new_v4();
-        let not_found = get_by_id(&pool, &non_existent_id).await.unwrap();
+        let not_found = get_by_id(&db, &non_existent_id).await.unwrap();
         assert!(not_found.is_none());
     }
 }

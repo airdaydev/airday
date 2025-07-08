@@ -456,9 +456,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_crud() {
-        let pool = test_util::create_test_pool().await;
-        let user = test_util::mock_user(&pool, "test_session_crud@air.day".to_string()).await;
-        let session = mock_session(&pool, user.id).await;
+        let db = test_util::create_test_db().await;
+        let user = test_util::mock_user(&db, "test_session_crud@air.day".to_string()).await;
+        let session = mock_session(&db, user.id).await;
         let refreshed_session = UserSession::refresh(&pool, session.clone()).await.unwrap();
         assert_eq!(session.id, refreshed_session.id);
         assert_ne!(session.token, refreshed_session.token);
