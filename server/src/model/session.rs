@@ -62,7 +62,14 @@ pub struct ClientMeta {
     pub user_agent: String,
 }
 
-struct InsertSessionParams {
+pub struct TokenRefresh {
+    token: String,
+    expires: i64,
+    refresh_token_hash: String,
+    refresh_expires: i64,
+}
+
+pub struct InsertSessionParams {
     id: Uuid,
     token: String,
     expires: i64,
@@ -76,6 +83,14 @@ struct InsertSessionParams {
 pub trait SessionModel: Send + Sync {
     // TODO: Consider encapsulating these in struct
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
+    async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<UserSession>, AppError>;
+    async fn update_token(
+        &self,
+        session_id: Uuid,
+        token_refresh: &TokenRefresh,
+    ) -> Result<(), AppError>;
+    async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError>;
 }
 
 pub struct SessionModelSqlite {
@@ -109,6 +124,118 @@ impl SessionModel for SessionModelSqlite {
       .await
       .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         Ok(())
+    }
+    async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError> {
+        let now = get_current_timestamp();
+
+        let results = sqlx::query!(
+            r#"
+        SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+        refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
+        FROM session
+        WHERE user_id = ? AND expires > ?
+        "#,
+            user_id,
+            now
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let sessions: Vec<UserSession> = results
+            .into_iter()
+            .map(|row| UserSession {
+                id: row.id,
+                token: row.token,
+                expires: row.expires,
+                refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
+                user_id: row.user_id,
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<UserSession>, AppError> {
+        let now = get_current_timestamp();
+
+        let result = sqlx::query!(
+            r#"
+            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
+            FROM session
+            WHERE id = ? AND refresh_expires > ?
+            "#,
+            id,
+            now
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match result {
+            Some(row) => Ok(Some(UserSession {
+                id: row.id,
+                token: row.token,
+                expires: row.expires,
+                refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
+                user_id: row.user_id,
+            })),
+            None => Ok(None),
+        }
+    }
+    async fn update_token(
+        &self,
+        session_id: Uuid,
+        token_refresh: &TokenRefresh,
+    ) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"
+          UPDATE session
+          SET token = ?, expires = ?, refresh_token = ?, refresh_expires = ?
+          WHERE id = ?
+          "#,
+            token_refresh.token,
+            token_refresh.expires,
+            token_refresh.refresh_token_hash,
+            token_refresh.refresh_expires,
+            session_id,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+    async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError> {
+        let now = get_current_timestamp();
+
+        let result = sqlx::query!(
+            r#"
+            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
+            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>",
+            user_id as 'user_id: Uuid'
+            FROM session
+            WHERE token = ? AND expires > ?
+            "#,
+            token,
+            now
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match result {
+            Some(row) => Ok(Some(UserSession {
+                id: row.id,
+                expires: row.expires,
+                token: row.id.to_string(),
+                refresh_token: row.refresh_token,
+                refresh_expires: row.refresh_expires,
+                user_id: row.user_id,
+            })),
+            None => Ok(None),
+        }
     }
 }
 
@@ -168,71 +295,7 @@ impl UserSession {
         })
     }
 
-    pub async fn get_by_token(
-        pool: &SqlitePool,
-        token: &str,
-    ) -> Result<Option<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let result = sqlx::query!(
-            r#"
-            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>",
-            user_id as 'user_id: Uuid'
-            FROM session
-            WHERE token = ? AND expires > ?
-            "#,
-            token,
-            now
-        )
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        match result {
-            Some(row) => Ok(Some(UserSession {
-                id: row.id,
-                expires: row.expires,
-                token: row.id.to_string(),
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })),
-            None => Ok(None),
-        }
-    }
-
-    pub async fn get_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let result = sqlx::query!(
-            r#"
-            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
-            FROM session
-            WHERE id = ? AND refresh_expires > ?
-            "#,
-            id,
-            now
-        )
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        match result {
-            Some(row) => Ok(Some(UserSession {
-                id: row.id,
-                token: row.token,
-                expires: row.expires,
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })),
-            None => Ok(None),
-        }
-    }
-
-    pub async fn refresh(pool: &SqlitePool, old_session: UserSession) -> Result<Self, AppError> {
+    pub async fn refresh(db: &Db, session: UserSession) -> Result<Self, AppError> {
         // Generate new tokens
         let token = gen_token();
         let new_refresh_token = gen_token();
@@ -243,66 +306,23 @@ impl UserSession {
         let expires = calculate_session_expiry(now);
         let refresh_expires = calculate_refresh_expiry(now);
 
-        // Update existing session with new tokens
-        sqlx::query!(
-            r#"
-            UPDATE session
-            SET token = ?, expires = ?, refresh_token = ?, refresh_expires = ?
-            WHERE id = ?
-            "#,
+        let refresh = TokenRefresh {
             token,
             expires,
             refresh_token_hash,
             refresh_expires,
-            old_session.id,
-        )
-        .execute(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        };
+        // Update existing session with new tokens
+        db.session.update_token(session.id, &refresh).await?;
 
         Ok(UserSession {
-            id: old_session.id,
-            token,
+            id: session.id,
+            token: refresh.token.clone(),
             expires: timestamp_to_datetime(expires),
             refresh_token: new_refresh_token,
             refresh_expires: timestamp_to_datetime(refresh_expires),
-            user_id: old_session.user_id,
+            user_id: session.user_id,
         })
-    }
-
-    pub async fn get_by_user(
-        pool: &SqlitePool,
-        user_id: Uuid,
-    ) -> Result<Vec<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let results = sqlx::query!(
-            r#"
-        SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-        refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
-        FROM session
-        WHERE user_id = ? AND expires > ?
-        "#,
-            user_id,
-            now
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let sessions: Vec<UserSession> = results
-            .into_iter()
-            .map(|row| UserSession {
-                id: row.id,
-                token: row.token,
-                expires: row.expires,
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })
-            .collect();
-
-        Ok(sessions)
     }
 }
 
@@ -315,7 +335,7 @@ pub async fn get_user_sessions(
     State(state): State<AppState>,
     session: UserSession,
 ) -> Result<Json<GetUserSessionsResponse>, AppError> {
-    let sessions = UserSession::get_by_user(&state.pool, session.id).await?;
+    let sessions = state.db.session.get_by_user(session.id).await?;
     Ok(Json(GetUserSessionsResponse { data: sessions }))
 }
 
@@ -330,12 +350,12 @@ pub struct RefreshSessionReq {
 }
 
 async fn refresh_if_valid(
-    pool: &SqlitePool,
+    db: &Db,
     user_id: Uuid,
     refresh_token: &str,
 ) -> Result<UserSession, AppError> {
     let refresh_token: &[u8] = refresh_token.as_bytes();
-    let old_session = match UserSession::get_by_id(pool, user_id).await? {
+    let old_session = match db.session.get_by_id(user_id).await? {
         Some(session) => session,
         None => {
             return Err(AppError::AuthorisationError(
@@ -351,7 +371,7 @@ async fn refresh_if_valid(
     if !ok {
         return Err(AppError::ValidationError(String::from("Invalid token")));
     }
-    let session = UserSession::refresh(pool, old_session).await?;
+    let session = UserSession::refresh(db, old_session).await?;
     Ok(session)
 }
 
@@ -364,7 +384,7 @@ pub async fn refresh_session_bearer(
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
         .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
-    let session = refresh_if_valid(&state.pool, sqlx_user_id, &refresh_token).await?;
+    let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     Ok(Json(session))
 }
 
@@ -377,7 +397,7 @@ pub async fn refresh_session_cookie(
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
         .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
-    let session = refresh_if_valid(&state.pool, sqlx_user_id, &refresh_token).await?;
+    let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
@@ -435,7 +455,10 @@ where
                     "no auth token found",
                 )))?;
 
-            let session = UserSession::get_by_token(&app_state.pool, &token)
+            let session = app_state
+                .db
+                .session
+                .get_by_token(&token)
                 .await
                 .map_err(|_| {
                     AppError::ServerError(String::from("Failed to retrieve user session db error"))
@@ -459,11 +482,11 @@ mod tests {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, "test_session_crud@air.day".to_string()).await;
         let session = mock_session(&db, user.id).await;
-        let refreshed_session = UserSession::refresh(&pool, session.clone()).await.unwrap();
+        let refreshed_session = UserSession::refresh(&db, session.clone()).await.unwrap();
         assert_eq!(session.id, refreshed_session.id);
         assert_ne!(session.token, refreshed_session.token);
         assert_ne!(session.refresh_token, refreshed_session.refresh_token);
-        let existing_session = UserSession::get_by_id(&pool, session.id).await.unwrap();
+        let existing_session = db.session.get_by_id(session.id).await.unwrap();
         assert!(existing_session.is_some());
     }
 }

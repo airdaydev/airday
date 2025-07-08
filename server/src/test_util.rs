@@ -5,7 +5,7 @@ use crate::{
     common::sql::Db,
     model::{
         session::{ClientMeta, UserSession},
-        user::{self, User},
+        user::User,
     },
 };
 
@@ -21,8 +21,8 @@ pub async fn create_test_db() -> Db {
     Db::from_sqlite_pool(pool)
 }
 
-pub async fn mock_user(pool: &SqlitePool, email: String) -> User {
-    user::create(pool, &email, "test").await.unwrap()
+pub async fn mock_user(db: &Db, email: String) -> User {
+    db.user.create(&email, "test").await.unwrap()
 }
 
 pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
