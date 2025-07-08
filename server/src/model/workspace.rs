@@ -12,18 +12,18 @@ pub trait WorkspaceModel: Send + Sync {
     async fn create(&self, owner_id: &Uuid) -> Result<Option<Workspace>, AppError>;
 }
 
-pub struct SqliteWorkspace {
+pub struct WorkspaceModelSqlite {
     pool: SqlitePool,
 }
 
-impl SqliteWorkspace {
+impl WorkspaceModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl WorkspaceModel for SqliteWorkspace {
+impl WorkspaceModel for WorkspaceModelSqlite {
     async fn create(&self, owner_id: &Uuid) -> Result<Option<Workspace>, AppError> {
         Ok(Some(Workspace {}))
     }

@@ -1,13 +1,25 @@
 use crate::{
     AppState,
-    common::{config::AirdayConfig, error::AppError},
+    common::{config::AirdayConfig, error::AppError, sql::Db},
     model::{self, session::UserSession, user::verify_login},
 };
+use async_trait::async_trait;
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
+
+// pub struct AuthModel {}
+
+// #[async_trait]
+// pub trait AuthModel: Send + Sync {
+//   async get_by_email(&self, email: String)
+// }
+
+// impl AuthModel {
+//   pub fn verify_login()
+// }
 
 #[derive(Serialize)]
 pub struct PwdAuthResponse {
@@ -43,11 +55,11 @@ pub fn build_refresh_cookie(config: AirdayConfig, token: &str) -> Cookie<'static
 }
 
 pub async fn password_authorisation(
-    pool: &SqlitePool,
+    db: &Db,
     headers: axum::http::HeaderMap,
     payload: PasswordAuthorisationReq,
 ) -> Result<UserSession, AppError> {
-    let user = verify_login(pool, &payload.email, &payload.password).await?;
+    let user = verify_login(&db, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
     let client_meta = model::session::get_client_meta(&headers);
     let session = model::session::UserSession::new(pool, user_uuid, client_meta).await?;

@@ -1,11 +1,53 @@
-use crate::common::error::AppError;
+use crate::common::{error::AppError, sql::Db};
 use argon2::{
     Argon2, PasswordVerifier,
     password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
+use async_trait::async_trait;
 use serde::Serialize;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
+
+#[async_trait]
+pub trait UserModel: Send + Sync {
+    async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
+}
+
+pub struct UserModelSqlite {
+    pool: SqlitePool,
+}
+
+#[async_trait]
+impl UserModel for UserModelSqlite {
+    async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
+        let result = sqlx::query_as!(
+            User,
+            r#"
+          SELECT id as "id: Uuid", email, password_hash
+          FROM user
+          WHERE email = ?
+          "#,
+            email
+        )
+        .fetch_optional(&self.pool)
+        .await;
+
+        match result {
+            Ok(user) => Ok(user),
+            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+        }
+    }
+}
+
+impl UserModelSqlite {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
+// impl UserModel {
+//   pub fn verify_login()
+// }
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct User {
@@ -59,24 +101,7 @@ pub async fn create(pool: &SqlitePool, email: &str, password: &str) -> Result<Us
     }
 }
 
-pub async fn get_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, AppError> {
-    let result = sqlx::query_as!(
-        User,
-        r#"
-        SELECT id as "id: Uuid", email, password_hash
-        FROM user
-        WHERE email = ?
-        "#,
-        email
-    )
-    .fetch_optional(pool)
-    .await;
-
-    match result {
-        Ok(user) => Ok(user),
-        Err(e) => Err(AppError::DatabaseError(e.to_string())),
-    }
-}
+pub async fn get_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, AppError> {}
 
 pub async fn get_by_id(pool: &SqlitePool, id: &Uuid) -> Result<Option<User>, AppError> {
     let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
@@ -98,12 +123,8 @@ pub async fn get_by_id(pool: &SqlitePool, id: &Uuid) -> Result<Option<User>, App
     }
 }
 
-pub async fn verify_login(
-    pool: &SqlitePool,
-    email: &str,
-    password: &str,
-) -> Result<User, AppError> {
-    let user = get_by_email(pool, email).await?;
+pub async fn verify_login(db: &Db, email: &str, password: &str) -> Result<User, AppError> {
+    let user = db.user.get_by_email(email).await?;
     match user {
         Some(user) => {
             verify_password(&user.password_hash, password)?;

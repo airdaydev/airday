@@ -18,7 +18,6 @@ use crate::common::sql::Db;
 use axum::Router;
 use axum::routing::{any, get, post};
 use bpaf::Bpaf;
-use sqlx::SqlitePool;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
 #[cfg(test)]

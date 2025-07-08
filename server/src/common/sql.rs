@@ -1,6 +1,9 @@
 use crate::{
     common::config::AirdayConfig,
-    model::workspace::{SqliteWorkspace, WorkspaceModel},
+    model::{
+        user::{UserModel, UserModelSqlite},
+        workspace::{SqliteWorkspace, WorkspaceModel},
+    },
 };
 use sqlx::{
     Pool, Sqlite,
@@ -19,6 +22,7 @@ pub enum DatabasePool {
 pub struct Db {
     pub pool: DatabasePool,
     pub workspaces: Arc<dyn WorkspaceModel>,
+    pub user: Arc<dyn UserModel>,
 }
 
 impl Db {
@@ -26,6 +30,7 @@ impl Db {
         Db {
             pool: DatabasePool::Sqlite(pool.clone()),
             workspaces: Arc::new(SqliteWorkspace::new(pool.clone())),
+            user: Arc::new(UserModelSqlite::new(pool.clone())),
         }
     }
     // fn from_pg_pool(pool: Pool<Pg>) -> Self {
