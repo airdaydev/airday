@@ -1,15 +1,14 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] Personal workspace setup on account creation
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
-- [] @airday/core - repeat events
-- [] @airday/core - repeat events (shuffle)?
+- [] @airday/core - repeat tasks
+- [] @airday/core - repeat tasks (shuffle)?
 - [] @airday/core - export database to flatbuffer
 - [] deal with orphaned items
 - [] UI - Create items
@@ -29,6 +28,7 @@
 - [] Done board chronological index
 
 ## 2025 Q4 Initial Release
+- [] Postgresql adapter with personal workspace setup on account creation
 - [] Text encryption
 - [] Shared lists
 

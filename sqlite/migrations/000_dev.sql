@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS user_workspace (
 );
 
 -- TODO: All following tables to be created on a per workspace basis
--- & appended with space_ e.g. workspace_{sqids}_item i.e. moved to code
+-- & appended with space_ e.g. workspace_{uuid}_item i.e. moved to code
 
 CREATE TABLE IF NOT EXISTS item (
   id UUID NOT NULL PRIMARY KEY,
