@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] @airday/core sqlite - workspace ids
+- [] authenticate users over websockets, setting a default workspace
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
