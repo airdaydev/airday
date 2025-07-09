@@ -98,9 +98,10 @@ export class AddItemAction extends Action {
     return new AddItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
-    ItemProto.startItemProto(builder);
     if (!this.fields.id) throw new Error("id required");
-    ItemProto.createIdVector(builder, this.fields.id);
+    const idOffset = ItemProto.createIdVector(builder, this.fields.id);
+    ItemProto.startItemProto(builder);
+    ItemProto.addId(builder, idOffset);
     if (this.fields.text) {
       const timestampOffset =
         this.fields.text.timestamp.addToFlatBuffer(builder);
