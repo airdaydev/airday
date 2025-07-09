@@ -12,6 +12,12 @@ const createUserOpts = APISchema(
 const createUserRes = APISchema(
   v.object({
     id: v.string().required(),
+    default_workspace: v
+      .object({
+        id: v.string().required(),
+        name: v.string().required(),
+      })
+      .required(),
   }),
 );
 

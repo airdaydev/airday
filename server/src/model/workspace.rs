@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use serde::Serialize;
 use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
@@ -6,9 +7,10 @@ use uuid::Uuid;
 use crate::common::error::AppError;
 
 // Creating a workspace
-struct Workspace {
-    id: Uuid,
-    name: String,
+#[derive(Serialize)]
+pub struct Workspace {
+    pub id: Uuid,
+    pub name: String,
 }
 
 #[async_trait]
@@ -29,20 +31,61 @@ impl WorkspaceModelSqlite {
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
     async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
-        let uuid = Uuid::new_v4();
-        let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+
+        let workspace_uuid = Uuid::new_v4();
+        let workspace_sqlx_uuid = SqlxUuid::from_bytes(workspace_uuid.into_bytes());
         let name = String::from("Personal");
-        let result = sqlx::query_as!(
+
+        // Create workspace
+        let workspace = sqlx::query_as!(
             Workspace,
             r#"
     INSERT INTO workspace (id, name) VALUES (?, ?) RETURNING id as "id: Uuid", name
     "#,
-            sqlx_uuid,
+            workspace_sqlx_uuid,
             name
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
-        .map_err(|err| Err(AppError::DatabaseError(err.to_string())))?;
-        Ok(result)
+        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+
+        // Create user_workspace relationship
+        let owner_sqlx_uuid = SqlxUuid::from_bytes(owner_id.into_bytes());
+
+        sqlx::query!(
+            r#"
+    INSERT INTO user_workspace (user_id, workspace_id) VALUES (?, ?)
+    "#,
+            owner_sqlx_uuid,
+            workspace_sqlx_uuid
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+
+        sqlx::query!(
+            r#"
+            UPDATE user
+            SET default_workspace_id = ?
+            WHERE id = ?
+              AND default_workspace_id IS NULL;
+    "#,
+            workspace_sqlx_uuid,
+            owner_sqlx_uuid,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+
+        Ok(workspace)
     }
 }

@@ -8,7 +8,9 @@
 CREATE TABLE IF NOT EXISTS user (
   id UUID NOT NULL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL
+  password_hash TEXT NOT NULL,
+  default_workspace_id UUID NULL,
+  FOREIGN KEY (default_workspace_id) REFERENCES workspace (id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS workspace (
@@ -17,12 +19,11 @@ CREATE TABLE IF NOT EXISTS workspace (
 );
 
 CREATE TABLE IF NOT EXISTS user_workspace (
-  id UUID NOT NULL PRIMARY KEY,
   user_id UUID NOT NULL,
   workspace_id UUID NOT NULL,
   FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE CASCADE,
-  UNIQUE(user_id, workspace_id)
+  PRIMARY KEY (user_id, workspace_id)
 );
 
 CREATE TABLE IF NOT EXISTS item (

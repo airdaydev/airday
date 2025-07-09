@@ -15,13 +15,15 @@ test("API root url & version", async () => {
   expect(d.data.version).toBeTypeOf("string");
 });
 
-test("Creating a user", async () => {
+test("Creating a user & default workspace", async () => {
   const res = await createUser(client, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",
   });
   expect(res.data.id).toBeTypeOf("string");
   expect(res.data.id.length).toBe(36);
+  expect(res.data.default_workspace.id).toHaveLength(36);
+  expect(res.data.default_workspace.name).toBeTypeOf("string");
   expect(
     createUser(client, {
       email: "daniel@air.day",
