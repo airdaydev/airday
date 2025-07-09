@@ -1,11 +1,13 @@
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
+use futures_util::SinkExt;
+use tokio::sync::mpsc;
 // use futures_util::SinkExt;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
 use crate::model::user::User;
-use crate::sync::airday::{self, AirdayMessage, message_handler};
+use crate::sync::airday::{AirdayMessage, message_handler};
 use crate::sync::proto_generated::proto::MessageProto;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use std::collections::HashMap;
@@ -27,12 +29,6 @@ pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Res
     })
 }
 
-pub struct WebsocketClient {
-    id: Uuid,
-    sender: SplitSink<WebSocket, Message>,
-    user_id: Option<User>,
-}
-
 // TODO: e.g. like client upgrades
 pub const PUBLIC_CHANNEL: &str = "public";
 
@@ -46,12 +42,18 @@ pub const PUBLIC_CHANNEL: &str = "public";
 
 type WSRoomName = String;
 
-pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketClient>>>;
+pub struct WebsocketConn {
+    id: Uuid,
+    sender: mpsc::Sender<Message>,
+    user_id: Option<User>,
+}
+
+pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketConn>>>;
 pub fn build_ws_sub_map() -> WSSubMap {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
-pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketClient>>>;
+pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketConn>>>;
 pub fn build_ws_conn_map() -> WSConnectionMap {
     Arc::new(Mutex::new(HashMap::new()))
 }
@@ -59,12 +61,23 @@ pub fn build_ws_conn_map() -> WSConnectionMap {
 async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
     let (sender, receiver) = socket.split();
-
-    tokio::spawn(write(sender));
-    tokio::spawn(read(state, receiver));
+    let (tx, rx) = mpsc::channel::<Message>(100);
+    let socket_id = Uuid::new_v4();
+    let connection = WebsocketConn {
+        id: socket_id,
+        sender: tx,
+        user_id: None,
+    };
+    state
+        .ws_connection_map
+        .lock()
+        .unwrap()
+        .insert(socket_id, connection);
+    tokio::spawn(read(state, receiver, socket_id));
+    tokio::spawn(write(sender, rx));
 }
 
-async fn read(state: AppState, mut receiver: SplitStream<WebSocket>) {
+async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
         match msg {
             Ok(Message::Binary(b)) => {
@@ -78,7 +91,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>) {
                         let airday_message = msg.message_as_airday_message_proto().unwrap();
                         let parsed_message = AirdayMessage::from_proto(&airday_message);
                         if let Ok(msg) = parsed_message {
-                            message_handler(&state, &msg).await;
+                            message_handler(&state, &msg, &socket_id).await;
                         }
                     }
                     _ => {
@@ -101,8 +114,28 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>) {
             }
         }
     }
+    state.ws_connection_map.lock().unwrap().remove(&socket_id);
 }
 
-async fn write(_sender: SplitSink<WebSocket, Message>) {
+async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver<Message>) {
+    while let Some(message) = rx.recv().await {
+        if let Err(err) = sender.send(message).await {
+            eprintln!("Failed to send: {:?}", err);
+            break;
+        }
+    }
     println!("Received message");
+}
+
+pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {
+    let sender = {
+        let mut connections = state.ws_connection_map.lock().unwrap();
+        connections
+            .get_mut(client_id)
+            .map(|client| client.sender.clone())
+    };
+    if let Some(sender) = sender {
+        let _ = sender.send(message).await;
+        // TODO: Show error! Consider disconnecting?
+    }
 }

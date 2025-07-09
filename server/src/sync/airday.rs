@@ -1,7 +1,13 @@
+use axum::extract::ws::Message;
+use uuid::Uuid;
+
 use crate::{
     AppState,
     common::error::AppError,
-    sync::proto_generated::proto::{AirdayActionProto, AirdayMessageProto},
+    sync::{
+        proto_generated::proto::{AirdayActionProto, AirdayMessageProto},
+        websocket::send_to_client,
+    },
 };
 
 pub struct AirdayMessage {
@@ -61,11 +67,18 @@ impl AirdayMessage {
 
 // TODO: We should probably parse/collect these first then action them
 // TODO: All unwraps should be parsing/validation errors
-pub async fn message_handler(state: &AppState, message: &AirdayMessage) -> () {
+pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
                 state.db.session.get_by_token(&session_token).await.unwrap();
+                // TODO: Reciprocal Authenticated action (todo: look up that!)
+                send_to_client(
+                    &state,
+                    &socket_id,
+                    Message::Text(String::from("test").into()),
+                )
+                .await;
                 return ();
             }
             _ => {
