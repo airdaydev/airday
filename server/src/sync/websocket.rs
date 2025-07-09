@@ -5,7 +5,7 @@ use axum::response::Response;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
 use crate::model::user::User;
-use crate::sync::airday;
+use crate::sync::airday::{self, AirdayMessage, message_handler};
 use crate::sync::proto_generated::proto::MessageProto;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use std::collections::HashMap;
@@ -22,7 +22,9 @@ use uuid::Uuid;
 
 pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     // TODO: Unwrap cookie auth here
-    ws.on_upgrade(handle_socket)
+    ws.on_upgrade(|socket| async move {
+        handle_socket(socket, state).await;
+    })
 }
 
 pub struct WebsocketClient {
@@ -54,50 +56,48 @@ pub fn build_ws_conn_map() -> WSConnectionMap {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
-async fn handle_socket(socket: WebSocket) {
+async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
     let (sender, receiver) = socket.split();
 
     tokio::spawn(write(sender));
-    tokio::spawn(read(receiver));
+    tokio::spawn(read(state, receiver));
 }
 
-async fn read(mut receiver: SplitStream<WebSocket>) {
+async fn read(state: AppState, mut receiver: SplitStream<WebSocket>) {
     while let Some(msg) = receiver.next().await {
         match msg {
-            Ok(Message::Text(text)) => {
-                println!("Received text: {}", text);
-            }
             Ok(Message::Binary(b)) => {
                 let msg = root_as_message_wrapper_proto(&b).unwrap();
                 match msg.message_type() {
+                    // Holy shit man i can just fuck this off and put it as text...
                     MessageProto::JMAPMessageProto => {
                         println!("Dropping JMAP message!");
                     }
                     MessageProto::AirdayMessageProto => {
                         let airday_message = msg.message_as_airday_message_proto().unwrap();
-                        // TODO: Dependency injection may be required via handle_socket
-                        airday::message_handler(airday_message);
+                        let parsed_message = AirdayMessage::from_proto(&airday_message);
+                        if let Ok(msg) = parsed_message {
+                            message_handler(&state, &msg).await;
+                        }
                     }
                     _ => {
-                        println!("how bout i'm doing none of em")
+                        println!("Throwing away non binary message")
                     }
                 }
                 ()
             }
-            Ok(Message::Ping(_)) => {
-                println!("Received ping")
-            }
-            Ok(Message::Pong(_)) => {
-                println!("Received pong")
-            }
             Ok(Message::Close(_)) => {
+                // Clean up maps
                 println!("Closed")
             }
             Err(e) => {
                 eprintln!("Error receiving message: {:?}", e);
                 // TODO: Disconnect client
                 break;
+            }
+            _ => {
+                // Discard
             }
         }
     }
