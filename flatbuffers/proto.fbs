@@ -32,7 +32,13 @@ table AddItemActionProto {
   item: ItemProto;
 }
 
+table AuthenticateAction {
+  session_token: string;
+  default_workspace_id: [ubyte];
+}
+
 union AirdayActionProto {
+  AuthenticateAction,
   AddItemActionProto,
   DeleteItemActionProto,
 }

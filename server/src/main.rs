@@ -5,6 +5,7 @@ mod common {
     pub mod sql;
 }
 mod sync {
+    pub mod airday;
     pub mod proto_generated;
     pub mod websocket;
 }

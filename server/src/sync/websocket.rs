@@ -3,13 +3,14 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 // use futures_util::SinkExt;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
+use crate::AppState;
+use crate::model::user::User;
+use crate::sync::airday;
+use crate::sync::proto_generated::proto::MessageProto;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-
-use crate::AppState;
 
 // auth handler
 // channel: sync
@@ -24,13 +25,10 @@ pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Res
     ws.on_upgrade(handle_socket)
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct CreateItemMessage {}
-
 pub struct WebsocketClient {
     id: Uuid,
-    user_id: Option<Uuid>,
     sender: SplitSink<WebSocket, Message>,
+    user_id: Option<User>,
 }
 
 // TODO: e.g. like client upgrades
@@ -56,11 +54,6 @@ pub fn build_ws_conn_map() -> WSConnectionMap {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
-struct OutgoingMessage {
-    client_id: String,
-    content: String,
-}
-
 async fn handle_socket(socket: WebSocket) {
     // TODO: Evaluate move to async mutex after access patterns established!
     let (sender, receiver) = socket.split();
@@ -76,14 +69,21 @@ async fn read(mut receiver: SplitStream<WebSocket>) {
                 println!("Received text: {}", text);
             }
             Ok(Message::Binary(b)) => {
-                let c = root_as_message_wrapper_proto(&b).unwrap();
-                // 1. Collect Airday actions & run through sequentially
-                // 2. Collect JMAP actions & run via JMAP engine, played back as demanded by jmap protocol
-                println!(
-                    "Received binary message: {:?} {:?}",
-                    b.len(),
-                    c.message_type()
-                );
+                let msg = root_as_message_wrapper_proto(&b).unwrap();
+                match msg.message_type() {
+                    MessageProto::JMAPMessageProto => {
+                        println!("Dropping JMAP message!");
+                    }
+                    MessageProto::AirdayMessageProto => {
+                        let airday_message = msg.message_as_airday_message_proto().unwrap();
+                        // TODO: Dependency injection may be required via handle_socket
+                        airday::message_handler(airday_message);
+                    }
+                    _ => {
+                        println!("how bout i'm doing none of em")
+                    }
+                }
+                ()
             }
             Ok(Message::Ping(_)) => {
                 println!("Received ping")
