@@ -10,7 +10,6 @@
 - [] @airday/core - create subitems / sequence
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
-- [] @airday/core - export database to flatbuffer
 - [] deal with orphaned items
 - [] UI - Create items
 - [] UI - Update items
@@ -20,10 +19,10 @@
 - [] Robust dummy data system
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
-- @airday/core - tracing
-- server - tracing
-- Add license https://mariadb.com/bsl-faq-adopting/
-- Put up website
+- [] @airday/core - tracing
+- [] server - tracing
+- [] Add license https://mariadb.com/bsl-faq-adopting/
+- [] Put up website
 
 ## Done board
 - [] Done board show which list item was from
@@ -31,6 +30,7 @@
 - [] Done board chronological index
 
 ## 2025 Q4 Initial Release
+- [] @airday/core - export database to flatbuffer
 - [] Postgresql adapter with personal workspace setup on account creation
 - [] Text encryption
 - [] Shared lists
