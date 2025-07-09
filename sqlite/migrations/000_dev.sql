@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS user (
 );
 
 CREATE TABLE IF NOT EXISTS workspace (
-  id UUID NOT NULL PRIMARY KEY
+  id UUID NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_workspace (
@@ -24,10 +25,8 @@ CREATE TABLE IF NOT EXISTS user_workspace (
   UNIQUE(user_id, workspace_id)
 );
 
--- TODO: All following tables to be created on a per workspace basis
--- & appended with space_ e.g. workspace_{uuid}_item i.e. moved to code
-
 CREATE TABLE IF NOT EXISTS item (
+  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   text TEXT NOT NULL,
   text_ts STRING NOT NULL,
@@ -41,6 +40,7 @@ CREATE TABLE IF NOT EXISTS item (
 );
 
 CREATE TABLE IF NOT EXISTS item_tombstone (
+  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   container_id UUID NOT NULL,
   item_id UUID NOT NULL,
@@ -48,12 +48,14 @@ CREATE TABLE IF NOT EXISTS item_tombstone (
 );
 
 CREATE TABLE IF NOT EXISTS container (
+  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   title TEXT NOT NULL,
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS container_item (
+  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   container_id UUID NOT NULL,
   item_id UUID NOT NULL,
@@ -65,6 +67,7 @@ CREATE TABLE IF NOT EXISTS container_item (
 );
 
 CREATE TABLE IF NOT EXISTS container_item_tombstone (
+  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   container_id UUID NOT NULL,
   item_id UUID NOT NULL,
