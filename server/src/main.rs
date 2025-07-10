@@ -31,7 +31,7 @@ struct AppState {
     db: Db,
     config: AirdayConfig,
     ws_connection_map: sync::websocket::WSConnectionMap,
-    ws_sub_map: sync::websocket::WSSubMap,
+    // ws_sub_map: sync::websocket::WSSubMap,
 }
 
 #[derive(Bpaf, Debug, Clone)]
@@ -66,7 +66,7 @@ async fn main() {
     let state = AppState {
         db: db,
         config: cfg.clone(),
-        ws_sub_map: sync::websocket::build_ws_sub_map(),
+        // ws_sub_map: sync::websocket::build_ws_sub_map(),
         ws_connection_map: sync::websocket::build_ws_conn_map(),
     };
 

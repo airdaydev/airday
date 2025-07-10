@@ -28,26 +28,21 @@ pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Res
     })
 }
 
-// TODO: e.g. like client upgrades
-pub const PUBLIC_CHANNEL: &str = "public";
-
 // fn accountWSChannel(id: Uuid) -> String {
 //     format!("account_{}", id)
 // }
 
-type WSRoomName = String;
-
 #[derive(Clone)]
 pub struct WebsocketConn {
-    pub id: Uuid,
     pub sender: mpsc::Sender<Message>,
     pub user_id: Option<Uuid>,
 }
 
-pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketConn>>>;
-pub fn build_ws_sub_map() -> WSSubMap {
-    Arc::new(Mutex::new(HashMap::new()))
-}
+// type WSRoomName = String;
+// pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketConn>>>;
+// pub fn build_ws_sub_map() -> WSSubMap {
+//     Arc::new(Mutex::new(HashMap::new()))
+// }
 
 pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketConn>>>;
 pub fn build_ws_conn_map() -> WSConnectionMap {
@@ -60,7 +55,6 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let (tx, rx) = mpsc::channel::<Message>(100);
     let socket_id = Uuid::new_v4();
     let connection = WebsocketConn {
-        id: socket_id,
         sender: tx,
         user_id: None,
     };

@@ -8,9 +8,8 @@ use crate::{
     sync::{
         outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
-            AirdayActionProto, AirdayActionProtoUnionTableOffset, AirdayBatchComponentProto,
-            AirdayBatchComponentProtoArgs, AirdayMessageProto, AuthenticateResponseProto,
-            AuthenticateResponseProtoArgs,
+            AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
+            AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
         },
         websocket::send_to_client,
     },
@@ -23,8 +22,8 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { id: String }, // TODO: possible properties not this
-    DeleteItem { id: String },
+    // AddItem { id: String }, // TODO: possible properties not this
+    // DeleteItem { id: String },
 }
 
 impl AirdayMessage {
@@ -61,16 +60,22 @@ impl AirdayMessage {
                     })
                 }
                 AirdayActionProto::AddItemActionProto => {
-                    let action = batch_component.action_as_add_item_action_proto().ok_or(
-                        AppError::ValidationError(String::from("Could not parse add item action")),
+                    let action = batch_component
+                        .action_as_add_item_action_proto()
+                        .ok_or(AppError::ValidationError(String::from(
+                            "Could not parse add item action",
+                        )))
+                        .unwrap();
+                    println!(
+                        "Received add item message, {:?}",
+                        action.item().unwrap().id()
                     );
-                    println!("Received add item message");
                 }
                 AirdayActionProto::DeleteItemActionProto => {
                     let action = batch_component
                         .action_as_delete_item_action_proto()
                         .unwrap();
-                    println!("Received delete item message");
+                    println!("Received delete item message {:?}", action.id().unwrap());
                 }
                 _ => {
                     println!("BROKEN");
@@ -122,10 +127,9 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     );
                     action_offsets.push(offset);
                 }
-            }
-            _ => {
-                return ();
-            }
+            } // _ => {
+              //     return ();
+              // }
         }
     }
     let msg = create_airday_message_with_builder(&mut builder, action_offsets);

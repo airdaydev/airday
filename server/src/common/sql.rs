@@ -8,20 +8,20 @@ use crate::{
 };
 use sqlx::{
     Pool, Sqlite,
-    sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions},
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 // Provides direct pool access in case we need behaviour conditionally, specific to a db
-#[derive(Clone)]
-pub enum DatabasePool {
-    // Postgres(PgPool), activate l8a
-    Sqlite(SqlitePool),
-}
+// #[derive(Clone)]
+// pub enum DatabasePool {
+//     // Postgres(PgPool), activate l8a
+//     Sqlite(SqlitePool),
+// }
 
 #[derive(Clone)]
 pub struct Db {
-    pub pool: DatabasePool,
+    // pub pool: DatabasePool,
     pub workspaces: Arc<dyn WorkspaceModel>,
     pub user: Arc<dyn UserModel>,
     pub session: Arc<dyn SessionModel>,
@@ -30,7 +30,7 @@ pub struct Db {
 impl Db {
     pub fn from_sqlite_pool(pool: Pool<Sqlite>) -> Self {
         Db {
-            pool: DatabasePool::Sqlite(pool.clone()),
+            // pool: DatabasePool::Sqlite(pool.clone()),
             workspaces: Arc::new(WorkspaceModelSqlite::new(pool.clone())),
             user: Arc::new(UserModelSqlite::new(pool.clone())),
             session: Arc::new(SessionModelSqlite::new(pool.clone())),

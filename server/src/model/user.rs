@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
+    #[cfg(test)]
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
 }
 
@@ -39,6 +40,7 @@ impl UserModel for UserModelSqlite {
             Err(e) => Err(AppError::DatabaseError(e.to_string())),
         }
     }
+    #[cfg(test)]
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError> {
         let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
         let result = sqlx::query_as!(
