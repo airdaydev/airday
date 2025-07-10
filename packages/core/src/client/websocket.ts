@@ -1,5 +1,9 @@
+import { Builder } from "flatbuffers";
+import { AuthenticateActionProto } from "../proto";
 import type { AirdayClient } from "./main";
+import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
 
+// TODO: Offline considerations
 export class WebsocketManager {
   client: AirdayClient;
   ws: WebSocket;
@@ -23,12 +27,14 @@ export class WebsocketManager {
       console.warn("Cannot websocket bearer auth, no bearer token");
       return;
     }
-    this.send({
-      type: "bearer_auth",
-      token: this.client.session.token,
-    });
+    const action = new AuthenticateAction(this.client.session.token);
+    const msg = createAirdayMessage([action]);
+    this.send(msg);
   }
   send(data: any) {
+    if (!this.authorised) {
+      throw new Error("Attempted to use ws connection while not authorised");
+    }
     return this.ws.send(data);
   }
   close() {
@@ -37,6 +43,7 @@ export class WebsocketManager {
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
   listener = (messageEvent: MessageEvent) => {
+    // TODO: We must wait for response!
     console.log(messageEvent);
   };
 }

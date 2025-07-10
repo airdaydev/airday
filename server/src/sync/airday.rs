@@ -26,12 +26,12 @@ impl AirdayMessage {
         let mut actions = Vec::new();
         for batch_component in message.batch().unwrap() {
             match batch_component.action_type() {
-                AirdayActionProto::AuthenticateAction => {
-                    let action = batch_component.action_as_authenticate_action().ok_or(
-                        AppError::ValidationError(String::from(
+                AirdayActionProto::AuthenticateActionProto => {
+                    let action = batch_component
+                        .action_as_authenticate_action_proto()
+                        .ok_or(AppError::ValidationError(String::from(
                             "Could not parse authenticate action",
-                        )),
-                    )?;
+                        )))?;
                     let token =
                         action
                             .session_token()

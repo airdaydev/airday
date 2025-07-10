@@ -16,6 +16,7 @@ import {
   DeleteItemActionProto,
   MessageWrapperProto,
   MessageProto,
+  AuthenticateActionProto,
 } from "../proto";
 import { getUuidBytes } from "../common";
 
@@ -60,6 +61,27 @@ export function deserialiseAction(buffer: Uint8Array) {
       const deleteAction = component.action(rObj);
       break;
     }
+  }
+}
+
+export class AuthenticateAction extends Action {
+  sessionToken: string;
+  constructor(sessionToken: string) {
+    super();
+    this.sessionToken = sessionToken;
+  }
+  addToFlatBuffer(builder: Builder): Offset {
+    const sessionTokenOffset = builder.createString(this.sessionToken);
+    const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
+      builder,
+      sessionTokenOffset,
+    );
+    const offset = AirdayBatchComponentProto.createAirdayBatchComponentProto(
+      builder,
+      AirdayActionProto.AuthenticateActionProto,
+      actionOffset,
+    );
+    return offset;
   }
 }
 
