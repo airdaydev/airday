@@ -1,12 +1,16 @@
 use axum::extract::ws::Message;
+use flatbuffers::FlatBufferBuilder;
 use uuid::Uuid;
 
 use crate::{
     AppState,
     common::error::AppError,
     sync::{
-        proto_generated::proto::{AirdayActionProto, AirdayMessageProto},
-        websocket::{add_conn, get_conn, send_to_client},
+        proto_generated::proto::{
+            AirdayActionProto, AirdayMessageProto, AuthenticateResponseProto,
+            AuthenticateResponseProtoArgs,
+        },
+        websocket::send_to_client,
     },
 };
 
@@ -100,7 +104,11 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                         }
                     };
                     println!("User {:?} authenticated!", sesh.user_id);
-                    // TODO: Reciprocal Authenticated action
+                    let mut builder = FlatBufferBuilder::new();
+                    AuthenticateResponseProto::create(
+                        &mut builder,
+                        &AuthenticateResponseProtoArgs { success: true },
+                    );
                     send_to_client(&state, &socket_id, Message::Binary(vec![0].into())).await;
                 }
                 return ();

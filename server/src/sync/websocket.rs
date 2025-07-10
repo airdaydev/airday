@@ -138,7 +138,7 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
             break;
         }
     }
-    println!("Sending a message");
+    println!("Ending write");
 }
 
 pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {

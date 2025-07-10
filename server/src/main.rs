@@ -6,6 +6,7 @@ mod common {
 }
 mod sync {
     pub mod airday;
+    pub mod outgoing;
     pub mod proto_generated;
     pub mod websocket;
 }

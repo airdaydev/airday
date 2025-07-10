@@ -36,8 +36,13 @@ table AuthenticateActionProto {
   session_token: string;
 }
 
+table AuthenticateResponseProto {
+  success: bool;
+}
+
 union AirdayActionProto {
   AuthenticateActionProto,
+  AuthenticateResponseProto,
   AddItemActionProto,
   DeleteItemActionProto,
 }
