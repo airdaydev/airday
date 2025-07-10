@@ -140,7 +140,13 @@ export class AddItemAction extends Action {
       builder,
       itemOffset,
     );
-    return actionOffset;
+    const batchComponentOffset =
+      AirdayBatchComponentProto.createAirdayBatchComponentProto(
+        builder,
+        AirdayActionProto.AddItemActionProto,
+        actionOffset,
+      );
+    return batchComponentOffset;
   }
 }
 
@@ -151,19 +157,7 @@ export function createAirdayMessage(actions: Action[]) {
 
   // 1. Build action batch components
   const batchOffsets = actions
-    .map((action) => {
-      if (action instanceof AddItemAction) {
-        const actionOffset = action.addToFlatBuffer(builder);
-        const batchOffset =
-          AirdayBatchComponentProto.createAirdayBatchComponentProto(
-            builder,
-            AirdayActionProto.AddItemActionProto,
-            actionOffset,
-          );
-        return batchOffset;
-      }
-      return null;
-    })
+    .map((action) => action.addToFlatBuffer(builder))
     .filter((a) => a !== null);
 
   // 2. Build AridayMessageProto (contains batches)

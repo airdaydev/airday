@@ -29,7 +29,7 @@ impl AirdayMessage {
             .ok_or(AppError::ValidationError(String::from(
                 "No actions found in mesage",
             )))?;
-        if (batch.len() == 0) {
+        if batch.len() == 0 {
             return Err(AppError::ValidationError(String::from(
                 "No actions found in message",
             )));
