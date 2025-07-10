@@ -99,7 +99,7 @@ impl UserModelSqlite {
 //   pub fn verify_login()
 // }
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Debug, Clone)]
 pub struct User {
     pub id: SqlxUuid,
     pub email: String,

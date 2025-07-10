@@ -6,7 +6,7 @@ use crate::{
     common::error::AppError,
     sync::{
         proto_generated::proto::{AirdayActionProto, AirdayMessageProto},
-        websocket::send_to_client,
+        websocket::{add_conn, get_conn, send_to_client},
     },
 };
 
@@ -84,14 +84,25 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
-                state.db.session.get_by_token(&session_token).await.unwrap();
-                // TODO: Reciprocal Authenticated action (todo: look up that!)
-                send_to_client(
-                    &state,
-                    &socket_id,
-                    Message::Text(String::from("test").into()),
-                )
-                .await;
+                // TODO: We should ok_or this and propagate errors up
+                let session_option = state.db.session.get_by_token(&session_token).await.unwrap();
+                // TODO: SECURITY! VALIDATE THE SESSION!!
+                if let Some(sesh) = session_option {
+                    {
+                        // Mutex scope
+                        let mut map = state.ws_connection_map.lock().unwrap();
+                        if let Some(conn) = map.get_mut(&socket_id) {
+                            conn.user_id = Some(sesh.user_id);
+                        } else {
+                            // TODO: this could happen if a the user dc'd while this was still going on
+                            println!("User disconnected while authenticated in ws");
+                            return ();
+                        }
+                    };
+                    println!("User {:?} authenticated!", sesh.user_id);
+                    // TODO: Reciprocal Authenticated action
+                    send_to_client(&state, &socket_id, Message::Binary(vec![0].into())).await;
+                }
                 return ();
             }
             _ => {
