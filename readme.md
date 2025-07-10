@@ -12,17 +12,17 @@
 └── 📂 server       → Rust based server
 ```
 
-## Self-hosting:
+## Self-hosting
 Coming soon
 
-## Development Requirements:
+## Development Requirements
 - Rust
 - Bun
 - pnpm
 - sqlx-cli: (`cargo install sqlx-cli`)
 - flatbuffers (flatc cli)
 
-## Development Setup:
+## Development Setup
 ```bash
 ./prep.sh # sets up database, config, downloads js deps, etc
 pnpm run test # runs all tests
