@@ -3,10 +3,12 @@
 [Airday](https://air.day/) calender & tasks app monorepo
 
 ## Directories
-- ./server: Rust based server
-- ./web: Web based application
-- ./flatbuffers: Protocol definition & build script
+- ./flatbuffers: Protocol definitions and code gen
 - ./ios: iOS app placeholder
+- ./packages: JavaScript packages
+- ./sqlite: Sqlite migration & notes
+- ./web: Web based application
+- ./server: Rust based server
 
 ## Development requirements
 - Rust
