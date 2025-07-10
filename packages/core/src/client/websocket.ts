@@ -57,9 +57,8 @@ export class WebsocketManager {
       const bb = new ByteBuffer(messageEvent.data);
       const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
       if (msg.messageType() === MessageProto.AirdayMessageProto) {
-        const airdayMessage = msg.message(
-          new AirdayMessageProto(),
-        ) as AirdayMessageProto;
+        const airdayMessage = new AirdayMessageProto();
+        msg.message(airdayMessage);
         this.handleAirdayMessage(airdayMessage);
       }
     }
@@ -77,10 +76,9 @@ export class WebsocketManager {
 
       switch (actionType) {
         case AirdayActionProto.AuthenticateResponseProto:
-          const authResponse = component.action(
-            new AuthenticateResponseProto(),
-          );
-          // this.handleAuthResponse(authResponse);
+          const authResponse = new AuthenticateResponseProto();
+          component.action(authResponse);
+          this.authorised = authResponse.success() === true;
           break;
         case AirdayActionProto.AddItemActionProto:
           // const addItemAction = component.action(new AddItemActionProto());
