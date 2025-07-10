@@ -10,12 +10,10 @@ type UpdateFields = Partial<Omit<AirdayItemFields, "id">>;
 
 export class AirdayItem {
   id: Uint8Array;
-  text?: LWWRegisterString;
-  constructor(params: Partial<AirdayItemFields>) {
+  text: LWWRegisterString;
+  constructor(params: AirdayItemFields) {
     this.id = params.id || parse(v4());
-    if (params.text) {
-      this.text = params.text;
-    }
+    this.text = params.text;
   }
   // TODO: Custom logic MAY be necessary
   merge(fields: UpdateFields) {
@@ -32,7 +30,7 @@ export class AirdayItem {
   toJSON() {
     return {
       id: this.id,
-      text: this.text?.toJSON() || "",
+      text: this.text.toJSON(),
     };
   }
 }

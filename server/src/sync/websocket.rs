@@ -54,16 +54,6 @@ pub fn build_ws_conn_map() -> WSConnectionMap {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
-pub fn add_conn(ws_conn_map: &WSConnectionMap, id: Uuid, conn: WebsocketConn) {
-    let mut connections = ws_conn_map.lock().unwrap();
-    connections.insert(id, conn);
-}
-
-pub fn get_conn(ws_conn_map: &WSConnectionMap, id: &Uuid) -> Option<WebsocketConn> {
-    let connections = ws_conn_map.lock().unwrap();
-    connections.get(id).cloned()
-}
-
 async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
     let (sender, receiver) = socket.split();

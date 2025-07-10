@@ -1,5 +1,6 @@
 import { ByteBuffer } from "flatbuffers";
 import {
+  AddItemActionProto,
   AirdayActionProto,
   AirdayMessageProto,
   AuthenticateResponseProto,
@@ -80,8 +81,14 @@ export class WebsocketManager {
           component.action(authResponse);
           this.authorised = authResponse.success() === true;
           break;
+        case AirdayActionProto.AddItemActionProto:
+          const itemResponse = new AddItemActionProto();
+          component.action(itemResponse);
+          // TODO: Validate and add item to storage
+          console.log(itemResponse.item());
+          break;
         default:
-          console.warn(`No response handler for action type: ${actionType}:`);
+          console.warn(`No handler for rx action type: ${actionType}:`);
       }
     }
   }
