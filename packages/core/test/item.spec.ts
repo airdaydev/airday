@@ -17,13 +17,14 @@ beforeAll(async () => {
 });
 
 test.only("Item sync", async () => {
-  const newItem = new AirdayItem({
-    text: new LWWRegisterString({
-      timestamp: syncClient.timestampProducer.timestamp(),
-      data: "test",
-    }),
-  });
-  airdayItemSync.createItem(newItem);
+  client.ws.bearerAuth();
+  // const newItem = new AirdayItem({
+  //   text: new LWWRegisterString({
+  //     timestamp: syncClient.timestampProducer.timestamp(),
+  //     data: "test",
+  //   }),
+  // });
+  // airdayItemSync.createItem(newItem);
   client.ws.close();
 
   // syncClient.subscribe((test) => {

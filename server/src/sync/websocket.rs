@@ -91,7 +91,14 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                         let airday_message = msg.message_as_airday_message_proto().unwrap();
                         let parsed_message = AirdayMessage::from_proto(&airday_message);
                         if let Ok(msg) = parsed_message {
+                            println!(
+                                "Received valid airday message with {} actions",
+                                msg.actions.len()
+                            );
                             message_handler(&state, &msg, &socket_id).await;
+                        } else if let Err(err) = parsed_message {
+                            // TODO & test if there are no actions
+                            println!("Invalid airday message: {:?}", err);
                         }
                     }
                     _ => {
@@ -124,7 +131,7 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
             break;
         }
     }
-    println!("Received message");
+    println!("Sending a message");
 }
 
 pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {

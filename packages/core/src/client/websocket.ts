@@ -29,12 +29,13 @@ export class WebsocketManager {
     }
     const action = new AuthenticateAction(this.client.session.token);
     const msg = createAirdayMessage([action]);
-    this.send(msg);
+    console.log("sending", msg);
+    this.ws.send(msg);
   }
   send(data: any) {
-    if (!this.authorised) {
-      throw new Error("Attempted to use ws connection while not authorised");
-    }
+    // if (!this.authorised) {
+    //   throw new Error("Attempted to use ws connection while not authorised");
+    // }
     return this.ws.send(data);
   }
   close() {

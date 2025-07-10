@@ -12,21 +12,34 @@ use crate::{
 
 pub struct AirdayMessage {
     // TODO: We should match the id 100%, interior actions just need a tick
-    actions: Vec<AirdayAction>,
+    pub actions: Vec<AirdayAction>,
 }
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { item_data: String },
-    // DeleteItem { id: String },
+    AddItem { id: String }, // TODO: possible properties not this
+    DeleteItem { id: String },
 }
 
 impl AirdayMessage {
     pub fn from_proto(message: &AirdayMessageProto) -> Result<Self, AppError> {
         let mut actions = Vec::new();
+        let batch = message
+            .batch()
+            .ok_or(AppError::ValidationError(String::from(
+                "No actions found in mesage",
+            )))?;
+        if (batch.len() == 0) {
+            return Err(AppError::ValidationError(String::from(
+                "No actions found in message",
+            )));
+        }
+        // 0 actions = we should drop this and warn / print
         for batch_component in message.batch().unwrap() {
+            println!("the type of the bc is {:?}", batch_component.action_type());
             match batch_component.action_type() {
                 AirdayActionProto::AuthenticateActionProto => {
+                    println!("Received authentication request");
                     let action = batch_component
                         .action_as_authenticate_action_proto()
                         .ok_or(AppError::ValidationError(String::from(
@@ -55,6 +68,7 @@ impl AirdayMessage {
                     println!("Received delete item message");
                 }
                 _ => {
+                    println!("BROKEN");
                     return Err(AppError::ValidationError(String::from(
                         "Unknown message type",
                     )));
