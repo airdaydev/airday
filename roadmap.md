@@ -17,6 +17,7 @@
 - [] UI - Delete items
 - [] UI - Settings
 - [] UI - Spanish
+- [] UI - Kanban
 - [] Robust dummy data system
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
