@@ -1,8 +1,7 @@
-import { Builder, ByteBuffer } from "flatbuffers";
+import { ByteBuffer } from "flatbuffers";
 import {
   AirdayActionProto,
   AirdayMessageProto,
-  AuthenticateActionProto,
   AuthenticateResponseProto,
   MessageProto,
   MessageWrapperProto,
@@ -75,23 +74,14 @@ export class WebsocketManager {
       const actionType = component.actionType();
 
       switch (actionType) {
+        // TODO: Make a generic success / ack response + match on msg id
         case AirdayActionProto.AuthenticateResponseProto:
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
           this.authorised = authResponse.success() === true;
           break;
-        case AirdayActionProto.AddItemActionProto:
-          // const addItemAction = component.action(new AddItemActionProto());
-          // this.handleAddItemAction(addItemAction);
-          break;
-        case AirdayActionProto.DeleteItemActionProto:
-          // const deleteItemAction = component.action(
-          //   new DeleteItemActionProto(),
-          // );
-          // this.handleDeleteItemAction(deleteItemAction);
-          break;
         default:
-          console.warn("Unknown action type:", actionType);
+          console.warn(`No response handler for action type: ${actionType}:`);
       }
     }
   }
