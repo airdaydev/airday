@@ -149,7 +149,9 @@ pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message
             .map(|client| client.sender.clone())
     };
     if let Some(sender) = sender {
-        let _ = sender.send(message).await;
-        // TODO: Show error! Consider disconnecting?
+        if let Err(err) = sender.send(message).await {
+            eprintln!("Failed to send message to client {}: {:?}", client_id, err);
+            // TODO: Consider disconnecting?
+        }
     }
 }

@@ -6,8 +6,10 @@ use crate::{
     AppState,
     common::error::AppError,
     sync::{
+        outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
-            AirdayActionProto, AirdayMessageProto, AuthenticateResponseProto,
+            AirdayActionProto, AirdayActionProtoUnionTableOffset, AirdayBatchComponentProto,
+            AirdayBatchComponentProtoArgs, AirdayMessageProto, AuthenticateResponseProto,
             AuthenticateResponseProtoArgs,
         },
         websocket::send_to_client,
@@ -85,6 +87,8 @@ impl AirdayMessage {
 // TODO: We should probably parse/collect these first then action them
 // TODO: All unwraps should be parsing/validation errors
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
+    let mut builder = FlatBufferBuilder::new();
+    let mut action_offsets = vec![];
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
@@ -104,18 +108,26 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                         }
                     };
                     println!("User {:?} authenticated!", sesh.user_id);
-                    let mut builder = FlatBufferBuilder::new();
-                    AuthenticateResponseProto::create(
+                    let action_offset = AuthenticateResponseProto::create(
                         &mut builder,
                         &AuthenticateResponseProtoArgs { success: true },
+                    )
+                    .as_union_value();
+                    let offset = AirdayBatchComponentProto::create(
+                        &mut builder,
+                        &AirdayBatchComponentProtoArgs {
+                            action_type: AirdayActionProto::AuthenticateResponseProto,
+                            action: Some(action_offset),
+                        },
                     );
-                    send_to_client(&state, &socket_id, Message::Binary(vec![0].into())).await;
+                    action_offsets.push(offset);
                 }
-                return ();
             }
             _ => {
                 return ();
             }
         }
     }
+    let msg = create_airday_message_with_builder(&mut builder, action_offsets);
+    send_to_client(&state, &socket_id, Message::Binary(msg.into())).await;
 }
