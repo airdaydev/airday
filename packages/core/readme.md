@@ -9,6 +9,7 @@ Airday JavaScript Client handling
 - TODO: E2EE management
 - TODO: JMAP calendar management
 - TODO: Profile uuid string vs bytes representation
+- TODO: literally just a bit instead of top level message definition..? e.g. 0 = Airday, 1 = JMAP
 
 ## Undo/redo notes
 something like this

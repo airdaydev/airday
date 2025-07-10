@@ -1,5 +1,5 @@
 import { Builder } from "flatbuffers";
-import { AuthenticateActionProto } from "../proto";
+import { AuthenticateActionProto, MessageWrapperProto } from "../proto";
 import type { AirdayClient } from "./main";
 import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
 
@@ -44,7 +44,8 @@ export class WebsocketManager {
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
   listener = (messageEvent: MessageEvent) => {
-    // TODO: We must wait for response!
-    console.log(messageEvent);
+    // TODO: parse binary messages here, then provide response subscription system
+    console.log("message received", messageEvent);
+    // MessageWrapperProto.getRootAsMessageWrapperProto(bb)
   };
 }

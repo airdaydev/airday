@@ -36,7 +36,6 @@ impl AirdayMessage {
         }
         // 0 actions = we should drop this and warn / print
         for batch_component in message.batch().unwrap() {
-            println!("the type of the bc is {:?}", batch_component.action_type());
             match batch_component.action_type() {
                 AirdayActionProto::AuthenticateActionProto => {
                     println!("Received authentication request");
@@ -49,7 +48,7 @@ impl AirdayMessage {
                         action
                             .session_token()
                             .ok_or(AppError::ValidationError(String::from(
-                                "Authenticat action is missing session_token",
+                                "Authenticate action is missing session_token",
                             )))?;
                     actions.push(AirdayAction::Authenticate {
                         session_token: String::from(token),
