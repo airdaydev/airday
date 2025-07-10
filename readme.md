@@ -1,23 +1,28 @@
-## Airday
+# Airday
 
-[Airday](https://air.day/) calender & tasks app monorepo
+[Airday](https://air.day/) calendar & tasks app monorepo
 
-## Directories
-- ./flatbuffers: Protocol definitions and code gen
-- ./ios: iOS app placeholder
-- ./packages: JavaScript packages
-- ./sqlite: Sqlite migration & notes
-- ./web: Web based application
-- ./server: Rust based server
+```
+📁 monorepo
+├── 📂 flatbuffers  → Protocol definitions and code gen
+├── 📂 ios          → iOS app placeholder
+├── 📂 packages     → JavaScript packages
+├── 📂 sqlite       → Sqlite migration & notes
+├── 📂 web          → Web based application
+└── 📂 server       → Rust based server
+```
 
-## Development requirements
+## Self-hosting:
+Coming soon
+
+## Development Requirements:
 - Rust
 - Bun
 - pnpm
 - sqlx-cli: (`cargo install sqlx-cli`)
 - flatbuffers (flatc cli)
 
-## Start
+## Development Setup:
 ```bash
 ./prep.sh # sets up database, config, downloads js deps, etc
 pnpm run test # runs all tests
