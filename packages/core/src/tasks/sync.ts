@@ -18,6 +18,8 @@ export class AirdayItemSync {
     this.idbHandle = idb.handle;
   }
   wrapAction() {}
+  async createList(list: any) {}
+  // TODO: Pluralise this and we can call it when a list has been synced
   async createItem(item: AirdayItem) {
     const action = AddItemAction.fromItem(item);
     const walAction = action.toActionFlatBuffer();

@@ -1,12 +1,11 @@
 ## Roadmap
-- [] session auth (sqlx based username/password) with sqlite storage
-- [] jmap core
 - [] e2e contacts
 - [] tracing
-- [] basic auth (front-end sign in, up, user management)
-- [] todo
+- [] user management
+- [] todo items
 - [] oauth
 - [] basic cal
 - [] hardcore cal
 - [] ical import/export
 - [] caldav
+- [] jmap core

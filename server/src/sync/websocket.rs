@@ -6,7 +6,6 @@ use tokio::sync::mpsc;
 // use futures_util::SinkExt;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
-use crate::model::user::User;
 use crate::sync::airday::{AirdayMessage, message_handler};
 use crate::sync::proto_generated::proto::MessageProto;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};

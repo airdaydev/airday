@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] contemplate removal of airday batch messaging system in favour of single action messages
 - [] authenticate users over websockets, setting a default workspace
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)

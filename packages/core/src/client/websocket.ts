@@ -1,5 +1,12 @@
-import { Builder } from "flatbuffers";
-import { AuthenticateActionProto, MessageWrapperProto } from "../proto";
+import { Builder, ByteBuffer } from "flatbuffers";
+import {
+  AirdayActionProto,
+  AirdayMessageProto,
+  AuthenticateActionProto,
+  AuthenticateResponseProto,
+  MessageProto,
+  MessageWrapperProto,
+} from "../proto";
 import type { AirdayClient } from "./main";
 import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
 
@@ -44,8 +51,50 @@ export class WebsocketManager {
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
   listener = (messageEvent: MessageEvent) => {
-    // TODO: parse binary messages here, then provide response subscription system
-    console.log("message received", messageEvent);
-    // MessageWrapperProto.getRootAsMessageWrapperProto(bb)
+    if (messageEvent.type === "message") {
+      // TODO: parse binary messages here, then provide response subscription system
+      console.log("message received", messageEvent);
+      const bb = new ByteBuffer(messageEvent.data);
+      const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
+      if (msg.messageType() === MessageProto.AirdayMessageProto) {
+        const airdayMessage = msg.message(
+          new AirdayMessageProto(),
+        ) as AirdayMessageProto;
+        this.handleAirdayMessage(airdayMessage);
+      }
+    }
   };
+  // TODO Consider moving this into subhandler
+  private handleAirdayMessage(message: AirdayMessageProto) {
+    if (!message) return;
+
+    const batchLength = message.batchLength();
+    for (let i = 0; i < batchLength; i++) {
+      const component = message.batch(i);
+      if (!component) continue;
+
+      const actionType = component.actionType();
+
+      switch (actionType) {
+        case AirdayActionProto.AuthenticateResponseProto:
+          const authResponse = component.action(
+            new AuthenticateResponseProto(),
+          );
+          // this.handleAuthResponse(authResponse);
+          break;
+        case AirdayActionProto.AddItemActionProto:
+          // const addItemAction = component.action(new AddItemActionProto());
+          // this.handleAddItemAction(addItemAction);
+          break;
+        case AirdayActionProto.DeleteItemActionProto:
+          // const deleteItemAction = component.action(
+          //   new DeleteItemActionProto(),
+          // );
+          // this.handleDeleteItemAction(deleteItemAction);
+          break;
+        default:
+          console.warn("Unknown action type:", actionType);
+      }
+    }
+  }
 }
