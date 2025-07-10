@@ -79,7 +79,7 @@ export const Footer = () => {
           Airday
           <span style={"margin-left: 0.25em; display: none;"}>Air</span>
         </button>
-        {/* <button
+        <button
           tabIndex={-1}
           ref={workspaceButtonRef}
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
@@ -92,7 +92,7 @@ export const Footer = () => {
           }}
         >
           {session.workspace.name}
-        </button> */}
+        </button>
         <button
           tabIndex={-1}
           class={styles["nav-button"]}

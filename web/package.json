@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "description": "Airday",
   "scripts": {
-    "start": "vite --host 0.0.0.0 --port 8000",
-    "dev": "vite",
-    "build": "vite build",
-    "serve": "vite preview"
+    "start": "bunx --bun vite --host 0.0.0.0 --port 8000",
+    "dev": "bunx --bun vite",
+    "build": "bunx --bun vite build",
+    "serve": "bunx --bun vite preview"
   },
   "license": "MIT",
   "devDependencies": {
