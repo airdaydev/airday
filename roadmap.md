@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] server - tracing (replace env var with config.toml defined)
 - [] contemplate removal of airday batch messaging system in favour of single action messages
 - [] set a default workspace
 - [] @airday/core - create & update items
@@ -22,7 +23,6 @@
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
 - [] @airday/core - tracing
-- [] server - tracing
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Put up website
 

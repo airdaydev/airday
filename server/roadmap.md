@@ -1,11 +1,11 @@
 ## Roadmap
-- [] e2e contacts
 - [] tracing
-- [] user management
 - [] todo items
+- [] user management
 - [] oauth
 - [] basic cal
 - [] hardcore cal
 - [] ical import/export
 - [] caldav
 - [] jmap core
+- [] e2e contacts
