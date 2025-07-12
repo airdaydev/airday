@@ -19,12 +19,17 @@ mod root;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
 use axum::Router;
+use axum::extract::MatchedPath;
+use axum::http::Request;
 use axum::routing::{any, get, post};
 use bpaf::Bpaf;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
 #[cfg(test)]
 pub mod test_util;
+use tower_http::trace::TraceLayer;
+use tracing::{Span, info_span};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone)]
 struct AppState {
@@ -47,22 +52,41 @@ struct AirdayOptions {
 
 #[tokio::main]
 async fn main() {
+    // Config
     let opts = airday_options().run();
     let raw_cfg = fs::read_to_string(opts.config).unwrap();
     let mut cfg = common::config::AirdayConfig::from_toml(&raw_cfg);
     let host_str = format!("{}:{}", cfg.host, cfg.port);
-
     if let Some(db) = opts.sqlx_host {
         cfg.sqlx_host = db.clone();
     }
-
     if let Some(port) = opts.port {
         cfg.port = port;
     }
 
+    // Tracing
+    // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs
+    // TODO: Consider removing envfilter in favour of config driven approach
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                // axum logs rejections from built-in extractors with the `axum::rejection`
+                // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
+                format!(
+                    "{}=debug,tower_http=debug,axum::rejection=trace",
+                    env!("CARGO_CRATE_NAME")
+                )
+                .into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    // Database
     // TODO: Match config to make correct connection (pg vs sql)
     let db = common::sql::connect_sqlite(&cfg).await;
 
+    // App state
     let state = AppState {
         db: db,
         config: cfg.clone(),
@@ -103,7 +127,24 @@ async fn main() {
         .merge(private)
         .merge(public)
         .with_state(state)
-        .layer(CookieManagerLayer::new());
+        .layer(CookieManagerLayer::new())
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                // Log the matched route's path (with placeholders not filled in).
+                // Use request.uri() or OriginalUri if you want the real path.
+                let matched_path = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .map(MatchedPath::as_str);
+
+                info_span!(
+                    "http_request",
+                    method = ?request.method(),
+                    matched_path,
+                    some_other_field = tracing::field::Empty,
+                )
+            }),
+        );
 
     axum::serve(listener, app).await.unwrap();
 }
