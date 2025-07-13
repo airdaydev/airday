@@ -1,0 +1,31 @@
+{
+  "name": "@airday/ul-tracer",
+  "version": "0.0.1",
+  "description": "Ultra-light tracing. OpenTelemetry compatible, hopefully.",
+  "main": "dist/ul-tracer.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "bun test",
+    "build": "bun run bundle.ts",
+    "dev": "bun run bundle.ts --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/ul-tracer.esm.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.13.1",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
