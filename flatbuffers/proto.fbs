@@ -65,16 +65,14 @@ union MessageProto {
   JMAPMessageProto,
 }
 
-table TraceContextProto {
-  trace_id: string;
-  span_id: string;
-  parent_span_id: string;
-  timestamp: uint64;
-}
-
 table MessageWrapperProto {
   message: MessageProto;
-  ctx: TraceContextProto;
+  span: SpanContextProto;
+}
+
+table SpanContextProto {
+  trace_id: [uint8];
+  span_id: [uint8];
 }
 
 root_type MessageWrapperProto;
