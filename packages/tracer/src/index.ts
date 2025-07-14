@@ -99,7 +99,7 @@ interface LiveStats {
 }
 
 // Ultra-light JSON tracer
-export class ULTracer {
+export class Tracer {
   private serviceName: string;
   private spans: ULSpan[] = [];
   private resource: { attributes: Attributes };
@@ -128,7 +128,7 @@ export class ULTracer {
 
   constructor(serviceName: string, config: Partial<BatchConfig> = {}) {
     if (!serviceName) {
-      throw new Error("ULTracer: serviceName required");
+      throw new Error("Tracer: serviceName required");
     }
     this.serviceName = serviceName;
     this.resource = { attributes: { "service.name": serviceName } };
@@ -228,7 +228,7 @@ export class ULTracer {
           scopeSpans: [
             {
               scope: {
-                name: "ul-tracer",
+                name: "tracer",
                 version: "1.0.0",
               },
               spans: spans.map((span) => this.spanToOTLP(span)),
@@ -414,14 +414,14 @@ export class ULTracer {
       this.stats.spansSent += this.spans.length;
       this.spans = [];
     } catch (error) {
-      console.error("ULTracer: Failed to send beacon:", error);
+      console.error("Tracer: Failed to send beacon:", error);
     }
   }
 
   // Handle send errors
   private handleSendError(error: any): void {
     // TODO: Generate span?
-    console.error("ULTracer: Batch send failed:", error);
+    console.error("Tracer: Batch send failed:", error);
     // Spans remain in buffer for retry
   }
 

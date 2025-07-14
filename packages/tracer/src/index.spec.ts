@@ -1,12 +1,12 @@
 // @ts-ignore
 import { test, expect, describe } from "bun:test";
-import { ULTracer } from "./index";
+import { Tracer } from "./index";
 
 // NOTE: This file has been vibecoded and remains unchecked in-depth
 
-describe("ULTracer OTLP Implementation", () => {
+describe("Tracer OTLP Implementation", () => {
   test("should create tracer with service name", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -20,11 +20,11 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should throw error without service name", () => {
-    expect(() => new ULTracer("")).toThrow("ULTracer: serviceName required");
+    expect(() => new Tracer("")).toThrow("Tracer: serviceName required");
   });
 
   test("should create and end spans", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -41,7 +41,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should add tags to spans", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -57,7 +57,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should log events to spans", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -73,7 +73,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should create nested spans", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -88,7 +88,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should flush spans", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -109,7 +109,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should create valid OTLP payload", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -127,7 +127,7 @@ describe("ULTracer OTLP Implementation", () => {
     ]);
     expect(payload.resourceSpans[0].scopeSpans).toHaveLength(1);
     expect(payload.resourceSpans[0].scopeSpans[0].spans).toHaveLength(1);
-    expect(payload.resourceSpans[0].scopeSpans[0].scope.name).toBe("ul-tracer");
+    expect(payload.resourceSpans[0].scopeSpans[0].scope.name).toBe("tracer");
 
     const serialized = JSON.stringify(payload);
     expect(serialized).toBeTruthy();
@@ -138,7 +138,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should calculate span duration", () => {
-    const tracer = new ULTracer("test-service", {
+    const tracer = new Tracer("test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -155,7 +155,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should handle large payloads", () => {
-    const tracer = new ULTracer("large-test", {
+    const tracer = new Tracer("large-test", {
       endpoint: "http://localhost:4318/v1/traces",
       maxBufferSize: 1000,
       maxBatchSize: 1001, // Slightly larger than span count to prevent auto-flushing
@@ -192,7 +192,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should generate unique IDs", () => {
-    const tracer = new ULTracer("id-test", {
+    const tracer = new Tracer("id-test", {
       endpoint: "http://localhost:4318/v1/traces",
       maxBufferSize: 1000,
       networkEnabled: false,
@@ -210,7 +210,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should maintain performance at scale", () => {
-    const tracer = new ULTracer("perf-test", {
+    const tracer = new Tracer("perf-test", {
       endpoint: "http://localhost:4318/v1/traces",
       maxBufferSize: 15000, // Larger buffer to handle 10k spans
       maxBatchSize: 15000, // Large batch size to prevent auto-flushing
@@ -249,7 +249,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should debug batching behavior", () => {
-    const tracer = new ULTracer("batch-debug", {
+    const tracer = new Tracer("batch-debug", {
       endpoint: "http://localhost:4318/v1/traces",
       maxBufferSize: 10,
       maxBatchSize: 10,
@@ -276,7 +276,7 @@ describe("ULTracer OTLP Implementation", () => {
 
   test("should handle networkEnabled option", async () => {
     // Test with networking disabled
-    const tracerDisabled = new ULTracer("network-disabled-test", {
+    const tracerDisabled = new Tracer("network-disabled-test", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
       maxBatchSize: 1, // Small batch size to trigger immediate flush
@@ -295,7 +295,7 @@ describe("ULTracer OTLP Implementation", () => {
     expect(stats.batchesFailed).toBe(0);
 
     // Test with networking enabled - create spans but don't send
-    const tracerEnabled = new ULTracer("network-enabled-test", {
+    const tracerEnabled = new Tracer("network-enabled-test", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: true,
       maxBatchSize: 100, // Large batch size to prevent auto-flush
@@ -311,7 +311,7 @@ describe("ULTracer OTLP Implementation", () => {
   });
 
   test("should produce OTLP-compliant output", () => {
-    const tracer = new ULTracer("otlp-test-service", {
+    const tracer = new Tracer("otlp-test-service", {
       endpoint: "http://localhost:4318/v1/traces",
       networkEnabled: false,
     });
@@ -351,7 +351,7 @@ describe("ULTracer OTLP Implementation", () => {
     const scopeSpan = resourceSpan.scopeSpans[0];
     expect(scopeSpan).toHaveProperty("scope");
     expect(scopeSpan.scope).toEqual({
-      name: "ul-tracer",
+      name: "tracer",
       version: "1.0.0",
     });
 

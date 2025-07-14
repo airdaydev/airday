@@ -2,10 +2,10 @@
 import { test, expect } from "bun:test";
 
 // Integrated OTLP testing
-import { ULSpan, ULTracer } from "../src/index";
+import { ULSpan, Tracer } from "../src/index";
 
 test("simple span", async () => {
-  const tracer = new ULTracer("otlp-tester");
+  const tracer = new Tracer("otlp-tester");
   const span = tracer.startSpan("yo");
   tracer.endSpan(span);
   console.log("sending spans to date");
@@ -13,7 +13,7 @@ test("simple span", async () => {
 });
 
 test("complex spans with nested operations", async () => {
-  const tracer = new ULTracer("otlp-complex-tester");
+  const tracer = new Tracer("otlp-complex-tester");
 
   // Create a more complex span with nested operations
   const rootSpan = tracer.startSpan("complex-operation");
@@ -56,7 +56,7 @@ test("complex spans with nested operations", async () => {
 test("performance test - 1000 spans", async () => {
   console.log("█▒ Performance tests start");
 
-  const tracer = new ULTracer("otlp-perf-tester");
+  const tracer = new Tracer("otlp-perf-tester");
   const startTime = performance.now();
 
   // Generate 1000 spans with varying complexity
@@ -137,7 +137,7 @@ test("batching system test", async () => {
   console.log("█▒ Batch sys tests");
 
   // Test with smaller batch size for quick testing
-  const tracer = new ULTracer("batching-tester", {
+  const tracer = new Tracer("batching-tester", {
     maxBatchSize: 5,
     flushIntervalMs: 2000, // 2 second flush interval
     endpoint: "http://localhost:4318/v1/traces",
@@ -181,7 +181,7 @@ test("batching system test", async () => {
 
 test("buffer overflow test", async () => {
   // Test with very small buffer to trigger overflow
-  const tracer = new ULTracer("overflow-tester", {
+  const tracer = new Tracer("overflow-tester", {
     maxBatchSize: 1000, // Large batch size
     maxBufferSize: 10, // Small buffer
     flushIntervalMs: 60000, // Long flush interval

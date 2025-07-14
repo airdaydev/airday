@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-// Bundle configuration for ULTracer frontend distribution
+// Bundle configuration for Tracer frontend distribution
 // Run with: bun run bundle.ts
 
 import { $ } from "bun";
@@ -19,13 +19,13 @@ const bundleConfig: Bun.BuildConfig = {
 
 // Bundle for different environments
 async function bundle() {
-  console.log("🚀 Building ULTracer for frontend...");
+  console.log("🚀 Building Tracer for frontend...");
 
   // 1. ESM Bundle (modern browsers)
   console.log("📦 Building ESM bundle...");
   const esmResult = await Bun.build({
     ...bundleConfig,
-    naming: "ul-tracer.esm.js",
+    naming: "tracer.esm.js",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
@@ -38,16 +38,16 @@ async function bundle() {
 
   // Generate package.json for distribution
   const packageJson = {
-    name: "ul-tracer",
+    name: "tracer",
     version: "1.0.0",
     description: "Ultra-light JSON-based tracer",
-    main: "ul-tracer.cjs.js",
-    module: "ul-tracer.esm.js",
+    main: "tracer.cjs.js",
+    module: "tracer.esm.js",
     types: "index.d.ts",
     files: ["*.js", "*.d.ts", "*.map"],
     exports: {
       ".": {
-        import: "./ul-tracer.esm.js",
+        import: "./tracer.esm.js",
         types: "./index.d.ts",
       },
     },
@@ -63,16 +63,16 @@ async function bundle() {
   console.log("\nBundle outputs:");
 
   try {
-    const esmStats = statSync("dist/ul-tracer.esm.js");
+    const esmStats = statSync("dist/tracer.esm.js");
     const esmSize = (esmStats.size / 1024).toFixed(2);
-    console.log(`- ul-tracer.esm.js (${esmSize} KB)`);
+    console.log(`- tracer.esm.js (${esmSize} KB)`);
 
-    const mapStats = statSync("dist/ul-tracer.esm.js.map");
+    const mapStats = statSync("dist/tracer.esm.js.map");
     const mapSize = (mapStats.size / 1024).toFixed(2);
-    console.log(`- ul-tracer.esm.js.map (${mapSize} KB)`);
+    console.log(`- tracer.esm.js.map (${mapSize} KB)`);
   } catch (error) {
-    console.log("- ul-tracer.esm.js (size unknown)");
-    console.log("- ul-tracer.esm.js.map (size unknown)");
+    console.log("- tracer.esm.js (size unknown)");
+    console.log("- tracer.esm.js.map (size unknown)");
   }
 
   console.log("- package.json (Distribution metadata)");
@@ -81,8 +81,8 @@ async function bundle() {
   console.log("\n🧪 Testing bundles...");
   try {
     // Test ESM import
-    const { default: ULTracer } = await import("./dist/ul-tracer.esm.js");
-    const tracer = new ULTracer("test-service");
+    const { Tracer } = await import("./dist/tracer.esm.js");
+    const tracer = new Tracer("test-service");
     const span = tracer.startSpan("test-span");
     tracer.endSpan(span);
     console.log("✅ ESM bundle test passed");
