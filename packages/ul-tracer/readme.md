@@ -6,3 +6,14 @@ This is a fairly vibecoded (to be reviewed) tracer designed to get logs from Air
 - [] Check the vibes
 - [] https://www.jaegertracing.io/docs/1.22/getting-started/ Test with jaeger initially and write test suite for integration testing
 - [] Bring up Signoz and same thing
+
+## OpenTelemetry collector testing
+```bash
+docker pull otel/opentelemetry-collector-contrib:0.128.0
+# Not exposing zpages, grpc, only OTLP HTTP
+docker run \
+  -p 127.0.0.1:4318:4318 \
+  otel/opentelemetry-collector-contrib:0.128.0
+# ./jaeger.sh
+# firefox http://localhost:16686/search
+```

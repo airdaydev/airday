@@ -7,7 +7,7 @@ interface SpanLog {
 }
 
 // Minimal types for compatibility
-type HrTime = [number, number];
+type ULTime = [number, number]; // seconds, nanoseconds
 type Attributes = Record<string, any>;
 
 interface ULSpan {
@@ -15,9 +15,9 @@ interface ULSpan {
   readonly traceId: string;
   readonly spanId: string;
   readonly parentSpanId?: string;
-  readonly startTime: HrTime;
-  readonly endTime: HrTime;
-  readonly duration: HrTime;
+  readonly startTime: ULTime;
+  readonly endTime: ULTime;
+  readonly duration: ULTime;
   readonly status: { code: number; message?: string };
   readonly attributes: Attributes;
   readonly events: SpanLog[];
@@ -69,18 +69,86 @@ interface TracePayload {
   }[];
 }
 
+interface BatchConfig {
+  maxBatchSize: number; // Default: 50 (smaller for browser)
+  flushIntervalMs: number; // Default: 10000ms (10s - less aggressive)
+  endpoint: string; // OTLP endpoint
+  maxBufferSize: number; // Default: 2500 spans
+  maxRetries: number; // Default: 2 (less aggressive)
+  retryDelayMs: number; // Default: 2000ms
+  useBeacon: boolean; // Default: true (for page unload)
+  pauseWhenHidden: boolean; // Default: true (save battery)
+  networkEnabled: boolean; // Default: true (enable networking)
+}
+
+interface TracerStats {
+  spansGenerated: number; // Total spans created
+  spansBuffered: number; // Currently in buffer
+  spansSent: number; // Successfully sent
+  spansDropped: number; // Dropped due to buffer overflow
+  batchesSent: number; // Total batches sent
+  batchesFailed: number; // Failed batch attempts
+  lastSendTime: number; // Timestamp of last successful send
+  lastError: string | null; // Last error message
+}
+
+interface LiveStats {
+  isOnline: boolean; // Network status
+  isTabVisible: boolean; // Tab visibility
+  beaconSupported: boolean; // Beacon API support
+}
+
 // Ultra-light JSON tracer
-class ULTracer {
+export class ULTracer {
   private serviceName: string;
   private spans: ULSpan[] = [];
   private resource: { attributes: Attributes };
+  private readonly epochOffsetMs = Date.now() - performance.now();
 
-  constructor(serviceName: string) {
+  // Batching system
+  private batchConfig: BatchConfig;
+  private batchTimer: number | null = null;
+  private retryCount = 0;
+  private circuitBreakerUntil = 0;
+  private isTabVisible = true;
+  private isOnline = true;
+  private beaconSupported: boolean; // Beacon API support
+
+  // Stats
+  private stats: TracerStats = {
+    spansGenerated: 0,
+    spansBuffered: 0,
+    spansSent: 0,
+    spansDropped: 0,
+    batchesSent: 0,
+    batchesFailed: 0,
+    lastSendTime: 0,
+    lastError: null,
+  };
+
+  constructor(serviceName: string, config: Partial<BatchConfig> = {}) {
     if (!serviceName) {
       throw new Error("ULTracer: serviceName required");
     }
     this.serviceName = serviceName;
     this.resource = { attributes: { "service.name": serviceName } };
+
+    // Set default batch config
+    this.batchConfig = {
+      maxBatchSize: 50,
+      flushIntervalMs: 10000,
+      endpoint: "http://localhost:4318/v1/traces",
+      maxBufferSize: 2500,
+      maxRetries: 2,
+      retryDelayMs: 2000,
+      useBeacon: true,
+      pauseWhenHidden: true,
+      networkEnabled: true,
+      ...config,
+    };
+
+    this.initializeBrowserFeatures();
+    this.startBatching();
   }
 
   startSpan(name: string, parentSpanId?: string): ULSpan {
@@ -102,7 +170,8 @@ class ULTracer {
       ended: false,
     };
 
-    this.spans.push(span);
+    this.addSpanToBuffer(span);
+    this.stats.spansGenerated++;
     return span;
   }
 
@@ -120,6 +189,9 @@ class ULTracer {
       (span as any).status = { code: 1 }; // OK
     }
 
+    // Check if we should flush based on batch size
+    this.checkBatchSize();
+
     return span;
   }
 
@@ -129,7 +201,7 @@ class ULTracer {
 
   log(span: ULSpan, message: string, data: Record<string, any> = {}): void {
     const event: SpanLog = {
-      timestamp: Date.now(),
+      timestamp: this.epochOffsetMs + performance.now(),
       message,
       data,
     };
@@ -139,6 +211,7 @@ class ULTracer {
   flush(): ULSpan[] {
     const traces = this.spans.slice();
     this.spans = [];
+    this.updateStats();
     return traces;
   }
 
@@ -166,10 +239,134 @@ class ULTracer {
     };
   }
 
-  // Send to endpoint
-  async send(endpoint: string): Promise<void> {
+  async send(endpoint?: string): Promise<void> {
+    return this.flushNow(endpoint);
+  }
+
+  getStats(): TracerStats & LiveStats {
+    this.updateStats();
+    return {
+      ...this.stats,
+      isOnline: this.isOnline,
+      isTabVisible: this.isTabVisible,
+      beaconSupported: this.beaconSupported,
+    };
+  }
+
+  async flushNow(endpoint?: string): Promise<void> {
+    if (this.spans.length === 0) return;
+
+    const targetEndpoint = endpoint || this.batchConfig.endpoint;
     const payload = this.createPayload();
 
+    // If networking is disabled, just clear the spans without sending
+    if (!this.batchConfig.networkEnabled) {
+      this.stats.spansSent +=
+        payload.resourceSpans[0]?.scopeSpans[0]?.spans.length || 0;
+      return;
+    }
+
+    try {
+      await this.sendBatch(payload, targetEndpoint);
+      this.stats.batchesSent++;
+      this.stats.lastSendTime = Date.now();
+      this.retryCount = 0;
+      this.circuitBreakerUntil = 0;
+    } catch (error) {
+      this.stats.batchesFailed++;
+      this.stats.lastError = String(error);
+      this.handleSendError(error);
+    }
+  }
+
+  private initializeBrowserFeatures(): void {
+    if (typeof window === "undefined") return;
+
+    // Check for beacon support
+    this.beaconSupported =
+      typeof navigator !== "undefined" && "sendBeacon" in navigator;
+
+    // Online/offline detection
+    if (typeof navigator !== "undefined") {
+      this.isOnline = navigator.onLine;
+
+      window.addEventListener("online", () => {
+        this.isOnline = true;
+        this.circuitBreakerUntil = 0; // Reset circuit breaker
+      });
+
+      window.addEventListener("offline", () => {
+        this.isOnline = false;
+      });
+    }
+
+    if (typeof document !== "undefined") {
+      this.isTabVisible = document.visibilityState === "visible";
+
+      document.addEventListener("visibilitychange", () => {
+        this.isTabVisible = document.visibilityState === "visible";
+
+        if (!this.isTabVisible) {
+          this.flushNow().catch(console.error);
+        }
+      });
+    }
+
+    if (typeof window !== "undefined") {
+      const flushOnUnload = () => {
+        if (this.spans.length > 0) {
+          this.sendBeacon();
+        }
+      };
+
+      window.addEventListener("beforeunload", flushOnUnload);
+      window.addEventListener("pagehide", flushOnUnload);
+    }
+  }
+
+  private startBatching(): void {
+    if (this.batchTimer) return;
+
+    this.batchTimer = setInterval(() => {
+      if (this.shouldFlush()) {
+        this.flushNow().catch(console.error);
+      }
+    }, this.batchConfig.flushIntervalMs) as any;
+  }
+
+  private addSpanToBuffer(span: ULSpan): void {
+    // Check if buffer is full
+    if (this.spans.length >= this.batchConfig.maxBufferSize) {
+      // Drop oldest span (FIFO)
+      this.spans.shift();
+      this.stats.spansDropped++;
+    }
+
+    this.spans.push(span);
+    this.updateStats();
+  }
+
+  private checkBatchSize(): void {
+    if (this.spans.length >= this.batchConfig.maxBatchSize) {
+      this.flushNow().catch(console.error);
+    }
+  }
+
+  private shouldFlush(): boolean {
+    if (this.spans.length === 0) return false;
+    if (!this.batchConfig.networkEnabled) return false;
+    if (!this.isOnline) return false;
+    if (this.batchConfig.pauseWhenHidden && !this.isTabVisible) return false;
+    if (Date.now() < this.circuitBreakerUntil) return false;
+
+    return true;
+  }
+
+  // Send batch with retry logic
+  private async sendBatch(
+    payload: TracePayload,
+    endpoint: string,
+  ): Promise<void> {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -183,10 +380,54 @@ class ULTracer {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      this.stats.spansSent +=
+        payload.resourceSpans[0]?.scopeSpans[0]?.spans.length || 0;
     } catch (error) {
-      console.error("ULTracer: Failed to send traces:", error);
+      this.retryCount++;
+
+      if (this.retryCount <= this.batchConfig.maxRetries) {
+        // Exponential backoff
+        const delay =
+          this.batchConfig.retryDelayMs * Math.pow(2, this.retryCount - 1);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return this.sendBatch(payload, endpoint);
+      }
+
+      // Circuit breaker: stop trying for 30 seconds
+      this.circuitBreakerUntil = Date.now() + 30000;
       throw error;
     }
+  }
+
+  // Send using beacon API for page unload
+  private sendBeacon(): void {
+    if (!this.beaconSupported || this.spans.length === 0) return;
+    if (!this.batchConfig.networkEnabled) return;
+
+    try {
+      const payload = this.createPayload();
+      const blob = new Blob([JSON.stringify(payload)], {
+        type: "application/json",
+      });
+      navigator.sendBeacon(this.batchConfig.endpoint, blob);
+      this.stats.spansSent += this.spans.length;
+      this.spans = [];
+    } catch (error) {
+      console.error("ULTracer: Failed to send beacon:", error);
+    }
+  }
+
+  // Handle send errors
+  private handleSendError(error: any): void {
+    // TODO: Generate span?
+    console.error("ULTracer: Batch send failed:", error);
+    // Spans remain in buffer for retry
+  }
+
+  // Update stats
+  private updateStats(): void {
+    this.stats.spansBuffered = this.spans.length;
   }
 
   // Convert span to OTLP format
@@ -254,8 +495,8 @@ class ULTracer {
     return combined.padStart(length, "0");
   }
 
-  // Convert HrTime to nanoseconds
-  private hrTimeToNanos(hrTime: HrTime): bigint {
+  // Convert ULTime to nanoseconds
+  private hrTimeToNanos(hrTime: ULTime): bigint {
     const [seconds, nanos] = hrTime;
     return BigInt(seconds) * BigInt(1000000000) + BigInt(Math.floor(nanos));
   }
@@ -265,55 +506,25 @@ class ULTracer {
     return Math.random().toString(36).substring(2, 15);
   }
 
-  private hrTime(): HrTime {
-    const now = performance.now();
-    const seconds = Math.floor(now / 1000);
-    const nanoseconds = Math.floor((now % 1000) * 1000000);
+  private hrTime(): ULTime {
+    const absoluteMs = this.epochOffsetMs + performance.now();
+    const seconds = Math.floor(absoluteMs / 1000);
+    const nanoseconds = Math.floor((absoluteMs % 1000) * 1000000);
     return [seconds, nanoseconds];
   }
 
-  private calculateDuration(start: HrTime, end: HrTime): HrTime {
+  private calculateDuration(start: ULTime, end: ULTime): ULTime {
     const startMs = start[0] * 1000 + start[1] / 1000000;
     const endMs = end[0] * 1000 + end[1] / 1000000;
     const durationMs = endMs - startMs;
     return [Math.floor(durationMs / 1000), (durationMs % 1000) * 1000000];
   }
-
-  // Convenience methods
-  withSpan<T>(name: string, fn: (span: ULSpan) => T, parentSpanId?: string): T {
-    const span = this.startSpan(name, parentSpanId);
-    try {
-      const result = fn(span);
-      this.endSpan(span);
-      return result;
-    } catch (error) {
-      this.addTag(span, "error", true);
-      this.addTag(span, "error.message", String(error));
-      (span as any).status = { code: 2, message: String(error) }; // ERROR
-      this.endSpan(span);
-      throw error;
-    }
-  }
-
-  async withSpanAsync<T>(
-    name: string,
-    fn: (span: ULSpan) => Promise<T>,
-    parentSpanId?: string,
-  ): Promise<T> {
-    const span = this.startSpan(name, parentSpanId);
-    try {
-      const result = await fn(span);
-      this.endSpan(span);
-      return result;
-    } catch (error) {
-      this.addTag(span, "error", true);
-      this.addTag(span, "error.message", String(error));
-      (span as any).status = { code: 2, message: String(error) }; // ERROR
-      this.endSpan(span);
-      throw error;
-    }
-  }
 }
 
-export default ULTracer;
-export { type ULSpan, type SpanLog, type TracePayload };
+export {
+  type ULSpan,
+  type SpanLog,
+  type TracePayload,
+  type BatchConfig,
+  type TracerStats,
+};
