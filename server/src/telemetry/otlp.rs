@@ -1,12 +1,14 @@
 use crate::common::config::AirdayConfig;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{KeyValue, global};
-use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_otlp::{SpanExporterBuilder, WithExportConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+// TODO: opentelemetry_otlp crate v0.30.0 has no logs compatibility (traces/metrics only)
+// TODO: in production we could patch this by also reading logs directly (... for another time)
 pub fn setup(cfg: &AirdayConfig) {
     let mut level_filter = LevelFilter::INFO;
     if cfg.log_level == "debug" {
@@ -17,7 +19,7 @@ pub fn setup(cfg: &AirdayConfig) {
         .with(tracing_subscriber::fmt::layer());
 
     if let Some(otlp_host) = cfg.otlp_host.as_deref() {
-        let exporter = SpanExporter::builder()
+        let span_exporter = SpanExporterBuilder::new()
             .with_http()
             .with_endpoint(otlp_host)
             .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
@@ -31,13 +33,13 @@ pub fn setup(cfg: &AirdayConfig) {
             .build();
         // TODO: Instance id!
 
-        let provider = SdkTracerProvider::builder()
-            .with_batch_exporter(exporter)
-            .with_resource(resource)
+        let trace_provider = SdkTracerProvider::builder()
+            .with_batch_exporter(span_exporter)
+            .with_resource(resource.clone())
             .build();
 
-        let tracer = provider.tracer("airday");
-        global::set_tracer_provider(provider);
+        let tracer = trace_provider.tracer("airday");
+        global::set_tracer_provider(trace_provider);
 
         let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
         registry

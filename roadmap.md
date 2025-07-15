@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] tracing - replace env var with config.toml defined
 - [] server - websocket tracing
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
