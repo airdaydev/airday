@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] server - replace all println with tracing
 - [] server - websocket tracing
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
