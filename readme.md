@@ -8,6 +8,7 @@
 ├── 📂 ios          → iOS app placeholder
 ├── 📂 packages     → JavaScript packages
 ├── 📂 sqlite       → Sqlite migration & notes
+├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
 ├── 📂 web          → Web based application
 └── 📂 server       → Rust based server
 ```
