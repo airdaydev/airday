@@ -152,6 +152,27 @@ interface ParseOpts {
   debug: boolean;
 }
 
+export class APIError extends Error {
+  public readonly status: number;
+  public readonly body: any;
+
+  constructor(message: string, status: number, body?: any) {
+    super(message);
+
+    // Set the prototype explicitly to maintain instanceof checks
+    Object.setPrototypeOf(this, APIError.prototype);
+
+    this.name = "APIError";
+    this.status = status;
+    this.body = body;
+
+    // Capture stack trace if available (V8 specific)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, APIError);
+    }
+  }
+}
+
 // TODO: Error handling, tracing
 export async function parseJSONResponse(
   response: Response,
@@ -167,9 +188,7 @@ export async function parseJSONResponse(
   }
   if (response.status !== 200) {
     // TODO: Robust status handling
-    throw new Error(
-      `Status: ${response.status}, body: ${JSON.stringify(body)}`,
-    );
+    throw new APIError(JSON.stringify(body), response.status);
   }
   return {
     response,

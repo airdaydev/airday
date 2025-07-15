@@ -79,13 +79,7 @@ async fn main() {
         // ws_sub_map: sync::websocket::build_ws_sub_map(),
         ws_connection_map: sync::websocket::build_ws_conn_map(),
     };
-
-    info!("Airday server started at http://{}", host_str);
-    info!(
-        port = 3000,
-        address = "0.0.0.0",
-        "Server started successfully"
-    );
+    info!(port = 3000, address = "0.0.0.0", "Airday server started");
     let public = Router::new()
         .route("/", get(root::root_handler))
         .route(

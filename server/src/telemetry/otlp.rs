@@ -4,6 +4,7 @@ use opentelemetry::{KeyValue, global};
 use opentelemetry_otlp::{SpanExporterBuilder, WithExportConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::SdkTracerProvider;
+use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -42,12 +43,9 @@ pub fn setup(cfg: &AirdayConfig) {
         global::set_tracer_provider(trace_provider);
 
         let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
-        registry
-            .with(level_filter)
-            .with(tracing_subscriber::fmt::layer())
-            .with(telemetry_layer)
-            .init();
+        registry.with(telemetry_layer).init();
     } else {
         registry.init();
     }
+    info!(level_filter = level_filter.to_string(), "Tracer started");
 }

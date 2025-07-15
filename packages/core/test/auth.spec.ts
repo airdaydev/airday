@@ -15,6 +15,17 @@ test("API root url & version", async () => {
   expect(d.data.version).toBeTypeOf("string");
 });
 
+test.only("non-existent username & password", async () => {
+  await client
+    .loginWithPasswordBearer({
+      email: "nope@nope.com",
+      password: "1234",
+    })
+    .catch((d) => {
+      expect(d.status).toBe(400);
+    });
+});
+
 test("Creating a user & default workspace", async () => {
   const res = await createUser(client, {
     email: "daniel@air.day",
