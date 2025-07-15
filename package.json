@@ -9,7 +9,8 @@
     "fb": "./flatbuffers/compile.sh",
     "test": "npm run test-server && npm run test-core",
     "test-core": "./e2e.sh",
-    "test-server": "cargo test --manifest-path server/Cargo.toml"
+    "test-server": "cargo test --manifest-path server/Cargo.toml",
+    "jaeger": "./telemetry/jaeger.sh"
   },
   "keywords": [],
   "author": "",

@@ -54,7 +54,7 @@ test("complex spans with nested operations", async () => {
 });
 
 test("performance test - 1000 spans", async () => {
-  console.log("█▒ Performance tests start");
+  console.log("░▒█ Performance tests start");
 
   const tracer = new Tracer("otlp-perf-tester");
   const startTime = performance.now();
@@ -130,11 +130,11 @@ test("performance test - 1000 spans", async () => {
   expect(serializationTime).toBeLessThan(50); // Should serialize in < 50ms
   expect(totalTime).toBeLessThan(1000); // Total should be < 1s
 
-  console.log("█▒ Performance tests completed");
+  console.log("░▒█ Performance tests completed");
 });
 
 test("batching system test", async () => {
-  console.log("█▒ Batch sys tests");
+  console.log("░▒█ Batch sys tests");
 
   // Test with smaller batch size for quick testing
   const tracer = new Tracer("batching-tester", {
@@ -176,7 +176,7 @@ test("batching system test", async () => {
   expect(finalStats.batchesSent).toBeGreaterThan(0);
   expect(finalStats.spansSent).toBe(12);
   expect(finalStats.spansBuffered).toBe(0); // Should be empty after flush
-  console.log("█▒ Batch testing complete");
+  console.log("░▒█ Batch testing complete");
 });
 
 test("buffer overflow test", async () => {

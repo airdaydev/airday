@@ -14,6 +14,9 @@ mod sync {
 mod jmap {
     pub mod core;
 }
+mod telemetry {
+    pub mod otlp;
+}
 mod model;
 mod root;
 use crate::common::config::AirdayConfig;
@@ -28,8 +31,7 @@ use tower_cookies::CookieManagerLayer;
 #[cfg(test)]
 pub mod test_util;
 use tower_http::trace::TraceLayer;
-use tracing::{Span, info_span};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::{info, info_span};
 
 #[derive(Clone)]
 struct AppState {
@@ -64,23 +66,7 @@ async fn main() {
         cfg.port = port;
     }
 
-    // Tracing
-    // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs
-    // TODO: Consider removing envfilter in favour of config driven approach
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                // axum logs rejections from built-in extractors with the `axum::rejection`
-                // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
-                format!(
-                    "{}=debug,tower_http=debug,axum::rejection=trace",
-                    env!("CARGO_CRATE_NAME")
-                )
-                .into()
-            }),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    telemetry::otlp::setup(&cfg);
 
     // Database
     // TODO: Match config to make correct connection (pg vs sql)
@@ -94,7 +80,12 @@ async fn main() {
         ws_connection_map: sync::websocket::build_ws_conn_map(),
     };
 
-    println!("Airday server started at http://{}", host_str);
+    info!("Airday server started at http://{}", host_str);
+    info!(
+        port = 3000,
+        address = "0.0.0.0",
+        "Server started successfully"
+    );
     let public = Router::new()
         .route("/", get(root::root_handler))
         .route(

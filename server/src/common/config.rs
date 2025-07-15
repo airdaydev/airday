@@ -7,6 +7,17 @@ pub struct AirdayConfig {
     pub host: String, // TODO: Use an IP address type
     pub sqlx_host: String,
     pub secure_cookies: bool,
+    #[serde(deserialize_with = "deserialize_lowercase")]
+    pub log_level: String,
+    pub otlp_host: Option<String>,
+}
+
+fn deserialize_lowercase<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(s.to_lowercase())
 }
 
 impl Default for AirdayConfig {
@@ -16,6 +27,8 @@ impl Default for AirdayConfig {
             host: String::from("localhost"),
             sqlx_host: String::from("sqlite:default.db"),
             secure_cookies: true,
+            otlp_host: None,
+            log_level: String::from("info"),
         }
     }
 }
