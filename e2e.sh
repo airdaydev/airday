@@ -9,6 +9,7 @@ sqlx database reset -y --source sqlite/migrations
 # Start server in background
 cargo run --manifest-path ./server/Cargo.toml -- \
   --sqlx-host=$DATABASE_URL \
+  --log-level=OFF \
   --config=./server/config.toml & SERVER_PID=$!
 
 # Wait for server to be ready (adjust URL/port as needed)

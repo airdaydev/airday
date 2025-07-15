@@ -50,6 +50,7 @@ struct AirdayOptions {
     /// Override database
     sqlx_host: Option<String>,
     port: Option<usize>,
+    log_level: Option<String>,
 }
 
 #[tokio::main]
@@ -64,6 +65,9 @@ async fn main() {
     }
     if let Some(port) = opts.port {
         cfg.port = port;
+    }
+    if let Some(log_level) = opts.log_level {
+        cfg.log_level = log_level.to_lowercase();
     }
 
     telemetry::otlp::setup(&cfg);

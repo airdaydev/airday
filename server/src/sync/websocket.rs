@@ -3,6 +3,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use futures_util::SinkExt;
 use tokio::sync::mpsc;
+use tracing::{Instrument, error, info, info_span};
 // use futures_util::SinkExt;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
@@ -69,47 +70,50 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
 async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
-        match msg {
-            Ok(Message::Binary(b)) => {
-                let msg = root_as_message_wrapper_proto(&b).unwrap();
-                match msg.message_type() {
-                    // Holy shit man i can just fuck this off and put it as text...
-                    MessageProto::JMAPMessageProto => {
-                        println!("Dropping JMAP message!");
-                    }
-                    MessageProto::AirdayMessageProto => {
-                        let airday_message = msg.message_as_airday_message_proto().unwrap();
-                        let parsed_message = AirdayMessage::from_proto(&airday_message);
-                        if let Ok(msg) = parsed_message {
-                            println!(
-                                "Received valid airday message with {} actions",
-                                msg.actions.len()
-                            );
-                            message_handler(&state, &msg, &socket_id).await;
-                        } else if let Err(err) = parsed_message {
-                            // TODO & test if there are no actions
-                            println!("Invalid airday message: {:?}", err);
+        async {
+            match msg {
+                Ok(Message::Binary(b)) => {
+                    let msg = root_as_message_wrapper_proto(&b).unwrap();
+                    match msg.message_type() {
+                        // Holy shit man i can just fuck this off and put it as text...
+                        MessageProto::JMAPMessageProto => {
+                            info!("Dropping JMAP message!");
+                        }
+                        MessageProto::AirdayMessageProto => {
+                            let airday_message = msg.message_as_airday_message_proto().unwrap();
+                            let parsed_message = AirdayMessage::from_proto(&airday_message);
+                            if let Ok(msg) = parsed_message {
+                                info!(
+                                    "Received valid airday message with {} actions",
+                                    msg.actions.len()
+                                );
+                                message_handler(&state, &msg, &socket_id).await;
+                            } else if let Err(err) = parsed_message {
+                                // TODO & test if there are no actions
+                                info!("Invalid airday message: {:?}", err);
+                            }
+                        }
+                        _ => {
+                            info!("Throwing away non binary message")
                         }
                     }
-                    _ => {
-                        println!("Throwing away non binary message")
-                    }
+                    ()
                 }
-                ()
-            }
-            Ok(Message::Close(_)) => {
-                // Clean up maps
-                println!("Closed")
-            }
-            Err(e) => {
-                eprintln!("Error receiving message: {:?}", e);
-                // TODO: Disconnect client
-                break;
-            }
-            _ => {
-                // Discard
+                Ok(Message::Close(_)) => {
+                    // Clean up maps
+                    info!("Closed")
+                }
+                Err(e) => {
+                    error!("Error receiving message: {:?}", e);
+                    // TODO: Disconnect client
+                }
+                _ => {
+                    // Discard
+                }
             }
         }
+        .instrument(info_span!("ws_message", socket_id = %socket_id))
+        .await
     }
     state.ws_connection_map.lock().unwrap().remove(&socket_id);
 }
@@ -117,11 +121,11 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
 async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver<Message>) {
     while let Some(message) = rx.recv().await {
         if let Err(err) = sender.send(message).await {
-            eprintln!("Failed to send: {:?}", err);
+            // eprintln!("Failed to send: {:?}", err);
             break;
         }
     }
-    println!("Ending write");
+    // println!("Ending write");
 }
 
 pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {

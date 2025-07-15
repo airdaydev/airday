@@ -15,6 +15,9 @@ pub fn setup(cfg: &AirdayConfig) {
     if cfg.log_level == "debug" {
         level_filter = LevelFilter::DEBUG;
     }
+    if cfg.log_level == "off" {
+        level_filter = LevelFilter::OFF;
+    }
     let registry = tracing_subscriber::registry()
         .with(level_filter)
         .with(tracing_subscriber::fmt::layer());
