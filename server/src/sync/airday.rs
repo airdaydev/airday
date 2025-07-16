@@ -127,9 +127,7 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     );
                     action_offsets.push(offset);
                 }
-            } // _ => {
-              //     return ();
-              // }
+            }
         }
     }
     let msg = create_airday_message_with_builder(&mut builder, action_offsets);

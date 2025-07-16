@@ -1,26 +1,17 @@
-use axum::extract::State;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::response::Response;
-use futures_util::SinkExt;
-use tokio::sync::mpsc;
-use tracing::{Instrument, error, info, info_span};
-// use futures_util::SinkExt;
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
 use crate::sync::airday::{AirdayMessage, message_handler};
 use crate::sync::proto_generated::proto::MessageProto;
+use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::Response;
+use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
+use tracing::{Instrument, error, info, info_span};
 use uuid::Uuid;
-
-// auth handler
-// channel: sync
-// type: create_item
-// data: serialised_item
-//
-// https://docs.rs/axum/latest/axum/extract/ws/index.html
-// https://github.com/tokio-rs/axum/blob/main/examples/websockets/src/main.rs
 
 pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     // TODO: Unwrap cookie auth here
@@ -28,10 +19,6 @@ pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Res
         handle_socket(socket, state).await;
     })
 }
-
-// fn accountWSChannel(id: Uuid) -> String {
-//     format!("account_{}", id)
-// }
 
 #[derive(Clone)]
 pub struct WebsocketConn {
@@ -75,8 +62,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 Ok(Message::Binary(b)) => {
                     let msg = root_as_message_wrapper_proto(&b).unwrap();
                     match msg.message_type() {
-                        // Holy shit man i can just fuck this off and put it as text...
                         MessageProto::JMAPMessageProto => {
+                            // TODO: Consider making JMAP messages plain text
                             info!("Dropping JMAP message!");
                         }
                         MessageProto::AirdayMessageProto => {
