@@ -71,8 +71,8 @@ table MessageWrapperProto {
 }
 
 table SpanContextProto {
-  trace_id: [uint8];
-  span_id: [uint8];
+  trace_id: [uint8]; // 16 byte (128 bit) as per otlp spec n.b. swift code gen doesn't like fixed-length arrays (later perf opt is to have high/low fields or fuck off swift)
+  span_id: uint64; // 8 byte (64 bit) as per otlp spec
 }
 
 root_type MessageWrapperProto;

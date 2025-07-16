@@ -11,6 +11,11 @@ Spans have beginnings and ends thus represent a span of time. Spans can have chi
 
 OpenTelemetry is the standard that came out of various competing systems. OpenTelemetry Protocol (OTLP) is a protocol used for sending traces, logs and telemetry.
 
+## OTLP
+- Format definition: https://github.com/open-telemetry/opentelemetry-specification/blob/main/oteps/trace/0059-otlp-trace-data-format.md
+- JSON definition: https://github.com/open-telemetry/opentelemetry-proto/blob/main/examples/trace.json
+
+
 ## Rust tracing package
 https://docs.rs/tracing/latest/tracing/
 

@@ -1,4 +1,4 @@
-// NOTE: This file has been vibecoded and remains unchecked in-depth
+// NOTE: Initially Vibecoded
 
 interface SpanLog {
   timestamp: number;
@@ -12,8 +12,8 @@ type Attributes = Record<string, any>;
 
 interface ULSpan {
   readonly name: string;
-  readonly traceId: string;
-  readonly spanId: string;
+  readonly traceId: Uint8Array;
+  readonly spanId: Uint8Array;
   readonly parentSpanId?: string;
   readonly startTime: ULTime;
   readonly endTime: ULTime;
@@ -112,7 +112,7 @@ export class Tracer {
   private circuitBreakerUntil = 0;
   private isTabVisible = true;
   private isOnline = true;
-  private beaconSupported: boolean; // Beacon API support
+  private beaconSupported: boolean = false; // Beacon API support
 
   // Stats
   private stats: TracerStats = {
@@ -152,8 +152,8 @@ export class Tracer {
   }
 
   startSpan(name: string, parentSpanId?: string): ULSpan {
-    const traceId = this.generateId();
-    const spanId = this.generateId();
+    const traceId = this.generateId(16);
+    const spanId = this.generateId(8);
     const startTime = this.hrTime();
 
     const span: ULSpan = {
@@ -440,8 +440,8 @@ export class Tracer {
   // Convert span to OTLP format
   private spanToOTLP(span: ULSpan): OTLPSpan {
     return {
-      traceId: this.toHex(span.traceId, 32),
-      spanId: this.toHex(span.spanId, 16),
+      traceId: this.toHex(span.traceId),
+      spanId: this.toHex(span.spanId),
       parentSpanId: span.parentSpanId
         ? this.toHex(span.parentSpanId, 16)
         : undefined,
@@ -460,6 +460,12 @@ export class Tracer {
         message: span.status.message || "",
       },
     };
+  }
+
+  static toHex(bytes: Uint8Array) {
+    return Array.from(bytes)
+      .map((b) => b.toString(bytes.length).padStart(2, "0"))
+      .join("");
   }
 
   // Convert attributes to OTLP format
@@ -485,32 +491,16 @@ export class Tracer {
     }
   }
 
-  // Convert ID to hex format with padding
-  private toHex(id: string, length: number): string {
-    // Create a simple hash from the string ID
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) {
-      const char = id.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-
-    // Convert to hex and pad to required length
-    const hex = Math.abs(hash).toString(16);
-    const randomSuffix = Math.random().toString(16).substring(2);
-    const combined = (hex + randomSuffix).substring(0, length);
-    return combined.padStart(length, "0");
-  }
-
   // Convert ULTime to nanoseconds
   private hrTimeToNanos(hrTime: ULTime): bigint {
     const [seconds, nanos] = hrTime;
     return BigInt(seconds) * BigInt(1000000000) + BigInt(Math.floor(nanos));
   }
 
-  // Utility methods
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 15);
+  private generateId(byte_count: number): Uint8Array {
+    const bytes = new Uint8Array(byte_count);
+    crypto.getRandomValues(bytes);
+    return bytes;
   }
 
   private hrTime(): ULTime {
