@@ -2,7 +2,7 @@ import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AirdayWALEntry } from "../storage/wal";
-import { AddItemAction, createAirdayMessage } from "./actions";
+import { AddItemAction, AirdayBatchMessage } from "./actions";
 import { AirdayItem } from "./model";
 
 // Creates & serialises actions to pass to mq
@@ -32,7 +32,7 @@ export class AirdaySync {
       AirdayWALEntry(action.id, walAction),
     );
     tx.objectStore("item").add(item.toJSON()); // optimistic update
-    const message = createAirdayMessage([action]);
+    const message = new AirdayBatchMessage([action]);
     this.core.mq.enqueueAirdayMessage(message);
     // TODO: So we need our sync core to subscribe to all item updates!
     // When the item is synced, we need to kill its WAL entry (and maybe mark the live item as synced)

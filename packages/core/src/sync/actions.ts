@@ -19,6 +19,7 @@ import {
   AuthenticateActionProto,
 } from "../proto";
 import { getUuidBytes } from "../common";
+import type { MQMessage } from "../websocket/mq";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -150,27 +151,34 @@ export class AddItemAction extends Action {
   }
 }
 
-// TODO: Add message ids?
-// const uuidOffset = UUID.createUUID(builder, Array.from(parse(v4()))); // TODO... wait where does this go...?
-export function createAirdayMessage(actions: Action[]) {
-  const builder = new Builder(1024);
+export class AirdayBatchMessage implements MQMessage {
+  actions: Action[];
+  constructor(actions: Action[]) {
+    this.actions = actions;
+  }
+  toFlatBuffer() {
+    const builder = new Builder(1024);
 
-  // 1. Build action batch components
-  const batchOffsets = actions
-    .map((action) => action.addToFlatBuffer(builder))
-    .filter((a) => a !== null);
+    // 1. Build action batch components
+    const batchOffsets = this.actions
+      .map((action) => action.addToFlatBuffer(builder))
+      .filter((a) => a !== null);
 
-  // 2. Build AridayMessageProto (contains batches)
-  const batch = AirdayMessageProto.createBatchVector(builder, batchOffsets);
-  AirdayMessageProto.startAirdayMessageProto(builder);
-  AirdayMessageProto.addBatch(builder, batch);
-  let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
+    // 2. Build AridayMessageProto (contains batches)
+    const batch = AirdayMessageProto.createBatchVector(builder, batchOffsets);
+    AirdayMessageProto.startAirdayMessageProto(builder);
+    AirdayMessageProto.addBatch(builder, batch);
+    let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
 
-  // 3. Builds message wrapper (distinguihes it from JMAPMessageProto)
-  MessageWrapperProto.startMessageWrapperProto(builder);
-  MessageWrapperProto.addMessageType(builder, MessageProto.AirdayMessageProto);
-  MessageWrapperProto.addMessage(builder, messageOffset);
-  let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
-  builder.finish(wrapper);
-  return builder.asUint8Array();
+    // 3. Builds message wrapper (distinguihes it from JMAPMessageProto)
+    MessageWrapperProto.startMessageWrapperProto(builder);
+    MessageWrapperProto.addMessageType(
+      builder,
+      MessageProto.AirdayMessageProto,
+    );
+    MessageWrapperProto.addMessage(builder, messageOffset);
+    let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
+    builder.finish(wrapper);
+    return builder.asUint8Array();
+  }
 }

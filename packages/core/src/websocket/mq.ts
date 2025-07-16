@@ -8,9 +8,13 @@ export enum Protocol {
   JMAP = 1,
 }
 
+export interface MQMessage {
+  toFlatBuffer(): Uint8Array;
+}
+
 export interface QueuedMessage {
   type: Protocol;
-  message: Uint8Array;
+  message: MQMessage;
 }
 
 export interface AirdayQueuedMessage extends QueuedMessage {
@@ -39,12 +43,12 @@ export class MessageQueue {
     this.queue.push(message);
     this.next();
   }
-  enqueueAirdayMessage(fb: Uint8Array) {
-    const message: QueuedMessage = {
+  enqueueAirdayMessage(message: MQMessage) {
+    const queuedMessage: QueuedMessage = {
       type: Protocol.Airday,
-      message: fb,
+      message,
     };
-    this.enqueue(message);
+    this.enqueue(queuedMessage);
   }
   next() {
     const batch: QueuedMessage[] = [];
@@ -76,7 +80,7 @@ export class MessageQueue {
   }
   async wsSend(batch: Array<QueuedMessage>) {
     batch.map((item) => {
-      this.core.ws.send(item.message);
+      this.core.ws.send(item.message.toFlatBuffer());
     });
     // TODO: We need a timeout and ask to put back on the queue
     // Promise.resolve(batchInput).then((batch) => {
