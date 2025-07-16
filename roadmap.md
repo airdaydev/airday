@@ -1,8 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] server - websocket tracing (replacing printlns too)
-- [] @airday/core - no websocket conn until ready to sync
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
@@ -27,7 +25,7 @@
 - [] Put up website
 
 ## Protocol improvements (l8a)
-- [] contemplate removal of airday batch messaging system in favour of single action messages
+- [] contemplate removal of airday batch messaging system in favour of single action messages (batches vs domain-specific batching actions?)
 - [] version numbers?
 - [] first byte to determine message type (allow separate flatbuffer definitions)
 

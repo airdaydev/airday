@@ -13,14 +13,18 @@ import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
 // TODO: Offline considerations
 export class WebsocketManager {
   client: AirdayClient;
-  ws: WebSocket;
+  ws: WebSocket | null = null;
+  address: URL;
   authorised = false;
   constructor(client: AirdayClient) {
     this.client = client;
     const address = client.root;
     address.pathname = "ws";
+    this.address = address;
     console.debug(`WS connection attempt to ${address}`);
-    this.ws = new WebSocket(address);
+  }
+  enable() {
+    this.ws = new WebSocket(this.address);
     this.ws.addEventListener("message", this.listener);
     this.ws.addEventListener("error", (error) => {
       console.error("error");
@@ -30,6 +34,7 @@ export class WebsocketManager {
     });
   }
   bearerAuth() {
+    if (!this.ws) throw new Error("WS is not enabled");
     if (!this.client.session?.token) {
       console.warn("Cannot websocket bearer auth, no bearer token");
       return;
@@ -40,12 +45,14 @@ export class WebsocketManager {
     this.ws.send(msg);
   }
   send(data: any) {
+    if (!this.ws) throw new Error("Cannot send, WS is not enabled");
     // if (!this.authorised) {
     //   throw new Error("Attempted to use ws connection while not authorised");
     // }
     return this.ws.send(data);
   }
   close() {
+    if (!this.ws) throw new Error("Cannot close, WS is not enabled");
     return this.ws.close();
   }
   // Explicit reconnect is useful for doing cookie authorisation
