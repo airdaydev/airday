@@ -17,7 +17,9 @@ import {
   MessageWrapperProto,
   MessageProto,
   AuthenticateActionProto,
+  SpanContextProto,
 } from "../proto";
+import { tracer } from "../tracer";
 import { getUuidBytes } from "../common";
 import type { MQMessage } from "../websocket/mq";
 
@@ -177,6 +179,12 @@ export class AirdayBatchMessage implements MQMessage {
       MessageProto.AirdayMessageProto,
     );
     MessageWrapperProto.addMessage(builder, messageOffset);
+
+    const span = tracer.startSpan("ws_message");
+    tracer.addTag(span, "action_count", this.actions.length);
+    // SpanContextProto.createSpanIdVector(builder, span.spanId);
+    // MessageWrapperProto.addSpanContext(builder, spanContextOffset);
+
     let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
     builder.finish(wrapper);
     return builder.asUint8Array();

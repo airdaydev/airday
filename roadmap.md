@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] @airday/tracer - generate otlp compliant trace/span ids, high performance send through flatbuffers (see l8est convo), do it by hand (good exercise)
 - [] @airday/core - create & update items, follow e2e traces
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
