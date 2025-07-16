@@ -7,7 +7,7 @@ import {
   MessageProto,
   MessageWrapperProto,
 } from "../proto";
-import type { AirdayClient } from "./main";
+import { AuthMode, type AirdayClient } from "./main";
 import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
 
 // TODO: Offline considerations
@@ -15,25 +15,34 @@ export class WebsocketManager {
   client: AirdayClient;
   ws: WebSocket | null = null;
   address: URL;
+  connected = false;
   authorised = false;
   constructor(client: AirdayClient) {
     this.client = client;
     const address = client.root;
     address.pathname = "ws";
     this.address = address;
-    console.debug(`WS connection attempt to ${address}`);
   }
-  enable() {
+  connect() {
+    console.debug(`WS connection attempt to ${this.address}`);
     this.ws = new WebSocket(this.address);
     this.ws.addEventListener("message", this.listener);
     this.ws.addEventListener("error", (error) => {
       console.error("error");
     });
     this.ws.addEventListener("close", (event) => {
+      this.connected = false;
       console.error("closed");
     });
+    this.ws.addEventListener("open", (event) => {
+      this.connected = true;
+      if (this.client.authMode === AuthMode.BearerToken) {
+        this.bearerAuth();
+      }
+      // TODO: Re. cookie auth... send same message on server to ensure client is authorised
+    });
   }
-  bearerAuth() {
+  private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");
     if (!this.client.session?.token) {
       console.warn("Cannot websocket bearer auth, no bearer token");
@@ -41,7 +50,7 @@ export class WebsocketManager {
     }
     const action = new AuthenticateAction(this.client.session.token);
     const msg = createAirdayMessage([action]);
-    console.log("sending", msg);
+    console.debug("WS: Sending", msg);
     this.ws.send(msg);
   }
   send(data: any) {
@@ -87,6 +96,7 @@ export class WebsocketManager {
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
           this.authorised = authResponse.success() === true;
+          // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:
           const itemResponse = new AddItemActionProto();

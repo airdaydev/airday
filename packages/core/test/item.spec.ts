@@ -17,7 +17,8 @@ beforeAll(async () => {
 });
 
 test.only("Item sync", async () => {
-  client.ws.bearerAuth();
+  client.ws.enable();
+  // client.ws.bearerAuth();
   // const newItem = new AirdayItem({
   //   text: new LWWRegisterString({
   //     timestamp: syncClient.timestampProducer.timestamp(),

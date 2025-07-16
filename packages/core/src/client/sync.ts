@@ -52,7 +52,13 @@ export class SyncClient {
     const batch: QueuedMessage[] = [];
     const messageQueueFull =
       this.pendingMessages.size > this.maxPendingMessages;
-    if (!this.running || messageQueueFull || this.queue.length === 0) {
+    if (
+      !this.running ||
+      messageQueueFull ||
+      !this.airdayClient.ws.authorised ||
+      this.queue.length === 0
+    ) {
+      // TODO: We need a means for the sync batcher to continue when auth starts
       return; // Wait until pending messages are done
     }
     // TODO: Possible optimisation; count batch count towards pending messages count! (separate from pendingMessages.size)
