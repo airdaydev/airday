@@ -1,8 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] @airday/core - Instrument with tracing
-- [] @airday/core - create & update items
+- [] @airday/core - create & update items, follow e2e traces
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
 - [] set a default workspace
