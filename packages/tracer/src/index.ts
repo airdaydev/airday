@@ -334,6 +334,13 @@ export class Tracer {
     }, this.batchConfig.flushIntervalMs) as any;
   }
 
+  async shutdown(): Promise<void> {
+    await this.send();
+    if (this.batchTimer) {
+      clearInterval(this.batchTimer);
+    }
+  }
+
   private addSpanToBuffer(span: ULSpan): void {
     // Check if buffer is full
     if (this.spans.length >= this.batchConfig.maxBufferSize) {

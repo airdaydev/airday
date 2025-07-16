@@ -86,6 +86,7 @@ async function bundle() {
     const span = tracer.startSpan("test-span");
     tracer.endSpan(span);
     console.log("✅ ESM bundle test passed");
+    await tracer.shutdown();
   } catch (error) {
     console.error("❌ Bundle test failed:", error);
   }
