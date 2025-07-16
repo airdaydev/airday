@@ -1,6 +1,7 @@
-import { APISchema, parseJSONResponse, AirdayClient, valJSONRes } from "./main";
+import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
 import { type TypeOf, v } from "suretype";
 import { v_session_bearer, v_session_cookie } from "./types";
+import type { AirdayCore } from "../core";
 
 const createUserOpts = APISchema(
   v.object({
@@ -22,11 +23,11 @@ const createUserRes = APISchema(
 );
 
 export async function createUser(
-  client: AirdayClient,
+  core: AirdayCore,
   opts: TypeOf<typeof createUserOpts.schema>,
 ) {
   createUserOpts.ensureFunc(opts);
-  const res = await fetch(client.endpoint("/user"), {
+  const res = await fetch(core.endpoint("/user"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -48,7 +49,7 @@ export const passwordAuthSchema = APISchema(
 const passwordAuthCookieRes = APISchema(v_session_cookie);
 
 export async function passwordAuthCookie(
-  client: AirdayClient,
+  client: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
   const res = await fetch(client.endpoint("/auth/password"), {
@@ -65,7 +66,7 @@ export async function passwordAuthCookie(
 const passwordAuthBearerRes = APISchema(v_session_bearer);
 
 export async function passwordAuthBearer(
-  client: AirdayClient,
+  client: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
   const res = await fetch(client.endpoint("/auth/password/bearer"), {
@@ -89,7 +90,7 @@ const sessionsRes = APISchema(
   }),
 );
 
-export async function getUserSessions(client: AirdayClient) {
+export async function getUserSessions(client: AirdayCore) {
   const res = await fetch(client.endpoint("/auth/sessions"), {
     method: "GET",
     credentials: client.credentials(),
@@ -102,7 +103,7 @@ export async function getUserSessions(client: AirdayClient) {
 const refreshCookieRes = APISchema(v_session_cookie);
 const refreshBearerRes = APISchema(v_session_bearer);
 
-export async function refreshCookie(client: AirdayClient) {
+export async function refreshCookie(client: AirdayCore) {
   if (!client.session) throw new Error("No existing session");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -118,7 +119,7 @@ export async function refreshCookie(client: AirdayClient) {
   return valJSONRes(untyped, refreshCookieRes.ensureFunc);
 }
 
-export async function refreshBearer(client: AirdayClient) {
+export async function refreshBearer(client: AirdayCore) {
   if (!client.session) throw new Error("No existing session");
   if (!client.session?.refreshToken) throw new Error("No refresh token");
   const headers: Record<string, string> = {

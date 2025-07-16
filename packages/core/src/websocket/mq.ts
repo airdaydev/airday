@@ -1,4 +1,4 @@
-import type { AirdayClient } from "./main";
+import type { AirdayCore } from "../core";
 import { TimestampProducer } from "../crdt/lww";
 import { MessageProto } from "../proto";
 
@@ -19,8 +19,8 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 }
 
 // TODO: Add time based message flushing
-export class SyncClient {
-  airdayClient: AirdayClient;
+export class MessageQueue {
+  airdayClient: AirdayCore;
   timestampProducer = new TimestampProducer(); // TODO: Retain PID if exists
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
@@ -30,7 +30,7 @@ export class SyncClient {
   timeout = 10000;
   retries = 3;
   observers = new Set<ObserverFunc>();
-  constructor(airdayClient: AirdayClient) {
+  constructor(airdayClient: AirdayCore) {
     this.airdayClient = airdayClient;
   }
   subscribe(observerFn: ObserverFunc) {

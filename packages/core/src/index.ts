@@ -1,6 +1,5 @@
-export { AirdayClient, AuthMode } from "./client/main";
-export { SyncClient } from "./client/sync";
-export { getJMAPSession } from "./client/jmap";
-export { createUser } from "./client/auth";
-export { AirdayItem } from "./tasks/model";
-export { getRoot } from "./client/root";
+export { AirdayCore, AuthMode } from "./core";
+export { getJMAPSession } from "./http/jmap";
+export { createUser } from "./http/auth";
+export { getRoot } from "./http/root";
+export { AirdayItem } from "./sync/model";

@@ -1,6 +1,6 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { WAL, type AirdayActionWALEntry } from "./wal";
-import type { AirdayItem, AirdayItemFields } from "../tasks/model";
+import type { AirdayItem, AirdayItemFields } from "../sync/model";
 
 export interface AirdayDBSchema extends DBSchema {
   wal: {

@@ -7,19 +7,19 @@ import {
   MessageProto,
   MessageWrapperProto,
 } from "../proto";
-import { AuthMode, type AirdayClient } from "./main";
-import { AuthenticateAction, createAirdayMessage } from "../tasks/actions";
+import { AuthMode, type AirdayCore } from "../core";
+import { AuthenticateAction, createAirdayMessage } from "../sync/actions";
 
 // TODO: Offline considerations
 export class WebsocketManager {
-  client: AirdayClient;
+  core: AirdayCore;
   ws: WebSocket | null = null;
   address: URL;
   connected = false;
   authorised = false;
-  constructor(client: AirdayClient) {
-    this.client = client;
-    const address = client.root;
+  constructor(core: AirdayCore) {
+    this.core = core;
+    const address = core.root;
     address.pathname = "ws";
     this.address = address;
   }
@@ -36,19 +36,19 @@ export class WebsocketManager {
     });
     this.ws.addEventListener("open", (event) => {
       this.connected = true;
-      if (this.client.authMode === AuthMode.BearerToken) {
+      if (this.core.authMode === AuthMode.BearerToken) {
         this.bearerAuth();
       }
-      // TODO: Re. cookie auth... send same message on server to ensure client is authorised
+      // TODO: Re. cookie auth... send same message on server to ensure core is authorised
     });
   }
   private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");
-    if (!this.client.session?.token) {
+    if (!this.core.session?.token) {
       console.warn("Cannot websocket bearer auth, no bearer token");
       return;
     }
-    const action = new AuthenticateAction(this.client.session.token);
+    const action = new AuthenticateAction(this.core.session.token);
     const msg = createAirdayMessage([action]);
     console.debug("WS: Sending", msg);
     this.ws.send(msg);

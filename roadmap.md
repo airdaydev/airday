@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] @airday/core - tighter integration between sync/websocket/itemsync + better names
 - [] @airday/core - Instrument with tracing
 - [] @airday/core - create & update items
 - [] @airday/core - get items since last sync (~5min before)
@@ -27,7 +26,7 @@
 - [] Put up website
 
 ## Protocol improvements (l8a)
-- [] contemplate removal of airday batch messaging system in favour of single action messages (batches vs domain-specific batching actions?)
+- [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)
 - [] version numbers?
 - [] first byte to determine message type (allow separate flatbuffer definitions)
 

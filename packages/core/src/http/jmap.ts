@@ -1,4 +1,5 @@
-import { APISchema, parseJSONResponse, AirdayClient, valJSONRes } from "./main";
+import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
+import { AirdayCore } from "../core";
 import { v } from "suretype";
 
 const getSessionRes = APISchema(
@@ -7,7 +8,7 @@ const getSessionRes = APISchema(
   }),
 );
 
-export async function getJMAPSession(client: AirdayClient) {
+export async function getJMAPSession(client: AirdayCore) {
   const res = await fetch(client.endpoint("/jmap/session"), {
     method: "GET",
     credentials: client.credentials(),

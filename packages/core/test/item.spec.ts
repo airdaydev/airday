@@ -1,23 +1,17 @@
 import { expect, test, beforeAll } from "bun:test";
 import { authenticateClient, createBearerClient } from "./utils.spec";
-import { SyncClient, AirdayItem } from "../src/index";
-import { AirdayIDB } from "../src/storage/idb";
-import { AirdayItemSync } from "../src/tasks/sync";
-import { WebsocketManager } from "../src/client/websocket";
 import { LWWRegisterString } from "../src/crdt/lww";
 
 const client = createBearerClient();
-const syncClient = new SyncClient(client);
-const airdayItemSync = new AirdayItemSync(syncClient);
 
 beforeAll(async () => {
   await authenticateClient(client, `${Math.random()}@airday.com}`);
   await client.db.connect();
-  airdayItemSync.setDB(client.db);
+  client.sync.setDB(client.db); // TODO: This should happen automatically
 });
 
 test.only("Item sync", async () => {
-  client.ws.enable();
+  client.ws.connect();
   // client.ws.bearerAuth();
   // const newItem = new AirdayItem({
   //   text: new LWWRegisterString({

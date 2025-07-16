@@ -1,18 +1,15 @@
 import {
-  type TypeOf,
-  compile,
-  type ObjectValidator,
-  type EnsureFunction,
-} from "suretype";
-import {
   passwordAuthBearer,
   passwordAuthCookie,
   passwordAuthSchema,
   refreshBearer,
   refreshCookie,
-} from "./auth";
-import { AirdayIDB } from "../storage/idb";
+} from "./http/auth";
+import { AirdayIDB } from "./storage/idb";
 import { WebsocketManager } from "./websocket";
+import { MessageQueue } from "./websocket/mq";
+import { AirdaySync } from "./sync";
+import type { TypeOf } from "suretype";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -33,20 +30,23 @@ interface Session {
   userId: string;
 }
 
-// TODO: This queue should run instantly, unless the session token is about to expire
-// In that case, it should place refresh at the top of the queue and continue
-// If the refresh token fails, it should fire an event that the user is logged out
-export class AirdayClient {
+// TODO: Consider making an HTTP class separately and calling this core
+export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
-  ws: WebsocketManager;
-  db = new AirdayIDB();
-  // TODO: Refresh token
+  ws: WebsocketManager; // websocket layer
+  mq: MessageQueue; // message queueing
+  sync: AirdaySync; // airday item layer
+  db: AirdayIDB; // persistence layer
+  // TODO: Refresh token management
   constructor(opts: AirdayClientOpts) {
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
+    this.mq = new MessageQueue(this);
+    this.sync = new AirdaySync(this);
+    this.db = new AirdayIDB();
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);
@@ -138,83 +138,4 @@ export class AirdayClient {
     });
     return res;
   }
-}
-
-interface AirdayJSONResponse<T> {
-  response: Response;
-  data: T;
-}
-
-type ExtractEnsureType<T extends EnsureFunction<any>> =
-  T extends EnsureFunction<infer U> ? U : never;
-
-interface ParseOpts {
-  debug: boolean;
-}
-
-export class APIError extends Error {
-  public readonly status: number;
-  public readonly body: any;
-
-  constructor(message: string, status: number, body?: any) {
-    super(message);
-
-    // Set the prototype explicitly to maintain instanceof checks
-    Object.setPrototypeOf(this, APIError.prototype);
-
-    this.name = "APIError";
-    this.status = status;
-    this.body = body;
-
-    // Capture stack trace if available (V8 specific)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, APIError);
-    }
-  }
-}
-
-// TODO: Error handling, tracing
-export async function parseJSONResponse(
-  response: Response,
-  opts?: ParseOpts,
-): Promise<AirdayJSONResponse<any>> {
-  let body = await response.json();
-  const parseOpts = {
-    debug: false,
-    ...opts,
-  };
-  if (parseOpts.debug) {
-    console.log(response, body);
-  }
-  if (response.status !== 200) {
-    // TODO: Robust status handling
-    throw new APIError(JSON.stringify(body), response.status);
-  }
-  return {
-    response,
-    data: body,
-  };
-}
-
-export async function valJSONRes<T extends EnsureFunction<any>>(
-  response: AirdayJSONResponse<any>,
-  validator: T,
-): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
-  const data = await validator(response.data);
-  return {
-    response: response.response,
-    data,
-  };
-}
-
-export function APISchema<T extends ObjectValidator<any>>(
-  schema: T,
-): {
-  schema: T;
-  ensureFunc: EnsureFunction<TypeOf<T, false>>;
-} {
-  return {
-    schema,
-    ensureFunc: compile(schema, { ensure: true }),
-  };
 }

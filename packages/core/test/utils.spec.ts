@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { loadToml, validateConfig } from "toml-config";
-import { AirdayClient, AuthMode } from "../src/index";
+import { AirdayCore, AuthMode } from "../src/index";
 import { createUser } from "../src/index";
 
 export function extractCookie(
@@ -38,18 +38,18 @@ const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
 export function createBearerClient() {
-  return new AirdayClient({
+  return new AirdayCore({
     rootUrl: config.API_URL,
     authMode: AuthMode.BearerToken,
   });
 }
 
-export async function authenticateClient(client: AirdayClient, email: string) {
+export async function authenticateClient(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
-  await createUser(client, {
+  await createUser(core, {
     email,
     password,
   });
-  await client.loginWithPasswordBearer({ email, password });
-  return client;
+  await core.loginWithPasswordBearer({ email, password });
+  return core;
 }
