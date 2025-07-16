@@ -1,6 +1,7 @@
-import { expect, test, beforeAll } from "bun:test";
+import { test, beforeAll } from "bun:test";
 import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
+import { AirdayItem } from "../src";
 
 const core = createTestCore();
 
@@ -12,13 +13,10 @@ beforeAll(async () => {
 
 test.only("Item sync", async () => {
   core.ws.connect();
-  // const newItem = new AirdayItem({
-  //   text: new LWWRegisterString({
-  //     timestamp: syncClient.timestampProducer.timestamp(),
-  //     data: "test",
-  //   }),
-  // });
-  // airdayItemSync.createItem(newItem);
+  const newItem = new AirdayItem({
+    text: LWWRegisterString.fromString("test"),
+  });
+  core.sync.createItem(newItem);
   await new Promise((resolve, reject) => {
     setTimeout(() => {
       core.ws.close();

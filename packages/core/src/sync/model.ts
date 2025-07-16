@@ -1,19 +1,19 @@
 import { v4, parse } from "uuid";
 import { LWWRegisterString } from "../crdt/lww";
+import type { SerialisedAirdayItem } from "./actions";
 
 export interface AirdayItemFields {
-  id: Uint8Array;
-  text: LWWRegisterString;
+  id?: Uint8Array;
+  text?: LWWRegisterString;
 }
 
 type UpdateFields = Partial<Omit<AirdayItemFields, "id">>;
 
 export class AirdayItem {
   id: Uint8Array;
-  text: LWWRegisterString;
+  text?: LWWRegisterString;
   constructor(params: AirdayItemFields) {
     this.id = params.id || parse(v4());
-    this.text = params.text;
   }
   // TODO: Custom logic MAY be necessary
   merge(fields: UpdateFields) {
@@ -28,9 +28,13 @@ export class AirdayItem {
     });
   }
   toJSON() {
-    return {
-      id: this.id,
-      text: this.text.toJSON(),
+    // TODO: Clean up id requirement
+    let obj: Partial<SerialisedAirdayItem> = {
+      id: this.id.toString(),
     };
+    if (this.text) {
+      obj.text = this.text.toJSON();
+    }
+    return obj;
   }
 }

@@ -1,5 +1,5 @@
 import type { AirdayCore } from "../core";
-import { MessageQueue } from "../websocket/mq";
+import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AirdayWALEntry } from "../storage/wal";
 import { AddItemAction, createAirdayMessage } from "./actions";
@@ -12,6 +12,9 @@ export class AirdaySync {
   private core: AirdayCore;
   constructor(core: AirdayCore) {
     this.core = core;
+  }
+  timestamp() {
+    return globalTSProducer.timestamp();
   }
   // TODO: Use account
   setDB(idb: AirdayIDB) {

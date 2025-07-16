@@ -9,6 +9,8 @@ interface TimestampConstructorOps {
   tick?: number;
 }
 
+export type LWWTimestampArr = [number, number, number];
+
 export class LWWTimestamp {
   utc: number; // Process wall clock
   pid: number; // Process id
@@ -54,11 +56,35 @@ export class LWWTimestamp {
   }
 }
 
-export type LWWTimestampArr = [number, number, number];
+export class TimestampProducer {
+  private pid: number;
+  private lastUtc: number = 0;
+  private tick: number = 0;
+  constructor(pid: number = genPid()) {
+    this.pid = pid;
+  }
+  timestamp(): LWWTimestamp {
+    const now = Date.now();
+    if (now === this.lastUtc) {
+      this.tick++;
+    } else {
+      this.lastUtc = now;
+      this.tick = 0;
+    }
+    return new LWWTimestamp({
+      utc: this.lastUtc,
+      pid: this.pid,
+      tick: this.tick,
+    });
+  }
+}
+
+export const globalTSProducer = new TimestampProducer();
+
 export type SerialisedLWWRegister<T> = [LWWTimestampArr, T];
 
 interface LWWRegisterConstructorOpts<T> {
-  timestamp: LWWTimestamp;
+  timestamp?: LWWTimestamp;
   data: T;
 }
 
@@ -66,7 +92,7 @@ export class LWWRegister<T> {
   timestamp: LWWTimestamp;
   data: T;
   constructor(opts: LWWRegisterConstructorOpts<T>) {
-    this.timestamp = opts.timestamp;
+    this.timestamp = opts.timestamp || globalTSProducer.timestamp();
     this.data = opts.data;
   }
   static fromJSON<T>(json: any): LWWRegister<T> {
@@ -102,6 +128,11 @@ export class LWWRegisterString extends LWWRegister<string> {
   constructor(opts: LWWRegisterConstructorOpts<string>) {
     super(opts);
   }
+  static fromString(string: string) {
+    return new LWWRegisterString({
+      data: string,
+    });
+  }
   addToFlatBuffer(builder: Builder) {
     const dataOffset = builder.createString(this.data);
     const tsOffset = this.timestamp.addToFlatBuffer(builder);
@@ -110,28 +141,5 @@ export class LWWRegisterString extends LWWRegister<string> {
       tsOffset,
       dataOffset,
     );
-  }
-}
-
-export class TimestampProducer {
-  private pid: number;
-  private lastUtc: number = 0;
-  private tick: number = 0;
-  constructor(pid: number = genPid()) {
-    this.pid = pid;
-  }
-  timestamp(): LWWTimestamp {
-    const now = Date.now();
-    if (now === this.lastUtc) {
-      this.tick++;
-    } else {
-      this.lastUtc = now;
-      this.tick = 0;
-    }
-    return new LWWTimestamp({
-      utc: this.lastUtc,
-      pid: this.pid,
-      tick: this.tick,
-    });
   }
 }

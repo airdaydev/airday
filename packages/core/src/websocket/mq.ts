@@ -1,5 +1,4 @@
 import type { AirdayCore } from "../core";
-import { TimestampProducer } from "../crdt/lww";
 import { MessageProto } from "../proto";
 
 type ObserverFunc = (action: MessageProto) => void;
@@ -21,7 +20,6 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 // TODO: Add time based message flushing
 export class MessageQueue {
   core: AirdayCore;
-  timestampProducer = new TimestampProducer(); // TODO: Retain PID if exists
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
   running = true;
