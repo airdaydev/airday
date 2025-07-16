@@ -5,6 +5,7 @@
 
 import { $ } from "bun";
 import { statSync } from "fs";
+import pkg from "./package.json";
 
 const bundleConfig: Bun.BuildConfig = {
   entrypoints: ["./src/index.ts"],
@@ -38,10 +39,10 @@ async function bundle() {
 
   // Generate package.json for distribution
   const packageJson = {
-    name: "tracer",
-    version: "1.0.0",
-    description: "Ultra-light JSON-based tracer",
-    main: "tracer.cjs.js",
+    name: pkg.name,
+    version: pkg.version,
+    description: pkg.description,
+    main: "tracer.esm.js",
     module: "tracer.esm.js",
     types: "index.d.ts",
     files: ["*.js", "*.d.ts", "*.map"],
@@ -52,8 +53,8 @@ async function bundle() {
       },
     },
     keywords: ["json", "tracing", "observability", "lightweight"],
-    author: "Airday",
-    license: "MIT",
+    author: pkg.author,
+    license: pkg.license,
   };
 
   await Bun.write("dist/package.json", JSON.stringify(packageJson, null, 2));
@@ -82,7 +83,7 @@ async function bundle() {
   try {
     // Test ESM import
     const { Tracer } = await import("./dist/tracer.esm.js");
-    const tracer = new Tracer("test-service");
+    const tracer = new Tracer("airday_tracer_tests");
     const span = tracer.startSpan("test-span");
     tracer.endSpan(span);
     console.log("✅ ESM bundle test passed");

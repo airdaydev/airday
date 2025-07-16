@@ -13,6 +13,6 @@
     "jaeger": "./telemetry/jaeger.sh"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "author": "Daniel Gormly",
+  "license": "BSL-1.0"
 }
