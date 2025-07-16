@@ -9,12 +9,13 @@
     "build": "bun run bundle.ts",
     "dev": "bun run bundle.ts --watch",
     "clean": "rm -rf dist",
+    "ts": "tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts",
     "prepublishOnly": "bun run clean && bun run build"
   },
   "exports": {
     ".": {
       "import": "./dist/tracer.esm.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/tracer.d.ts"
     }
   },
   "files": [
@@ -23,9 +24,8 @@
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.13.1",
-  "dependencies": {},
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5.0.0"
+    "typescript": "^5.6.3"
   }
 }

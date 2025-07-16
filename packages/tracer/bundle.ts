@@ -22,6 +22,16 @@ const bundleConfig: Bun.BuildConfig = {
 async function bundle() {
   console.log("🚀 Building Tracer for frontend...");
 
+  // 1. Generate TypeScript declarations
+  console.log("📝 Generating TypeScript declarations...");
+  try {
+    await $`tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts`;
+    console.log("✅ TypeScript declarations generated");
+  } catch (error) {
+    console.error("❌ TypeScript declaration generation failed:", error);
+    process.exit(1);
+  }
+
   // 1. ESM Bundle (modern browsers)
   console.log("📦 Building ESM bundle...");
   const esmResult = await Bun.build({

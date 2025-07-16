@@ -1,3 +1,4 @@
+import { Tracer } from "@airday/tracer";
 import {
   passwordAuthBearer,
   passwordAuthCookie,
@@ -39,6 +40,7 @@ export class AirdayCore {
   mq: MessageQueue; // message queueing
   sync: AirdaySync; // airday item layer
   db: AirdayIDB; // persistence layer
+  tracer = new Tracer("airday_js");
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
     this.root = new URL(opts.rootUrl);
