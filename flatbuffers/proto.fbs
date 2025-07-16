@@ -67,7 +67,7 @@ union MessageProto {
 
 table MessageWrapperProto {
   message: MessageProto;
-  span: SpanContextProto;
+  span_context: SpanContextProto;
 }
 
 table SpanContextProto {

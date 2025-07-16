@@ -7,10 +7,12 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
+use opentelemetry::KeyValue;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use tracing::{Instrument, error, info, info_span};
+use tracing::{Instrument, Span, error, info, info_span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
@@ -55,44 +57,45 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     tokio::spawn(write(sender, rx));
 }
 
+// TODO: The name itself could further be differentiated into message types
 async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
         async {
+            let cur_span = Span::current();
             match msg {
                 Ok(Message::Binary(b)) => {
+                    cur_span.set_attribute("message_type", "binary");
+                    // TODO: Get trace_id here
+                    // cur_span.set_attribute("trace_id", value);
                     let msg = root_as_message_wrapper_proto(&b).unwrap();
                     match msg.message_type() {
                         MessageProto::JMAPMessageProto => {
                             // TODO: Consider making JMAP messages plain text
-                            info!("Dropping JMAP message!");
                         }
                         MessageProto::AirdayMessageProto => {
                             let airday_message = msg.message_as_airday_message_proto().unwrap();
                             let parsed_message = AirdayMessage::from_proto(&airday_message);
                             if let Ok(msg) = parsed_message {
-                                info!(
-                                    "Received valid airday message with {} actions",
-                                    msg.actions.len()
-                                );
+                                cur_span
+                                    .set_attribute("action_count", msg.actions.len().to_string());
+                                cur_span.add_event("wtf", vec![KeyValue::new("hi", "hi")]);
                                 message_handler(&state, &msg, &socket_id).await;
                             } else if let Err(err) = parsed_message {
                                 // TODO & test if there are no actions
-                                info!("Invalid airday message: {:?}", err);
+                                error!("Error parsing Airday message: {:?}", err);
                             }
                         }
                         _ => {
-                            info!("Throwing away non binary message")
+                            info!("Ignoring invalid protocol");
                         }
                     }
                     ()
                 }
                 Ok(Message::Close(_)) => {
-                    // Clean up maps
-                    info!("Closed")
+                    cur_span.record("message_type", "close");
                 }
                 Err(e) => {
-                    error!("Error receiving message: {:?}", e);
-                    // TODO: Disconnect client
+                    cur_span.record("message_type", "error");
                 }
                 _ => {
                     // Discard

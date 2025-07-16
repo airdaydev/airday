@@ -6,11 +6,10 @@ secure_cookies = false
 # ░▒█ Database settings
 sqlx_host = "sqlite:/home/daniel/.config/airday/airday.db"
 
+# ░▒█ Telemetry
+log_level = "debug"
+otlp_host = "http://localhost:4318/v1/traces"
+
 # ░▒█ Server features
 # Allow new sign ups on this instance
 # allow_create_user = false
-
-# ░▒█ Data types
-# enable_contacts = false
-# enable_calendar = false
-# enable_tasks = false
