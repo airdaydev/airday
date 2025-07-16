@@ -8,7 +8,7 @@ import {
   MessageWrapperProto,
 } from "../proto";
 import { AuthMode, type AirdayCore } from "../core";
-import { AuthenticateAction, createAirdayMessage } from "../sync/actions";
+import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 
 // TODO: Offline considerations
 export class WebsocketManager {
@@ -49,9 +49,9 @@ export class WebsocketManager {
       return;
     }
     const action = new AuthenticateAction(this.core.session.token);
-    const msg = createAirdayMessage([action]);
+    const msg = new AirdayBatchMessage([action]);
     console.debug("WS: Sending", msg);
-    this.ws.send(msg);
+    this.ws.send(msg.toFlatBuffer());
   }
   send(data: any) {
     if (!this.ws) throw new Error("Cannot send, WS is not enabled");
