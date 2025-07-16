@@ -20,7 +20,7 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 
 // TODO: Add time based message flushing
 export class MessageQueue {
-  airdayClient: AirdayCore;
+  core: AirdayCore;
   timestampProducer = new TimestampProducer(); // TODO: Retain PID if exists
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
@@ -30,8 +30,8 @@ export class MessageQueue {
   timeout = 10000;
   retries = 3;
   observers = new Set<ObserverFunc>();
-  constructor(airdayClient: AirdayCore) {
-    this.airdayClient = airdayClient;
+  constructor(core: AirdayCore) {
+    this.core = core;
   }
   subscribe(observerFn: ObserverFunc) {
     this.observers.add(observerFn);
@@ -55,7 +55,7 @@ export class MessageQueue {
     if (
       !this.running ||
       messageQueueFull ||
-      !this.airdayClient.ws.authorised ||
+      !this.core.ws.authorised ||
       this.queue.length === 0
     ) {
       // TODO: We need a means for the sync batcher to continue when auth starts
@@ -78,7 +78,7 @@ export class MessageQueue {
   }
   async wsSend(batch: Array<QueuedMessage>) {
     batch.map((item) => {
-      this.airdayClient.ws.send(item.message);
+      this.core.ws.send(item.message);
     });
     // TODO: We need a timeout and ask to put back on the queue
     // Promise.resolve(batchInput).then((batch) => {
@@ -87,7 +87,7 @@ export class MessageQueue {
     //   this.next();
     // });
     // batchInput.forEach((messageWrapper) => {
-    //   this.airdayClient.ws.send(messageWrapper.fb);
+    //   this.core.ws.send(messageWrapper.fb);
     //   this.pendingMessages.delete(key)
     // });
   }

@@ -8,8 +8,8 @@ const getRootResSchema = APISchema(
   }),
 );
 
-export async function getRoot(client: AirdayCore) {
-  const res = await fetch(client.endpoint("/"), {
+export async function getRoot(core: AirdayCore) {
+  const res = await fetch(core.endpoint("/"), {
     method: "GET",
   });
   const untyped = await parseJSONResponse(res);

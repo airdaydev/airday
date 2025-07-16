@@ -8,11 +8,11 @@ const getSessionRes = APISchema(
   }),
 );
 
-export async function getJMAPSession(client: AirdayCore) {
-  const res = await fetch(client.endpoint("/jmap/session"), {
+export async function getJMAPSession(core: AirdayCore) {
+  const res = await fetch(core.endpoint("/jmap/session"), {
     method: "GET",
-    credentials: client.credentials(),
-    headers: client.headers(),
+    credentials: core.credentials(),
+    headers: core.headers(),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, getSessionRes.ensureFunc);

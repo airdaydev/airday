@@ -37,14 +37,14 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-export function createBearerClient() {
+export function createTestCore() {
   return new AirdayCore({
     rootUrl: config.API_URL,
     authMode: AuthMode.BearerToken,
   });
 }
 
-export async function authenticateClient(core: AirdayCore, email: string) {
+export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
   await createUser(core, {
     email,

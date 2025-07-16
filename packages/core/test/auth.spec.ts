@@ -1,22 +1,18 @@
 import { expect, test } from "bun:test";
 import { createUser } from "../src/index";
 import { getRoot } from "../src/index";
-import {
-  createBearerClient,
-  extractCookie,
-  parseCookieValue,
-} from "./utils.spec";
+import { createTestCore, extractCookie, parseCookieValue } from "./utils.spec";
 import { getJMAPSession } from "../src/index";
 
-const client = createBearerClient();
+const core = createTestCore();
 
 test("API root url & version", async () => {
-  const d = await getRoot(client);
+  const d = await getRoot(core);
   expect(d.data.version).toBeTypeOf("string");
 });
 
 test.only("non-existent username & password", async () => {
-  await client
+  await core
     .loginWithPasswordBearer({
       email: "nope@nope.com",
       password: "1234",
@@ -27,7 +23,7 @@ test.only("non-existent username & password", async () => {
 });
 
 test("Creating a user & default workspace", async () => {
-  const res = await createUser(client, {
+  const res = await createUser(core, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",
   });
@@ -36,14 +32,14 @@ test("Creating a user & default workspace", async () => {
   expect(res.data.default_workspace.id).toHaveLength(36);
   expect(res.data.default_workspace.name).toBeTypeOf("string");
   expect(
-    createUser(client, {
+    createUser(core, {
       email: "daniel@air.day",
       password: "fa09j20fiaj3fpaof",
     }),
     "Can't create another user with the same email",
   ).rejects.toThrow();
   expect(
-    createUser(client, {
+    createUser(core, {
       email: "daniel@air.day",
     }),
     "Can't create a user without a password",
@@ -67,45 +63,44 @@ test("Cookie authorisation", async () => {
 test("Bearer authorisation & refreshing sessions with bearer tokens", async () => {
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
-  await createUser(client, {
+  await createUser(core, {
     email,
     password,
   });
   expect(
-    client.loginWithPasswordBearer({
+    core.loginWithPasswordBearer({
       email,
       password: "hi",
     }),
     "Rejects bad passwords",
   ).rejects.toThrow();
-  const res = await client.loginWithPasswordBearer({
+  const res = await core.loginWithPasswordBearer({
     email,
     password,
   });
-  expect(client.session?.expires instanceof Date).toBeTrue();
-  expect(client.session?.refreshExpires instanceof Date).toBeTrue();
-  expect(client.session?.token).toBeTypeOf("string");
-  expect(client.session?.refreshToken).toBeTypeOf("string");
-  expect(client.session?.userId).toBeTypeOf("string");
-  const firstToken = client.session?.token;
-  const firstRefreshToken = client.session?.refreshToken;
-  const session = await getJMAPSession(client);
+  expect(core.session?.expires instanceof Date).toBeTrue();
+  expect(core.session?.refreshExpires instanceof Date).toBeTrue();
+  expect(core.session?.token).toBeTypeOf("string");
+  expect(core.session?.refreshToken).toBeTypeOf("string");
+  expect(core.session?.userId).toBeTypeOf("string");
+  const firstToken = core.session?.token;
+  const firstRefreshToken = core.session?.refreshToken;
+  const session = await getJMAPSession(core);
   expect(session.response.status).toBe(200);
-  expect(client.session?.token?.length, "Valid session token").toBe(27);
-  expect(client.session?.refreshToken?.length, "Valid refresh token").toBe(27);
-  const refresh = await client.refreshBearer();
+  expect(core.session?.token?.length, "Valid session token").toBe(27);
+  expect(core.session?.refreshToken?.length, "Valid refresh token").toBe(27);
+  const refresh = await core.refreshBearer();
   expect(refresh.response.status, "refresh api call succeeded").toBe(200);
-  expect(refresh.data.token, "client set refresh token").toBe(
-    client.session?.token as string,
+  expect(refresh.data.token, "core set refresh token").toBe(
+    core.session?.token as string,
   );
-  expect(
-    client.session?.token,
-    "client token has rotated after refresh",
-  ).not.toBe(firstToken as string);
+  expect(core.session?.token, "core token has rotated after refresh").not.toBe(
+    firstToken as string,
+  );
   expect(refresh.data.refreshToken, "refresh token has set from api call").toBe(
-    client.session?.refreshToken as string,
+    core.session?.refreshToken as string,
   );
-  expect(client.session?.refreshToken, "refresh token has rotated").not.toBe(
+  expect(core.session?.refreshToken, "refresh token has rotated").not.toBe(
     firstRefreshToken as string,
   );
 });

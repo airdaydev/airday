@@ -16,7 +16,7 @@ export enum AuthMode {
   BearerToken,
 }
 
-interface AirdayClientOpts {
+interface AirdayCoreOpts {
   rootUrl: string;
   authMode?: AuthMode;
 }
@@ -30,7 +30,7 @@ interface Session {
   userId: string;
 }
 
-// TODO: Consider making an HTTP class separately and calling this core
+// TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   root: URL;
   authMode: AuthMode;
@@ -40,7 +40,7 @@ export class AirdayCore {
   sync: AirdaySync; // airday item layer
   db: AirdayIDB; // persistence layer
   // TODO: Refresh token management
-  constructor(opts: AirdayClientOpts) {
+  constructor(opts: AirdayCoreOpts) {
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
@@ -116,6 +116,7 @@ export class AirdayCore {
   async loginWithPasswordCookie(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
+    this.authMode = AuthMode.ImplicitCookie;
     const res = await passwordAuthCookie(this, opts);
     this.setSession({
       id: res.data.id,
@@ -127,6 +128,7 @@ export class AirdayCore {
   async loginWithPasswordBearer(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ) {
+    this.authMode = AuthMode.BearerToken;
     const res = await passwordAuthBearer(this, opts);
     this.setSession({
       id: res.data.id,

@@ -49,10 +49,10 @@ export const passwordAuthSchema = APISchema(
 const passwordAuthCookieRes = APISchema(v_session_cookie);
 
 export async function passwordAuthCookie(
-  client: AirdayCore,
+  core: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
-  const res = await fetch(client.endpoint("/auth/password"), {
+  const res = await fetch(core.endpoint("/auth/password"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -66,10 +66,10 @@ export async function passwordAuthCookie(
 const passwordAuthBearerRes = APISchema(v_session_bearer);
 
 export async function passwordAuthBearer(
-  client: AirdayCore,
+  core: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
-  const res = await fetch(client.endpoint("/auth/password/bearer"), {
+  const res = await fetch(core.endpoint("/auth/password/bearer"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -90,11 +90,11 @@ const sessionsRes = APISchema(
   }),
 );
 
-export async function getUserSessions(client: AirdayCore) {
-  const res = await fetch(client.endpoint("/auth/sessions"), {
+export async function getUserSessions(core: AirdayCore) {
+  const res = await fetch(core.endpoint("/auth/sessions"), {
     method: "GET",
-    credentials: client.credentials(),
-    headers: client.headers(),
+    credentials: core.credentials(),
+    headers: core.headers(),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, sessionsRes.ensureFunc);
@@ -103,35 +103,35 @@ export async function getUserSessions(client: AirdayCore) {
 const refreshCookieRes = APISchema(v_session_cookie);
 const refreshBearerRes = APISchema(v_session_bearer);
 
-export async function refreshCookie(client: AirdayCore) {
-  if (!client.session) throw new Error("No existing session");
+export async function refreshCookie(core: AirdayCore) {
+  if (!core.session) throw new Error("No existing session");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Accept-Content": "application/json",
   };
-  const res = await fetch(client.endpoint("/auth/refresh"), {
+  const res = await fetch(core.endpoint("/auth/refresh"), {
     method: "POST",
     headers,
     credentials: "include",
-    body: JSON.stringify({ id: client.session.id }),
+    body: JSON.stringify({ id: core.session.id }),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, refreshCookieRes.ensureFunc);
 }
 
-export async function refreshBearer(client: AirdayCore) {
-  if (!client.session) throw new Error("No existing session");
-  if (!client.session?.refreshToken) throw new Error("No refresh token");
+export async function refreshBearer(core: AirdayCore) {
+  if (!core.session) throw new Error("No existing session");
+  if (!core.session?.refreshToken) throw new Error("No refresh token");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Accept-Content": "application/json",
-    Authorization: `Bearer ${client.session.refreshToken}`,
+    Authorization: `Bearer ${core.session.refreshToken}`,
   };
-  const res = await fetch(client.endpoint("/auth/refresh/bearer"), {
+  const res = await fetch(core.endpoint("/auth/refresh/bearer"), {
     method: "POST",
     headers,
     credentials: "include",
-    body: JSON.stringify({ id: client.session.id }),
+    body: JSON.stringify({ id: core.session.id }),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, refreshBearerRes.ensureFunc);
