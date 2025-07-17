@@ -22,6 +22,7 @@ import {
 import { tracer } from "../tracer";
 import { getUuidBytes } from "../common";
 import type { MQMessage } from "../websocket/mq";
+import type { ULSpan } from "@airday/tracer";
 
 export interface SerialisedAirdayItem {
   id: string;
@@ -155,6 +156,7 @@ export class AddItemAction extends Action {
 
 export class AirdayBatchMessage implements MQMessage {
   actions: Action[];
+  span?: ULSpan;
   constructor(actions: Action[]) {
     this.actions = actions;
   }
@@ -173,14 +175,15 @@ export class AirdayBatchMessage implements MQMessage {
     let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
 
     // TODO: Improve instrumentation
-    const span = tracer.startSpan("ws_message");
+    const span = tracer.startSpan("ws_send");
+    this.span = span;
     tracer.addTag(span, "action_count", this.actions.length);
-    tracer.endSpan(span);
     const traceIdOffset = SpanContextProto.createTraceIdVector(
       builder,
       span.traceId,
     );
     SpanContextProto.startSpanContextProto(builder);
+    SpanContextProto.addSpanId(builder, span.spanId.toBigInt());
     SpanContextProto.addTraceId(builder, traceIdOffset);
     const spanContextOffset = SpanContextProto.endSpanContextProto(builder);
 
@@ -196,5 +199,11 @@ export class AirdayBatchMessage implements MQMessage {
     let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
     builder.finish(wrapper);
     return builder.asUint8Array();
+  }
+  complete() {
+    // TODO: Show error/failure
+    if (this.span) {
+      tracer.endSpan(this.span);
+    }
   }
 }

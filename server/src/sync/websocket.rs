@@ -1,15 +1,15 @@
 use super::proto_generated::proto::root_as_message_wrapper_proto;
 use crate::AppState;
 use crate::sync::airday::{AirdayMessage, message_handler};
-use crate::sync::proto_generated::proto::MessageProto;
+use crate::sync::proto_generated::proto::{MessageProto, MessageWrapperProto};
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
-use hex;
-use opentelemetry::KeyValue;
-use opentelemetry::TraceId;
+use opentelemetry::trace::{SpanContext, TraceContextExt, TraceState};
+use opentelemetry::{Context, TraceId};
+use opentelemetry::{KeyValue, SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -59,6 +59,26 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     tokio::spawn(write(sender, rx));
 }
 
+fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
+    let mut otel_trace_id: TraceId = TraceId::INVALID;
+    let mut otel_span_id = SpanId::INVALID;
+    if let Some(span_context) = wrapper.span_context() {
+        if let Some(trace_id) = span_context.trace_id() {
+            let trace_id_bytes: [u8; 16] = trace_id.bytes().try_into().unwrap();
+            otel_trace_id = TraceId::from_bytes(trace_id_bytes);
+        }
+        let span_id_bytes: [u8; 8] = span_context.span_id().to_be_bytes();
+        otel_span_id = SpanId::from_bytes(span_id_bytes);
+    }
+    SpanContext::new(
+        otel_trace_id,
+        otel_span_id,
+        TraceFlags::SAMPLED,
+        false,
+        TraceState::default(),
+    )
+}
+
 // TODO: The name itself could further be differentiated into message types
 async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
@@ -69,12 +89,10 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                     cur_span.set_attribute("message_type", "binary");
                     // Set trace id
                     let msg = root_as_message_wrapper_proto(&b).unwrap();
-                    if let Some(span_context) = msg.span_context() {
-                        if let Some(trace_id) = span_context.trace_id() {
-                            let trace_id_hex = hex::encode(trace_id.bytes());
-                            cur_span.set_attribute("trace_id", trace_id_hex);
-                        }
-                    }
+                    // TODO: Separate function
+                    let span_ctx = extract_span_ctx(msg);
+                    let parent_ctx = Context::current().with_remote_span_context(span_ctx);
+                    cur_span.set_parent(parent_ctx);
                     match msg.message_type() {
                         MessageProto::JMAPMessageProto => {
                             // TODO: Consider making JMAP messages plain text
@@ -85,7 +103,6 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             if let Ok(msg) = parsed_message {
                                 cur_span
                                     .set_attribute("action_count", msg.actions.len().to_string());
-                                cur_span.add_event("wtf", vec![KeyValue::new("hi", "hi")]);
                                 message_handler(&state, &msg, &socket_id).await;
                             } else if let Err(err) = parsed_message {
                                 // TODO & test if there are no actions
@@ -109,7 +126,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 }
             }
         }
-        .instrument(info_span!("ws_message", socket_id = %socket_id))
+        .instrument(info_span!("ws_receive", socket_id = %socket_id))
         .await
     }
     state.ws_connection_map.lock().unwrap().remove(&socket_id);

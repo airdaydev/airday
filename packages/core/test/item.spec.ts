@@ -1,4 +1,4 @@
-import { test, beforeAll } from "bun:test";
+import { test, beforeAll, afterAll } from "bun:test";
 import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
@@ -12,22 +12,28 @@ beforeAll(async () => {
   core.sync.setDB(core.db); // TODO: This should happen automatically
 });
 
-test.only("Item sync", async () => {
+test("Item sync", async () => {
   core.ws.connect();
   const newItem = new AirdayItem({
     text: LWWRegisterString.fromString("test"),
   });
   core.sync.createItem(newItem);
   await new Promise((resolve, reject) => {
+    // TODO: Flush and close!
     setTimeout(() => {
+      console.log("awaiting one second (hack)");
       core.ws.close();
       resolve(null);
-    }, 3000);
+    }, 1000);
   });
-  await tracer.flushNow();
 
   // syncClient.subscribe((test) => {
   //   expect(test.payload.id).toBe("string");
   // });
   // const t = await core.ws.send("type");
+});
+
+afterAll(async () => {
+  console.log("Flushing traces");
+  await tracer.flushNow();
 });

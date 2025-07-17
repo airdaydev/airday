@@ -50,8 +50,9 @@ export class WebsocketManager {
     }
     const action = new AuthenticateAction(this.core.session.token);
     const msg = new AirdayBatchMessage([action]);
-    console.debug("WS: Sending", msg);
+    console.debug("WS: Sending", msg.actions.length, "action");
     this.ws.send(msg.toFlatBuffer());
+    msg.complete();
   }
   send(data: any) {
     if (!this.ws) throw new Error("Cannot send, WS is not enabled");
@@ -69,7 +70,7 @@ export class WebsocketManager {
   listener = (messageEvent: MessageEvent) => {
     if (messageEvent.type === "message") {
       // TODO: parse binary messages here, then provide response subscription system
-      console.log("message received", messageEvent);
+      console.log("message received");
       const bb = new ByteBuffer(messageEvent.data);
       const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
       if (msg.messageType() === MessageProto.AirdayMessageProto) {

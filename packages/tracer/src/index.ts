@@ -102,10 +102,10 @@ export class TracerID extends Uint8Array {
   constructor(byte_count: 8 | 16 = 8) {
     super(byte_count);
   }
-  static generate(byte_count: 8 | 16 = 8): Uint8Array {
-    const bytes = new Uint8Array(byte_count);
-    crypto.getRandomValues(bytes);
-    return new TracerID(byte_count);
+  static generate(byte_count: 8 | 16 = 8): TracerID {
+    const id = new TracerID(byte_count);
+    crypto.getRandomValues(id);
+    return id;
   }
   toHex() {
     return Array.from(this)
@@ -172,8 +172,8 @@ export class Tracer {
   }
 
   startSpan(name: string, parentSpanId?: TracerID): ULSpan {
-    const traceId = new TracerID(16);
-    const spanId = new TracerID(8);
+    const traceId = TracerID.generate(16);
+    const spanId = TracerID.generate(8);
     const startTime = this.hrTime();
 
     const span: ULSpan = {

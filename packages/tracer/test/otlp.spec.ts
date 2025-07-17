@@ -6,7 +6,8 @@ import { ULSpan, Tracer } from "../src/index";
 
 test("simple span", async () => {
   const tracer = new Tracer("otlp-tester");
-  const span = tracer.startSpan("yo");
+  const span = tracer.startSpan("simple-span");
+  console.log(span.traceId);
   tracer.endSpan(span);
   console.log("sending spans to date");
   await tracer.send("http://localhost:4318/v1/traces");
