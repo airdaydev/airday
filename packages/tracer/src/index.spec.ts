@@ -257,21 +257,15 @@ describe("Tracer OTLP Implementation", () => {
       networkEnabled: false,
     });
 
-    console.log("Initial stats:", tracer.getStats());
-
     // Create 5 spans
     for (let i = 0; i < 5; i++) {
       const span = tracer.startSpan(`test-${i}`);
       tracer.endSpan(span);
-      console.log(`After span ${i}:`, tracer.getStats());
+      expect(tracer.getStats().spansGenerated).toBe(i + 1);
     }
 
     const payload = tracer.createPayload();
-    console.log("After createPayload:", tracer.getStats());
-    console.log(
-      "Payload spans:",
-      payload.resourceSpans[0].scopeSpans[0].spans.length,
-    );
+    expect(payload.resourceSpans[0].scopeSpans[0].spans.length).toBe(5);
   });
 
   test("should handle networkEnabled option", async () => {
