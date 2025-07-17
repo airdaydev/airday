@@ -1,4 +1,4 @@
-// NOTE: Initially Vibecoded
+// NOTE: Initially Vibecoded, batching and browser features unchecked
 
 interface SpanLog {
   timestamp: number;
@@ -12,9 +12,9 @@ type Attributes = Record<string, any>;
 
 interface ULSpan {
   readonly name: string;
-  readonly traceId: Uint8Array;
-  readonly spanId: Uint8Array;
-  readonly parentSpanId?: Uint8Array;
+  readonly traceId: TracerID;
+  readonly spanId: TracerID;
+  readonly parentSpanId?: TracerID;
   readonly startTime: ULTime;
   readonly endTime: ULTime;
   readonly duration: ULTime;
@@ -98,6 +98,26 @@ interface LiveStats {
   beaconSupported: boolean; // Beacon API support
 }
 
+export class TracerID extends Uint8Array {
+  constructor(byte_count: 8 | 16 = 8) {
+    super(byte_count);
+  }
+  static generate(byte_count: 8 | 16 = 8): Uint8Array {
+    const bytes = new Uint8Array(byte_count);
+    crypto.getRandomValues(bytes);
+    return new TracerID(byte_count);
+  }
+  toHex() {
+    return Array.from(this)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  toBigInt(): bigint {
+    const view = new DataView(this.buffer, 0, 8);
+    return view.getBigUint64(0, false);
+  }
+}
+
 // Ultra-light JSON tracer
 export class Tracer {
   private serviceName: string;
@@ -151,9 +171,9 @@ export class Tracer {
     this.startBatching();
   }
 
-  startSpan(name: string, parentSpanId?: Uint8Array): ULSpan {
-    const traceId = this.generateId(16);
-    const spanId = this.generateId(8);
+  startSpan(name: string, parentSpanId?: TracerID): ULSpan {
+    const traceId = new TracerID(16);
+    const spanId = new TracerID(8);
     const startTime = this.hrTime();
 
     const span: ULSpan = {
@@ -434,11 +454,9 @@ export class Tracer {
   // Convert span to OTLP format
   private spanToOTLP(span: ULSpan): OTLPSpan {
     return {
-      traceId: Tracer.toHex(span.traceId),
-      spanId: Tracer.toHex(span.spanId),
-      parentSpanId: span.parentSpanId
-        ? Tracer.toHex(span.parentSpanId)
-        : undefined,
+      traceId: span.traceId.toHex(),
+      spanId: span.spanId.toHex(),
+      parentSpanId: span.parentSpanId ? span.parentSpanId.toHex() : undefined,
       name: span.name,
       kind: 1, // SPAN_KIND_INTERNAL
       startTimeUnixNano: this.hrTimeToNanos(span.startTime).toString(),
@@ -454,12 +472,6 @@ export class Tracer {
         message: span.status.message || "",
       },
     };
-  }
-
-  static toHex(bytes: Uint8Array) {
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
   }
 
   // Convert attributes to OTLP format
@@ -489,12 +501,6 @@ export class Tracer {
   private hrTimeToNanos(hrTime: ULTime): bigint {
     const [seconds, nanos] = hrTime;
     return BigInt(seconds) * BigInt(1000000000) + BigInt(Math.floor(nanos));
-  }
-
-  private generateId(byte_count: number): Uint8Array {
-    const bytes = new Uint8Array(byte_count);
-    crypto.getRandomValues(bytes);
-    return bytes;
   }
 
   private hrTime(): ULTime {

@@ -2,6 +2,7 @@ import { test, beforeAll } from "bun:test";
 import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
+import { tracer } from "../src/tracer";
 
 const core = createTestCore();
 
@@ -23,6 +24,7 @@ test.only("Item sync", async () => {
       resolve(null);
     }, 3000);
   });
+  await tracer.flushNow();
 
   // syncClient.subscribe((test) => {
   //   expect(test.payload.id).toBe("string");

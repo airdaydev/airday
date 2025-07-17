@@ -7,7 +7,9 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
+use hex;
 use opentelemetry::KeyValue;
+use opentelemetry::TraceId;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -65,9 +67,14 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
             match msg {
                 Ok(Message::Binary(b)) => {
                     cur_span.set_attribute("message_type", "binary");
-                    // TODO: Get trace_id here
-                    // cur_span.set_attribute("trace_id", value);
+                    // Set trace id
                     let msg = root_as_message_wrapper_proto(&b).unwrap();
+                    if let Some(span_context) = msg.span_context() {
+                        if let Some(trace_id) = span_context.trace_id() {
+                            let trace_id_hex = hex::encode(trace_id.bytes());
+                            cur_span.set_attribute("trace_id", trace_id_hex);
+                        }
+                    }
                     match msg.message_type() {
                         MessageProto::JMAPMessageProto => {
                             // TODO: Consider making JMAP messages plain text

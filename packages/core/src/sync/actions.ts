@@ -172,6 +172,18 @@ export class AirdayBatchMessage implements MQMessage {
     AirdayMessageProto.addBatch(builder, batch);
     let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
 
+    // TODO: Improve instrumentation
+    const span = tracer.startSpan("ws_message");
+    tracer.addTag(span, "action_count", this.actions.length);
+    tracer.endSpan(span);
+    const traceIdOffset = SpanContextProto.createTraceIdVector(
+      builder,
+      span.traceId,
+    );
+    SpanContextProto.startSpanContextProto(builder);
+    SpanContextProto.addTraceId(builder, traceIdOffset);
+    const spanContextOffset = SpanContextProto.endSpanContextProto(builder);
+
     // 3. Builds message wrapper (distinguihes it from JMAPMessageProto)
     MessageWrapperProto.startMessageWrapperProto(builder);
     MessageWrapperProto.addMessageType(
@@ -179,11 +191,7 @@ export class AirdayBatchMessage implements MQMessage {
       MessageProto.AirdayMessageProto,
     );
     MessageWrapperProto.addMessage(builder, messageOffset);
-
-    const span = tracer.startSpan("ws_message");
-    tracer.addTag(span, "action_count", this.actions.length);
-    // SpanContextProto.addSpanId(builder, span.tr);
-    // MessageWrapperProto.addSpanContext(builder, spanContextOffset);
+    MessageWrapperProto.addSpanContext(builder, spanContextOffset);
 
     let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
     builder.finish(wrapper);

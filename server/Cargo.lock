@@ -29,6 +29,7 @@ dependencies = [
  "chrono",
  "flatbuffers",
  "futures-util",
+ "hex",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-stdout",
