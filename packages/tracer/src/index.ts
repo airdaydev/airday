@@ -14,7 +14,7 @@ interface ULSpan {
   readonly name: string;
   readonly traceId: Uint8Array;
   readonly spanId: Uint8Array;
-  readonly parentSpanId?: string;
+  readonly parentSpanId?: Uint8Array;
   readonly startTime: ULTime;
   readonly endTime: ULTime;
   readonly duration: ULTime;
@@ -151,7 +151,7 @@ export class Tracer {
     this.startBatching();
   }
 
-  startSpan(name: string, parentSpanId?: string): ULSpan {
+  startSpan(name: string, parentSpanId?: Uint8Array): ULSpan {
     const traceId = this.generateId(16);
     const spanId = this.generateId(8);
     const startTime = this.hrTime();
@@ -275,7 +275,7 @@ export class Tracer {
     } catch (error) {
       this.stats.batchesFailed++;
       this.stats.lastError = String(error);
-      this.handleSendError(error);
+      console.error("Tracer: Batch send failed:", error);
     }
   }
 
@@ -385,7 +385,8 @@ export class Tracer {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text}`);
       }
 
       this.stats.spansSent +=
@@ -425,13 +426,6 @@ export class Tracer {
     }
   }
 
-  // Handle send errors
-  private handleSendError(error: any): void {
-    // TODO: Generate span?
-    console.error("Tracer: Batch send failed:", error);
-    // Spans remain in buffer for retry
-  }
-
   // Update stats
   private updateStats(): void {
     this.stats.spansBuffered = this.spans.length;
@@ -440,10 +434,10 @@ export class Tracer {
   // Convert span to OTLP format
   private spanToOTLP(span: ULSpan): OTLPSpan {
     return {
-      traceId: this.toHex(span.traceId),
-      spanId: this.toHex(span.spanId),
+      traceId: Tracer.toHex(span.traceId),
+      spanId: Tracer.toHex(span.spanId),
       parentSpanId: span.parentSpanId
-        ? this.toHex(span.parentSpanId, 16)
+        ? Tracer.toHex(span.parentSpanId)
         : undefined,
       name: span.name,
       kind: 1, // SPAN_KIND_INTERNAL
@@ -464,7 +458,7 @@ export class Tracer {
 
   static toHex(bytes: Uint8Array) {
     return Array.from(bytes)
-      .map((b) => b.toString(bytes.length).padStart(2, "0"))
+      .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
 

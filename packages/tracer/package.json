@@ -2,20 +2,20 @@
   "name": "@airday/tracer",
   "version": "0.0.1",
   "description": "Ultra-light tracing. OpenTelemetry compatible, hopefully.",
-  "main": "dist/tracer.esm.js",
+  "main": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "bun test",
     "build": "bun run bundle.ts",
     "dev": "bun run bundle.ts --watch",
     "clean": "rm -rf dist",
-    "ts": "tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts",
+    "ts": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
     "prepublishOnly": "bun run clean && bun run build"
   },
   "exports": {
     ".": {
-      "import": "./dist/tracer.esm.js",
-      "types": "./dist/tracer.d.ts"
+      "import": "./dist/index.esm.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "files": [

@@ -25,7 +25,7 @@ async function bundle() {
   // 1. Generate TypeScript declarations
   console.log("📝 Generating TypeScript declarations...");
   try {
-    await $`tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts`;
+    await $`npm run ts`;
     console.log("✅ TypeScript declarations generated");
   } catch (error) {
     console.error("❌ TypeScript declaration generation failed:", error);
@@ -36,7 +36,7 @@ async function bundle() {
   console.log("📦 Building ESM bundle...");
   const esmResult = await Bun.build({
     ...bundleConfig,
-    naming: "tracer.esm.js",
+    naming: "index.esm.js",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
@@ -52,13 +52,13 @@ async function bundle() {
     name: pkg.name,
     version: pkg.version,
     description: pkg.description,
-    main: "tracer.esm.js",
-    module: "tracer.esm.js",
+    main: "index.esm.js",
+    module: "index.esm.js",
     types: "index.d.ts",
     files: ["*.js", "*.d.ts", "*.map"],
     exports: {
       ".": {
-        import: "./tracer.esm.js",
+        import: "./index.esm.js",
         types: "./index.d.ts",
       },
     },
@@ -74,16 +74,16 @@ async function bundle() {
   console.log("\nBundle outputs:");
 
   try {
-    const esmStats = statSync("dist/tracer.esm.js");
+    const esmStats = statSync("dist/index.esm.js");
     const esmSize = (esmStats.size / 1024).toFixed(2);
-    console.log(`- tracer.esm.js (${esmSize} KB)`);
+    console.log(`- index.esm.js (${esmSize} KB)`);
 
-    const mapStats = statSync("dist/tracer.esm.js.map");
+    const mapStats = statSync("dist/index.esm.js.map");
     const mapSize = (mapStats.size / 1024).toFixed(2);
-    console.log(`- tracer.esm.js.map (${mapSize} KB)`);
+    console.log(`- index.esm.js.map (${mapSize} KB)`);
   } catch (error) {
-    console.log("- tracer.esm.js (size unknown)");
-    console.log("- tracer.esm.js.map (size unknown)");
+    console.log("- index.esm.js (size unknown)");
+    console.log("- index.esm.js.map (size unknown)");
   }
 
   console.log("- package.json (Distribution metadata)");
@@ -92,7 +92,7 @@ async function bundle() {
   console.log("\n🧪 Testing bundles...");
   try {
     // Test ESM import
-    const { Tracer } = await import("./dist/tracer.esm.js");
+    const { Tracer } = await import("./dist/index.esm.js");
     const tracer = new Tracer("airday_tracer_tests");
     const span = tracer.startSpan("test-span");
     tracer.endSpan(span);
