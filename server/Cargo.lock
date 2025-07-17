@@ -29,7 +29,7 @@ dependencies = [
  "chrono",
  "flatbuffers",
  "futures-util",
- "hex",
+ "lazy_static",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-stdout",

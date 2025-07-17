@@ -65,7 +65,13 @@ export class TimestampProducer {
   }
   timestamp(): LWWTimestamp {
     const now = Date.now();
-    if (now === this.lastUtc) {
+    // Ensures monotonic timestamp + uniqueness
+    if (now <= this.lastUtc) {
+      if (this.tick >= Number.MAX_SAFE_INTEGER) {
+        throw new Error(
+          "Tick overflow - too many timestamps generated for the same UTC",
+        );
+      }
       this.tick++;
     } else {
       this.lastUtc = now;
@@ -114,8 +120,7 @@ export class LWWRegister<T> {
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
     if (this.timestamp.equals(other.timestamp)) {
-      console.warn("Timestamp conflict detected, ignoring merge");
-      return this;
+      throw new Error("Timestamp collision detected on merge");
     }
     if (this.timestamp.greaterThan(other.timestamp)) {
       return this;
