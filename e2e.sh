@@ -6,6 +6,15 @@ DATABASE_PATH="$HOME/.config/airday/test.db"
 export DATABASE_URL="sqlite:$DATABASE_PATH"
 sqlx database reset -y --source sqlite/migrations
 
+## Database tests
+pnpm run test-server
+sqlx database reset -y --source sqlite/migrations
+
+## Package tests
+pnpm run --dir packages/cal test --run
+pnpm run --dir packages/list test --run
+pnpm run --dir packages/tracer test --run
+
 # Start server in background
 cargo run --manifest-path ./server/Cargo.toml -- \
   --sqlx-host=$DATABASE_URL \
