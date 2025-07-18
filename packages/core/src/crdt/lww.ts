@@ -111,11 +111,19 @@ export class LWWRegister<T> {
     return [this.timestamp.toArray(), this.data];
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
-    if (this.timestamp.equals(other.timestamp) && this.data !== this.data) {
-      throw new Error(
-        "Timestamp collision detected on merge between different data",
-      );
+    // If timestamps are equal, check data consistency
+    if (this.timestamp.equals(other.timestamp)) {
+      // Same timestamp with different data is an error
+      if (this.data !== other.data) {
+        throw new Error(
+          "Timestamp collision detected on merge between different data",
+        );
+      }
+      // Same timestamp with same data - this is the same instance, return either one
+      return this;
     }
+
+    // Different timestamps - last write wins
     if (this.timestamp.greaterThan(other.timestamp)) {
       return this;
     }
