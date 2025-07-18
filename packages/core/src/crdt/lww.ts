@@ -104,14 +104,6 @@ export class LWWRegister<T> {
   static fromJSON<T>(json: any): LWWRegister<T> {
     if (!Array.isArray(json) || json.length !== 2)
       throw new Error("Invalid LWWRegister format");
-    // TODO: Replace with validator for complex objects
-    if (
-      typeof json[1] !== "string" &&
-      typeof json[1] !== "boolean" &&
-      typeof json[1] !== "number"
-    ) {
-      throw new Error("LWWRegister only handles strings, booleans and numbers");
-    }
     const timestamp = LWWTimestamp.fromArray(json[0]);
     return new LWWRegister<T>({ timestamp, data: json[1] as unknown as T });
   }
@@ -119,8 +111,10 @@ export class LWWRegister<T> {
     return [this.timestamp.toArray(), this.data];
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
-    if (this.timestamp.equals(other.timestamp)) {
-      throw new Error("Timestamp collision detected on merge");
+    if (this.timestamp.equals(other.timestamp) && this.data !== this.data) {
+      throw new Error(
+        "Timestamp collision detected on merge between different data",
+      );
     }
     if (this.timestamp.greaterThan(other.timestamp)) {
       return this;
