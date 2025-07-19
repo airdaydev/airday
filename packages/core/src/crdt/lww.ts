@@ -3,22 +3,22 @@ import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
 
 export const genPid = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 
+const initialOffsetMs = Date.now() - performance.now();
+const nextMicro = () => Math.floor(initialOffsetMs + performance.now() / 1000);
+
 interface TimestampConstructorOps {
-  utc?: number;
+  utc: number;
   pid: number;
-  tick?: number;
 }
 
-export type LWWTimestampArr = [number, number, number];
+export type LWWTimestampArr = [number, number];
 
 export class LWWTimestamp {
-  utc: number; // Process wall clock
+  utc: number; // Monotonic client wall clock in microseconds
   pid: number; // Process id
-  tick: number; // Process tick
   constructor(opts: TimestampConstructorOps) {
-    this.utc = opts.utc || Date.now();
+    this.utc = opts.utc;
     this.pid = opts.pid;
-    this.tick = opts.tick || 0;
   }
   greaterThan(other: LWWTimestamp): boolean {
     if (this.utc !== other.utc) {
@@ -27,31 +27,25 @@ export class LWWTimestamp {
     if (this.pid !== other.pid) {
       return this.pid > other.pid;
     }
-    return this.tick > other.tick;
+    return false;
   }
   equals(other: LWWTimestamp): boolean {
-    return (
-      this.utc === other.utc &&
-      this.pid === other.pid &&
-      this.tick === other.tick
-    );
+    return this.utc === other.utc && this.pid === other.pid;
   }
   addToFlatBuffer(builder: Builder) {
     return LWWTimestampProto.createLWWTimestampProto(
       builder,
-      this.utc,
-      this.pid,
-      this.tick,
+      BigInt(this.utc),
+      BigInt(this.pid),
     );
   }
   toArray(): LWWTimestampArr {
-    return [this.utc, this.pid, this.tick];
+    return [this.utc, this.pid];
   }
   static fromArray(arr: LWWTimestampArr) {
     return new LWWTimestamp({
       utc: arr[0],
       pid: arr[1],
-      tick: arr[2],
     });
   }
 }
@@ -59,28 +53,20 @@ export class LWWTimestamp {
 export class TimestampProducer {
   private pid: number;
   private lastUtc: number = 0;
-  private tick: number = 0;
   constructor(pid: number = genPid()) {
     this.pid = pid;
   }
   timestamp(): LWWTimestamp {
-    const now = Date.now();
+    const now = nextMicro();
     // Ensures monotonic timestamp + uniqueness
     if (now <= this.lastUtc) {
-      if (this.tick >= Number.MAX_SAFE_INTEGER) {
-        throw new Error(
-          "Tick overflow - too many timestamps generated for the same UTC",
-        );
-      }
-      this.tick++;
+      this.lastUtc++;
     } else {
       this.lastUtc = now;
-      this.tick = 0;
     }
     return new LWWTimestamp({
       utc: this.lastUtc,
       pid: this.pid,
-      tick: this.tick,
     });
   }
 }

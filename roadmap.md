@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] @airday/core - update js & flatbuffer lww formats to match rust improvements
 - [] @airday/core - merge item api
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items

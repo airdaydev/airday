@@ -18,10 +18,19 @@ impl<T> LWWRegister<T> {
 
         Ok(Self { timestamp, data })
     }
+}
 
-    /// Merge with another LWW register
+/// Specialized LWW register for strings
+#[derive(Debug, Clone)]
+pub struct LWWRegisterString {
+    pub timestamp: LWWTimestamp,
+    pub data: String,
+}
+
+impl<T: PartialEq> LWWRegister<T> {
+    /// Merge with another string register
     pub fn merge(self, other: Self) -> Result<Self, &'static str> {
-        if self.timestamp == other.timestamp {
+        if self.timestamp == other.timestamp && self.data != other.data {
             return Err("Timestamp collision detected on merge");
         }
 
@@ -31,13 +40,6 @@ impl<T> LWWRegister<T> {
             Ok(other)
         }
     }
-}
-
-/// Specialized LWW register for strings
-#[derive(Debug, Clone)]
-pub struct LWWRegisterString {
-    pub timestamp: LWWTimestamp,
-    pub data: String,
 }
 
 impl LWWRegisterString {
@@ -54,19 +56,6 @@ impl LWWRegisterString {
     /// Create from a string
     pub fn from_string(string: String) -> Result<Self, &'static str> {
         Self::new(string, None)
-    }
-
-    /// Merge with another string register
-    pub fn merge(self, other: Self) -> Result<Self, &'static str> {
-        if self.timestamp == other.timestamp {
-            return Err("Timestamp collision detected on merge");
-        }
-
-        if self.timestamp > other.timestamp {
-            Ok(self)
-        } else {
-            Ok(other)
-        }
     }
 }
 

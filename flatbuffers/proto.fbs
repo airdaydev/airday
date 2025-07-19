@@ -3,9 +3,8 @@
 namespace proto;
 
 struct LWWTimestampProto {
-  utc: double;
-  pid: double;
-  tick: short;
+  utc: ulong;
+  pid: ulong;
 }
 
 table LWWRegisterStringProto {

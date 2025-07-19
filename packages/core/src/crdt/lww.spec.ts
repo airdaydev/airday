@@ -6,7 +6,7 @@ import { LWWRegisterStringProto } from "../proto";
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;
   const pid = 1750820210000;
-  const manualTS = [utc, pid, 0];
+  const manualTS = [utc, pid];
   const data = "hello";
   const lww = LWWRegister.fromJSON([manualTS, data]);
   expect(lww.timestamp.pid).toBe(pid);
@@ -88,7 +88,6 @@ test("LWWRegisterString flat buffer serialisation & deserialisation", async () =
   let bb = new ByteBuffer(uint8);
   let parsedLWW = LWWRegisterStringProto.getRootAsLWWRegisterStringProto(bb);
   expect(parsedLWW.data()).toBe(data);
-  expect(parsedLWW.timestamp()?.utc()).toBe(timestamp.utc);
-  expect(parsedLWW.timestamp()?.pid()).toBe(timestamp.pid);
-  expect(parsedLWW.timestamp()?.tick()).toBe(timestamp.tick);
+  expect(Number(parsedLWW.timestamp()?.utc())).toBe(timestamp.utc);
+  expect(Number(parsedLWW.timestamp()?.pid())).toBe(timestamp.pid);
 });
