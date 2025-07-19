@@ -35,3 +35,4 @@ opentelemetry_sdk = "0.30.0"
 opentelemetry = "0.30.0"
 opentelemetry-stdout = "0.30.0"
 lazy_static = "1.4.0"
+lww_rs = { path = "../packages/lww_rs" }

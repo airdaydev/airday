@@ -1,0 +1,3 @@
+[workspace]
+members = ["server", "packages/lww_rs"]
+resolver = "3"

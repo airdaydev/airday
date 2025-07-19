@@ -4,7 +4,6 @@ mod common {
     pub mod error;
     pub mod sql;
 }
-mod crdt;
 mod sync {
     pub mod airday;
     pub mod outgoing;

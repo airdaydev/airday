@@ -9,7 +9,7 @@ use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use opentelemetry::trace::{SpanContext, TraceContextExt, TraceState};
 use opentelemetry::{Context, TraceId};
-use opentelemetry::{KeyValue, SpanId, TraceFlags};
+use opentelemetry::{SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
