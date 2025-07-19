@@ -1,7 +1,6 @@
 // TODO: This is a direct llm generated translation from the JS version, will need a thorough review
 
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
@@ -13,7 +12,7 @@ pub fn gen_pid() -> u64 {
 }
 
 /// LWW timestamp for ordering operations
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LWWTimestamp {
     pub utc: u64,  // Process wall clock in milliseconds
     pub pid: u64,  // Process ID
@@ -129,7 +128,7 @@ lazy_static::lazy_static! {
 }
 
 /// Last-Write-Wins register
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct LWWRegister<T> {
     pub timestamp: LWWTimestamp,
     pub data: T,
@@ -161,7 +160,7 @@ impl<T> LWWRegister<T> {
 }
 
 /// Specialized LWW register for strings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct LWWRegisterString {
     pub timestamp: LWWTimestamp,
     pub data: String,
