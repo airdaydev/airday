@@ -9,9 +9,9 @@ use uuid::Uuid;
 struct SqlItem {
     id: Uuid,
     pub text: String,
+    pub hlc_text_utc: String,
+    pub hlc_text_pid: String,
 }
-
-struct LWWStringRegister {}
 
 // TODO: Implement Item from SqlItem
 // TODO: Define LWWStringRegister

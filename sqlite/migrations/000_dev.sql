@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS user_workspace (
   PRIMARY KEY (user_id, workspace_id)
 );
 
+-- Colocated timestamp solution
 CREATE TABLE IF NOT EXISTS item (
   workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
@@ -38,6 +39,26 @@ CREATE TABLE IF NOT EXISTS item (
   repeat_target INTEGER NULL,
   repeat_target_ts STRING NOT NULL,
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Alternative solution:
+-- CREATE TABLE IF NOT EXISTS item (
+--   workspace_id UUID NOT NULL,
+--   id UUID NOT NULL PRIMARY KEY,
+-- );
+
+CREATE TABLE IF NOT EXISTS attributes (
+  type TEXT NOT NULL,
+  uuid UUID NOT NULL,
+  attr TEXT NOT NULL,
+  -- values
+  value_type TEXT NOT NULL,
+  value_text TEXT,
+  value_integer INTEGER,
+  -- clock
+  utc INTEGER NOT NULL,
+  pid INTEGER NOT NULL,
+  PRIMARY KEY (type, uuid, attr)
 );
 
 CREATE TABLE IF NOT EXISTS item_tombstone (
