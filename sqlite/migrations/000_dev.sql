@@ -28,37 +28,14 @@ CREATE TABLE IF NOT EXISTS user_workspace (
 
 -- Colocated timestamp solution
 CREATE TABLE IF NOT EXISTS item (
+  -- static vals
   workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
+  -- dynamic vals
   text TEXT NOT NULL,
-  text_ts STRING NOT NULL,
-  type TEXT NOT NULL,
-  type_ts STRING NOT NULL,
-  repeat_break INTEGER NULL,
-  repeat_break_ts STRING NOT NULL,
-  repeat_target INTEGER NULL,
-  repeat_target_ts STRING NOT NULL,
+  text_utc INTEGER NOT NULL DEFAULT 0,
+  text_pid INTEGER NOT NULL DEFAULT 0,
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- Alternative solution:
--- CREATE TABLE IF NOT EXISTS item (
---   workspace_id UUID NOT NULL,
---   id UUID NOT NULL PRIMARY KEY,
--- );
-
-CREATE TABLE IF NOT EXISTS attributes (
-  type TEXT NOT NULL,
-  uuid UUID NOT NULL,
-  attr TEXT NOT NULL,
-  -- values
-  value_type TEXT NOT NULL,
-  value_text TEXT,
-  value_integer INTEGER,
-  -- clock
-  utc INTEGER NOT NULL,
-  pid INTEGER NOT NULL,
-  PRIMARY KEY (type, uuid, attr)
 );
 
 CREATE TABLE IF NOT EXISTS item_tombstone (
