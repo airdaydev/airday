@@ -1,6 +1,5 @@
 -- notes on the data model
--- ts = custom timestamp for lww-register ("{utc}:{pid}:{tick}")
--- utc = native utc timestamp
+-- *_utc = native utc timestamp
 -- TODO: item.type could be an enum (repeat, static, series, shuffle, playlist)
 -- TODO: repeat could be a property...
 -- TODO: Consider an sql trigger for updating timestamps
@@ -40,8 +39,8 @@ CREATE TABLE IF NOT EXISTS user_workspace (
 
 CREATE TABLE IF NOT EXISTS item (
   -- static vals
-  workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
+  workspace_id UUID NOT NULL,
   -- dynamic vals via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- metadata & tombstone
