@@ -1,7 +1,20 @@
 import { Builder } from "flatbuffers";
 import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
 
-export const genPid = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+// 53-bit number (safe integer limit) generated from high entropy-source, if available
+export const genPid = (): number => {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const array = new Uint32Array(2);
+    crypto.getRandomValues(array);
+    // create 53-bit number (JavaScript's safe integer limit)
+    // 1. Drop 11 bits from first Uint32, leaving 21 low bits
+    // 2. Shift 21 low bits from first Uint32 to high place
+    // 3. Add all array[1] bits
+    return (array[0] & 0x1fffff) * 0x100000000 + array[1];
+  }
+  // Fallback for environments without crypto
+  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+};
 
 const initialOffsetMs = Date.now() - performance.now();
 const nextMicro = () => Math.floor(initialOffsetMs + performance.now() / 1000);

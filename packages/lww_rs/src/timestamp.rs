@@ -1,12 +1,13 @@
 use rand::Rng;
 use std::cmp::Ordering;
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static PID: OnceLock<u64> = OnceLock::new();
 
-// Singleton, filled once, microsecond res clock
+// Singleton, filled once, microsecond res clock,
+// should be good to year 2225 in JS land from memory
 static CLOCK: MonotonicClock = MonotonicClock {
     last_micros: AtomicU64::new(0),
 };
@@ -47,9 +48,9 @@ pub fn now_micros() -> u64 {
     CLOCK.now()
 }
 
-/// Generate a random process ID
+/// Generate a random process ID (js MAX_SAFE_INTEGER compatible)
 pub fn gen_pid() -> u64 {
-    rand::rng().random_range(1..=u64::MAX)
+    rand::rng().random_range(1..=9007199254740991u64)
 }
 
 /// LWW timestamp for ordering operations
