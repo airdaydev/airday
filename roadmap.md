@@ -11,7 +11,8 @@
 - [] @airday/core - create subitems / sequence
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
-- [] deal with orphaned items
+- [] @airday/core - make an element-set crdt for
+- [] deal with orphaned items (no reference found - they just show up in the bin!)
 - [] UI - Create items
 - [] UI - Update items
 - [] UI - Delete items

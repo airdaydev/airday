@@ -70,3 +70,9 @@ i'm updating any 4 attributes on one item, EAV probably easiest to write the cod
 
 ## Bulk read
 i'm grabbing the first 250 items since the beginning of time (is that creation time or last update time?) - i guess last update time! only in the EAV case really could i isolate only the changed attributes without first checking over EVERYTHING in application code
+
+## Reference lists!
+I may need an LWW-Element-Set set type here to pull this off. I could use LWW-types still, but then i really start polluting the attrs thing, and list removal starts becoming insane.
+
+## Docs/text
+If i want collaborative docs later on, or long form text anywhere, i can always add a blob that is the whole crdt. anyway cya
