@@ -7,8 +7,8 @@ export const genPid = (): number => {
     const array = new Uint32Array(2);
     crypto.getRandomValues(array);
     // create 53-bit number (JavaScript's safe integer limit)
-    // 1. Drop 11 bits from first Uint32, leaving 21 low bits
-    // 2. Shift 21 low bits from first Uint32 to high place
+    // 1. Drop 11 high bits from first Uint32 (& 0 them out of existence), leaving 21 low bits
+    // 2. Multiply 21 low bits from first Uint32, effectively shifting them to high place of 64bit number i.e. 32 bits to left
     // 3. Add all array[1] bits
     return (array[0] & 0x1fffff) * 0x100000000 + array[1];
   }
