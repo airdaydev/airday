@@ -31,10 +31,9 @@ CREATE TABLE IF NOT EXISTS item (
   -- static vals
   workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
-  -- dynamic vals
-  text TEXT NOT NULL,
-  text_utc INTEGER NOT NULL DEFAULT 0,
-  text_pid INTEGER NOT NULL DEFAULT 0,
+  -- dynamic vals via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
+  attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
+  -- metadata
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
