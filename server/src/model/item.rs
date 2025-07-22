@@ -4,8 +4,8 @@ use crate::common::error::AppError;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt, TryStreamExt};
-use lww_rs::LWWRegister;
-use lww_rs::timestamp::LWWTimestamp;
+use crdt::LWWRegister;
+use crdt::timestamp::LWWTimestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, SqlitePool, Transaction, error::DatabaseError, sqlite::SqliteRow, types::Json};
 use uuid::Uuid;
@@ -109,7 +109,7 @@ pub trait ItemModel: Send + Sync {
         &self,
         // workspace: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
-    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<Item, AppError>;
+    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
 
@@ -126,7 +126,7 @@ impl ItemModelSqlite {
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
     // TODO: Break this into parts
-    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<Item, AppError> {
+    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<(), AppError> {
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
@@ -141,14 +141,14 @@ impl ItemModel for ItemModelSqlite {
         .fetch_optional(&mut *tx)
         .await
         .map_err(|err| AppError::from(err))?;
-        if let Some(tombstone) = item.tombstone_utc {
-            // BLACKHOLE
-            // TODO: Consider usage pattern to determine type - we would usually want to give the user back this info
-            return Err(AppError::ValidationError(String::from(
-                "item is tombstoned",
-            )));
-        }
         if let Some(mut sql_item) = result {
+            if let Some(tombstone) = sql_item.tombstone_utc {
+                // BLACKHOLE
+                // TODO: Consider usage pattern to determine type - we would usually want to give the user back this info
+                return Err(AppError::ValidationError(String::from(
+                    "item is tombstoned",
+                )));
+            }
             let attrs: ItemAttributesJson = sql_item
                 .attributes
                 .as_ref()
@@ -157,7 +157,7 @@ impl ItemModel for ItemModelSqlite {
             // attrs.merge(item);
             // TODO: Evaluate and merge here i.e. turn each attribute into a valid LWWRegister
             // then merge with item above
-            return Ok(sql_item);
+            return Ok(());
         } else {
             // TODO: This is where we insert a new item
             Err(AppError::ServerError(String::from("Not yet implemented")))

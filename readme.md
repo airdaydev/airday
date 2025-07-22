@@ -6,11 +6,12 @@
 📁 monorepo
 ├── 📂 flatbuffers  → Protocol definitions and code gen
 ├── 📂 ios          → iOS app placeholder
-├── 📂 packages     → JavaScript packages
+├── 📂 pkg_js       → JavaScript packages
+├── 📂 pkg_rust     → Rust packages
+└── 📂 server       → Rust based server
 ├── 📂 sqlite       → Sqlite migration & notes
 ├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
 ├── 📂 web          → Web based application
-└── 📂 server       → Rust based server
 ```
 
 ## Self-hosting

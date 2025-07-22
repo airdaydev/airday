@@ -1,4 +1,4 @@
 packages:
   - ./web
   - ./api
-  - ./packages/*
+  - ./pkg_js/*
