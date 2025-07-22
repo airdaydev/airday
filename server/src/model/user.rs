@@ -37,7 +37,7 @@ impl UserModel for UserModelSqlite {
 
         match result {
             Ok(user) => Ok(user),
-            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+            Err(e) => Err(AppError::from(e)),
         }
     }
     #[cfg(test)]
@@ -57,7 +57,7 @@ impl UserModel for UserModelSqlite {
 
         match result {
             Ok(user) => Ok(user),
-            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+            Err(e) => Err(AppError::from(e)),
         }
     }
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError> {
@@ -86,7 +86,7 @@ impl UserModel for UserModelSqlite {
                     Err(AppError::DatabaseError(db_err.to_string()))
                 }
             }
-            Err(e) => Err(AppError::DatabaseError(e.to_string())),
+            Err(e) => Err(AppError::from(e)),
         }
     }
 }

@@ -31,11 +31,7 @@ impl WorkspaceModelSqlite {
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
     async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
 
         let workspace_uuid = Uuid::new_v4();
         let workspace_sqlx_uuid = SqlxUuid::from_bytes(workspace_uuid.into_bytes());
@@ -52,7 +48,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
         )
         .fetch_one(&mut *tx)
         .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
         // Create user_workspace relationship
         let owner_sqlx_uuid = SqlxUuid::from_bytes(owner_id.into_bytes());
@@ -66,7 +62,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
         sqlx::query!(
             r#"
@@ -80,11 +76,9 @@ impl WorkspaceModel for WorkspaceModelSqlite {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
-        tx.commit()
-            .await
-            .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        tx.commit().await.map_err(|err| AppError::from(err))?;
 
         Ok(workspace)
     }

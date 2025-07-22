@@ -50,3 +50,9 @@ impl From<serde_json::Error> for AppError {
         AppError::ValidationError(String::from("Error parsing JSON"))
     }
 }
+
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        AppError::DatabaseError(err.to_string())
+    }
+}

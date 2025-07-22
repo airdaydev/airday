@@ -6,7 +6,7 @@ use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use lww_rs::LWWRegisterString;
 use serde::{Deserialize, Serialize};
-use sqlx::{Error, SqlitePool, error::DatabaseError, sqlite::SqliteRow, types::Json};
+use sqlx::{Error, SqlitePool, Transaction, error::DatabaseError, sqlite::SqliteRow, types::Json};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -70,9 +70,12 @@ pub struct ItemModelSqlite {
 
 #[async_trait]
 impl UserModel for ItemModelSqlite {
+    // TODO: Break this into parts
     async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError> {
+        // TODO: Check for tombstone!
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
+        // let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err));
         let result = sqlx::query_as!(
             SqlItem,
             r#"SELECT id as "id: Uuid", workspace_id as "workspace_id: Uuid",
@@ -83,15 +86,17 @@ impl UserModel for ItemModelSqlite {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
         if let Some(mut sql_item) = result {
             sql_item.attributes = sql_item
                 .attributes
                 .as_ref()
                 .and_then(|json| serde_json::from_value(json.clone()).ok());
+            // TODO: Evaluate and merge here i.e. turn each attribute into a valid LWWRegister
+            // then merge with item above
             return Ok(sql_item);
         } else {
-            // TODO: This is where we build an item
+            // TODO: This is where we insert a new item
             Err(AppError::ServerError(String::from("Not yet implemented")))
         }
     }
@@ -100,8 +105,7 @@ impl UserModel for ItemModelSqlite {
         // workspace: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>> {
         let stream = sqlx::query_as!(Item, r#""#).fetch(&self.pool);
-        let mapped_stream =
-            stream.map(|result| result.map_err(|e| AppError::DatabaseError(e.to_string())));
+        let mapped_stream = stream.map(|result| result.map_err(|err| AppError::from(err)));
         Box::pin(mapped_stream)
     }
 }

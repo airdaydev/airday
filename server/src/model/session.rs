@@ -122,7 +122,7 @@ impl SessionModel for SessionModelSqlite {
       )
       .execute(&self.pool)
       .await
-      .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+      .map_err(|err| AppError::from(err))?;
         Ok(())
     }
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError> {
@@ -140,7 +140,7 @@ impl SessionModel for SessionModelSqlite {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
         let sessions: Vec<UserSession> = results
             .into_iter()
@@ -171,7 +171,7 @@ impl SessionModel for SessionModelSqlite {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
         match result {
             Some(row) => Ok(Some(UserSession {
@@ -204,7 +204,7 @@ impl SessionModel for SessionModelSqlite {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
         Ok(())
     }
     async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError> {
@@ -223,7 +223,7 @@ impl SessionModel for SessionModelSqlite {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|err| AppError::from(err))?;
 
         match result {
             Some(row) => Ok(Some(UserSession {
@@ -383,7 +383,7 @@ pub async fn refresh_session_bearer(
     let refresh_token = extract_bearer_token(&headers)
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+        .map_err(|_| AppError::ValidationError("Invalid user ID format".to_string()))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     Ok(Json(session))
 }
@@ -396,7 +396,7 @@ pub async fn refresh_session_cookie(
     let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
         .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::DatabaseError("Invalid user ID format".to_string()))?;
+        .map_err(|_| AppError::ValidationError("Invalid user ID format".to_string()))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
