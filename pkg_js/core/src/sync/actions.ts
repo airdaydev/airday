@@ -155,9 +155,11 @@ export class AddItemAction extends Action {
 }
 
 export class AirdayBatchMessage implements MQMessage {
+  workspaceId: Uint8Array;
   actions: Action[];
   span?: ULSpan;
-  constructor(actions: Action[]) {
+  constructor(workspaceId: Uint8Array, actions: Action[]) {
+    this.workspaceId = workspaceId;
     this.actions = actions;
   }
   toFlatBuffer() {
@@ -187,7 +189,7 @@ export class AirdayBatchMessage implements MQMessage {
     SpanContextProto.addTraceId(builder, traceIdOffset);
     const spanContextOffset = SpanContextProto.endSpanContextProto(builder);
 
-    // 3. Builds message wrapper (distinguihes it from JMAPMessageProto)
+    // 3. Builds message wrapper (distinguishes it from JMAPMessageProto)
     MessageWrapperProto.startMessageWrapperProto(builder);
     MessageWrapperProto.addMessageType(
       builder,

@@ -27,6 +27,7 @@ export class AirdaySync {
   async createItem(item: AirdayItem) {
     const action = AddItemAction.fromItem(item);
     const walAction = action.toActionFlatBuffer();
+    // TODO: Workspace-specific WAL
     const tx = this.idb!.wal.writeTx(
       ["item"],
       AirdayWALEntry(action.id, walAction),

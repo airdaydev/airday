@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] @airday/core - what workspace am i on? - follow from user creation to login
 - [] @airday/core - merge item api
 - [] @airday/core - get items since last sync (~5min before)
 - [] @airday/core - delete items
@@ -115,9 +116,11 @@
 
 ## Sync/Data structure
 - [] Build todo list sync
-- [] Tiered e2ee for most text i.e. custodial vs non-custodial
+- [] Tiered e2ee for most text i.e. on-server encrypted key vs off-server key option (probably need on-server encryption... idk revisit this)
 - [] Undo/redo... in general, save granular outcomes & apply them
 - [] Multiple users / tenancy is accounted for
+
+## Calendar
 - [] Full jmap calendar support
 - [] CalDAV support
 
@@ -126,6 +129,7 @@
 - [] Friends alpha and testing
 - [] PWA update strategy
 - [] Automated testing story
+- [] optionally disabled magic login with email
 - [] Paid web service with introductory prices
 - [] Opens immediately into application, landing page at air.day/about
 - [] Consider license type for copyleft (reselling no)
