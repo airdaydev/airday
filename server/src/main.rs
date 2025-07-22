@@ -16,6 +16,10 @@ mod user {
     pub mod model;
     pub mod sqlite;
 }
+mod workspace {
+    pub mod model;
+    pub mod sqlite;
+}
 mod jmap {
     pub mod core;
 }

@@ -3,9 +3,9 @@ use crate::{
     model::{
         item::{ItemModel, ItemModelSqlite},
         session::{SessionModel, SessionModelSqlite},
-        workspace::{WorkspaceModel, WorkspaceModelSqlite},
     },
     user::{model::UserModel, sqlite::UserModelSqlite},
+    workspace::{model::WorkspaceModel, sqlite::WorkspaceModelSqlite},
 };
 use sqlx::{
     Pool, Sqlite,
