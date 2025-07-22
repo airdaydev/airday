@@ -4,7 +4,7 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
 
@@ -14,10 +14,33 @@ pub trait UserModel: Send + Sync {
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
     #[cfg(test)]
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
+    async fn update_user(&self, user_id: &Uuid, attributes: UserAttributes)
+    -> Result<(), AppError>;
 }
 
 pub struct UserModelSqlite {
     pool: SqlitePool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WorkspaceUpdate {
+    Set(Uuid),
+    Unset,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserAttributes {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace_id: Option<WorkspaceUpdate>,
+}
+
+impl UserAttributes {
+    pub fn new() -> Self {
+        UserAttributes {
+            default_workspace_id: None,
+        }
+    }
 }
 
 #[async_trait]
@@ -26,7 +49,8 @@ impl UserModel for UserModelSqlite {
         let result = sqlx::query_as!(
             User,
             r#"
-          SELECT id as "id: Uuid", email, password_hash
+          SELECT id as "id: Uuid", email, password_hash,
+          default_workspace_id as "default_workspace_id: Uuid"
           FROM user
           WHERE email = ?
           "#,
@@ -46,7 +70,7 @@ impl UserModel for UserModelSqlite {
         let result = sqlx::query_as!(
             User,
             r#"
-            SELECT id as "id: Uuid", email, password_hash
+            SELECT id as "id: Uuid", email, password_hash, default_workspace_id as "default_workspace_id: Uuid"
             FROM user
             WHERE id = ?
             "#,
@@ -67,7 +91,9 @@ impl UserModel for UserModelSqlite {
         let result = sqlx::query_as!(
             User,
             r#"
-      INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?) RETURNING id as "id: Uuid", email, password_hash
+      INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?)
+      RETURNING id as "id: Uuid", email, password_hash,
+      default_workspace_id as "default_workspace_id: Uuid"
       "#,
             sqlx_uuid,
             email,
@@ -89,6 +115,33 @@ impl UserModel for UserModelSqlite {
             Err(e) => Err(AppError::from(e)),
         }
     }
+
+    async fn update_user(
+        &self,
+        user_id: &Uuid,
+        attributes: UserAttributes,
+    ) -> Result<(), AppError> {
+        let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
+
+        // Only update default_workspace if it was provided in the request
+        if let Some(workspace_update) = attributes.default_workspace_id {
+            let workspace_value: Option<SqlxUuid> = match workspace_update {
+                WorkspaceUpdate::Set(workspace_id) => {
+                    Some(SqlxUuid::from_bytes(workspace_id.into_bytes()))
+                }
+                WorkspaceUpdate::Unset => None,
+            };
+            sqlx::query!(
+                "UPDATE user SET default_workspace_id = ? WHERE id = ?",
+                workspace_value,
+                sqlx_user_id
+            )
+            .execute(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+        }
+        Ok(())
+    }
 }
 
 impl UserModelSqlite {
@@ -106,12 +159,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
+    pub default_workspace_id: Option<SqlxUuid>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
+    pub default_workspace_id: Option<String>,
 }
 
 impl From<User> for PublicUser {
@@ -119,6 +174,7 @@ impl From<User> for PublicUser {
         Self {
             id: user.id.to_string(),
             email: user.email,
+            default_workspace_id: user.default_workspace_id.map(|val| val.to_string()),
         }
     }
 }
@@ -165,7 +221,10 @@ fn verify_password(password_hash: &str, password: &str) -> Result<(), AppError> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util;
+    use crate::{
+        model::workspace::{WorkspaceModel, WorkspaceModelSqlite},
+        test_util,
+    };
 
     #[tokio::test]
     async fn test_create_user() {
@@ -208,5 +267,12 @@ mod tests {
         let non_existent_id = Uuid::new_v4();
         let not_found = db.user.get_by_id(&non_existent_id).await.unwrap();
         assert!(not_found.is_none());
+    }
+
+    // TODO: Update user test
+    #[tokio::test]
+    async fn test_update_user_attributes() {
+        let db = test_util::create_test_db().await;
+        // WorkspaceModelSqlite::create_owned(ex, name)
     }
 }

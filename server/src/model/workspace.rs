@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde::Serialize;
-use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
+use sqlx::{Executor, Sqlite, SqlitePool};
 use uuid::Uuid;
 
 use crate::common::error::AppError;
@@ -19,12 +19,32 @@ pub trait WorkspaceModel: Send + Sync {
 }
 
 pub struct WorkspaceModelSqlite {
-    pool: SqlitePool,
+    pub pool: SqlitePool,
 }
 
 impl WorkspaceModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
+    }
+    pub async fn create_owned<'e, E>(ex: E, name: String) -> Result<Workspace, AppError>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let workspace_uuid = Uuid::new_v4();
+        let workspace_sqlx_uuid = SqlxUuid::from_bytes(workspace_uuid.into_bytes());
+        // Create workspace
+        let workspace = sqlx::query_as!(
+            Workspace,
+            r#"
+  INSERT INTO workspace (id, name) VALUES (?, ?) RETURNING id as "id: Uuid", name
+  "#,
+            workspace_sqlx_uuid,
+            name
+        )
+        .fetch_one(ex)
+        .await
+        .map_err(|err| AppError::from(err))?;
+        Ok(workspace)
     }
 }
 
@@ -37,18 +57,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
         let workspace_sqlx_uuid = SqlxUuid::from_bytes(workspace_uuid.into_bytes());
         let name = String::from("Personal");
 
-        // Create workspace
-        let workspace = sqlx::query_as!(
-            Workspace,
-            r#"
-    INSERT INTO workspace (id, name) VALUES (?, ?) RETURNING id as "id: Uuid", name
-    "#,
-            workspace_sqlx_uuid,
-            name
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        let workspace = WorkspaceModelSqlite::create_owned(&mut *tx, name).await?;
 
         // Create user_workspace relationship
         let owner_sqlx_uuid = SqlxUuid::from_bytes(owner_id.into_bytes());

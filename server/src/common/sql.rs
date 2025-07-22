@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use sqlx::{
-    Pool, Sqlite,
+    Executor, Pool, Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
@@ -22,12 +22,38 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone)]
 pub struct Db {
-    // pub pool: DatabasePool,
     pub workspaces: Arc<dyn WorkspaceModel>,
     pub user: Arc<dyn UserModel>,
     pub session: Arc<dyn SessionModel>,
     pub item: Arc<dyn ItemModel>,
 }
+
+// struct DbUtils {
+//   new_trx
+// }
+
+// #[async_trait]
+// pub trait DebugModel: Send + Sync {
+//     // Accept query options
+//     async fn tx(&self) -> Result<dyn Executor>;
+// }
+
+// pub struct DebugModelSqlite {
+//     pool: SqlitePool,
+// }
+
+// impl DebugModelSqlite {
+//     pub fn new(pool: SqlitePool) -> Self {
+//         Self { pool }
+//     }
+// }
+
+// #[async_trait]
+// impl DebugModel for DebugModelSqlite {
+//     async fn tx(&self) -> Result<Transaction<'static, Sqlite>, sqlx::Error> {
+//         self.pool.begin().await
+//     }
+// }
 
 impl Db {
     pub fn from_sqlite_pool(pool: Pool<Sqlite>) -> Self {
