@@ -1,4 +1,4 @@
-mod timestamp;
+pub mod timestamp;
 use crate::timestamp::LWWTimestamp;
 
 /// Last-Write-Wins register
@@ -39,23 +39,6 @@ impl<T: PartialEq> LWWRegister<T> {
         } else {
             Ok(other)
         }
-    }
-}
-
-impl LWWRegisterString {
-    /// Create a new string register
-    pub fn new(data: String, timestamp: Option<LWWTimestamp>) -> Result<Self, &'static str> {
-        let timestamp = match timestamp {
-            Some(ts) => ts,
-            None => LWWTimestamp::new(None, None),
-        };
-
-        Ok(Self { timestamp, data })
-    }
-
-    /// Create from a string
-    pub fn from_string(string: String) -> Result<Self, &'static str> {
-        Self::new(string, None)
     }
 }
 

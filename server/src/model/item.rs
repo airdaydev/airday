@@ -4,20 +4,27 @@ use crate::common::error::AppError;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt, TryStreamExt};
-use lww_rs::LWWRegisterString;
+use lww_rs::LWWRegister;
+use lww_rs::timestamp::LWWTimestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, SqlitePool, Transaction, error::DatabaseError, sqlite::SqliteRow, types::Json};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
 struct LWWDefinitionJson<T> {
-    utc: i64,
-    pid: i64,
+    utc: u64,
+    pid: u64,
     data: T,
 }
 
 struct ItemAttributes {
-    text: Option<LWWRegisterString>,
+    text: Option<LWWRegister<String>>,
+}
+
+impl ItemAttributes {
+    fn new() -> Self {
+        ItemAttributes { text: None }
+    }
 }
 
 // Should serialize/deserialize to this
@@ -27,13 +34,35 @@ struct ItemAttributesJson {
 }
 
 impl ItemAttributesJson {
-    fn merge(&self, other: &ItemAttributesJson) {
+    fn merge(&self, attrs: &ItemAttributes) -> Option<ItemAttributes> {
+        let mut attributes = ItemAttributes::new();
         // Merging text
-        if let Some(text) = &other.text {
-            // case 1: attr doesn't exist on self, replace
-            // case 2: attr does exist, merge via app logic
+        if let Some(text) = &attrs.text {
+            if let Some(self_text) = &self.text {
+                // case 1: attr does exist, merge via app logic
+                // TODO: Ergonomics!
+                let lwwA = LWWRegister::new(
+                    self_text.data.clone(),
+                    Some(LWWTimestamp::new(Some(self_text.utc), Some(self_text.pid))),
+                )
+                .unwrap();
+                let lwwB = LWWRegister::new(
+                    text.data.clone(),
+                    Some(LWWTimestamp::new(
+                        Some(text.timestamp.utc),
+                        Some(text.timestamp.pid),
+                    )),
+                )
+                .unwrap();
+                let merged = lwwA.merge(lwwB).unwrap();
+                attributes.text = Some(merged);
+            } else {
+                // case 2: attr doesn't exist on self, replace
+                attributes.text = Some(text.clone());
+            }
         }
-        // TODO: Repeat for each attribute
+        // TODO: Repeat for each attribute (after improving ergonomics)
+        Some(attributes)
     }
 }
 
@@ -54,7 +83,7 @@ pub struct SqlItem {
 // pub struct Item {
 //     pub id: Uuid,
 //     pub workspace_id: Uuid,
-//     pub text: Option<LWWRegisterString>,
+//     pub text: Option<LWWRegister<>>,
 // }
 
 // impl From<SqlItem> for Item {
@@ -62,7 +91,7 @@ pub struct SqlItem {
 //         Self {
 //             id: sql_item.id,
 //             // TODO: back and forth between json type
-//             // text: LWWRegisterString::from_string(String::from("Test")),
+//             // text: LWWRegister<>::from_string(String::from("Test")),
 //         }
 //     }
 // }
@@ -108,10 +137,12 @@ impl UserModel for ItemModelSqlite {
             )));
         }
         if let Some(mut sql_item) = result {
-            sql_item.attributes = sql_item
+            let attrs: ItemAttributesJson = sql_item
                 .attributes
                 .as_ref()
-                .and_then(|json| serde_json::from_value(json.clone()).ok());
+                .and_then(|json| serde_json::from_value(json.clone()).ok())
+                .unwrap();
+            // attrs.merge(item);
             // TODO: Evaluate and merge here i.e. turn each attribute into a valid LWWRegister
             // then merge with item above
             return Ok(sql_item);
