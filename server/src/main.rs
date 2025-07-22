@@ -3,6 +3,7 @@ mod common {
     pub mod datetime;
     pub mod error;
     pub mod sql;
+    pub mod utils;
 }
 mod sync {
     pub mod airday;

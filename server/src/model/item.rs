@@ -103,13 +103,13 @@ pub struct SqlItem {
 // }
 
 #[async_trait]
-pub trait UserModel: Send + Sync {
+pub trait ItemModel: Send + Sync {
     // Accept query options
     async fn get_by_workspace(
         &self,
         // workspace: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
-    async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError>;
+    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<Item, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
 
@@ -117,10 +117,16 @@ pub struct ItemModelSqlite {
     pool: SqlitePool,
 }
 
+impl ItemModelSqlite {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
 #[async_trait]
-impl UserModel for ItemModelSqlite {
+impl ItemModel for ItemModelSqlite {
     // TODO: Break this into parts
-    async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError> {
+    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<Item, AppError> {
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;

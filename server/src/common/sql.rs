@@ -1,6 +1,7 @@
 use crate::{
     common::config::AirdayConfig,
     model::{
+        item::{ItemModel, ItemModelSqlite},
         session::{SessionModel, SessionModelSqlite},
         user::{UserModel, UserModelSqlite},
         workspace::{WorkspaceModel, WorkspaceModelSqlite},
@@ -25,6 +26,7 @@ pub struct Db {
     pub workspaces: Arc<dyn WorkspaceModel>,
     pub user: Arc<dyn UserModel>,
     pub session: Arc<dyn SessionModel>,
+    pub item: Arc<dyn ItemModel>,
 }
 
 impl Db {
@@ -34,6 +36,7 @@ impl Db {
             workspaces: Arc::new(WorkspaceModelSqlite::new(pool.clone())),
             user: Arc::new(UserModelSqlite::new(pool.clone())),
             session: Arc::new(SessionModelSqlite::new(pool.clone())),
+            item: Arc::new(ItemModelSqlite::new(pool.clone())),
         }
     }
     // fn from_pg_pool(pool: Pool<Pg>) -> Self {

@@ -4,8 +4,11 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
-    common::error::AppError,
-    model::item::{Item, ItemAttributes},
+    common::{error::AppError, utils::fbv_to_uuid},
+    model::{
+        item::{Item, ItemAttributes},
+        workspace,
+    },
     sync::{
         outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
@@ -74,19 +77,16 @@ impl AirdayMessage {
                         )))
                         .unwrap();
 
-                    let id = Uuid::from_bytes(item_buffer.id().bytes()[0..16].try_into().unwrap());
-                    let workspace_id =
-                        Uuid::from_bytes(item_buffer.id().bytes()[0..16].try_into().unwrap());
+                    let id = fbv_to_uuid(item_buffer.id())?;
+                    // TODO: It isn't the real workspace_id!
+                    // TODO: Contextualise item.workspace_id through session?
+                    let workspace_id = fbv_to_uuid(item_buffer.id())?;
                     let item = Item {
-                        id: Uuid::from_bytes(item_buffer.id().bytes()),
-                        workspace_id: item_buffer.id(),
+                        id: id,
+                        workspace_id: workspace_id,
                         attributes: ItemAttributes { text: None },
                     };
                     actions.push(AirdayAction::AddItem { item });
-                    println!(
-                        "Received add item message, {:?}",
-                        action.item().unwrap().id()
-                    );
                 }
                 AirdayActionProto::DeleteItemActionProto => {
                     let action = batch_component
@@ -106,7 +106,7 @@ impl AirdayMessage {
     }
 }
 
-// TODO: Unwrap errors to be sent as error responses (for that message)
+// TODO: Create error resposes for each message
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     let mut builder = FlatBufferBuilder::new();
     let mut action_offsets = vec![];
@@ -143,6 +143,17 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     );
                     action_offsets.push(offset);
                 }
+            }
+            AirdayAction::AddItem { item } => {
+                let user = {
+                    let record = state.ws_connection_map.lock().unwrap();
+                    record.get(socket_id).unwrap().clone()
+                };
+                // t.user_id;
+                // TODO: Verify workspace_id is correct (+ derive from session)
+                state.db.item.merge(&item.workspace_id, &item);
+                // TODO: Acknowledgement message + fan out notification
+                // (channels(?) for single server, redis fb w channel name for multi server)
             }
         }
     }
