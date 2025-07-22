@@ -16,6 +16,10 @@ struct LWWDefinitionJson<T> {
     data: T,
 }
 
+struct ItemAttributes {
+    text: Option<LWWRegisterString>,
+}
+
 // Should serialize/deserialize to this
 #[derive(sqlx::FromRow, Deserialize, Serialize)]
 struct ItemAttributesJson {
@@ -30,7 +34,6 @@ impl ItemAttributesJson {
             // case 2: attr does exist, merge via app logic
         }
         // TODO: Repeat for each attribute
-        // TODO: Dynamic properties?
     }
 }
 

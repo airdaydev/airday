@@ -41,8 +41,9 @@ CREATE TABLE IF NOT EXISTS item (
   -- static vals
   id UUID NOT NULL PRIMARY KEY,
   workspace_id UUID NOT NULL,
-  -- dynamic vals via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
+  -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
+  -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
   -- metadata & tombstone
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   tombstone_utc TIMESTAMP NULL
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS item (
 CREATE TABLE IF NOT EXISTS container (
   workspace_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
-  -- dynamic vals via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
+  -- later, specific container type could be static here
+  -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- metadata & tombtone
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
