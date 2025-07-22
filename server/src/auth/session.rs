@@ -1,8 +1,8 @@
 use crate::AppState;
+use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::common::datetime::serialize_datetime_iso;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
-use crate::model::auth::{build_refresh_cookie, build_session_cookie};
 use crate::user::model::hash_password;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use async_trait::async_trait;

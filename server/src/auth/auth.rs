@@ -1,7 +1,7 @@
 use crate::{
     AppState,
+    auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
-    model::{self, session::UserSession},
     user::model::verify_login,
     workspace::model::Workspace,
 };
@@ -50,8 +50,8 @@ pub async fn password_authorisation(
 ) -> Result<UserSession, AppError> {
     let user = verify_login(&db, &payload.email, &payload.password).await?;
     let user_uuid = Uuid::from_bytes(user.id.into_bytes());
-    let client_meta = model::session::get_client_meta(&headers);
-    let session = model::session::UserSession::new(db, user_uuid, client_meta).await?;
+    let client_meta = get_client_meta(&headers);
+    let session = UserSession::new(db, user_uuid, client_meta).await?;
     Ok(session)
 }
 

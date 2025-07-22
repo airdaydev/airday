@@ -26,7 +26,14 @@ mod jmap {
 mod telemetry {
     pub mod otlp;
 }
-mod model;
+mod auth {
+    pub mod auth;
+    pub mod session;
+}
+mod item {
+    pub mod model;
+    pub mod sqlite;
+}
 mod root;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
@@ -97,23 +104,20 @@ async fn main() {
         .route("/", get(root::root_handler))
         .route(
             "/auth/password",
-            post(model::auth::password_authorisation_cookie),
+            post(auth::auth::password_authorisation_cookie),
         )
         .route(
             "/auth/password/bearer",
-            post(model::auth::password_authorisation_bearer),
+            post(auth::auth::password_authorisation_bearer),
         )
-        .route("/user", post(model::auth::create_user));
+        .route("/user", post(auth::auth::create_user));
     let private = Router::new()
-        .route(
-            "/auth/refresh",
-            post(model::session::refresh_session_cookie),
-        )
+        .route("/auth/refresh", post(auth::session::refresh_session_cookie))
         .route(
             "/auth/refresh/bearer",
-            post(model::session::refresh_session_bearer),
+            post(auth::session::refresh_session_bearer),
         )
-        .route("/auth/sessions", post(model::session::get_user_sessions))
+        .route("/auth/sessions", post(auth::session::get_user_sessions))
         .route("/jmap/session", get(jmap::core::session_handler))
         .route("/ws", any(sync::websocket::handler));
 

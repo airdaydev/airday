@@ -1,9 +1,7 @@
 use crate::{
+    auth::session::{SessionModel, SessionModelSqlite},
     common::config::AirdayConfig,
-    model::{
-        item::{ItemModel, ItemModelSqlite},
-        session::{SessionModel, SessionModelSqlite},
-    },
+    item::{model::ItemModel, sqlite::ItemModelSqlite},
     user::{model::UserModel, sqlite::UserModelSqlite},
     workspace::{model::WorkspaceModel, sqlite::WorkspaceModelSqlite},
 };

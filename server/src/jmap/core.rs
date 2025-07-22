@@ -2,7 +2,7 @@
 use axum::response::Json;
 use serde::Serialize;
 
-use crate::model::session::UserSession;
+use crate::auth::session::UserSession;
 
 /// Session Resource
 /// https://datatracker.ietf.org/doc/html/rfc8620#section-2

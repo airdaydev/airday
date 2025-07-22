@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] server - replace model dir with direct concerns
 - [] what workspace am i on? - follow from user creation to login
 - [] merge item api
 - [] get items since last sync (~5min before)

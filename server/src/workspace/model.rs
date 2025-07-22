@@ -1,7 +1,5 @@
 use async_trait::async_trait;
 use serde::Serialize;
-use sqlx::types::Uuid as SqlxUuid;
-use sqlx::{Executor, Sqlite, SqlitePool};
 use uuid::Uuid;
 
 use crate::common::error::AppError;

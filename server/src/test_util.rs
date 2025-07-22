@@ -2,9 +2,9 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
+    auth::session::{ClientMeta, UserSession},
     common::sql::Db,
-    model::session::{ClientMeta, UserSession},
-    user::model::{User, UserModel},
+    user::model::User,
 };
 
 pub async fn create_test_db() -> Db {

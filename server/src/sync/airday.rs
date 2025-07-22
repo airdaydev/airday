@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     common::{error::AppError, utils::fbv_to_uuid},
-    model::item::{Item, ItemAttributes},
+    item::model::{Item, ItemAttributes},
     sync::{
         outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
