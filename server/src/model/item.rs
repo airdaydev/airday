@@ -22,6 +22,18 @@ struct ItemAttributesJson {
     text: Option<LWWDefinitionJson<String>>,
 }
 
+impl ItemAttributesJson {
+    fn merge(&self, other: &ItemAttributesJson) {
+        // Merging text
+        if let Some(text) = &other.text {
+            // case 1: attr doesn't exist on self, replace
+            // case 2: attr does exist, merge via app logic
+        }
+        // TODO: Repeat for each attribute
+        // TODO: Dynamic properties?
+    }
+}
+
 type JsonAttributes = Option<serde_json::Value>;
 
 pub struct SqlItem {
@@ -32,16 +44,15 @@ pub struct SqlItem {
     pub attributes: JsonAttributes,
     // metadata
     pub updated_utc: NaiveDateTime,
-    pub tombstone_utc: NaiveDateTime,
+    pub tombstone_utc: Option<NaiveDateTime>,
 }
 
-// TODO: Implement Item from SqlItem
-// TODO: Define LWWStringRegister
-pub struct Item {
-    pub id: Uuid,
-    pub workspace_id: Uuid,
-    pub text: Option<LWWRegisterString>,
-}
+// TODO: Implement Item * Item from SqlItem (Maybe?)
+// pub struct Item {
+//     pub id: Uuid,
+//     pub workspace_id: Uuid,
+//     pub text: Option<LWWRegisterString>,
+// }
 
 // impl From<SqlItem> for Item {
 //     fn from(sql_item: SqlItem) -> Self {
@@ -72,10 +83,9 @@ pub struct ItemModelSqlite {
 impl UserModel for ItemModelSqlite {
     // TODO: Break this into parts
     async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError> {
-        // TODO: Check for tombstone!
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
-        // let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err));
+        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
         let result = sqlx::query_as!(
             SqlItem,
             r#"SELECT id as "id: Uuid", workspace_id as "workspace_id: Uuid",
@@ -84,9 +94,16 @@ impl UserModel for ItemModelSqlite {
             workspace_id,
             item.id,
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|err| AppError::from(err))?;
+        if let Some(tombstone) = item.tombstone_utc {
+            // BLACKHOLE
+            // TODO: Consider usage pattern to determine type - we would usually want to give the user back this info
+            return Err(AppError::ValidationError(String::from(
+                "item is tombstoned",
+            )));
+        }
         if let Some(mut sql_item) = result {
             sql_item.attributes = sql_item
                 .attributes

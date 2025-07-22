@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS item (
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- metadata & tombstone
   updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  tombstone_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  tombstone_utc TIMESTAMP NULL
   -- TODO: deleted by?
 );
 
