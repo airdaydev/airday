@@ -40,7 +40,7 @@ use crate::common::sql::Db;
 use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::Request;
-use axum::routing::{any, get, post};
+use axum::routing::{any, get, post, put};
 use bpaf::Bpaf;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
@@ -117,6 +117,7 @@ async fn main() {
             "/auth/refresh/bearer",
             post(auth::session::refresh_session_bearer),
         )
+        .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions))
         .route("/jmap/session", get(jmap::core::session_handler))
         .route("/ws", any(sync::websocket::handler));

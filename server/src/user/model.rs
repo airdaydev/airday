@@ -1,9 +1,18 @@
-use crate::common::{error::AppError, sql::Db};
+use crate::{
+    AppState,
+    auth::{
+        auth::{PasswordAuthorisationReq, password_authorisation},
+        session::UserSession,
+    },
+    common::{error::AppError, sql::Db},
+};
 use argon2::{
     Argon2, PasswordVerifier,
     password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
 use async_trait::async_trait;
+use axum::{Json, extract::State, http::StatusCode};
+use opentelemetry::trace::Status;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
@@ -101,4 +110,18 @@ pub fn verify_password(password_hash: &str, password: &str) -> Result<(), AppErr
             "Incorrect password",
         )));
     }
+}
+
+#[derive(Serialize)]
+pub struct Response {
+    pub ok: bool,
+}
+
+pub async fn update_user_handler(
+    State(state): State<AppState>,
+    session: UserSession,
+    Json(payload): Json<UserAttributes>,
+) -> Result<Json<Response>, AppError> {
+    state.db.user.update_user(&session.user_id, payload).await?;
+    Ok(Json(Response { ok: true }))
 }
