@@ -17,8 +17,14 @@ struct LWWDefinitionJson<T> {
     data: T,
 }
 
-struct ItemAttributes {
-    text: Option<LWWRegister<String>>,
+pub struct ItemAttributes {
+    pub text: Option<LWWRegister<String>>,
+}
+
+pub struct Item {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    pub attributes: ItemAttributes,
 }
 
 impl ItemAttributes {
@@ -41,12 +47,12 @@ impl ItemAttributesJson {
             if let Some(self_text) = &self.text {
                 // case 1: attr does exist, merge via app logic
                 // TODO: Ergonomics!
-                let lwwA = LWWRegister::new(
+                let lww_a = LWWRegister::new(
                     self_text.data.clone(),
                     Some(LWWTimestamp::new(Some(self_text.utc), Some(self_text.pid))),
                 )
                 .unwrap();
-                let lwwB = LWWRegister::new(
+                let lww_b = LWWRegister::new(
                     text.data.clone(),
                     Some(LWWTimestamp::new(
                         Some(text.timestamp.utc),
@@ -54,7 +60,7 @@ impl ItemAttributesJson {
                     )),
                 )
                 .unwrap();
-                let merged = lwwA.merge(lwwB).unwrap();
+                let merged = lww_a.merge(lww_b).unwrap();
                 attributes.text = Some(merged);
             } else {
                 // case 2: attr doesn't exist on self, replace

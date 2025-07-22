@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     common::error::AppError,
+    model::item::{Item, ItemAttributes},
     sync::{
         outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
@@ -22,8 +23,8 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    // AddItem { id: String }, // TODO: possible properties not this
-    // DeleteItem { id: String },
+    AddItem { item: Item }, // TODO: possible properties not this
+                            // DeleteItem { id: String },
 }
 
 impl AirdayMessage {
@@ -66,6 +67,22 @@ impl AirdayMessage {
                             "Could not parse add item action",
                         )))
                         .unwrap();
+                    let item_buffer = action
+                        .item()
+                        .ok_or(AppError::ValidationError(String::from(
+                            "Could not parse add item action",
+                        )))
+                        .unwrap();
+
+                    let id = Uuid::from_bytes(item_buffer.id().bytes()[0..16].try_into().unwrap());
+                    let workspace_id =
+                        Uuid::from_bytes(item_buffer.id().bytes()[0..16].try_into().unwrap());
+                    let item = Item {
+                        id: Uuid::from_bytes(item_buffer.id().bytes()),
+                        workspace_id: item_buffer.id(),
+                        attributes: ItemAttributes { text: None },
+                    };
+                    actions.push(AirdayAction::AddItem { item });
                     println!(
                         "Received add item message, {:?}",
                         action.item().unwrap().id()
@@ -89,8 +106,7 @@ impl AirdayMessage {
     }
 }
 
-// TODO: We should probably parse/collect these first then action them
-// TODO: All unwraps should be parsing/validation errors
+// TODO: Unwrap errors to be sent as error responses (for that message)
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     let mut builder = FlatBufferBuilder::new();
     let mut action_offsets = vec![];
