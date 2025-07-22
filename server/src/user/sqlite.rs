@@ -1,46 +1,13 @@
-use crate::common::{error::AppError, sql::Db};
-use argon2::{
-    Argon2, PasswordVerifier,
-    password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
+use crate::{
+    common::error::AppError,
+    user::model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
 };
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
 use uuid::Uuid;
 
-#[async_trait]
-pub trait UserModel: Send + Sync {
-    async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
-    async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
-    #[cfg(test)]
-    async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
-    async fn update_user(&self, user_id: &Uuid, attributes: UserAttributes)
-    -> Result<(), AppError>;
-}
-
 pub struct UserModelSqlite {
     pool: SqlitePool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum WorkspaceUpdate {
-    Set(Uuid),
-    Unset,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserAttributes {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_workspace_id: Option<WorkspaceUpdate>,
-}
-
-impl UserAttributes {
-    pub fn new() -> Self {
-        UserAttributes {
-            default_workspace_id: None,
-        }
-    }
 }
 
 #[async_trait]
@@ -150,81 +117,10 @@ impl UserModelSqlite {
     }
 }
 
-// impl UserModel {
-//   pub fn verify_login()
-// }
-
-#[derive(sqlx::FromRow, Debug, Clone)]
-pub struct User {
-    pub id: SqlxUuid,
-    pub email: String,
-    pub password_hash: String,
-    pub default_workspace_id: Option<SqlxUuid>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct PublicUser {
-    pub id: String,
-    pub email: String,
-    pub default_workspace_id: Option<String>,
-}
-
-impl From<User> for PublicUser {
-    fn from(user: User) -> Self {
-        Self {
-            id: user.id.to_string(),
-            email: user.email,
-            default_workspace_id: user.default_workspace_id.map(|val| val.to_string()),
-        }
-    }
-}
-
-pub async fn verify_login(db: &Db, email: &str, password: &str) -> Result<User, AppError> {
-    let user = db.user.get_by_email(email).await?;
-    match user {
-        Some(user) => {
-            verify_password(&user.password_hash, password)?;
-            Ok(user)
-        }
-        None => Err(AppError::ValidationError(String::from("User not found"))),
-    }
-}
-
-pub fn hash_password(password: &str) -> Result<String, AppError> {
-    let salt = SaltString::generate(&mut OsRng);
-    let password: &[u8] = password.as_bytes();
-    // Argon2 with default params (Argon2id v19)
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(password, &salt)
-        .map_err(|e| AppError::ServerError(format!("Password hashing failed: {}", e)))?;
-    Ok(password_hash.to_string())
-}
-
-fn verify_password(password_hash: &str, password: &str) -> Result<(), AppError> {
-    let password: &[u8] = password.as_bytes();
-    // TODO: Forward system errors
-    let parsed_hash = PasswordHash::new(&password_hash)
-        .map_err(|_| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
-    let ok = Argon2::default()
-        .verify_password(password, &parsed_hash)
-        .is_ok();
-    if ok {
-        return Ok(());
-    } else {
-        return Err(AppError::ValidationError(String::from(
-            "Incorrect password",
-        )));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        model::workspace::{WorkspaceModel, WorkspaceModelSqlite},
-        test_util,
-    };
+    use crate::{test_util, user::model::verify_password};
 
     #[tokio::test]
     async fn test_create_user() {

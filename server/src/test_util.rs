@@ -3,10 +3,8 @@ use uuid::Uuid;
 
 use crate::{
     common::sql::Db,
-    model::{
-        session::{ClientMeta, UserSession},
-        user::User,
-    },
+    model::session::{ClientMeta, UserSession},
+    user::model::{User, UserModel},
 };
 
 pub async fn create_test_db() -> Db {

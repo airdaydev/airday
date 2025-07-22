@@ -12,6 +12,10 @@ mod sync {
     pub mod proto_generated;
     pub mod websocket;
 }
+mod user {
+    pub mod model;
+    pub mod sqlite;
+}
 mod jmap {
     pub mod core;
 }

@@ -1,8 +1,9 @@
 use crate::AppState;
 use crate::common::datetime::serialize_datetime_iso;
+use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::model::auth::{build_refresh_cookie, build_session_cookie};
-use crate::{common::error::AppError, model::user};
+use crate::user::model::hash_password;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use async_trait::async_trait;
 use axum::Json;
@@ -259,7 +260,7 @@ impl UserSession {
     pub async fn new(db: &Db, user_id: Uuid, client_meta: ClientMeta) -> Result<Self, AppError> {
         let token = gen_token();
         let refresh_token = gen_token();
-        let refresh_token_hash = user::hash_password(&refresh_token)?;
+        let refresh_token_hash = hash_password(&refresh_token)?;
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
         let now = get_current_timestamp();
@@ -299,7 +300,7 @@ impl UserSession {
         // Generate new tokens
         let token = gen_token();
         let new_refresh_token = gen_token();
-        let refresh_token_hash = user::hash_password(&new_refresh_token)?;
+        let refresh_token_hash = hash_password(&new_refresh_token)?;
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)
         let now = get_current_timestamp();

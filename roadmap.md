@@ -12,7 +12,7 @@
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
 - [] @airday/core - make an element-set crdt for
-- [] deal with orphaned items (no reference found - they just show up in the bin!)
+- [] deal with orphaned items (no list reference found - they just show up in the bin! - slightly weird as there's no put back opt, also a partially synced move could push items into the bin erroneously)
 - [] UI - Create items
 - [] UI - Update items
 - [] UI - Delete items
