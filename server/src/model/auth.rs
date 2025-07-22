@@ -98,7 +98,7 @@ pub async fn create_user(
     // TODO: Fallback mechanism/ux if workspace not created.
     // Or consider putting these in a transaction.
     let user = state.db.user.create(&email, &password).await?;
-    let workspace = state.db.workspaces.create(&user.id).await?;
+    let workspace = state.db.workspaces.create_owned(&user.id).await?;
     Ok(Json(CreateUserResponse {
         id: user.id.to_string(),
         default_workspace: workspace,

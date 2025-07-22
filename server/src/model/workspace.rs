@@ -15,7 +15,7 @@ pub struct Workspace {
 
 #[async_trait]
 pub trait WorkspaceModel: Send + Sync {
-    async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError>;
+    async fn create_owned(&self, owner_id: &Uuid) -> Result<Workspace, AppError>;
 }
 
 pub struct WorkspaceModelSqlite {
@@ -26,7 +26,7 @@ impl WorkspaceModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-    pub async fn create_owned<'e, E>(ex: E, name: String) -> Result<Workspace, AppError>
+    pub async fn create<'e, E>(ex: E, name: String) -> Result<Workspace, AppError>
     where
         E: Executor<'e, Database = sqlx::Sqlite>,
     {
@@ -50,14 +50,12 @@ impl WorkspaceModelSqlite {
 
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
-    async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
+    async fn create_owned(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
 
-        let workspace_uuid = Uuid::new_v4();
-        let workspace_sqlx_uuid = SqlxUuid::from_bytes(workspace_uuid.into_bytes());
         let name = String::from("Personal");
 
-        let workspace = WorkspaceModelSqlite::create_owned(&mut *tx, name).await?;
+        let workspace = WorkspaceModelSqlite::create(&mut *tx, name).await?;
 
         // Create user_workspace relationship
         let owner_sqlx_uuid = SqlxUuid::from_bytes(owner_id.into_bytes());
@@ -67,7 +65,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
     INSERT INTO user_workspace (user_id, workspace_id) VALUES (?, ?)
     "#,
             owner_sqlx_uuid,
-            workspace_sqlx_uuid
+            workspace.id,
         )
         .execute(&mut *tx)
         .await
@@ -80,7 +78,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
             WHERE id = ?
               AND default_workspace_id IS NULL;
     "#,
-            workspace_sqlx_uuid,
+            workspace.id,
             owner_sqlx_uuid,
         )
         .execute(&mut *tx)

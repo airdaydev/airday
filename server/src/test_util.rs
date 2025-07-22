@@ -30,8 +30,8 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
         &db,
         user_id,
         ClientMeta {
-            ip: "".to_string(),
-            user_agent: "".to_string(),
+            ip: String::from(""),
+            user_agent: String::from(""),
         },
     )
     .await

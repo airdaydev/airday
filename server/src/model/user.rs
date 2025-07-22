@@ -273,6 +273,27 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_attributes() {
         let db = test_util::create_test_db().await;
-        // WorkspaceModelSqlite::create_owned(ex, name)
+        let user = test_util::mock_user(&db, String::from("user_attr_updates@air.day")).await;
+        let workspace = db.workspaces.create_owned(&user.id).await.unwrap();
+        let workspace_2 = db.workspaces.create_owned(&user.id).await.unwrap();
+        let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
+        assert_eq!(
+            current_user_state.default_workspace_id.unwrap(),
+            workspace.id
+        );
+        db.user
+            .update_user(
+                &user.id,
+                UserAttributes {
+                    default_workspace_id: Some(WorkspaceUpdate::Set(workspace_2.id)),
+                },
+            )
+            .await
+            .unwrap();
+        let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
+        assert_eq!(
+            post_user_state.default_workspace_id.unwrap(),
+            workspace_2.id
+        );
     }
 }

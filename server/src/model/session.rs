@@ -358,9 +358,9 @@ async fn refresh_if_valid(
     let old_session = match db.session.get_by_id(user_id).await? {
         Some(session) => session,
         None => {
-            return Err(AppError::AuthorisationError(
-                "Invalid session id errr".to_string(),
-            ));
+            return Err(AppError::AuthorisationError(String::from(
+                "Invalid session id errr",
+            )));
         }
     };
     let parsed_hash = PasswordHash::new(&old_session.refresh_token)
@@ -380,10 +380,11 @@ pub async fn refresh_session_bearer(
     headers: axum::http::HeaderMap,
     Json(payload): Json<RefreshSessionReq>,
 ) -> Result<Json<UserSession>, AppError> {
-    let refresh_token = extract_bearer_token(&headers)
-        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
+    let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
+        String::from("No refresh token"),
+    ))?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::ValidationError("Invalid user ID format".to_string()))?;
+        .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     Ok(Json(session))
 }
@@ -393,10 +394,11 @@ pub async fn refresh_session_cookie(
     cookies: Cookies,
     Json(payload): Json<RefreshSessionReq>,
 ) -> Result<Json<UserSession>, AppError> {
-    let refresh_token = extract_cookie(&cookies, "refresh_token".to_string())
-        .ok_or(AppError::AuthorisationError("No refresh token".to_string()))?;
+    let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
+        AppError::AuthorisationError(String::from("No refresh token")),
+    )?;
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::ValidationError("Invalid user ID format".to_string()))?;
+        .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session.token);
     cookies.add(session_cookie);
@@ -480,7 +482,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_crud() {
         let db = test_util::create_test_db().await;
-        let user = test_util::mock_user(&db, "test_session_crud@air.day".to_string()).await;
+        let user = test_util::mock_user(&db, String::from("test_session_crud@air.day")).await;
         let session = mock_session(&db, user.id).await;
         let refreshed_session = UserSession::refresh(&db, session.clone()).await.unwrap();
         assert_eq!(session.id, refreshed_session.id);

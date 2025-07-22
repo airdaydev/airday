@@ -66,8 +66,8 @@ mod tests {
         let ts1 = LWWTimestamp::new(Some(1000), Some(1));
         let ts2 = LWWTimestamp::new(Some(1001), Some(1));
 
-        let reg1 = LWWRegister::new("hello".to_string(), Some(ts1)).unwrap();
-        let reg2 = LWWRegister::new("world".to_string(), Some(ts2)).unwrap();
+        let reg1 = LWWRegister::new(String::from("hello"), Some(ts1)).unwrap();
+        let reg2 = LWWRegister::new(String::from("world"), Some(ts2)).unwrap();
 
         let merged = reg1.merge(reg2).unwrap();
         assert_eq!(merged.data, "world");
@@ -76,8 +76,8 @@ mod tests {
     #[test]
     fn test_timestamp_collision_error() {
         let ts = LWWTimestamp::new(Some(1000), Some(1));
-        let reg1 = LWWRegister::new("hello".to_string(), Some(ts.clone())).unwrap();
-        let reg2 = LWWRegister::new("world".to_string(), Some(ts)).unwrap();
+        let reg1 = LWWRegister::new(String::from("hello"), Some(ts.clone())).unwrap();
+        let reg2 = LWWRegister::new(String::from("world"), Some(ts)).unwrap();
 
         let result = reg1.merge(reg2);
         assert!(result.is_err());
