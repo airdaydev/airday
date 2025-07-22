@@ -1,10 +1,11 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] @airday/core - what workspace am i on? - follow from user creation to login
-- [] @airday/core - merge item api
-- [] @airday/core - get items since last sync (~5min before)
-- [] @airday/core - delete items
+- [] server - replace model dir with direct concerns
+- [] what workspace am i on? - follow from user creation to login
+- [] merge item api
+- [] get items since last sync (~5min before)
+- [] delete items
 - [] set a default workspace
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
