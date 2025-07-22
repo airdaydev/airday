@@ -5,49 +5,53 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use lww_rs::LWWRegisterString;
+use serde::{Deserialize, Serialize};
 use sqlx::{Error, SqlitePool, error::DatabaseError, sqlite::SqliteRow, types::Json};
 use uuid::Uuid;
 
-struct SqlLWWDefinition<T> {
+#[derive(Deserialize, Serialize)]
+struct LWWDefinitionJson<T> {
     utc: i64,
     pid: i64,
     data: T,
 }
 
 // Should serialize/deserialize to this
-#[derive(sqlx::FromRow)]
-struct SqlItemAttributes {
-    text: Option<SqlLWWDefinition<String>>,
+#[derive(sqlx::FromRow, Deserialize, Serialize)]
+struct ItemAttributesJson {
+    text: Option<LWWDefinitionJson<String>>,
 }
 
-struct SqlItem {
+type JsonAttributes = Option<serde_json::Value>;
+
+pub struct SqlItem {
     // static attrs
-    id: Uuid,
-    workspace_id: Uuid,
+    pub id: Uuid,
+    pub workspace_id: Uuid,
     // dynamic attrs (lww-map)
-    pub attributes: Json<SqlItemAttributes>,
+    pub attributes: JsonAttributes,
     // metadata
-    updated_utc: NaiveDateTime,
-    tombstone_utc: NaiveDateTime,
+    pub updated_utc: NaiveDateTime,
+    pub tombstone_utc: NaiveDateTime,
 }
 
 // TODO: Implement Item from SqlItem
 // TODO: Define LWWStringRegister
-struct Item {
+pub struct Item {
     pub id: Uuid,
     pub workspace_id: Uuid,
     pub text: Option<LWWRegisterString>,
 }
 
-impl From<SqlItem> for Item {
-    fn from(sql_item: SqlItem) -> Self {
-        Self {
-            id: sql_item.id,
-            // TODO: back and forth between json type
-            // text: LWWRegisterString::from_string(String::from("Test")),
-        }
-    }
-}
+// impl From<SqlItem> for Item {
+//     fn from(sql_item: SqlItem) -> Self {
+//         Self {
+//             id: sql_item.id,
+//             // TODO: back and forth between json type
+//             // text: LWWRegisterString::from_string(String::from("Test")),
+//         }
+//     }
+// }
 
 #[async_trait]
 pub trait UserModel: Send + Sync {
@@ -56,7 +60,7 @@ pub trait UserModel: Send + Sync {
         &self,
         // workspace: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
-    async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<Item, AppError>;
+    async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
 
@@ -69,15 +73,27 @@ impl UserModel for ItemModelSqlite {
     async fn merge(&self, workspace_id: &Uuid, item: &SqlItem) -> Result<SqlItem, AppError> {
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
-        let select = sqlx::query_as!(
+        let result = sqlx::query_as!(
             SqlItem,
-            r#"SELECT id as "id: Uuid", updated_utc, tombstone_utc, attributes FROM item WHERE workspace_id = ? AND id = ?"#,
+            r#"SELECT id as "id: Uuid", workspace_id as "workspace_id: Uuid",
+            updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes" FROM item
+            WHERE workspace_id = ? AND id = ?"#,
             workspace_id,
             item.id,
         )
         .fetch_optional(&self.pool)
-        .await;
-        // 1: get item
+        .await
+        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+        if let Some(mut sql_item) = result {
+            sql_item.attributes = sql_item
+                .attributes
+                .as_ref()
+                .and_then(|json| serde_json::from_value(json.clone()).ok());
+            return Ok(sql_item);
+        } else {
+            // TODO: This is where we build an item
+            Err(AppError::ServerError(String::from("Not yet implemented")))
+        }
     }
     async fn get_by_workspace(
         &self,
