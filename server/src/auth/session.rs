@@ -122,8 +122,7 @@ impl SessionModel for SessionModelSqlite {
           params.client_meta.ip
       )
       .execute(&self.pool)
-      .await
-      .map_err(|err| AppError::from(err))?;
+      .await?;
         Ok(())
     }
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError> {
@@ -140,8 +139,7 @@ impl SessionModel for SessionModelSqlite {
             now
         )
         .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
 
         let sessions: Vec<UserSession> = results
             .into_iter()
@@ -171,8 +169,7 @@ impl SessionModel for SessionModelSqlite {
             now
         )
         .fetch_optional(&self.pool)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
 
         match result {
             Some(row) => Ok(Some(UserSession {
@@ -204,8 +201,7 @@ impl SessionModel for SessionModelSqlite {
             session_id,
         )
         .execute(&self.pool)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
         Ok(())
     }
     async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError> {
@@ -223,8 +219,7 @@ impl SessionModel for SessionModelSqlite {
             now
         )
         .fetch_optional(&self.pool)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
 
         match result {
             Some(row) => Ok(Some(UserSession {

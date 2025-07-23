@@ -126,8 +126,7 @@ impl UserModel for UserModelSqlite {
                 sqlx_user_id
             )
             .execute(&self.pool)
-            .await
-            .map_err(AppError::from)?;
+            .await?;
         }
         Ok(())
     }

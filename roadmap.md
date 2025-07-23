@@ -2,7 +2,6 @@
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] get default workspace (i.e. account workspace)
-- [] Just realised we can ? errors directly from sqlx errors to apperrors
 - [] merge item api
 - [] consul-template & or bash templating for config.toml
 - [] get items since last sync (~5min before)

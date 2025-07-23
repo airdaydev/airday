@@ -29,8 +29,7 @@ impl WorkspaceModelSqlite {
             name
         )
         .fetch_one(ex)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
         Ok(workspace)
     }
 }
@@ -38,7 +37,7 @@ impl WorkspaceModelSqlite {
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
     async fn create_owned(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
-        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
+        let mut tx = self.pool.begin().await?;
 
         let name = String::from("Personal");
 
@@ -55,8 +54,7 @@ impl WorkspaceModel for WorkspaceModelSqlite {
             workspace.id,
         )
         .execute(&mut *tx)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
 
         sqlx::query!(
             r#"
@@ -69,10 +67,9 @@ impl WorkspaceModel for WorkspaceModelSqlite {
             owner_sqlx_uuid,
         )
         .execute(&mut *tx)
-        .await
-        .map_err(|err| AppError::from(err))?;
+        .await?;
 
-        tx.commit().await.map_err(|err| AppError::from(err))?;
+        tx.commit().await?;
 
         Ok(workspace)
     }
