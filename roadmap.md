@@ -1,10 +1,10 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] primary workspace should be created as a transaction
-- [] merge item api
+- [] merge item api (send a bunch of items to the server & save)
+- [] primary workspace should be created as a transaction, before user?!
+- [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] consul-template & or bash templating for config.toml
-- [] get items since last sync (~5min before)
 - [] delete items
 - [] set a default workspace ui
 - [] @airday/core - create & update lists
