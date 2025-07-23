@@ -1,12 +1,13 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] what workspace am i on? - follow from user creation to login
+- [] get default workspace (i.e. account workspace)
 - [] Just realised we can ? errors directly from sqlx errors to apperrors
 - [] merge item api
+- [] consul-template & or bash templating for config.toml
 - [] get items since last sync (~5min before)
 - [] delete items
-- [] set a default workspace
+- [] set a default workspace ui
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
