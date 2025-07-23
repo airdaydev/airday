@@ -2,6 +2,7 @@ use crate::{
     AppState,
     auth::session::UserSession,
     common::{error::AppError, sql::Db},
+    workspace::model::Workspace,
 };
 use argon2::{
     Argon2, PasswordVerifier,
@@ -10,7 +11,7 @@ use argon2::{
 use async_trait::async_trait;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
-use sqlx::types::Uuid as SqlxUuid;
+use sqlx::types::{Json as SqlJson, Uuid as SqlxUuid};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,7 +39,6 @@ impl UserAttributes {
 pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
-    #[cfg(test)]
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
     async fn update_user(&self, user_id: &Uuid, attributes: UserAttributes)
     -> Result<(), AppError>;
@@ -49,14 +49,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
-    pub default_workspace_id: Option<SqlxUuid>,
+    pub workspace: Option<Workspace>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
-    pub default_workspace_id: Option<String>,
+    pub workspace: Option<Workspace>,
 }
 
 impl From<User> for PublicUser {
@@ -64,7 +64,7 @@ impl From<User> for PublicUser {
         Self {
             id: user.id.to_string(),
             email: user.email,
-            default_workspace_id: user.default_workspace_id.map(|val| val.to_string()),
+            workspace: user.workspace,
         }
     }
 }

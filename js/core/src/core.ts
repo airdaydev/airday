@@ -1,4 +1,3 @@
-import { Tracer } from "@airday/tracer";
 import {
   passwordAuthBearer,
   passwordAuthCookie,
@@ -31,11 +30,23 @@ interface Session {
   userId: string;
 }
 
+class Workspace {
+  id?: string;
+  name: string;
+  local: boolean;
+  constructor() {
+    this.id;
+    this.name = "Local Workspace";
+    this.local = true;
+  }
+}
+
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
+  workspace: Workspace = new Workspace();
   ws: WebsocketManager; // websocket layer
   mq: MessageQueue; // message queueing
   sync: AirdaySync; // airday item layer

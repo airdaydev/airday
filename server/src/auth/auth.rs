@@ -10,17 +10,16 @@ use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
 
-#[derive(Serialize)]
-pub struct PwdAuthResponse {
-    id: String,
-    // tokenExpiry: Date,
-    // refreshTokenExpiry: Date,
-}
-
 #[derive(Deserialize)]
 pub struct PasswordAuthorisationReq {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Serialize)]
+pub struct AuthResponse {
+    pub session: UserSession,
+    pub workspace_id: String,
 }
 
 pub fn build_session_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
@@ -67,6 +66,13 @@ pub async fn password_authorisation_cookie(
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
     cookies.add(refresh_cookie);
     // TODO: Remove tokens from cookie sessions
+    //         // TODO: Improve with default workspace
+    // let user = state
+    //     .db
+    //     .user
+    //     .get_by_id(&session.user_id)
+    //     .await?
+    //     .ok_or(AppError::ServerError(String::from("User retrieval failed")))?;
     Ok(Json(session))
 }
 

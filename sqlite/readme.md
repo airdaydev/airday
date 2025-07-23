@@ -26,6 +26,7 @@ sqlite3 <<< "select uuid4();"
 ## Example queries
 - `SELECT uuid4();`
 - `SELECT uuid_str(id) FROM session;`
+- `SELECT * FROM user WHERE id = uuid_blob('54f001cc-d0c9-400d-aa1f-ff1621aafd78');`
 
 ## SQLite tooling
 ```bash

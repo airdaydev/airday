@@ -1,6 +1,10 @@
 use crate::{
     common::error::AppError,
-    user::model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
+    user::{
+        self,
+        model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
+    },
+    workspace::model::Workspace,
 };
 use async_trait::async_trait;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
@@ -31,25 +35,39 @@ impl UserModel for UserModelSqlite {
             Err(e) => Err(AppError::from(e)),
         }
     }
-    #[cfg(test)]
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError> {
         let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
-        let result = sqlx::query_as!(
-            User,
+        let result = sqlx::query!(
             r#"
-            SELECT id as "id: Uuid", email, password_hash, default_workspace_id as "default_workspace_id: Uuid"
+            SELECT user.id as "id: Uuid", email, password_hash,
+            workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
             FROM user
-            WHERE id = ?
+            JOIN workspace ON workspace.id = default_workspace_id
+            WHERE user.id = ?
             "#,
             sqlx_uuid
         )
         .fetch_optional(&self.pool)
-        .await;
+        .await?;
 
-        match result {
-            Ok(user) => Ok(user),
-            Err(e) => Err(AppError::from(e)),
+        // nesting with sqlx is difficult, this is simpler
+        if let Some(row) = result {
+            let mut workspace = None;
+            if let Some(workspace_id) = row.workspace_id {
+                workspace = Some(Workspace {
+                    id: workspace_id,
+                    name: row.workspace_name.unwrap_or(String::from("")),
+                })
+            }
+            let user = User {
+                id: row.id,
+                email: row.email,
+                password_hash: row.password_hash,
+                workspace,
+            };
+            return Ok(Some(user));
         }
+        Ok(None)
     }
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError> {
         let password_hash = hash_password(password)?;

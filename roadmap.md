@@ -2,6 +2,7 @@
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] what workspace am i on? - follow from user creation to login
+- [] Just realised we can ? errors directly from sqlx errors to apperrors
 - [] merge item api
 - [] get items since last sync (~5min before)
 - [] delete items

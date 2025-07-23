@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::common::error::AppError;
 
 // Creating a workspace
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Workspace {
     pub id: Uuid,
     pub name: String,

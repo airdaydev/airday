@@ -32,6 +32,6 @@ pnpm run test # runs all tests
 
 ---
 
-Airday is designed to be a secure product. E2E encrypted fields should not be compromised and user data should not be leaked. If you believe you have found a security issue, please disclose responsibility at support@air.day.
-
 Airday is BSL-licensed software. You may self-host it for your own personal or own small team use for free.
+
+Airday is designed to be a secure product. E2E encrypted fields should not be compromised and user data should not be leaked. If you believe you have found a security issue, please disclose responsibility at support@air.day.
