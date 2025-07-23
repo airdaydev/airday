@@ -19,6 +19,7 @@ use crate::{
 pub struct AirdayMessage {
     // TODO: We should match the id 100%, interior actions just need a tick
     pub actions: Vec<AirdayAction>,
+    pub workspace_id: Option<Uuid>,
 }
 
 pub enum AirdayAction {
@@ -29,6 +30,10 @@ pub enum AirdayAction {
 
 impl AirdayMessage {
     pub fn from_proto(message: &AirdayMessageProto) -> Result<Self, AppError> {
+        let mut workspace_id: Option<Uuid> = None;
+        if let Some(workspace_id_buffer) = message.workspace_id() {
+            workspace_id = fbv_to_uuid(workspace_id_buffer).ok();
+        }
         let mut actions = Vec::new();
         let batch = message
             .batch()
@@ -99,7 +104,10 @@ impl AirdayMessage {
                 }
             }
         }
-        Ok(Self { actions })
+        Ok(Self {
+            actions,
+            workspace_id,
+        })
     }
 }
 
@@ -126,9 +134,12 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                         }
                     };
                     println!("User {:?} authenticated!", sesh.user_id);
+                    let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
                     let action_offset = AuthenticateResponseProto::create(
                         &mut builder,
-                        &AuthenticateResponseProtoArgs { success: true },
+                        &AuthenticateResponseProtoArgs {
+                            user_id: Some(user_id_offset),
+                        },
                     )
                     .as_union_value();
                     let offset = AirdayBatchComponentProto::create(
@@ -146,9 +157,17 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     let record = state.ws_connection_map.lock().unwrap();
                     record.get(socket_id).unwrap().clone()
                 };
+                let workspace_id: Uuid;
+                if let Some(workspace) = message.workspace_id {
+                    workspace_id = workspace;
+                } else {
+                    // Workspace id required
+                    return ();
+                }
+                // TODO: Security! Confirm user has access to workspace!
                 // t.user_id;
                 // TODO: Verify workspace_id is correct (+ derive from session)
-                state.db.item.merge(&item.workspace_id, &item);
+                state.db.item.merge(&workspace_id, &item);
                 // TODO: Acknowledgement message + fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }

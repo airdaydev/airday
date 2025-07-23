@@ -11,5 +11,9 @@ pub fn fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, A
         .bytes()
         .try_into()
         .map_err(|_| AppError::ValidationError(String::from("Could not validate UUID")))?;
+    let zero_id: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    if id_bytes == zero_id {
+        Err(AppError::ValidationError(String::from("All zero uuid")))?;
+    }
     Ok(Uuid::from_bytes(id_bytes))
 }

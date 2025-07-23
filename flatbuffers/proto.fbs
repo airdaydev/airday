@@ -1,4 +1,6 @@
 // Flatbuffer serialisation for Airday messages & objects
+// n.b. currently swift generation does not support fixed byte array - if we can get away with a rust code
+// all id representations should be switched to fix with downstream code adapted
 
 namespace proto;
 
@@ -36,7 +38,7 @@ table AuthenticateActionProto {
 }
 
 table AuthenticateResponseProto {
-  success: bool;
+  user_id: [ubyte];
 }
 
 union AirdayActionProto {
@@ -51,7 +53,7 @@ table AirdayBatchComponentProto {
 }
 
 table AirdayMessageProto {
-  workspace_id: [ubyte] (required);
+  workspace_id: [ubyte];
   batch: [AirdayBatchComponentProto];
 }
 
