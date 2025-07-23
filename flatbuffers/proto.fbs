@@ -59,6 +59,7 @@ union AirdayActionProto {
   DeleteItemActionProto,
   AuthenticateActionProto,
   AuthenticateResponseProto,
+  WorkspaceSyncResponseProto,
 }
 
 table AirdayBatchComponentProto {

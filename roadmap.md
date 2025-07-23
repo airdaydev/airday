@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] get primary workspace
 - [] primary workspace should be created as a transaction
 - [] merge item api
 - [] consul-template & or bash templating for config.toml
@@ -10,6 +9,7 @@
 - [] set a default workspace ui
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
+- [] SYNC CLEAN UP before continuing
 - [] @airday/core - create subitems / sequence
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?

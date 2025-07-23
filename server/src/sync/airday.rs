@@ -110,7 +110,7 @@ pub async fn create_primary_workspace_action<'a>(
     state: &AppState,
     builder: &mut FlatBufferBuilder<'a>,
     user_id: &Uuid,
-) -> Result<WIPOffset<WorkspaceSyncResponseProto<'a>>, AppError> {
+) -> Result<WIPOffset<AirdayBatchComponentProto<'a>>, AppError> {
     let res = state.db.user.get_by_id(user_id).await?;
     if let Some(user) = res {
         if let Some(primary_workspace) = user.primary_workspace {
@@ -124,9 +124,17 @@ pub async fn create_primary_workspace_action<'a>(
             let primary_workspace_offset = WorkspaceSyncResponseProtoArgs {
                 primary_workspace: Some(workspace_offset),
             };
-            let workspace_offset =
-                WorkspaceSyncResponseProto::create(builder, &primary_workspace_offset);
-            return Ok(workspace_offset);
+            let action_offset =
+                WorkspaceSyncResponseProto::create(builder, &primary_workspace_offset)
+                    .as_union_value();
+            let batch_offset = AirdayBatchComponentProto::create(
+                builder,
+                &AirdayBatchComponentProtoArgs {
+                    action_type: AirdayActionProto::WorkspaceSyncResponseProto,
+                    action: Some(action_offset),
+                },
+            );
+            return Ok(batch_offset);
         }
     }
     Err(AppError::ServerError(String::from(
@@ -177,14 +185,20 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                             action: Some(action_offset),
                         },
                     );
+                    // Sneaky, change later
                     action_offsets.push(offset);
+                    let workspace_offset =
+                        create_primary_workspace_action(state, &mut builder, &sesh.user_id)
+                            .await
+                            .unwrap();
+                    action_offsets.push(workspace_offset);
                 }
             }
             AirdayAction::AddItem { item } => {
-                let user = {
-                    let record = state.ws_connection_map.lock().unwrap();
-                    record.get(socket_id).unwrap().clone()
-                };
+                // let user = {
+                //     let record = state.ws_connection_map.lock().unwrap();
+                //     record.get(socket_id).unwrap().clone()
+                // };
                 // let workspace_id: Uuid;
                 // if let Some(workspace) = message.workspace_id {
                 //     workspace_id = workspace;

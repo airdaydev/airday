@@ -32,13 +32,13 @@ interface Session {
 }
 
 interface WorkspaceConstructorOpts {
-  id?: string;
+  id?: Uint8Array;
   name: string;
   local: boolean;
 }
 
-class Workspace {
-  id?: string;
+export class Workspace {
+  id?: Uint8Array;
   name: string = "Local Workspace";
   local = true;
   primary = false;

@@ -6,8 +6,9 @@ import {
   AuthenticateResponseProto,
   MessageProto,
   MessageWrapperProto,
+  WorkspaceSyncResponseProto,
 } from "../proto";
-import { AuthMode, type AirdayCore } from "../core";
+import { AuthMode, Workspace, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
 import { getUuidBytes, getUuidFromFbVec } from "../common";
@@ -98,9 +99,16 @@ export class WebsocketManager {
         case AirdayActionProto.AuthenticateResponseProto:
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
-          const userId = getUuidFromFbVec(authResponse.userId);
+          const userId = getUuidFromFbVec(
+            authResponse.userId.bind(authResponse),
+          );
           // Confirm things make sense and authorise
           this.authorised = this.core.session?.userId === stringify(userId);
+          if (!this.authorised) {
+            console.warn(this.core.session?.userId, stringify(userId), "huh");
+          } else {
+            console.log("WS: User authenticated");
+          }
           // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:
@@ -108,6 +116,24 @@ export class WebsocketManager {
           component.action(itemResponse);
           // TODO: Validate and add item to storage
           console.log(itemResponse.item());
+          break;
+        case AirdayActionProto.WorkspaceSyncResponseProto:
+          const workspaceResponse = new WorkspaceSyncResponseProto();
+          component.action(workspaceResponse);
+          const primaryWorkspaceBuffer = workspaceResponse.primaryWorkspace();
+          if (primaryWorkspaceBuffer) {
+            // TODO: Validate and add item to storage
+            let id = getUuidFromFbVec(
+              primaryWorkspaceBuffer.id.bind(primaryWorkspaceBuffer),
+            );
+            let name = primaryWorkspaceBuffer.name() || "";
+            this.core.primaryWorkspace = new Workspace({
+              id,
+              name,
+              local: true,
+            });
+            console.log(this.core.primaryWorkspace);
+          }
           break;
         default:
           console.warn(`No handler for rx action type: ${actionType}:`);
