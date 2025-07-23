@@ -1,9 +1,6 @@
 use crate::{
     common::error::AppError,
-    user::{
-        self,
-        model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
-    },
+    user::model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
     workspace::model::Workspace,
 };
 use async_trait::async_trait;
@@ -17,23 +14,30 @@ pub struct UserModelSqlite {
 #[async_trait]
 impl UserModel for UserModelSqlite {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
-        let result = sqlx::query_as!(
-            User,
+        let result = sqlx::query!(
             r#"
-          SELECT id as "id: Uuid", email, password_hash,
-          default_workspace_id as "default_workspace_id: Uuid"
-          FROM user
-          WHERE email = ?
-          "#,
+            SELECT user.id as "id: Uuid", email, password_hash,
+            workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
+            FROM user
+            LEFT JOIN workspace ON workspace.id = default_workspace_id
+            WHERE email = ?
+            "#,
             email
         )
         .fetch_optional(&self.pool)
-        .await;
+        .await?;
 
-        match result {
-            Ok(user) => Ok(user),
-            Err(e) => Err(AppError::from(e)),
+        if let Some(row) = result {
+            let user = self.build_user_with_workspace(
+                row.id,
+                row.email,
+                row.password_hash,
+                row.workspace_id,
+                row.workspace_name,
+            );
+            return Ok(Some(user));
         }
+        Ok(None)
     }
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError> {
         let sqlx_uuid = SqlxUuid::from_bytes(id.into_bytes());
@@ -52,19 +56,13 @@ impl UserModel for UserModelSqlite {
 
         // nesting with sqlx is difficult, this is simpler
         if let Some(row) = result {
-            let mut workspace = None;
-            if let Some(workspace_id) = row.workspace_id {
-                workspace = Some(Workspace {
-                    id: workspace_id,
-                    name: row.workspace_name.unwrap_or(String::from("")),
-                })
-            }
-            let user = User {
-                id: row.id,
-                email: row.email,
-                password_hash: row.password_hash,
-                workspace,
-            };
+            let user = self.build_user_with_workspace(
+                row.id,
+                row.email,
+                row.password_hash,
+                row.workspace_id,
+                row.workspace_name,
+            );
             return Ok(Some(user));
         }
         Ok(None)
@@ -73,12 +71,10 @@ impl UserModel for UserModelSqlite {
         let password_hash = hash_password(password)?;
         let uuid = Uuid::new_v4();
         let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
-        let result = sqlx::query_as!(
-            User,
+        let result = sqlx::query!(
             r#"
       INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?)
-      RETURNING id as "id: Uuid", email, password_hash,
-      default_workspace_id as "default_workspace_id: Uuid"
+      RETURNING id as "id: Uuid", email, password_hash
       "#,
             sqlx_uuid,
             email,
@@ -87,7 +83,15 @@ impl UserModel for UserModelSqlite {
         .fetch_one(&self.pool)
         .await;
         match result {
-            Ok(user) => Ok(user),
+            Ok(row) => {
+                let user = User {
+                    id: row.id,
+                    email: row.email,
+                    password_hash: row.password_hash,
+                    default_workspace: None,
+                };
+                Ok(user)
+            }
             Err(sqlx::Error::Database(db_err)) => {
                 if db_err.is_unique_violation() {
                     Err(AppError::ValidationError(String::from(
@@ -132,6 +136,27 @@ impl UserModel for UserModelSqlite {
 impl UserModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
+    }
+
+    fn build_user_with_workspace(
+        &self,
+        id: Uuid,
+        email: String,
+        password_hash: String,
+        workspace_id: Option<Uuid>,
+        workspace_name: Option<String>,
+    ) -> User {
+        let workspace = workspace_id.map(|id| Workspace {
+            id,
+            name: workspace_name.unwrap_or_default(),
+        });
+
+        User {
+            id,
+            email,
+            password_hash,
+            default_workspace: workspace,
+        }
     }
 }
 
@@ -192,7 +217,7 @@ mod tests {
         let workspace_2 = db.workspaces.create_owned(&user.id).await.unwrap();
         let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
         assert_eq!(
-            current_user_state.default_workspace_id.unwrap(),
+            current_user_state.default_workspace.unwrap().id,
             workspace.id
         );
         db.user
@@ -206,7 +231,7 @@ mod tests {
             .unwrap();
         let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
         assert_eq!(
-            post_user_state.default_workspace_id.unwrap(),
+            post_user_state.default_workspace.unwrap().id,
             workspace_2.id
         );
     }

@@ -49,14 +49,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
-    pub workspace: Option<Workspace>,
+    pub default_workspace: Option<Workspace>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
-    pub workspace: Option<Workspace>,
+    pub default_workspace: Option<Workspace>,
 }
 
 impl From<User> for PublicUser {
@@ -64,7 +64,7 @@ impl From<User> for PublicUser {
         Self {
             id: user.id.to_string(),
             email: user.email,
-            workspace: user.workspace,
+            default_workspace: user.default_workspace,
         }
     }
 }

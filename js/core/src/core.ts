@@ -30,14 +30,22 @@ interface Session {
   userId: string;
 }
 
-class Workspace {
-  id?: string;
+interface WorkspaceConstructorOpts {
+  id: string;
   name: string;
   local: boolean;
-  constructor() {
-    this.id;
-    this.name = "Local Workspace";
-    this.local = true;
+}
+
+class Workspace {
+  id?: string;
+  name: string = "Local Workspace";
+  local = true;
+  constructor(opts?: WorkspaceConstructorOpts) {
+    if (opts) {
+      this.id = opts.id;
+      this.name = opts.name;
+      this.local = opts.local;
+    }
   }
 }
 
