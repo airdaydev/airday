@@ -12,8 +12,8 @@ use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
 struct LWWDefinitionJson<T> {
-    utc: u64,
-    pid: u64,
+    utc: f64,
+    pid: f64,
     data: T,
 }
 
@@ -49,7 +49,10 @@ impl ItemAttributesJson {
                 // TODO: Ergonomics!
                 let lww_a = LWWRegister::new(
                     self_text.data.clone(),
-                    Some(LWWTimestamp::new(Some(self_text.utc), Some(self_text.pid))),
+                    Some(LWWTimestamp::new(
+                        Some(self_text.utc as u64),
+                        Some(self_text.pid as u64),
+                    )),
                 )
                 .unwrap();
                 let lww_b = LWWRegister::new(
