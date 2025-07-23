@@ -5,7 +5,7 @@ import {
   type EnsureFunction,
 } from "suretype";
 
-interface AirdayJSONResponse<T> {
+interface AirdayResponse<T> {
   response: Response;
   data: T;
 }
@@ -15,6 +15,7 @@ type ExtractEnsureType<T extends EnsureFunction<any>> =
 
 interface ParseOpts {
   debug: boolean;
+  json: boolean;
 }
 
 export class APIError extends Error {
@@ -42,12 +43,13 @@ export class APIError extends Error {
 export async function parseJSONResponse(
   response: Response,
   opts?: ParseOpts,
-): Promise<AirdayJSONResponse<any>> {
-  let body = await response.json();
+): Promise<AirdayResponse<any>> {
   const parseOpts = {
     debug: false,
+    json: true,
     ...opts,
   };
+  let body = parseOpts.json ? await response.json() : null;
   if (parseOpts.debug) {
     console.log(response, body);
   }
@@ -62,9 +64,9 @@ export async function parseJSONResponse(
 }
 
 export async function valJSONRes<T extends EnsureFunction<any>>(
-  response: AirdayJSONResponse<any>,
+  response: AirdayResponse<any>,
   validator: T,
-): Promise<AirdayJSONResponse<ExtractEnsureType<T>>> {
+): Promise<AirdayResponse<ExtractEnsureType<T>>> {
   const data = await validator(response.data);
   return {
     response: response.response,

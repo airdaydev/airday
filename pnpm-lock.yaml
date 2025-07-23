@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  pkg_js/cal:
+  js/cal:
     dependencies:
       '@flatten-js/interval-tree':
         specifier: ^1.1.3
@@ -42,7 +42,7 @@ importers:
         specifier: ^2.0.5
         version: 2.1.9(@types/node@20.12.7)(jsdom@24.1.3)
 
-  pkg_js/core:
+  js/core:
     dependencies:
       '@airday/tracer':
         specifier: workspace:^
@@ -73,9 +73,9 @@ importers:
         specifier: 6.0.1
         version: 6.0.1
 
-  pkg_js/keyboard: {}
+  js/keyboard: {}
 
-  pkg_js/list:
+  js/list:
     dependencies:
       '@airday/keyboard':
         specifier: workspace:^
@@ -106,7 +106,7 @@ importers:
         specifier: ^2.10.2
         version: 2.11.6(solid-js@1.9.7)(vite@5.4.19(@types/node@20.12.7))
 
-  pkg_js/tracer:
+  js/tracer:
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -119,13 +119,13 @@ importers:
     dependencies:
       '@airday/cal':
         specifier: workspace:^
-        version: link:../pkg_js/cal
+        version: link:../js/cal
       '@airday/keyboard':
         specifier: workspace:^
-        version: link:../pkg_js/keyboard
+        version: link:../js/keyboard
       '@airday/list':
         specifier: workspace:^
-        version: link:../pkg_js/list
+        version: link:../js/list
       fractional-indexing:
         specifier: ^3.2.0
         version: 3.2.0

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createUser } from "../src/index";
+import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
 import { createTestCore, extractCookie, parseCookieValue } from "./utils.spec";
 import { getJMAPSession } from "../src/index";
@@ -22,7 +22,7 @@ test.only("non-existent username & password", async () => {
     });
 });
 
-test("Creating a user & default workspace", async () => {
+test.only("Creating a user & default workspace", async () => {
   const res = await createUser(core, {
     email: "daniel@air.day",
     password: "fa09j20fiaj3fpaof",

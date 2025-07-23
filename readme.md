@@ -6,8 +6,8 @@
 📁 monorepo
 ├── 📂 flatbuffers  → Protocol definitions and code gen
 ├── 📂 ios          → iOS app placeholder
-├── 📂 pkg_js       → JavaScript packages
-├── 📂 pkg_rust     → Rust packages
+├── 📂 js           → JavaScript packages
+├── 📂 rust         → Rust packages
 └── 📂 server       → Rust based server
 ├── 📂 sqlite       → Sqlite migration & notes
 ├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
