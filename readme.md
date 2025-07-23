@@ -8,7 +8,7 @@
 ├── 📂 ios          → iOS app placeholder
 ├── 📂 js           → JavaScript packages
 ├── 📂 rust         → Rust packages
-└── 📂 server       → Rust based server
+├── 📂 server       → Rust based server
 ├── 📂 sqlite       → Sqlite migration & notes
 ├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
 ├── 📂 web          → Web based application
