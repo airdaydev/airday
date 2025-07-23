@@ -21,7 +21,7 @@ pub enum WorkspaceUpdate {
     Unset,
 }
 
-// TODO: Remove default_workspace_id as a user modifiable object
+// TODO: Remove primary _workspace_id as a user modifiable object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -50,14 +50,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
-    pub default_workspace: Option<Workspace>,
+    pub primary_workspace: Option<Workspace>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
-    pub default_workspace: Option<Workspace>,
+    pub primary_workspace: Option<Workspace>,
 }
 
 impl From<User> for PublicUser {
@@ -65,7 +65,7 @@ impl From<User> for PublicUser {
         Self {
             id: user.id.to_string(),
             email: user.email,
-            default_workspace: user.default_workspace,
+            primary_workspace: user.primary_workspace,
         }
     }
 }

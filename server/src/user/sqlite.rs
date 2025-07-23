@@ -88,7 +88,7 @@ impl UserModel for UserModelSqlite {
                     id: row.id,
                     email: row.email,
                     password_hash: row.password_hash,
-                    default_workspace: None,
+                    primary_workspace: None,
                 };
                 Ok(user)
             }
@@ -112,7 +112,7 @@ impl UserModel for UserModelSqlite {
     ) -> Result<(), AppError> {
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
-        // Only update default_workspace if it was provided in the request
+        // Only update primary_workspace if it was provided in the request
         if let Some(workspace_update) = attributes.primary_workspace_id {
             let workspace_value: Option<SqlxUuid> = match workspace_update {
                 WorkspaceUpdate::Set(workspace_id) => {
@@ -154,7 +154,7 @@ impl UserModelSqlite {
             id,
             email,
             password_hash,
-            default_workspace: workspace,
+            primary_workspace: workspace,
         }
     }
 }
@@ -216,7 +216,7 @@ mod tests {
         let workspace_2 = db.workspaces.create_owned(&user.id).await.unwrap();
         let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
         assert_eq!(
-            current_user_state.default_workspace.unwrap().id,
+            current_user_state.primary_workspace.unwrap().id,
             workspace.id
         );
         db.user
@@ -230,7 +230,7 @@ mod tests {
             .unwrap();
         let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
         assert_eq!(
-            post_user_state.default_workspace.unwrap().id,
+            post_user_state.primary_workspace.unwrap().id,
             workspace_2.id
         );
     }

@@ -1,5 +1,5 @@
 use axum::extract::ws::Message;
-use flatbuffers::FlatBufferBuilder;
+use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
@@ -11,9 +11,13 @@ use crate::{
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
+            WorkspaceProto, WorkspaceProtoArgs, WorkspaceProtoBuilder, WorkspaceSyncResponseProto,
+            WorkspaceSyncResponseProtoArgs, WorkspaceSyncResponseProtoBuilder,
         },
         websocket::send_to_client,
     },
+    user,
+    workspace::model::Workspace,
 };
 
 pub struct AirdayMessage {
@@ -101,6 +105,35 @@ impl AirdayMessage {
     }
 }
 
+// TODO: DEFAULT WORKSPACE SHOULD ALWAYS EXIST
+pub async fn create_primary_workspace_action<'a>(
+    state: &AppState,
+    builder: &mut FlatBufferBuilder<'a>,
+    user_id: &Uuid,
+) -> Result<WIPOffset<WorkspaceSyncResponseProto<'a>>, AppError> {
+    let res = state.db.user.get_by_id(user_id).await?;
+    if let Some(user) = res {
+        if let Some(primary_workspace) = user.primary_workspace {
+            let workspace_id_offset = builder.create_vector(primary_workspace.id.as_bytes());
+            let workspace_name_offset = builder.create_string(&primary_workspace.name);
+            let workspace_args = WorkspaceProtoArgs {
+                id: Some(workspace_id_offset),
+                name: Some(workspace_name_offset),
+            };
+            let workspace_offset = WorkspaceProto::create(builder, &workspace_args);
+            let primary_workspace_offset = WorkspaceSyncResponseProtoArgs {
+                primary_workspace: Some(workspace_offset),
+            };
+            let workspace_offset =
+                WorkspaceSyncResponseProto::create(builder, &primary_workspace_offset);
+            return Ok(workspace_offset);
+        }
+    }
+    Err(AppError::ServerError(String::from(
+        "Couldn't find primary workspace",
+    )))
+}
+
 // TODO: Create error resposes for each message
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     let mut builder = FlatBufferBuilder::new();
@@ -112,17 +145,22 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                 let session_option = state.db.session.get_by_token(&session_token).await.unwrap();
                 // TODO: SECURITY! VALIDATE THE SESSION!!
                 if let Some(sesh) = session_option {
-                    {
+                    let set_conn_user_id: bool = {
                         // Mutex scope
                         let mut map = state.ws_connection_map.lock().unwrap();
                         if let Some(conn) = map.get_mut(&socket_id) {
                             conn.user_id = Some(sesh.user_id);
+                            true
                         } else {
-                            // TODO: this could happen if a the user dc'd while this was still going on
-                            println!("User disconnected while authenticated in ws");
-                            return ();
+                            false
                         }
                     };
+                    if set_conn_user_id == false {
+                        // TODO: SPAN!?
+                        println!("WS: User disconnected while authenticating");
+                        return ();
+                    }
+                    // TODO: Span?
                     println!("User {:?} authenticated!", sesh.user_id);
                     let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
                     let action_offset = AuthenticateResponseProto::create(

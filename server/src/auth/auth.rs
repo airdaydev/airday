@@ -94,7 +94,7 @@ pub struct CreateUserRequest {
 #[derive(Serialize)]
 pub struct CreateUserResponse {
     id: String,
-    default_workspace: Workspace,
+    primary_workspace: Workspace,
 }
 
 pub async fn create_user(
@@ -109,6 +109,6 @@ pub async fn create_user(
     let workspace = state.db.workspaces.create_owned(&user.id).await?;
     Ok(Json(CreateUserResponse {
         id: user.id.to_string(),
-        default_workspace: workspace,
+        primary_workspace: workspace,
     }))
 }
