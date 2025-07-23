@@ -59,9 +59,9 @@ impl WorkspaceModel for WorkspaceModelSqlite {
         sqlx::query!(
             r#"
             UPDATE user
-            SET default_workspace_id = ?
+            SET primary_workspace_id = ?
             WHERE id = ?
-              AND default_workspace_id IS NULL;
+              AND primary_workspace_id IS NULL;
     "#,
             workspace.id,
             owner_sqlx_uuid,

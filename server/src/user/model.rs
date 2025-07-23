@@ -21,16 +21,17 @@ pub enum WorkspaceUpdate {
     Unset,
 }
 
+// TODO: Remove default_workspace_id as a user modifiable object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_workspace_id: Option<WorkspaceUpdate>,
+    pub primary_workspace_id: Option<WorkspaceUpdate>,
 }
 
 impl UserAttributes {
     pub fn new() -> Self {
         UserAttributes {
-            default_workspace_id: None,
+            primary_workspace_id: None,
         }
     }
 }

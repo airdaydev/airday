@@ -19,7 +19,7 @@ impl UserModel for UserModelSqlite {
             SELECT user.id as "id: Uuid", email, password_hash,
             workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
             FROM user
-            LEFT JOIN workspace ON workspace.id = default_workspace_id
+            LEFT JOIN workspace ON workspace.id = primary_workspace_id
             WHERE email = ?
             "#,
             email
@@ -46,7 +46,7 @@ impl UserModel for UserModelSqlite {
             SELECT user.id as "id: Uuid", email, password_hash,
             workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
             FROM user
-            JOIN workspace ON workspace.id = default_workspace_id
+            JOIN workspace ON workspace.id = primary_workspace_id
             WHERE user.id = ?
             "#,
             sqlx_uuid
@@ -113,7 +113,7 @@ impl UserModel for UserModelSqlite {
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
         // Only update default_workspace if it was provided in the request
-        if let Some(workspace_update) = attributes.default_workspace_id {
+        if let Some(workspace_update) = attributes.primary_workspace_id {
             let workspace_value: Option<SqlxUuid> = match workspace_update {
                 WorkspaceUpdate::Set(workspace_id) => {
                     Some(SqlxUuid::from_bytes(workspace_id.into_bytes()))
@@ -121,7 +121,7 @@ impl UserModel for UserModelSqlite {
                 WorkspaceUpdate::Unset => None,
             };
             sqlx::query!(
-                "UPDATE user SET default_workspace_id = ? WHERE id = ?",
+                "UPDATE user SET primary_workspace_id = ? WHERE id = ?",
                 workspace_value,
                 sqlx_user_id
             )
@@ -223,7 +223,7 @@ mod tests {
             .update_user(
                 &user.id,
                 UserAttributes {
-                    default_workspace_id: Some(WorkspaceUpdate::Set(workspace_2.id)),
+                    primary_workspace_id: Some(WorkspaceUpdate::Set(workspace_2.id)),
                 },
             )
             .await

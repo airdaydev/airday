@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS user (
   id UUID NOT NULL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  default_workspace_id UUID NULL,
-  FOREIGN KEY (default_workspace_id) REFERENCES workspace (id) ON DELETE SET NULL
+  primary_workspace_id UUID NULL,
+  FOREIGN KEY (primary_workspace_id) REFERENCES workspace (id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS session (

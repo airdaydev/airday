@@ -40,7 +40,7 @@ export async function createUser(
 
 const updateUserOpts = APISchema(
   v.object({
-    default_workspace_id: v.string(),
+    primary_workspace_id: v.string(),
   }),
 );
 
