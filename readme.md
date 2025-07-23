@@ -11,7 +11,7 @@
 ├── 📂 server       → Rust based server
 ├── 📂 sqlite       → Sqlite migration & notes
 ├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
-├── 📂 web          → Web based application
+└── 📂 web          → Web based application
 ```
 
 ## Self-hosting
