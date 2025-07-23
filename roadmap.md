@@ -1,7 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] get default workspace (i.e. account workspace)
+- [] get primary workspace
+- [] primary workspace should be created as a transaction
 - [] merge item api
 - [] consul-template & or bash templating for config.toml
 - [] get items since last sync (~5min before)
@@ -26,6 +27,7 @@
 - [] @airday/core - tracing
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Put up website
+- [] get all workspaces
 
 ## Protocol improvements (l8a)
 - [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)

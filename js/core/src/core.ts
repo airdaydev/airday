@@ -10,6 +10,7 @@ import { WebsocketManager } from "./websocket";
 import { MessageQueue } from "./websocket/mq";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
+import { v4 } from "uuid";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -31,7 +32,7 @@ interface Session {
 }
 
 interface WorkspaceConstructorOpts {
-  id: string;
+  id?: string;
   name: string;
   local: boolean;
 }
@@ -40,6 +41,7 @@ class Workspace {
   id?: string;
   name: string = "Local Workspace";
   local = true;
+  primary = false;
   constructor(opts?: WorkspaceConstructorOpts) {
     if (opts) {
       this.id = opts.id;
@@ -54,7 +56,10 @@ export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
-  workspace: Workspace = new Workspace();
+  primaryWorkspace: Workspace = new Workspace({
+    name: "Primary",
+    local: true,
+  });
   ws: WebsocketManager; // websocket layer
   mq: MessageQueue; // message queueing
   sync: AirdaySync; // airday item layer

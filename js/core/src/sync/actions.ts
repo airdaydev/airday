@@ -5,7 +5,7 @@ import {
   type SerialisedLWWRegister,
 } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
-import { v4 } from "uuid";
+import { v4, parse } from "uuid";
 import {
   ItemProto,
   LWWRegisterStringProto,
@@ -90,6 +90,7 @@ export class AuthenticateAction extends Action {
 }
 
 export class AddItemAction extends Action {
+  workspaceId = v4(); // TODO: WRONG, should be taken from outside
   fields: Partial<AirdayItemFields> = {};
   constructor(fields: Partial<AirdayItemFields>) {
     super();
@@ -108,7 +109,6 @@ export class AddItemAction extends Action {
       const timestamp = new LWWTimestamp({
         utc: textTimestamp.utc(),
         pid: textTimestamp.pid(),
-        tick: textTimestamp.tick(),
       });
       fields.text = new LWWRegisterString({
         timestamp,
@@ -140,10 +140,14 @@ export class AddItemAction extends Action {
       ItemProto.addText(builder, textOffset);
     }
     const itemOffset = ItemProto.endItemProto(builder);
-    const actionOffset = AddItemActionProto.createAddItemActionProto(
+    const workspaceIdOffset = AddItemActionProto.createWorkspaceIdVector(
       builder,
-      itemOffset,
+      parse(this.workspaceId),
     );
+    AddItemActionProto.startAddItemActionProto(builder);
+    AddItemActionProto.addWorkspaceId(builder, workspaceIdOffset);
+    AddItemActionProto.addItem(builder, itemOffset);
+    const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
     const batchComponentOffset =
       AirdayBatchComponentProto.createAirdayBatchComponentProto(
         builder,
@@ -155,11 +159,9 @@ export class AddItemAction extends Action {
 }
 
 export class AirdayBatchMessage implements MQMessage {
-  workspaceId: Uint8Array;
   actions: Action[];
   span?: ULSpan;
-  constructor(workspaceId: Uint8Array, actions: Action[]) {
-    this.workspaceId = workspaceId;
+  constructor(actions: Action[]) {
     this.actions = actions;
   }
   toFlatBuffer() {

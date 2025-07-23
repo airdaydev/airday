@@ -9,6 +9,8 @@ import {
 } from "../proto";
 import { AuthMode, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
+import { stringify } from "uuid";
+import { getUuidBytes, getUuidFromFbVec } from "../common";
 
 // TODO: Offline considerations
 export class WebsocketManager {
@@ -96,7 +98,9 @@ export class WebsocketManager {
         case AirdayActionProto.AuthenticateResponseProto:
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
-          this.authorised = authResponse.success() === true;
+          const userId = getUuidFromFbVec(authResponse.userId);
+          // Confirm things make sense and authorise
+          this.authorised = this.core.session?.userId === stringify(userId);
           // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:
