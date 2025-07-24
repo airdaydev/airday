@@ -28,6 +28,7 @@
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Put up website
 - [] get all workspaces
+- [] handling tabs?!
 
 ## Protocol improvements (l8a)
 - [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)

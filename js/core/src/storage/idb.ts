@@ -44,21 +44,23 @@ export class AirdayIDB {
   };
 }
 
+// TODO: Get completed items separately
 export class ItemIDBModel {
   db: AirdayIDB;
   storeName = ITEM_STORE_NAME;
   constructor(db: AirdayIDB) {
     this.db = db;
   }
-  insert = async (items: AirdayItem[]) => {
+  upsert = async (items: AirdayItem[]) => {
     const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
     const store = tx.objectStore(ITEM_STORE_NAME);
     // TODO: Not gonna throw when merging tho
-    const upsert = async (item: AirdayItemSerialised) => {
+    const upsertInternal = async (item: AirdayItemSerialised) => {
       const val = await store.add(item);
       return val;
     };
-    items.map((item) => upsert(item.toJSON()));
+    // TODO: We also need to extract indexes in JSON version (e.g. done)!
+    items.map((item) => upsertInternal(item.toJSON()));
     await tx.done;
   };
   getItemsByWorkspace = async (workspaceId: string) => {
@@ -67,6 +69,17 @@ export class ItemIDBModel {
       "workspaceId",
       workspaceId,
     );
-    res.map((row) => {});
+    const items: AirdayItem[] = [];
+    res.forEach((row) => {
+      try {
+        items.push(AirdayItem.fromJSON(row));
+      } catch (err) {
+        console.warn("Could not parse row from db", row);
+      }
+    });
+    return items;
+  };
+  deleteItem = async (id: string) => {
+    await this.db!.handle?.delete(ITEM_STORE_NAME, id);
   };
 }
