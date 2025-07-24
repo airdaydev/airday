@@ -38,26 +38,28 @@ export class GetListsActions extends Action {
   }
 }
 
-export function deserialiseAction(buffer: Uint8Array) {
-  const bb = new ByteBuffer(buffer);
-  const component =
-    AirdayBatchComponentProto.getRootAsAirdayBatchComponentProto(bb);
-  switch (component.actionType()) {
-    case AirdayActionProto.AddItemActionProto: {
-      const rObj = new AddItemActionProto();
-      const addAction = component.action(rObj);
-      const item = rObj.item(); // TODO: null vs non-existent
-      if (!item) throw new Error("Item could not be found");
-      return AddItemAction.fromItemFlatBuffer(item);
-      AddItemAction.from;
-    }
-    case AirdayActionProto.DeleteItemActionProto: {
-      const rObj = new DeleteItemActionProto();
-      const deleteAction = component.action(rObj);
-      break;
-    }
-  }
-}
+// Was used for WAL
+// Can be adapted for replies
+// export function deserialiseAction(buffer: Uint8Array) {
+//   const bb = new ByteBuffer(buffer);
+//   const component =
+//     AirdayBatchComponentProto.getRootAsAirdayBatchComponentProto(bb);
+//   switch (component.actionType()) {
+//     case AirdayActionProto.AddItemActionProto: {
+//       const rObj = new AddItemActionProto();
+//       const addAction = component.action(rObj);
+//       const item = rObj.item(); // TODO: null vs non-existent
+//       if (!item) throw new Error("Item could not be found");
+//       return AddItemAction.fromItemFlatBuffer(item);
+//       AddItemAction.from;
+//     }
+//     case AirdayActionProto.DeleteItemActionProto: {
+//       const rObj = new DeleteItemActionProto();
+//       const deleteAction = component.action(rObj);
+//       break;
+//     }
+//   }
+// }
 
 export class AuthenticateAction extends Action {
   sessionToken: string;
@@ -86,8 +88,8 @@ export class AddItemAction extends Action {
     super();
     this.item = item;
   }
+  // Coul be Used for inverse - to apply from server
   static fromItemFlatBuffer(item: ItemProto) {
-    throw new Error("needs rewriting!");
     // const fields: Partial<AirdayItemAttributes> = {};
     // const id = item.idArray();
     // if (id) {
