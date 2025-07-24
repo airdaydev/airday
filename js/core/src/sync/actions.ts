@@ -1,4 +1,4 @@
-import { AirdayItem, type AirdayItemFields } from "./model";
+import { AirdayItem, type AirdayItemAttributes } from "./model";
 import { LWWRegisterString, LWWTimestamp } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
@@ -49,6 +49,7 @@ export function deserialiseAction(buffer: Uint8Array) {
       const item = rObj.item(); // TODO: null vs non-existent
       if (!item) throw new Error("Item could not be found");
       return AddItemAction.fromItemFlatBuffer(item);
+      AddItemAction.from;
     }
     case AirdayActionProto.DeleteItemActionProto: {
       const rObj = new DeleteItemActionProto();
@@ -80,48 +81,41 @@ export class AuthenticateAction extends Action {
 }
 
 export class AddItemAction extends Action {
-  workspaceId = new Uuidv4(); // TODO: WRONG, should be taken from outside
-  fields: Partial<AirdayItemFields> = {};
-  constructor(fields: Partial<AirdayItemFields>) {
+  item: AirdayItem;
+  constructor(item: AirdayItem) {
     super();
-    this.fields = fields;
+    this.item = item;
   }
   static fromItemFlatBuffer(item: ItemProto) {
-    const fields: Partial<AirdayItemFields> = {};
-    const id = item.idArray();
-    if (id) {
-      fields.id = Uuidv4.from(id);
-    }
-    const text = item.text();
-    const textTimestamp = item.text()?.timestamp();
-    if (text && textTimestamp) {
-      // TODO: Make this its own function
-      const timestamp = new LWWTimestamp({
-        utc: textTimestamp.utc(),
-        pid: textTimestamp.pid(),
-      });
-      fields.text = new LWWRegisterString({
-        timestamp,
-        data: text.data() || "",
-      });
-    }
-    return new AddItemAction(fields);
-  }
-  static fromItem(item: AirdayItem) {
-    const fields: Partial<AirdayItemFields> = {};
-    fields.id = item.id;
-    if (fields.text) fields.text = item.text;
-    return new AddItemAction(fields);
+    throw new Error("needs rewriting!");
+    // const fields: Partial<AirdayItemAttributes> = {};
+    // const id = item.idArray();
+    // if (id) {
+    //   fields.id = Uuidv4.from(id);
+    // }
+    // const text = item.text();
+    // const textTimestamp = item.text()?.timestamp();
+    // if (text && textTimestamp) {
+    //   // TODO: Make this its own function
+    //   const timestamp = new LWWTimestamp({
+    //     utc: textTimestamp.utc(),
+    //     pid: textTimestamp.pid(),
+    //   });
+    //   fields.text = new LWWRegisterString({
+    //     timestamp,
+    //     data: text.data() || "",
+    //   });
+    // }
+    // return new AddItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
-    if (!this.fields.id) throw new Error("id required");
-    const idOffset = ItemProto.createIdVector(builder, this.fields.id);
+    const idOffset = ItemProto.createIdVector(builder, this.item.id);
     ItemProto.startItemProto(builder);
     ItemProto.addId(builder, idOffset);
-    if (this.fields.text) {
+    if (this.item.attributes.text) {
       const timestampOffset =
-        this.fields.text.timestamp.addToFlatBuffer(builder);
-      const valueOffset = builder.createString(this.fields.text.data);
+        this.item.attributes.text.timestamp.addToFlatBuffer(builder);
+      const valueOffset = builder.createString(this.item.attributes.text.data);
       const textOffset = LWWRegisterStringProto.createLWWRegisterStringProto(
         builder,
         timestampOffset,
@@ -132,7 +126,7 @@ export class AddItemAction extends Action {
     const itemOffset = ItemProto.endItemProto(builder);
     const workspaceIdOffset = AddItemActionProto.createWorkspaceIdVector(
       builder,
-      this.workspaceId,
+      this.item.workspaceId,
     );
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addWorkspaceId(builder, workspaceIdOffset);

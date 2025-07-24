@@ -1,29 +1,52 @@
 import { LWWRegisterString } from "../crdt/lww";
 import { Uuidv4 } from "../common";
 
-export interface AirdayAttributes {
+export interface AirdayItemAttributes {
   text?: LWWRegisterString;
 }
 
-export interface AirdayItemFields {
+enum SyncState {
+  synced = 0, // Server has acknowledged sync
+  dirty = 1, // Local modifications not synced
+  syncing = 2, // Pending sync (on deserialisation, make dirty)
+}
+
+export interface AirdayItemSerialised {
+  // Immutable
+  id: string;
+  workspaceId: string;
+  // LWW attributes (Serialise!)
+  attributes: AirdayItemAttributes;
+  // Client-only
+  syncState: SyncState;
+}
+
+export interface AirdayItemConstructorOpts {
   // Immutable
   id: Uuidv4;
   workspaceId: Uuidv4;
   // LWW attributes
-  attributes: AirdayAttributes;
+  attributes: AirdayItemAttributes;
   // Client-only
-  dirty: true;
+  syncState: SyncState;
 }
 
 export class AirdayItem {
   id: Uuidv4;
+  workspaceId: Uuidv4;
   text?: LWWRegisterString;
-  constructor(params: AirdayItemFields) {
+  attributes: AirdayItemAttributes;
+  syncState = SyncState.synced;
+  // TODO: isCreating attribute
+  // TODO: Find fields with pending updates
+  constructor(params: AirdayItemConstructorOpts) {
     this.id = params.id || new Uuidv4();
+    this.workspaceId = params.workspaceId;
+    this.attributes = params.attributes;
   }
   // TODO: Custom logic MAY be necessary
-  merge(fields: Partial<AirdayAttributes>) {
-    (Object.keys(fields) as Array<keyof AirdayAttributes>).map((key) => {
+  merge(fields: AirdayItemAttributes) {
+    (Object.keys(fields) as Array<keyof AirdayItemAttributes>).map((key) => {
       if (fields[key]) {
         if (!this[key]) {
           this[key] = fields[key];
@@ -35,12 +58,12 @@ export class AirdayItem {
   }
   toJSON() {
     // TODO: Clean up id requirement
-    let obj: Partial<SerialisedAirdayItem> = {
+    let obj: AirdayItemSerialised = {
       id: this.id.toString(),
+      workspaceId: this.id.toString(),
+      attributes: {}, // TODO: Attributes!
+      syncState: this.syncState,
     };
-    if (this.text) {
-      obj.text = this.text.toJSON();
-    }
     return obj;
   }
 }
