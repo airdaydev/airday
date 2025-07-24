@@ -13,5 +13,5 @@ pub struct Workspace {
 
 #[async_trait]
 pub trait WorkspaceModel: Send + Sync {
-    async fn create_owned(&self, owner_id: &Uuid) -> Result<Workspace, AppError>;
+    async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError>;
 }

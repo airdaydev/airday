@@ -1,7 +1,7 @@
 use crate::{
     common::error::AppError,
     user::model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
-    workspace::model::Workspace,
+    workspace::{model::Workspace, sqlite::WorkspaceModelSqlite},
 };
 use async_trait::async_trait;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
@@ -68,19 +68,25 @@ impl UserModel for UserModelSqlite {
         Ok(None)
     }
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError> {
+        // 1. Create primary workspace
+        let mut tx = self.pool.begin().await?;
+        let name = String::from("Private");
+        let primary_workspace = WorkspaceModelSqlite::create_with(&mut *tx, name).await?;
+        // 2. Create associated user
         let password_hash = hash_password(password)?;
         let uuid = Uuid::new_v4();
         let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
         let result = sqlx::query!(
             r#"
-      INSERT INTO user (id, email, password_hash) VALUES (?, ?, ?)
+      INSERT INTO user (id, email, password_hash, primary_workspace_id) VALUES (?, ?, ?, ?)
       RETURNING id as "id: Uuid", email, password_hash
       "#,
             sqlx_uuid,
             email,
-            password_hash
+            password_hash,
+            primary_workspace.id
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await;
         match result {
             Ok(row) => {
@@ -88,7 +94,10 @@ impl UserModel for UserModelSqlite {
                     id: row.id,
                     email: row.email,
                     password_hash: row.password_hash,
-                    primary_workspace: None,
+                    primary_workspace: Some(Workspace {
+                        id: primary_workspace.id,
+                        name: primary_workspace.name,
+                    }),
                 };
                 Ok(user)
             }
@@ -212,8 +221,8 @@ mod tests {
     async fn test_update_user_attributes() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("user_attr_updates@air.day")).await;
-        let workspace = db.workspaces.create_owned(&user.id).await.unwrap();
-        let workspace_2 = db.workspaces.create_owned(&user.id).await.unwrap();
+        let workspace = db.workspaces.create(&user.id).await.unwrap();
+        let workspace_2 = db.workspaces.create(&user.id).await.unwrap();
         let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
         assert_eq!(
             current_user_state.primary_workspace.unwrap().id,

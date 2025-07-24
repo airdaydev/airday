@@ -13,7 +13,7 @@ impl WorkspaceModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-    pub async fn create<'e, E>(ex: E, name: String) -> Result<Workspace, AppError>
+    pub async fn create_with<'e, E>(ex: E, name: String) -> Result<Workspace, AppError>
     where
         E: Executor<'e, Database = sqlx::Sqlite>,
     {
@@ -36,12 +36,12 @@ impl WorkspaceModelSqlite {
 
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
-    async fn create_owned(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
+    async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
         let mut tx = self.pool.begin().await?;
 
         let name = String::from("Personal");
 
-        let workspace = WorkspaceModelSqlite::create(&mut *tx, name).await?;
+        let workspace = WorkspaceModelSqlite::create_with(&mut *tx, name).await?;
 
         // Create user_workspace relationship
         let owner_sqlx_uuid = SqlxUuid::from_bytes(owner_id.into_bytes());
@@ -52,19 +52,6 @@ impl WorkspaceModel for WorkspaceModelSqlite {
     "#,
             owner_sqlx_uuid,
             workspace.id,
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        sqlx::query!(
-            r#"
-            UPDATE user
-            SET primary_workspace_id = ?
-            WHERE id = ?
-              AND primary_workspace_id IS NULL;
-    "#,
-            workspace.id,
-            owner_sqlx_uuid,
         )
         .execute(&mut *tx)
         .await?;

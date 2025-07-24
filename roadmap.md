@@ -1,8 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] merge item api (send a bunch of items to the server & save)
 - [] primary workspace should be created as a transaction, before user?!
+- [] merge item api (send a bunch of items to the server & save)
 - [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] consul-template & or bash templating for config.toml
 - [] delete items

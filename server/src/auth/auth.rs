@@ -2,7 +2,7 @@ use crate::{
     AppState,
     auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
-    user::model::verify_login,
+    user::model::{User, verify_login},
     workspace::model::Workspace,
 };
 use axum::{extract::State, response::Json};
@@ -91,24 +91,12 @@ pub struct CreateUserRequest {
     pub password: String,
 }
 
-#[derive(Serialize)]
-pub struct CreateUserResponse {
-    id: String,
-    primary_workspace: Workspace,
-}
-
 pub async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<CreateUserResponse>, AppError> {
+) -> Result<Json<User>, AppError> {
     let email = payload.email;
     let password = payload.password;
-    // TODO: Fallback mechanism/ux if workspace not created.
-    // Or consider putting these in a transaction.
     let user = state.db.user.create(&email, &password).await?;
-    let workspace = state.db.workspaces.create_owned(&user.id).await?;
-    Ok(Json(CreateUserResponse {
-        id: user.id.to_string(),
-        primary_workspace: workspace,
-    }))
+    Ok(Json(user))
 }
