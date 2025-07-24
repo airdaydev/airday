@@ -26,12 +26,15 @@ test("Item sync", async () => {
       resolve(null);
     }, 1000);
   });
+  // get items from beginning
 
   // syncClient.subscribe((test) => {
   //   expect(test.payload.id).toBe("string");
   // });
   // const t = await core.ws.send("type");
 });
+
+test("sync", () => {});
 
 afterAll(async () => {
   console.log("Flushing traces");
