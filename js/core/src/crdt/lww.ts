@@ -1,5 +1,6 @@
 import { Builder } from "flatbuffers";
 import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
+import { type TypeOf, v, ensure } from "suretype";
 
 // 53-bit number (safe integer limit) generated from high entropy-source, if available
 export const genPid = (): number => {
@@ -24,8 +25,6 @@ interface TimestampConstructorOps {
   pid: number;
 }
 
-export type LWWTimestampArr = [number, number];
-
 export class LWWTimestamp {
   utc: number; // Monotonic client wall clock in microseconds
   pid: number; // Process id
@@ -48,18 +47,15 @@ export class LWWTimestamp {
   addToFlatBuffer(builder: Builder) {
     return LWWTimestampProto.createLWWTimestampProto(
       builder,
-      BigInt(this.utc),
-      BigInt(this.pid),
+      this.utc,
+      this.pid,
     );
   }
-  toArray(): LWWTimestampArr {
-    return [this.utc, this.pid];
-  }
-  static fromArray(arr: LWWTimestampArr) {
-    return new LWWTimestamp({
-      utc: arr[0],
-      pid: arr[1],
-    });
+  toJSON() {
+    return {
+      utc: this.utc,
+      pid: this.pid,
+    };
   }
 }
 
@@ -86,28 +82,46 @@ export class TimestampProducer {
 
 export const globalTSProducer = new TimestampProducer();
 
-export type SerialisedLWWRegister<T> = [LWWTimestampArr, T];
-
 interface LWWRegisterConstructorOpts<T> {
   timestamp?: LWWTimestamp;
   data: T;
 }
 
+const LwwJSON = v.object({
+  timestamp: v
+    .object({
+      utc: v.number().required(),
+      pid: v.number().required(),
+    })
+    .required(),
+  data: v.any(),
+});
+
 export class LWWRegister<T> {
   timestamp: LWWTimestamp;
   data: T;
+  dirty = false;
   constructor(opts: LWWRegisterConstructorOpts<T>) {
     this.timestamp = opts.timestamp || globalTSProducer.timestamp();
     this.data = opts.data;
+    this.dirty = this.dirty ?? false;
   }
   static fromJSON<T>(json: any): LWWRegister<T> {
-    if (!Array.isArray(json) || json.length !== 2)
+    ensure(LwwJSON, json);
+    let typed = json as TypeOf<typeof LwwJSON>;
+    // TODO: Validate with suretype
+    if (!Array.isArray(json) || json.length !== 2) {
       throw new Error("Invalid LWWRegister format");
-    const timestamp = LWWTimestamp.fromArray(json[0]);
-    return new LWWRegister<T>({ timestamp, data: json[1] as unknown as T });
+    }
+    const timestamp = new LWWTimestamp(typed.timestamp);
+    return new LWWRegister<T>({ timestamp, data: typed.data as T });
   }
-  toJSON(): SerialisedLWWRegister<T> {
-    return [this.timestamp.toArray(), this.data];
+  toJSON() {
+    return {
+      data: this.data,
+      timestamp: this.timestamp.toJSON(),
+      dirty: this.dirty,
+    };
   }
   merge(other: LWWRegister<T>): LWWRegister<T> {
     // If timestamps are equal, check data consistency

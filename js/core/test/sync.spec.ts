@@ -28,7 +28,6 @@ test("Item sync", async () => {
     }, 1000);
   });
   // get items from beginning
-
   // syncClient.subscribe((test) => {
   //   expect(test.payload.id).toBe("string");
   // });
