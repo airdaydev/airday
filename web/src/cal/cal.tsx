@@ -6,6 +6,7 @@ import {
   CalSolidWrapper,
   EventDB,
   CalendarEventConstructorProps,
+  AirdayCal,
 } from "@airday/cal";
 import { theme } from "../theme/theme";
 
@@ -29,6 +30,7 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     const roundedRandom = random - r + zeroStartDate.valueOf();
     const duration = (Math.random() > 0.5 ? 15 : 60) * 1000 * 60;
     const date = new Date(roundedRandom);
+    const color = Math.random() > 0.5 ? "blue" : "yellow";
     date.setSeconds(0);
     date.setMilliseconds(0);
     events.push({
@@ -37,16 +39,21 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
       start: new Date(date),
       end: new Date(date.valueOf() + duration),
       allDay: false,
+      color,
     });
   }
   return events;
 }
 
 const start = new Date(new Date().setDate(new Date().getDate() - 182));
-const events = dummyEvents(start, 365, 20000);
+const events = dummyEvents(start, 365, 200);
 
 const db = new EventDB();
 db.loadEvents(events);
+db.ready = true;
+
+const cal = new AirdayCal(db);
+cal.setDaysVisible(7);
 
 /**
  * Initially, a weekly view.
@@ -56,7 +63,7 @@ export const Calendar = (props: { view: DataView }) => {
   return (
     <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
       <CalendarHeader view={props.view} />
-      <CalSolidWrapper theme={theme[0]} db={db} />
+      <CalSolidWrapper cal={cal} theme={theme[0]} db={db} />
     </div>
   );
 };

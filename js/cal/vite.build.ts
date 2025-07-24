@@ -1,9 +1,13 @@
 import { defineConfig } from "vite";
+import dts from "unplugin-dts/vite";
 import solid from "vite-plugin-solid";
 
 export default defineConfig({
   base: "./",
-  plugins: [solid()],
+  plugins: [
+    solid(),
+    dts({ tsconfigPath: "./tsconfig.app.json", bundleTypes: true }),
+  ],
   css: {
     modules: {
       // Add namespace to all generated CSS class names
