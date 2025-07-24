@@ -12,6 +12,7 @@ beforeAll(async () => {
   core.sync.setDB(core.db); // TODO: This should happen automatically
 });
 
+// TODO Test bulk sync
 test("Item sync", async () => {
   core.ws.connect();
   const newItem = new AirdayItem({

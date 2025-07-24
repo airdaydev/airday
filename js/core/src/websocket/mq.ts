@@ -26,7 +26,7 @@ export class MessageQueue {
   core: AirdayCore;
   queue: Array<QueuedMessage> = [];
   pendingMessages = new Map<string, QueuedMessage>();
-  running = true;
+  running = false;
   maxBatch = 50;
   maxPendingMessages = 5;
   timeout = 10000;
@@ -51,7 +51,7 @@ export class MessageQueue {
     this.enqueue(queuedMessage);
   }
   next() {
-    const batch: QueuedMessage[] = [];
+    // 1. Test if queue is live
     const messageQueueFull =
       this.pendingMessages.size > this.maxPendingMessages;
     if (
@@ -63,6 +63,8 @@ export class MessageQueue {
       // TODO: We need a means for the sync batcher to continue when auth starts
       return; // Wait until pending messages are done
     }
+    // 2. Form batch
+    const batch: QueuedMessage[] = [];
     // TODO: Possible optimisation; count batch count towards pending messages count! (separate from pendingMessages.size)
     while (this.queue.length > 0 && batch.length < this.maxBatch) {
       const item = this.queue[0];

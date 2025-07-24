@@ -109,6 +109,7 @@ export class WebsocketManager {
           } else {
             console.log("WS: User authenticated");
           }
+          this.core.mq.start();
           // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:
