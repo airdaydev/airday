@@ -1,14 +1,15 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import type { AirdayItem, AirdayItemFields } from "../sync/model";
+import { AirdayItem, type AirdayItemSerialised } from "../sync/model";
 
 export interface AirdayDBSchema extends DBSchema {
   item: {
     key: string;
     value: any;
     indexes: {
-      listId: string;
-      order: [string, string, string];
-      done: string;
+      workspaceId: string;
+      // listId: string;
+      // order: [string, string, string];
+      // done: string;
     };
   };
   container: {
@@ -33,9 +34,10 @@ export class AirdayIDB {
     this.handle = await openDB("test", 1, {
       upgrade(db) {
         const items = db.createObjectStore(ITEM_STORE_NAME, { keyPath: "id" });
-        items.createIndex("listId", "listId");
-        items.createIndex("order", ["listId", "orderKey", "id"]);
-        items.createIndex("done", ["doneTS"]); // TODO: Done timestamp?
+        items.createIndex("workspaceId", "workspaceId");
+        // items.createIndex("listId", "listId");
+        // items.createIndex("order", ["listId", "orderKey", "id"]);
+        // items.createIndex("done", ["doneTS"]); // TODO: Done timestamp?
         const container = db.createObjectStore("container", { keyPath: "id" });
       },
     });
@@ -48,21 +50,23 @@ export class ItemIDBModel {
   constructor(db: AirdayIDB) {
     this.db = db;
   }
-  insert = async (items: AirdayItem | AirdayItem[]) => {
+  insert = async (items: AirdayItem[]) => {
     const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
     const store = tx.objectStore(ITEM_STORE_NAME);
-    const insert = async (item: AirdayItemFields) => {
-      const prev = await store.get(item.id.toString());
-      if (prev) throw new Error("Key already exists");
+    // TODO: Not gonna throw when merging tho
+    const upsert = async (item: AirdayItemSerialised) => {
       const val = await store.add(item);
       return val;
     };
-    // TODO: pure json storage or flatbuffer?
-    if (Array.isArray(items)) {
-      items.map((item) => insert(item));
-    } else {
-      // insert(items);
-    }
+    items.map((item) => upsert(item.toJSON()));
     await tx.done;
+  };
+  getItemsByWorkspace = async (workspaceId: string) => {
+    const res = await this.db.handle!.getAllFromIndex(
+      ITEM_STORE_NAME,
+      "workspaceId",
+      workspaceId,
+    );
+    res.map((row) => {});
   };
 }

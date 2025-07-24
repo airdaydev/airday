@@ -109,10 +109,6 @@ export class LWWRegister<T> {
   static fromJSON<T>(json: any): LWWRegister<T> {
     ensure(LwwJSON, json);
     let typed = json as TypeOf<typeof LwwJSON>;
-    // TODO: Validate with suretype
-    if (!Array.isArray(json) || json.length !== 2) {
-      throw new Error("Invalid LWWRegister format");
-    }
     const timestamp = new LWWTimestamp(typed.timestamp);
     return new LWWRegister<T>({ timestamp, data: typed.data as T });
   }
@@ -163,3 +159,13 @@ export class LWWRegisterString extends LWWRegister<string> {
     );
   }
 }
+
+export const TimestampSchema = v.object({
+  utc: v.number(),
+  pid: v.number(),
+});
+
+export const LWWSerialiseSchema = v.object({
+  data: v.any(),
+  timestamp: TimestampSchema,
+});

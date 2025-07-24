@@ -1,24 +1,19 @@
-import { LWWRegisterString } from "../crdt/lww";
+import {
+  LWWRegister,
+  LWWRegisterString,
+  LWWSerialiseSchema,
+} from "../crdt/lww";
 import { Uuidv4 } from "../common";
+import { compile, v, type TypeOf } from "suretype";
 
 export interface AirdayItemAttributes {
-  text?: LWWRegisterString;
+  text?: LWWRegister<String>;
 }
 
 enum SyncState {
   synced = 0, // Server has acknowledged sync
   dirty = 1, // Local modifications not synced
   syncing = 2, // Pending sync (on deserialisation, make dirty)
-}
-
-export interface AirdayItemSerialised {
-  // Immutable
-  id: string;
-  workspaceId: string;
-  // LWW attributes (Serialise!)
-  attributes: AirdayItemAttributes;
-  // Client-only
-  syncState: SyncState;
 }
 
 export interface AirdayItemConstructorOpts {
@@ -28,30 +23,53 @@ export interface AirdayItemConstructorOpts {
   // LWW attributes
   attributes: AirdayItemAttributes;
   // Client-only
-  syncState: SyncState;
+  syncState?: SyncState;
 }
+
+const AirdayItemSerialisedSchema = v.object({
+  id: v.string().required(),
+  workspaceId: v.string().required(),
+  attributes: v.object({
+    text: LWWSerialiseSchema,
+  }),
+  syncState: v
+    .number()
+    .anyOf([v.number().const(0), v.number().const(1), v.number().const(2)]),
+});
+
+export type AirdayItemSerialised = TypeOf<typeof AirdayItemSerialisedSchema>;
+
+const ensureSerialisedItem = compile(AirdayItemSerialisedSchema, {
+  ensure: true,
+});
 
 export class AirdayItem {
   id: Uuidv4;
   workspaceId: Uuidv4;
-  text?: LWWRegisterString;
   attributes: AirdayItemAttributes;
-  syncState = SyncState.synced;
+  syncState = SyncState.dirty;
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
     this.id = params.id || new Uuidv4();
     this.workspaceId = params.workspaceId;
     this.attributes = params.attributes;
+    if (
+      params.syncState === SyncState.synced ||
+      params.syncState === SyncState.dirty
+    ) {
+      // Do not reserialise "syncing" state
+      this.syncState = params.syncState;
+    }
   }
   // TODO: Custom logic MAY be necessary
-  merge(fields: AirdayItemAttributes) {
-    (Object.keys(fields) as Array<keyof AirdayItemAttributes>).map((key) => {
-      if (fields[key]) {
-        if (!this[key]) {
-          this[key] = fields[key];
+  merge(attrs: AirdayItemAttributes) {
+    (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map((key) => {
+      if (attrs[key]) {
+        if (!this.attributes[key]) {
+          this.attributes[key] = attrs[key];
         } else {
-          const text = this[key].merge(fields[key]);
+          const text = this.attributes[key].merge(attrs[key]);
         }
       }
     });
@@ -65,5 +83,19 @@ export class AirdayItem {
       syncState: this.syncState,
     };
     return obj;
+  }
+  static fromJSON(json: any) {
+    ensureSerialisedItem(json);
+    let typed = json as AirdayItemSerialised;
+    const attributes: AirdayItemAttributes = {};
+    if (typed.attributes?.text) {
+      attributes.text = LWWRegister.fromJSON(typed.attributes.text);
+    }
+    return new AirdayItem({
+      id: Uuidv4.fromString(typed.id),
+      workspaceId: Uuidv4.fromString(typed.workspaceId),
+      attributes,
+      syncState: typed.syncState,
+    });
   }
 }
