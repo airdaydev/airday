@@ -80,6 +80,7 @@ export function AirNav() {
           )}
         />
       </div>
+      <MonthNav />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <button class={styles["nav-text-header"]} tabindex="-1">
         <span>Private</span>
