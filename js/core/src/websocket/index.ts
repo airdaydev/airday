@@ -109,6 +109,7 @@ export class WebsocketManager {
           } else {
             console.log("WS: User authenticated");
           }
+          // TODO: Consider "auth" notification using JS native events
           this.core.mq.start();
           // TODO: We need a means for the sync batcher to continue
           break;

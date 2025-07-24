@@ -1,7 +1,6 @@
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
-import { AirdayWALEntry } from "../storage/wal";
 import { AddItemAction, AirdayBatchMessage } from "./actions";
 import { AirdayItem } from "./model";
 
@@ -26,20 +25,12 @@ export class AirdaySync {
   // TODO: Pluralise this and we can call it when a list has been synced
   async createItem(item: AirdayItem) {
     const action = AddItemAction.fromItem(item);
-    const walAction = action.toActionFlatBuffer();
-    // TODO: Workspace-specific WAL
-    const tx = this.idb!.wal.writeTx(
-      ["item"],
-      AirdayWALEntry(action.id, walAction),
-    );
-    tx.objectStore("item").add(item.toJSON()); // optimistic update
+    this.idb?.item.insert(item.toJSON()); // optimistic update
     const message = new AirdayBatchMessage([action]);
     this.core.mq.enqueueAirdayMessage(message);
     // TODO: So we need our sync core to subscribe to all item updates!
-    // When the item is synced, we need to kill its WAL entry (and maybe mark the live item as synced)
-    // We could do this ultra granular (callbacks) or just a one off (permanent subscription)
-    // TODO: test to ensure item is created server side before core update!
-    await tx.done;
+    // When the item is synced, we need to mark the live item as synced
+    // TODO: test to ensure item is created server side before it is allowed an update (Notification via the item themself (on create, immediately update)!
   }
   async deleteItem(id: String) {}
 }

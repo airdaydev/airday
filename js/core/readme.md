@@ -3,7 +3,7 @@
 Airday JavaScript Client handling
 - Auth & account management APIs
 - Core data types
-- Sync w/cross-tab management over WS with WAL persistence
+- Sync w/cross-tab management over WS persistence
 - Persistent cache backed by indexedb
 - Undo/redo
 - TODO: E2EE management
