@@ -11,6 +11,19 @@
   box-sizing: border-box;
 }
 
+.nav-text-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  outline: none;
+  text-align: left;
+  color: var(--body-tint);
+  padding: 0.5em;
+  font-size: 1rem;
+}
+
 .nav-text-button {
   position: relative;
   display: flex;

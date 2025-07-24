@@ -12,6 +12,7 @@ import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
 import { SoloNode } from "@airday/list";
 import { CalendarView, DoneView } from "../view/state";
+import CaretSVG from "../icons/caret.svg?component-solid";
 
 export function AirNav() {
   const session = useContext(sessionContext);
@@ -51,12 +52,14 @@ export function AirNav() {
           />
           <span>Next</span>
         </button>
+        <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
         <SoloNode
           dndContext={session.workspace.containerStore.dndContext}
           enableDrop={false}
           Component={(props) => (
             <button
               class={styles["nav-text-button"]}
+              style="display: flex; align-items: center; justify-content: space-between;"
               tabindex="-1"
               onClick={session.viewState.openCalendarView}
               onMouseDown={(event) => {
@@ -68,13 +71,20 @@ export function AirNav() {
               ref={props.ref}
               selected={props.selected}
             >
-              <CalendarSVG style="width: 1.25em; stroke-width: 1.5px;" />
-              <span>Calendar</span>
+              <div style="display: flex; align-items: center;">
+                <CalendarSVG style="width: 1.25em; stroke-width: 1.5px;" />
+                <span>Calendar</span>
+              </div>
+              <CaretSVG style="stroke-width: 2.5px; width: 7px; color: var(--body-tint);" />
             </button>
           )}
         />
       </div>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      <button class={styles["nav-text-header"]} tabindex="-1">
+        <span>Private</span>
+        <CaretSVG style="stroke-width: 2.5px; width: 7px;" />
+      </button>
       <NavLists />
       <AddListButton />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
@@ -111,9 +121,11 @@ export function AirNav() {
       </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
-      <div style="color: #81777f; border: none; background: none; cursor: pointer; padding: 0.5em; outline: 0; font-family: inherit; font-size: 1rem;">
-        Add stickers
-      </div>
+      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
+      <button class={styles["nav-text-header"]} tabindex="-1">
+        <span>Shared spaces</span>
+        <CaretSVG style="stroke-width: 2.5px; width: 7px;" />
+      </button>
     </nav>
   );
 }
