@@ -99,6 +99,7 @@ impl UserModel for UserModelSqlite {
                         name: primary_workspace.name,
                     }),
                 };
+                tx.commit().await?;
                 Ok(user)
             }
             Err(sqlx::Error::Database(db_err)) => {

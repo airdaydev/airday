@@ -2,7 +2,7 @@ use crate::{
     AppState,
     auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
-    user::model::{User, verify_login},
+    user::model::{PublicUser, User, verify_login},
     workspace::model::Workspace,
 };
 use axum::{extract::State, response::Json};
@@ -94,9 +94,10 @@ pub struct CreateUserRequest {
 pub async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<User>, AppError> {
+) -> Result<Json<PublicUser>, AppError> {
     let email = payload.email;
     let password = payload.password;
     let user = state.db.user.create(&email, &password).await?;
-    Ok(Json(user))
+    let public_user: PublicUser = user.into();
+    Ok(Json(public_user))
 }

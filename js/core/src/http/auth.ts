@@ -7,7 +7,6 @@ export const passwordAuthSchema = APISchema(
   v.object({
     email: v.string().required(),
     password: v.string().required(),
-    type: v.string().const("bearer"),
   }),
 );
 

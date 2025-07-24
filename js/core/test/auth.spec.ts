@@ -11,7 +11,7 @@ test("API root url & version", async () => {
   expect(d.data.version).toBeTypeOf("string");
 });
 
-test.only("non-existent username & password", async () => {
+test("non-existent username & password", async () => {
   await core
     .loginWithPasswordBearer({
       email: "nope@nope.com",
@@ -22,9 +22,9 @@ test.only("non-existent username & password", async () => {
     });
 });
 
-test.only("Creating a user & default workspace", async () => {
+test("Creating a user & default workspace", async () => {
   const res = await createUser(core, {
-    email: "daniel@air.day",
+    email: "doubleup@air.day",
     password: "fa09j20fiaj3fpaof",
   });
   expect(res.data.id).toBeTypeOf("string");
@@ -33,20 +33,20 @@ test.only("Creating a user & default workspace", async () => {
   expect(res.data.primary_workspace.name).toBeTypeOf("string");
   expect(
     createUser(core, {
-      email: "daniel@air.day",
+      email: "doubleup@air.day",
       password: "fa09j20fiaj3fpaof",
     }),
     "Can't create another user with the same email",
   ).rejects.toThrow();
   expect(
     createUser(core, {
-      email: "daniel@air.day",
+      email: "newtest@air.day",
     }),
     "Can't create a user without a password",
   ).rejects.toThrow();
 });
 
-test("Cookie authorisation", async () => {
+test.skip("Cookie authorisation", async () => {
   // const sessionSetCookie = extractCookie(res.response.headers, "session_token");
   // const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
   // expect(sessionToken).toBeTypeOf("string");
