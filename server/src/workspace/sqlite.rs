@@ -36,7 +36,7 @@ impl WorkspaceModelSqlite {
 
 #[async_trait]
 impl WorkspaceModel for WorkspaceModelSqlite {
-    async fn create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
+    async fn _create(&self, owner_id: &Uuid) -> Result<Workspace, AppError> {
         let mut tx = self.pool.begin().await?;
 
         let name = String::from("Personal");

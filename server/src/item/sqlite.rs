@@ -46,7 +46,7 @@ impl ItemModel for ItemModelSqlite {
                     "item is tombstoned",
                 )));
             }
-            let attrs: ItemAttributesJson = sql_item
+            let _attrs: ItemAttributesJson = sql_item
                 .attributes
                 .as_ref()
                 .and_then(|json| serde_json::from_value(json.clone()).ok())

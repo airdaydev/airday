@@ -2,8 +2,7 @@ use crate::{
     AppState,
     auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
-    user::model::{PublicUser, User, verify_login},
-    workspace::model::Workspace,
+    user::model::{PublicUser, verify_login},
 };
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};

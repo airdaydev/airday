@@ -11,13 +11,11 @@ use crate::{
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
-            WorkspaceProto, WorkspaceProtoArgs, WorkspaceProtoBuilder, WorkspaceSyncResponseProto,
-            WorkspaceSyncResponseProtoArgs, WorkspaceSyncResponseProtoBuilder,
+            WorkspaceProto, WorkspaceProtoArgs, WorkspaceSyncResponseProto,
+            WorkspaceSyncResponseProtoArgs,
         },
         websocket::send_to_client,
     },
-    user,
-    workspace::model::Workspace,
 };
 
 pub struct AirdayMessage {
@@ -27,8 +25,8 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { item: Item }, // TODO: possible properties not this
-                            // DeleteItem { id: String },
+    AddItem { _item: Item }, // TODO: possible properties not this
+                             // DeleteItem { id: String },
 }
 
 impl AirdayMessage {
@@ -85,7 +83,7 @@ impl AirdayMessage {
                         workspace_id,
                         attributes: ItemAttributes { text: None },
                     };
-                    actions.push(AirdayAction::AddItem { item });
+                    actions.push(AirdayAction::AddItem { _item: item });
                 }
                 AirdayActionProto::DeleteItemActionProto => {
                     let action = batch_component
@@ -194,7 +192,7 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     action_offsets.push(workspace_offset);
                 }
             }
-            AirdayAction::AddItem { item } => {
+            AirdayAction::AddItem { _item } => {
                 // let user = {
                 //     let record = state.ws_connection_map.lock().unwrap();
                 //     record.get(socket_id).unwrap().clone()

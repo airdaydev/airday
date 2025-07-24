@@ -118,7 +118,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 Ok(Message::Close(_)) => {
                     cur_span.record("message_type", "close");
                 }
-                Err(e) => {
+                Err(_) => {
                     cur_span.record("message_type", "error");
                 }
                 _ => {
@@ -134,7 +134,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
 
 async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver<Message>) {
     while let Some(message) = rx.recv().await {
-        if let Err(err) = sender.send(message).await {
+        if let Err(_) = sender.send(message).await {
             // eprintln!("Failed to send: {:?}", err);
             break;
         }

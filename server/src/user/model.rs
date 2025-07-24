@@ -11,7 +11,7 @@ use argon2::{
 use async_trait::async_trait;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
-use sqlx::types::{Json as SqlJson, Uuid as SqlxUuid};
+use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
