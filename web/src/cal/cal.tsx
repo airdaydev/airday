@@ -28,9 +28,10 @@ function dummyEvents(startDate: Date, days = 14, n = 100) {
     const random = Math.random() * range;
     const r = random % 15;
     const roundedRandom = random - r + zeroStartDate.valueOf();
-    const duration = (Math.random() > 0.5 ? 15 : 60) * 1000 * 60;
+    const duration = (Math.random() > 0.5 ? 60 : 120) * 1000 * 60;
     const date = new Date(roundedRandom);
     const color = Math.random() > 0.5 ? "blue" : "yellow";
+    date.setMinutes(0);
     date.setSeconds(0);
     date.setMilliseconds(0);
     events.push({
