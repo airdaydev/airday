@@ -10,7 +10,7 @@ import { WebsocketManager } from "./websocket";
 import { MessageQueue } from "./websocket/mq";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
-import { v4 } from "uuid";
+import type { Uuidv4 } from "./common";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -32,13 +32,13 @@ interface Session {
 }
 
 interface WorkspaceConstructorOpts {
-  id?: Uint8Array;
+  id?: Uuidv4;
   name: string;
   local: boolean;
 }
 
 export class Workspace {
-  id?: Uint8Array;
+  id?: Uuidv4;
   name: string = "Local Workspace";
   local = true;
   primary = false;

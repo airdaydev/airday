@@ -1,11 +1,6 @@
 import { AirdayItem, type AirdayItemFields } from "./model";
-import {
-  LWWRegisterString,
-  LWWTimestamp,
-  type SerialisedLWWRegister,
-} from "../crdt/lww";
+import { LWWRegisterString, LWWTimestamp } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
-import { v4, parse } from "uuid";
 import {
   ItemProto,
   LWWRegisterStringProto,
@@ -20,17 +15,12 @@ import {
   SpanContextProto,
 } from "../proto";
 import { tracer } from "../tracer";
-import { getUuidBytes } from "../common";
 import type { MQMessage } from "../websocket/mq";
 import type { ULSpan } from "@airday/tracer";
-
-export interface SerialisedAirdayItem {
-  id: string;
-  text: SerialisedLWWRegister<string>;
-}
+import { Uuidv4 } from "../common";
 
 class Action {
-  id = v4();
+  id = new Uuidv4();
   addToFlatBuffer(build: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
   }
@@ -90,7 +80,7 @@ export class AuthenticateAction extends Action {
 }
 
 export class AddItemAction extends Action {
-  workspaceId = v4(); // TODO: WRONG, should be taken from outside
+  workspaceId = new Uuidv4(); // TODO: WRONG, should be taken from outside
   fields: Partial<AirdayItemFields> = {};
   constructor(fields: Partial<AirdayItemFields>) {
     super();
@@ -100,7 +90,7 @@ export class AddItemAction extends Action {
     const fields: Partial<AirdayItemFields> = {};
     const id = item.idArray();
     if (id) {
-      fields.id = getUuidBytes(id);
+      fields.id = Uuidv4.from(id);
     }
     const text = item.text();
     const textTimestamp = item.text()?.timestamp();
@@ -142,7 +132,7 @@ export class AddItemAction extends Action {
     const itemOffset = ItemProto.endItemProto(builder);
     const workspaceIdOffset = AddItemActionProto.createWorkspaceIdVector(
       builder,
-      parse(this.workspaceId),
+      this.workspaceId,
     );
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addWorkspaceId(builder, workspaceIdOffset);

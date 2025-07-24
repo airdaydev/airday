@@ -11,7 +11,7 @@ import {
 import { AuthMode, Workspace, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
-import { getUuidBytes, getUuidFromFbVec } from "../common";
+import { Uuidv4 } from "../common";
 
 // TODO: Offline considerations
 export class WebsocketManager {
@@ -99,7 +99,7 @@ export class WebsocketManager {
         case AirdayActionProto.AuthenticateResponseProto:
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
-          const userId = getUuidFromFbVec(
+          const userId = Uuidv4.fromFBVector(
             authResponse.userId.bind(authResponse),
           );
           // Confirm things make sense and authorise
@@ -125,7 +125,7 @@ export class WebsocketManager {
           const primaryWorkspaceBuffer = workspaceResponse.primaryWorkspace();
           if (primaryWorkspaceBuffer) {
             // TODO: Validate and add item to storage
-            let id = getUuidFromFbVec(
+            let id = Uuidv4.fromFBVector(
               primaryWorkspaceBuffer.id.bind(primaryWorkspaceBuffer),
             );
             let name = primaryWorkspaceBuffer.name() || "";

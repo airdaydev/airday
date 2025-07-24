@@ -1,23 +1,29 @@
-import { v4, parse } from "uuid";
 import { LWWRegisterString } from "../crdt/lww";
-import type { SerialisedAirdayItem } from "./actions";
+import { Uuidv4 } from "../common";
 
-export interface AirdayItemFields {
-  id?: Uint8Array;
+export interface AirdayAttributes {
   text?: LWWRegisterString;
 }
 
-type UpdateFields = Partial<Omit<AirdayItemFields, "id">>;
+export interface AirdayItemFields {
+  // Immutable
+  id: Uuidv4;
+  workspaceId: Uuidv4;
+  // LWW attributes
+  attributes: AirdayAttributes;
+  // Client-only
+  dirty: true;
+}
 
 export class AirdayItem {
-  id: Uint8Array;
+  id: Uuidv4;
   text?: LWWRegisterString;
   constructor(params: AirdayItemFields) {
-    this.id = params.id || parse(v4());
+    this.id = params.id || new Uuidv4();
   }
   // TODO: Custom logic MAY be necessary
-  merge(fields: UpdateFields) {
-    (Object.keys(fields) as Array<keyof UpdateFields>).map((key) => {
+  merge(fields: Partial<AirdayAttributes>) {
+    (Object.keys(fields) as Array<keyof AirdayAttributes>).map((key) => {
       if (fields[key]) {
         if (!this[key]) {
           this[key] = fields[key];
