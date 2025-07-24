@@ -7,7 +7,7 @@ import { Uuidv4 } from "../common";
 import { compile, v, type TypeOf } from "suretype";
 
 export interface AirdayItemAttributes {
-  text?: LWWRegister<String>;
+  text?: LWWRegister<string>;
 }
 
 enum SyncState {

@@ -21,11 +21,17 @@ export class AirdaySync {
     this.idbHandle = idb.handle;
   }
   wrapAction() {}
+  // TODO: Should this just be a general sync message with what items and since when!?
+  // TODO: Also we should store this in our database
+  async getWorkspaces() {}
+  async getContainers() {}
+  async getActiveItemsByWorkspace() {}
+  async getCompletedItemsByWorkspace() {}
   async createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   async createItem(item: AirdayItem) {
-    const action = AddItemAction.fromItem(item);
-    this.idb?.item.insert(item.toJSON()); // optimistic update
+    const action = new AddItemAction(item);
+    this.idb?.item.upsert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
     this.core.mq.enqueueAirdayMessage(message);
     // TODO: So we need our sync core to subscribe to all item updates!
