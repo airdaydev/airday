@@ -147,8 +147,8 @@ export class EventRenderCoordinator {
         const dayEl = DayEl(this.airdayCal, dateVal, domPx);
         // TODO: Clean up headerCell!
         const headerCell = CalHeaderCol(this.airdayCal, dateVal, domPx);
-        this.airdayCal.dayHeader.appendChild(headerCell); // TODO: append at once
-        this.airdayCal.eventsContainer.appendChild(dayEl); // TODO: append at once
+        this.airdayCal.dayHeader?.appendChild(headerCell); // TODO: append at once
+        this.airdayCal.eventsContainer?.appendChild(dayEl); // TODO: append at once
         this.domCache.set(dateVal, new CacheEntry(dayEl));
       }
     }
@@ -247,14 +247,16 @@ export class EventRenderCoordinator {
     });
     // header cell cleanup
     this.airdayCal.dayHeader?.childNodes.forEach((cell) => {
-      const date = Number(cell.getAttribute("data-date"));
+      if (!cell.ELEMENT_NODE) return;
+      const typedCell = cell as Element;
+      const date = Number(typedCell.getAttribute("data-date"));
       if (date < minDate) {
-        cell.parentNode?.removeChild(cell);
+        typedCell.parentNode?.removeChild(typedCell);
         this.domCache.delete(date);
         this.renderedCache.delete(date);
       }
       if (date > maxDate) {
-        cell.parentNode?.removeChild(cell);
+        typedCell.parentNode?.removeChild(typedCell);
         this.domCache.delete(date);
         this.renderedCache.delete(date);
       }
@@ -266,7 +268,7 @@ export class EventRenderCoordinator {
       this.airdayCal.allDayEvents?.expanded !==
         this.airdayCal.allDayEvents?.renderedExpanded
     ) {
-      if (!this.airdayCal.allDayEvents.expanded) {
+      if (!this.airdayCal.allDayEvents?.expanded) {
         const work: AllDaySmlWorkload = {
           type: "all-day-sml",
           dates: this.airdayCal.transform.dates, // TODO: Just serialise first + length

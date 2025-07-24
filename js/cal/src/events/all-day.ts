@@ -47,7 +47,10 @@ export class AllDayEvents {
   }
   // TODO: Test the shit out of this function
   // TODO: copy only necessary data
-  renderContracted(events: CalendarEvent[], labels: Map<number, number>) {
+  renderContracted(
+    events: (CalendarEvent & { dayLength: number })[],
+    labels: Map<number, number>,
+  ) {
     this.renderedExpanded = false;
     const divs = events.map((event) => {
       const x = this.airdayCal.transform.dateToX(

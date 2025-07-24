@@ -114,13 +114,15 @@ export class AirdayCal {
       // while scrolling calculate
       // TODO: not really a problem on desktop: so consider listening to touchstart/touchmove events directly on iOS before implementing this!
       event.preventDefault();
-      this.transform.offset[1] = event.target.scrollTop;
-      this.transform.offset[0] = event.target.scrollLeft;
-      if (event.target.scrollTop < 10) {
-        event.target.style.overscrollBehaviorY = "none";
+      if (!event.target) return; // TODO: Why no dom event on event.target
+      const target = event.target as typeof scrollable;
+      this.transform.offset[1] = target.scrollTop;
+      this.transform.offset[0] = target.scrollLeft;
+      if (target.scrollTop < 10) {
+        target.style.overscrollBehaviorY = "none";
       } else {
         // TODO: Don't set this so frequently (does the browser optimise for this?)
-        event.target.style.overscrollBehaviorY = "auto";
+        target.style.overscrollBehaviorY = "auto";
       }
       this.act();
     });
@@ -147,7 +149,7 @@ export class AirdayCal {
     if (this.theme === "light") return lightScheme;
     else return darkScheme;
   }
-  mouseMove(event: MouseEvent) {
+  mouseMove(_: MouseEvent) {
     this.act();
   }
   mouseDown(event: MouseEvent) {
@@ -197,6 +199,7 @@ export class AirdayCal {
   // };
   resizeCal = () => {
     // Taking initial scroll position into account
+    if (!this.scrollable || !this.scrollChild) return;
     const nearestDayX = this.transform.getNearestDay();
     this.transform.refitCal(
       this.scrollable.offsetWidth - this.transform.timeColWidth,
