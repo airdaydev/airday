@@ -77,10 +77,10 @@ export const Footer = () => {
             if (ctxOpen()) openContextMenu(event, "main");
           }}
         >
-          Airday
+          <Key key="/" />
           <span style={"margin-left: 0.25em; display: none;"}>Air</span>
         </button>
-        <button
+        {/* <button
           tabIndex={-1}
           ref={workspaceButtonRef}
           class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
@@ -93,14 +93,7 @@ export const Footer = () => {
           }}
         >
           Dev
-        </button>
-        <button
-          tabIndex={-1}
-          class={styles["nav-button"]}
-          style={"line-height: 0rem;"}
-        >
-          <Key key="/" />
-        </button>
+        </button> */}
         <Screens />
       </div>
       <div class={styles["nav-section"]}>
@@ -118,7 +111,6 @@ export const Footer = () => {
             }
           }}
         >
-          <Key key="N" />
           <NewSVG style="stroke-width: 2px;" />
         </button>
         <button
@@ -126,7 +118,6 @@ export const Footer = () => {
           class={styles["nav-button"]}
           style={"line-height: 0rem;"}
         >
-          <Key key="F" />
           <SearchSVG />
         </button>
         <ThemeToggle class={styles["nav-button"]} />
