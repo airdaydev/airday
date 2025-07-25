@@ -172,13 +172,13 @@ export class AirWorkspace {
   dummyData = async () => {
     const items = [
       ...genTestData("work", airItems),
-      ...genTestData("tasks", taskItems),
+      ...genTestData("inbox", taskItems),
     ];
     await this.itemStore.insert(items);
     await this.containerStore.insert([
       {
-        id: "tasks",
-        name: "Tasks",
+        id: "inbox",
+        name: "Inbox",
         icon: "task",
         sortKey: "a",
         type: "generic-list",

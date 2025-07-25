@@ -8,6 +8,7 @@ import { ThemeToggle } from "../theme/theme";
 import { AirContextMenu, WorkspaceContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 import { Key } from "../generic/key.jsx";
+import { Screens } from "./screens.jsx";
 
 type ContextMenu = "main" | "workspace";
 
@@ -91,7 +92,7 @@ export const Footer = () => {
             if (ctxOpen()) openContextMenu(event, "workspace");
           }}
         >
-          {session.workspace.name}
+          Dev
         </button>
         <button
           tabIndex={-1}
@@ -100,6 +101,7 @@ export const Footer = () => {
         >
           <Key key="/" />
         </button>
+        <Screens />
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>

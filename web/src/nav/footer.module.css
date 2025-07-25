@@ -62,3 +62,32 @@
   margin-right: 0.25em;
   font-size: 0.9rem;
 }
+
+.screens {
+  display: flex;
+  flex-direction: row;
+}
+
+.screen-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 20;
+  padding: 0.5em;
+  border: none;
+  cursor: pointer;
+  background: none;
+  border-radius: 2px;
+  font-size: 1rem;
+  line-height: 1rem;
+  border-radius: 2px;
+  transition: 100ms transform;
+  margin-left: 0.25em;
+}
+
+.screen-button.active {
+  background: var(--shade);
+}
+.screen-button:not(.active) {
+  box-shadow: 1px 1px 0px #0000002e;
+}

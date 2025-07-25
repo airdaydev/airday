@@ -77,12 +77,6 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
         ))}
       </div>
       <hr />
-      <button disabled>
-        <span>Workspace settings</span>
-      </button>
-      <button disabled>
-        <span>Export Workspace</span>
-      </button>
       <button
         onClick={async () => {
           await session.workspace.reset();
