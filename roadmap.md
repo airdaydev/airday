@@ -9,6 +9,7 @@
 - [] set a default workspace ui
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
+- [] Shadows beneath todo list icons
 - [] SYNC CLEAN UP before continuing
 - [] @airday/core - create subitems / sequence
 - [] @airday/core - repeat tasks
