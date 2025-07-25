@@ -5,13 +5,14 @@
             <stop stop-color="#EEEEEE" offset="100%"></stop>
         </linearGradient>
     </defs>
-    <g id="calendar" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="Group-17" transform="translate(1, 1)">
+    <g id="calendar" stroke="none" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle" fill-opacity="0.206102491" fill="#000000" x="0" y="0" width="16.5" height="16.5" rx="2"></rect>
+        <g id="cal" stroke-width="1">
             <path d="M2,0 L14,0 C15.1045695,0 16,0.8954305 16,2 L16,14 C16,15.1045695 15.1045695,16 14,16 L2,16 C0.8954305,16 0,15.1045695 0,14 L0,2 C0,0.8954305 0.8954305,2.22044605e-16 2,0 Z" id="Rectangle" fill="#8A85FF"></path>
             <path d="M0,3 L16,3 L16,14 C16,15.1045695 15.1045695,16 14,16 L2,16 C0.8954305,16 0,15.1045695 0,14 L0,3 L0,3 Z" id="Rectangle" fill="url(#linearGradient-1)"></path>
+            <text id="27" font-family="AlteHaasGrotesk, Alte Haas Grotesk" font-size="10" font-weight="normal" fill="#3B3B3B">
+                <tspan x="3" y="13">27</tspan>
+            </text>
         </g>
-        <text id="27" font-family="AlteHaasGrotesk, Alte Haas Grotesk" font-size="10" font-weight="normal" fill="#3B3B3B">
-            <tspan x="4" y="14">27</tspan>
-        </text>
     </g>
 </svg>
