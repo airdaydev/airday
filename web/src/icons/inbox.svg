@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="39px" height="48px" viewBox="0 0 39 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>48x48@1x</title>
     <defs>
         <path d="M4,0 L30,0 C32.209139,-4.05812251e-16 34,1.790861 34,4 L34,40 C34,42.209139 32.209139,44 30,44 L4,44 C1.790861,44 1.3527075e-16,42.209139 0,40 L0,4 C-2.705415e-16,1.790861 1.790861,2.705415e-16 4,0 Z" id="path-1"></path>
         <filter x="-2.9%" y="-2.3%" width="111.8%" height="109.1%" filterUnits="objectBoundingBox" id="filter-2">

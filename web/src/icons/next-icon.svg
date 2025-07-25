@@ -1,5 +1,4 @@
 <svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>next-icon</title>
     <g id="next-icon" stroke="none" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
         <g id="next" transform="translate(2, 5)" stroke="currentColor">
             <polyline id="Path" stroke-width="1.25" points="6 0 9 3 6 6"></polyline>
