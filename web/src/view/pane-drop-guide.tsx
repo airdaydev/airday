@@ -1,7 +1,6 @@
 import { createSignal, onMount, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { DataView } from "./state";
-import { TreeContext } from "@airday/list";
 import { sessionContext } from "../store/context";
 
 interface PaneDropDOMRect extends DOMRect {
@@ -9,7 +8,7 @@ interface PaneDropDOMRect extends DOMRect {
   limitHeight: number;
 }
 
-type DropRegion = "all" | "left" | "right" | "top" | "bottom" | "none";
+type DropRegion = "all" | "left" | "right" | "none";
 
 interface PaneDropGuideProps {
   view: DataView;
@@ -38,10 +37,6 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         return `position: absolute; top: 0; left: 0; width: ${rect.width / 2}px; height: 100%;`;
       case "right":
         return `position: absolute; top: 0; right: 0; width: ${rect.width / 2}px; height: 100%;`;
-      case "top":
-        return `position: absolute; top: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`;
-      case "bottom":
-        return `position: absolute; bottom: 0; left: 0; width: 100%; height: ${rect.height / 2}px;`;
       case "all":
         return `position: absolute; top: 0; right: 0; width: 100%; height: 100%;`;
       default:
@@ -59,12 +54,6 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         if (event.clientX > rect.x + rect.width - rect.limitWidth) {
           return dropRegion[1]("right");
         }
-        if (event.clientY < rect.y + rect.limitHeight) {
-          return dropRegion[1]("top");
-        }
-        if (event.clientY > rect.y + rect.height - rect.limitHeight) {
-          return dropRegion[1]("bottom");
-        }
         return dropRegion[1]("all");
       }}
       onMouseLeave={() => {
@@ -79,12 +68,6 @@ export const PaneDropGuide = (props: PaneDropGuideProps) => {
         }
         if (region === "right") {
           props.view.addRight(view);
-        }
-        if (region === "top") {
-          props.view.addUp(view);
-        }
-        if (region === "bottom") {
-          props.view.addDown(view);
         }
         if (region === "all") {
           props.view.replace(view);

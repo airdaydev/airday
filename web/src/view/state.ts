@@ -5,7 +5,6 @@ import { KeyboardShortcuts } from "./keyboard";
 
 type ActiveRegionType = "sidebar" | "container";
 type ModalTypes = "command" | "find" | null;
-type SplitDirection = "vertical" | "horizontal";
 type ViewType = "container" | "data";
 type DataViewType = "list" | "done" | "calendar";
 
@@ -26,11 +25,11 @@ export function signalWalk<
     node.children[0]().forEach((child) => signalWalk(child, func, parent));
 }
 
+// TODO: Replace tree with a simple arra, and create workspaces!
 export class ViewNode {
   id = createUniqueId();
   isRoot = false;
   type: ViewType = "container";
-  direction: SplitDirection = "horizontal";
   children?: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
   parent?: ViewNode;
   viewState: ViewState;
@@ -93,27 +92,12 @@ export class ViewNode {
     if (!this.parent) return;
     const ogParent = this.parent;
     const thisIndex = ogParent.children[0]().indexOf(this);
-    if (this.parent.direction === "horizontal") {
-      this.addSibling(view, "before");
-    } else {
-      const horzSplit = new HorizontalSplitNode();
-      horzSplit.addChild(view);
-      horzSplit.addChild(this);
-      ogParent.replaceChild(horzSplit, thisIndex);
-    }
+    this.addSibling(view, "before");
   }
   addRight(view: ViewNode) {
     if (!this.parent) return;
     const ogParent = this.parent;
-    const thisIndex = ogParent.children[0]().indexOf(this);
-    if (this.parent.direction === "horizontal") {
-      this.addSibling(view, "after");
-    } else {
-      const horzSplit = new HorizontalSplitNode();
-      horzSplit.addChild(this);
-      horzSplit.addChild(view);
-      ogParent.replaceChild(horzSplit, thisIndex);
-    }
+    this.addSibling(view, "after");
   }
   addSibling(view: ViewNode, position: "before" | "after") {
     if (!this.parent) return;
@@ -124,33 +108,14 @@ export class ViewNode {
   }
   addUp(view: ViewNode) {
     if (!this.parent) return;
-    const ogParent = this.parent;
-    const thisIndex = ogParent.children[0]().indexOf(this);
-    if (this.parent.direction === "vertical") {
-      this.addSibling(view, "before");
-    } else {
-      const vertSplit = new VerticalSplitNode();
-      vertSplit.addChild(view);
-      vertSplit.addChild(this);
-      // TODO: Method this
-      ogParent.replaceChild(vertSplit, thisIndex);
-    }
+    this.addSibling(view, "before");
   }
   addDown(view: ViewNode) {
     if (!this.parent) return;
-    const ogParent = this.parent;
-    const thisIndex = ogParent.children[0]().indexOf(this);
-    if (this.parent.direction === "vertical") {
-      this.addSibling(view, "after");
-    } else {
-      const vertSplit = new VerticalSplitNode();
-      vertSplit.addChild(this);
-      vertSplit.addChild(view);
-      ogParent.replaceChild(vertSplit, thisIndex);
-    }
+    this.addSibling(view, "after");
   }
   // TODO: AI gen code needs review
-  getSibling(direction: "up" | "down" | "left" | "right"): ViewNode | null {
+  getSibling(direction: "left" | "right"): ViewNode | null {
     if (!this.parent) return null;
 
     const isHorizontal = this.parent.direction === "horizontal";
@@ -164,15 +129,9 @@ export class ViewNode {
       return siblings[nextIndex];
     };
 
-    if (
-      (direction === "left" && isHorizontal) ||
-      (direction === "up" && !isHorizontal)
-    ) {
+    if (direction === "left") {
       nextSibling = getNextSibling(-1);
-    } else if (
-      (direction === "right" && isHorizontal) ||
-      (direction === "down" && !isHorizontal)
-    ) {
+    } else if (direction === "right") {
       nextSibling = getNextSibling(1);
     }
 
@@ -211,13 +170,6 @@ export class ViewNode {
 export class RootViewNode extends ViewNode {
   isRoot = true;
   splitDirection = "horizontal";
-}
-
-export class VerticalSplitNode extends ViewNode {
-  constructor() {
-    super();
-    this.direction = "vertical";
-  }
 }
 
 export class DoneView extends ViewNode {
@@ -265,7 +217,6 @@ export class UpNextView extends ViewNode {
 export class HorizontalSplitNode extends ViewNode {
   constructor() {
     super();
-    this.direction = "horizontal";
   }
 }
 

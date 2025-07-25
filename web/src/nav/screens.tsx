@@ -6,8 +6,7 @@ export const Screens = () => {
   return (
     <div class={styles["screens"]}>
       <button class={styles["screen-button"]}>
-        <CalendarSVG style="margin-right: 0.5em;" />
-        <ListIconTaskSVG />
+        <CalendarSVG />
       </button>
       <button
         classList={{

@@ -40,13 +40,6 @@ export function View(props: ViewProps) {
               <View view={view} />
             </div>
           </Match>
-          <Match
-            when={view.type === "container" && view.direction === "vertical"}
-          >
-            <div class={styles["vertical-container"]}>
-              <View view={view} />
-            </div>
-          </Match>
         </Switch>
       )}
     </For>
