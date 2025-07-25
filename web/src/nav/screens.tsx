@@ -19,7 +19,7 @@ export const Screens = () => {
       </button>
       <button
         class={styles["nav-button"]}
-        style="width: 2em; display: flex; justify-content:center; margin-left: 0.25em;"
+        style="width: 2em; display: flex; justify-content:center; margin-left: 0.25em; color: var(--body-tint);"
       >
         +
       </button>

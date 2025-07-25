@@ -1,8 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] reconsider "workspaces" vs "screens" nomenclature in favour of "default_ctx" vs "workspaces"
-- [] upgrade screen selection to workspaces
 - [] merge item api (send a bunch of items to the server & save)
 - [] remap initial local workspace to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
@@ -30,7 +28,9 @@
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Put up website
 - [] get all workspaces
-- [] handling tabs?!
+- [] handling browser tabs?!
+- [] reconsider "workspace" nomenclature in favour of "collection/ctx/air_ctx/context/namespace/container/base"
+- [] upgrade screen selection to workspaces, horizontal split only
 
 ## Protocol improvements (l8a)
 - [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)

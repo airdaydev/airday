@@ -83,14 +83,7 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
           session.workspace.dummyData();
         }}
       >
-        DEV DB RESET
-      </button>
-      <hr />
-      <button disabled>
-        <span>Create new workspace</span>
-      </button>
-      <button disabled>
-        <span>Import Workspace</span>
+        Reset db
       </button>
     </ContextMenu>
   );

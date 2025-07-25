@@ -82,7 +82,10 @@
   line-height: 1rem;
   border-radius: 2px;
   transition: 100ms transform;
-  margin-left: 0.25em;
+}
+
+.screen-button:not(:first-child) {
+  margin-left: 0.5em;
 }
 
 .screen-button.active {

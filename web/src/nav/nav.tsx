@@ -80,7 +80,7 @@ export function AirNav() {
           )}
         />
       </div>
-      <MonthNav />
+      {/* <MonthNav /> */}
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <button class={styles["nav-text-header"]} tabindex="-1">
         <span>Private</span>
@@ -124,7 +124,7 @@ export function AirNav() {
       <Stickers />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <button class={styles["nav-text-header"]} tabindex="-1">
-        <span>Shared spaces</span>
+        <span>Shared</span>
         <CaretSVG style="stroke-width: 2.5px; width: 7px;" />
       </button>
     </nav>
