@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] Replace tree with a simple arra, and create workspaces!
+- [] workspace api! view swapping
 - [] merge item api (send a bunch of items to the server & save)
 - [] remap initial local workspace to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)

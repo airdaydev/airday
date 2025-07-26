@@ -8,33 +8,61 @@ type ModalTypes = "command" | "find" | null;
 type ViewType = "container" | "data";
 type DataViewType = "list" | "done" | "calendar";
 
-export interface SignalNode<T extends SignalNode<any | undefined>> {
-  children?: Signal<T[]>;
-}
-
-/**
- * Walks through nodes with children signal
- */
-export function signalWalk<
-  T extends SignalNode<any>,
-  O extends SignalNode<any>,
->(node: T, func: (node: T, parent?: O) => boolean | void, parent?: O) {
-  const skipChildren = func(node, parent);
-  if (skipChildren) return;
-  if (node.children)
-    node.children[0]().forEach((child) => signalWalk(child, func, parent));
+export class Views {
+  children: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
+  addChild(view: ViewNode, index?: number) {
+    this.children[1]((prev) => {
+      const next = [...prev];
+      if (index !== undefined) {
+        next.splice(index, 0, view);
+      } else {
+        next.push(view);
+      }
+      return next;
+    });
+  }
+  findNodeById(id: string): ViewNode | undefined {
+    return this.children[0]().find((node) => {
+      if (node.id === id) {
+        return node;
+      }
+    });
+  }
+  findNodeIndexById(id: string): number | undefined {
+    return this.children[0]().findIndex((node) => {
+      if (node.id === id) {
+        return node;
+      }
+    });
+  }
+  count() {
+    return this.children[0]().length;
+  }
+  replaceChild = (view: ViewNode, index: number = 0) => {
+    view.parent = this;
+    this.children[1]((prev) => {
+      const next = [...prev];
+      next[index] = view;
+      return next;
+    });
+  };
+  removeView = (view: ViewNode) => {
+    this.children[1]((prev) => {
+      const next = prev.filter((v) => v.id !== view.id);
+      return next;
+    });
+  };
 }
 
 // TODO: Replace tree with a simple arra, and create workspaces!
 export class ViewNode {
   id = createUniqueId();
-  isRoot = false;
   type: ViewType = "container";
-  children?: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
-  parent?: ViewNode;
+  parent: Views;
   viewState: ViewState;
   constructor(viewState: ViewState) {
     this.viewState = viewState;
+    this.parent = this.viewState.views;
   }
   detach() {
     this.parent?.removeView(this);
@@ -50,76 +78,26 @@ export class ViewNode {
     }
     document.title = "Airday";
   }
-  getIndexShallow() {
-    if (!this.parent) return -1;
-    return this.parent.children[0]().findIndex((node) => node === this);
-  }
   replace = (view: ViewNode) => {
-    const index = this.getIndexShallow();
-    this.parent?.replaceChild(view, index);
+    const index = this.parent.findNodeIndexById(this.id);
+    this.parent.replaceChild(view, index);
   };
-  replaceChild = (view: ViewNode, index: number = 0) => {
-    view.parent = this;
-    this.children[1]((prev) => {
-      const next = [...prev];
-      next[index] = view;
-      return next;
-    });
-  };
-  // TODO: AI written; review
-  removeView = (view: ViewNode) => {
-    this.children[1]((prev) => {
-      const next = prev.filter((v) => v.id !== view.id);
-      if (next.length === 0 && this.type === "container" && this.parent) {
-        this.parent.removeView(this);
-      }
-      return next;
-    });
-  };
-  addChild(view: ViewNode, index?: number) {
-    view.parent = this;
-    this.children[1]((prev) => {
-      const next = [...prev];
-      if (index !== undefined) {
-        next.splice(index, 0, view);
-      } else {
-        next.push(view);
-      }
-      return next;
-    });
-  }
   addLeft(view: ViewNode) {
-    if (!this.parent) return;
-    const ogParent = this.parent;
-    const thisIndex = ogParent.children[0]().indexOf(this);
     this.addSibling(view, "before");
   }
   addRight(view: ViewNode) {
-    if (!this.parent) return;
-    const ogParent = this.parent;
     this.addSibling(view, "after");
   }
   addSibling(view: ViewNode, position: "before" | "after") {
-    if (!this.parent) return;
     const ogParent = this.parent;
     const thisIndex = ogParent.children[0]().indexOf(this);
     const newIndex = position === "before" ? thisIndex : thisIndex + 1;
     ogParent.addChild(view, newIndex);
   }
-  addUp(view: ViewNode) {
-    if (!this.parent) return;
-    this.addSibling(view, "before");
-  }
-  addDown(view: ViewNode) {
-    if (!this.parent) return;
-    this.addSibling(view, "after");
-  }
-  // TODO: AI gen code needs review
+  // TODO: separate get next / get prev functions
   getSibling(direction: "left" | "right"): ViewNode | null {
-    if (!this.parent) return null;
-
-    const isHorizontal = this.parent.direction === "horizontal";
-    const index = this.getIndexShallow();
+    const index = this.parent.findNodeIndexById(this.id);
+    if (!index) return null;
     const siblings = this.parent.children?.[0]() || [];
 
     let nextSibling: ViewNode | null = null;
@@ -136,40 +114,10 @@ export class ViewNode {
     }
 
     if (nextSibling) {
-      if (nextSibling.type === "container") {
-        return this.getDeepestChild(nextSibling, direction);
-      }
       return nextSibling;
     }
-
-    // If no sibling found, go up to parent and try again
-    return this.parent.getSibling(direction);
+    return null;
   }
-
-  private getDeepestChild(
-    node: ViewNode,
-    direction: "up" | "down" | "left" | "right",
-  ): ViewNode | null {
-    const children = node.children?.[0]() || [];
-    if (children.length === 0) return node;
-
-    let targetChild: ViewNode;
-    if (direction === "left" || direction === "up") {
-      targetChild = children[children.length - 1];
-    } else {
-      targetChild = children[0];
-    }
-
-    if (targetChild.type === "container") {
-      return this.getDeepestChild(targetChild, direction);
-    }
-    return targetChild;
-  }
-}
-
-export class RootViewNode extends ViewNode {
-  isRoot = true;
-  splitDirection = "horizontal";
 }
 
 export class DoneView extends ViewNode {
@@ -214,12 +162,6 @@ export class UpNextView extends ViewNode {
   }
 }
 
-export class HorizontalSplitNode extends ViewNode {
-  constructor() {
-    super();
-  }
-}
-
 export class DataView extends ViewNode {
   id = createUniqueId();
   containerId: string;
@@ -258,7 +200,7 @@ export class ViewState {
     createSignal<ActiveRegionType>("container");
   activePane = createSignal<ViewNode | undefined>();
   sidebarVisible = createSignal<boolean>(true);
-  tree = new RootViewNode();
+  views = new Views();
   scene = createSignal<Scene>("default");
   focus?: GenericItem;
   workspace: AirWorkspace;
@@ -267,6 +209,9 @@ export class ViewState {
   constructor(workspace: AirWorkspace) {
     this.workspace = workspace;
     this.keyboard = new KeyboardShortcuts(workspace, this);
+  }
+  count() {
+    return this.views.count();
   }
   toggleSidebar() {
     this.sidebarVisible[1]((prev) => !prev);
@@ -299,22 +244,12 @@ export class ViewState {
     if (region === "container") {
     }
   }
-  findNodeById(id: string): ViewNode | null {
-    let result: ViewNode | null = null;
-    signalWalk(this.tree, (node) => {
-      if (node.id === id) {
-        result = node;
-        return true; // Stop signalWalking
-      }
-    });
-    return result;
-  }
   addViewRelative(
     view: DataView | DoneView,
     relativeTo: string,
-    position: "left" | "right" | "up" | "down",
+    position: "left" | "right",
   ) {
-    const relativeNode = this.findNodeById(relativeTo);
+    const relativeNode = this.parent.findNodeById(relativeTo);
     if (!relativeNode) return;
 
     const newView = view.duplicate();
@@ -325,22 +260,8 @@ export class ViewState {
       case "right":
         relativeNode.addRight(newView);
         break;
-      case "up":
-        relativeNode.addUp(newView);
-        break;
-      case "down":
-        relativeNode.addDown(newView);
-        break;
     }
     this.setActivePane(newView);
-  }
-
-  count() {
-    let count = 0;
-    signalWalk(this.tree, (node) => {
-      if (node.type !== "container") count++;
-    });
-    return count;
   }
   focusItem(item: GenericItem) {
     this.focus = item;
@@ -368,7 +289,7 @@ export class ViewState {
     }
   };
   addViewToRoot(view: ViewNode, ViewIndex = [0, 0]) {
-    this.tree.addChild(view);
+    this.views.addChild(view);
   }
   closeView(view: DataView) {
     view.detach();

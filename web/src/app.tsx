@@ -1,7 +1,7 @@
 import { useContext, Switch, Match } from "solid-js";
 import { AirNav } from "./nav/nav";
 import styles from "./app.module.css";
-import { PaneRegion } from "./view/view";
+import { View } from "./view/view";
 import { Footer } from "./nav/footer";
 import { Dragged } from "@airday/list";
 import { sessionContext } from "./store/context.js";
@@ -24,7 +24,7 @@ export function App() {
           )}
           <div class={styles.main}>
             <AirNav />
-            <PaneRegion tree={session.viewState.tree} />
+            <View views={session.viewState.views} />
           </div>
           <Footer />
         </div>
