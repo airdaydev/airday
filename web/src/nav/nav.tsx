@@ -5,7 +5,7 @@ import NextIconSVG from "../icons/next-icon.svg?component-solid";
 import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import DoneSVG from "../icons/check-hand.svg?component-solid";
-import TrashSVG from "../icons/bin-desaturated.png";
+import BinSVG from "../icons/bin.svg?component-solid";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
@@ -114,10 +114,7 @@ export function AirNav() {
         )}
       />
       <button class={styles["nav-text-button"]} tabindex="-1">
-        <img
-          src={TrashSVG}
-          style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);"
-        />
+        <BinSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
         <span>Trash</span>
       </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
