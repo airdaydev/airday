@@ -1,11 +1,10 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] redo recycling bin art
+- [] Replace tree with a simple arra, and create workspaces!
 - [] merge item api (send a bunch of items to the server & save)
 - [] remap initial local workspace to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
-- [] Replace tree with a simple arra, and create workspaces!
 - [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] delete items
 - [] set a default workspace ui
