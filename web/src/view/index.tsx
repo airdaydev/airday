@@ -34,16 +34,17 @@ function DataViewComponent(props: ViewProps) {
  * TODO: This has been simplified down from previous 4 way split but rushed, still
  * some ugly code going on
  */
-export function WorkspaceView(props: { workspace: Workspace }) {
+export function WorkspaceView() {
   const session = useContext(sessionContext);
   return (
     <div class={styles["pane-region"]}>
       <For
-        each={props.workspace.children[0]()}
+        each={session.viewState.workspace.children[0]()}
         fallback={<div>Empty View / loading</div>}
       >
         {(view, index) => (
           <div class={styles["view-cell"]}>
+            {view}
             {session.library.containerStore.dndContext.isDragging() && (
               <PaneDropGuide view={view} />
             )}

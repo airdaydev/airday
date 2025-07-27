@@ -24,7 +24,7 @@ export function App() {
           )}
           <div class={styles.main}>
             <AirNav />
-            <WorkspaceView workspace={session.viewState.workspace} />
+            <WorkspaceView />
           </div>
           <Footer />
         </div>

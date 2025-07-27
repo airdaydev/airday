@@ -44,10 +44,19 @@ export class ViewState {
     this.keyboard = new KeyboardShortcuts(library, this);
   }
   get workspace() {
-    return this.workspaces[0]()[0];
+    return this.workspaces[0]()[this.activeWorkspace[0]()];
   }
   loadWorkspaces() {
     // Load from local storage (workspaces = per device)
+  }
+  addWorkspace() {
+    this.workspaces[1]((arr) => {
+      return [...arr, new Workspace()];
+    });
+  }
+  saveWorkspaceState() {
+    // Save via library id
+    // localStorage.setItem('workspaces', value)
   }
   switchWorkspace(index = 0) {
     this.activeWorkspace[1](index);

@@ -85,7 +85,7 @@
 }
 
 .workspace-button:not(:first-child) {
-  margin-left: 0.5em;
+  margin-left: 0.25em;
 }
 
 .workspace-button.active {
@@ -93,4 +93,8 @@
 }
 .workspace-button:not(.active) {
   box-shadow: 1px 1px 0px #0000002e;
+}
+
+.workspace-button:hover {
+  background: var(--shade);
 }
