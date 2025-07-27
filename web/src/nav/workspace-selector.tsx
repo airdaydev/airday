@@ -3,15 +3,15 @@ import NewSVG from "../icons/plus.svg?component-solid";
 import ListIconTaskSVG from "../icons/list-icon-task.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 
-export const Screens = () => {
+export const WorkspaceSelector = () => {
   return (
-    <div class={styles["screens"]}>
+    <div class={styles["workspace-selector"]}>
       {/* <button class={styles["screen-button"]}>
         <CalendarSVG />
       </button> */}
       <button
         classList={{
-          [styles["screen-button"]]: true,
+          [styles["workspace-button"]]: true,
           [styles["active"]]: true,
         }}
       >

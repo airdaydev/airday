@@ -8,7 +8,7 @@ import { ThemeToggle } from "../theme/theme";
 import { AirContextMenu, LibraryContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 import { Key } from "../generic/key.jsx";
-import { Screens } from "./screens.jsx";
+import { WorkspaceSelector } from "./workspace-selector.jsx";
 
 type ContextMenu = "main" | "library";
 
@@ -94,7 +94,7 @@ export const Footer = () => {
         >
           Dev
         </button> */}
-        <Screens />
+        <WorkspaceSelector />
       </div>
       <div class={styles["nav-section"]}>
         <span class={styles["count"]}>{stats()}</span>

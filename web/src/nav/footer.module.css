@@ -63,12 +63,12 @@
   font-size: 0.9rem;
 }
 
-.screens {
+.workspace-selector {
   display: flex;
   flex-direction: row;
 }
 
-.screen-button {
+.workspace-button {
   position: relative;
   display: flex;
   align-items: center;
@@ -84,13 +84,13 @@
   transition: 100ms transform;
 }
 
-.screen-button:not(:first-child) {
+.workspace-button:not(:first-child) {
   margin-left: 0.5em;
 }
 
-.screen-button.active {
+.workspace-button.active {
   background: var(--shade);
 }
-.screen-button:not(.active) {
+.workspace-button:not(.active) {
   box-shadow: 1px 1px 0px #0000002e;
 }
