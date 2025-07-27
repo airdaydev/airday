@@ -14,20 +14,9 @@ interface ListHeaderProps {
   view: DataView;
 }
 
-const KeyboardMarker = (props: { view: DataView }) => {
-  const session = useContext(sessionContext);
-  return (
-    <div
-      class={styles["keyboard-marker"]}
-      style={`opacity: ${session.viewState.activePane[0]() == props.view ? "1" : "0"}`}
-    >
-      -
-    </div>
-  );
-};
-
 export const ListHeaderButton = (props: ListHeaderProps) => {
   let ref;
+  const session = useContext(sessionContext);
   const [ctxOpen, setCtxOpen] = createSignal<boolean>(false);
   const [ctxOffset, setCtxOffset] = createSignal<[number, number]>([0, 0]);
   return (
@@ -42,6 +31,7 @@ export const ListHeaderButton = (props: ListHeaderProps) => {
       <button
         class={styles["list-head-button"]}
         tabIndex={-1}
+        style={`filter: opacity(${session.viewState.activePane[0]() == props.view ? "1" : "0.5"})`}
         aria-expanded={ctxOpen()}
         ref={ref}
         onContextMenu={(event: MouseEvent) => {
@@ -54,7 +44,6 @@ export const ListHeaderButton = (props: ListHeaderProps) => {
           <ListIcon container={props.container} />
         </span>
         <span class={styles["title-text"]}>{props.container.name}</span>
-        <KeyboardMarker view={props.view} />
       </button>
     </>
   );
@@ -101,7 +90,6 @@ export const DoneListHeader = (props: ListHeaderProps) => {
             left: -3px; padding-right: 0.25em;"
           />
           <span>Done</span>
-          <KeyboardMarker view={props.view} />
         </button>
         <CloseViewButton view={props.view} />
       </div>
@@ -120,7 +108,6 @@ export const CalendarHeader = (props: ListHeaderProps) => {
             left: -3px; padding-right: 0.25em;"
           />
           <span>Calendar</span>
-          <KeyboardMarker view={props.view} />
         </button>
         <CloseViewButton view={props.view} />
       </div>
@@ -139,7 +126,6 @@ export const UpNextHeader = (props: ListHeaderProps) => {
             left: -3px; padding-right: 0.25em;"
           />
           <span>Next</span>
-          <KeyboardMarker view={props.view} />
         </button>
         <div
           style="display: flex;
