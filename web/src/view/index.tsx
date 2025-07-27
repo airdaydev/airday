@@ -39,7 +39,7 @@ export function WorkspaceView() {
   return (
     <div class={styles["pane-region"]}>
       <For
-        each={session.viewState.workspace.children[0]()}
+        each={session.viewState.workspace?.children[0]()}
         fallback={<div>Empty View / loading</div>}
       >
         {(view, index) => (

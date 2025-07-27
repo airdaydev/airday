@@ -50,9 +50,21 @@ export class ViewState {
     // Load from local storage (workspaces = per device)
   }
   addWorkspace() {
+    let index = 0;
     this.workspaces[1]((arr) => {
+      index = arr.length;
       return [...arr, new Workspace()];
     });
+    this.activeWorkspace[1](index);
+  }
+  closeActiveWorskpace() {
+    this.workspaces[1]((arr) => {
+      const filtered = arr.filter((workspace) => this.workspace !== workspace);
+      return filtered;
+    });
+  }
+  activeView() {
+    this.workspace.activeNode;
   }
   saveWorkspaceState() {
     // Save via library id
@@ -131,13 +143,8 @@ export class ViewState {
     this.openView(new UpNextView(this));
   };
   openView = (view: ViewNode) => {
-    const activePane = this.activePane[0]();
-    if (activePane) {
-      activePane?.replace(view);
-      this.setActivePane(view);
-    } else {
-      this.addViewToRoot(view);
-    }
+    const index = this.workspace.activeIndex[0]();
+    this.workspace.replaceChild(view, index);
   };
   addViewToRoot(view: ViewNode, ViewIndex = [0, 0]) {
     this.workspace.addChild(view);

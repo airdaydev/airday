@@ -68,33 +68,64 @@
   flex-direction: row;
 }
 
-.workspace-button {
+.workspace-button-container {
+  z-index: 20;
   position: relative;
   display: flex;
   align-items: center;
-  z-index: 20;
-  padding: 0.5em;
-  border: none;
-  cursor: pointer;
-  background: none;
   border-radius: 2px;
-  font-size: 1rem;
-  line-height: 1rem;
-  border-radius: 2px;
-  transition: 100ms transform;
 }
 
-.workspace-button:not(:first-child) {
+.workspace-button-container:not(:first-child) {
   margin-left: 0.25em;
 }
 
-.workspace-button.active {
+.workspace-button-container.active {
   background: var(--shade);
 }
-.workspace-button:not(.active) {
+.workspace-button-container:not(.active) {
   box-shadow: 1px 1px 0px #0000002e;
 }
 
-.workspace-button:hover {
+.workspace-button-container:hover {
   background: var(--shade);
+}
+
+.workspace-button {
+  display: flex;
+  padding: 0.5em 1.5em 0.5em 0.5em;
+  border: none;
+  background: none;
+  font-size: 1rem;
+  line-height: 1rem;
+  transition: 100ms transform;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.workspace-close {
+  position: absolute;
+  right: 0.5em;
+  outline: 0;
+  border: none;
+  width: 1.25em;
+  background: none;
+  color: var(--body-tint);
+  height: 1.25em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  top: 7px;
+}
+
+.workspace-close:hover {
+  background: var(--sunshade);
+}
+
+.workspace-text {
+  margin-left: 0.25em;
+  margin-right: 1em;
 }

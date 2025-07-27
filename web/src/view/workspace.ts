@@ -1,8 +1,12 @@
 import { createSignal, Signal } from "solid-js";
-import { ViewNode } from "./state";
+import { ViewNode } from "./views";
 
 export class Workspace {
   children: Signal<ViewNode[]> = createSignal<ViewNode[]>([]);
+  activeIndex: Signal<number> = createSignal(0);
+  get activeNode() {
+    return this.children[0]()[this.activeIndex[0]()];
+  }
   addChild(view: ViewNode, index?: number) {
     this.children[1]((prev) => {
       const next = [...prev];
@@ -32,7 +36,6 @@ export class Workspace {
     return this.children[0]().length;
   }
   replaceChild = (view: ViewNode, index: number = 0) => {
-    view.parent = this;
     this.children[1]((prev) => {
       const next = [...prev];
       next[index] = view;
