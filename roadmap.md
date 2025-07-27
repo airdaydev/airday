@@ -1,13 +1,13 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] workspace api! view swapping
-- [] upgrade screen selection to workspaces
 - [] merge item api (send a bunch of items to the server & save)
+- [] inbox = default = virtual list! (where orphans go too!)
 - [] remap initial local library to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
 - [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] delete items
+- [] complete, but then reconsider workspaces
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] SYNC CLEAN UP before continuing

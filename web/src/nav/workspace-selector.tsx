@@ -24,7 +24,7 @@ export const WorkspaceSelector = () => {
             >
               {/* TODO: Get from active view in workspace */}
               <ListIconTaskSVG />
-              <span class={styles["workspace-text"]}>2 tabs</span>
+              <span class={styles["workspace-text"]}>Inbox</span>
             </button>
             <button
               class={styles["workspace-close"]}
