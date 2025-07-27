@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import styles from "./list.module.css";
 import itemStyles from "../item/item.module.css";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import { Tree, SolidListContext, TreeContext } from "@airday/list";
 import { sessionContext } from "../store/context.js";
 import { ListHeader } from "./list-header";

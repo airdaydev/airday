@@ -1,6 +1,6 @@
 import { useContext, createUniqueId } from "solid-js";
 import { sessionContext } from "../store/context";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import { CalendarHeader } from "../list/list-header";
 import {
   CalSolidWrapper,

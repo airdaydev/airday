@@ -1,5 +1,5 @@
 import { Component } from "solid-js";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
 

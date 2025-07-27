@@ -4,7 +4,7 @@ import {
   DataView,
   UpNextView,
   CalendarView,
-} from "./state";
+} from "./views";
 import { List } from "../list/list";
 import { Done } from "../list/done";
 import { Match, Switch } from "solid-js";

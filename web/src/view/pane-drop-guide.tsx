@@ -1,6 +1,6 @@
 import { createSignal, onMount, useContext } from "solid-js";
 import styles from "./view.module.css";
-import { DataView } from "./state";
+import { DataView } from "./views";
 import { sessionContext } from "../store/context";
 
 interface PaneDropDOMRect extends DOMRect {

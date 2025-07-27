@@ -1,7 +1,7 @@
 import { For, Match, Switch, useContext } from "solid-js";
 import styles from "./view.module.css";
 import { sessionContext } from "../store/context.js";
-import { Views } from "./state";
+import { Workspace } from "./workspace";
 import { PaneDropGuide } from "./pane-drop-guide";
 import { DataViewComponent } from "./data-view";
 
@@ -10,12 +10,12 @@ import { DataViewComponent } from "./data-view";
  * TODO: This has been simplified down from previous 4 way split but rushed, still
  * some ugly code going on
  */
-export function View(props: { views: Views }) {
+export function WorkspaceView(props: { workspace: Workspace }) {
   const session = useContext(sessionContext);
   return (
     <div class={styles["pane-region"]}>
       <For
-        each={props.views.children[0]()}
+        each={props.workspace.children[0]()}
         fallback={<div>Empty View / loading</div>}
       >
         {(view, index) => (

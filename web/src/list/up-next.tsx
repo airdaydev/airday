@@ -9,7 +9,7 @@
 import { useContext } from "solid-js";
 import { sessionContext } from "../store/context";
 import { UpNextHeader } from "./list-header";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import { TreeContext, SolidListContext, Tree } from "@airday/list";
 import styles from "./list.module.css";
 import { ListColumnHeaders } from "./list-col-head";

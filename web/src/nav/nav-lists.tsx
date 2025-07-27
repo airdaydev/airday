@@ -6,7 +6,7 @@ import { NodeComponentType } from "@airday/list";
 import styles from "./nav.module.css";
 import FolderSVG from "../icons/folder.svg?component-solid";
 import { TreeContext, SolidListContext, Tree } from "@airday/list";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import { ContainerFolderNode, ContainerNode } from "../store/container";
 
 export const FolderNodeComponent: NodeComponentType<ContainerFolderNode> = (

@@ -12,7 +12,7 @@ import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
 import { MonthNav } from "../cal/month-nav";
 import { SoloNode } from "@airday/list";
-import { CalendarView, DoneView } from "../view/state";
+import { CalendarView, DoneView } from "../view/views";
 import CaretSVG from "../icons/caret.svg?component-solid";
 
 export function AirNav() {

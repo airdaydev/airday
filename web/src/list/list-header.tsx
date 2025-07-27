@@ -1,5 +1,5 @@
 import { createSignal, Signal, useContext } from "solid-js";
-import { DataView } from "../view/state";
+import { DataView } from "../view/views";
 import styles from "./list.module.css";
 import XSVG from "../icons/x.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
