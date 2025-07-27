@@ -6,9 +6,9 @@ import CalendarSVG from "../icons/calendar.svg?component-solid";
 export const Screens = () => {
   return (
     <div class={styles["screens"]}>
-      <button class={styles["screen-button"]}>
+      {/* <button class={styles["screen-button"]}>
         <CalendarSVG />
-      </button>
+      </button> */}
       <button
         classList={{
           [styles["screen-button"]]: true,

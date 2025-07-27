@@ -6,6 +6,7 @@ import PulseSVG from "../icons/pulse.svg?component-solid";
 import CalendarSVG from "../icons/calendar.svg?component-solid";
 import DoneSVG from "../icons/check-hand.svg?component-solid";
 import BinSVG from "../icons/bin.svg?component-solid";
+import TrashSVG from "../icons/trash.svg?component-solid";
 import { NavLists } from "./nav-lists";
 import { sessionContext } from "../store/context";
 import { AddListButton } from "./add-list";
@@ -84,7 +85,7 @@ export function AirNav() {
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <button class={styles["nav-text-header"]} tabindex="-1">
         <span>Private</span>
-        <CaretSVG style="stroke-width: 2.5px; width: 7px;" />
+        <CaretSVG style="stroke-width: 2.5px; width: 7px;  transform: rotate(180deg); color: var(--body-tint);" />
       </button>
       <NavLists />
       <AddListButton />
@@ -113,6 +114,10 @@ export function AirNav() {
           </button>
         )}
       />
+      <button class={styles["nav-text-button"]} tabindex="-1">
+        <BinSVG style="width: 1.5em; height: 1.5em; stroke-width: 1.75px; color: var(--body-tint);" />
+        <span>Bin</span>
+      </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <Stickers />
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
@@ -121,10 +126,6 @@ export function AirNav() {
         <CaretSVG style="stroke-width: 2.5px; width: 7px;" />
       </button>
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <button class={styles["nav-text-button"]} tabindex="-1">
-        <BinSVG style="width: 1.25em; stroke-width: 1.5px; color: var(--body-tint);" />
-        <span>Trash</span>
-      </button>
     </nav>
   );
 }
