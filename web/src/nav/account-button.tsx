@@ -17,7 +17,7 @@ export const AccountButton = () => {
   }
   return (
     <button
-      class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
+      class={`${styles["library-button"]} ${styles["nav-button"]}`}
       onClick={(event) => {
         openContextMenu(event);
       }}

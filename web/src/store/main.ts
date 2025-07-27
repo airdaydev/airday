@@ -21,9 +21,9 @@ export type AirDB = IDBPDatabase<DBTypes>;
 export const dbNotReadyMessage =
   "DB not loaded, pre-load buffer not yet implemented";
 
-const workspaceCache = v.object({
-  activeWorkspace: v.string(),
-  workspaces: v.array(
+const libraryCache = v.object({
+  activeLibrary: v.string(),
+  libraries: v.array(
     v.object({
       id: v.string().required(),
       name: v.string().required(),
@@ -32,38 +32,38 @@ const workspaceCache = v.object({
 });
 
 /**
- * Session & workspace store
+ * Session & Library store
  */
 export class AirSession {
   userId: string = "anonymous";
-  map = new Map<string, AirWorkspace>();
-  workspace = new AirWorkspace(this);
-  viewState = new ViewState(this.workspace);
+  map = new Map<string, AirLibrary>();
+  library = new AirLibrary(this);
+  viewState = new ViewState(this.library);
   constructor() {
     window.session = this;
   }
   get cacheKey() {
     return `user_${this.userId}:cache`;
   }
-  loadWorkspaceCache() {
+  loadLibraryCache() {
     const raw = localStorage.getItem(this.cacheKey);
     let parsed;
     if (raw) {
       try {
         parsed = JSON.parse(raw);
       } catch (err) {
-        console.log("Invalid workspace object found in cache");
+        console.log("Invalid library object found in cache");
       }
     }
-    if (parsed && compile(workspaceCache, { simple: true })(parsed)) {
-      console.log("found existing workspaces");
-      parsed.workspaces?.forEach((workspace) => {
-        this.map.set(workspace.id, new AirWorkspace(this, workspace));
+    if (parsed && compile(libraryCache, { simple: true })(parsed)) {
+      console.log("found existing libraries");
+      parsed.libraries?.forEach((library) => {
+        this.map.set(library.id, new AirLibrary(this, library));
       });
-      if (parsed.activeWorkspace) {
-        this.open(parsed.activeWorkspace);
+      if (parsed.activeLibrary) {
+        this.open(parsed.activeLibrary);
       } else if (this.map.size > 1) {
-        // Assign active workspace & load
+        // Assign active library & load
         const firstEntry = this.map.entries().next();
         this.open(firstEntry.value[0]);
       } else {
@@ -79,24 +79,24 @@ export class AirSession {
     // localStorage.setItem(
     //   this.cacheKey,
     //   JSON.stringify({
-    //     activeWorkspace: this.workspace?.id,
-    //     workspaces: Array.from(this.map.values()),
+    //     activeLibrary: this.library?.id,
+    //     libraries: Array.from(this.map.values()),
     //   }),
     // );
   }
-  open(workspaceId: string) {
-    // TODO: Separate open/new workspace
-    const workspace = this.map.get(workspaceId);
-    if (workspace) {
-      this.workspace = workspace;
+  open(libraryId: string) {
+    // TODO: Separate open/new library
+    const library = this.map.get(libraryId);
+    if (library) {
+      this.library = library;
     } else {
-      // new workspace
-      if (!this.workspace.initialised) {
-        this.workspace.name = "Private";
+      // new library
+      if (!this.library.initialised) {
+        this.library.name = "Private";
       }
-      this.map.set(this.workspace.id, this.workspace);
+      this.map.set(this.library.id, this.library);
     }
-    this.workspace.connect();
+    this.library.connect();
     this.serialise();
   }
   remove() {}
@@ -105,10 +105,10 @@ export class AirSession {
   }
 }
 
-// Primary local persistence layer for a workspace
-// Handles one workspace concurrently
-// Each workspace has a separate idb connection
-export class AirWorkspace {
+// Primary local persistence layer for a library
+// Handles one library concurrently
+// Each library has a separate idb connection
+export class AirLibrary {
   db: AirDB | null = null;
   itemStore = new ItemStore();
   containerStore = new ContainerStore(this);
@@ -125,11 +125,11 @@ export class AirWorkspace {
   get ref() {
     return `idb://${this.id}@${schemaVersion}`;
   }
-  constructor(app: AirSession, workspace?: { id: string; name: string }) {
+  constructor(app: AirSession, library?: { id: string; name: string }) {
     this.app = app;
-    if (workspace) {
-      this.id = workspace.id;
-      this.name = workspace.name;
+    if (library) {
+      this.id = library.id;
+      this.name = library.name;
     }
     this.historical = new HistoricalItems(this.itemStore, this);
     this.upNext = new UpNext(this.itemStore, this);

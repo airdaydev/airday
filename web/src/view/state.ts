@@ -1,6 +1,6 @@
 import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
 import { GenericItem } from "../store/item";
-import { AirWorkspace } from "../store/main";
+import { AirLibrary } from "../store/main";
 import { KeyboardShortcuts } from "./keyboard";
 
 type ActiveRegionType = "sidebar" | "container";
@@ -54,7 +54,7 @@ export class Views {
   };
 }
 
-// TODO: Replace tree with a simple arra, and create workspaces!
+// TODO: Replace tree with a simple arra, and create librarys!
 export class ViewNode {
   id = createUniqueId();
   type: ViewType = "container";
@@ -173,8 +173,9 @@ export class DataView extends ViewNode {
     this.containerId = containerId;
   }
   get title(): false {
-    const containerNode =
-      this.viewState.workspace.containerStore.tree.idMap.get(this.containerId);
+    const containerNode = this.viewState.library.containerStore.tree.idMap.get(
+      this.containerId,
+    );
     if (!containerNode) return false;
     return containerNode.name;
   }
@@ -192,7 +193,7 @@ type Scene = "default" | "focus";
  * default = 1 pane: inbox
  * ⌘+/ = command modal
  * / = find modal
- * State should be saved in local storage, per workspace
+ * State should be saved in local storage, per library
  */
 export class ViewState {
   activeModal: Signal<ModalTypes> = createSignal<ModalTypes>(null);
@@ -203,12 +204,12 @@ export class ViewState {
   views = new Views();
   scene = createSignal<Scene>("default");
   focus?: GenericItem;
-  workspace: AirWorkspace;
+  library: AirLibrary;
   keyboard: KeyboardShortcuts;
   paneDropView?: ViewNode; // This is the currently selected pane being dragged
-  constructor(workspace: AirWorkspace) {
-    this.workspace = workspace;
-    this.keyboard = new KeyboardShortcuts(workspace, this);
+  constructor(library: AirLibrary) {
+    this.library = library;
+    this.keyboard = new KeyboardShortcuts(library, this);
   }
   count() {
     return this.views.count();
@@ -223,7 +224,7 @@ export class ViewState {
     this.activeRegion[1]("container");
     // TODO: Consider investigating for smell
     // the dnd isn't ready when list is prepared
-    const dnd = this.workspace.containerStore.getNavDnd();
+    const dnd = this.library.containerStore.getNavDnd();
     if (dnd) dnd.clearSelection();
   }
   openFocusScene() {
@@ -231,7 +232,7 @@ export class ViewState {
   }
   openDefaultScene() {
     this.scene[1]("default");
-    const t = this.workspace.dndContext.focusedContext();
+    const t = this.library.dndContext.focusedContext();
     if (this.focus) t?.selectOne(this.focus);
   }
   setActivePane(view: ViewNode) {

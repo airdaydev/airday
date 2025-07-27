@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { AirDB, AirWorkspace } from "./main";
+import { AirDB, AirLibrary } from "./main";
 import {
   DndContext,
   TreeContext,
@@ -26,9 +26,9 @@ export class ContainerStore {
   listStateContext = new ListStateContext();
   dndContext = new DndContext({ enableKeyboard: false });
   tree: TreeState;
-  workspace: AirWorkspace;
-  constructor(workspace: AirWorkspace) {
-    this.workspace = workspace;
+  library: AirLibrary;
+  constructor(library: AirLibrary) {
+    this.library = library;
     this.tree = this.listStateContext.createTree({ loader: containerLoader });
   }
   getNavDnd = () => {
@@ -43,7 +43,7 @@ export class ContainerStore {
     this.tree.loadChildren(items);
     // TODO: Remove temporary default view logic in favour of layouts
     if (defaultContainer) {
-      this.workspace.app.viewState.openDataView(defaultContainer.id);
+      this.library.app.viewState.openDataView(defaultContainer.id);
     }
   };
   upgrade = (db: AirDB) => {

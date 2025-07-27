@@ -58,7 +58,7 @@ simpler queries overall (no hardcoding each type / statically looping over each 
 
 less type safety
 
-i can actually grab 1 item's props without joins (well.. maybe not a good idea because it could be on another workspace & u have to verify that static property with a join - or at least another look up)
+i can actually grab 1 item's props without joins (well.. maybe not a good idea because it could be on another library & u have to verify that static property with a join - or at least another look up)
 
 lotta fkn rows to mash together when bulking = more disk i/o (or more netty reqs when moving to postgres)
 

@@ -22,15 +22,15 @@ test("non-existent username & password", async () => {
     });
 });
 
-test("Creating a user & default workspace", async () => {
+test("Creating a user & default library", async () => {
   const res = await createUser(core, {
     email: "doubleup@air.day",
     password: "fa09j20fiaj3fpaof",
   });
   expect(res.data.id).toBeTypeOf("string");
   expect(res.data.id.length).toBe(36);
-  expect(res.data.primary_workspace.id).toHaveLength(36);
-  expect(res.data.primary_workspace.name).toBeTypeOf("string");
+  expect(res.data.primary_library.id).toHaveLength(36);
+  expect(res.data.primary_library.name).toBeTypeOf("string");
   expect(
     createUser(core, {
       email: "doubleup@air.day",

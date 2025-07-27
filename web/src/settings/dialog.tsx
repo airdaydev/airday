@@ -8,7 +8,7 @@
 // Account
 // - (email, password, security, tokens, keys)
 // - Sessions
-// Workspace (Limit 2 synced per paid user) - flow for adding a second?
+// Shares (Limit 2 synced per paid user) - flow for adding a second?
 // Billing
 
 export const Settings = () => (
@@ -22,7 +22,6 @@ export const Settings = () => (
       <section>
         <div>Security</div>
         <div>Sessions</div>
-        <div>Workspace</div>
         <div>Billing</div>
       </section>
     </nav>

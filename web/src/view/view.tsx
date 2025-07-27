@@ -22,7 +22,7 @@ export function View(props: { views: Views }) {
           <Switch>
             <Match when={view.type === "data"}>
               <div class={styles["view-cell"]}>
-                {session.workspace.containerStore.dndContext.isDragging() && (
+                {session.library.containerStore.dndContext.isDragging() && (
                   <PaneDropGuide view={view} />
                 )}
                 <DataViewComponent view={view} />

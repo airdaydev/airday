@@ -55,7 +55,7 @@ export function AirNav() {
         </button>
         <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
         <SoloNode
-          dndContext={session.workspace.containerStore.dndContext}
+          dndContext={session.library.containerStore.dndContext}
           enableDrop={false}
           Component={(props) => (
             <button
@@ -95,7 +95,7 @@ export function AirNav() {
         <span>Performance</span>
       </button>
       <SoloNode
-        dndContext={session.workspace.containerStore.dndContext}
+        dndContext={session.library.containerStore.dndContext}
         enableDrop={false}
         Component={(props) => (
           <button

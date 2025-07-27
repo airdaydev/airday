@@ -52,13 +52,13 @@ export function AirContextMenu(props: AirContextMenuProps) {
   );
 }
 
-interface WorkspaceContextMenuProps {
+interface LibraryContextMenuProps {
   close: () => void;
   offset: [number, number];
   buttonRef?: HTMLElement;
 }
 
-export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
+export function LibraryContextMenu(props: LibraryContextMenuProps) {
   const session = useContext(sessionContext);
   return (
     <ContextMenu
@@ -69,18 +69,18 @@ export function WorkspaceContextMenu(props: WorkspaceContextMenuProps) {
       buttonRef={props.buttonRef}
     >
       <div>
-        {Array.from(session.map.values()).map((workspace) => (
+        {Array.from(session.map.values()).map((library) => (
           <div style={"padding: 0.25em 0.5em;"}>
-            <div>{workspace.name}</div>
-            <div style={"color: var(--body-tint);"}>{workspace.id}</div>
+            <div>{library.name}</div>
+            <div style={"color: var(--body-tint);"}>{library.id}</div>
           </div>
         ))}
       </div>
       <hr />
       <button
         onClick={async () => {
-          await session.workspace.reset();
-          session.workspace.dummyData();
+          await session.library.reset();
+          session.library.dummyData();
         }}
       >
         Reset db
@@ -130,7 +130,7 @@ export function NavItemContextMenu(props: NavItemContextMenuProps) {
       </button>
       <button
         onClick={() => {
-          session.workspace.containerStore.remove(props.container().id);
+          session.library.containerStore.remove(props.container().id);
         }}
       >
         <span>Delete</span>

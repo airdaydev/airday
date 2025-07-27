@@ -5,20 +5,20 @@ import SearchSVG from "../icons/search.svg?component-solid";
 import NewSVG from "../icons/plus.svg?component-solid";
 import styles from "./footer.module.css";
 import { ThemeToggle } from "../theme/theme";
-import { AirContextMenu, WorkspaceContextMenu } from "./context-menus";
+import { AirContextMenu, LibraryContextMenu } from "./context-menus";
 import { AccountButton } from "./account-button";
 import { Key } from "../generic/key.jsx";
 import { Screens } from "./screens.jsx";
 
-type ContextMenu = "main" | "workspace";
+type ContextMenu = "main" | "library";
 
 export const Footer = () => {
   // ContextMenu
   const session = useContext(sessionContext);
   let appButtonRef;
-  let workspaceButtonRef;
+  let libraryButtonRef;
   const stats = () => {
-    const focused = session.workspace.dndContext.focusContext[0]();
+    const focused = session.library.dndContext.focusContext[0]();
     if (!focused) return ``;
     const selectionSize = focused.selection[0]().size;
     const count = focused.treeState.count();
@@ -26,7 +26,7 @@ export const Footer = () => {
     return `${count}`;
   };
   const selectedItems = () => {
-    const focusedList = session.workspace.dndContext.focusContext[0]();
+    const focusedList = session.library.dndContext.focusContext[0]();
     if (!focusedList) return false;
     const selectionSize = focusedList.selection[0]().size;
     return !!selectionSize;
@@ -57,11 +57,11 @@ export const Footer = () => {
           buttonRef={appButtonRef}
         />
       )}
-      {ctxOpen() === "workspace" && (
-        <WorkspaceContextMenu
+      {ctxOpen() === "library" && (
+        <LibraryContextMenu
           close={() => setCtxOpen(false)}
           offset={ctxOffset()}
-          buttonRef={workspaceButtonRef}
+          buttonRef={libraryButtonRef}
         />
       )}
       <div class={styles["nav-section"]}>
@@ -82,14 +82,14 @@ export const Footer = () => {
         </button>
         {/* <button
           tabIndex={-1}
-          ref={workspaceButtonRef}
-          class={`${styles["workspace-button"]} ${styles["nav-button"]}`}
+          ref={libraryButtonRef}
+          class={`${styles["library-button"]} ${styles["nav-button"]}`}
           onmouseup={(event) => {
             if (ctxOpen()) setCtxOpen(false);
-            else openContextMenu(event, "workspace", workspaceButtonRef);
+            else openContextMenu(event, "library", libraryButtonRef);
           }}
           onMouseOver={(event) => {
-            if (ctxOpen()) openContextMenu(event, "workspace");
+            if (ctxOpen()) openContextMenu(event, "library");
           }}
         >
           Dev
@@ -107,7 +107,7 @@ export const Footer = () => {
           onClick={() => {
             const activePane = session.viewState.activePane[0]();
             if (activePane.containerId) {
-              // session.workspace.itemStore.insert(new )
+              // session.library.itemStore.insert(new )
             }
           }}
         >

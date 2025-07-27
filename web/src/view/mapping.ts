@@ -1,10 +1,10 @@
 import { encodeShortcut } from "@airday/keyboard";
 import { ViewState } from "./state";
-import { AirWorkspace } from "../store/main";
+import { AirLibrary } from "../store/main";
 
 export type ShortcutFunction = (ctx: {
   viewState: ViewState;
-  workspace: AirWorkspace;
+  library: AirLibrary;
 }) => void;
 
 export const defaultMapping = new Map<string, ShortcutFunction>([
@@ -18,7 +18,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
     encodeShortcut({ key: "ƒ", altKey: true }),
     (ctx) => {
       if (ctx.viewState.scene[0]() === "default") {
-        const item = ctx.workspace.dndContext
+        const item = ctx.library.dndContext
           .focusedContext()
           ?.selection[0]()
           .values()
@@ -70,7 +70,7 @@ export const defaultMapping = new Map<string, ShortcutFunction>([
   [
     encodeShortcut({ key: "Backspace" }),
     (ctx) => {
-      const context = ctx.workspace.dndContext.focusedContext();
+      const context = ctx.library.dndContext.focusedContext();
       context?.treeState.delete(context.selection[0]());
     },
   ],

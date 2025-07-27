@@ -133,17 +133,15 @@ export const NavLists = () => {
   const session = useContext(sessionContext);
   const treeContext = new TreeContext({
     id: "navlist",
-    treeState: session.workspace.containerStore.tree,
-    dndContext: session.workspace.containerStore.dndContext,
+    treeState: session.library.containerStore.tree,
+    dndContext: session.library.containerStore.dndContext,
     itemHeight: 32,
     fitContent: true,
     bottomRowPadding: 0,
     shadowColor: [100, 100, 100],
   });
   onCleanup(() => {
-    session.workspace.containerStore.dndContext.listContexts.delete(
-      treeContext,
-    );
+    session.library.containerStore.dndContext.listContexts.delete(treeContext);
   });
   return (
     <SolidListContext.Provider value={treeContext}>

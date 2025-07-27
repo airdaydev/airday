@@ -17,10 +17,10 @@ import { listOptions, ListOptionsContext } from "./list-options";
 
 export const UpNext = (props: { view: DataView }) => {
   const session = useContext(sessionContext);
-  const tree = session.workspace.upNext.tree;
+  const tree = session.library.upNext.tree;
   const ctx = new TreeContext({
     treeState: tree,
-    dndContext: session.workspace.dndContext,
+    dndContext: session.library.dndContext,
     itemHeight: 64,
   });
   const opts = listOptions({

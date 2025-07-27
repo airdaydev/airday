@@ -43,7 +43,7 @@
 
 ## 2025 Q4 Initial Release
 - [] @airday/core - export database to flatbuffer
-- [] Postgresql adapter with personal workspace setup on account creation
+- [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
 - [] Shared lists
 

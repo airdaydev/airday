@@ -5,7 +5,7 @@ import "./main.css";
 import { sessionContext, airSession } from "./store/context";
 
 // Setup app state
-airSession.loadWorkspaceCache();
+airSession.loadLibraryCache();
 
 // Attach debug helpers to window
 window.session = airSession;

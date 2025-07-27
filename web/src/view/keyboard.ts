@@ -1,5 +1,5 @@
 import { encodeShortcut } from "@airday/keyboard";
-import { AirSession, AirWorkspace } from "../store/main";
+import { AirSession, AirLibrary } from "../store/main";
 import { ViewState } from "./state";
 import { defaultMapping } from "./mapping";
 
@@ -8,7 +8,7 @@ export function toggleSidebar(session: AirSession) {
 }
 
 export class KeyboardShortcuts {
-  workspace: AirWorkspace;
+  library: AirLibrary;
   viewState: ViewState;
   handlerMap = new Map<string, (event: KeyboardEvent) => void>();
   globalHandlerActive = true;
@@ -16,8 +16,8 @@ export class KeyboardShortcuts {
   stopKeys = new Set<KeyboardEvent["key"]>();
   buffer: string[] = [];
   vimKeys = true;
-  constructor(workspace: AirWorkspace, viewState: ViewState) {
-    this.workspace = workspace;
+  constructor(library: AirLibrary, viewState: ViewState) {
+    this.library = library;
     this.viewState = viewState;
     window.addEventListener("keydown", (event: KeyboardEvent) => {
       if (!this.enabled) return;
@@ -26,12 +26,12 @@ export class KeyboardShortcuts {
         return;
       }
       if (this.viewState.activeRegion[0]() === "container") {
-        let action = this.workspace.dndContext.keyboard.listen(event);
+        let action = this.library.dndContext.keyboard.listen(event);
         if (action) return;
       }
       if (this.viewState.activeRegion[0]() === "sidebar") {
         let action =
-          this.workspace.containerStore.dndContext.keyboard.listen(event);
+          this.library.containerStore.dndContext.keyboard.listen(event);
         if (action) return;
       }
       const encodedEvent = encodeShortcut(event);
@@ -41,12 +41,12 @@ export class KeyboardShortcuts {
       }
       const func = defaultMapping.get(encodedEvent);
       if (func) {
-        func({ workspace: this.workspace, viewState: this.viewState });
+        func({ library: this.library, viewState: this.viewState });
         this.clearBuffer();
       }
       const funcMulti = defaultMapping.get(this.buffer.join(","));
       if (funcMulti) {
-        funcMulti({ workspace: this.workspace, viewState: this.viewState });
+        funcMulti({ library: this.library, viewState: this.viewState });
         this.clearBuffer();
       }
     });

@@ -7,7 +7,7 @@ import { Dragged } from "@airday/list";
 import { sessionContext } from "./store/context.js";
 import { Focus } from "./focus/focus";
 
-// TODO: Switch workspace
+// TODO: Switch library
 export function App() {
   const session = useContext(sessionContext);
   return (
@@ -16,11 +16,11 @@ export function App() {
     >
       <Match when={session.viewState.scene[0]() == "default"}>
         <div class={styles.app}>
-          {session.workspace.dndContext.isCustomDragging() && (
-            <Dragged dndContext={session.workspace.dndContext} />
+          {session.library.dndContext.isCustomDragging() && (
+            <Dragged dndContext={session.library.dndContext} />
           )}
-          {session.workspace.containerStore.dndContext.isCustomDragging() && (
-            <Dragged dndContext={session.workspace.containerStore.dndContext} />
+          {session.library.containerStore.dndContext.isCustomDragging() && (
+            <Dragged dndContext={session.library.containerStore.dndContext} />
           )}
           <div class={styles.main}>
             <AirNav />

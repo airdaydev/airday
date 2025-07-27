@@ -3,7 +3,7 @@ import { GenericComponent } from "../item/item";
 import { v, compile } from "suretype";
 import type { TypeOf } from "suretype";
 import { createUniqueId } from "solid-js";
-import { AirWorkspace } from "./main";
+import { AirLibrary } from "./main";
 import { Debouncer } from "./utils";
 
 const GenericItemSchema = v.object({
@@ -25,18 +25,18 @@ export class GenericItem extends Node {
   sticker: string | null = null;
   content?: string;
   component = GenericComponent;
-  workspace: AirWorkspace;
+  library: AirLibrary;
   justChecked = false;
   justCheckedRef?: () => void;
 
   static validate = compile(GenericItemSchema, { simple: true });
-  constructor(props: GenericItemSchema, workspace: AirWorkspace) {
+  constructor(props: GenericItemSchema, library: AirLibrary) {
     super(props);
     this.id = props.id || createUniqueId();
     this.content = props.content;
     this.tsDone = props.tsDone;
     this.sticker = props.sticker;
-    this.workspace = workspace;
+    this.library = library;
   }
   serialise() {
     return {
@@ -50,12 +50,12 @@ export class GenericItem extends Node {
   updateContent(newText: string) {
     this.content = newText;
     this.triggerUpdate();
-    this.workspace.itemStore.update(this.id, { content: newText });
+    this.library.itemStore.update(this.id, { content: newText });
   }
   updateSticker(sticker: string) {
     this.sticker = sticker || null;
     this.triggerUpdate();
-    this.workspace.itemStore.update(this.id, { sticker });
+    this.library.itemStore.update(this.id, { sticker });
   }
   // If toggling off, this should stay in its parent list for 2 seconds but grey before disappearing
   // deleting from memory list & moving to done memory list (having 2 items simultaneously may be confusing)
@@ -66,14 +66,14 @@ export class GenericItem extends Node {
   async toggleComplete(historical = false) {
     if (!this.tsDone) {
       this.tsDone = new Date();
-      const updatedItem = await this.workspace.itemStore.check(
+      const updatedItem = await this.library.itemStore.check(
         this.id,
         this.tsDone,
       );
       if (!historical) {
         this.justChecked = true;
         this.justCheckedRef = justCheckedDebouncer.add(() => {
-          this.workspace.itemStore.queue.enqueue({
+          this.library.itemStore.queue.enqueue({
             type: "check",
             item: updatedItem,
           });
@@ -81,9 +81,9 @@ export class GenericItem extends Node {
       }
     } else {
       this.tsDone = null;
-      const updatedItem = await this.workspace.itemStore.uncheck(this.id);
+      const updatedItem = await this.library.itemStore.uncheck(this.id);
       this.justChecked = false;
-      this.workspace.itemStore.queue.enqueue({
+      this.library.itemStore.queue.enqueue({
         type: "check",
         item: updatedItem,
       });
@@ -93,12 +93,12 @@ export class GenericItem extends Node {
   }
 }
 
-export function itemLoader(workspace: AirWorkspace) {
+export function itemLoader(library: AirLibrary) {
   return function loader(data: any) {
     // if (data.type === "generic") {
     const validated = GenericItem.validate(data);
     if (!validated) return false;
-    return new GenericItem(data, workspace);
+    return new GenericItem(data, library);
     // }
     console.warn("invalid data in container loader");
     return false;

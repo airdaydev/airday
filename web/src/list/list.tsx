@@ -23,18 +23,18 @@ interface ListProps {
 
 export function List(props: ListProps) {
   const session = useContext(sessionContext);
-  const list = session.workspace.openList(props.view);
+  const list = session.library.openList(props.view);
   const ctx = new TreeContext({
     treeState: list.tree,
-    dndContext: session.workspace.dndContext,
+    dndContext: session.library.dndContext,
     itemHeight: 32,
   });
-  const container = session.workspace.containerStore.tree.idMap.get(
+  const container = session.library.containerStore.tree.idMap.get(
     props.view.containerId,
   );
 
   onCleanup(() => {
-    session.workspace.dndContext.listContexts.delete(ctx);
+    session.library.dndContext.listContexts.delete(ctx);
   });
 
   createEffect(() => {
