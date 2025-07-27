@@ -101,6 +101,11 @@
   transition: 100ms transform;
   cursor: pointer;
   white-space: nowrap;
+  width: 8em;
+}
+
+.workspace-button svg {
+  flex-shrink: 0;
 }
 
 .workspace-close {
@@ -118,7 +123,6 @@
   padding: 0;
   border-radius: 2px;
   cursor: pointer;
-  top: 7px;
 }
 
 .workspace-close:hover {

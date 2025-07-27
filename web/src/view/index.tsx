@@ -10,7 +10,7 @@ import { Match, Switch } from "solid-js";
 import { UpNext } from "../list/up-next";
 import { Calendar } from "../cal/cal";
 
-function DataViewComponent(props: ViewProps) {
+function DataViewComponent(props: { view: DataView }) {
   return (
     <Switch>
       <Match when={props.view instanceof DoneView}>

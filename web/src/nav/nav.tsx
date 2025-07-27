@@ -118,8 +118,8 @@ export function AirNav() {
         <BinSVG style="width: 1.5em; height: 1.5em; stroke-width: 1.75px; color: var(--body-tint);" />
         <span>Bin</span>
       </button>
-      <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
-      <Stickers />
+      {/* <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" /> */}
+      {/* <Stickers /> */}
       <hr style="width: 100%; border: none; border-top: 1px solid var(--border);" />
       <button class={styles["nav-text-header"]} tabindex="-1">
         <span>Shared</span>
