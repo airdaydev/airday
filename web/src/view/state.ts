@@ -41,6 +41,9 @@ export class ViewState {
     this.library = library;
     this.keyboard = new KeyboardShortcuts(library, this);
   }
+  loadWorkspaces() {
+    // Load from local storage (workspaces = per device)
+  }
   count() {
     return this.workspace.count();
   }

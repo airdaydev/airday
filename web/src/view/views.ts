@@ -1,12 +1,7 @@
-import { createSignal, createUniqueId, Signal, createContext } from "solid-js";
-import { GenericItem } from "../store/item";
-import { AirLibrary } from "../store/main";
-import { KeyboardShortcuts } from "./keyboard";
+import { createUniqueId } from "solid-js";
 import { Workspace } from "./workspace";
 import { ViewState } from "./state";
 
-type ActiveRegionType = "sidebar" | "container";
-type ModalTypes = "command" | "find" | null;
 type ViewType = "container" | "data";
 type DataViewType = "list" | "done" | "calendar";
 
@@ -24,9 +19,6 @@ export class ViewNode {
   }
   get title(): string | false {
     return false;
-  }
-  loadWorkspaces() {
-    // Load from local storage (workspaces = per device)
   }
   setDocumentTitle() {
     const titleText = this.title;
