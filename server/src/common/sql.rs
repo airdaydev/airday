@@ -2,8 +2,8 @@ use crate::{
     auth::session::{SessionModel, SessionModelSqlite},
     common::config::AirdayConfig,
     item::{model::ItemModel, sqlite::ItemModelSqlite},
+    library::{model::LibraryModel, sqlite::LibraryModelSqlite},
     user::{model::UserModel, sqlite::UserModelSqlite},
-    workspace::{model::WorkspaceModel, sqlite::WorkspaceModelSqlite},
 };
 use sqlx::{
     Pool, Sqlite,
@@ -20,7 +20,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone)]
 pub struct Db {
-    pub workspaces: Arc<dyn WorkspaceModel>,
+    pub library: Arc<dyn LibraryModel>,
     pub user: Arc<dyn UserModel>,
     pub session: Arc<dyn SessionModel>,
     pub item: Arc<dyn ItemModel>,
@@ -30,7 +30,7 @@ impl Db {
     pub fn from_sqlite_pool(pool: Pool<Sqlite>) -> Self {
         Db {
             // pool: DatabasePool::Sqlite(pool.clone()),
-            workspaces: Arc::new(WorkspaceModelSqlite::new(pool.clone())),
+            library: Arc::new(LibraryModelSqlite::new(pool.clone())),
             user: Arc::new(UserModelSqlite::new(pool.clone())),
             session: Arc::new(SessionModelSqlite::new(pool.clone())),
             item: Arc::new(ItemModelSqlite::new(pool.clone())),

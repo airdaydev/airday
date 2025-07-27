@@ -13,7 +13,7 @@ const createUserOpts = APISchema(
 const createUserRes = APISchema(
   v.object({
     id: v.string().required(),
-    primary_workspace: v
+    primary_library: v
       .object({
         id: v.string().required(),
         name: v.string().required(),
@@ -40,7 +40,7 @@ export async function createUser(
 
 const updateUserOpts = APISchema(
   v.object({
-    primary_workspace_id: v.string(),
+    primary_library_id: v.string(),
   }),
 );
 

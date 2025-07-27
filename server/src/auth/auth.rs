@@ -18,7 +18,7 @@ pub struct PasswordAuthorisationReq {
 #[derive(Serialize)]
 pub struct AuthResponse {
     pub session: UserSession,
-    pub workspace_id: String,
+    pub libary_id: String,
 }
 
 pub fn build_session_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
@@ -65,7 +65,7 @@ pub async fn password_authorisation_cookie(
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
     cookies.add(refresh_cookie);
     // TODO: Remove tokens from cookie sessions
-    //         // TODO: Improve with default workspace
+    // TODO: Improve with default library
     // let user = state
     //     .db
     //     .user

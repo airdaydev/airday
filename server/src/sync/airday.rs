@@ -11,8 +11,7 @@ use crate::{
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
-            WorkspaceProto, WorkspaceProtoArgs, WorkspaceSyncResponseProto,
-            WorkspaceSyncResponseProtoArgs,
+            LibraryProto, LibraryProtoArgs, LibrarySyncResponseProto, LibrarySyncResponseProtoArgs,
         },
         websocket::send_to_client,
     },
@@ -77,10 +76,10 @@ impl AirdayMessage {
                         .unwrap();
 
                     let id = fbv_to_uuid(item_buffer.id())?;
-                    let workspace_id = fbv_to_uuid(action.workspace_id())?;
+                    let library_id = fbv_to_uuid(action.library_id())?;
                     let item = Item {
                         id: id,
-                        workspace_id,
+                        library_id,
                         attributes: ItemAttributes { text: None },
                     };
                     actions.push(AirdayAction::AddItem { _item: item });
@@ -103,32 +102,31 @@ impl AirdayMessage {
     }
 }
 
-// TODO: DEFAULT WORKSPACE SHOULD ALWAYS EXIST
-pub async fn create_primary_workspace_action<'a>(
+// TODO: DEFAULT LIBRARY SHOULD ALWAYS EXIST
+pub async fn create_primary_library_action<'a>(
     state: &AppState,
     builder: &mut FlatBufferBuilder<'a>,
     user_id: &Uuid,
 ) -> Result<WIPOffset<AirdayBatchComponentProto<'a>>, AppError> {
     let res = state.db.user.get_by_id(user_id).await?;
     if let Some(user) = res {
-        if let Some(primary_workspace) = user.primary_workspace {
-            let workspace_id_offset = builder.create_vector(primary_workspace.id.as_bytes());
-            let workspace_name_offset = builder.create_string(&primary_workspace.name);
-            let workspace_args = WorkspaceProtoArgs {
-                id: Some(workspace_id_offset),
-                name: Some(workspace_name_offset),
+        if let Some(primary_library) = user.primary_library {
+            let library_id_offset = builder.create_vector(primary_library.id.as_bytes());
+            let library_name_offset = builder.create_string(&primary_library.name);
+            let library_args = LibraryProtoArgs {
+                id: Some(library_id_offset),
+                name: Some(library_name_offset),
             };
-            let workspace_offset = WorkspaceProto::create(builder, &workspace_args);
-            let primary_workspace_offset = WorkspaceSyncResponseProtoArgs {
-                primary_workspace: Some(workspace_offset),
+            let library_offset = LibraryProto::create(builder, &library_args);
+            let primary_library_offset = LibrarySyncResponseProtoArgs {
+                primary_library: Some(library_offset),
             };
             let action_offset =
-                WorkspaceSyncResponseProto::create(builder, &primary_workspace_offset)
-                    .as_union_value();
+                LibrarySyncResponseProto::create(builder, &primary_library_offset).as_union_value();
             let batch_offset = AirdayBatchComponentProto::create(
                 builder,
                 &AirdayBatchComponentProtoArgs {
-                    action_type: AirdayActionProto::WorkspaceSyncResponseProto,
+                    action_type: AirdayActionProto::LibrarySyncResponseProto,
                     action: Some(action_offset),
                 },
             );
@@ -136,7 +134,7 @@ pub async fn create_primary_workspace_action<'a>(
         }
     }
     Err(AppError::ServerError(String::from(
-        "Couldn't find primary workspace",
+        "Couldn't find primary library",
     )))
 }
 
@@ -185,11 +183,11 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     );
                     // Sneaky, change later
                     action_offsets.push(offset);
-                    let workspace_offset =
-                        create_primary_workspace_action(state, &mut builder, &sesh.user_id)
+                    let library_offset =
+                        create_primary_library_action(state, &mut builder, &sesh.user_id)
                             .await
                             .unwrap();
-                    action_offsets.push(workspace_offset);
+                    action_offsets.push(library_offset);
                 }
             }
             AirdayAction::AddItem { _item } => {
@@ -197,17 +195,17 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                 //     let record = state.ws_connection_map.lock().unwrap();
                 //     record.get(socket_id).unwrap().clone()
                 // };
-                // let workspace_id: Uuid;
-                // if let Some(workspace) = message.workspace_id {
-                //     workspace_id = workspace;
+                // let library_id: Uuid;
+                // if let Some(library) = message.library_id {
+                //     library_id = library;
                 // } else {
-                //     // Workspace id required
+                //     // Library id required
                 //     return ();
                 // }
-                // TODO: Security! Confirm user has access to workspace!
+                // TODO: Security! Confirm user has access to library!
                 // t.user_id;
-                // TODO: Verify workspace_id is correct (+ derive from session)
-                // state.db.item.merge(&workspace_id, &item);
+                // TODO: Verify library_id is correct (+ derive from session)
+                // state.db.item.merge(&library_id, &item);
                 // TODO: Acknowledgement message + fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }

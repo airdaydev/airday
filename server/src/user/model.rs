@@ -2,7 +2,7 @@ use crate::{
     AppState,
     auth::session::UserSession,
     common::{error::AppError, sql::Db},
-    workspace::model::Workspace,
+    library::model::Library,
 };
 use argon2::{
     Argon2, PasswordVerifier,
@@ -16,22 +16,22 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum WorkspaceUpdate {
+pub enum LibraryUpdate {
     Set(Uuid),
     Unset,
 }
 
-// TODO: Remove primary _workspace_id as a user modifiable object
+// TODO: Remove primary _library_id as a user modifiable object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub primary_workspace_id: Option<WorkspaceUpdate>,
+    pub primary_library_id: Option<LibraryUpdate>,
 }
 
 impl UserAttributes {
     pub fn new() -> Self {
         UserAttributes {
-            primary_workspace_id: None,
+            primary_library_id: None,
         }
     }
 }
@@ -50,14 +50,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
-    pub primary_workspace: Option<Workspace>,
+    pub primary_library: Option<Library>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
-    pub primary_workspace: Option<Workspace>,
+    pub primary_library: Option<Library>,
 }
 
 impl From<User> for PublicUser {
@@ -65,7 +65,7 @@ impl From<User> for PublicUser {
         Self {
             id: user.id.to_string(),
             email: user.email,
-            primary_workspace: user.primary_workspace,
+            primary_library: user.primary_library,
         }
     }
 }

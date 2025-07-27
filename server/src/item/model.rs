@@ -23,7 +23,7 @@ pub struct ItemAttributes {
 
 pub struct Item {
     pub id: Uuid,
-    pub workspace_id: Uuid,
+    pub library_id: Uuid,
     pub attributes: ItemAttributes,
 }
 
@@ -80,7 +80,7 @@ pub type JsonAttributes = Option<serde_json::Value>;
 pub struct SqlItem {
     // static attrs
     pub id: Uuid,
-    pub workspace_id: Uuid,
+    pub library_id: Uuid,
     // dynamic attrs (lww-map)
     pub attributes: JsonAttributes,
     // metadata
@@ -91,7 +91,7 @@ pub struct SqlItem {
 // TODO: Implement Item * Item from SqlItem (Maybe?)
 // pub struct Item {
 //     pub id: Uuid,
-//     pub workspace_id: Uuid,
+//     pub library_id: Uuid,
 //     pub text: Option<LWWRegister<>>,
 // }
 
@@ -108,10 +108,10 @@ pub struct SqlItem {
 #[async_trait]
 pub trait ItemModel: Send + Sync {
     // Accept query options
-    async fn get_by_workspace(
+    async fn get_by_library(
         &self,
-        // workspace: &Uuid,
+        // library: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
-    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<(), AppError>;
+    async fn merge(&self, library_id: &Uuid, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

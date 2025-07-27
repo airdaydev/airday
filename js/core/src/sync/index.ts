@@ -23,10 +23,10 @@ export class AirdaySync {
   wrapAction() {}
   // TODO: Should this just be a general sync message with what items and since when!?
   // TODO: Also we should store this in our database
-  async getWorkspaces() {}
+  async getLibraries() {}
   async getContainers() {}
-  async getActiveItemsByWorkspace() {}
-  async getCompletedItemsByWorkspace() {}
+  async getActiveItemsByLibrary() {}
+  async getCompletedItemsByLibrary() {}
   async createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   async createItem(item: AirdayItem) {

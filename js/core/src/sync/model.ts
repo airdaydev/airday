@@ -19,7 +19,7 @@ enum SyncState {
 export interface AirdayItemConstructorOpts {
   // Immutable
   id: Uuidv4;
-  workspaceId: Uuidv4;
+  libraryId: Uuidv4;
   // LWW attributes
   attributes: AirdayItemAttributes;
   // Client-only
@@ -28,7 +28,7 @@ export interface AirdayItemConstructorOpts {
 
 const AirdayItemSerialisedSchema = v.object({
   id: v.string().required(),
-  workspaceId: v.string().required(),
+  libraryId: v.string().required(),
   attributes: v.object({
     text: LWWSerialiseSchema,
   }),
@@ -45,14 +45,14 @@ const ensureSerialisedItem = compile(AirdayItemSerialisedSchema, {
 
 export class AirdayItem {
   id: Uuidv4;
-  workspaceId: Uuidv4;
+  libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
   syncState = SyncState.dirty;
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
     this.id = params.id || new Uuidv4();
-    this.workspaceId = params.workspaceId;
+    this.libraryId = params.libraryId;
     this.attributes = params.attributes;
     if (
       params.syncState === SyncState.synced ||
@@ -78,7 +78,7 @@ export class AirdayItem {
     // TODO: Clean up id requirement
     let obj: AirdayItemSerialised = {
       id: this.id.toString(),
-      workspaceId: this.id.toString(),
+      libraryId: this.id.toString(),
       attributes: {}, // TODO: Attributes!
       syncState: this.syncState,
     };
@@ -93,7 +93,7 @@ export class AirdayItem {
     }
     return new AirdayItem({
       id: Uuidv4.fromString(typed.id),
-      workspaceId: Uuidv4.fromString(typed.workspaceId),
+      libraryId: Uuidv4.fromString(typed.libraryId),
       attributes,
       syncState: typed.syncState,
     });

@@ -16,7 +16,7 @@ mod user {
     pub mod model;
     pub mod sqlite;
 }
-mod workspace {
+mod library {
     pub mod model;
     pub mod sqlite;
 }

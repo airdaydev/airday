@@ -6,7 +6,7 @@ export interface AirdayDBSchema extends DBSchema {
     key: string;
     value: any;
     indexes: {
-      workspaceId: string;
+      libraryId: string;
       // listId: string;
       // order: [string, string, string];
       // done: string;
@@ -25,7 +25,6 @@ export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 const ITEM_STORE_NAME = "item";
 
 // Front-end persistent storage for Airday JS apps
-// TODO: Workspace model?
 export class AirdayIDB {
   handle: AirdayIDBPDatabase | null = null;
   item = new ItemIDBModel(this);
@@ -34,7 +33,7 @@ export class AirdayIDB {
     this.handle = await openDB("test", 1, {
       upgrade(db) {
         const items = db.createObjectStore(ITEM_STORE_NAME, { keyPath: "id" });
-        items.createIndex("workspaceId", "workspaceId");
+        items.createIndex("libraryId", "libraryId");
         // items.createIndex("listId", "listId");
         // items.createIndex("order", ["listId", "orderKey", "id"]);
         // items.createIndex("done", ["doneTS"]); // TODO: Done timestamp?
@@ -63,11 +62,11 @@ export class ItemIDBModel {
     items.map((item) => upsertInternal(item.toJSON()));
     await tx.done;
   };
-  getItemsByWorkspace = async (workspaceId: string) => {
+  getItemsByLibrary = async (libraryId: string) => {
     const res = await this.db.handle!.getAllFromIndex(
       ITEM_STORE_NAME,
-      "workspaceId",
-      workspaceId,
+      "libraryId",
+      libraryId,
     );
     const items: AirdayItem[] = [];
     res.forEach((row) => {

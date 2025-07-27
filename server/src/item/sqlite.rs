@@ -23,16 +23,16 @@ impl ItemModelSqlite {
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
     // TODO: Break this into parts
-    async fn merge(&self, workspace_id: &Uuid, item: &Item) -> Result<(), AppError> {
+    async fn merge(&self, library_id: &Uuid, item: &Item) -> Result<(), AppError> {
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
         let result = sqlx::query_as!(
             SqlItem,
-            r#"SELECT id as "id: Uuid", workspace_id as "workspace_id: Uuid",
+            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
             updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes" FROM item
-            WHERE workspace_id = ? AND id = ?"#,
-            workspace_id,
+            WHERE library_id = ? AND id = ?"#,
+            library_id,
             item.id,
         )
         .fetch_optional(&mut *tx)
@@ -60,9 +60,9 @@ impl ItemModel for ItemModelSqlite {
             Err(AppError::ServerError(String::from("Not yet implemented")))
         }
     }
-    async fn get_by_workspace(
+    async fn get_by_library(
         &self,
-        // workspace: &Uuid,
+        // library: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>> {
         let stream = sqlx::query_as!(Item, r#""#).fetch(&self.pool);
         let mapped_stream = stream.map(|result| result.map_err(|err| AppError::from(err)));

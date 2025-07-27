@@ -31,18 +31,18 @@ interface Session {
   userId: string;
 }
 
-interface WorkspaceConstructorOpts {
+interface LibraryConstructorOpts {
   id?: Uuidv4;
   name: string;
   local: boolean;
 }
 
-export class Workspace {
+export class Library {
   id?: Uuidv4;
-  name: string = "Local Workspace";
+  name: string = "Private";
   local = true;
   primary = false;
-  constructor(opts?: WorkspaceConstructorOpts) {
+  constructor(opts?: LibraryConstructorOpts) {
     if (opts) {
       this.id = opts.id;
       this.name = opts.name;
@@ -56,7 +56,7 @@ export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
-  primaryWorkspace: Workspace = new Workspace({
+  primaryLibrary: Library = new Library({
     name: "Primary",
     local: true,
   });

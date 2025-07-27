@@ -6,9 +6,9 @@ import {
   AuthenticateResponseProto,
   MessageProto,
   MessageWrapperProto,
-  WorkspaceSyncResponseProto,
+  LibrarySyncResponseProto,
 } from "../proto";
-import { AuthMode, Workspace, type AirdayCore } from "../core";
+import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common";
@@ -119,22 +119,22 @@ export class WebsocketManager {
           // TODO: Validate and add item to storage
           console.log(itemResponse.item());
           break;
-        case AirdayActionProto.WorkspaceSyncResponseProto:
-          const workspaceResponse = new WorkspaceSyncResponseProto();
-          component.action(workspaceResponse);
-          const primaryWorkspaceBuffer = workspaceResponse.primaryWorkspace();
-          if (primaryWorkspaceBuffer) {
+        case AirdayActionProto.LibrarySyncResponseProto:
+          const libraryResponse = new LibrarySyncResponseProto();
+          component.action(libraryResponse);
+          const primaryLibraryBuffer = libraryResponse.primaryLibrary();
+          if (primaryLibraryBuffer) {
             // TODO: Validate and add item to storage
             let id = Uuidv4.fromFBVector(
-              primaryWorkspaceBuffer.id.bind(primaryWorkspaceBuffer),
+              primaryLibraryBuffer.id.bind(primaryLibraryBuffer),
             );
-            let name = primaryWorkspaceBuffer.name() || "";
-            this.core.primaryWorkspace = new Workspace({
+            let name = primaryLibraryBuffer.name() || "";
+            this.core.primaryLibrary = new Library({
               id,
               name,
               local: true,
             });
-            console.log(this.core.primaryWorkspace);
+            console.log(this.core.primaryLibrary);
           }
           break;
         default:

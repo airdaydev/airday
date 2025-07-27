@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS user (
   id UUID NOT NULL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  primary_workspace_id UUID NULL,
-  FOREIGN KEY (primary_workspace_id) REFERENCES workspace (id) ON DELETE SET NULL
+  primary_library_id UUID NULL,
+  FOREIGN KEY (primary_library_id) REFERENCES library (id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS session (
@@ -24,24 +24,24 @@ CREATE TABLE IF NOT EXISTS session (
   FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
-CREATE TABLE IF NOT EXISTS workspace (
+CREATE TABLE IF NOT EXISTS library (
   id UUID NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
-  primary_workspace BOOLEAN NOT NULL DEFAULT FALSE
+  primary_library BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE TABLE IF NOT EXISTS user_workspace (
+CREATE TABLE IF NOT EXISTS user_library (
   user_id UUID NOT NULL,
-  workspace_id UUID NOT NULL,
+  library_id UUID NOT NULL,
   FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
-  FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE CASCADE,
-  PRIMARY KEY (user_id, workspace_id)
+  FOREIGN KEY (library_id) REFERENCES library (id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, library_id)
 );
 
 CREATE TABLE IF NOT EXISTS item (
   -- static vals
   id UUID NOT NULL PRIMARY KEY,
-  workspace_id UUID NOT NULL,
+  library_id UUID NOT NULL,
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS item (
 );
 
 CREATE TABLE IF NOT EXISTS container (
-  workspace_id UUID NOT NULL,
+  library_id UUID NOT NULL,
   id UUID NOT NULL PRIMARY KEY,
   -- later, specific container type could be static here
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters

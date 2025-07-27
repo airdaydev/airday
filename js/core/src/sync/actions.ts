@@ -126,12 +126,12 @@ export class AddItemAction extends Action {
       ItemProto.addText(builder, textOffset);
     }
     const itemOffset = ItemProto.endItemProto(builder);
-    const workspaceIdOffset = AddItemActionProto.createWorkspaceIdVector(
+    const libraryIdOffset = AddItemActionProto.createLibraryIdVector(
       builder,
-      this.item.workspaceId,
+      this.item.libraryId,
     );
     AddItemActionProto.startAddItemActionProto(builder);
-    AddItemActionProto.addWorkspaceId(builder, workspaceIdOffset);
+    AddItemActionProto.addLibraryId(builder, libraryIdOffset);
     AddItemActionProto.addItem(builder, itemOffset);
     const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
     const batchComponentOffset =

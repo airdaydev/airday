@@ -1,7 +1,7 @@
 use crate::{
     common::error::AppError,
-    user::model::{User, UserAttributes, UserModel, WorkspaceUpdate, hash_password},
-    workspace::{model::Workspace, sqlite::WorkspaceModelSqlite},
+    library::{model::Library, sqlite::LibraryModelSqlite},
+    user::model::{LibraryUpdate, User, UserAttributes, UserModel, hash_password},
 };
 use async_trait::async_trait;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
@@ -17,9 +17,9 @@ impl UserModel for UserModelSqlite {
         let result = sqlx::query!(
             r#"
             SELECT user.id as "id: Uuid", email, password_hash,
-            workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
+            library.id as "library_id: Option<Uuid>", library.name as "library_name: Option<String>"
             FROM user
-            LEFT JOIN workspace ON workspace.id = primary_workspace_id
+            LEFT JOIN library ON library.id = primary_library_id
             WHERE email = ?
             "#,
             email
@@ -28,12 +28,12 @@ impl UserModel for UserModelSqlite {
         .await?;
 
         if let Some(row) = result {
-            let user = self.build_user_with_workspace(
+            let user = self.build_user_with_library(
                 row.id,
                 row.email,
                 row.password_hash,
-                row.workspace_id,
-                row.workspace_name,
+                row.library_id,
+                row.library_name,
             );
             return Ok(Some(user));
         }
@@ -44,9 +44,9 @@ impl UserModel for UserModelSqlite {
         let result = sqlx::query!(
             r#"
             SELECT user.id as "id: Uuid", email, password_hash,
-            workspace.id as "workspace_id: Option<Uuid>", workspace.name as "workspace_name: Option<String>"
+            library.id as "library_id: Option<Uuid>", library.name as "library_name: Option<String>"
             FROM user
-            JOIN workspace ON workspace.id = primary_workspace_id
+            JOIN library ON library.id = primary_library_id
             WHERE user.id = ?
             "#,
             sqlx_uuid
@@ -56,35 +56,35 @@ impl UserModel for UserModelSqlite {
 
         // nesting with sqlx is difficult, this is simpler
         if let Some(row) = result {
-            let user = self.build_user_with_workspace(
+            let user = self.build_user_with_library(
                 row.id,
                 row.email,
                 row.password_hash,
-                row.workspace_id,
-                row.workspace_name,
+                row.library_id,
+                row.library_name,
             );
             return Ok(Some(user));
         }
         Ok(None)
     }
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError> {
-        // 1. Create primary workspace
+        // 1. Create primary library
         let mut tx = self.pool.begin().await?;
         let name = String::from("Private");
-        let primary_workspace = WorkspaceModelSqlite::create_with(&mut *tx, name).await?;
+        let primary_library = LibraryModelSqlite::create_with(&mut *tx, name).await?;
         // 2. Create associated user
         let password_hash = hash_password(password)?;
         let uuid = Uuid::new_v4();
         let sqlx_uuid = SqlxUuid::from_bytes(uuid.into_bytes());
         let result = sqlx::query!(
             r#"
-      INSERT INTO user (id, email, password_hash, primary_workspace_id) VALUES (?, ?, ?, ?)
+      INSERT INTO user (id, email, password_hash, primary_library_id) VALUES (?, ?, ?, ?)
       RETURNING id as "id: Uuid", email, password_hash
       "#,
             sqlx_uuid,
             email,
             password_hash,
-            primary_workspace.id
+            primary_library.id
         )
         .fetch_one(&mut *tx)
         .await;
@@ -94,9 +94,9 @@ impl UserModel for UserModelSqlite {
                     id: row.id,
                     email: row.email,
                     password_hash: row.password_hash,
-                    primary_workspace: Some(Workspace {
-                        id: primary_workspace.id,
-                        name: primary_workspace.name,
+                    primary_library: Some(Library {
+                        id: primary_library.id,
+                        name: primary_library.name,
                     }),
                 };
                 tx.commit().await?;
@@ -122,17 +122,17 @@ impl UserModel for UserModelSqlite {
     ) -> Result<(), AppError> {
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
-        // Only update primary_workspace if it was provided in the request
-        if let Some(workspace_update) = attributes.primary_workspace_id {
-            let workspace_value: Option<SqlxUuid> = match workspace_update {
-                WorkspaceUpdate::Set(workspace_id) => {
-                    Some(SqlxUuid::from_bytes(workspace_id.into_bytes()))
+        // Only update primary_library if it was provided in the request
+        if let Some(library_update) = attributes.primary_library_id {
+            let library_value: Option<SqlxUuid> = match library_update {
+                LibraryUpdate::Set(library_id) => {
+                    Some(SqlxUuid::from_bytes(library_id.into_bytes()))
                 }
-                WorkspaceUpdate::Unset => None,
+                LibraryUpdate::Unset => None,
             };
             sqlx::query!(
-                "UPDATE user SET primary_workspace_id = ? WHERE id = ?",
-                workspace_value,
+                "UPDATE user SET primary_library_id = ? WHERE id = ?",
+                library_value,
                 sqlx_user_id
             )
             .execute(&self.pool)
@@ -147,24 +147,24 @@ impl UserModelSqlite {
         Self { pool }
     }
 
-    fn build_user_with_workspace(
+    fn build_user_with_library(
         &self,
         id: Uuid,
         email: String,
         password_hash: String,
-        workspace_id: Option<Uuid>,
-        workspace_name: Option<String>,
+        library_id: Option<Uuid>,
+        library_name: Option<String>,
     ) -> User {
-        let workspace = workspace_id.map(|id| Workspace {
+        let library = library_id.map(|id| Library {
             id,
-            name: workspace_name.unwrap_or_default(),
+            name: library_name.unwrap_or_default(),
         });
 
         User {
             id,
             email,
             password_hash,
-            primary_workspace: workspace,
+            primary_library: library,
         }
     }
 }
@@ -220,28 +220,23 @@ mod tests {
     // TODO: Update user test
     #[tokio::test]
     async fn test_update_user_attributes() {
+        // TODO: Review
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("user_attr_updates@air.day")).await;
-        let workspace = db.workspaces.create(&user.id).await.unwrap();
-        let workspace_2 = db.workspaces.create(&user.id).await.unwrap();
+        let library = db.library._create(&user.id).await.unwrap();
+        let library_2 = db.library._create(&user.id).await.unwrap();
         let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
-        assert_eq!(
-            current_user_state.primary_workspace.unwrap().id,
-            workspace.id
-        );
+        assert_eq!(current_user_state.primary_library.unwrap().id, library.id);
         db.user
             .update_user(
                 &user.id,
                 UserAttributes {
-                    primary_workspace_id: Some(WorkspaceUpdate::Set(workspace_2.id)),
+                    primary_library_id: Some(LibraryUpdate::Set(library_2.id)),
                 },
             )
             .await
             .unwrap();
         let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
-        assert_eq!(
-            post_user_state.primary_workspace.unwrap().id,
-            workspace_2.id
-        );
+        assert_eq!(post_user_state.primary_library.unwrap().id, library_2.id);
     }
 }

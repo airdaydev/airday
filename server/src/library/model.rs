@@ -4,14 +4,14 @@ use uuid::Uuid;
 
 use crate::common::error::AppError;
 
-// Creating a workspace
+// Creating a library
 #[derive(Serialize, Debug, Clone)]
-pub struct Workspace {
+pub struct Library {
     pub id: Uuid,
     pub name: String,
 }
 
 #[async_trait]
-pub trait WorkspaceModel: Send + Sync {
-    async fn _create(&self, owner_id: &Uuid) -> Result<Workspace, AppError>;
+pub trait LibraryModel: Send + Sync {
+    async fn _create(&self, owner_id: &Uuid) -> Result<Library, AppError>;
 }

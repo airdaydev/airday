@@ -27,18 +27,18 @@ table ItemProto {
   completed: LWWRegisterBoolProto;
 }
 
-table WorkspaceProto {
+table LibraryProto {
   id: [uint8] (required);
   name: string;
 }
 
 table DeleteItemActionProto {
-  workspace_id: [uint8] (required);
+  library_id: [uint8] (required);
   id: [uint8];
 }
 
 table AddItemActionProto {
-  workspace_id: [uint8] (required);
+  library_id: [uint8] (required);
   item: ItemProto;
 }
 
@@ -50,8 +50,8 @@ table AuthenticateResponseProto {
   user_id: [uint8];
 }
 
-table WorkspaceSyncResponseProto {
-  primary_workspace: WorkspaceProto;
+table LibrarySyncResponseProto {
+  primary_library: LibraryProto;
 }
 
 union AirdayActionProto {
@@ -59,7 +59,7 @@ union AirdayActionProto {
   DeleteItemActionProto,
   AuthenticateActionProto,
   AuthenticateResponseProto,
-  WorkspaceSyncResponseProto,
+  LibrarySyncResponseProto,
 }
 
 table AirdayBatchComponentProto {

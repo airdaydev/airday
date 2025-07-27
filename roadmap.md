@@ -2,12 +2,12 @@
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] workspace api! view swapping
+- [] upgrade screen selection to workspaces
 - [] merge item api (send a bunch of items to the server & save)
-- [] remap initial local workspace to new on sign up!
+- [] remap initial local library to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
 - [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] delete items
-- [] set a default workspace ui
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] SYNC CLEAN UP before continuing
@@ -28,10 +28,8 @@
 - [] @airday/core - tracing
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Put up website
-- [] get all workspaces
+- [] get all libraries
 - [] handling browser tabs?!
-- [] reconsider "workspace" nomenclature in favour of "collection/ctx/air_ctx/context/namespace/container/base"
-- [] upgrade screen selection to workspaces, horizontal split only
 
 ## Protocol improvements (l8a)
 - [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)
