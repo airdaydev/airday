@@ -22,6 +22,7 @@ struct LWWRegisterBoolProto {
 }
 
 table ItemProto {
+  library_id: [uint8] (required);
   id: [uint8] (required);
   text: LWWRegisterStringProto;
   completed: LWWRegisterBoolProto;

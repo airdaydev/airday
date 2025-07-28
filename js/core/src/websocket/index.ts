@@ -12,14 +12,21 @@ import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common";
+import { EventEmitter } from "./events";
+
+interface WSEventMap {
+  authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
+}
 
 // TODO: Offline considerations
 export class WebsocketManager {
   core: AirdayCore;
   ws: WebSocket | null = null;
   address: URL;
+  events = new EventEmitter<WSEventMap>();
   connected = false;
   authorised = false;
+  // events = new Event();
   constructor(core: AirdayCore) {
     this.core = core;
     const address = core.root;
@@ -112,7 +119,10 @@ export class WebsocketManager {
           if (!this.authorised) {
             console.warn(this.core.session?.userId, stringify(userId), "huh");
           } else {
-            console.log("WS: User authenticated");
+            this.events.emit("authenticated", {
+              userId,
+              libraryId,
+            });
           }
           // TODO: Consider "auth" notification using JS native events
           this.core.mq.start();

@@ -6,6 +6,7 @@ use crate::{
     AppState,
     common::{error::AppError, utils::fbv_to_uuid},
     item::model::{Item, ItemAttributes},
+    library,
     sync::{
         outgoing::create_airday_message_with_builder,
         proto_generated::proto::{
@@ -13,7 +14,7 @@ use crate::{
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
             LibraryProto, LibraryProtoArgs, LibrarySyncResponseProto, LibrarySyncResponseProtoArgs,
         },
-        websocket::send_to_client,
+        websocket::{WebsocketConn, send_to_client},
     },
 };
 
@@ -68,17 +69,12 @@ impl AirdayMessage {
                             "Could not parse add item action",
                         )))
                         .unwrap();
-                    let item_buffer = action
-                        .item()
-                        .ok_or(AppError::ValidationError(String::from(
-                            "Could not parse add item action",
-                        )))
-                        .unwrap();
+                    let item_buffer = action.item();
 
                     let id = fbv_to_uuid(item_buffer.id())?;
-                    let library_id = fbv_to_uuid(action.library_id())?;
+                    let library_id = fbv_to_uuid(item_buffer.library_id())?;
                     let item = Item {
-                        id: id,
+                        id,
                         library_id,
                         attributes: ItemAttributes { text: None },
                     };
@@ -102,46 +98,14 @@ impl AirdayMessage {
     }
 }
 
-// TODO: DEFAULT LIBRARY SHOULD ALWAYS EXIST
-pub async fn create_primary_library_action<'a>(
-    state: &AppState,
-    builder: &mut FlatBufferBuilder<'a>,
-    user_id: &Uuid,
-) -> Result<WIPOffset<AirdayBatchComponentProto<'a>>, AppError> {
-    let res = state.db.user.get_by_id(user_id).await?;
-    if let Some(user) = res {
-        if let Some(primary_library) = user.primary_library {
-            let library_id_offset = builder.create_vector(primary_library.id.as_bytes());
-            let library_name_offset = builder.create_string(&primary_library.name);
-            let library_args = LibraryProtoArgs {
-                id: Some(library_id_offset),
-                name: Some(library_name_offset),
-            };
-            let library_offset = LibraryProto::create(builder, &library_args);
-            let primary_library_offset = LibrarySyncResponseProtoArgs {
-                primary_library: Some(library_offset),
-            };
-            let action_offset =
-                LibrarySyncResponseProto::create(builder, &primary_library_offset).as_union_value();
-            let batch_offset = AirdayBatchComponentProto::create(
-                builder,
-                &AirdayBatchComponentProtoArgs {
-                    action_type: AirdayActionProto::LibrarySyncResponseProto,
-                    action: Some(action_offset),
-                },
-            );
-            return Ok(batch_offset);
-        }
-    }
-    Err(AppError::ServerError(String::from(
-        "Couldn't find primary library",
-    )))
-}
-
 // TODO: Create error resposes for each message
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     let mut builder = FlatBufferBuilder::new();
     let mut action_offsets = vec![];
+    let user: Option<WebsocketConn> = {
+        let record = state.ws_connection_map.lock().unwrap();
+        record.get(socket_id).ok_or(None).clone()
+    };
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
@@ -187,19 +151,9 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                         );
                         action_offsets.push(offset);
                     }
-                    // Sneaky, change later
-                    let library_offset =
-                        create_primary_library_action(state, &mut builder, &sesh.user_id)
-                            .await
-                            .unwrap();
-                    action_offsets.push(library_offset);
                 }
             }
             AirdayAction::AddItem { _item } => {
-                // let user = {
-                //     let record = state.ws_connection_map.lock().unwrap();
-                //     record.get(socket_id).unwrap().clone()
-                // };
                 // let library_id: Uuid;
                 // if let Some(library) = message.library_id {
                 //     library_id = library;

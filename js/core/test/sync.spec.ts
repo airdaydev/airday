@@ -15,6 +15,11 @@ beforeAll(async () => {
 // TODO Test bulk sync
 test("Item sync", async () => {
   core.ws.connect();
+  // TODO: We shouldn't need async here... or we have to manage it
+  await new Promise((resolve) => {
+    if (core.ws.authorised) return resolve(null);
+    core.ws.events.on("authenticated", resolve);
+  });
   const newItem = new AirdayItem({
     libraryId: core.library.id!,
     attributes: {

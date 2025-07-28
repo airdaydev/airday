@@ -6,6 +6,42 @@ use crate::sync::proto_generated::proto::{
     MessageWrapperProto, MessageWrapperProtoArgs,
 };
 
+// TODO: Needs updating to new code
+// pub async fn send_shared_libraries<'a>(
+//     state: &AppState,
+//     builder: &mut FlatBufferBuilder<'a>,
+//     user_id: &Uuid,
+// ) -> Result<WIPOffset<AirdayBatchComponentProto<'a>>, AppError> {
+//     let res = state.db.user.get_by_id(user_id).await?;
+//     if let Some(user) = res {
+//         if let Some(primary_library) = user.primary_library {
+//             let library_id_offset = builder.create_vector(primary_library.id.as_bytes());
+//             let library_name_offset = builder.create_string(&primary_library.name);
+//             let library_args = LibraryProtoArgs {
+//                 id: Some(library_id_offset),
+//                 name: Some(library_name_offset),
+//             };
+//             let library_offset = LibraryProto::create(builder, &library_args);
+//             let primary_library_offset = LibrarySyncResponseProtoArgs {
+//                 primary_library: Some(library_offset),
+//             };
+//             let action_offset =
+//                 LibrarySyncResponseProto::create(builder, &primary_library_offset).as_union_value();
+//             let batch_offset = AirdayBatchComponentProto::create(
+//                 builder,
+//                 &AirdayBatchComponentProtoArgs {
+//                     action_type: AirdayActionProto::LibrarySyncResponseProto,
+//                     action: Some(action_offset),
+//                 },
+//             );
+//             return Ok(batch_offset);
+//         }
+//     }
+//     Err(AppError::ServerError(String::from(
+//         "Couldn't find primary library",
+//     )))
+// }
+
 pub fn create_airday_message_with_builder<'a>(
     builder: &mut FlatBufferBuilder<'a>,
     action_offsets: Vec<WIPOffset<AirdayBatchComponentProto<'a>>>,

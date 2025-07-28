@@ -111,11 +111,11 @@ export class AddItemAction extends Action {
     // return new AddItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
+    const libraryIdOffset = ItemProto.createLibraryIdVector(
+      builder,
+      this.item.libraryId,
+    );
     const idOffset = ItemProto.createIdVector(builder, this.item.id);
-    // const libraryIdOffset = AddItemActionProto.createLibraryIdVector(
-    //   builder,
-    //   this.item.libraryId,
-    // );
     let textOffset;
     if (this.item.attributes.text) {
       const valueOffset = builder.createString(this.item.attributes.text.data);
@@ -131,6 +131,7 @@ export class AddItemAction extends Action {
       ItemProto.addText(builder, textOffset);
     }
     ItemProto.addId(builder, idOffset);
+    ItemProto.addLibraryId(builder, libraryIdOffset);
     const itemOffset = ItemProto.endItemProto(builder);
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addItem(builder, itemOffset);
