@@ -39,6 +39,27 @@ pub struct ItemAttributesJson {
     text: Option<LWWDefinitionJson<String>>,
 }
 
+pub fn convert_item_attributes_to_json(
+    attributes: &ItemAttributes,
+) -> Result<JsonAttributes, AppError> {
+    let mut json_attrs = ItemAttributesJson { text: None };
+
+    // Convert text attribute if it exists
+    if let Some(text_lww) = &attributes.text {
+        json_attrs.text = Some(LWWDefinitionJson {
+            utc: text_lww.timestamp.utc as f64,
+            pid: text_lww.timestamp.pid as f64,
+            data: text_lww.data.clone(),
+        });
+    }
+
+    // Serialize to JSON
+    let json_value = serde_json::to_value(json_attrs)
+        .map_err(|err| AppError::ServerError(format!("Failed to serialize attributes: {}", err)))?;
+
+    Ok(Some(json_value))
+}
+
 impl ItemAttributesJson {
     fn merge(&self, attrs: &ItemAttributes) -> Option<ItemAttributes> {
         let mut attributes = ItemAttributes::new();
@@ -112,6 +133,7 @@ pub trait ItemModel: Send + Sync {
         &self,
         // library: &Uuid,
     ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
-    async fn merge(&self, library_id: &Uuid, item: &Item) -> Result<(), AppError>;
+    async fn merge(&self, item: &Item) -> Result<(), AppError>;
+    async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

@@ -1,13 +1,17 @@
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt};
 use sqlx::{SqlitePool, sqlite::SqliteRow};
 use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
-    item::model::{Item, ItemAttributesJson, ItemModel, JsonAttributes, SqlItem},
+    item::model::{
+        Item, ItemAttributesJson, ItemModel, JsonAttributes, SqlItem,
+        convert_item_attributes_to_json,
+    },
 };
 
 pub struct ItemModelSqlite {
@@ -23,7 +27,8 @@ impl ItemModelSqlite {
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
     // TODO: Break this into parts
-    async fn merge(&self, library_id: &Uuid, item: &Item) -> Result<(), AppError> {
+    async fn merge(&self, item: &Item) -> Result<(), AppError> {
+        println!("We MERGING");
         // Start trx, read, merge, end trx
         // let tx = sqlx::SqliteTransaction;
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
@@ -32,14 +37,15 @@ impl ItemModel for ItemModelSqlite {
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
             updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes" FROM item
             WHERE library_id = ? AND id = ?"#,
-            library_id,
+            item.library_id,
             item.id,
         )
         .fetch_optional(&mut *tx)
         .await
         .map_err(|err| AppError::from(err))?;
-        if let Some(mut sql_item) = result {
-            if let Some(tombstone) = sql_item.tombstone_utc {
+        // Does item exist?
+        if let Some(sql_item) = result {
+            if let Some(_) = sql_item.tombstone_utc {
                 // BLACKHOLE
                 // TODO: Consider usage pattern to determine type - we would usually want to give the user back this info
                 return Err(AppError::ValidationError(String::from(
@@ -57,8 +63,35 @@ impl ItemModel for ItemModelSqlite {
             return Ok(());
         } else {
             // TODO: This is where we insert a new item
+            let _ = self.insert(item).await.unwrap();
             Err(AppError::ServerError(String::from("Not yet implemented")))
         }
+    }
+    async fn insert(&self, item: &Item) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
+
+        // Convert ItemAttributes to JsonAttributes
+        let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
+
+        // Insert the item with current timestamp
+        let now = chrono::Utc::now().naive_utc();
+
+        sqlx::query!(
+            r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
+               VALUES (?, ?, ?, ?, ?)"#,
+            item.id,
+            item.library_id,
+            attributes_json,
+            now,
+            Option::<NaiveDateTime>::None
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|err| AppError::from(err))?;
+
+        tx.commit().await.map_err(|err| AppError::from(err))?;
+
+        Ok(())
     }
     async fn get_by_library(
         &self,

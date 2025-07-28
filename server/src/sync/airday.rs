@@ -25,8 +25,8 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { _item: Item }, // TODO: possible properties not this
-                             // DeleteItem { id: String },
+    AddItem { item: Item }, // TODO: possible properties not this
+                            // DeleteItem { id: String },
 }
 
 impl AirdayMessage {
@@ -78,7 +78,7 @@ impl AirdayMessage {
                         library_id,
                         attributes: ItemAttributes { text: None },
                     };
-                    actions.push(AirdayAction::AddItem { _item: item });
+                    actions.push(AirdayAction::AddItem { item });
                 }
                 AirdayActionProto::DeleteItemActionProto => {
                     let action = batch_component
@@ -99,10 +99,17 @@ impl AirdayMessage {
 }
 
 // TODO: Create error resposes for each message
-pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
+pub async fn message_handler(
+    state: &AppState,
+    message: &AirdayMessage,
+    socket_id: &Uuid,
+) -> Result<(), AppError> {
     let mut builder = FlatBufferBuilder::new();
     let mut action_offsets = vec![];
-    let conn = state.ws.get_conn(socket_id);
+    let Some(conn) = state.ws.get_conn(socket_id) else {
+        // Connection may have ended before messages were processed
+        return Ok(());
+    };
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
@@ -123,10 +130,11 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     if set_conn_user_id == false {
                         // TODO: SPAN!?
                         println!("WS: User disconnected while authenticating");
-                        return ();
+                        return Ok(());
                     }
                     // TODO: Span?
                     println!("User {:?} authenticated!", sesh.user_id);
+                    // TODO: Don't panic!
                     if let Some(user) = state.db.user.get_by_id(&sesh.user_id).await.unwrap() {
                         let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
                         let library_id_offset =
@@ -150,18 +158,33 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     }
                 }
             }
-            AirdayAction::AddItem { _item } => {
-                // let library_id: Uuid;
-                // if let Some(library) = message.library_id {
-                //     library_id = library;
-                // } else {
-                //     // Library id required
-                //     return ();
-                // }
-                // TODO: Security! Confirm user has access to library!
-                // t.user_id;
-                // TODO: Verify library_id is correct (+ derive from session)
-                // state.db.item.merge(&library_id, &item);
+            AirdayAction::AddItem { item } => {
+                let Some(user_id) = conn.user_id else {
+                    // Unauthorised, ignore
+                    // TODO: ...
+                    return Ok(());
+                };
+                // Confirm user has access (TODO: Cache user's main workspace in memory somewhere - ws map?)
+                // // TODO: Don't panic
+                let Some(user) = state.db.user.get_by_id(&user_id).await.unwrap() else {
+                    // User doesn't exist!
+                    return Err(AppError::ServerError(String::from(
+                        "cannot find user referenced in ws conn map - deleted?",
+                    )));
+                };
+
+                // TODO: Extend for shared access
+                let user_has_access = match user.primary_library {
+                    Some(lib) => lib.id == item.library_id,
+                    None => false,
+                };
+
+                if !user_has_access {
+                    return Err(AppError::AuthorisationError(String::from(
+                        "User does not have access to this library",
+                    )));
+                }
+                let _ = state.db.item.merge(&item).await;
                 // TODO: Acknowledgement message + fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }
@@ -169,4 +192,5 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
     }
     let msg = create_airday_message_with_builder(&mut builder, action_offsets);
     send_to_client(&state, &socket_id, Message::Binary(msg.into())).await;
+    Ok(())
 }

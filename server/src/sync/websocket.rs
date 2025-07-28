@@ -122,6 +122,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             if let Ok(msg) = parsed_message {
                                 cur_span
                                     .set_attribute("action_count", msg.actions.len().to_string());
+                                // TODO: Do something with a bad result!
                                 message_handler(&state, &msg, &socket_id).await;
                             } else if let Err(err) = parsed_message {
                                 // TODO & test if there are no actions
