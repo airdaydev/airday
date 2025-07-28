@@ -30,16 +30,34 @@ pub struct WebsocketConn {
     pub user_id: Option<Uuid>,
 }
 
+pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketConn>>>;
+
+#[derive(Clone)]
+pub struct WebsocketState {
+    pub conn_map: WSConnectionMap,
+}
+
+impl WebsocketState {
+    pub fn new() -> Self {
+        WebsocketState {
+            conn_map: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+    pub fn get_conn(&self, socket_id: &Uuid) -> Option<WebsocketConn> {
+        let record = self.conn_map.lock().unwrap();
+        if let Some(conn) = record.get(socket_id) {
+            Some(conn.clone())
+        } else {
+            None
+        }
+    }
+}
+
 // type WSRoomName = String;
 // pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketConn>>>;
 // pub fn build_ws_sub_map() -> WSSubMap {
 //     Arc::new(Mutex::new(HashMap::new()))
 // }
-
-pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketConn>>>;
-pub fn build_ws_conn_map() -> WSConnectionMap {
-    Arc::new(Mutex::new(HashMap::new()))
-}
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
@@ -51,7 +69,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         user_id: None,
     };
     state
-        .ws_connection_map
+        .ws
+        .conn_map
         .lock()
         .unwrap()
         .insert(socket_id, connection);
@@ -129,7 +148,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
         .instrument(info_span!("ws_receive", socket_id = %socket_id))
         .await
     }
-    state.ws_connection_map.lock().unwrap().remove(&socket_id);
+    state.ws.conn_map.lock().unwrap().remove(&socket_id);
 }
 
 async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver<Message>) {
@@ -144,7 +163,7 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
 
 pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {
     let sender = {
-        let mut connections = state.ws_connection_map.lock().unwrap();
+        let mut connections = state.ws.conn_map.lock().unwrap();
         connections
             .get_mut(client_id)
             .map(|client| client.sender.clone())

@@ -20,7 +20,6 @@ export class AirdaySync {
     this.idb = idb;
     this.idbHandle = idb.handle;
   }
-  wrapAction() {}
   // TODO: Should this just be a general sync message with what items and since when!?
   // TODO: Also we should store this in our database
   async getLibraries() {}

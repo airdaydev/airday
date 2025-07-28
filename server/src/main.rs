@@ -53,7 +53,7 @@ use tracing::{info, info_span};
 struct AppState {
     db: Db,
     config: AirdayConfig,
-    ws_connection_map: sync::websocket::WSConnectionMap,
+    ws: sync::websocket::WebsocketState,
     // ws_sub_map: sync::websocket::WSSubMap,
 }
 
@@ -96,8 +96,7 @@ async fn main() {
     let state = AppState {
         db: db,
         config: cfg.clone(),
-        // ws_sub_map: sync::websocket::build_ws_sub_map(),
-        ws_connection_map: sync::websocket::build_ws_conn_map(),
+        ws: sync::websocket::WebsocketState::new(),
     };
     info!(port = 3000, address = "0.0.0.0", "Airday server started");
     let public = Router::new()

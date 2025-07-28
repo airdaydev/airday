@@ -102,10 +102,7 @@ impl AirdayMessage {
 pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_id: &Uuid) -> () {
     let mut builder = FlatBufferBuilder::new();
     let mut action_offsets = vec![];
-    let user: Option<WebsocketConn> = {
-        let record = state.ws_connection_map.lock().unwrap();
-        record.get(socket_id).ok_or(None).clone()
-    };
+    let conn = state.ws.get_conn(socket_id);
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
@@ -115,7 +112,7 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                 if let Some(sesh) = session_option {
                     let set_conn_user_id: bool = {
                         // Mutex scope
-                        let mut map = state.ws_connection_map.lock().unwrap();
+                        let mut map = state.ws.conn_map.lock().unwrap();
                         if let Some(conn) = map.get_mut(&socket_id) {
                             conn.user_id = Some(sesh.user_id);
                             true
