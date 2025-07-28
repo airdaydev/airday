@@ -3,8 +3,6 @@ import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
 import { tracer } from "../src/tracer";
-import { v4 } from "uuid";
-import { Uuidv4 } from "../src/common";
 
 const core = createTestCore();
 
@@ -18,7 +16,7 @@ beforeAll(async () => {
 test("Item sync", async () => {
   core.ws.connect();
   const newItem = new AirdayItem({
-    libraryId: new Uuidv4(),
+    libraryId: core.library.id!,
     attributes: {
       text: LWWRegisterString.fromString("test"),
     },

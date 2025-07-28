@@ -166,23 +166,28 @@ pub async fn message_handler(state: &AppState, message: &AirdayMessage, socket_i
                     }
                     // TODO: Span?
                     println!("User {:?} authenticated!", sesh.user_id);
-                    let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
-                    let action_offset = AuthenticateResponseProto::create(
-                        &mut builder,
-                        &AuthenticateResponseProtoArgs {
-                            user_id: Some(user_id_offset),
-                        },
-                    )
-                    .as_union_value();
-                    let offset = AirdayBatchComponentProto::create(
-                        &mut builder,
-                        &AirdayBatchComponentProtoArgs {
-                            action_type: AirdayActionProto::AuthenticateResponseProto,
-                            action: Some(action_offset),
-                        },
-                    );
+                    if let Some(user) = state.db.user.get_by_id(&sesh.user_id).await.unwrap() {
+                        let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
+                        let library_id_offset =
+                            builder.create_vector(user.primary_library.unwrap().id.as_bytes());
+                        let action_offset = AuthenticateResponseProto::create(
+                            &mut builder,
+                            &AuthenticateResponseProtoArgs {
+                                user_id: Some(user_id_offset),
+                                library_id: Some(library_id_offset),
+                            },
+                        )
+                        .as_union_value();
+                        let offset = AirdayBatchComponentProto::create(
+                            &mut builder,
+                            &AirdayBatchComponentProtoArgs {
+                                action_type: AirdayActionProto::AuthenticateResponseProto,
+                                action: Some(action_offset),
+                            },
+                        );
+                        action_offsets.push(offset);
+                    }
                     // Sneaky, change later
-                    action_offsets.push(offset);
                     let library_offset =
                         create_primary_library_action(state, &mut builder, &sesh.user_id)
                             .await

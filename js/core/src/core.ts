@@ -56,8 +56,8 @@ export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
-  primaryLibrary: Library = new Library({
-    name: "Primary",
+  library: Library = new Library({
+    name: "private",
     local: true,
   });
   ws: WebsocketManager; // websocket layer

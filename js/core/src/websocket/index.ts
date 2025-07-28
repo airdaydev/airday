@@ -102,8 +102,13 @@ export class WebsocketManager {
           const userId = Uuidv4.fromFBVector(
             authResponse.userId.bind(authResponse),
           );
+          const libraryId = Uuidv4.fromFBVector(
+            authResponse.libraryId.bind(authResponse),
+          );
           // Confirm things make sense and authorise
+          // TODO: Confirm library id valid
           this.authorised = this.core.session?.userId === stringify(userId);
+          this.core.library.id = libraryId; // TODO: Handle previous library/store?
           if (!this.authorised) {
             console.warn(this.core.session?.userId, stringify(userId), "huh");
           } else {
@@ -129,12 +134,12 @@ export class WebsocketManager {
               primaryLibraryBuffer.id.bind(primaryLibraryBuffer),
             );
             let name = primaryLibraryBuffer.name() || "";
-            this.core.primaryLibrary = new Library({
+            this.core.library = new Library({
               id,
               name,
               local: true,
             });
-            console.log(this.core.primaryLibrary);
+            console.log(this.core.library);
           }
           break;
         default:

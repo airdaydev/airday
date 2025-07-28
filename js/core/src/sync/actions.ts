@@ -1,5 +1,5 @@
 import { AirdayItem, type AirdayItemAttributes } from "./model";
-import { LWWRegisterString, LWWTimestamp } from "../crdt/lww";
+import { LWWRegister, LWWRegisterString, LWWTimestamp } from "../crdt/lww";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
   ItemProto,
@@ -112,26 +112,27 @@ export class AddItemAction extends Action {
   }
   addToFlatBuffer(builder: Builder) {
     const idOffset = ItemProto.createIdVector(builder, this.item.id);
-    ItemProto.startItemProto(builder);
-    ItemProto.addId(builder, idOffset);
+    // const libraryIdOffset = AddItemActionProto.createLibraryIdVector(
+    //   builder,
+    //   this.item.libraryId,
+    // );
+    let textOffset;
     if (this.item.attributes.text) {
+      const valueOffset = builder.createString(this.item.attributes.text.data);
+      LWWRegisterStringProto.startLWWRegisterStringProto(builder);
       const timestampOffset =
         this.item.attributes.text.timestamp.addToFlatBuffer(builder);
-      const valueOffset = builder.createString(this.item.attributes.text.data);
-      const textOffset = LWWRegisterStringProto.createLWWRegisterStringProto(
-        builder,
-        timestampOffset,
-        valueOffset,
-      );
+      LWWRegisterStringProto.addTimestamp(builder, timestampOffset);
+      LWWRegisterStringProto.addData(builder, valueOffset);
+      textOffset = LWWRegisterStringProto.endLWWRegisterStringProto(builder);
+    }
+    ItemProto.startItemProto(builder);
+    if (textOffset) {
       ItemProto.addText(builder, textOffset);
     }
+    ItemProto.addId(builder, idOffset);
     const itemOffset = ItemProto.endItemProto(builder);
-    const libraryIdOffset = AddItemActionProto.createLibraryIdVector(
-      builder,
-      this.item.libraryId,
-    );
     AddItemActionProto.startAddItemActionProto(builder);
-    AddItemActionProto.addLibraryId(builder, libraryIdOffset);
     AddItemActionProto.addItem(builder, itemOffset);
     const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
     const batchComponentOffset =
