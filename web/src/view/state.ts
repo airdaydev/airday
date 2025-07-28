@@ -31,9 +31,7 @@ export class ViewState {
     createSignal<ActiveRegionType>("container");
   activePane = createSignal<ViewNode | undefined>();
   sidebarVisible = createSignal<boolean>(true);
-  // workspace = new Workspace();
-  workspaces = createSignal<Workspace[]>([new Workspace()]);
-  activeWorkspace = createSignal<number>(0);
+  workspace = new Workspace();
   scene = createSignal<Scene>("default");
   focus?: GenericItem;
   library: AirLibrary;
@@ -43,25 +41,8 @@ export class ViewState {
     this.library = library;
     this.keyboard = new KeyboardShortcuts(library, this);
   }
-  get workspace() {
-    return this.workspaces[0]()[this.activeWorkspace[0]()];
-  }
   loadWorkspaces() {
     // Load from local storage (workspaces = per device)
-  }
-  addWorkspace() {
-    let index = 0;
-    this.workspaces[1]((arr) => {
-      index = arr.length;
-      return [...arr, new Workspace()];
-    });
-    this.activeWorkspace[1](index);
-  }
-  closeActiveWorskpace() {
-    this.workspaces[1]((arr) => {
-      const filtered = arr.filter((workspace) => this.workspace !== workspace);
-      return filtered;
-    });
   }
   activeView() {
     this.workspace.activeNode;
@@ -69,9 +50,6 @@ export class ViewState {
   saveWorkspaceState() {
     // Save via library id
     // localStorage.setItem('workspaces', value)
-  }
-  switchWorkspace(index = 0) {
-    this.activeWorkspace[1](index);
   }
   count() {
     return this.workspace.count();
