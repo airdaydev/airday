@@ -11,9 +11,9 @@ pnpm run test-server
 sqlx database reset -y --source sqlite/migrations
 
 ## Package tests
-pnpm run --dir packages/cal test --run
-pnpm run --dir packages/list test --run
-pnpm run --dir packages/tracer test --run
+pnpm run --dir js/cal test --run
+pnpm run --dir js/list test --run
+pnpm run --dir js/tracer test --run
 
 # Start server in background
 cargo run --manifest-path ./server/Cargo.toml -- \
@@ -29,7 +29,7 @@ done
 
 # Run tests
 set +e # disable exit on error
-pnpm --dir ./packages/core test
+pnpm --dir ./js/core test
 TEST_EXIT_CODE=$?
 set -e # enable exit on error
 

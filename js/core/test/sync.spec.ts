@@ -3,6 +3,8 @@ import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
 import { tracer } from "../src/tracer";
+import { v4 } from "uuid";
+import { Uuidv4 } from "../src/common";
 
 const core = createTestCore();
 
@@ -16,7 +18,10 @@ beforeAll(async () => {
 test("Item sync", async () => {
   core.ws.connect();
   const newItem = new AirdayItem({
-    text: LWWRegisterString.fromString("test"),
+    libraryId: new Uuidv4(),
+    attributes: {
+      text: LWWRegisterString.fromString("test"),
+    },
   });
   core.sync.createItem(newItem);
   await new Promise((resolve, reject) => {
@@ -33,8 +38,6 @@ test("Item sync", async () => {
   // });
   // const t = await core.ws.send("type");
 });
-
-test("sync", () => {});
 
 afterAll(async () => {
   console.log("Flushing traces");

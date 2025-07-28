@@ -18,7 +18,7 @@ enum SyncState {
 
 export interface AirdayItemConstructorOpts {
   // Immutable
-  id: Uuidv4;
+  id?: Uuidv4;
   libraryId: Uuidv4;
   // LWW attributes
   attributes: AirdayItemAttributes;
@@ -29,9 +29,11 @@ export interface AirdayItemConstructorOpts {
 const AirdayItemSerialisedSchema = v.object({
   id: v.string().required(),
   libraryId: v.string().required(),
-  attributes: v.object({
-    text: LWWSerialiseSchema,
-  }),
+  attributes: v
+    .object({
+      text: LWWSerialiseSchema,
+    })
+    .required(),
   syncState: v
     .number()
     .anyOf([v.number().const(0), v.number().const(1), v.number().const(2)]),
@@ -88,7 +90,7 @@ export class AirdayItem {
     ensureSerialisedItem(json);
     let typed = json as AirdayItemSerialised;
     const attributes: AirdayItemAttributes = {};
-    if (typed.attributes?.text) {
+    if (typed.attributes.text) {
       attributes.text = LWWRegister.fromJSON(typed.attributes.text);
     }
     return new AirdayItem({

@@ -1,7 +1,7 @@
 use crate::{
     common::error::AppError,
     library::{model::Library, sqlite::LibraryModelSqlite},
-    user::model::{LibraryUpdate, User, UserAttributes, UserModel, hash_password},
+    user::model::{User, UserModel, hash_password},
 };
 use async_trait::async_trait;
 use sqlx::{SqlitePool, types::Uuid as SqlxUuid};
@@ -115,31 +115,31 @@ impl UserModel for UserModelSqlite {
         }
     }
 
-    async fn update_user(
-        &self,
-        user_id: &Uuid,
-        attributes: UserAttributes,
-    ) -> Result<(), AppError> {
-        let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
+    // async fn update_user(
+    //     &self,
+    //     user_id: &Uuid,
+    //     attributes: UserAttributes,
+    // ) -> Result<(), AppError> {
+    //     let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
-        // Only update primary_library if it was provided in the request
-        if let Some(library_update) = attributes.primary_library_id {
-            let library_value: Option<SqlxUuid> = match library_update {
-                LibraryUpdate::Set(library_id) => {
-                    Some(SqlxUuid::from_bytes(library_id.into_bytes()))
-                }
-                LibraryUpdate::Unset => None,
-            };
-            sqlx::query!(
-                "UPDATE user SET primary_library_id = ? WHERE id = ?",
-                library_value,
-                sqlx_user_id
-            )
-            .execute(&self.pool)
-            .await?;
-        }
-        Ok(())
-    }
+    //     // Only update primary_library if it was provided in the request
+    //     if let Some(library_update) = attributes.primary_library_id {
+    //         let library_value: Option<SqlxUuid> = match library_update {
+    //             LibraryUpdate::Set(library_id) => {
+    //                 Some(SqlxUuid::from_bytes(library_id.into_bytes()))
+    //             }
+    //             LibraryUpdate::Unset => None,
+    //         };
+    //         sqlx::query!(
+    //             "UPDATE user SET primary_library_id = ? WHERE id = ?",
+    //             library_value,
+    //             sqlx_user_id
+    //         )
+    //         .execute(&self.pool)
+    //         .await?;
+    //     }
+    //     Ok(())
+    // }
 }
 
 impl UserModelSqlite {
@@ -217,26 +217,26 @@ mod tests {
         assert!(not_found.is_none());
     }
 
-    // TODO: Update user test
-    #[tokio::test]
-    async fn test_update_user_attributes() {
-        // TODO: Review
-        let db = test_util::create_test_db().await;
-        let user = test_util::mock_user(&db, String::from("user_attr_updates@air.day")).await;
-        let library = db.library._create(&user.id).await.unwrap();
-        let library_2 = db.library._create(&user.id).await.unwrap();
-        let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
-        assert_eq!(current_user_state.primary_library.unwrap().id, library.id);
-        db.user
-            .update_user(
-                &user.id,
-                UserAttributes {
-                    primary_library_id: Some(LibraryUpdate::Set(library_2.id)),
-                },
-            )
-            .await
-            .unwrap();
-        let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
-        assert_eq!(post_user_state.primary_library.unwrap().id, library_2.id);
-    }
+    // TODO: Reinstate if we need to update a user property
+    // #[tokio::test]
+    // async fn test_update_user_attributes() {
+    //     // TODO: Review
+    //     let db = test_util::create_test_db().await;
+    //     let user = test_util::mock_user(&db, String::from("user_attr_updates@air.day")).await;
+    //     let library = db.library._create(&user.id).await.unwrap();
+    //     let library_2 = db.library._create(&user.id).await.unwrap();
+    //     let current_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
+    //     assert_eq!(current_user_state.primary_library.unwrap().id, library.id);
+    //     db.user
+    //         .update_user(
+    //             &user.id,
+    //             UserAttributes {
+    //                 primary_library_id: Some(LibraryUpdate::Set(library_2.id)),
+    //             },
+    //         )
+    //         .await
+    //         .unwrap();
+    //     let post_user_state = db.user.get_by_id(&user.id).await.unwrap().unwrap();
+    //     assert_eq!(post_user_state.primary_library.unwrap().id, library_2.id);
+    // }
 }

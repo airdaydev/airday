@@ -14,24 +14,26 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum LibraryUpdate {
-    Set(Uuid),
-    Unset,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// #[serde(untagged)]
+// pub enum LibraryUpdate {
+//     Set(Uuid),
+//     Unset,
+// }
 
 // TODO: Remove primary _library_id as a user modifiable object
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub primary_library_id: Option<LibraryUpdate>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 impl UserAttributes {
     pub fn new() -> Self {
         UserAttributes {
-            primary_library_id: None,
+            first_name: None,
+            last_name: None,
         }
     }
 }
@@ -41,8 +43,8 @@ pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
     async fn create(&self, email: &str, password: &str) -> Result<User, AppError>;
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<User>, AppError>;
-    async fn update_user(&self, user_id: &Uuid, attributes: UserAttributes)
-    -> Result<(), AppError>;
+    // async fn update_user(&self, user_id: &Uuid, attributes: UserAttributes)
+    // -> Result<(), AppError>;
 }
 
 #[derive(sqlx::FromRow, Debug, Clone)]
@@ -109,11 +111,10 @@ pub fn verify_password(password_hash: &str, password: &str) -> Result<(), AppErr
     }
 }
 
-pub async fn update_user_handler(
-    State(state): State<AppState>,
-    session: UserSession,
-    Json(payload): Json<UserAttributes>,
+pub async fn update_user_handler(// State(state): State<AppState>,
+    // session: UserSession,
+    // Json(payload): Json<UserAttributes>,
 ) -> Result<StatusCode, AppError> {
-    state.db.user.update_user(&session.user_id, payload).await?;
-    Ok(StatusCode::OK)
+    // state.db.user.update_user(&session.user_id, payload).await?;
+    Ok(StatusCode::NOT_IMPLEMENTED)
 }
