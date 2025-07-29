@@ -16,7 +16,7 @@ export class AirdaySync {
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => {
-      console.debug(`ack: ${ack}`);
+      console.debug("ack", ack);
       const action = this.pendingActions.get(ack.actionId);
       if (action instanceof AddItemAction) {
         action.item.endSync();

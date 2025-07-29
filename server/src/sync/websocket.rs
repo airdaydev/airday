@@ -123,7 +123,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 cur_span
                                     .set_attribute("action_count", msg.actions.len().to_string());
                                 // TODO: Do something with a bad result!
-                                message_handler(&state, &msg, &socket_id).await;
+                                message_handler(&state, &msg, &socket_id).await.unwrap();
                             } else if let Err(err) = parsed_message {
                                 // TODO & test if there are no actions
                                 error!("Error parsing Airday message: {:?}", err);

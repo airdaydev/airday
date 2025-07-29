@@ -71,20 +71,23 @@ export class AuthenticateAction extends AirdayAction {
   }
   addToFlatBuffer(builder: Builder): Offset {
     const sessionTokenOffset = builder.createString(this.sessionToken);
-    const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
-      builder,
-      sessionTokenOffset,
-    );
     const actionIdOffset = AirdayBatchComponentProto.createActionIdVector(
       builder,
       this.id,
     );
-    const offset = AirdayBatchComponentProto.createAirdayBatchComponentProto(
+    const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
+      builder,
+      sessionTokenOffset,
+    );
+    AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
+    AirdayBatchComponentProto.addActionType(
       builder,
       AirdayActionProto.AuthenticateActionProto,
-      actionOffset,
-      actionIdOffset,
     );
+    AirdayBatchComponentProto.addAction(builder, actionOffset);
+    AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
+    const offset =
+      AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);
     return offset;
   }
 }
@@ -148,13 +151,15 @@ export class AddItemAction extends AirdayAction {
       builder,
       this.id,
     );
+    AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
+    AirdayBatchComponentProto.addActionType(
+      builder,
+      AirdayActionProto.AddItemActionProto,
+    );
+    AirdayBatchComponentProto.addAction(builder, actionOffset);
+    AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
     const batchComponentOffset =
-      AirdayBatchComponentProto.createAirdayBatchComponentProto(
-        builder,
-        AirdayActionProto.AddItemActionProto,
-        actionOffset,
-        actionIdOffset,
-      );
+      AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);
     return batchComponentOffset;
   }
 }
