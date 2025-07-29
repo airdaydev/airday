@@ -12,17 +12,17 @@ export class AirdaySync {
   private idb: AirdayIDB | null = null;
   private idbHandle: AirdayIDBPDatabase | null = null;
   private core: AirdayCore;
-  private pendingActions = new Map<Uuidv4, AirdayAction>();
+  pendingActions = new Map<string, AirdayAction>(); // string = hex type
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => {
       console.debug("ack", ack);
-      const action = this.pendingActions.get(ack.actionId);
+      const action = this.pendingActions.get(ack.actionId.toHex());
       if (action instanceof AddItemAction) {
         action.item.endSync();
         // TODO: targeted change instead of blunt (pass in idb to endSync?)
         this.idb?.item.upsert([action.item]);
-        this.pendingActions.delete(ack.actionId);
+        this.pendingActions.delete(ack.actionId.toHex());
       }
     });
   }
@@ -46,8 +46,9 @@ export class AirdaySync {
     const action = new AddItemAction(item);
     this.idb?.item.upsert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
-    this.pendingActions.set(action.id, action);
+    this.pendingActions.set(action.id.toHex(), action);
     this.core.ws.enqueueAirdayMessage(message);
+    return action;
   }
   deleteItem(id: String) {}
 }

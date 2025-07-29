@@ -1,4 +1,4 @@
-import { test, beforeAll, afterAll } from "bun:test";
+import { test, beforeAll, afterAll, expect } from "bun:test";
 import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
@@ -28,15 +28,17 @@ test("Item sync", async () => {
       text: LWWRegisterString.fromString("test"),
     },
   });
-  core.sync.createItem(newItem);
-  await new Promise((resolve, reject) => {
-    // TODO: Flush and close!
-    setTimeout(() => {
-      console.log("awaiting one second (hack)");
+  let action = core.sync.createItem(newItem);
+  const pending = core.sync.pendingActions.get(action.id.toHex());
+  expect(pending?.id).toBe(action.id);
+  await new Promise((resolve) => {
+    core.ws.events.once("ack", (data) => {
+      console.log(data);
       core.ws.close();
       resolve(null);
-    }, 1000);
+    });
   });
+  expect(core.sync.pendingActions.size).toBe(0);
   // TODO: Ensure item is now marked as synced & clean
   // get items from beginning
 });
