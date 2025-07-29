@@ -22,6 +22,7 @@ import type { AirdayCore } from "../core";
 
 export class AirdayAction {
   id = new Uuidv4();
+  attempts = 0;
   addToFlatBuffer(build: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
   }
@@ -88,6 +89,7 @@ export class AuthenticateAction extends AirdayAction {
 
 export class AddItemAction extends AirdayAction {
   item: AirdayItem;
+  dirty = false;
   constructor(item: AirdayItem) {
     super();
     this.item = item;
@@ -150,6 +152,7 @@ export class AddItemAction extends AirdayAction {
   }
   ack(core: AirdayCore) {
     // We need to update the in mem AND idb library
+    this.item.startSync();
   }
 }
 

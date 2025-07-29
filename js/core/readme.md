@@ -7,7 +7,7 @@ Airday JavaScript Client handling
 - Persistent cache backed by indexedb
 - Undo/redo
 - TODO: E2EE management
-- TODO: JMAP calendar management
+- TODO: Calendar management
 - TODO: Profile uuid string vs bytes representation
 - TODO: literally just a bit instead of top level message definition..? e.g. 0 = Airday, 1 = JMAP
 

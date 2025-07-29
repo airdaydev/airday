@@ -1,4 +1,5 @@
 import {
+  globalTSProducer,
   LWWRegister,
   LWWRegisterString,
   LWWSerialiseSchema,
@@ -10,12 +11,6 @@ export interface AirdayItemAttributes {
   text?: LWWRegister<string>;
 }
 
-export enum SyncState {
-  local = 0, // Never synced, immutable vals client-side generated
-  synced = 1, // Client has received server ack on all latest syncs
-  dirty = 2, // Local mutable modifications not synced
-}
-
 export interface AirdayItemConstructorOpts {
   // Immutable
   id?: Uuidv4;
@@ -23,7 +18,8 @@ export interface AirdayItemConstructorOpts {
   // LWW attributes
   attributes: AirdayItemAttributes;
   // Client-only
-  syncState?: SyncState;
+  lastSync?: number | null;
+  lastModified?: number | null;
 }
 
 const AirdayItemSerialisedSchema = v.object({
@@ -34,7 +30,8 @@ const AirdayItemSerialisedSchema = v.object({
       text: LWWSerialiseSchema,
     })
     .required(),
-  syncState: v.number().gte(0).lte(3), // enum vals
+  lastSync: v.anyOf([v.number().gte(0), v.null()]),
+  lastModified: v.anyOf([v.number().gte(0), v.null()]),
 });
 
 export type AirdayItemSerialised = TypeOf<typeof AirdayItemSerialisedSchema>;
@@ -47,22 +44,29 @@ export class AirdayItem {
   id: Uuidv4;
   libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
-  syncState = SyncState.local;
-  syncing = false;
+  syncStarted: number | null = null; // in flight sync
+  lastSync: number | null = null; // Last sync (incl. time of first pull)
+  lastModified: number; // Last local modification (incl. time of first pull)
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
     this.attributes = params.attributes;
-    if (
-      params.syncState === SyncState.synced ||
-      params.syncState === SyncState.dirty ||
-      params.syncState === SyncState.local
-    ) {
-      // Do not reserialise "syncing" state
-      this.syncState = params.syncState;
+    if (params.lastModified) {
+      this.lastModified = params.lastModified;
+    } else {
+      this.lastModified = globalTSProducer.timestamp().utc;
     }
+    if (params.lastSync) {
+      this.lastSync = params.lastSync;
+    }
+  }
+  startSync() {
+    this.syncStarted = globalTSProducer.timestamp().utc;
+  }
+  synced() {
+    if (this.lastSync) return false;
   }
   // TODO: Custom logic MAY be necessary
   merge(attrs: AirdayItemAttributes) {
@@ -82,7 +86,8 @@ export class AirdayItem {
       id: this.id.toString(),
       libraryId: this.id.toString(),
       attributes: {}, // TODO: Attributes!
-      syncState: this.syncState,
+      lastSync: this.lastSync,
+      lastModified: this.lastModified,
     };
     return obj;
   }
@@ -97,7 +102,6 @@ export class AirdayItem {
       id: Uuidv4.fromString(typed.id),
       libraryId: Uuidv4.fromString(typed.libraryId),
       attributes,
-      syncState: typed.syncState,
     });
   }
 }
