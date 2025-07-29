@@ -7,6 +7,7 @@ import {
   MessageProto,
   MessageWrapperProto,
   LibrarySyncResponseProto,
+  AckResponseProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
@@ -228,6 +229,18 @@ export class WebsocketManager {
             console.log(this.core.library);
           }
           break;
+        case AirdayActionProto.AckResponseProto: {
+          const ackResponse = new AckResponseProto();
+          component.action(ackResponse);
+          let actionId = Uuidv4.fromFBVector(
+            ackResponse.messageId.bind(ackResponse),
+          );
+          this.events.emit("ack", {
+            actionId,
+            success: ackResponse.success(),
+          });
+          break;
+        }
         default:
           console.warn(`No handler for rx action type: ${actionType}:`);
       }

@@ -191,7 +191,7 @@ pub async fn message_handler(
                 let _ = state.db.item.merge(&item).await;
                 let ack_offset = ack(&mut builder, action_id).await?;
                 action_offsets.push(ack_offset);
-                // TODO: Acknowledgement message + fan out notification
+                // TODO: fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }
         }
