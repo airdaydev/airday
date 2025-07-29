@@ -3,7 +3,7 @@
 
 WORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-docker run --rm --name jaeger \
+docker run -d --rm --name jaeger \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \

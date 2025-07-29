@@ -6,9 +6,8 @@ import { LWWRegisterStringProto } from "../proto";
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;
   const pid = 1750820210000;
-  const manualTS = [utc, pid];
   const data = "hello";
-  const lww = LWWRegister.fromJSON([manualTS, data]);
+  const lww = LWWRegister.fromJSON({ timestamp: { utc, pid }, data });
   expect(lww.timestamp.pid).toBe(pid);
   expect(lww.timestamp.utc).toBe(utc);
   expect(lww.data).toBe(data);
