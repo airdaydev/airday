@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] add in memory list to core (or at least API to keep updated! will need solid compatibility)
 - [] merge item api (send a bunch of items to the server & save)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] remap initial local library to new on sign up!

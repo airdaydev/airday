@@ -18,8 +18,9 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common";
+import type { AirdayCore } from "../core";
 
-class Action {
+export class AirdayAction {
   id = new Uuidv4();
   addToFlatBuffer(build: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
@@ -30,9 +31,12 @@ class Action {
     builder.finish(actionOffset);
     return builder.asUint8Array();
   }
+  ack(core: AirdayCore) {
+    console.warn("ack not yet implemented");
+  }
 }
 
-export class GetListsActions extends Action {
+export class GetListsActions extends AirdayAction {
   constructor(item: AirdayItem) {
     super();
   }
@@ -61,7 +65,7 @@ export class GetListsActions extends Action {
 //   }
 // }
 
-export class AuthenticateAction extends Action {
+export class AuthenticateAction extends AirdayAction {
   sessionToken: string;
   constructor(sessionToken: string) {
     super();
@@ -82,7 +86,7 @@ export class AuthenticateAction extends Action {
   }
 }
 
-export class AddItemAction extends Action {
+export class AddItemAction extends AirdayAction {
   item: AirdayItem;
   constructor(item: AirdayItem) {
     super();
@@ -144,12 +148,15 @@ export class AddItemAction extends Action {
       );
     return batchComponentOffset;
   }
+  ack(core: AirdayCore) {
+    // We need to update the in mem AND idb library
+  }
 }
 
 export class AirdayBatchMessage implements MQMessage {
-  actions: Action[];
+  actions: AirdayAction[];
   span?: ULSpan;
-  constructor(actions: Action[]) {
+  constructor(actions: AirdayAction[]) {
     this.actions = actions;
   }
   toFlatBuffer() {

@@ -16,7 +16,7 @@ import { EventEmitter } from "./events";
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ack: { messageId: Uuidv4; success: boolean };
+  ack: { actionId: Uuidv4; success: boolean; error?: string };
 }
 
 export enum Protocol {
@@ -51,7 +51,6 @@ export class WebsocketManager {
   maxBatch = 20; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
-  // events = new Event();
   constructor(core: AirdayCore) {
     this.core = core;
     const address = core.root;
