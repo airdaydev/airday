@@ -22,11 +22,13 @@ pub async fn ack<'a>(
         success: true,
     };
     let action_offset = AckResponseProto::create(builder, &ack_args).as_union_value();
+    let action_id_offset = builder.create_vector(message_id.as_bytes());
     let batch_offset = AirdayBatchComponentProto::create(
         builder,
         &AirdayBatchComponentProtoArgs {
             action_type: AirdayActionProto::AckResponseProto,
             action: Some(action_offset),
+            action_id: Some(action_id_offset),
         },
     );
     return Ok(batch_offset);
