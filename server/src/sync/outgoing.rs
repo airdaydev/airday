@@ -1,10 +1,36 @@
 // TODO: Create airday message
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
+use uuid::Uuid;
 
-use crate::sync::proto_generated::proto::{
-    AirdayBatchComponentProto, AirdayMessageProto, AirdayMessageProtoArgs, MessageProto,
-    MessageWrapperProto, MessageWrapperProtoArgs,
+use crate::{
+    AppState,
+    common::error::AppError,
+    sync::proto_generated::proto::{
+        AckResponseProto, AckResponseProtoArgs, AirdayActionProto, AirdayBatchComponentProto,
+        AirdayBatchComponentProtoArgs, AirdayMessageProto, AirdayMessageProtoArgs, MessageProto,
+        MessageWrapperProto, MessageWrapperProtoArgs,
+    },
 };
+
+pub async fn ack<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    message_id: &Uuid,
+) -> Result<WIPOffset<AirdayBatchComponentProto<'a>>, AppError> {
+    let message_id_offset = builder.create_vector(message_id.as_bytes());
+    let ack_args = AckResponseProtoArgs {
+        message_id: Some(message_id_offset),
+        success: true,
+    };
+    let action_offset = AckResponseProto::create(builder, &ack_args).as_union_value();
+    let batch_offset = AirdayBatchComponentProto::create(
+        builder,
+        &AirdayBatchComponentProtoArgs {
+            action_type: AirdayActionProto::AckResponseProto,
+            action: Some(action_offset),
+        },
+    );
+    return Ok(batch_offset);
+}
 
 // TODO: Needs updating to new code
 // pub async fn send_shared_libraries<'a>(

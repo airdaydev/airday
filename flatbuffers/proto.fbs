@@ -55,15 +55,23 @@ table LibrarySyncResponseProto {
   primary_library: LibraryProto;
 }
 
+table AckResponseProto {
+  message_id: [uint8] (required);
+  success: bool;
+}
+
 union AirdayActionProto {
   AddItemActionProto,
   DeleteItemActionProto,
   AuthenticateActionProto,
   AuthenticateResponseProto,
   LibrarySyncResponseProto,
+  AckResponseProto,
 }
 
 table AirdayBatchComponentProto {
+// Initially, set on client only
+  action_id: [uint8];
   action: AirdayActionProto;
 }
 

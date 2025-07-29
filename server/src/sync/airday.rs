@@ -1,20 +1,18 @@
 use axum::extract::ws::Message;
-use flatbuffers::{FlatBufferBuilder, WIPOffset};
+use flatbuffers::FlatBufferBuilder;
 use uuid::Uuid;
 
 use crate::{
     AppState,
     common::{error::AppError, utils::fbv_to_uuid},
     item::model::{Item, ItemAttributes},
-    library,
     sync::{
-        outgoing::create_airday_message_with_builder,
+        outgoing::{ack, create_airday_message_with_builder},
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
-            LibraryProto, LibraryProtoArgs, LibrarySyncResponseProto, LibrarySyncResponseProtoArgs,
         },
-        websocket::{WebsocketConn, send_to_client},
+        websocket::send_to_client,
     },
 };
 
@@ -25,8 +23,8 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { item: Item }, // TODO: possible properties not this
-                            // DeleteItem { id: String },
+    AddItem { item: Item, action_id: Uuid }, // TODO: possible properties not this
+                                             // DeleteItem { id: String },
 }
 
 impl AirdayMessage {
@@ -44,6 +42,11 @@ impl AirdayMessage {
         }
         // 0 actions = we should drop this and warn / print
         for batch_component in message.batch().unwrap() {
+            let action_id = if let Some(action_id) = batch_component.action_id() {
+                fbv_to_uuid(action_id)?
+            } else {
+                return Err(AppError::ValidationError(String::from("No action_id")));
+            };
             match batch_component.action_type() {
                 AirdayActionProto::AuthenticateActionProto => {
                     println!("Received authentication request");
@@ -78,7 +81,7 @@ impl AirdayMessage {
                         library_id,
                         attributes: ItemAttributes { text: None },
                     };
-                    actions.push(AirdayAction::AddItem { item });
+                    actions.push(AirdayAction::AddItem { item, action_id });
                 }
                 AirdayActionProto::DeleteItemActionProto => {
                     let action = batch_component
@@ -152,13 +155,14 @@ pub async fn message_handler(
                             &AirdayBatchComponentProtoArgs {
                                 action_type: AirdayActionProto::AuthenticateResponseProto,
                                 action: Some(action_offset),
+                                action_id: None,
                             },
                         );
                         action_offsets.push(offset);
                     }
                 }
             }
-            AirdayAction::AddItem { item } => {
+            AirdayAction::AddItem { item, action_id } => {
                 let Some(user_id) = conn.user_id else {
                     // Unauthorised, ignore
                     // TODO: ...
@@ -185,6 +189,8 @@ pub async fn message_handler(
                     )));
                 }
                 let _ = state.db.item.merge(&item).await;
+                let ack_offset = ack(&mut builder, action_id).await?;
+                action_offsets.push(ack_offset);
                 // TODO: Acknowledgement message + fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }

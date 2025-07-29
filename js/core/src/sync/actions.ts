@@ -75,10 +75,15 @@ export class AuthenticateAction extends AirdayAction {
       builder,
       sessionTokenOffset,
     );
+    const actionIdOffset = AirdayBatchComponentProto.createActionIdVector(
+      builder,
+      this.id,
+    );
     const offset = AirdayBatchComponentProto.createAirdayBatchComponentProto(
       builder,
       AirdayActionProto.AuthenticateActionProto,
       actionOffset,
+      actionIdOffset,
     );
     return offset;
   }
@@ -139,11 +144,16 @@ export class AddItemAction extends AirdayAction {
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addItem(builder, itemOffset);
     const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
+    const actionIdOffset = AirdayBatchComponentProto.createActionIdVector(
+      builder,
+      this.id,
+    );
     const batchComponentOffset =
       AirdayBatchComponentProto.createAirdayBatchComponentProto(
         builder,
         AirdayActionProto.AddItemActionProto,
         actionOffset,
+        actionIdOffset,
       );
     return batchComponentOffset;
   }
