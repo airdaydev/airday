@@ -65,8 +65,13 @@ export class AirdayItem {
   startSync() {
     this.syncStarted = globalTSProducer.timestamp().utc;
   }
-  synced() {
-    if (this.lastSync) return false;
+  endSync() {
+    this.lastSync = this.syncStarted;
+    this.syncStarted = null;
+  }
+  isSynced() {
+    if (!this.lastSync) return false;
+    return this.lastModified > this.lastSync;
   }
   // TODO: Custom logic MAY be necessary
   merge(attrs: AirdayItemAttributes) {

@@ -22,7 +22,7 @@ import type { AirdayCore } from "../core";
 
 export class AirdayAction {
   id = new Uuidv4();
-  attempts = 0;
+  sent = 0; // send attempts over websockets
   addToFlatBuffer(build: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
   }
@@ -31,9 +31,6 @@ export class AirdayAction {
     const actionOffset = this.addToFlatBuffer(builder);
     builder.finish(actionOffset);
     return builder.asUint8Array();
-  }
-  ack(core: AirdayCore) {
-    console.warn("ack not yet implemented");
   }
 }
 
@@ -149,10 +146,6 @@ export class AddItemAction extends AirdayAction {
         actionOffset,
       );
     return batchComponentOffset;
-  }
-  ack(core: AirdayCore) {
-    // We need to update the in mem AND idb library
-    this.item.startSync();
   }
 }
 

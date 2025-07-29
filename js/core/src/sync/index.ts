@@ -3,7 +3,7 @@ import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AddItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
-import { AirdayItem, SyncState } from "./model";
+import { AirdayItem } from "./model";
 
 // Creates & serialises actions to pass to mq
 // TODO: Message retries (Exponential backoff + max attempts)
@@ -18,8 +18,10 @@ export class AirdaySync {
     this.core.ws.events.on("ack", (ack) => {
       console.debug(`ack: ${ack}`);
       const action = this.pendingActions.get(ack.actionId);
-      if (action) {
-        action.ack(this.core);
+      if (action instanceof AddItemAction) {
+        action.item.endSync();
+        // TODO: targeted change instead of blunt (pass in idb to endSync?)
+        this.idb?.item.upsert([action.item]);
         this.pendingActions.delete(ack.actionId);
       }
     });
@@ -40,7 +42,7 @@ export class AirdaySync {
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
   createItem(item: AirdayItem) {
-    item.syncing = true;
+    item.startSync();
     const action = new AddItemAction(item);
     this.idb?.item.upsert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
