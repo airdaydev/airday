@@ -3,6 +3,7 @@ import { authenticate, createTestCore } from "./utils.spec";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayItem } from "../src";
 import { tracer } from "../src/tracer";
+import { SyncState } from "../src/sync/model";
 
 const core = createTestCore();
 
@@ -20,6 +21,7 @@ test("Item sync", async () => {
     if (core.ws.authorised) return resolve(null);
     core.ws.events.on("authenticated", resolve);
   });
+  // TODO: in mem item cache!
   const newItem = new AirdayItem({
     libraryId: core.library.id!,
     attributes: {
@@ -35,11 +37,8 @@ test("Item sync", async () => {
       resolve(null);
     }, 1000);
   });
+  // TODO: Ensure item is now marked as synced & clean
   // get items from beginning
-  // syncClient.subscribe((test) => {
-  //   expect(test.payload.id).toBe("string");
-  // });
-  // const t = await core.ws.send("type");
 });
 
 afterAll(async () => {

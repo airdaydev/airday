@@ -22,6 +22,7 @@ export interface AirdayQueuedMessage extends QueuedMessage {
 }
 
 // TODO: Add time based message flushing
+// TODO: use this.core.ws.ws.bufferedAmount + consider merging this with websocket manager
 export class MessageQueue {
   core: AirdayCore;
   queue: Array<QueuedMessage> = [];
@@ -29,8 +30,6 @@ export class MessageQueue {
   running = false;
   maxBatch = 50;
   maxPendingMessages = 5;
-  timeout = 10000;
-  retries = 3;
   observers = new Set<ObserverFunc>();
   constructor(core: AirdayCore) {
     this.core = core;
@@ -65,7 +64,6 @@ export class MessageQueue {
     }
     // 2. Form batch
     const batch: QueuedMessage[] = [];
-    // TODO: Possible optimisation; count batch count towards pending messages count! (separate from pendingMessages.size)
     while (this.queue.length > 0 && batch.length < this.maxBatch) {
       const item = this.queue[0];
       this.queue.shift();
@@ -84,16 +82,6 @@ export class MessageQueue {
     batch.map((item) => {
       this.core.ws.send(item.message.toFlatBuffer());
     });
-    // TODO: We need a timeout and ask to put back on the queue
-    // Promise.resolve(batchInput).then((batch) => {
-    //   this.pendingMessages.delete(batch.id);
-    //   this.onBatchCompletion(batch.actions);
-    //   this.next();
-    // });
-    // batchInput.forEach((messageWrapper) => {
-    //   this.core.ws.send(messageWrapper.fb);
-    //   this.pendingMessages.delete(key)
-    // });
   }
   stop() {
     this.running = false;
@@ -105,7 +93,6 @@ export class MessageQueue {
   drain() {
     // TODO: implement if needed
   }
-  // TODO: Backoff
   // onBatchCompletion(actions: MessageWrapperProto[]) {
   //   actions.map((action) => {
   //     this.observers.forEach((fn) => {

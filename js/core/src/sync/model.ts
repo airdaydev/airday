@@ -10,10 +10,10 @@ export interface AirdayItemAttributes {
   text?: LWWRegister<string>;
 }
 
-enum SyncState {
-  synced = 0, // Server has acknowledged sync
-  dirty = 1, // Local modifications not synced
-  syncing = 2, // Pending sync (on deserialisation, make dirty)
+export enum SyncState {
+  local = 0, // Never synced, immutable vals client-side generated
+  synced = 1, // Client has received server ack on all latest syncs
+  dirty = 2, // Local mutable modifications not synced
 }
 
 export interface AirdayItemConstructorOpts {
@@ -34,9 +34,7 @@ const AirdayItemSerialisedSchema = v.object({
       text: LWWSerialiseSchema,
     })
     .required(),
-  syncState: v
-    .number()
-    .anyOf([v.number().const(0), v.number().const(1), v.number().const(2)]),
+  syncState: v.number().gte(0).lte(3), // enum vals
 });
 
 export type AirdayItemSerialised = TypeOf<typeof AirdayItemSerialisedSchema>;
@@ -49,7 +47,8 @@ export class AirdayItem {
   id: Uuidv4;
   libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
-  syncState = SyncState.dirty;
+  syncState = SyncState.local;
+  syncing = false;
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
@@ -58,7 +57,8 @@ export class AirdayItem {
     this.attributes = params.attributes;
     if (
       params.syncState === SyncState.synced ||
-      params.syncState === SyncState.dirty
+      params.syncState === SyncState.dirty ||
+      params.syncState === SyncState.local
     ) {
       // Do not reserialise "syncing" state
       this.syncState = params.syncState;

@@ -1,19 +1,17 @@
 // Claude one shot event emitter
 // TODO: Review
 
-type EventName = keyof EventMap;
-type EventData<T extends EventName> = EventMap[T];
-type EventCallback<T extends EventName> = (data: EventData<T>) => void;
-
-export class EventEmitter<TEventMap extends Record<string, any> = EventMap> {
+export class EventEmitter<
+  TEventMap extends Record<string, any> = Record<string, any>,
+> {
   private events: Partial<{
-    [K in keyof TEventMap]: EventCallback<K & EventName>[];
+    [K in keyof TEventMap]: ((data: TEventMap[K]) => void)[];
   }> = {};
 
   // Add event listener with full type safety
   on<T extends keyof TEventMap>(
     eventName: T,
-    callback: EventCallback<T & EventName>,
+    callback: (data: TEventMap[T]) => void,
   ): void {
     if (!this.events[eventName]) {
       this.events[eventName] = [];
@@ -24,7 +22,7 @@ export class EventEmitter<TEventMap extends Record<string, any> = EventMap> {
   // Remove event listener
   off<T extends keyof TEventMap>(
     eventName: T,
-    callback: EventCallback<T & EventName>,
+    callback: (data: TEventMap[T]) => void,
   ): void {
     if (!this.events[eventName]) return;
     this.events[eventName] = this.events[eventName]!.filter(
@@ -43,13 +41,13 @@ export class EventEmitter<TEventMap extends Record<string, any> = EventMap> {
   // One-time listener
   once<T extends keyof TEventMap>(
     eventName: T,
-    callback: EventCallback<T & EventName>,
+    callback: (data: TEventMap[T]) => void,
   ): void {
     const onceCallback = (data: TEventMap[T]) => {
       callback(data);
-      this.off(eventName, onceCallback as EventCallback<T & EventName>);
+      this.off(eventName, onceCallback);
     };
-    this.on(eventName, onceCallback as EventCallback<T & EventName>);
+    this.on(eventName, onceCallback);
   }
 
   // Remove all listeners for an event

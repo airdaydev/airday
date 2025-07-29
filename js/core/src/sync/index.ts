@@ -2,7 +2,7 @@ import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AddItemAction, AirdayBatchMessage } from "./actions";
-import { AirdayItem } from "./model";
+import { AirdayItem, SyncState } from "./model";
 
 // Creates & serialises actions to pass to mq
 export class AirdaySync {
@@ -11,6 +11,9 @@ export class AirdaySync {
   private core: AirdayCore;
   constructor(core: AirdayCore) {
     this.core = core;
+    // this.core.ws.events.on("ack", (message) => {
+    //   message.messageId
+    // });
   }
   timestamp() {
     return globalTSProducer.timestamp();
@@ -20,15 +23,15 @@ export class AirdaySync {
     this.idb = idb;
     this.idbHandle = idb.handle;
   }
-  // TODO: Should this just be a general sync message with what items and since when!?
-  // TODO: Also we should store this in our database
-  async getLibraries() {}
-  async getContainers() {}
-  async getActiveItemsByLibrary() {}
-  async getCompletedItemsByLibrary() {}
-  async createList(list: any) {}
+  getLibraries() {}
+  getContainers() {}
+  getActiveItemsByLibrary() {}
+  getCompletedItemsByLibrary() {}
+  createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
-  async createItem(item: AirdayItem) {
+  // TODO: Error handling?
+  createItem(item: AirdayItem) {
+    item.syncing = true;
     const action = new AddItemAction(item);
     this.idb?.item.upsert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
@@ -37,5 +40,5 @@ export class AirdaySync {
     // When the item is synced, we need to mark the live item as synced
     // TODO: test to ensure item is created server side before it is allowed an update (Notification via the item themself (on create, immediately update)!
   }
-  async deleteItem(id: String) {}
+  deleteItem(id: String) {}
 }

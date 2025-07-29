@@ -16,6 +16,7 @@ import { EventEmitter } from "./events";
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
+  ack: { messageId: Uuidv4; success: boolean };
 }
 
 // TODO: Offline considerations
