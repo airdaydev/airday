@@ -49,6 +49,7 @@ export class WebsocketManager {
   // Queue
   running = false;
   maxBatch = 20; // Messages to send at once
+  maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
   // events = new Event();
   constructor(core: AirdayCore) {
@@ -116,7 +117,7 @@ export class WebsocketManager {
   };
   enqueue(message: QueuedMessage) {
     this.outgoing.push(message);
-    // this.next();
+    this.next();
   }
   enqueueAirdayMessage(message: MQMessage) {
     const queuedMessage: QueuedMessage = {
@@ -125,9 +126,17 @@ export class WebsocketManager {
     };
     this.enqueue(queuedMessage);
   }
+  get overflowed() {
+    if (!this.ws) return true;
+    return this.ws.bufferedAmount > this.maxBufferedAmount;
+  }
   next() {
-    if (!this.running || !this.authorised || this.outgoing.length === 0) {
-      // TODO: We need a means for the sync batcher to continue when auth starts
+    if (
+      !this.running ||
+      !this.authorised ||
+      this.outgoing.length === 0 ||
+      this.overflowed
+    ) {
       return;
     }
     // 2. Form batch
