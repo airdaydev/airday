@@ -35,7 +35,7 @@ export class AirdaySync {
     const action = new AddItemAction(item);
     this.idb?.item.upsert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
-    this.core.mq.enqueueAirdayMessage(message);
+    this.core.ws.enqueueAirdayMessage(message);
     // TODO: So we need our sync core to subscribe to all item updates!
     // When the item is synced, we need to mark the live item as synced
     // TODO: test to ensure item is created server side before it is allowed an update (Notification via the item themself (on create, immediately update)!

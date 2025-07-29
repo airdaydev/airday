@@ -19,7 +19,26 @@ interface WSEventMap {
   ack: { messageId: Uuidv4; success: boolean };
 }
 
+export enum Protocol {
+  Airday = 0,
+  JMAP = 1,
+}
+
+export interface MQMessage {
+  toFlatBuffer(): Uint8Array;
+}
+
+export interface QueuedMessage {
+  type: Protocol;
+  message: MQMessage;
+}
+
+export interface AirdayQueuedMessage extends QueuedMessage {
+  type: Protocol.Airday;
+}
+
 // TODO: Offline considerations
+// TODO: Add time based flushing
 export class WebsocketManager {
   core: AirdayCore;
   ws: WebSocket | null = null;
@@ -27,6 +46,10 @@ export class WebsocketManager {
   events = new EventEmitter<WSEventMap>();
   connected = false;
   authorised = false;
+  // Queue
+  running = false;
+  maxBatch = 20; // Messages to send at once
+  outgoing: Array<QueuedMessage> = [];
   // events = new Event();
   constructor(core: AirdayCore) {
     this.core = core;
@@ -91,6 +114,50 @@ export class WebsocketManager {
       }
     }
   };
+  enqueue(message: QueuedMessage) {
+    this.outgoing.push(message);
+    // this.next();
+  }
+  enqueueAirdayMessage(message: MQMessage) {
+    const queuedMessage: QueuedMessage = {
+      type: Protocol.Airday,
+      message,
+    };
+    this.enqueue(queuedMessage);
+  }
+  next() {
+    if (!this.running || !this.authorised || this.outgoing.length === 0) {
+      // TODO: We need a means for the sync batcher to continue when auth starts
+      return;
+    }
+    // 2. Form batch
+    const batch: QueuedMessage[] = [];
+    while (this.outgoing.length > 0 && batch.length < this.maxBatch) {
+      const item = this.outgoing[0];
+      this.outgoing.shift();
+      if (item.type === Protocol.Airday) {
+        batch.push(item);
+      } else {
+        // discard for now
+      }
+    }
+    this.wsSend(batch);
+    if (this.outgoing.length > 0) {
+      this.next();
+    }
+  }
+  async wsSend(batch: Array<QueuedMessage>) {
+    batch.map((item) => {
+      this.send(item.message.toFlatBuffer());
+    });
+  }
+  stop() {
+    this.running = false;
+  }
+  start() {
+    this.running = true;
+    this.next();
+  }
   // TODO Consider moving this into subhandler
   private handleAirdayMessage(message: AirdayMessageProto) {
     if (!message) return;
@@ -126,7 +193,7 @@ export class WebsocketManager {
             });
           }
           // TODO: Consider "auth" notification using JS native events
-          this.core.mq.start();
+          this.start();
           // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:

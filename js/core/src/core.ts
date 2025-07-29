@@ -7,7 +7,6 @@ import {
 } from "./http/auth";
 import { AirdayIDB } from "./storage/idb";
 import { WebsocketManager } from "./websocket";
-import { MessageQueue } from "./websocket/mq";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
 import type { Uuidv4 } from "./common";
@@ -61,7 +60,6 @@ export class AirdayCore {
     local: true,
   });
   ws: WebsocketManager; // websocket layer
-  mq: MessageQueue; // message queueing
   sync: AirdaySync; // airday item layer
   db: AirdayIDB; // persistence layer
   // TODO: Refresh token management
@@ -69,7 +67,6 @@ export class AirdayCore {
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
-    this.mq = new MessageQueue(this);
     this.sync = new AirdaySync(this);
     this.db = new AirdayIDB();
   }

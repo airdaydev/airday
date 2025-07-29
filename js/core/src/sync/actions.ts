@@ -15,7 +15,7 @@ import {
   SpanContextProto,
 } from "../proto";
 import { tracer } from "../tracer";
-import type { MQMessage } from "../websocket/mq";
+import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common";
 
