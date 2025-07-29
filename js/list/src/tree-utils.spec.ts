@@ -27,6 +27,7 @@ const treeGen = (maxLength: number = 5) => {
   return root;
 };
 
+// TODO: THIS TEST CAN FAIL!!!!!!!!!!!
 describe("Tree map depth works", () => {
   test("depth of 5", () => {
     let has0Depth = false;
