@@ -9,6 +9,7 @@ interface SpanLog {
 // Minimal types for compatibility
 type ULTime = [number, number]; // seconds, nanoseconds
 type Attributes = Record<string, any>;
+type Status = { code: number; message?: string };
 
 interface ULSpan {
   readonly name: string;
@@ -18,10 +19,18 @@ interface ULSpan {
   readonly startTime: ULTime;
   readonly endTime: ULTime;
   readonly duration: ULTime;
-  readonly status: { code: number; message?: string };
+  readonly status: Status;
   readonly attributes: Attributes;
   readonly events: SpanLog[];
   readonly ended: boolean;
+}
+
+interface MutableSpan extends ULSpan {
+  endTime: any;
+  duration: any;
+  ended: boolean;
+  status: Status;
+  events: SpanLog[];
 }
 
 interface OTLPKeyValue {
@@ -200,13 +209,13 @@ export class Tracer {
     const duration = this.calculateDuration(span.startTime, endTime);
 
     // Update span (breaking readonly for internal implementation)
-    (span as any).endTime = endTime;
-    (span as any).duration = duration;
-    (span as any).ended = true;
+    (span as MutableSpan).endTime = endTime;
+    (span as MutableSpan).duration = duration;
+    (span as MutableSpan).ended = true;
 
     // Only set status to OK if it's not already set to ERROR
     if (span.status.code !== 2) {
-      (span as any).status = { code: 1 }; // OK
+      (span as MutableSpan).status = { code: 1 }; // OK
     }
 
     // Check if we should flush based on batch size
@@ -216,7 +225,7 @@ export class Tracer {
   }
 
   addTag(span: ULSpan, key: string, value: any): void {
-    (span.attributes as any)[key] = value;
+    ((span as MutableSpan).attributes as any)[key] = value;
   }
 
   log(span: ULSpan, message: string, data: Record<string, any> = {}): void {
@@ -225,7 +234,7 @@ export class Tracer {
       message,
       data,
     };
-    (span.events as any).push(event);
+    (span as MutableSpan).events.push(event);
   }
 
   flush(): ULSpan[] {
