@@ -88,8 +88,8 @@ export class AirdayItem {
   toJSON() {
     // TODO: Clean up id requirement
     let obj: AirdayItemSerialised = {
-      id: this.id.toString(),
-      libraryId: this.id.toString(),
+      id: this.id.toHex(),
+      libraryId: this.libraryId.toHex(),
       attributes: {}, // TODO: Attributes!
       lastSync: this.lastSync,
       lastModified: this.lastModified,

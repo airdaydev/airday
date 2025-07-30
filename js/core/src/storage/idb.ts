@@ -54,11 +54,11 @@ export class ItemIDBModel {
   insert = async (items: AirdayItem[]) => {
     const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
     const store = tx.objectStore(ITEM_STORE_NAME);
-    const b = await store.getAll();
     // TODO: We also need to extract indexes in JSON version (e.g. done)!
     await Promise.all(
       items.map((item) => {
-        return store.add(item.toJSON());
+        const serial = item.toJSON();
+        return store.add(serial);
       }),
     );
     await tx.done;
