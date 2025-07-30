@@ -50,16 +50,29 @@ export class ItemIDBModel {
   constructor(db: AirdayIDB) {
     this.db = db;
   }
-  upsert = async (items: AirdayItem[]) => {
+  // TODO: Should we just upsert!?
+  insert = async (items: AirdayItem[]) => {
     const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
     const store = tx.objectStore(ITEM_STORE_NAME);
-    // TODO: Not gonna throw when merging tho
-    const upsertInternal = async (item: AirdayItemSerialised) => {
-      const val = await store.add(item);
-      return val;
-    };
+    const b = await store.getAll();
     // TODO: We also need to extract indexes in JSON version (e.g. done)!
-    items.map((item) => upsertInternal(item.toJSON()));
+    await Promise.all(
+      items.map((item) => {
+        return store.add(item.toJSON());
+      }),
+    );
+    await tx.done;
+  };
+  update = async (items: AirdayItem[]) => {
+    const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
+    const store = tx.objectStore(ITEM_STORE_NAME);
+    const b = await store.getAll();
+    // TODO: We also need to extract indexes in JSON version (e.g. done)!
+    await Promise.all(
+      items.map((item) => {
+        return store.put(item.toJSON());
+      }),
+    );
     await tx.done;
   };
   getItemsByLibrary = async (libraryId: string) => {

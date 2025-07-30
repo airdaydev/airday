@@ -21,7 +21,9 @@ export class AirdaySync {
       if (action instanceof AddItemAction) {
         action.item.endSync();
         // TODO: targeted change instead of blunt (pass in idb to endSync?)
-        this.idb?.item.upsert([action.item]);
+        this.idb?.item.update([action.item]).catch((err) => {
+          console.log(err);
+        });
         this.pendingActions.delete(ack.actionId.toHex());
       }
     });
@@ -44,7 +46,7 @@ export class AirdaySync {
   createItem(item: AirdayItem) {
     item.startSync();
     const action = new AddItemAction(item);
-    this.idb?.item.upsert([item]); // optimistic update
+    this.idb?.item.insert([item]); // optimistic update
     const message = new AirdayBatchMessage([action]);
     this.pendingActions.set(action.id.toHex(), action);
     this.core.ws.enqueueAirdayMessage(message);
