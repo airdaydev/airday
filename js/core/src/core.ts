@@ -9,7 +9,7 @@ import { AirdayIDB } from "./storage/idb";
 import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
-import type { Uuidv4 } from "./common";
+import type { Uuidv4 } from "./uuid";
 
 export enum AuthMode {
   ImplicitCookie,

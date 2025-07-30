@@ -17,7 +17,7 @@ import {
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
-import { Uuidv4 } from "../common";
+import { Uuidv4 } from "../uuid";
 import type { AirdayCore } from "../core";
 
 export class AirdayAction {

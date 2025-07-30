@@ -4,7 +4,7 @@ import {
   LWWRegisterString,
   LWWSerialiseSchema,
 } from "../crdt/lww";
-import { Uuidv4 } from "../common";
+import { Uuidv4 } from "../uuid";
 import { compile, v, type TypeOf } from "suretype";
 
 export interface AirdayItemAttributes {
