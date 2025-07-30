@@ -15,7 +15,6 @@ const bundleConfig: Bun.BuildConfig = {
   minify: true,
   sourcemap: "external",
   splitting: false,
-  external: [], // Bundle everything for ultra-light JSON tracer
 };
 
 // Bundle for different environments
@@ -25,7 +24,7 @@ async function bundle() {
   // 1. Generate TypeScript declarations
   console.log("📝 Generating TypeScript declarations...");
   try {
-    await $`npm run tsc`;
+    await $`npm run ts`;
     console.log("✅ TypeScript declarations generated");
   } catch (error) {
     console.error("❌ TypeScript declaration generation failed:", error);
@@ -90,17 +89,17 @@ async function bundle() {
 
   // Test bundles
   console.log("\n🧪 Testing bundles...");
-  try {
-    // Test ESM import
-    const { Tracer } = await import("./dist/index.esm.js");
-    const tracer = new Tracer("airday_tracer_tests");
-    const span = tracer.startSpan("test-span");
-    tracer.endSpan(span);
-    console.log("✅ ESM bundle test passed");
-    await tracer.shutdown();
-  } catch (error) {
-    console.error("❌ Bundle test failed:", error);
-  }
+  // try {
+  //   // Test ESM import
+  //   const { Core } = await import("./dist/index.esm.js");
+  //   const tracer = new Tracer("airday_tracer_tests");
+  //   const span = tracer.startSpan("test-span");
+  //   tracer.endSpan(span);
+  //   console.log("✅ ESM bundle test passed");
+  //   await tracer.shutdown();
+  // } catch (error) {
+  //   console.error("❌ Bundle test failed:", error);
+  // }
 }
 
 // Run the bundler

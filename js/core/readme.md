@@ -1,6 +1,6 @@
 ## @airday/core
 
-Airday JS Browser Client handling:
+Airday JS client lib for browser handling:
 - Auth & account management APIs
 - Core data types
 - Sync over WS persistence

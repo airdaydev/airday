@@ -8,7 +8,7 @@
     "build": "bun run bundle.ts",
     "dev": "bun run bundle.ts --watch",
     "clean": "rm -rf dist",
-    "ts": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
+    "tsc": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
     "prepublishOnly": "bun run clean && bun run build"
   },
   "files": [
