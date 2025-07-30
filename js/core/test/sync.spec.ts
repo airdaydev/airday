@@ -15,12 +15,11 @@ beforeAll(async () => {
 // TODO Test bulk sync
 test("Item sync", async () => {
   core.ws.connect();
-  // TODO: We shouldn't need async here... or we have to manage it
+  // TODO: We shouldn't need async here... or we have to use same access pattern in app
   await new Promise((resolve) => {
     if (core.ws.authorised) return resolve(null);
     core.ws.events.on("authenticated", resolve);
   });
-  console.log("ws: authenticated!", core.library.id?.toHex());
   // TODO: in mem item cache!
   const newItem = new AirdayItem({
     libraryId: core.library.id!,
@@ -28,7 +27,6 @@ test("Item sync", async () => {
       text: LWWRegisterString.fromString("test"),
     },
   });
-  console.log("new", newItem.libraryId.toHex());
   let action = core.sync.createItem(newItem);
   const pending = core.sync.pendingActions.get(action.id.toHex());
   expect(pending?.id).toBe(action.id);
@@ -40,13 +38,13 @@ test("Item sync", async () => {
     });
   });
   expect(core.sync.pendingActions.size).toBe(0);
-  // expect();
-  // const items = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-  const item = (await core.db.item.db.handle?.getAll("item"))[0];
-  expect(item.libraryId).toBe(core.library.id!.toHex());
-  expect(item.lastSync).toBeGreaterThan(item.lastModified);
-  // TODO: Ensure item is now marked as synced & clean
-  // get items from beginning
+  const item = (
+    await core.db.item.getItemsByLibrary(core.library.id!.toHex())
+  )[0];
+  expect(item.libraryId.toHex()).toBe(core.library.id!.toHex());
+  expect(item.lastSync, "Item timestamps = considered sync").toBeGreaterThan(
+    item.lastModified,
+  );
 });
 
 afterAll(async () => {

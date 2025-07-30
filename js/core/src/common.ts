@@ -34,4 +34,7 @@ export class Uuidv4 extends Uint8Array {
     }
     return bytes;
   }
+  static fromHex(str: string) {
+    return new Uuidv4(Uint8Array.fromHex(str));
+  }
 }

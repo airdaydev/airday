@@ -86,7 +86,7 @@ export class ItemIDBModel {
       try {
         items.push(AirdayItem.fromJSON(row));
       } catch (err) {
-        console.warn("Could not parse row from db", row);
+        console.warn("Could not parse row from db", row, err);
       }
     });
     return items;

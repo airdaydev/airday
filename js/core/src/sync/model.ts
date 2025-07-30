@@ -104,9 +104,11 @@ export class AirdayItem {
       attributes.text = LWWRegister.fromJSON(typed.attributes.text);
     }
     return new AirdayItem({
-      id: Uuidv4.fromString(typed.id),
-      libraryId: Uuidv4.fromString(typed.libraryId),
+      id: Uuidv4.fromHex(typed.id),
+      libraryId: Uuidv4.fromHex(typed.libraryId),
       attributes,
+      lastSync: typed.lastSync,
+      lastModified: typed.lastModified,
     });
   }
 }
