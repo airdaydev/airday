@@ -1,11 +1,11 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "@playwright/test";
 import {
   LWWRegister,
   TimestampProducer,
   LWWRegisterString,
 } from "../src/crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { LWWRegisterStringProto } from "../proto";
+import { LWWRegisterStringProto } from "../src/proto";
 
 test("LWWRegister parsing", async () => {
   const utc = 1750820219953;

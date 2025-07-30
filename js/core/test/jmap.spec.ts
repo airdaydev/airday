@@ -1,13 +1,10 @@
-import { expect, test, beforeAll } from "bun:test";
+import { expect, test } from "@playwright/test";
 import { getJMAPSession } from "../src/index";
 import { authenticate, createTestCore } from "./utils.spec";
 
-const core = createTestCore();
-
-beforeAll(async () => {
-  await authenticate(core, "jmap@airday.com");
-});
-
 test("Get JMAP Session", async () => {
-  const session = await getJMAPSession(core);
+  const core = createTestCore();
+  await authenticate(core, "jmap@airday.com");
+  await getJMAPSession(core);
+  // TODO: Expect what? but also just delete all this shit
 });

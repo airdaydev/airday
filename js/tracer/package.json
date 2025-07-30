@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Ultra-light tracing. OpenTelemetry compatible, hopefully.",
   "main": "src/index.ts",
+  "type": "module",
   "scripts": {
     "test": "bun test",
     "build": "bun run bundle.ts",

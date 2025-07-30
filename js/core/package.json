@@ -9,17 +9,20 @@
   "scripts": {
     "build": "bun bundle",
     "start": "bun run",
-    "test": "bun test",
+    "test": "bun playwright test test/",
     "tsc": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist"
   },
   "devDependencies": {
     "@playwright/test": "1.54.1",
+    "@types/bun": "1.2.19",
     "bun-plugin-dts": "0.3.0",
     "playwright": "1.54.1",
+    "tape": "5.9.0",
     "typescript": "5.8.3"
   },
   "dependencies": {
     "@airday/tracer": "workspace:^",
+    "@types/tape": "5.8.1",
     "flatbuffers": "25.2.10",
     "idb": "^8.0.3",
     "suretype": "^3.3.1",

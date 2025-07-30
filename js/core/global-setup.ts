@@ -1,0 +1,72 @@
+// global-setup.ts
+import { writeFileSync } from "fs";
+
+async function globalSetup() {
+  // Generate test harness HTML
+  const harness = `
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="module">
+      import { hold, report, test } from 'https://esm.sh/zora@5';
+
+      hold();
+
+      test('quick test', (t) => {
+        t.equal(1 + 1, 2);
+        t.ok(true, 'this should pass');
+      });
+      const collectResults = async (stream) => {
+        const results = [];
+        let summary = { pass: 0, fail: 0, skip: 0 };
+
+        for await (const message of stream) {
+          if (message.type === 'ASSERTION') {
+            results.push({
+              name: message.data.description,
+              passed: message.data.pass,
+              error: message.data.pass ? null : message.data.actual,
+              test: message.data.test
+            });
+
+            if (message.data.pass) {
+              summary.pass++;
+            } else {
+              summary.fail++;
+            }
+          }
+
+          if (message.type === 'TEST_START') {
+            // Track test start if needed
+          }
+
+          if (message.type === 'TEST_END') {
+            // Track test end if needed
+          }
+        }
+
+        // Expose results to Playwright
+        window.__TEST_RESULTS__ = {
+          success: summary.fail === 0,
+          summary,
+          results
+        };
+
+        return { summary, results };
+      };
+
+      console.log('exist', window.sendToPlaywright);
+      window.sendToPlaywright('exist');
+
+      // start reporting
+      report({ reporter: collectResults });
+    </script>
+</head>
+<body></body>
+</html>`;
+
+  writeFileSync("./test-harness.html", harness);
+  console.log("Test harness created");
+}
+
+export default globalSetup;

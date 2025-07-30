@@ -17,7 +17,7 @@ const bundleConfig: Bun.BuildConfig = {
   sourcemap: "external",
   splitting: false,
   plugins: [dts({})],
-  external: ["@airday/tracer"],
+  external: [],
 };
 
 // Bundle for different environments

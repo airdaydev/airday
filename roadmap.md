@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] bundle core (fix types)
 - [] migrate core tests to playwright
 - [] kill fake indexedb in place of browser tests
 - [] kill jmap
