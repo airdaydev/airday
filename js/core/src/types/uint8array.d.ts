@@ -6,6 +6,9 @@ declare global {
   interface Uint8Array {
     toHex?(): string;
   }
+  interface Window {
+    sendToPlaywright?: (message: string) => void;
+  }
 }
 
 export {};

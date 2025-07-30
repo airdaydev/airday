@@ -9,11 +9,12 @@ import { statSync } from "fs";
 import pkg from "./package.json";
 
 const bundleConfig: Bun.BuildConfig = {
-  entrypoints: ["./src/index.ts"],
+  entrypoints: ["./src/index.ts", "./src/test/browser.ts"],
   outdir: "./dist",
   target: "browser",
   format: "esm",
   minify: true,
+  // naming: "[name].[hash].js",
   sourcemap: "external",
   splitting: false,
   plugins: [dts({})],
@@ -28,7 +29,6 @@ async function bundle() {
   console.log("📦 Building ESM bundle...");
   const esmResult = await Bun.build({
     ...bundleConfig,
-    naming: "index.esm.js",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
