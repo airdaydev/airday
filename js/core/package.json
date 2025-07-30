@@ -7,8 +7,9 @@
     "test": "bun test"
   },
   "devDependencies": {
+    "@playwright/test": "1.54.1",
     "@types/bun": "latest",
-    "fake-indexeddb": "6.0.1"
+    "playwright": "1.54.1"
   },
   "peerDependencies": {
     "typescript": "^5.8.3"

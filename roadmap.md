@@ -1,6 +1,9 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] migrate core tests to playwright
+- [] kill fake indexedb in place of browser tests
+- [] kill jmap
 - [] add in-memory list to core (or at least API to keep updated! will need solid compatibility)
 - [] merge item api (send a bunch of items to the server & save)
 - [] inbox = default = virtual list! (where orphans go too!)

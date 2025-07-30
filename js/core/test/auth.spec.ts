@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "@playwright/test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
 import { createTestCore, extractCookie, parseCookieValue } from "./utils.spec";
@@ -8,7 +8,7 @@ const core = createTestCore();
 
 test("API root url & version", async () => {
   const d = await getRoot(core);
-  expect(d.data.version).toBeTypeOf("string");
+  expect(typeof d.data.version).toBe("string");
 });
 
 test("non-existent username & password", async () => {
@@ -27,10 +27,10 @@ test("Creating a user & default library", async () => {
     email: "doubleup@air.day",
     password: "fa09j20fiaj3fpaof",
   });
-  expect(res.data.id).toBeTypeOf("string");
+  expect(typeof res.data.id).toBe("string");
   expect(res.data.id.length).toBe(36);
   expect(res.data.primary_library.id).toHaveLength(36);
-  expect(res.data.primary_library.name).toBeTypeOf("string");
+  expect(typeof res.data.primary_library.name).toBe("string");
   expect(
     createUser(core, {
       email: "doubleup@air.day",
@@ -78,11 +78,11 @@ test("Bearer authorisation & refreshing sessions with bearer tokens", async () =
     email,
     password,
   });
-  expect(core.session?.expires instanceof Date).toBeTrue();
-  expect(core.session?.refreshExpires instanceof Date).toBeTrue();
-  expect(core.session?.token).toBeTypeOf("string");
-  expect(core.session?.refreshToken).toBeTypeOf("string");
-  expect(core.session?.userId).toBeTypeOf("string");
+  expect(core.session?.expires instanceof Date).toBe(true);
+  expect(core.session?.refreshExpires instanceof Date).toBe(true);
+  expect(typeof core.session?.token).toBe("string");
+  expect(typeof core.session?.refreshToken).toBe("string");
+  expect(typeof core.session?.userId).toBe("string");
   const firstToken = core.session?.token;
   const firstRefreshToken = core.session?.refreshToken;
   const session = await getJMAPSession(core);
