@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import dts from "bun-plugin-dts";
 
 // Bundle configuration for Tracer frontend distribution
 // Run with: bun run bundle.ts
@@ -15,21 +16,12 @@ const bundleConfig: Bun.BuildConfig = {
   minify: true,
   sourcemap: "external",
   splitting: false,
+  plugins: [dts({})],
 };
 
 // Bundle for different environments
 async function bundle() {
   console.log("🚀 Building Tracer for frontend...");
-
-  // 1. Generate TypeScript declarations
-  console.log("📝 Generating TypeScript declarations...");
-  try {
-    await $`npm run ts`;
-    console.log("✅ TypeScript declarations generated");
-  } catch (error) {
-    console.error("❌ TypeScript declaration generation failed:", error);
-    process.exit(1);
-  }
 
   // 1. ESM Bundle (modern browsers)
   console.log("📦 Building ESM bundle...");

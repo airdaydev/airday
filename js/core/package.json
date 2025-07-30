@@ -13,11 +13,9 @@
   },
   "devDependencies": {
     "@playwright/test": "1.54.1",
-    "@types/bun": "latest",
-    "playwright": "1.54.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5.8.3"
+    "bun-plugin-dts": "0.3.0",
+    "playwright": "1.54.1",
+    "typescript": "5.8.3"
   },
   "dependencies": {
     "@airday/tracer": "workspace:^",
@@ -25,6 +23,7 @@
     "idb": "^8.0.3",
     "suretype": "^3.3.1",
     "toml-config": "^1.1.4",
+    "uint8array-extras": "1.4.0",
     "uuid": "11.1.0"
   }
 }

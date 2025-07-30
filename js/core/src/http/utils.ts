@@ -5,7 +5,7 @@ import {
   type EnsureFunction,
 } from "suretype";
 
-interface AirdayResponse<T> {
+export interface AirdayResponse<T> {
   response: Response;
   data: T;
 }
@@ -31,11 +31,6 @@ export class APIError extends Error {
     this.name = "APIError";
     this.status = status;
     this.body = body;
-
-    // Capture stack trace if available (V8 specific)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, APIError);
-    }
   }
 }
 

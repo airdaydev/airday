@@ -1,6 +1,5 @@
 import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
 import { type TypeOf, v } from "suretype";
-import { v_session_bearer, v_session_cookie } from "./types";
 import type { AirdayCore } from "../core";
 
 const createUserOpts = APISchema(

@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { LWWRegister, TimestampProducer, LWWRegisterString } from "./lww";
+import {
+  LWWRegister,
+  TimestampProducer,
+  LWWRegisterString,
+} from "../src/crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { LWWRegisterStringProto } from "../proto";
 
