@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head>
+    <h1>@airday/core headless tests</h1>
+    <p>This is designed to be run with Playwright via `pnpm run playwright`.</p>
+    <script type="module">
+      import { tests } from "./dist/test/browser.js";
+      console.log("test.html: running headless test suite for @airday/core.");
+      tests();
+    </script>
+  </head>
+  <body></body>
+</html>

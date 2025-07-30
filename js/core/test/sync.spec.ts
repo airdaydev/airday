@@ -20,7 +20,7 @@ test("Item sync", async ({ page }) => {
     return {};
   });
 
-  const filePath = path.resolve("./test-harness.html");
+  const filePath = path.resolve("./test.html");
   await page.goto(`file://${filePath}`);
 
   await page.evaluate(() => {
