@@ -37,9 +37,7 @@
 - [] cors review
 
 ## Protocol improvements (l8a)
-- [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)
 - [] version numbers?
-- [] first byte to determine message type (allow separate flatbuffer definitions)
 
 ## Done board
 - [] Done board show which list item was from
@@ -47,7 +45,7 @@
 - [] Done board chronological index
 
 ## 2025 Q4 Initial Release
-- [] @airday/core - export database to flatbuffer
+- [] @airday/core - export database to json
 - [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
 - [] Shared lists
@@ -82,7 +80,7 @@
 - [] Next board (referenced items!)
 - [] Drag items into list nav
 - [] Performance board
-- [] Save views (arrangements of panes)
+- [] Pin views (arrangements of panes) - after trying out workspaces (they suck) this is the right move
 - [] Print styles
 - [] Locations/Map?
 
