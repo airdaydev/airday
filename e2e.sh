@@ -1,21 +1,24 @@
 #!/bin/bash
 set -e
 
-# Reset database
-DATABASE_PATH="$HOME/.config/airday/test.db"
-export DATABASE_URL="sqlite:$DATABASE_PATH"
-sqlx database reset -y --source sqlite/migrations
+# Start jaeger if not started
+# pnpm run jaeger
 
-## Database tests
-pnpm run test-server
-sqlx database reset -y --source sqlite/migrations
-
-## Package tests
+## Offline package tests
 pnpm run --dir js/cal test --run
 pnpm run --dir js/list test --run
 pnpm run --dir js/tracer test --run
 
+# Database setup
+DATABASE_PATH="$HOME/.config/airday/test.db"
+export DATABASE_URL="sqlite:$DATABASE_PATH"
+
+## Server tests
+sqlx database reset -y --source sqlite/migrations
+pnpm run test-server
+
 # Start server in background
+sqlx database reset -y --source sqlite/migrations
 cargo run --manifest-path ./server/Cargo.toml -- \
   --sqlx-host=$DATABASE_URL \
   --log-level=OFF \
