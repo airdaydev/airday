@@ -1,11 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] add in-memory list to core (or at least API to keep updated! will need solid compatibility)
-- [] send back span from server
-- [] invalid parent span ids
-- [] negative duration spans from airday_js
 - [] merge item api (send a bunch of items to the server & save)
+- [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] remap initial local library to new on sign up!
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
@@ -35,6 +32,11 @@
 - [] get all libraries
 - [] handling browser tabs?!
 - [] cors review
+
+# Span issues
+- [] send back span from server
+- [] invalid parent span ids
+- [] negative duration spans from airday_js
 
 ## Protocol improvements (l8a)
 - [] version numbers?
