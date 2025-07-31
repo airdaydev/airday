@@ -39,7 +39,7 @@ export class WebsocketManager {
   authorised = false;
   // Queue
   intervalId: number | null = null;
-  maxBatch = 20; // Messages to send at once
+  maxBatch = 50; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
   constructor(core: AirdayCore) {

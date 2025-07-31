@@ -50,6 +50,17 @@ export class EventEmitter<
     this.on(eventName, onceCallback);
   }
 
+  // One-time listener
+  onceAsync<T extends keyof TEventMap>(eventName: T): Promise<TEventMap[T]> {
+    return new Promise((resolve) => {
+      const onceCallback = (data: TEventMap[T]) => {
+        this.off(eventName, onceCallback);
+        resolve(data);
+      };
+      this.on(eventName, onceCallback);
+    });
+  }
+
   // Remove all listeners for an event
   removeAllListeners<T extends keyof TEventMap>(eventName?: T): void {
     if (eventName) {

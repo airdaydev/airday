@@ -1,9 +1,14 @@
+import { EventEmitter } from "../common/events";
 import type { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AddItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
 import { AirdayItem } from "./model";
+
+interface SyncEventMap {
+  flushed: {};
+}
 
 // Creates & serialises actions to pass to mq
 // TODO: Message retries (Exponential backoff + max attempts)
@@ -13,6 +18,7 @@ export class AirdaySync {
   private idbHandle: AirdayIDBPDatabase | null = null;
   private core: AirdayCore;
   pendingActions = new Map<string, AirdayAction>(); // string = hex type
+  events = new EventEmitter<SyncEventMap>();
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => {
@@ -24,6 +30,9 @@ export class AirdaySync {
           console.log(err);
         });
         this.pendingActions.delete(ack.actionId.toHex());
+        if (this.pendingActions.size === 0) {
+          this.events.emit("flushed", {});
+        }
       }
     });
   }

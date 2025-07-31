@@ -74,6 +74,7 @@ export const tests = async () => {
       assert(pending?.id === action.id);
     }
     await core.ws.flush(); // however... we need to wait til acks are complete...
+    await core.sync.events.onceAsync("flushed");
     // which basically means checking every single ack related to this transaction
     // So i don't think we should be doing this test
     log(core.sync.pendingActions.values().next());
