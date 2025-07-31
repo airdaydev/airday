@@ -1,4 +1,4 @@
-import { SimpleTest, assertEqual, assert } from "./runner";
+import { BrowserRunner } from "./runner";
 import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
 import { LWWRegisterString } from "../crdt/lww";
 
@@ -20,9 +20,9 @@ export function createTestCore() {
 }
 
 export const tests = async () => {
-  const suite = new SimpleTest();
+  const suite = new BrowserRunner();
 
-  suite.test("async test", async () => {
+  suite.test("async test", async (assert) => {
     const core = createTestCore();
     await authenticate(core, `${Math.random()}@airday.com}`);
     await core.db.connect();
@@ -30,7 +30,6 @@ export const tests = async () => {
     core.ws.connect();
     // TODO: We shouldn't need async here... or we have to use same access pattern in app
     await new Promise((resolve) => {
-      console.log("is ws authorised?", core.ws.authorised);
       if (core.ws.authorised) return resolve(null);
       core.ws.events.on("authenticated", resolve);
     });
@@ -42,37 +41,25 @@ export const tests = async () => {
     });
     let action = core.sync.createItem(newItem);
     const pending = core.sync.pendingActions.get(action.id.toHex());
-    // expect(pending?.id).toBe(action.id);
+    assert(pending?.id === action.id);
     await new Promise((resolve) => {
       core.ws.events.once("ack", (data) => {
-        console.log(data);
         core.ws.close();
         resolve(null);
       });
-      // expect(core.sync.pendingActions.size).toBe(0);
-      // const item = (
-      //   await core.db.item.getItemsByLibrary(core.library.id!.toHex())
-      // )[0];
-      // expect(item.libraryId.toHex()).toBe(core.library.id!.toHex());
-      // expect(item.lastSync, "Item timestamps = considered sync").toBeGreaterThan(
-      //   item.lastModified,
-      // );
     });
+    assert(core.sync.pendingActions.size === 0);
+    const item = (
+      await core.db.item.getItemsByLibrary(core.library.id!.toHex())
+    )[0];
+    assert(item.libraryId.toHex() === core.library.id!.toHex());
+    assert(
+      typeof item.lastSync === "number" && item.lastSync > item.lastModified,
+      "Item timestamps = considered sync",
+    );
   });
 
   const results = await suite.run();
   console.log(`${results.passed}/${results.total} tests passed`);
   if (window.sendToPlaywright) window.sendToPlaywright(results as any);
 };
-
-// -const core = createTestCore();
-// -
-// -beforeAll(async () => {
-// -  await authenticate(core, `${Math.random()}@airday.com}`);
-// -  await core.db.connect();
-// -  core.sync.setDB(core.db); // TODO: This should happen automatically
-// -test("Item sync", async () => {
-// -  core.ws.connect();
-// -  // TODO: We shouldn't need async here... or we have to use same access pattern in app
-// -  core.ws.connect();
-// -  // TODO: We shouldn't need async here... or we have to use same access pattern in app

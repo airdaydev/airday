@@ -1,6 +1,7 @@
 export interface TestResult {
   name: string;
   passed: boolean;
+  expect: number;
   error?: string;
 }
 
@@ -11,10 +12,15 @@ export interface TestSuite {
   total: number;
 }
 
-export class SimpleTest {
-  private tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
+type Assert = (condition: boolean, message?: string) => void;
 
-  test(name: string, fn: () => void | Promise<void>) {
+export class BrowserRunner {
+  private tests: Array<{
+    name: string;
+    fn: (assert: Assert) => void | Promise<void>;
+  }> = [];
+
+  test(name: string, fn: (assert: Assert) => void | Promise<void>) {
     this.tests.push({ name, fn });
   }
 
@@ -22,13 +28,16 @@ export class SimpleTest {
     const results: TestResult[] = [];
 
     for (const { name, fn } of this.tests) {
+      let ctx = { expect: 0 };
+      let assert = assertWrap(ctx);
       try {
-        await fn();
-        results.push({ name, passed: true });
+        await fn(assert);
+        results.push({ name, expect: ctx.expect, passed: true });
       } catch (error) {
         results.push({
           name,
           passed: false,
+          expect: ctx.expect,
           error: error instanceof Error ? error.message : String(error),
         });
       }
@@ -50,11 +59,13 @@ export class SimpleTest {
   }
 }
 
-// Simple assertion helpers
-export function assert(condition: boolean, message = "Assertion failed") {
-  if (!condition) {
-    throw new Error(message);
-  }
+export function assertWrap(ctx: { expect: number }) {
+  return (condition: boolean, message = "Assertion failed") => {
+    if (!condition) {
+      throw new Error(message);
+    }
+    ctx.expect++;
+  };
 }
 
 export function assertEqual<T>(actual: T, expected: T, message?: string) {
