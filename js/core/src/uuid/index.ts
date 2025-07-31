@@ -1,4 +1,4 @@
-/// <reference path="../types/uint8array.d.ts" />
+/// <reference path="../types/browser.d.ts" />
 
 import { parse, stringify, v4 } from "uuid";
 import { hexToUint8Array, uint8ArrayToHex } from "uint8array-extras";

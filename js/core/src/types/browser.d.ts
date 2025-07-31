@@ -1,4 +1,4 @@
-// types/uint8array.d.ts
+// types/browser.d.ts
 declare global {
   interface Uint8ArrayConstructor {
     fromHex?(hex: string): Uint8Array;
@@ -7,7 +7,8 @@ declare global {
     toHex?(): string;
   }
   interface Window {
-    sendToPlaywright?: (message: string) => void;
+    sendToPlaywright?: (message: any) => void;
+    tests?: () => Promise<any>;
   }
 }
 

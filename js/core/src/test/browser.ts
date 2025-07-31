@@ -20,28 +20,20 @@ export function createTestCore() {
 }
 
 export const tests = async () => {
-  console.log("running tests");
   const suite = new SimpleTest();
 
   suite.test("async test", async () => {
-    console.log("first test");
     const core = createTestCore();
-    console.log("before auth");
     await authenticate(core, `${Math.random()}@airday.com}`);
-    console.log("next test");
     await core.db.connect();
-    console.log("connected to db");
     core.sync.setDB(core.db); // TODO: This should happen automatically
-    console.log("set db");
     core.ws.connect();
-    console.log("connecting to ws");
     // TODO: We shouldn't need async here... or we have to use same access pattern in app
     await new Promise((resolve) => {
       console.log("is ws authorised?", core.ws.authorised);
       if (core.ws.authorised) return resolve(null);
       core.ws.events.on("authenticated", resolve);
     });
-    console.log("creating new item");
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
@@ -50,7 +42,6 @@ export const tests = async () => {
     });
     let action = core.sync.createItem(newItem);
     const pending = core.sync.pendingActions.get(action.id.toHex());
-    console.log("checking pending items");
     // expect(pending?.id).toBe(action.id);
     await new Promise((resolve) => {
       core.ws.events.once("ack", (data) => {
@@ -58,7 +49,6 @@ export const tests = async () => {
         core.ws.close();
         resolve(null);
       });
-      console.log("ack received");
       // expect(core.sync.pendingActions.size).toBe(0);
       // const item = (
       //   await core.db.item.getItemsByLibrary(core.library.id!.toHex())
@@ -72,6 +62,7 @@ export const tests = async () => {
 
   const results = await suite.run();
   console.log(`${results.passed}/${results.total} tests passed`);
+  if (window.sendToPlaywright) window.sendToPlaywright(results as any);
 };
 
 // -const core = createTestCore();

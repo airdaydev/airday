@@ -24,7 +24,7 @@ TEST_EXIT_CODE=$?
 set -e # enable exit on error
 
 # Cleanup server
-pkill -f airday
+pkill -f airday || true
 
 echo "Tests completed with code $TEST_EXIT_CODE, server stopped"
 echo "sqlite3 $DATABASE_PATH"

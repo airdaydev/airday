@@ -14,17 +14,18 @@ test("Item sync", async ({ page }) => {
     console.error(`❌ Page Error: ${error.message}`);
   });
 
-  const msgs: string[] = [];
+  const msgs: any[] = [];
   page.exposeFunction("sendToPlaywright", (message) => {
-    msgs.push("yo");
-    return {};
+    msgs.push(message);
   });
 
   await page.goto(`/test.html`);
 
   await page.evaluate(async () => {
-    await tests();
-    console.log("wtf", JSON.stringify(window.__TEST_RESULTS__));
+    if (window.tests) await window.tests();
   });
-  console.log("msgs", msgs);
+  await page.close();
+  expect(msgs[0].failed, "No browser tests failing").toBe(0);
+  expect(msgs[0].passed, "Browser tests passing").toBeGreaterThan(0);
+  console.log(msgs[0]);
 });
