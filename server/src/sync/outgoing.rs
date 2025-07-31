@@ -6,8 +6,7 @@ use crate::{
     common::error::AppError,
     sync::proto_generated::proto::{
         AckResponseProto, AckResponseProtoArgs, AirdayActionProto, AirdayBatchComponentProto,
-        AirdayBatchComponentProtoArgs, AirdayMessageProto, AirdayMessageProtoArgs, MessageProto,
-        MessageWrapperProto, MessageWrapperProtoArgs,
+        AirdayBatchComponentProtoArgs, AirdayMessageProto, AirdayMessageProtoArgs,
     },
 };
 
@@ -83,16 +82,6 @@ pub fn create_airday_message_with_builder<'a>(
         },
     );
 
-    // 2. Build message wrapper
-    let wrapper = MessageWrapperProto::create(
-        builder,
-        &MessageWrapperProtoArgs {
-            message_type: MessageProto::AirdayMessageProto,
-            message: Some(message_offset.as_union_value()),
-            ..Default::default()
-        },
-    );
-
-    builder.finish(wrapper, None);
+    builder.finish(message_offset, None);
     builder.finished_data().to_vec()
 }

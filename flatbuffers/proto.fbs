@@ -70,27 +70,13 @@ union AirdayActionProto {
 }
 
 table AirdayBatchComponentProto {
-// Initially, set on client only
+  // Initially, set on client only
   action_id: [uint8];
   action: AirdayActionProto;
 }
 
 table AirdayMessageProto {
   batch: [AirdayBatchComponentProto];
-}
-
-// Currently, simply a wrapper for JSON encoded message
-table JMAPMessageProto {
-  payload: string;
-}
-
-union MessageProto {
-  JMAPMessageProto,
-  AirdayMessageProto,
-}
-
-table MessageWrapperProto {
-  message: MessageProto;
   span_context: SpanContextProto;
 }
 
@@ -99,4 +85,4 @@ table SpanContextProto {
   span_id: uint64; // 8 byte (64 bit) as per otlp spec
 }
 
-root_type MessageWrapperProto;
+root_type AirdayMessageProto;
