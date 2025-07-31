@@ -12,6 +12,8 @@ import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../uuid";
 import { EventEmitter } from "./events";
+import { spanFromFlatbuffer, tracer } from "../tracer";
+import { ULSpan } from "@airday/tracer";
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
@@ -99,8 +101,10 @@ export class WebsocketManager {
 
       const bb = new ByteBuffer(uint8Array);
       const msg = AirdayMessageProto.getRootAsAirdayMessageProto(bb);
+      const span = spanFromFlatbuffer(msg.spanContext(), "ws:message");
+      // TODO: Unwrap span dedicated function
       // TODO: Validate batch/extract span
-      this.handleAirdayMessage(msg);
+      this.handleAirdayMessage(span, msg);
     }
   };
   enqueue(message: QueuedMessage) {
@@ -151,8 +155,7 @@ export class WebsocketManager {
     this.next();
   }
   // TODO Consider moving this into subhandler
-  private handleAirdayMessage(message: AirdayMessageProto) {
-    console.log("RECEIVING A RESPONSE", message);
+  private handleAirdayMessage(span: ULSpan, message: AirdayMessageProto) {
     if (!message) return;
 
     const batchLength = message.batchLength();
@@ -165,6 +168,7 @@ export class WebsocketManager {
       switch (actionType) {
         // TODO: Make a generic success / ack response + match on msg id
         case AirdayActionProto.AuthenticateResponseProto:
+          tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
           const userId = Uuidv4.fromFBVector(
@@ -190,12 +194,14 @@ export class WebsocketManager {
           // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.AddItemActionProto:
+          tracer.addTag(span, "msg_type", "AddItemActionProto");
           const itemResponse = new AddItemActionProto();
           component.action(itemResponse);
           // TODO: Validate and add item to storage
           console.log(itemResponse.item());
           break;
         case AirdayActionProto.LibrarySyncResponseProto:
+          tracer.addTag(span, "msg_type", "LibrarySyncResponseProto");
           const libraryResponse = new LibrarySyncResponseProto();
           component.action(libraryResponse);
           const primaryLibraryBuffer = libraryResponse.primaryLibrary();
@@ -214,6 +220,7 @@ export class WebsocketManager {
           }
           break;
         case AirdayActionProto.AckResponseProto: {
+          tracer.addTag(span, "msg_type", "AckResponseProto");
           const ackResponse = new AckResponseProto();
           component.action(ackResponse);
           let actionId = Uuidv4.fromFBVector(
@@ -228,6 +235,7 @@ export class WebsocketManager {
         default:
           console.warn(`No handler for rx action type: ${actionType}:`);
       }
+      tracer.endSpan(span);
     }
   }
 }

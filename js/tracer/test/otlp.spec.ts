@@ -24,7 +24,9 @@ test("complex spans with nested operations", async () => {
   await new Promise((resolve) => setTimeout(resolve, 5));
 
   // Add a nested span
-  const childSpan = tracer.startSpan("database-query", rootSpan.spanId);
+  const childSpan = tracer.startSpan("database-query", {
+    parentSpanId: rootSpan.spanId,
+  });
   tracer.addTag(childSpan, "db.table", "users");
   tracer.addTag(childSpan, "db.operation", "SELECT");
   tracer.log(childSpan, "Query executed", { rowCount: 42, duration: "12ms" });
@@ -32,7 +34,9 @@ test("complex spans with nested operations", async () => {
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   // Another nested span
-  const processSpan = tracer.startSpan("data-processing", rootSpan.spanId);
+  const processSpan = tracer.startSpan("data-processing", {
+    parentSpanId: rootSpan.spanId,
+  });
   tracer.addTag(processSpan, "processor.type", "json-transformer");
   tracer.addTag(processSpan, "items.processed", 42);
   tracer.log(processSpan, "Processing started");

@@ -125,6 +125,41 @@ export class TracerID extends Uint8Array {
     const view = new DataView(this.buffer, 0, 8);
     return view.getBigUint64(0, false);
   }
+  static fromBigInt(value: bigint) {
+    const id = new TracerID(8);
+    const view = new DataView(id.buffer);
+    view.setBigUint64(0, value, false);
+    return id;
+  }
+  isNull(): boolean {
+    // Check 8 bytes at once using BigUint64Array view
+    const view = new BigUint64Array(this.buffer);
+    for (let i = 0; i < view.length; i++) {
+      if (view[i] !== 0n) return false;
+    }
+    return true;
+  }
+  static fromFBVector(id: (index: number) => number | null) {
+    const tracerId = new TracerID(16);
+    for (let i = 0; i < 16; i++) {
+      let byte = id(i);
+      if (byte === null) {
+        console.warn("UUID failed to parse from flatbuffer");
+        return this.generate();
+      }
+      tracerId[i] = byte;
+    }
+    if (tracerId.isNull()) {
+      console.warn("UUID is null");
+      return this.generate();
+    }
+    return tracerId;
+  }
+}
+
+interface StartSpanOpts {
+  parentSpanId?: TracerID;
+  traceId?: TracerID;
 }
 
 // Ultra-light JSON tracer
@@ -180,8 +215,8 @@ export class Tracer {
     this.startBatching();
   }
 
-  startSpan(name: string, parentSpanId?: TracerID): ULSpan {
-    const traceId = TracerID.generate(16);
+  startSpan(name: string, opts?: StartSpanOpts): ULSpan {
+    const traceId = opts?.traceId || TracerID.generate(16);
     const spanId = TracerID.generate(8);
     const startTime = this.hrTime();
 
@@ -189,7 +224,7 @@ export class Tracer {
       name,
       traceId,
       spanId,
-      parentSpanId,
+      parentSpanId: opts?.parentSpanId,
       startTime,
       endTime: [0, 0],
       duration: [0, 0],

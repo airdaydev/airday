@@ -68,17 +68,12 @@ export function assertWrap(ctx: { expect: number }) {
   };
 }
 
-export function assertEqual<T>(actual: T, expected: T, message?: string) {
-  if (actual !== expected) {
-    throw new Error(message || `Expected ${expected}, got ${actual}`);
-  }
-}
-
-export function assertDeepEqual<T>(actual: T, expected: T, message?: string) {
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error(
-      message ||
-        `Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
-    );
-  }
+export function log(value: any) {
+  const elapsed = performance.now() / 1000;
+  let serialised = null;
+  try {
+    serialised = JSON.stringify(value);
+  } catch (err) {}
+  const msg = `${elapsed}s: ${serialised}`;
+  console.log(msg);
 }

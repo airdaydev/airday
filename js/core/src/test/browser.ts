@@ -1,4 +1,4 @@
-import { BrowserRunner } from "./runner";
+import { BrowserRunner, log } from "./runner";
 import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
 import { LWWRegisterString } from "../crdt/lww";
 
@@ -60,6 +60,6 @@ export const tests = async () => {
   });
 
   const results = await suite.run();
-  console.log(`${results.passed}/${results.total} tests passed`);
+  log(`${results.passed}/${results.total} tests passed`);
   if (window.sendToPlaywright) window.sendToPlaywright(results as any);
 };

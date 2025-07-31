@@ -79,7 +79,9 @@ describe("Tracer OTLP Implementation", () => {
     });
 
     const parentSpan = tracer.startSpan("parent-operation");
-    const childSpan = tracer.startSpan("child-operation", parentSpan.spanId);
+    const childSpan = tracer.startSpan("child-operation", {
+      parentSpanId: parentSpan.spanId,
+    });
 
     expect(childSpan.parentSpanId).toBe(parentSpan.spanId);
     expect(childSpan.traceId).toBeTruthy();
