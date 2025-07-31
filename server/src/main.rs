@@ -20,9 +20,6 @@ mod library {
     pub mod model;
     pub mod sqlite;
 }
-mod jmap {
-    pub mod core;
-}
 mod telemetry {
     pub mod otlp;
 }
@@ -124,7 +121,6 @@ async fn main() {
         )
         .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions))
-        .route("/jmap/session", get(jmap::core::session_handler))
         .route("/ws", any(sync::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))

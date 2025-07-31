@@ -7,5 +7,4 @@
 - [] hardcore cal
 - [] ical import/export
 - [] caldav
-- [] jmap core
 - [] e2e contacts

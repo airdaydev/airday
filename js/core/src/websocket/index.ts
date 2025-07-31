@@ -18,22 +18,12 @@ interface WSEventMap {
   ack: { actionId: Uuidv4; success: boolean; error?: string };
 }
 
-export enum Protocol {
-  Airday = 0,
-  JMAP = 1,
-}
-
 export interface MQMessage {
   toFlatBuffer(): Uint8Array;
 }
 
 export interface QueuedMessage {
-  type: Protocol;
   message: MQMessage;
-}
-
-export interface AirdayQueuedMessage extends QueuedMessage {
-  type: Protocol.Airday;
 }
 
 // TODO: Offline considerations
@@ -119,7 +109,6 @@ export class WebsocketManager {
   }
   enqueueAirdayMessage(message: MQMessage) {
     const queuedMessage: QueuedMessage = {
-      type: Protocol.Airday,
       message,
     };
     this.enqueue(queuedMessage);
@@ -142,11 +131,7 @@ export class WebsocketManager {
     while (this.outgoing.length > 0 && batch.length < this.maxBatch) {
       const item = this.outgoing[0];
       this.outgoing.shift();
-      if (item.type === Protocol.Airday) {
-        batch.push(item);
-      } else {
-        // discard for now
-      }
+      batch.push(item);
     }
     this.wsSend(batch);
     if (this.outgoing.length > 0) {

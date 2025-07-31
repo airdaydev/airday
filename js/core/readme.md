@@ -10,7 +10,6 @@ Airday JS client lib for browser handling:
 - TODO: E2EE management
 - TODO: Calendar management
 - TODO: Profile uuid string vs bytes representation
-- TODO: literally just a bit instead of top level message definition..? e.g. 0 = Airday, 1 = JMAP (TODO: REMOVE)
 
 ## Tests
 Using real browser - bun test was nice, but lack of idb means reliance on polyfill which in practice was too slow and we have to do perf tests anyway, so here we are
