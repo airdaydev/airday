@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
-import { createTestCore, extractCookie, parseCookieValue } from "./utils.spec";
+import { createTestCore, extractCookie, parseCookieValue } from "./utils";
 
 const core = createTestCore();
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { authenticate, createTestCore } from "./utils.spec";
+import { authenticate, createTestCore } from "./utils";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayCore } from "../src";
 import { tracer } from "../src/tracer";
