@@ -3,7 +3,6 @@ import { authenticate, createTestCore } from "./utils";
 import { LWWRegisterString } from "../src/crdt/lww";
 import { AirdayCore } from "../src";
 import { tracer } from "../src/tracer";
-import path from "path";
 
 // TODO Test bulk sync
 test("Item sync", async ({ page }) => {
@@ -25,7 +24,7 @@ test("Item sync", async ({ page }) => {
     if (window.tests) await window.tests();
   });
   await page.close();
+  console.log(msgs[0]);
   expect(msgs[0].failed, "No browser tests failing").toBe(0);
   expect(msgs[0].passed, "Browser tests passing").toBeGreaterThan(0);
-  console.log(msgs[0]);
 });

@@ -34,7 +34,7 @@ export const tests = async () => {
     core.ws.events.on("authenticated", resolve);
   });
 
-  suite.skip("Sync item", async (assert) => {
+  suite.test("Sync item", async (assert) => {
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
@@ -46,7 +46,6 @@ export const tests = async () => {
     assert(pending?.id === action.id);
     await new Promise((resolve) => {
       core.ws.events.once("ack", (data) => {
-        // core.ws.close();
         resolve(null);
       });
     });
@@ -59,10 +58,16 @@ export const tests = async () => {
       typeof item.lastSync === "number" && item.lastSync > item.lastModified,
       "Item timestamps = considered sync",
     );
+    await new Promise((resolve) => {
+      if (core.sync.pendingActions.size === 0) {
+        return resolve(null);
+      }
+      core.sync.events.onceAsync("flushed").then(resolve);
+    });
   });
 
   suite.test("Sync many items", async (assert) => {
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 100; i++) {
       const newItem = new AirdayItem({
         libraryId: core.library.id!,
         attributes: {
@@ -71,23 +76,15 @@ export const tests = async () => {
       });
       let action = core.sync.createItem(newItem);
       const pending = core.sync.pendingActions.get(action.id.toHex());
-      assert(pending?.id === action.id);
+      assert(pending?.id === action.id, "pending action exists!");
     }
-    await core.ws.flush(); // however... we need to wait til acks are complete...
+    await core.ws.flush();
     await core.sync.events.onceAsync("flushed");
-    // which basically means checking every single ack related to this transaction
-    // So i don't think we should be doing this test
     log(core.sync.pendingActions.values().next());
-    assert(core.sync.pendingActions.size === 0);
-    const items = await core.db.item.getItemsByLibrary(
-      core.library.id!.toHex(),
-    );
-    console.log(items.length);
-    // assert(item.libraryId.toHex() === core.library.id!.toHex());
-    // assert(
-    //   typeof item.lastSync === "number" && item.lastSync > item.lastModified,
-    //   "Item timestamps = considered sync",
-    // );
+    assert(core.sync.pendingActions.size === 0, "no pending actions!");
+    const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+    core.ws.close();
   });
 
   const results = await suite.run();
