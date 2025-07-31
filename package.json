@@ -7,8 +7,9 @@
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
     "db": "sqlx database reset -y --source sqlite/migrations",
     "fb": "./flatbuffers/compile.sh",
-    "test": "./e2e.sh",
+    "test": "./test.sh",
     "test-server": "cargo test --manifest-path server/Cargo.toml",
+    "test-core": "pnpm test --dir ./js/core",
     "serverd": "./serverd.sh",
     "jaeger": "./telemetry/jaeger.sh"
   },

@@ -14,7 +14,6 @@ DATABASE_PATH="$HOME/.config/airday/test.db"
 export DATABASE_URL="sqlite:$DATABASE_PATH"
 
 ## Server tests
-sqlx database reset -y --source sqlite/migrations
 pnpm run test-server
 
 # Run tests
