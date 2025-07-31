@@ -20,8 +20,7 @@ test("Item sync", async ({ page }) => {
     return {};
   });
 
-  const filePath = path.resolve("./test.html");
-  await page.goto(`file://${filePath}`);
+  await page.goto(`/test.html`);
 
   await page.evaluate(() => {
     console.log("wtf", JSON.stringify(window.__TEST_RESULTS__));
