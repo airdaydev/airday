@@ -33,6 +33,7 @@
 - [] Put up website
 - [] get all libraries
 - [] handling browser tabs?!
+- [] cors review
 
 ## Protocol improvements (l8a)
 - [] contemplate removal of airday batch messaging system in favour of single action messages - allows generic batching later, when required (batches vs domain-specific batching actions?)

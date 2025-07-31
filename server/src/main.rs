@@ -39,11 +39,12 @@ use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
 use axum::Router;
 use axum::extract::MatchedPath;
-use axum::http::Request;
+use axum::http::{Method, Request};
 use axum::routing::{any, get, post, put};
 use bpaf::Bpaf;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
+use tower_http::cors::{Any, CorsLayer};
 #[cfg(test)]
 pub mod test_util;
 use tower_http::trace::TraceLayer;
@@ -98,7 +99,12 @@ async fn main() {
         config: cfg.clone(),
         ws: sync::websocket::WebsocketState::new(),
     };
-    info!(port = 3000, address = "0.0.0.0", "Airday server started");
+
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(Any)
+        .allow_origin(Any);
+
     let public = Router::new()
         .route("/", get(root::root_handler))
         .route(
@@ -129,6 +135,7 @@ async fn main() {
         .merge(private)
         .merge(public)
         .with_state(state)
+        .layer(cors)
         .layer(CookieManagerLayer::new())
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
@@ -149,4 +156,5 @@ async fn main() {
         );
 
     axum::serve(listener, app).await.unwrap();
+    info!(port = 3000, address = "0.0.0.0", "Airday server started");
 }

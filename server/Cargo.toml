@@ -27,7 +27,7 @@ futures-util = "0.3.31"
 flatbuffers = "25.2.10"
 async-trait = "0.1.88"
 tracing-subscriber = { version = "0.3.19" }
-tower-http = { version = "0.6.6", features = ["trace"] }
+tower-http = { version = "0.6.6", features = ["trace", "cors"] }
 tracing = "0.1.41"
 tracing-opentelemetry = "0.31.0"
 opentelemetry-otlp = "0.30.0"
