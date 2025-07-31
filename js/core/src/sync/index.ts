@@ -1,4 +1,4 @@
-import type { Uuidv4 } from "../uuid";
+import type { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";

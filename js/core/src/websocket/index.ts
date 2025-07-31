@@ -10,8 +10,8 @@ import {
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
 import { stringify } from "uuid";
-import { Uuidv4 } from "../uuid";
-import { EventEmitter } from "./events";
+import { Uuidv4 } from "../common/uuid";
+import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 
