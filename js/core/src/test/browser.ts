@@ -73,12 +73,9 @@ export const tests = async () => {
       const pending = core.sync.pendingActions.get(action.id.toHex());
       assert(pending?.id === action.id);
     }
-    await new Promise((resolve) => {
-      setTimeout(() => {
-        core.ws.close();
-        resolve(null);
-      }, 10000);
-    });
+    await core.ws.flush(); // however... we need to wait til acks are complete...
+    // which basically means checking every single ack related to this transaction
+    // So i don't think we should be doing this test
     log(core.sync.pendingActions.values().next());
     assert(core.sync.pendingActions.size === 0);
     const items = await core.db.item.getItemsByLibrary(

@@ -1,8 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] Performance - interval based batching from websocket (currently pushing 1 at a time)
-- [] websocket messages = flush now
 - [] add in-memory list to core (or at least API to keep updated! will need solid compatibility)
 - [] send back span from server
 - [] invalid parent span ids

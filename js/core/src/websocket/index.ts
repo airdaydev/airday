@@ -18,6 +18,7 @@ import { ULSpan } from "@airday/tracer";
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
   ack: { actionId: Uuidv4; success: boolean; error?: string };
+  flushed: {};
 }
 
 export interface MQMessage {
@@ -29,7 +30,6 @@ export interface QueuedMessage {
 }
 
 // TODO: Offline considerations
-// TODO: Add time based flushing
 export class WebsocketManager {
   core: AirdayCore;
   ws: WebSocket | null = null;
@@ -38,7 +38,7 @@ export class WebsocketManager {
   connected = false;
   authorised = false;
   // Queue
-  running = false;
+  intervalId: number | null = null;
   maxBatch = 20; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
@@ -109,7 +109,7 @@ export class WebsocketManager {
   };
   enqueue(message: QueuedMessage) {
     this.outgoing.push(message);
-    this.next();
+    this.start();
   }
   enqueueAirdayMessage(message: MQMessage) {
     const queuedMessage: QueuedMessage = {
@@ -122,12 +122,7 @@ export class WebsocketManager {
     return this.ws.bufferedAmount > this.maxBufferedAmount;
   }
   next() {
-    if (
-      !this.running ||
-      !this.authorised ||
-      this.outgoing.length === 0 ||
-      this.overflowed
-    ) {
+    if (!this.authorised || this.outgoing.length === 0 || this.overflowed) {
       return;
     }
     // 2. Form batch
@@ -138,8 +133,10 @@ export class WebsocketManager {
       batch.push(item);
     }
     this.wsSend(batch);
-    if (this.outgoing.length > 0) {
-      this.next();
+    console.log(this.outgoing.length);
+    if (this.outgoing.length === 0) {
+      this.events.emit("flushed", {});
+      this.stop(); // stop until we start again
     }
   }
   async wsSend(batch: Array<QueuedMessage>) {
@@ -148,11 +145,23 @@ export class WebsocketManager {
     });
   }
   stop() {
-    this.running = false;
+    console.log("stopping");
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+    this.intervalId = null;
   }
   start() {
-    this.running = true;
-    this.next();
+    // Targeting 60fps
+    if (this.intervalId) return; // Do nothing if interval is already going
+    console.log("starting");
+    this.intervalId = setInterval(() => this.next(), 16);
+  }
+  flush() {
+    return new Promise((resolve) => {
+      if (this.outgoing.length === 0) resolve(null);
+      this.events.once("flushed", resolve);
+    });
   }
   // TODO Consider moving this into subhandler
   private handleAirdayMessage(span: ULSpan, message: AirdayMessageProto) {
