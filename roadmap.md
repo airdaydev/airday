@@ -1,22 +1,22 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] merge item api (send a bunch of items to the server & save)
+- [] merge item api (send a bunch of items to the server & merge attributes)
+- [] and... push items from server!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
-- [] inbox = default = virtual list! (where orphans go too!)
-- [] remap initial local library to new on sign up!
-- [] Compute unsynced deltas on load (track last sync) (coarse at first)
-- [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
 - [] delete items
-- [] complete, but then reconsider workspaces
+- [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
+- [] Compute unsynced deltas on load (track last sync) (coarse at first)
+- [] inbox = default = virtual list! (where orphans go too!)
+- [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
-- [] SYNC CLEAN UP before continuing
 - [] @airday/core - create subitems / sequence
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
 - [] @airday/core - make an element-set crdt for
 - [] deal with orphaned items (no list reference found - they just show up in the bin! - slightly weird as there's no put back opt, also a partially synced move could push items into the bin erroneously)
+- [] GLUE CORE TO APP!!
 - [] UI - Create items
 - [] UI - Update items
 - [] UI - Delete items
@@ -28,6 +28,7 @@
 - [] Nav List UI - build & respect fractional indexing system
 - [] @airday/core - tracing
 - [] Add license https://mariadb.com/bsl-faq-adopting/
+- [] Consider AGPL-3.0
 - [] Put up website
 - [] get all libraries
 - [] handling browser tabs?!
