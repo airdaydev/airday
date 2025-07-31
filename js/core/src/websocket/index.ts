@@ -101,7 +101,7 @@ export class WebsocketManager {
 
       const bb = new ByteBuffer(uint8Array);
       const msg = AirdayMessageProto.getRootAsAirdayMessageProto(bb);
-      const span = spanFromFlatbuffer(msg.spanContext(), "ws:message");
+      const span = spanFromFlatbuffer(msg.spanContext(), "ws:receive");
       // TODO: Unwrap span dedicated function
       // TODO: Validate batch/extract span
       this.handleAirdayMessage(span, msg);

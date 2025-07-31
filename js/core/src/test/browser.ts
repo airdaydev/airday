@@ -1,6 +1,7 @@
 import { BrowserRunner, log } from "./runner";
 import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
 import { LWWRegisterString } from "../crdt/lww";
+import { tracer } from "../tracer";
 
 export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
@@ -57,6 +58,8 @@ export const tests = async () => {
       typeof item.lastSync === "number" && item.lastSync > item.lastModified,
       "Item timestamps = considered sync",
     );
+    log("flushing");
+    await tracer.flushNow();
   });
 
   const results = await suite.run();

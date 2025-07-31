@@ -9,6 +9,7 @@
   "scripts": {
     "build": "bun bundle",
     "start": "bun run",
+    "test_only": "bun playwright test",
     "test": "pnpm run -w serverd && bun run build && bun playwright test",
     "tsc": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist"
   },
