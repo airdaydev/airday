@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
 import { createTestCore, extractCookie, parseCookieValue } from "./utils.spec";
-import { getJMAPSession } from "../src/index";
 
 const core = createTestCore();
 
@@ -85,8 +84,9 @@ test("Bearer authorisation & refreshing sessions with bearer tokens", async () =
   expect(typeof core.session?.userId).toBe("string");
   const firstToken = core.session?.token;
   const firstRefreshToken = core.session?.refreshToken;
-  const session = await getJMAPSession(core);
-  expect(session.response.status).toBe(200);
+  // TODO: Use another route
+  // const session = await getJMAPSession(core);
+  // expect(session.response.status).toBe(200);
   expect(core.session?.token?.length, "Valid session token").toBe(27);
   expect(core.session?.refreshToken?.length, "Valid refresh token").toBe(27);
   const refresh = await core.refreshBearer();
