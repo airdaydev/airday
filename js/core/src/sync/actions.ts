@@ -9,8 +9,6 @@ import {
   AirdayActionProto,
   AirdayBatchComponentProto,
   DeleteItemActionProto,
-  MessageWrapperProto,
-  MessageProto,
   AuthenticateActionProto,
   SpanContextProto,
 } from "../proto";
@@ -178,12 +176,7 @@ export class AirdayBatchMessage implements MQMessage {
       .map((action) => action.addToFlatBuffer(builder))
       .filter((a) => a !== null);
 
-    // 2. Build AridayMessageProto (contains batches)
-    const batch = AirdayMessageProto.createBatchVector(builder, batchOffsets);
-    AirdayMessageProto.startAirdayMessageProto(builder);
-    AirdayMessageProto.addBatch(builder, batch);
-    let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
-
+    // 2. Tracing
     // TODO: Improve instrumentation
     const span = tracer.startSpan("ws_send");
     this.span = span;
@@ -197,17 +190,14 @@ export class AirdayBatchMessage implements MQMessage {
     SpanContextProto.addTraceId(builder, traceIdOffset);
     const spanContextOffset = SpanContextProto.endSpanContextProto(builder);
 
-    // 3. Builds message wrapper (distinguishes it from JMAPMessageProto)
-    MessageWrapperProto.startMessageWrapperProto(builder);
-    MessageWrapperProto.addMessageType(
-      builder,
-      MessageProto.AirdayMessageProto,
-    );
-    MessageWrapperProto.addMessage(builder, messageOffset);
-    MessageWrapperProto.addSpanContext(builder, spanContextOffset);
+    // 2. Build AridayMessageProto (contains batches)
+    const batch = AirdayMessageProto.createBatchVector(builder, batchOffsets);
+    AirdayMessageProto.startAirdayMessageProto(builder);
+    AirdayMessageProto.addBatch(builder, batch);
+    AirdayMessageProto.addSpanContext(builder, spanContextOffset);
+    let messageOffset = AirdayMessageProto.endAirdayMessageProto(builder);
 
-    let wrapper = MessageWrapperProto.endMessageWrapperProto(builder);
-    builder.finish(wrapper);
+    builder.finish(messageOffset);
     return builder.asUint8Array();
   }
   complete() {

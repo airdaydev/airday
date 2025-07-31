@@ -2,7 +2,6 @@
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] migrate core tests to playwright (bun playwright test test/sync.spec.ts)
-- [] kill jmap
 - [] add in-memory list to core (or at least API to keep updated! will need solid compatibility)
 - [] merge item api (send a bunch of items to the server & save)
 - [] inbox = default = virtual list! (where orphans go too!)
@@ -131,8 +130,8 @@
 - [] Multiple users / tenancy is accounted for
 
 ## Calendar
-- [] Full jmap calendar support
 - [] CalDAV support
+- [] Consider jmap calendar support
 
 ## Predeploy, meta app
 - [] Verify keyboard only, accessibility

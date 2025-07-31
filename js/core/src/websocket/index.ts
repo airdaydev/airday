@@ -4,8 +4,6 @@ import {
   AirdayActionProto,
   AirdayMessageProto,
   AuthenticateResponseProto,
-  MessageProto,
-  MessageWrapperProto,
   LibrarySyncResponseProto,
   AckResponseProto,
 } from "../proto";
@@ -110,14 +108,9 @@ export class WebsocketManager {
       const uint8Array = new Uint8Array(messageEvent.data);
 
       const bb = new ByteBuffer(uint8Array);
-      const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
-      if (msg.messageType() === MessageProto.AirdayMessageProto) {
-        const airdayMessage = new AirdayMessageProto();
-        msg.message(airdayMessage);
-        this.handleAirdayMessage(airdayMessage);
-      } else {
-        console.log("messageType not found:", msg.messageType());
-      }
+      const msg = AirdayMessageProto.getRootAsAirdayMessageProto(bb);
+      // TODO: Validate batch/extract span
+      this.handleAirdayMessage(msg);
     }
   };
   enqueue(message: QueuedMessage) {
