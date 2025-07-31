@@ -1,7 +1,7 @@
 export interface TestResult {
   name: string;
   passed: boolean;
-  expect: number;
+  assertions: number;
   error?: string;
 }
 
@@ -28,16 +28,16 @@ export class BrowserRunner {
     const results: TestResult[] = [];
 
     for (const { name, fn } of this.tests) {
-      let ctx = { expect: 0 };
+      let ctx = { assertions: 0 };
       let assert = assertWrap(ctx);
       try {
         await fn(assert);
-        results.push({ name, expect: ctx.expect, passed: true });
+        results.push({ name, assertions: ctx.assertions, passed: true });
       } catch (error) {
         results.push({
           name,
           passed: false,
-          expect: ctx.expect,
+          assertions: ctx.assertions,
           error: error instanceof Error ? error.message : String(error),
         });
       }
@@ -59,12 +59,12 @@ export class BrowserRunner {
   }
 }
 
-export function assertWrap(ctx: { expect: number }) {
+export function assertWrap(ctx: { assertions: number }) {
   return (condition: boolean, message = "Assertion failed") => {
     if (!condition) {
       throw new Error(message);
     }
-    ctx.expect++;
+    ctx.assertions++;
   };
 }
 

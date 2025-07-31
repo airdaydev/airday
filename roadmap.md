@@ -1,10 +1,12 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] Performance - interval based batching from websocket (currently pushing 1 at a time)
+- [] websocket messages = flush now
 - [] add in-memory list to core (or at least API to keep updated! will need solid compatibility)
 - [] send back span from server
 - [] invalid parent span ids
-- [] front-end logs/investigate jaeger logging endpoint.
+- [] negative duration spans from airday_js
 - [] merge item api (send a bunch of items to the server & save)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] remap initial local library to new on sign up!
