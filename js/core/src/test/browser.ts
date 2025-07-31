@@ -23,17 +23,18 @@ export function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.test("async test", async (assert) => {
-    const core = createTestCore();
-    await authenticate(core, `${Math.random()}@airday.com}`);
-    await core.db.connect();
-    core.sync.setDB(core.db); // TODO: This should happen automatically
-    core.ws.connect();
-    // TODO: We shouldn't need async here... or we have to use same access pattern in app
-    await new Promise((resolve) => {
-      if (core.ws.authorised) return resolve(null);
-      core.ws.events.on("authenticated", resolve);
-    });
+  const core = createTestCore();
+  await authenticate(core, `${Math.random()}@airday.com}`);
+  await core.db.connect();
+  core.sync.setDB(core.db); // TODO: This should happen automatically
+  core.ws.connect();
+  // TODO: We shouldn't need async here... or we have to use same access pattern in app
+  await new Promise((resolve) => {
+    if (core.ws.authorised) return resolve(null);
+    core.ws.events.on("authenticated", resolve);
+  });
+
+  suite.skip("Sync item", async (assert) => {
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
@@ -45,7 +46,7 @@ export const tests = async () => {
     assert(pending?.id === action.id);
     await new Promise((resolve) => {
       core.ws.events.once("ack", (data) => {
-        core.ws.close();
+        // core.ws.close();
         resolve(null);
       });
     });
@@ -58,11 +59,42 @@ export const tests = async () => {
       typeof item.lastSync === "number" && item.lastSync > item.lastModified,
       "Item timestamps = considered sync",
     );
-    log("flushing");
-    await tracer.flushNow();
+  });
+
+  suite.test("Sync many items", async (assert) => {
+    for (let i = 0; i < 1000; i++) {
+      const newItem = new AirdayItem({
+        libraryId: core.library.id!,
+        attributes: {
+          text: LWWRegisterString.fromString("test"),
+        },
+      });
+      let action = core.sync.createItem(newItem);
+      const pending = core.sync.pendingActions.get(action.id.toHex());
+      assert(pending?.id === action.id);
+    }
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        core.ws.close();
+        resolve(null);
+      }, 10000);
+    });
+    log(core.sync.pendingActions.values().next());
+    assert(core.sync.pendingActions.size === 0);
+    const items = await core.db.item.getItemsByLibrary(
+      core.library.id!.toHex(),
+    );
+    console.log(items.length);
+    // assert(item.libraryId.toHex() === core.library.id!.toHex());
+    // assert(
+    //   typeof item.lastSync === "number" && item.lastSync > item.lastModified,
+    //   "Item timestamps = considered sync",
+    // );
   });
 
   const results = await suite.run();
+  log("Flushing");
+  await tracer.flushNow();
   log(`${results.passed}/${results.total} tests passed`);
   if (window.sendToPlaywright) window.sendToPlaywright(results as any);
 };

@@ -7,6 +7,7 @@ export interface TestResult {
 
 export interface TestSuite {
   results: TestResult[];
+  skipped: number;
   passed: number;
   failed: number;
   total: number;
@@ -15,6 +16,7 @@ export interface TestSuite {
 type Assert = (condition: boolean, message?: string) => void;
 
 export class BrowserRunner {
+  skipped = 0;
   private tests: Array<{
     name: string;
     fn: (assert: Assert) => void | Promise<void>;
@@ -22,6 +24,11 @@ export class BrowserRunner {
 
   test(name: string, fn: (assert: Assert) => void | Promise<void>) {
     this.tests.push({ name, fn });
+  }
+
+  skip(name: string, fn: (assert: Assert) => void | Promise<void>) {
+    log(`skipping test ${name}`);
+    this.skipped++;
   }
 
   async run(): Promise<TestSuite> {
@@ -48,6 +55,7 @@ export class BrowserRunner {
 
     return {
       results,
+      skipped: this.skipped,
       passed,
       failed,
       total: results.length,
