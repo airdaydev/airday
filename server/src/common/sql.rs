@@ -44,7 +44,9 @@ impl Db {
 }
 
 pub async fn connect_sqlite(config: &AirdayConfig) -> Db {
-    let opts = SqliteConnectOptions::from_str(&config.sqlx_host).unwrap();
+    let opts = SqliteConnectOptions::from_str(&config.sqlx_host)
+        .unwrap()
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
     // TODO: Move extension into a local addr
     // .extension("/usr/local/lib/sqlite3/uuid.so");
     let pool_res = SqlitePoolOptions::new()
