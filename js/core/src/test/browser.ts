@@ -20,11 +20,15 @@ export function createTestCore() {
 }
 
 export const tests = async () => {
+  console.log("running tests");
   const suite = new SimpleTest();
 
   suite.test("async test", async () => {
+    console.log("first test");
     const core = createTestCore();
+    console.log("before auth");
     await authenticate(core, `${Math.random()}@airday.com}`);
+    console.log("next test");
     await core.db.connect();
     core.sync.setDB(core.db); // TODO: This should happen automatically
     core.ws.connect();

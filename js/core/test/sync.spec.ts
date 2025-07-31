@@ -22,7 +22,8 @@ test("Item sync", async ({ page }) => {
 
   await page.goto(`/test.html`);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    await tests();
     console.log("wtf", JSON.stringify(window.__TEST_RESULTS__));
   });
   console.log("msgs", msgs);

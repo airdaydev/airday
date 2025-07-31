@@ -5,8 +5,8 @@
     <p>This is designed to be run with Playwright via `pnpm run playwright`.</p>
     <script type="module">
       import { tests } from "./dist/test/browser.js";
+      window.tests = tests;
       console.log("test.html: running headless test suite for @airday/core.");
-      tests();
     </script>
   </head>
   <body></body>

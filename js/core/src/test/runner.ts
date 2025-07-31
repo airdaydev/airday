@@ -23,9 +23,12 @@ export class SimpleTest {
 
     for (const { name, fn } of this.tests) {
       try {
+        console.log("ATTEMPING!", name);
         await fn();
+        console.log("FAILED!!", name);
         results.push({ name, passed: true });
       } catch (error) {
+        console.log("ERROR!", error);
         results.push({
           name,
           passed: false,
