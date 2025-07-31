@@ -26,6 +26,8 @@ Coming soon
 
 ## Development Setup
 ```bash
+sudo systemctl start docker # if not started
+pnpm run jaeger # to get tracing (system tests rely on this currently)
 ./prep.sh # sets up database, config, downloads js deps, etc
 pnpm run test # runs all tests
 ```
