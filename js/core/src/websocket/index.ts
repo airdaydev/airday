@@ -61,6 +61,7 @@ export class WebsocketManager {
   connect() {
     console.debug(`WS connection attempt to ${this.address}`);
     this.ws = new WebSocket(this.address);
+    this.ws.binaryType = "arraybuffer";
     this.ws.addEventListener("message", this.listener);
     this.ws.addEventListener("error", (error) => {
       console.error("error");
@@ -103,15 +104,19 @@ export class WebsocketManager {
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
   listener = (messageEvent: MessageEvent) => {
+    // TODO: Unwrap span here!
     if (messageEvent.type === "message") {
       // TODO: parse binary messages here, then provide response subscription system
-      console.log("message received");
-      const bb = new ByteBuffer(messageEvent.data);
+      const uint8Array = new Uint8Array(messageEvent.data);
+
+      const bb = new ByteBuffer(uint8Array);
       const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
       if (msg.messageType() === MessageProto.AirdayMessageProto) {
         const airdayMessage = new AirdayMessageProto();
         msg.message(airdayMessage);
         this.handleAirdayMessage(airdayMessage);
+      } else {
+        console.log("messageType not found:", msg.messageType());
       }
     }
   };
@@ -169,6 +174,7 @@ export class WebsocketManager {
   }
   // TODO Consider moving this into subhandler
   private handleAirdayMessage(message: AirdayMessageProto) {
+    console.log("RECEIVING A RESPONSE", message);
     if (!message) return;
 
     const batchLength = message.batchLength();

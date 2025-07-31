@@ -3,7 +3,6 @@ use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
-    AppState,
     common::error::AppError,
     sync::proto_generated::proto::{
         AckResponseProto, AckResponseProtoArgs, AirdayActionProto, AirdayBatchComponentProto,
