@@ -17,9 +17,6 @@ export DATABASE_URL="sqlite:$DATABASE_PATH"
 sqlx database reset -y --source sqlite/migrations
 pnpm run test-server
 
-# Start server in background
-./severd.sh
-
 # Run tests
 set +e # disable exit on error
 pnpm --dir ./js/core test
