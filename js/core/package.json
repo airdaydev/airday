@@ -7,7 +7,7 @@
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun bundle",
+    "build": "bun bundle.ts",
     "start": "bun run",
     "test_only": "bun playwright test",
     "test": "pnpm run -w serverd && bun run build && bun playwright test",

@@ -14,7 +14,8 @@ Airday JS client lib for browser handling:
 ## Tests
 Using real browser - bun test was nice, but lack of idb means reliance on polyfill which in practice was too slow and we have to do perf tests anyway, so here we are
 ```bash
-pnpx playwright install firefox
+pnpm exec playwright install # install all browsers
+pnpx playwright install firefox # install ff only
 ```
 
 ## Undo/redo notes
