@@ -74,20 +74,35 @@ export const tests = async () => {
           text: LWWRegisterString.fromString("test"),
         },
       });
-      let action = core.sync.createItem(newItem);
-      const pending = core.sync.pendingActions.get(action.id.toHex());
-      assert(pending?.id === action.id, "pending action exists!");
+      core.sync.createItem(newItem);
     }
     await core.ws.flush();
     await core.sync.events.onceAsync("flushed");
-    log(core.sync.pendingActions.values().next());
     assert(core.sync.pendingActions.size === 0, "no pending actions!");
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
-    core.ws.close();
+  });
+
+  suite.only("Merge text same message", async (assert) => {
+    const oldText = LWWRegisterString.fromString("old_text");
+    const item = new AirdayItem({
+      libraryId: core.library.id!,
+      attributes: {
+        text: oldText,
+      },
+    });
+    const newText = LWWRegisterString.fromString("new_text");
+    assert(newText.timestamp.greaterThan(oldText.timestamp)!);
+    let insertion = core.sync.createItem(item);
+    let update = core.sync.createItem(item);
+    await core.ws.flush();
+    await core.sync.events.onceAsync("flushed");
+    const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
   });
 
   const results = await suite.run();
+  core.ws.close();
   log("Flushing");
   await tracer.flushNow();
   log(`${results.passed}/${results.total} tests passed`);

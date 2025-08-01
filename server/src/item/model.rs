@@ -17,6 +17,20 @@ struct LWWDefinitionJson<T> {
     data: T,
 }
 
+impl<T: Clone> LWWDefinitionJson<T> {
+    pub fn to_lww(&self) -> LWWRegister<T> {
+        let timestamp = LWWTimestamp {
+            utc: self.utc as u64,
+            pid: self.pid as u64,
+        };
+        LWWRegister {
+            timestamp,
+            data: self.data.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ItemAttributes {
     pub text: Option<LWWRegister<String>>,
 }
@@ -33,6 +47,16 @@ impl ItemAttributes {
     }
 }
 
+impl From<ItemAttributesJson> for ItemAttributes {
+    fn from(attr_json: ItemAttributesJson) -> ItemAttributes {
+        let mut attrs = ItemAttributes { text: None };
+        if let Some(text) = attr_json.text {
+            attrs.text = Some(text.to_lww())
+        }
+        attrs
+    }
+}
+
 // Should serialize/deserialize to this
 #[derive(sqlx::FromRow, Deserialize, Serialize)]
 pub struct ItemAttributesJson {
@@ -42,6 +66,7 @@ pub struct ItemAttributesJson {
 pub fn convert_item_attributes_to_json(
     attributes: &ItemAttributes,
 ) -> Result<JsonAttributes, AppError> {
+    println!("converting {:?}", attributes);
     let mut json_attrs = ItemAttributesJson { text: None };
 
     // Convert text attribute if it exists
@@ -60,39 +85,24 @@ pub fn convert_item_attributes_to_json(
     Ok(Some(json_value))
 }
 
-impl ItemAttributesJson {
-    pub fn merge(&self, attrs: &ItemAttributes) -> Option<ItemAttributes> {
-        let mut attributes = ItemAttributes::new();
+impl ItemAttributes {
+    pub fn merge<'a>(&'a mut self, attrs: &ItemAttributes) -> &'a ItemAttributes {
         // Merging text
         if let Some(text) = &attrs.text {
             if let Some(self_text) = &self.text {
                 // case 1: attr does exist, merge via app logic
                 // TODO: Ergonomics!
-                let lww_a = LWWRegister::new(
-                    self_text.data.clone(),
-                    Some(LWWTimestamp::new(
-                        Some(self_text.utc as u64),
-                        Some(self_text.pid as u64),
-                    )),
-                )
-                .unwrap();
-                let lww_b = LWWRegister::new(
-                    text.data.clone(),
-                    Some(LWWTimestamp::new(
-                        Some(text.timestamp.utc),
-                        Some(text.timestamp.pid),
-                    )),
-                )
-                .unwrap();
+                let lww_a = self_text.clone();
+                let lww_b = text.clone();
                 let merged = lww_a.merge(lww_b).unwrap();
-                attributes.text = Some(merged);
+                self.text = Some(merged);
             } else {
                 // case 2: attr doesn't exist on self, replace
-                attributes.text = Some(text.clone());
+                self.text = Some(text.clone());
             }
         }
         // TODO: Repeat for each attribute (after improving ergonomics)
-        Some(attributes)
+        self
     }
 }
 

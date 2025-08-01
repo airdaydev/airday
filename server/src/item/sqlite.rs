@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     common::error::AppError,
     item::model::{
-        Item, ItemAttributesJson, ItemModel, JsonAttributes, SqlItem,
+        Item, ItemAttributes, ItemAttributesJson, ItemModel, JsonAttributes, SqlItem,
         convert_item_attributes_to_json,
     },
 };
@@ -51,14 +51,17 @@ impl ItemModel for ItemModelSqlite {
                 )));
             }
             // Get existing attributes
-            let attrs: ItemAttributesJson = sql_item
+            // TODO: How to handle parsing error...? Parsing must be VERY robust
+            let mut src_attrs: ItemAttributes = sql_item
                 .attributes
                 .as_ref()
-                .and_then(|json| serde_json::from_value(json.clone()).ok())
+                .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
+                .map(ItemAttributes::from)
                 .unwrap();
-            attrs.merge(&attrs);
-            // TODO: Evaluate and merge here i.e. turn each attribute into a valid LWWRegister
-            // then merge with item above
+            println!("{:?}", src_attrs);
+            src_attrs.merge(&item.attributes);
+            // TODO: UPDATE
+            println!("Ready to update {:?}", src_attrs);
             return Ok(());
         } else {
             // Item does not exist, insert new item
@@ -71,6 +74,9 @@ impl ItemModel for ItemModelSqlite {
 
         // Convert ItemAttributes to JsonAttributes
         let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
+
+        println!("receiving {:?}", &item.attributes);
+        println!("we are inserting {:?}", attributes_json);
 
         // Insert the item with current timestamp
         let now = chrono::Utc::now().naive_utc();

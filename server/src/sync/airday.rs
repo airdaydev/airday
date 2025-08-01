@@ -190,6 +190,7 @@ pub async fn message_handler(
                         "User does not have access to this library",
                     )));
                 }
+                println!("from the horse's mouth {:?}", item.attributes);
                 // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
                 let ack_offset = ack(&mut builder, action_id).await?;

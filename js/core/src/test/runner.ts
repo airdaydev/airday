@@ -19,6 +19,7 @@ export class BrowserRunner {
   skipped = 0;
   private tests: Array<{
     name: string;
+    only?: boolean;
     fn: (assert: Assert) => void | Promise<void>;
   }> = [];
 
@@ -31,10 +32,24 @@ export class BrowserRunner {
     this.skipped++;
   }
 
+  only(name: string, fn: (assert: Assert) => void | Promise<void>) {
+    this.tests.push({ name, fn, only: true });
+  }
+
   async run(): Promise<TestSuite> {
     const results: TestResult[] = [];
 
-    for (const { name, fn } of this.tests) {
+    const only = this.tests.filter((test) => test.only);
+    let tests = this.tests;
+    if (only.length > 0) {
+      tests = only;
+      this.skipped = only.length;
+    }
+
+    console.log(`Running ${this.tests.length} tests`);
+
+    for (const { name, fn } of tests) {
+      console.log(`running test: ${name}`, fn);
       let ctx = { assertions: 0 };
       let assert = assertWrap(ctx);
       try {
