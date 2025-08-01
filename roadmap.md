@@ -1,10 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] item attributes actually sent over flatbuffer
-- [] merge item api (send a bunch of items to the server & merge attributes)
-- [] Merge attribute macro!
 - [] transactions for bulk merging items
+- [] Merge attribute macro and/or hashmap!
 - [] and... push items from server!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] delete items

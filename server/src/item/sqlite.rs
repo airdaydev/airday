@@ -3,7 +3,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use futures_util::{Stream, StreamExt};
-use sqlx::{SqlitePool, sqlite::SqliteRow};
+use sqlx::{Sqlite, SqlitePool, Transaction, sqlite::SqliteRow};
 use uuid::Uuid;
 
 use crate::{
@@ -60,7 +60,25 @@ impl ItemModel for ItemModelSqlite {
                 .unwrap();
             println!("existing_attrs {:?}", src_attrs);
             src_attrs.merge(&item.attributes);
-            // TODO: UPDATE
+
+            // Update!
+            let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
+            let now = chrono::Utc::now().naive_utc();
+
+            sqlx::query!(
+                r#"UPDATE item
+                 SET attributes = ?, updated_utc = ?
+                 WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL"#,
+                updated_attributes_json,
+                now,
+                item.id,
+                item.library_id
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| AppError::from(err))?;
+
+            tx.commit().await.map_err(|err| AppError::from(err))?;
             println!("merged_attrs {:?}", src_attrs);
             return Ok(());
         } else {
