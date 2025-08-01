@@ -58,10 +58,10 @@ impl ItemModel for ItemModelSqlite {
                 .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
                 .map(ItemAttributes::from)
                 .unwrap();
-            println!("{:?}", src_attrs);
+            println!("existing_attrs {:?}", src_attrs);
             src_attrs.merge(&item.attributes);
             // TODO: UPDATE
-            println!("Ready to update {:?}", src_attrs);
+            println!("merged_attrs {:?}", src_attrs);
             return Ok(());
         } else {
             // Item does not exist, insert new item
@@ -74,9 +74,6 @@ impl ItemModel for ItemModelSqlite {
 
         // Convert ItemAttributes to JsonAttributes
         let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
-
-        println!("receiving {:?}", &item.attributes);
-        println!("we are inserting {:?}", attributes_json);
 
         // Insert the item with current timestamp
         let now = chrono::Utc::now().naive_utc();

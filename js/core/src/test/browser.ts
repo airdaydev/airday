@@ -94,6 +94,8 @@ export const tests = async () => {
     const newText = LWWRegisterString.fromString("new_text");
     assert(newText.timestamp.greaterThan(oldText.timestamp)!);
     let insertion = core.sync.createItem(item);
+    await core.sync.events.onceAsync("flushed");
+    item.attributes.text = newText;
     let update = core.sync.createItem(item);
     await core.ws.flush();
     await core.sync.events.onceAsync("flushed");

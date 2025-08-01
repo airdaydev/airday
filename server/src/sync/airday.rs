@@ -1,4 +1,5 @@
 use axum::extract::ws::Message;
+use crdt::{LWWRegister, timestamp::LWWTimestamp};
 use flatbuffers::FlatBufferBuilder;
 use uuid::Uuid;
 
@@ -76,10 +77,22 @@ impl AirdayMessage {
 
                     let id = fbv_to_uuid(item_buffer.id())?;
                     let library_id = fbv_to_uuid(item_buffer.library_id())?;
+                    // TODO: UNWRAP ITEM IN SEPARATE FUNC
+                    let lww = item_buffer.text().unwrap();
+                    let timestamp = lww.timestamp().unwrap();
+                    let text_lww = LWWRegister {
+                        timestamp: LWWTimestamp {
+                            utc: timestamp.utc() as u64,
+                            pid: timestamp.pid() as u64,
+                        },
+                        data: lww.data().unwrap().to_string(),
+                    };
                     let item = Item {
                         id,
                         library_id,
-                        attributes: ItemAttributes { text: None },
+                        attributes: ItemAttributes {
+                            text: Some(text_lww),
+                        },
                     };
                     actions.push(AirdayAction::AddItem { item, action_id });
                 }
@@ -190,7 +203,6 @@ pub async fn message_handler(
                         "User does not have access to this library",
                     )));
                 }
-                println!("from the horse's mouth {:?}", item.attributes);
                 // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
                 let ack_offset = ack(&mut builder, action_id).await?;

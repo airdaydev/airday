@@ -66,7 +66,6 @@ pub struct ItemAttributesJson {
 pub fn convert_item_attributes_to_json(
     attributes: &ItemAttributes,
 ) -> Result<JsonAttributes, AppError> {
-    println!("converting {:?}", attributes);
     let mut json_attrs = ItemAttributesJson { text: None };
 
     // Convert text attribute if it exists
