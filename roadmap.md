@@ -1,13 +1,13 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] core teardown function
+- [] get items since last sync (merkle tree base on resource.last_server_microseconds (f64) hashes)
 - [] transactions for bulk merging items
 - [] Merge attribute macro and/or hashmap!
 - [] and... push items from server!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] delete items
-- [] get items since last sync (server clock skew between restarts?! persist to ensure monotonicity? clock skew BETWEEN SERVERS think about)
+- [] cache library authorisation
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)

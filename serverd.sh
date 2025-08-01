@@ -11,7 +11,7 @@ pkill -f airday || true
 sqlx database reset -y --source sqlite/migrations
 cargo run --manifest-path $WORK_DIR/server/Cargo.toml -- \
   --sqlx-host=$DATABASE_URL \
-  --log-level=OFF \
+  --log-level=DEBUG \
   --config=./server/config.toml > $LOG_FILE 2>&1 &
 export AIRDAY_PID=$!
 
