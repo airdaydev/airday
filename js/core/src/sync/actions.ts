@@ -38,29 +38,6 @@ export class GetListsActions extends AirdayAction {
   }
 }
 
-// Was used for WAL
-// Can be adapted for replies
-// export function deserialiseAction(buffer: Uint8Array) {
-//   const bb = new ByteBuffer(buffer);
-//   const component =
-//     AirdayBatchComponentProto.getRootAsAirdayBatchComponentProto(bb);
-//   switch (component.actionType()) {
-//     case AirdayActionProto.AddItemActionProto: {
-//       const rObj = new AddItemActionProto();
-//       const addAction = component.action(rObj);
-//       const item = rObj.item(); // TODO: null vs non-existent
-//       if (!item) throw new Error("Item could not be found");
-//       return AddItemAction.fromItemFlatBuffer(item);
-//       AddItemAction.from;
-//     }
-//     case AirdayActionProto.DeleteItemActionProto: {
-//       const rObj = new DeleteItemActionProto();
-//       const deleteAction = component.action(rObj);
-//       break;
-//     }
-//   }
-// }
-
 export class AuthenticateAction extends AirdayAction {
   sessionToken: string;
   constructor(sessionToken: string) {
