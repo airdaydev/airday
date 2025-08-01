@@ -46,7 +46,7 @@ export class BrowserRunner {
       this.skipped = only.length;
     }
 
-    console.log(`Running ${this.tests.length} tests`);
+    console.log(`Running ${tests.length} tests`);
 
     for (const { name, fn } of tests) {
       console.log(`running test: ${name}`, fn);

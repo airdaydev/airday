@@ -51,14 +51,17 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  createItem(item: AirdayItem) {
-    item.startSync();
-    const action = new AddItemAction(item);
-    this.idb?.item.insert([item]); // optimistic update
-    const message = new AirdayBatchMessage([action]);
-    this.pendingActions.set(action.id.toHex(), action);
+  createItems(items: AirdayItem[]) {
+    const actions = items.map((item) => {
+      item.startSync();
+      const action = new AddItemAction(item);
+      this.idb?.item.insert([item]); // optimistic update
+      this.pendingActions.set(action.id.toHex(), action);
+      return action;
+    });
+    const message = new AirdayBatchMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
-    return action;
+    return actions;
   }
   deleteItem(id: String) {}
 }

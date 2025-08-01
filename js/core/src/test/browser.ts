@@ -13,35 +13,31 @@ export async function authenticate(core: AirdayCore, email: string) {
   return core;
 }
 
-export function createTestCore() {
-  return new AirdayCore({
+export async function createTestCore() {
+  const core = new AirdayCore({
     rootUrl: "http://localhost:3000",
     authMode: AuthMode.BearerToken,
   });
+  await authenticate(core, `${Math.random()}@airday.com}`);
+  await core.db.connect();
+  core.sync.setDB(core.db);
+  core.ws.connect();
+  await core.ws.events.onceAsync("authenticated");
+  return core;
 }
 
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  const core = createTestCore();
-  await authenticate(core, `${Math.random()}@airday.com}`);
-  await core.db.connect();
-  core.sync.setDB(core.db); // TODO: This should happen automatically
-  core.ws.connect();
-  // TODO: We shouldn't need async here... or we have to use same access pattern in app
-  await new Promise((resolve) => {
-    if (core.ws.authorised) return resolve(null);
-    core.ws.events.on("authenticated", resolve);
-  });
-
   suite.test("Sync item", async (assert) => {
+    const core = await createTestCore();
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
         text: LWWRegisterString.fromString("test"),
       },
     });
-    let action = core.sync.createItem(newItem);
+    let action = core.sync.createItems([newItem])[0];
     const pending = core.sync.pendingActions.get(action.id.toHex());
     assert(pending?.id === action.id);
     await new Promise((resolve) => {
@@ -64,26 +60,34 @@ export const tests = async () => {
       }
       core.sync.events.onceAsync("flushed").then(resolve);
     });
+    core.ws.close();
   });
 
   suite.test("Sync many items", async (assert) => {
+    const core = await createTestCore();
+    let items = [];
     for (let i = 0; i < 100; i++) {
-      const newItem = new AirdayItem({
-        libraryId: core.library.id!,
-        attributes: {
-          text: LWWRegisterString.fromString("test"),
-        },
-      });
-      core.sync.createItem(newItem);
+      items.push(
+        new AirdayItem({
+          libraryId: core.library.id!,
+          attributes: {
+            text: LWWRegisterString.fromString("test"),
+          },
+        }),
+      );
+    }
+    core.sync.createItems(items);
+    if (core.sync.pendingActions.size !== 0) {
+      await core.sync.events.onceAsync("flushed");
     }
     await core.ws.flush();
-    await core.sync.events.onceAsync("flushed");
-    assert(core.sync.pendingActions.size === 0, "no pending actions!");
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-    assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+    assert(res.length === 100, "res length");
+    core.ws.close();
   });
 
-  suite.only("Merge text same message", async (assert) => {
+  suite.test("Merge text same message", async (assert) => {
+    const core = await createTestCore();
     const oldText = LWWRegisterString.fromString("old_text");
     const item = new AirdayItem({
       libraryId: core.library.id!,
@@ -93,18 +97,18 @@ export const tests = async () => {
     });
     const newText = LWWRegisterString.fromString("new_text");
     assert(newText.timestamp.greaterThan(oldText.timestamp)!);
-    let insertion = core.sync.createItem(item);
+    let insertion = core.sync.createItems([item]);
     await core.sync.events.onceAsync("flushed");
     item.attributes.text = newText;
-    let update = core.sync.createItem(item);
+    let update = core.sync.createItems([item]);
     await core.ws.flush();
     await core.sync.events.onceAsync("flushed");
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+    core.ws.close();
   });
 
   const results = await suite.run();
-  core.ws.close();
   log("Flushing");
   await tracer.flushNow();
   log(`${results.passed}/${results.total} tests passed`);

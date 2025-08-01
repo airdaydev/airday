@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] core teardown function
 - [] transactions for bulk merging items
 - [] Merge attribute macro and/or hashmap!
 - [] and... push items from server!
