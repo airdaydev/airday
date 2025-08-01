@@ -28,9 +28,7 @@ impl ItemModelSqlite {
 impl ItemModel for ItemModelSqlite {
     // TODO: Break this into parts
     async fn merge(&self, item: &Item) -> Result<(), AppError> {
-        println!("We MERGING");
-        // Start trx, read, merge, end trx
-        // let tx = sqlx::SqliteTransaction;
+        // 1. Select (we could grab multiple l8a?)
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
         let result = sqlx::query_as!(
             SqlItem,
@@ -43,28 +41,29 @@ impl ItemModel for ItemModelSqlite {
         .fetch_optional(&mut *tx)
         .await
         .map_err(|err| AppError::from(err))?;
-        // Does item exist?
+        // 2. Check if item exists
         if let Some(sql_item) = result {
             if let Some(_) = sql_item.tombstone_utc {
-                // BLACKHOLE
-                // TODO: Consider usage pattern to determine type - we would usually want to give the user back this info
+                // Item is tombstones - discard changes
+                // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
                 return Err(AppError::ValidationError(String::from(
                     "item is tombstoned",
                 )));
             }
-            let _attrs: ItemAttributesJson = sql_item
+            // Get existing attributes
+            let attrs: ItemAttributesJson = sql_item
                 .attributes
                 .as_ref()
                 .and_then(|json| serde_json::from_value(json.clone()).ok())
                 .unwrap();
-            // attrs.merge(item);
+            attrs.merge(&attrs);
             // TODO: Evaluate and merge here i.e. turn each attribute into a valid LWWRegister
             // then merge with item above
             return Ok(());
         } else {
-            // TODO: This is where we insert a new item
+            // Item does not exist, insert new item
             let _ = self.insert(item).await.unwrap();
-            Err(AppError::ServerError(String::from("Not yet implemented")))
+            Ok(())
         }
     }
     async fn insert(&self, item: &Item) -> Result<(), AppError> {

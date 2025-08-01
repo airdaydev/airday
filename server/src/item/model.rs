@@ -61,7 +61,7 @@ pub fn convert_item_attributes_to_json(
 }
 
 impl ItemAttributesJson {
-    fn merge(&self, attrs: &ItemAttributes) -> Option<ItemAttributes> {
+    pub fn merge(&self, attrs: &ItemAttributes) -> Option<ItemAttributes> {
         let mut attributes = ItemAttributes::new();
         // Merging text
         if let Some(text) = &attrs.text {

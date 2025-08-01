@@ -2,6 +2,7 @@
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] merge item api (send a bunch of items to the server & merge attributes)
+- [] transactions for bulk merging items
 - [] and... push items from server!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] delete items

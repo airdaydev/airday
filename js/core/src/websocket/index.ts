@@ -133,7 +133,6 @@ export class WebsocketManager {
       batch.push(item);
     }
     this.wsSend(batch);
-    console.log(this.outgoing.length);
     if (this.outgoing.length === 0) {
       this.events.emit("flushed", {});
       this.stop(); // stop until we start again
@@ -145,7 +144,6 @@ export class WebsocketManager {
     });
   }
   stop() {
-    console.log("stopping");
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
@@ -154,7 +152,6 @@ export class WebsocketManager {
   start() {
     // Targeting 60fps
     if (this.intervalId) return; // Do nothing if interval is already going
-    console.log("starting");
     this.intervalId = setInterval(() => this.next(), 16);
   }
   flush() {

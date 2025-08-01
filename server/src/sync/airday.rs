@@ -113,6 +113,8 @@ pub async fn message_handler(
         // Connection may have ended before messages were processed
         return Ok(());
     };
+    // Collect items for trx merge
+    // let mut items = Vec::new();
     for action in &message.actions {
         match action {
             AirdayAction::Authenticate { session_token } => {
@@ -188,6 +190,7 @@ pub async fn message_handler(
                         "User does not have access to this library",
                     )));
                 }
+                // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
                 let ack_offset = ack(&mut builder, action_id).await?;
                 action_offsets.push(ack_offset);
