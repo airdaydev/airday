@@ -1,5 +1,14 @@
 # Air Roadmap
 
+# Merkle tree plan for item sync
+- [] tree saved in a hashmap & serialised
+- [] hour granularity last 7 days
+- [] day granularity before then
+- [] clean-ups required! in-binary job on community version
+- [] Calculate hashes within sqlite statement? or in application?
+- [] On front-end, keep live hash structure that persists on update... probably need same for server-side.
+- [] Sync client gets pushed hash + year hashes on every load
+
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] get items since last sync (merkle tree base on resource.last_server_microseconds (f64) hashes)
 - [] transactions for bulk merging items
@@ -173,7 +182,6 @@
 ## Future goals
 - [x] List animations (v1)
 - [x] Canvas list
-- [] UI - Japanese
 - [] Experiment with sounds (e.g. speaking llm prompts)
 - [] List cal view
 - [] Monthly cal view
@@ -182,7 +190,6 @@
 - [] Webgl shadows/pickup
 - [] Markdown descriptions
 - [] LLM Prompting / MCP
-- [] Secrets
 - [] Custom fields
 - [] JSON export
 - [] consider flexsearch
