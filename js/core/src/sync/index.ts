@@ -2,8 +2,14 @@ import { EventEmitter } from "../common/events";
 import type { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
+import { ItemSyncReqProto } from "../proto";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
-import { AddItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
+import {
+  AddItemAction,
+  AirdayAction,
+  AirdayBatchMessage,
+  ItemSyncReqAction,
+} from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
 
@@ -48,12 +54,11 @@ export class AirdaySync {
     this.idb = idb;
     this.idbHandle = idb.handle;
   }
-  getItemSince(serverTimestamp: number, libraryId: Uuidv4) {
+  getItemSince(libraryId: Uuidv4, serverTimestamp: number | null) {
     this.syncing = true;
-    // this.core.ws.enqueueAirdayMessage();
-    // TODO: create request
-    // Initially we'll get all items since last seen
-    // once we're satisfied, we'll engage regular diffs
+    const action = new ItemSyncReqAction(libraryId, serverTimestamp);
+    const message = new AirdayBatchMessage([action]);
+    this.core.ws.enqueueAirdayMessage(message);
   }
   getLibraries() {}
   getContainers() {}
