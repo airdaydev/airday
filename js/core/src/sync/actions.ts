@@ -12,6 +12,7 @@ import {
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
+  ItemSyncReqProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -19,10 +20,32 @@ import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 
+// function buildBatchComponent(
+//   builder: Builder,
+//   actionProto: AirdayActionProto,
+//   actionOffset: Offset,
+// ) {
+// AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
+// AirdayBatchComponentProto.addActionType(
+//   builder,
+//   AirdayActionProto.AuthenticateActionProto,
+// );
+// AirdayBatchComponentProto.addAction(builder, actionOffset);
+// const actionIdOffset = UuidProto.createUuidProto(
+//   builder,
+//   this.id.toUUIDProto(),
+// );
+// AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
+// const offset =
+//   AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);
+// return offset;
+// }
+
 export class AirdayAction {
   id = new Uuidv4();
   sent = 0; // send attempts over websockets
-  addToFlatBuffer(build: Builder): Offset {
+  actionProto?: AirdayActionProto;
+  addToFlatBuffer(builder: Builder): Offset {
     throw new Error("addToFlatBuffer not implemented");
   }
   toActionFlatBuffer(): Uint8Array {
@@ -31,31 +54,10 @@ export class AirdayAction {
     builder.finish(actionOffset);
     return builder.asUint8Array();
   }
-}
-
-export class GetListsActions extends AirdayAction {
-  constructor(item: AirdayItem) {
-    super();
-  }
-}
-
-export class AuthenticateAction extends AirdayAction {
-  sessionToken: string;
-  constructor(sessionToken: string) {
-    super();
-    this.sessionToken = sessionToken;
-  }
-  addToFlatBuffer(builder: Builder): Offset {
-    const sessionTokenOffset = builder.createString(this.sessionToken);
-    const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
-      builder,
-      sessionTokenOffset,
-    );
+  buildBatchComponent(builder: Builder, actionOffset: Offset): Offset {
+    if (!this.actionProto) throw new Error("Not yet implemented");
     AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
-    AirdayBatchComponentProto.addActionType(
-      builder,
-      AirdayActionProto.AuthenticateActionProto,
-    );
+    AirdayBatchComponentProto.addActionType(builder, this.actionProto);
     AirdayBatchComponentProto.addAction(builder, actionOffset);
     const actionIdOffset = UuidProto.createUuidProto(
       builder,
@@ -68,9 +70,56 @@ export class AuthenticateAction extends AirdayAction {
   }
 }
 
+export class GetListsActions extends AirdayAction {
+  constructor(item: AirdayItem) {
+    super();
+  }
+}
+
+export class ItemSyncReqAction extends AirdayAction {
+  libraryId: Uuidv4;
+  serverTimestamp: number | null = null;
+  actionProto = AirdayActionProto.ItemSyncReqProto;
+  constructor(libraryId: Uuidv4, serverTimestamp: number | null = null) {
+    super();
+    this.libraryId = libraryId;
+    this.serverTimestamp = serverTimestamp;
+  }
+  addToFlatBuffer(builder: Builder): Offset {
+    ItemSyncReqProto.startItemSyncReqProto(builder);
+    ItemSyncReqProto.addLibraryId(
+      builder,
+      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
+    );
+    if (this.serverTimestamp) {
+      ItemSyncReqProto.addServerTimestamp(builder, this.serverTimestamp);
+    }
+    const actionOffset = ItemSyncReqProto.endItemSyncReqProto(builder);
+    return this.buildBatchComponent(builder, actionOffset);
+  }
+}
+
+export class AuthenticateAction extends AirdayAction {
+  sessionToken: string;
+  actionProto = AirdayActionProto.AuthenticateActionProto;
+  constructor(sessionToken: string) {
+    super();
+    this.sessionToken = sessionToken;
+  }
+  addToFlatBuffer(builder: Builder): Offset {
+    const sessionTokenOffset = builder.createString(this.sessionToken);
+    const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
+      builder,
+      sessionTokenOffset,
+    );
+    return this.buildBatchComponent(builder, actionOffset);
+  }
+}
+
 export class AddItemAction extends AirdayAction {
   item: AirdayItem;
   dirty = false;
+  actionProto = AirdayActionProto.AddItemActionProto;
   constructor(item: AirdayItem) {
     super();
     this.item = item;
@@ -124,20 +173,7 @@ export class AddItemAction extends AirdayAction {
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addItem(builder, itemOffset);
     const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
-    AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
-    AirdayBatchComponentProto.addActionType(
-      builder,
-      AirdayActionProto.AddItemActionProto,
-    );
-    AirdayBatchComponentProto.addAction(builder, actionOffset);
-    const actionIdOffset = UuidProto.createUuidProto(
-      builder,
-      this.id.toUUIDProto(),
-    );
-    AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
-    const batchComponentOffset =
-      AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);
-    return batchComponentOffset;
+    return this.buildBatchComponent(builder, actionOffset);
   }
 }
 
