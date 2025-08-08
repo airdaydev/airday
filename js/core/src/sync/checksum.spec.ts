@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ChecksumStore } from "./verification";
+import { ChecksumStore } from "./checksum";
 
 test("ChecksumStore instantiates clean", async () => {
   const store = new ChecksumStore();
@@ -207,3 +207,5 @@ test("ChecksumStore - edge case with empty usecs array", async () => {
   const dayNode = store.daysTouched.get(dayMs);
   expect(dayNode).toBeUndefined();
 });
+
+// TODO: Big ol' diff test

@@ -60,7 +60,16 @@ table AckResponseProto {
   success: bool;
 }
 
+// TODO: ListSync, LibrarySync
+// TODO: Merkle checks of items, lists (e.g. ItemDiffReqProto)
+
+table ItemSyncReqProto {
+  library_id: [uint8] (required);
+  server_timestamp: number;
+}
+
 union AirdayActionProto {
+  ItemSyncReqProto,
   AddItemActionProto,
   DeleteItemActionProto,
   AuthenticateActionProto,
