@@ -177,12 +177,8 @@ export class WebsocketManager {
           tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
           const authResponse = new AuthenticateResponseProto();
           component.action(authResponse);
-          const userId = Uuidv4.fromFBVector(
-            authResponse.userId.bind(authResponse),
-          );
-          const libraryId = Uuidv4.fromFBVector(
-            authResponse.libraryId.bind(authResponse),
-          );
+          const userId = Uuidv4.fromFBProto(authResponse.userId());
+          const libraryId = Uuidv4.fromFBProto(authResponse.libraryId());
           // Confirm things make sense and authorise
           // TODO: Confirm library id valid
           this.authorised = this.core.session?.userId === stringify(userId);
@@ -213,9 +209,7 @@ export class WebsocketManager {
           const primaryLibraryBuffer = libraryResponse.primaryLibrary();
           if (primaryLibraryBuffer) {
             // TODO: Validate and add item to storage
-            let id = Uuidv4.fromFBVector(
-              primaryLibraryBuffer.id.bind(primaryLibraryBuffer),
-            );
+            let id = Uuidv4.fromFBProto(primaryLibraryBuffer.id());
             let name = primaryLibraryBuffer.name() || "";
             this.core.library = new Library({
               id,
@@ -229,9 +223,7 @@ export class WebsocketManager {
           tracer.addTag(span, "msg_type", "AckResponseProto");
           const ackResponse = new AckResponseProto();
           component.action(ackResponse);
-          let actionId = Uuidv4.fromFBVector(
-            ackResponse.messageId.bind(ackResponse),
-          );
+          let actionId = Uuidv4.fromFBProto(ackResponse.messageId());
           this.events.emit("ack", {
             actionId,
             success: ackResponse.success(),

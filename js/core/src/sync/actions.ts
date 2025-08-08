@@ -11,6 +11,7 @@ import {
   DeleteItemActionProto,
   AuthenticateActionProto,
   SpanContextProto,
+  UuidProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -46,10 +47,6 @@ export class AuthenticateAction extends AirdayAction {
   }
   addToFlatBuffer(builder: Builder): Offset {
     const sessionTokenOffset = builder.createString(this.sessionToken);
-    const actionIdOffset = AirdayBatchComponentProto.createActionIdVector(
-      builder,
-      this.id,
-    );
     const actionOffset = AuthenticateActionProto.createAuthenticateActionProto(
       builder,
       sessionTokenOffset,
@@ -60,6 +57,10 @@ export class AuthenticateAction extends AirdayAction {
       AirdayActionProto.AuthenticateActionProto,
     );
     AirdayBatchComponentProto.addAction(builder, actionOffset);
+    const actionIdOffset = UuidProto.createUuidProto(
+      builder,
+      this.id.toUUIDProto(),
+    );
     AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
     const offset =
       AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);
@@ -97,11 +98,6 @@ export class AddItemAction extends AirdayAction {
     // return new AddItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
-    const libraryIdOffset = ItemProto.createLibraryIdVector(
-      builder,
-      this.item.libraryId,
-    );
-    const idOffset = ItemProto.createIdVector(builder, this.item.id);
     let textOffset;
     if (this.item.attributes.text) {
       const valueOffset = builder.createString(this.item.attributes.text.data);
@@ -116,22 +112,30 @@ export class AddItemAction extends AirdayAction {
     if (textOffset) {
       ItemProto.addText(builder, textOffset);
     }
+    const libraryIdOffset = UuidProto.createUuidProto(
+      builder,
+      this.item.libraryId.toUUIDProto(),
+    );
+    const idOffset = UuidProto.createUuidProto(
+      builder,
+      this.item.id.toUUIDProto(),
+    );
     ItemProto.addId(builder, idOffset);
     ItemProto.addLibraryId(builder, libraryIdOffset);
     const itemOffset = ItemProto.endItemProto(builder);
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addItem(builder, itemOffset);
     const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
-    const actionIdOffset = AirdayBatchComponentProto.createActionIdVector(
-      builder,
-      this.id,
-    );
     AirdayBatchComponentProto.startAirdayBatchComponentProto(builder);
     AirdayBatchComponentProto.addActionType(
       builder,
       AirdayActionProto.AddItemActionProto,
     );
     AirdayBatchComponentProto.addAction(builder, actionOffset);
+    const actionIdOffset = UuidProto.createUuidProto(
+      builder,
+      this.id.toUUIDProto(),
+    );
     AirdayBatchComponentProto.addActionId(builder, actionIdOffset);
     const batchComponentOffset =
       AirdayBatchComponentProto.endAirdayBatchComponentProto(builder);

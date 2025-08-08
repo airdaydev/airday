@@ -5,13 +5,14 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
-    common::{error::AppError, utils::fbv_to_uuid},
+    common::{error::AppError, utils::proto_uuid_to_uuid},
     item::model::{Item, ItemAttributes},
     sync::{
         outgoing::{ack, create_airday_message_with_builder},
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
+            UuidProto,
         },
         websocket::send_to_client,
     },
@@ -44,7 +45,7 @@ impl AirdayMessage {
         // 0 actions = we should drop this and warn / print
         for batch_component in message.batch().unwrap() {
             let action_id = if let Some(action_id) = batch_component.action_id() {
-                fbv_to_uuid(action_id)?
+                proto_uuid_to_uuid(action_id)
             } else {
                 return Err(AppError::ValidationError(String::from("No action_id")));
             };
@@ -75,8 +76,8 @@ impl AirdayMessage {
                         .unwrap();
                     let item_buffer = action.item();
 
-                    let id = fbv_to_uuid(item_buffer.id())?;
-                    let library_id = fbv_to_uuid(item_buffer.library_id())?;
+                    let id = proto_uuid_to_uuid(item_buffer.id());
+                    let library_id = proto_uuid_to_uuid(item_buffer.library_id());
                     // TODO: UNWRAP ITEM IN SEPARATE FUNC
                     let lww = item_buffer.text().unwrap();
                     let timestamp = lww.timestamp().unwrap();
@@ -154,14 +155,13 @@ pub async fn message_handler(
                     println!("User {:?} authenticated!", sesh.user_id);
                     // TODO: Don't panic!
                     if let Some(user) = state.db.user.get_by_id(&sesh.user_id).await.unwrap() {
-                        let user_id_offset = builder.create_vector(sesh.user_id.as_bytes());
-                        let library_id_offset =
-                            builder.create_vector(user.primary_library.unwrap().id.as_bytes());
                         let action_offset = AuthenticateResponseProto::create(
                             &mut builder,
                             &AuthenticateResponseProtoArgs {
-                                user_id: Some(user_id_offset),
-                                library_id: Some(library_id_offset),
+                                user_id: Some(&UuidProto::new(sesh.user_id.as_bytes())),
+                                library_id: Some(&UuidProto::new(
+                                    user.primary_library.unwrap().id.as_bytes(),
+                                )),
                             },
                         )
                         .as_union_value();

@@ -21,21 +21,25 @@ struct LWWRegisterBoolProto {
   data: bool;
 }
 
+struct UuidProto {
+  value: [uint8:16];
+}
+
 table ItemProto {
-  library_id: [uint8] (required);
-  id: [uint8] (required);
+  library_id: UuidProto (required);
+  id: UuidProto (required);
   text: LWWRegisterStringProto;
   completed: LWWRegisterBoolProto;
 }
 
 table LibraryProto {
-  id: [uint8] (required);
+  id: UuidProto (required);
   name: string;
 }
 
 table DeleteItemActionProto {
-  library_id: [uint8] (required);
-  id: [uint8];
+  library_id: UuidProto (required);
+  id: UuidProto;
 }
 
 table AddItemActionProto {
@@ -47,8 +51,8 @@ table AuthenticateActionProto {
 }
 
 table AuthenticateResponseProto {
-  user_id: [uint8];
-  library_id: [uint8];
+  user_id: UuidProto;
+  library_id: UuidProto;
 }
 
 table LibrarySyncResponseProto {
@@ -56,7 +60,7 @@ table LibrarySyncResponseProto {
 }
 
 table AckResponseProto {
-  message_id: [uint8] (required);
+  message_id: UuidProto (required);
   success: bool;
 }
 
@@ -64,8 +68,8 @@ table AckResponseProto {
 // TODO: Merkle checks of items, lists (e.g. ItemDiffReqProto)
 
 table ItemSyncReqProto {
-  library_id: [uint8] (required);
-  server_timestamp: number;
+  library_id: UuidProto (required);
+  server_timestamp: uint8;
 }
 
 union AirdayActionProto {
@@ -80,7 +84,7 @@ union AirdayActionProto {
 
 table AirdayBatchComponentProto {
   // Initially, set on client only
-  action_id: [uint8];
+  action_id: UuidProto;
   action: AirdayActionProto;
 }
 
@@ -90,7 +94,7 @@ table AirdayMessageProto {
 }
 
 table SpanContextProto {
-  trace_id: [uint8]; // 16 byte (128 bit) as per otlp spec n.b. swift code gen doesn't like fixed-length arrays (later perf opt is to have high/low fields or fuck off swift)
+  trace_id: [uint8]; // 16 byte (128 bit) as per otlp spec (reuse Uuid type?)
   span_id: uint64; // 8 byte (64 bit) as per otlp spec
 }
 

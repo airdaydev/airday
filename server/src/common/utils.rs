@@ -1,11 +1,8 @@
 use uuid::Uuid;
 
-use crate::common::error::AppError;
+use crate::{common::error::AppError, sync::proto_generated::proto::UuidProto};
 
-/// flatbuffer vector (variable length) to uuid
-/// This is necessary bc there are is no swift output for the fixed length uuid
-/// I MAY NOT NEED SWIFT OUTPUT however if i can get away with a rust backed core
-/// so i can simplify this later
+/// Legacy flatbuffer variable version (FB doesn't compile static sized vars in some langs e.g. Swift)
 pub fn fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, AppError> {
     let id_bytes: [u8; 16] = id_buffer
         .bytes()
@@ -16,4 +13,9 @@ pub fn fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, A
         Err(AppError::ValidationError(String::from("All zero uuid")))?;
     }
     Ok(Uuid::from_bytes(id_bytes))
+}
+
+pub fn proto_uuid_to_uuid(proto: &UuidProto) -> Uuid {
+    let highd: [u8; 16] = proto.0;
+    Uuid::from_bytes(highd)
 }

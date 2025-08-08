@@ -2,6 +2,7 @@
 
 import { parse, stringify, v4 } from "uuid";
 import { hexToUint8Array, uint8ArrayToHex } from "uint8array-extras";
+import { UuidProto } from "../proto";
 
 export class Uuidv4 extends Uint8Array {
   constructor(props: Uint8Array = parse(v4())) {
@@ -23,17 +24,12 @@ export class Uuidv4 extends Uint8Array {
     }
     return new Uuidv4(bytes);
   }
-  // TODO: Seems like you could just pass it in directly? just chops off length?
-  // Not currently used as we have to used vector fb representations atm
-  static fromFBFixed(id: Uint8Array) {
-    const bytes = new Uint8Array(16);
-    for (let i = 0; i < 16; i++) {
-      let byte = id[i];
-      if (byte === null)
-        throw new Error("UUID failed to parse from flatbuffer");
-      bytes[i] = byte;
+  static fromFBProto(id: UuidProto | null) {
+    if (!id || !id.bb) {
+      throw new Error("UUID failed to parse from flatbuffer");
     }
-    return bytes;
+    const bytes = id.bb?.bytes();
+    return new Uuidv4(bytes);
   }
   static fromHex(str: string) {
     if (!Uint8Array.fromHex) {
@@ -47,5 +43,12 @@ export class Uuidv4 extends Uint8Array {
       return (Uint8Array.prototype as any).toHex.call(this);
     }
     return uint8ArrayToHex(this);
+  }
+  toUUIDProto() {
+    const result = new Array(16);
+    for (let i = 0; i < 16; i++) {
+      result[i] = this[i];
+    }
+    return result;
   }
 }
