@@ -15,7 +15,9 @@ pub fn fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, A
     Ok(Uuid::from_bytes(id_bytes))
 }
 
+// Static version
+// TODO: Result me
 pub fn proto_uuid_to_uuid(proto: &UuidProto) -> Uuid {
-    let highd: [u8; 16] = proto.0;
+    let highd: [u8; 16] = proto.value().try_into().unwrap();
     Uuid::from_bytes(highd)
 }

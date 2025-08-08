@@ -12,7 +12,7 @@ export default defineConfig({
     baseURL,
   },
   webServer: {
-    command: "bunx serve -l 3002",
+    command: "pnpm run fe_test_server",
     url: baseURL,
     reuseExistingServer: false,
   },

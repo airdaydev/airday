@@ -112,16 +112,14 @@ export class AddItemAction extends AirdayAction {
     if (textOffset) {
       ItemProto.addText(builder, textOffset);
     }
-    const libraryIdOffset = UuidProto.createUuidProto(
+    ItemProto.addId(
       builder,
-      this.item.libraryId.toUUIDProto(),
+      UuidProto.createUuidProto(builder, this.item.id.toUUIDProto()),
     );
-    const idOffset = UuidProto.createUuidProto(
+    ItemProto.addLibraryId(
       builder,
-      this.item.id.toUUIDProto(),
+      UuidProto.createUuidProto(builder, this.item.libraryId.toUUIDProto()),
     );
-    ItemProto.addId(builder, idOffset);
-    ItemProto.addLibraryId(builder, libraryIdOffset);
     const itemOffset = ItemProto.endItemProto(builder);
     AddItemActionProto.startAddItemActionProto(builder);
     AddItemActionProto.addItem(builder, itemOffset);

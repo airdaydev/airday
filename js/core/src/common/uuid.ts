@@ -28,7 +28,13 @@ export class Uuidv4 extends Uint8Array {
     if (!id || !id.bb) {
       throw new Error("UUID failed to parse from flatbuffer");
     }
-    const bytes = id.bb?.bytes();
+    const bytes = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+      let byte = id.value(i);
+      if (byte === null)
+        throw new Error("UUID failed to parse from flatbuffer");
+      bytes[i] = byte;
+    }
     return new Uuidv4(bytes);
   }
   static fromHex(str: string) {

@@ -5,7 +5,7 @@ import { AirdayCore } from "../src";
 import { tracer } from "../src/tracer";
 
 // TODO Test bulk sync
-test("Item sync", async ({ page }) => {
+test.only("Item sync", async ({ page }) => {
   page.on("console", (msg) => {
     console.log(`🌐 Browser: ${msg.text()}`);
   });

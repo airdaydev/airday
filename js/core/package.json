@@ -9,6 +9,8 @@
   "scripts": {
     "build": "bun bundle.ts",
     "start": "bun run",
+    "fe_test_server": "bunx serve -l 3002",
+    "build_run_fe_test_server": "pnpm run build && pnpm run fe_test_server",
     "test_only": "bun playwright test",
     "test": "pnpm run -w serverd && bun run build && bun playwright test",
     "tsc": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist"
