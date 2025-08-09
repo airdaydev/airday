@@ -51,7 +51,7 @@
 - [] negative duration spans from airday_js
 
 ## Protocol improvements (l8a)
-- [] version numbers?
+- [] create versioning plan
 
 ## Done board
 - [] Done board show which list item was from
@@ -59,11 +59,13 @@
 - [] Done board chronological index
 
 ## 2025 Q4 Initial Release
-- [] @airday/core - export database to json
 - [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
-- [] Shared lists
+
+## Post release:
+- [] Shared libraries (Enforce library limits (3 per user?))
 - [] qwen3-1.7B exploration
+- [] @airday/core - export database to json
 
 ## Fixes
 - [] Canvas doesn't render constantly (todo list)

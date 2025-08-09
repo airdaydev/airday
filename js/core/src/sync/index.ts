@@ -12,21 +12,10 @@ import {
 } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem, AirdayItemAttributes } from "./model";
+import { ItemSyncStream, ListSyncStream, SyncStream } from "./stream";
 
 interface SyncEventMap {
   flushed: {};
-}
-
-// TODO: Streams within sync protocol!
-class SyncStream {
-  id = new Uuidv4();
-  syncing = false;
-  type: "item" | "list" = "item"; // TODO: Consider subtyping
-  start() {
-    this.syncing = true;
-  }
-  // on end
-  // on error (?!)
 }
 
 // TODO: Ack timeouts...?
@@ -34,15 +23,12 @@ class SyncStream {
 // TODO: Ensure we are doing one sync at a time
 export class AirdaySync {
   private idb: AirdayIDB | null = null;
-  private idbHandle: AirdayIDBPDatabase | null = null;
-  private core: AirdayCore;
+  core: AirdayCore;
   pendingActions = new Map<string, AirdayAction>(); // string = hex type
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerTimestamp: number | null = null;
-  // Initial sync streams, before server push
-  itemSyncStream = new SyncStream();
-  listSyncStream = new SyncStream();
+  streams = new Map<string, SyncStream>(); // key = streamKey() func
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => this.handleAck(ack));
@@ -60,13 +46,6 @@ export class AirdaySync {
   // TODO: Use account
   setDB(idb: AirdayIDB) {
     this.idb = idb;
-    this.idbHandle = idb.handle;
-  }
-  getItemSince(libraryId: Uuidv4, serverTimestamp: number | null) {
-    this.syncing = true;
-    const action = new ItemSyncReqAction(libraryId, serverTimestamp);
-    const message = new AirdayBatchMessage([action]);
-    this.core.ws.enqueueAirdayMessage(message);
   }
   getLibraries() {}
   getContainers() {}
