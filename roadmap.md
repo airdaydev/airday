@@ -23,8 +23,6 @@
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
-- [] @airday/core - repeat tasks
-- [] @airday/core - repeat tasks (shuffle)?
 - [] @airday/core - make an element-set crdt for
 - [] deal with orphaned items (no list reference found - they just show up in the bin! - slightly weird as there's no put back opt, also a partially synced move could push items into the bin erroneously)
 - [] GLUE CORE TO APP!!
@@ -34,6 +32,8 @@
 - [] UI - Settings
 - [] UI - Spanish
 - [] UI - Kanban
+- [] @airday/core - repeat tasks
+- [] @airday/core - repeat tasks (shuffle)?
 - [] Robust dummy data system
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
@@ -45,7 +45,7 @@
 - [] handling browser tabs?!
 - [] cors review
 
-# Span issues
+# Span issues!
 - [] send back span from server
 - [] invalid parent span ids
 - [] negative duration spans from airday_js
@@ -61,11 +61,6 @@
 ## 2025 Q4 Initial Release
 - [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
-
-## Post release:
-- [] Shared libraries (Enforce library limits (3 per user?))
-- [] qwen3-1.7B exploration
-- [] @airday/core - export database to json
 
 ## Fixes
 - [] Canvas doesn't render constantly (todo list)
@@ -131,7 +126,6 @@
 - [] Reconsider split view, maybe do horizontal only
 
 ## Stickers
-- [x] Sticker system
 - [] Consider less abstract stickers (create sets with AI? artists?)
 - [] Remove many stickers
 - [] Reinstate sticker system
@@ -144,10 +138,6 @@
 - [] Tiered e2ee for most text i.e. on-server encrypted key vs off-server key option (probably need on-server encryption... idk revisit this)
 - [] Undo/redo... in general, save granular outcomes & apply them
 - [] Multiple users / tenancy is accounted for
-
-## Calendar
-- [] CalDAV support
-- [] Consider jmap calendar support
 
 ## Predeploy, meta app
 - [] Verify keyboard only, accessibility
@@ -175,15 +165,31 @@
 
 ## Multiplatform
 - [] PWA
-- [] Linux Tauri release
-- [] MacOS Tauri release
+- [] Linux Tauri release (?)
+- [] MacOS Tauri release (?)
+- [] Rust core
 - [] Native iOS release
 - [] Native Android release
-- [] Explore Webview for cal as partial fallback
+
+## Bugs?
+- [] can't multiselect nav due to automatically activating pane on list open
+- [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
+- [] Maybe: show active pane border highlighted, then fade
+
+## Production phase 1:
+- Postgresql single-region cluster (can I upgrade later without downtime?)
+- 3 nodes with docker swarm or nomad in Australia
+- lb to any node, some sort of health indicator so lb can stop routing to dead nodes
+- users can be in conceptually the same room but in different regions, thus message broker must exist between ws servers, redis streams is fine.
+
+## Production part 2:
+- Postgresql multi-region cluster (write in US) (no sharding necessary)
+- 1+ websocket server per region
+
 
 ## Future goals
-- [x] List animations (v1)
-- [x] Canvas list
+- [] User switching
+- [] CalDAV support
 - [] Experiment with sounds (e.g. speaking llm prompts)
 - [] List cal view
 - [] Monthly cal view
@@ -195,24 +201,10 @@
 - [] Custom fields
 - [] JSON export
 - [] consider flexsearch
-
-## Bugs?
-- [] can't multiselect nav due to automatically activating pane on list open
-- [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
-- [] Maybe: show active pane border highlighted, then fade
-
-## Reliability
-Attribute-level CRDTs but not on object collections and potentially unreliable websocket message dissemination means things can still go out of sync. Checksums, state token count checks (that may include checksum, counts and timestamps), age-based resyncs, list-independence natural shards and smaller more incremental checks.
-
-## Production phase 1:
-- Postgresql single-region cluster (can I upgrade later without downtime?)
-- 3 nodes with docker swarm or nomad in Australia
-- lb to any node, some sort of health indicator so lb can stop routing to dead nodes
-- users can be in conceptually the same room but in different regions, thus message broker must exist between ws servers, redis streams is fine.
-
-## Production part 2:
-- Postgresql multi-region cluster (write in US) (no sharding necessary)
-- 1+ websocket server per region
+- [] Shared libraries (Enforce library limits (3 per user?))
+- [] qwen3-1.7B exploration
+- [] @airday/core - export database to json
+- [] Consider jmap calendar support
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
