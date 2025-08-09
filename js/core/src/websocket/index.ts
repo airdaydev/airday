@@ -178,7 +178,6 @@ export class WebsocketManager {
       const actionType = component.actionType();
 
       switch (actionType) {
-        // TODO: Make a generic success / ack response + match on msg id
         case AirdayActionProto.AuthenticateResponseProto:
           tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
           const authResponse = new AuthenticateResponseProto();
@@ -199,7 +198,6 @@ export class WebsocketManager {
           }
           // TODO: Consider "auth" notification using JS native events
           this.start();
-          // TODO: We need a means for the sync batcher to continue
           break;
         case AirdayActionProto.UpsertItemActionProto:
           tracer.addTag(span, "msg_type", "UpsertItemActionProto");

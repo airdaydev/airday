@@ -142,6 +142,10 @@ export const tests = async () => {
     await core.sync.flush();
     // Clear database
     await core.db.handle?.clear("item");
+    const emptyRes = await core.db.item.getItemsByLibrary(
+      core.library.id!.toHex(),
+    );
+    assert(emptyRes.length === 0, "idb has been emptied");
     // Retrieve all items
     core.sync.getItemSince(core.library.id!, null);
     await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
