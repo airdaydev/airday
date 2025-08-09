@@ -71,7 +71,7 @@ export class AirdayItem {
   }
   isSynced() {
     if (!this.lastSync) return false;
-    return this.lastModified > this.lastSync;
+    return this.lastSync >= this.lastModified;
   }
   // TODO: Custom logic MAY be necessary
   merge(attrs: AirdayItemAttributes) {
@@ -85,6 +85,7 @@ export class AirdayItem {
         }
       }
     });
+    this.lastModified = globalTSProducer.timestamp().utc;
   }
   toJSON() {
     // TODO: Clean up id requirement

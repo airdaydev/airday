@@ -37,19 +37,26 @@ export const tests = async () => {
         text: LWWRegisterString.fromString("test"),
       },
     });
-    let action = core.sync.createItems([newItem])[0];
+    let action = core.sync.upsertItems([newItem])[0];
     const pending = core.sync.pendingActions.get(action.id.toHex());
-    assert(pending?.id === action.id);
+    assert(pending?.id === action.id, "message gets placed on pending queue");
     await new Promise((resolve) => {
       core.ws.events.once("ack", (data) => {
         resolve(null);
       });
     });
-    assert(core.sync.pendingActions.size === 0);
+    console.log("size", core.sync.pendingActions.size);
+    assert(
+      core.sync.pendingActions.size === 0,
+      "ack message received & pending queue back to 0",
+    );
     const item = (
       await core.db.item.getItemsByLibrary(core.library.id!.toHex())
     )[0];
-    assert(item.libraryId.toHex() === core.library.id!.toHex());
+    assert(
+      item.libraryId.toHex() === core.library.id!.toHex(),
+      "correct libraryId stored in idb",
+    );
     assert(
       typeof item.lastSync === "number" && item.lastSync > item.lastModified,
       "Item timestamps = considered sync",
@@ -76,10 +83,7 @@ export const tests = async () => {
         }),
       );
     }
-    core.sync.createItems(items);
-    if (core.sync.pendingActions.size !== 0) {
-      await core.sync.events.onceAsync("flushed");
-    }
+    core.sync.upsertItems(items);
     await core.ws.flush();
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     assert(res.length === 100, "res length");
@@ -89,7 +93,7 @@ export const tests = async () => {
   });
 
   // TODO: Test update before flush!
-  suite.only("Merge text same message", async (assert) => {
+  suite.test("Merge text same message", async (assert) => {
     const core = await createTestCore();
     // Create item
     const oldText = LWWRegisterString.fromString("old_text");
@@ -99,17 +103,18 @@ export const tests = async () => {
         text: oldText,
       },
     });
-    let insertion = core.sync.createItems([item]);
+    let insertion = core.sync.upsertItems([item]);
     await core.sync.events.onceAsync("flushed");
     // Update item AFTER flush
     const newText = LWWRegisterString.fromString("new_text");
-    assert(newText.timestamp.greaterThan(oldText.timestamp)!);
+    assert(
+      newText.timestamp.greaterThan(oldText.timestamp)!,
+      "new text older than old text",
+    );
     item.merge({ text: newText });
-    assert(item.attributes.text?.data === newText.data);
-    assert(item.isSynced() === false);
-    core.sync.syncUpdatedItem(item); // Could we queue it... and decide it doesn't need it later?
-    // TODO: here, we need to let the item work out if it included this merge in the sync, or not
-    // if not, it needs to sync again after!
+    assert(item.attributes.text?.data === newText.data, "merge success");
+    assert(item.isSynced() === false, "item considered not synced");
+    core.sync.upsertItems([item]);
     await core.ws.flush();
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!

@@ -6,7 +6,7 @@ import { ItemSyncReqProto } from "../proto";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
 import { AckEvent } from "../websocket";
 import {
-  AddItemAction,
+  UpsertItemAction,
   AirdayAction,
   AirdayBatchMessage,
   ItemSyncReqAction,
@@ -18,9 +18,9 @@ interface SyncEventMap {
   flushed: {};
 }
 
-// Creates & serialises actions to pass to mq
-// TODO: Message retries (Exponential backoff + max attempts)
+// TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
+// TODO: Ensure we are doing one sync at a time
 export class AirdaySync {
   private idb: AirdayIDB | null = null;
   private idbHandle: AirdayIDBPDatabase | null = null;
@@ -57,27 +57,23 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  createItems(items: AirdayItem[]) {
-    const actions = items.map((item) => {
-      item.startSync();
-      const action = new AddItemAction(item);
-      this.idb?.item.insert([item]); // optimistic update
-      this.pendingActions.set(action.id.toHex(), action);
-      return action;
-    });
+  upsertItems(items: AirdayItem[]) {
+    // Filter out items currently in sync
+    const actions = items
+      .filter((item) => {
+        return !item.syncStarted;
+      })
+      .map((item) => {
+        item.startSync();
+        const action = new UpsertItemAction(item);
+        // TODO: Ensure this works for updated items too
+        this.idb?.item.upsert([item]); // optimistic update
+        this.pendingActions.set(action.id.toHex(), action);
+        return action;
+      });
     const message = new AirdayBatchMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
-  }
-  // TODO: The initial update is ON the item itself
-  syncUpdatedItem(item: AirdayItem) {
-    if (item.syncStarted) {
-      console.warn("Can't sync until done!");
-      // Will automatically sync on ack
-      return;
-    }
-    item.startSync();
-    // TODO: Use upsert item here (ASSUME ALL ITEMS ARE MERGES!?)
   }
   syncPendingItems() {
     // Collects pending items from database to sync on boot
@@ -86,20 +82,21 @@ export class AirdaySync {
   handleAck(ack: AckEvent) {
     const action = this.pendingActions.get(ack.actionId.toHex());
 
-    if (action instanceof AddItemAction) {
+    if (action instanceof UpsertItemAction) {
       // TODO: targeted change instead of blunt (pass in idb to endSync?)
-      this.idb?.item.update([action.item]).catch((err) => {
+      this.idb?.item.upsert([action.item]).catch((err) => {
         console.log(err);
       });
-      action.item.endSync();
       this.pendingActions.delete(ack.actionId.toHex());
+      action.item.endSync();
       if (this.pendingActions.size === 0) {
         this.events.emit("flushed", {});
       }
+      // If item has changes applied during sync, sync them
       if (!action.item.isSynced()) {
-        this.syncUpdatedItem(action.item);
+        this.upsertItems([action.item]);
       }
     }
-    // TODO: More actions here
+    // TODO: More actions here?
   }
 }

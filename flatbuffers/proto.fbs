@@ -40,7 +40,7 @@ table DeleteItemActionProto {
   id: UuidProto;
 }
 
-table AddItemActionProto {
+table UpsertItemActionProto {
   item: ItemProto (required);
 }
 
@@ -72,7 +72,7 @@ table ItemSyncReqProto {
 
 union AirdayActionProto {
   ItemSyncReqProto,
-  AddItemActionProto,
+  UpsertItemActionProto,
   DeleteItemActionProto,
   AuthenticateActionProto,
   AuthenticateResponseProto,

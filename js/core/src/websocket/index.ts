@@ -1,6 +1,6 @@
 import { ByteBuffer } from "flatbuffers";
 import {
-  AddItemActionProto,
+  UpsertItemActionProto,
   AirdayActionProto,
   AirdayMessageProto,
   AuthenticateResponseProto,
@@ -156,9 +156,9 @@ export class WebsocketManager {
     this.intervalId = null;
   }
   start() {
-    // Targeting 60fps
+    // TODO: Start at 150ms and tune
     if (this.intervalId) return; // Do nothing if interval is already going
-    this.intervalId = setInterval(() => this.next(), 16);
+    this.intervalId = setInterval(() => this.next(), 150);
   }
   flush() {
     return new Promise((resolve) => {
@@ -201,9 +201,9 @@ export class WebsocketManager {
           this.start();
           // TODO: We need a means for the sync batcher to continue
           break;
-        case AirdayActionProto.AddItemActionProto:
-          tracer.addTag(span, "msg_type", "AddItemActionProto");
-          const itemResponse = new AddItemActionProto();
+        case AirdayActionProto.UpsertItemActionProto:
+          tracer.addTag(span, "msg_type", "UpsertItemActionProto");
+          const itemResponse = new UpsertItemActionProto();
           component.action(itemResponse);
           // TODO: Validate and add item to storage
           console.log(itemResponse.item());

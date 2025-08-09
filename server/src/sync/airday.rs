@@ -67,9 +67,9 @@ impl AirdayMessage {
                         session_token: String::from(token),
                     })
                 }
-                AirdayActionProto::AddItemActionProto => {
+                AirdayActionProto::UpsertItemActionProto => {
                     let action = batch_component
-                        .action_as_add_item_action_proto()
+                        .action_as_upsert_item_action_proto()
                         .ok_or(AppError::ValidationError(String::from(
                             "Could not parse add item action",
                         )))

@@ -4,7 +4,7 @@ import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
   ItemProto,
   LWWRegisterStringProto,
-  AddItemActionProto,
+  UpsertItemActionProto,
   AirdayMessageProto,
   AirdayActionProto,
   AirdayBatchComponentProto,
@@ -116,10 +116,10 @@ export class AuthenticateAction extends AirdayAction {
   }
 }
 
-export class AddItemAction extends AirdayAction {
+export class UpsertItemAction extends AirdayAction {
   item: AirdayItem;
   dirty = false;
-  actionProto = AirdayActionProto.AddItemActionProto;
+  actionProto = AirdayActionProto.UpsertItemActionProto;
   constructor(item: AirdayItem) {
     super();
     this.item = item;
@@ -144,7 +144,7 @@ export class AddItemAction extends AirdayAction {
     //     data: text.data() || "",
     //   });
     // }
-    // return new AddItemAction(fields);
+    // return new UpsertItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
     let textOffset;
@@ -170,9 +170,10 @@ export class AddItemAction extends AirdayAction {
       UuidProto.createUuidProto(builder, this.item.libraryId.toUUIDProto()),
     );
     const itemOffset = ItemProto.endItemProto(builder);
-    AddItemActionProto.startAddItemActionProto(builder);
-    AddItemActionProto.addItem(builder, itemOffset);
-    const actionOffset = AddItemActionProto.endAddItemActionProto(builder);
+    UpsertItemActionProto.startUpsertItemActionProto(builder);
+    UpsertItemActionProto.addItem(builder, itemOffset);
+    const actionOffset =
+      UpsertItemActionProto.endUpsertItemActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }

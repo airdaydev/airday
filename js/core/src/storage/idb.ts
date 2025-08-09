@@ -50,20 +50,7 @@ export class ItemIDBModel {
   constructor(db: AirdayIDB) {
     this.db = db;
   }
-  // TODO: Should we just upsert!?
-  insert = async (items: AirdayItem[]) => {
-    const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
-    const store = tx.objectStore(ITEM_STORE_NAME);
-    // TODO: We also need to extract indexes in JSON version (e.g. done)!
-    await Promise.all(
-      items.map((item) => {
-        const serial = item.toJSON();
-        return store.add(serial);
-      }),
-    );
-    await tx.done;
-  };
-  update = async (items: AirdayItem[]) => {
+  upsert = async (items: AirdayItem[]) => {
     const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
     const store = tx.objectStore(ITEM_STORE_NAME);
     const b = await store.getAll();
