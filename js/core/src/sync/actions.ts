@@ -12,7 +12,7 @@ import {
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
-  ItemSyncReqProto,
+  SyncStreamReqProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -79,22 +79,22 @@ export class GetListsActions extends AirdayAction {
 export class ItemSyncReqAction extends AirdayAction {
   libraryId: Uuidv4;
   serverTimestamp: number | null = null;
-  actionProto = AirdayActionProto.ItemSyncReqProto;
+  actionProto = AirdayActionProto.SyncStreamReqProto;
   constructor(libraryId: Uuidv4, serverTimestamp: number | null = null) {
     super();
     this.libraryId = libraryId;
     this.serverTimestamp = serverTimestamp;
   }
   addToFlatBuffer(builder: Builder): Offset {
-    ItemSyncReqProto.startItemSyncReqProto(builder);
-    ItemSyncReqProto.addLibraryId(
+    SyncStreamReqProto.startSyncStreamReqProto(builder);
+    SyncStreamReqProto.addLibraryId(
       builder,
       UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
     );
     if (this.serverTimestamp) {
-      ItemSyncReqProto.addServerTimestamp(builder, this.serverTimestamp);
+      SyncStreamReqProto.addServerTimestamp(builder, this.serverTimestamp);
     }
-    const actionOffset = ItemSyncReqProto.endItemSyncReqProto(builder);
+    const actionOffset = SyncStreamReqProto.endSyncStreamReqProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }

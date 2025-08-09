@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import "./sync.d.ts";
 
 // TODO Test bulk sync
 test.only("Item sync", async ({ page }) => {
