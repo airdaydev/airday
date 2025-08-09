@@ -104,8 +104,10 @@ export const tests = async () => {
     // Update item
     const newText = LWWRegisterString.fromString("new_text");
     assert(newText.timestamp.greaterThan(oldText.timestamp)!);
-    item.attributes.text = newText;
-    let update = core.sync.createItems([item]);
+    item.merge({ text: newText });
+    core.sync.syncUpdatedItem(item);
+    // TODO: here, we need to let the item work out if it included this merge in the sync, or not
+    // if not, it needs to sync again after!
     await core.ws.flush();
     await core.sync.events.onceAsync("flushed");
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
@@ -118,6 +120,7 @@ export const tests = async () => {
   suite.skip("Get all libraries", async (assert) => {});
   suite.skip("Get all lists", async (assert) => {});
   suite.skip("Get diff lists", async (assert) => {});
+  suite.skip("Sync local pending changes from idb", async (assert) => {});
 
   const results = await suite.run();
   log("Flushing");

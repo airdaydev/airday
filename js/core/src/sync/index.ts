@@ -82,11 +82,14 @@ export class AirdaySync {
     return actions;
   }
   // TODO: The initial update is ON the item itself
-  updateItem(item: AirdayItem, attributes: AirdayItemAttributes) {
+  syncUpdatedItem(item: AirdayItem) {
     if (item.syncStarted) {
       // Update local item
       // Even this neds to be a merge!
     }
+  }
+  syncPendingItems() {
+    // Collects pending items from database to sync!
   }
   deleteItem(id: String) {}
 }
