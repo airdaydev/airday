@@ -57,21 +57,29 @@ table LibrarySyncResponseProto {
   primary_library: LibraryProto;
 }
 
+// TODO: AckResponse should have a server timestamp
 table AckResponseProto {
   message_id: UuidProto (required);
   success: bool;
 }
 
-// TODO: ListSync, LibrarySync
+// TODO: LibrarySync
 // TODO: Merkle checks of items, lists (e.g. ItemDiffReqProto)
 
-table ItemSyncReqProto {
+enum ResourceType: byte {
+  Item,
+  List,
+}
+
+table SyncStreamReqProto {
+  stream_id: UuidProto (required);
   library_id: UuidProto (required);
+  resource: ResourceType;
   server_timestamp: uint8;
 }
 
 union AirdayActionProto {
-  ItemSyncReqProto,
+  SyncStreamReqProto,
   UpsertItemActionProto,
   DeleteItemActionProto,
   AuthenticateActionProto,
@@ -86,11 +94,25 @@ table AirdayBatchComponentProto {
   action: AirdayActionProto;
 }
 
-table AirdayMessageProto {
-  batch: [AirdayBatchComponentProto];
-  span_context: SpanContextProto;
+enum StreamEvent: byte {
+  None,
+  Data,
+  End,
+  Error,
 }
 
+struct StreamContext {
+  id: UuidProto;
+  event: StreamEvent;
+}
+
+table AirdayMessageProto {
+  span_context: SpanContextProto;
+  stream_context: StreamContext;
+  batch: [AirdayBatchComponentProto];
+}
+
+// TODO: Struct these
 table SpanContextProto {
   trace_id: [uint8]; // 16 byte (128 bit) as per otlp spec (reuse Uuid type?)
   span_id: uint64; // 8 byte (64 bit) as per otlp spec
