@@ -11,7 +11,7 @@ import {
   ItemSyncReqAction,
 } from "./actions";
 import { ChecksumStore } from "./checksum";
-import { AirdayItem } from "./model";
+import { AirdayItem, AirdayItemAttributes } from "./model";
 
 interface SyncEventMap {
   flushed: {};
@@ -80,6 +80,13 @@ export class AirdaySync {
     const message = new AirdayBatchMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
+  }
+  // TODO: The initial update is ON the item itself
+  updateItem(item: AirdayItem, attributes: AirdayItemAttributes) {
+    if (item.syncStarted) {
+      // Update local item
+      // Even this neds to be a merge!
+    }
   }
   deleteItem(id: String) {}
 }

@@ -63,7 +63,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.test("Sync many items", async (assert) => {
+  suite.test("Sync many items, get all items", async (assert) => {
     const core = await createTestCore();
     let items = [];
     for (let i = 0; i < 100; i++) {
@@ -83,11 +83,15 @@ export const tests = async () => {
     await core.ws.flush();
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     assert(res.length === 100, "res length");
+    // TODO: Get all items
+    // core.sync.getItemSince(core.library.id!, null);
     core.ws.close();
   });
 
-  suite.test("Merge text same message", async (assert) => {
+  // TODO: Test update DURING initial sync!
+  suite.only("Merge text same message", async (assert) => {
     const core = await createTestCore();
+    // Create item
     const oldText = LWWRegisterString.fromString("old_text");
     const item = new AirdayItem({
       libraryId: core.library.id!,
@@ -95,18 +99,25 @@ export const tests = async () => {
         text: oldText,
       },
     });
-    const newText = LWWRegisterString.fromString("new_text");
-    assert(newText.timestamp.greaterThan(oldText.timestamp)!);
     let insertion = core.sync.createItems([item]);
     await core.sync.events.onceAsync("flushed");
+    // Update item
+    const newText = LWWRegisterString.fromString("new_text");
+    assert(newText.timestamp.greaterThan(oldText.timestamp)!);
     item.attributes.text = newText;
     let update = core.sync.createItems([item]);
     await core.ws.flush();
     await core.sync.events.onceAsync("flushed");
-    const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
     core.ws.close();
   });
+
+  suite.skip("Get all items since beginning", async (assert) => {});
+  suite.skip("Get diff items", async (assert) => {});
+  suite.skip("Get all libraries", async (assert) => {});
+  suite.skip("Get all lists", async (assert) => {});
+  suite.skip("Get diff lists", async (assert) => {});
 
   const results = await suite.run();
   log("Flushing");

@@ -10,6 +10,7 @@
 - [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
+- [] Update item sync
 - [] get items since last sync (resource.last_server_microseconds (f64) hashes)
 - [] transactions for bulk merging items
 - [] Merge attribute macro and/or hashmap!
