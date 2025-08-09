@@ -10,9 +10,8 @@
 - [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)
 
 ## 2025 Q3 Working Alpha Prototype Sqlite
-- [] ensure upsert occurs once after sync
-- [] get items since last sync (resource.last_server_microseconds (f64) hashes)
-- [] transactions for bulk merging items
+- [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes)
+- [] transactions for bulk merging items (sql-side... idb side?)
 - [] Merge attribute macro and/or hashmap!
 - [] and... push items from server!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)

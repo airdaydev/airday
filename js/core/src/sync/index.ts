@@ -1,5 +1,5 @@
 import { EventEmitter } from "../common/events";
-import type { Uuidv4 } from "../common/uuid";
+import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
@@ -17,6 +17,18 @@ interface SyncEventMap {
   flushed: {};
 }
 
+// TODO: Streams within sync protocol!
+class SyncStream {
+  id = new Uuidv4();
+  syncing = false;
+  type: "item" | "list" = "item"; // TODO: Consider subtyping
+  start() {
+    this.syncing = true;
+  }
+  // on end
+  // on error (?!)
+}
+
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
 // TODO: Ensure we are doing one sync at a time
@@ -27,8 +39,10 @@ export class AirdaySync {
   pendingActions = new Map<string, AirdayAction>(); // string = hex type
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
-  syncing = false; // an initial or diff sync operation is in progress (TODO: expand)
   lastServerTimestamp: number | null = null;
+  // Initial sync streams, before server push
+  itemSyncStream = new SyncStream();
+  listSyncStream = new SyncStream();
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => this.handleAck(ack));
@@ -85,6 +99,8 @@ export class AirdaySync {
     // Collects pending items from database to sync on boot
   }
   deleteItem(id: String) {}
+  // TODO: Do we need ack + pending? vs retaining state on object itself?
+  // Probably yes but just keep this todo here for a bit
   handleAck(ack: AckEvent) {
     const action = this.pendingActions.get(ack.actionId.toHex());
 
