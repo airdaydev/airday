@@ -93,7 +93,7 @@ export const tests = async () => {
   });
 
   // TODO: Test update before flush!
-  suite.test("Merge text same message", async (assert) => {
+  suite.only("Merge text same message", async (assert) => {
     const core = await createTestCore();
     // Create item
     const oldText = LWWRegisterString.fromString("old_text");
@@ -103,8 +103,8 @@ export const tests = async () => {
         text: oldText,
       },
     });
-    let insertion = core.sync.upsertItems([item]);
-    await core.sync.events.onceAsync("flushed");
+    core.sync.upsertItems([item]);
+    await core.sync.flush();
     // Update item AFTER flush
     const newText = LWWRegisterString.fromString("new_text");
     assert(
@@ -115,7 +115,9 @@ export const tests = async () => {
     assert(item.attributes.text?.data === newText.data, "merge success");
     assert(item.isSynced() === false, "item considered not synced");
     core.sync.upsertItems([item]);
-    await core.ws.flush();
+    assert(item.isSynced() === false, "item considered not synced");
+    await core.sync.flush();
+    assert(item.isSynced() === true, "item now considered as synced");
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
     core.ws.close();
