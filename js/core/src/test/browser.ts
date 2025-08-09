@@ -88,7 +88,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  // TODO: Test update DURING initial sync!
+  // TODO: Test update before flush!
   suite.only("Merge text same message", async (assert) => {
     const core = await createTestCore();
     // Create item
@@ -101,15 +101,16 @@ export const tests = async () => {
     });
     let insertion = core.sync.createItems([item]);
     await core.sync.events.onceAsync("flushed");
-    // Update item
+    // Update item AFTER flush
     const newText = LWWRegisterString.fromString("new_text");
     assert(newText.timestamp.greaterThan(oldText.timestamp)!);
     item.merge({ text: newText });
-    core.sync.syncUpdatedItem(item);
+    assert(item.attributes.text?.data === newText.data);
+    assert(item.isSynced() === false);
+    core.sync.syncUpdatedItem(item); // Could we queue it... and decide it doesn't need it later?
     // TODO: here, we need to let the item work out if it included this merge in the sync, or not
     // if not, it needs to sync again after!
     await core.ws.flush();
-    await core.sync.events.onceAsync("flushed");
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
     core.ws.close();

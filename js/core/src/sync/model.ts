@@ -80,7 +80,8 @@ export class AirdayItem {
         if (!this.attributes[key]) {
           this.attributes[key] = attrs[key];
         } else {
-          const text = this.attributes[key].merge(attrs[key]);
+          const merged = this.attributes[key].merge(attrs[key]);
+          this.attributes[key] = merged;
         }
       }
     });

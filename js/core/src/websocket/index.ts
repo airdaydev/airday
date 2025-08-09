@@ -15,9 +15,15 @@ import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 
+export interface AckEvent {
+  actionId: Uuidv4;
+  success: boolean;
+  error?: string;
+}
+
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ack: { actionId: Uuidv4; success: boolean; error?: string };
+  ack: AckEvent;
   flushed: {};
 }
 

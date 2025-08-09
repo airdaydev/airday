@@ -4,6 +4,7 @@ import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { ItemSyncReqProto } from "../proto";
 import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
+import { AckEvent } from "../websocket";
 import {
   AddItemAction,
   AirdayAction,
@@ -31,20 +32,7 @@ export class AirdaySync {
   lastServerTimestamp: number | null = null;
   constructor(core: AirdayCore) {
     this.core = core;
-    this.core.ws.events.on("ack", (ack) => {
-      const action = this.pendingActions.get(ack.actionId.toHex());
-      if (action instanceof AddItemAction) {
-        action.item.endSync();
-        // TODO: targeted change instead of blunt (pass in idb to endSync?)
-        this.idb?.item.update([action.item]).catch((err) => {
-          console.log(err);
-        });
-        this.pendingActions.delete(ack.actionId.toHex());
-        if (this.pendingActions.size === 0) {
-          this.events.emit("flushed", {});
-        }
-      }
-    });
+    this.core.ws.events.on("ack", (ack) => this.handleAck(ack));
   }
   timestamp() {
     return globalTSProducer.timestamp();
@@ -84,12 +72,34 @@ export class AirdaySync {
   // TODO: The initial update is ON the item itself
   syncUpdatedItem(item: AirdayItem) {
     if (item.syncStarted) {
-      // Update local item
-      // Even this neds to be a merge!
+      console.warn("Can't sync until done!");
+      // Will automatically sync on ack
+      return;
     }
+    item.startSync();
+    // TODO: Use upsert item here (ASSUME ALL ITEMS ARE MERGES!?)
   }
   syncPendingItems() {
-    // Collects pending items from database to sync!
+    // Collects pending items from database to sync on boot
   }
   deleteItem(id: String) {}
+  handleAck(ack: AckEvent) {
+    const action = this.pendingActions.get(ack.actionId.toHex());
+
+    if (action instanceof AddItemAction) {
+      // TODO: targeted change instead of blunt (pass in idb to endSync?)
+      this.idb?.item.update([action.item]).catch((err) => {
+        console.log(err);
+      });
+      action.item.endSync();
+      this.pendingActions.delete(ack.actionId.toHex());
+      if (this.pendingActions.size === 0) {
+        this.events.emit("flushed", {});
+      }
+      if (!action.item.isSynced()) {
+        this.syncUpdatedItem(action.item);
+      }
+    }
+    // TODO: More actions here
+  }
 }
