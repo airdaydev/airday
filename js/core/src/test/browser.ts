@@ -3,6 +3,8 @@ import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
 import { LWWRegisterString } from "../crdt/lww";
 import { tracer } from "../tracer";
 
+// TODO: Performance testing!
+
 export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
   await createUser(core, {
@@ -45,7 +47,6 @@ export const tests = async () => {
         resolve(null);
       });
     });
-    console.log("size", core.sync.pendingActions.size);
     assert(
       core.sync.pendingActions.size === 0,
       "ack message received & pending queue back to 0",
@@ -70,7 +71,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.test("Sync many items, get all items", async (assert) => {
+  suite.test("Items stored in indexeddb", async (assert) => {
     const core = await createTestCore();
     let items = [];
     for (let i = 0; i < 100; i++) {
@@ -93,7 +94,7 @@ export const tests = async () => {
   });
 
   // TODO: Test update before flush!
-  suite.only("Merge text same message", async (assert) => {
+  suite.test("Merge text same message", async (assert) => {
     const core = await createTestCore();
     // Create item
     const oldText = LWWRegisterString.fromString("old_text");
@@ -123,7 +124,32 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.skip("Get all items since beginning", async (assert) => {});
+  suite.only("Get all items since beginning from server", async (assert) => {
+    const core = await createTestCore();
+    // create 50 items
+    let items = [];
+    for (let i = 0; i < 100; i++) {
+      items.push(
+        new AirdayItem({
+          libraryId: core.library.id!,
+          attributes: {
+            text: LWWRegisterString.fromString("test"),
+          },
+        }),
+      );
+    }
+    core.sync.upsertItems(items);
+    await core.sync.flush();
+    // Clear database
+    await core.db.handle?.clear("item");
+    // Retrieve all items
+    core.sync.getItemSince(core.library.id!, null);
+    await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
+    const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    console.log("items returned", res.length);
+    core.ws.close();
+  });
+
   suite.skip("Get diff items", async (assert) => {});
   suite.skip("Get all libraries", async (assert) => {});
   suite.skip("Get all lists", async (assert) => {});

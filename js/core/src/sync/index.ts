@@ -96,7 +96,6 @@ export class AirdaySync {
       });
       this.pendingActions.delete(ack.actionId.toHex());
       action.item.endSync();
-      console.log("umm bruh", action.item.isSynced());
       if (this.pendingActions.size === 0) {
         // Consider renaming: no pending acknowledgements remaining
         this.events.emit("flushed", {});
