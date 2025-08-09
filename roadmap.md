@@ -92,8 +92,6 @@
 - [] Drag items into list nav
 - [] Performance board
 - [] Pin views (arrangements of panes) - after trying out workspaces (they suck) this is the right move
-- [] Print styles
-- [] Locations/Map?
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
@@ -107,23 +105,19 @@
 - [] Add search
 - [] Persist views (per device)
 - [] Handle loader validation failure, types
-- [] Remove SVGs from JS or at least include in diff bundle
 
 ## UI
-- [] voice notes
 - [] Drag stack make it nice - add next two items + total count
 - [] Copy and paste many items, from csv, etc
 - [] Copy as JSON, CSV, Markdown, text, rich text etc
-- [] Show completed item in og list for 5 seconds before disappearing (progress bar follows checkbox border)
-- [] Rename container in sidenav
+- [] Rename container within sidenav
 - [] Ensure selection is cleared on edit
 - [] Edit selected items via 'enter' key (vim?)
 - [] Context menu for many items
 - [] Timeline index
 - [] Drag divider to change view size!
-- [] Focus mode (design)
+- [] Update focus mode to be a floating pomodoro timer that can maximise, without the corny hold to end
 - [] Nice empty list states
-- [] Reconsider split view, maybe do horizontal only
 
 ## Stickers
 - [] Consider less abstract stickers (create sets with AI? artists?)
@@ -134,10 +128,8 @@
 - [] Custom stickers
 
 ## Sync/Data structure
-- [] Build todo list sync
-- [] Tiered e2ee for most text i.e. on-server encrypted key vs off-server key option (probably need on-server encryption... idk revisit this)
+- [] Create Tiered e2ee key plan. tierd? for most text i.e. on-server encrypted key vs off-server key option (probably need on-server encryption... idk revisit this)
 - [] Undo/redo... in general, save granular outcomes & apply them
-- [] Multiple users / tenancy is accounted for
 
 ## Predeploy, meta app
 - [] Verify keyboard only, accessibility
@@ -154,7 +146,7 @@
 - [] Korean localisation
 
 ## Marketing, community
-- [] Website (Astro)
+- [] Website (Astro) + waitlist
 - [] Consider https://form-data.com/ for backend form (or just vibecode some bullshit)
 - [] Consider Zulip/matrix+element/discord (chat)
 - [] Consider https://motion.dev/ (Animation library)
@@ -162,14 +154,6 @@
 - [] Consider https://forwardemail.net/en/private-business-email?pricing=true#enhanced
 - Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
 - Pricing https://www.principlesofpricing.com/the-customer
-
-## Multiplatform
-- [] PWA
-- [] Linux Tauri release (?)
-- [] MacOS Tauri release (?)
-- [] Rust core
-- [] Native iOS release
-- [] Native Android release
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
@@ -182,12 +166,19 @@
 - lb to any node, some sort of health indicator so lb can stop routing to dead nodes
 - users can be in conceptually the same room but in different regions, thus message broker must exist between ws servers, redis streams is fine.
 
-## Production part 2:
-- Postgresql multi-region cluster (write in US) (no sharding necessary)
-- 1+ websocket server per region
+---
 
+# FUTURE GOALS FOR AIRDAY
 
-## Future goals
+## Multiplatform goals
+- [] PWA
+- [] Linux Tauri release (?)
+- [] MacOS Tauri release (?)
+- [] Rust core
+- [] Native iOS release
+- [] Native Android release
+
+## Features
 - [] User switching
 - [] CalDAV support
 - [] Experiment with sounds (e.g. speaking llm prompts)
@@ -205,6 +196,13 @@
 - [] qwen3-1.7B exploration
 - [] @airday/core - export database to json
 - [] Consider jmap calendar support
+- [] Locations/Map?
+- [] voice notes
+- [] Print styles
+
+## Multi-region goals:
+- Postgresql multi-region cluster (write in US) (no sharding necessary)
+- 1+ websocket server per region
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
