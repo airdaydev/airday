@@ -22,7 +22,6 @@
 - [] UI - Update items
 - [] UI - Delete items
 - [] UI - Settings
-- [] UI - Spanish
 - [] UI - Kanban
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
@@ -132,15 +131,14 @@
 - [] Undo/redo... in general, save granular outcomes & apply them
 
 ## Predeploy, meta app
+- [] API abuse mitigation / define limits
 - [] Verify keyboard only, accessibility
 - [] Friends alpha and testing
 - [] PWA update strategy
-- [] Automated testing story
-- [] optionally disabled magic login with email
+- [] optionally enable magic login with email
 - [] Paid web service with introductory prices
-- [] Opens immediately into application, landing page at air.day/about
-- [] Consider license type for copyleft (reselling no)
-- [] Custom Themes / compact mode
+- [] web app @ air.day/app
+- [] BSL vs AGPL?
 
 ## Marketing, community
 - [] Website (Astro) + waitlist
