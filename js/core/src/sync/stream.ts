@@ -3,20 +3,20 @@ import { AirdayCore } from "../core";
 import { ResourceType } from "../proto";
 import { AirdayBatchMessage, SyncReqAction } from "./actions";
 
-export const streamKey = (libraryId: Uuidv4, resource: "item" | "list") => {
-  return `${libraryId.toHex()}:${resource}`;
-};
-
 // Subprotocols for AirdayCore streams
 // Activated on connect/reconnect
 export class SyncStream {
   core: AirdayCore;
-  id = new Uuidv4();
+  id = new Uuidv4(); // TODO: Is this necessary?
   libraryId: Uuidv4;
   syncing = false;
+  resource: ResourceType = ResourceType.Item;
   constructor(core: AirdayCore, libraryId: Uuidv4) {
     this.core = core;
     this.libraryId = libraryId;
+  }
+  get key() {
+    return `${this.libraryId.toHex()}:${this.resource}`;
   }
   start() {
     this.syncing = true;

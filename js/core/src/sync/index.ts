@@ -1,4 +1,5 @@
 import { EventEmitter } from "../common/events";
+import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB } from "../storage/idb";
@@ -6,12 +7,13 @@ import { AckEvent } from "../websocket";
 import { UpsertItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
-import { SyncStream } from "./stream";
+import { ItemSyncStream, SyncStream } from "./stream";
 
 interface SyncEventMap {
   flushed: {};
 }
 
+// TODO: Streams should disappear on completion
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
 // TODO: Ensure we are doing one sync at a time
@@ -22,7 +24,7 @@ export class AirdaySync {
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerTimestamp: number | null = null;
-  streams = new Map<string, SyncStream>(); // key = streamKey() func
+  streams = new Map<string, SyncStream>();
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("ack", (ack) => this.handleAck(ack));
@@ -42,6 +44,7 @@ export class AirdaySync {
     this.idb = idb;
   }
   initialSync() {
+    this.streamItems(this.core.library.id!);
     // 0. After login:
     // 1. Start list & item streams on primary library
     // 1a. In parallel, get shared libraries
@@ -51,10 +54,22 @@ export class AirdaySync {
   getLibraries() {
     // TODO: Get all shared libraries (TODO: Offline mode? Sync? limits?)
   }
-  getContainers() {
+  streamContainers(libraryId: Uuidv4) {
     // i.e. lists
   }
-  getItems() {}
+  streamItems(libraryId: Uuidv4) {
+    const itemStream = new ItemSyncStream(this.core, libraryId);
+    const existingStream = this.streams.get(itemStream.key);
+    if (existingStream && existingStream.syncing) {
+      console.warn(
+        "Existing stream of same data is currently running.",
+        itemStream.key,
+      );
+      return;
+    }
+    this.streams.set(itemStream.key, itemStream);
+    itemStream.start();
+  }
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
