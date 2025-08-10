@@ -67,9 +67,8 @@ enum ResourceType: byte {
 }
 
 table SyncStreamReqProto {
-  stream_id: UuidProto (required);
-  library_id: UuidProto (required);
   resource: ResourceType;
+  library_id: UuidProto (required);
   server_timestamp: uint8;
 }
 
@@ -78,7 +77,7 @@ union AirdayActionProto {
   SyncItemActionProto, // Syncs a single item
   AuthenticateActionProto, // Authenticates user
   AuthenticateResponseProto, // Responds with authenticated state
-  LibrarySyncResponseProto, // This currently sends the primary library, but TODO: place under syncstream and TODO: make edit library SyncLibraryActionProto
+  LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
   AckResponseProto, // TODO: Per action, this needs a server timestamp
 }
 

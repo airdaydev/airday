@@ -1,18 +1,12 @@
 import { EventEmitter } from "../common/events";
-import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { AirdayIDB, type AirdayIDBPDatabase } from "../storage/idb";
+import { AirdayIDB } from "../storage/idb";
 import { AckEvent } from "../websocket";
-import {
-  UpsertItemAction,
-  AirdayAction,
-  AirdayBatchMessage,
-  ItemSyncReqAction,
-} from "./actions";
+import { UpsertItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
 import { ChecksumStore } from "./checksum";
-import { AirdayItem, AirdayItemAttributes } from "./model";
-import { ItemSyncStream, ListSyncStream, SyncStream } from "./stream";
+import { AirdayItem } from "./model";
+import { SyncStream } from "./stream";
 
 interface SyncEventMap {
   flushed: {};
@@ -47,12 +41,20 @@ export class AirdaySync {
   setDB(idb: AirdayIDB) {
     this.idb = idb;
   }
-  getLibraries() {}
-  getContainers() {}
-  getActiveItemsByLibrary() {
-    // TODO: We c/should prioritise active items first
+  initialSync() {
+    // 0. After login:
+    // 1. Start list & item streams on primary library
+    // 1a. In parallel, get shared libraries
+    // 2. For each shared library, start list & item streams
+    // TODO: Later, prioritise by active items, completed items, tombstoned items
   }
-  getCompletedItemsByLibrary() {}
+  getLibraries() {
+    // TODO: Get all shared libraries (TODO: Offline mode? Sync? limits?)
+  }
+  getContainers() {
+    // i.e. lists
+  }
+  getItems() {}
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
@@ -77,7 +79,9 @@ export class AirdaySync {
   syncPendingItems() {
     // Collects pending items from database to sync on boot
   }
-  deleteItem(id: String) {}
+  deleteItem(id: String) {
+    // TODO: Use the upsertItem api with tombstone timestamp
+  }
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
   handleAck(ack: AckEvent) {
@@ -99,6 +103,6 @@ export class AirdaySync {
         this.upsertItems([action.item]);
       }
     }
-    // TODO: More actions here?
+    // TODO: More acks? e.g. list ack
   }
 }

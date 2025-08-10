@@ -12,12 +12,14 @@ import {
   SpanContextProto,
   UuidProto,
   SyncStreamReqProto,
+  ResourceType,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
+import { SyncStream } from "./stream";
 
 // function buildBatchComponent(
 //   builder: Builder,
@@ -75,12 +77,18 @@ export class GetListsActions extends AirdayAction {
   }
 }
 
-export class ItemSyncReqAction extends AirdayAction {
+export class SyncReqAction extends AirdayAction {
   libraryId: Uuidv4;
   serverTimestamp: number | null = null;
   actionProto = AirdayActionProto.SyncStreamReqProto;
-  constructor(libraryId: Uuidv4, serverTimestamp: number | null = null) {
+  resourceType: ResourceType;
+  constructor(
+    resourceType: ResourceType,
+    libraryId: Uuidv4,
+    serverTimestamp: number | null = null,
+  ) {
     super();
+    this.resourceType = resourceType;
     this.libraryId = libraryId;
     this.serverTimestamp = serverTimestamp;
   }
@@ -90,6 +98,7 @@ export class ItemSyncReqAction extends AirdayAction {
       builder,
       UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
     );
+    SyncStreamReqProto.addResource(builder, ResourceType.Item);
     if (this.serverTimestamp) {
       SyncStreamReqProto.addServerTimestamp(builder, this.serverTimestamp);
     }
