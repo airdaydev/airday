@@ -16,7 +16,6 @@ interface SyncEventMap {
 // TODO: Streams should disappear on completion
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
-// TODO: Ensure we are doing one sync at a time
 export class AirdaySync {
   private idb: AirdayIDB | null = null;
   core: AirdayCore;
@@ -43,32 +42,35 @@ export class AirdaySync {
   setDB(idb: AirdayIDB) {
     this.idb = idb;
   }
+  // To be run after login
   initialSync() {
+    // TODO: Prevent if not authorised
     this.streamItems(this.core.library.id!);
-    // 0. After login:
-    // 1. Start list & item streams on primary library
-    // 1a. In parallel, get shared libraries
-    // 2. For each shared library, start list & item streams
-    // TODO: Later, prioritise by active items, completed items, tombstoned items
+    this.streamContainers(this.core.library.id!); // TODO: Currently a noop
+    this.getLibraries(); // TODO: currently a noop
+    // TODO: For each shared library, start list & item streams
+    // TODO: Later, prioritise by active items, tombstoned items, completed items
+
+    // TODO: Collect pending items, containers, libraries for pushing
   }
   getLibraries() {
+    console.log("hit getLibraries noop");
     // TODO: Get all shared libraries (TODO: Offline mode? Sync? limits?)
+    // TODO: Process for creating a shared library
   }
   streamContainers(libraryId: Uuidv4) {
+    console.log("hit streamContainers noop");
     // i.e. lists
   }
   streamItems(libraryId: Uuidv4) {
     const itemStream = new ItemSyncStream(this.core, libraryId);
     const existingStream = this.streams.get(itemStream.key);
     if (existingStream && existingStream.syncing) {
-      console.warn(
-        "Existing stream of same data is currently running.",
-        itemStream.key,
-      );
+      console.warn(`Existing stream [key=${itemStream.key}] already running`);
       return;
     }
     this.streams.set(itemStream.key, itemStream);
-    itemStream.start();
+    itemStream.start(null);
   }
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced

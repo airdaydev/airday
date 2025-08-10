@@ -7,7 +7,7 @@ import { AirdayBatchMessage, SyncReqAction } from "./actions";
 // Activated on connect/reconnect
 export class SyncStream {
   core: AirdayCore;
-  id = new Uuidv4(); // TODO: Is this necessary?
+  id = new Uuidv4();
   libraryId: Uuidv4;
   syncing = false;
   resource: ResourceType = ResourceType.Item;
@@ -18,12 +18,19 @@ export class SyncStream {
   get key() {
     return `${this.libraryId.toHex()}:${this.resource}`;
   }
-  start() {
+  start(serverTimestamp: number | null) {
     this.syncing = true;
+    const action = new SyncReqAction(
+      this.resource,
+      this.libraryId,
+      serverTimestamp,
+    );
+    const message = new AirdayBatchMessage([action]);
+    this.core.ws.enqueueAirdayMessage(message);
   }
-  end() {}
-  // on end
-  // on error (?!)
+  // listen: on data
+  // listen: on end
+  // listen: on error (?!)
 }
 
 export class ItemSyncStream extends SyncStream {
