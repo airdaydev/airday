@@ -1,7 +1,8 @@
 # Air Roadmap
 
-## 2025 Q3 Working Alpha Prototype Sqlite
+## 2025 Q3-4 Working Alpha Prototype Sqlite
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes)
+- [] sync stream clean up
 - [] transactions for bulk merging items (sql-side... idb side?)
 - [] Merge attribute macro and/or hashmap!
 - [] and... push items from server!
@@ -35,6 +36,8 @@
 - [] get all libraries
 - [] handling browser tabs?!
 - [] cors review
+- [] Postgresql adapter with personal library setup on account creation
+- [] Text encryption
 
 # Sync verification
 - [] Node index should be based on id or created time (what timestamp?)
@@ -58,10 +61,6 @@
 - [] Done board show which list item was from
 - [] Done board show month heading?
 - [] Done board chronological index
-
-## 2025 Q4 Initial Release
-- [] Postgresql adapter with personal library setup on account creation
-- [] Text encryption
 
 ## Fixes
 - [] Canvas doesn't render constantly (todo list)
@@ -97,13 +96,13 @@
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
 - [] Trash items (yes & ability to remove)
-- [] Empty trash
+- [] Empty trash i.e. tombstone
 - [] Delete containers
 - [] Repeat items
 - [] Series
 - [] Filter for habit tracking with sorting (worst/best)
 - [] When dragging while holding down command, duplicate
-- [] Add search
+- [] Add search (flexsearch?)
 - [] Persist views (per device)
 - [] Handle loader validation failure, types
 
@@ -142,9 +141,6 @@
 - [] Opens immediately into application, landing page at air.day/about
 - [] Consider license type for copyleft (reselling no)
 - [] Custom Themes / compact mode
-- [] Spanish (EU) localisation
-- [] Japanese localisation
-- [] Korean localisation
 
 ## Marketing, community
 - [] Website (Astro) + waitlist
@@ -171,6 +167,11 @@
 
 # FUTURE GOALS FOR AIRDAY
 
+## Multilingual goals
+- [] Spanish (EU) localisation
+- [] Japanese localisation
+- [] Korean localisation
+
 ## Multiplatform goals
 - [] PWA
 - [] Linux Tauri release (?)
@@ -192,7 +193,6 @@
 - [] LLM Prompting / MCP
 - [] Custom fields
 - [] JSON export
-- [] consider flexsearch
 - [] Shared libraries (Enforce library limits (3 per user?))
 - [] qwen3-1.7B exploration
 - [] @airday/core - export database to json
