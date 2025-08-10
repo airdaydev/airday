@@ -4,11 +4,10 @@ import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
   ItemProto,
   LWWRegisterStringProto,
-  UpsertItemActionProto,
+  SyncItemActionProto,
   AirdayMessageProto,
   AirdayActionProto,
   AirdayBatchComponentProto,
-  DeleteItemActionProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
@@ -119,7 +118,7 @@ export class AuthenticateAction extends AirdayAction {
 export class UpsertItemAction extends AirdayAction {
   item: AirdayItem;
   dirty = false;
-  actionProto = AirdayActionProto.UpsertItemActionProto;
+  actionProto = AirdayActionProto.SyncItemActionProto;
   constructor(item: AirdayItem) {
     super();
     this.item = item;
@@ -170,10 +169,9 @@ export class UpsertItemAction extends AirdayAction {
       UuidProto.createUuidProto(builder, this.item.libraryId.toUUIDProto()),
     );
     const itemOffset = ItemProto.endItemProto(builder);
-    UpsertItemActionProto.startUpsertItemActionProto(builder);
-    UpsertItemActionProto.addItem(builder, itemOffset);
-    const actionOffset =
-      UpsertItemActionProto.endUpsertItemActionProto(builder);
+    SyncItemActionProto.startSyncItemActionProto(builder);
+    SyncItemActionProto.addItem(builder, itemOffset);
+    const actionOffset = SyncItemActionProto.endSyncItemActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }

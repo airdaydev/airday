@@ -35,12 +35,7 @@ table LibraryProto {
   name: string;
 }
 
-table DeleteItemActionProto {
-  library_id: UuidProto (required);
-  id: UuidProto;
-}
-
-table UpsertItemActionProto {
+table SyncItemActionProto {
   item: ItemProto (required);
 }
 
@@ -79,13 +74,12 @@ table SyncStreamReqProto {
 }
 
 union AirdayActionProto {
-  SyncStreamReqProto,
-  UpsertItemActionProto,
-  DeleteItemActionProto,
-  AuthenticateActionProto,
-  AuthenticateResponseProto,
-  LibrarySyncResponseProto,
-  AckResponseProto,
+  SyncStreamReqProto, // Starts a stream from a server_timestamp
+  SyncItemActionProto, // Syncs a single item
+  AuthenticateActionProto, // Authenticates user
+  AuthenticateResponseProto, // Responds with authenticated state
+  LibrarySyncResponseProto, // This currently sends the primary library, but TODO: place under syncstream and TODO: make edit library SyncLibraryActionProto
+  AckResponseProto, // TODO: Per action, this needs a server timestamp
 }
 
 table AirdayBatchComponentProto {

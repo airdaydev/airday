@@ -1,6 +1,6 @@
 import { ByteBuffer } from "flatbuffers";
 import {
-  UpsertItemActionProto,
+  SyncItemActionProto,
   AirdayActionProto,
   AirdayMessageProto,
   AuthenticateResponseProto,
@@ -199,9 +199,9 @@ export class WebsocketManager {
           // TODO: Consider "auth" notification using JS native events
           this.start();
           break;
-        case AirdayActionProto.UpsertItemActionProto:
-          tracer.addTag(span, "msg_type", "UpsertItemActionProto");
-          const itemResponse = new UpsertItemActionProto();
+        case AirdayActionProto.SyncItemActionProto:
+          tracer.addTag(span, "msg_type", "SyncItemActionProto");
+          const itemResponse = new SyncItemActionProto();
           component.action(itemResponse);
           // TODO: Validate and add item to storage
           console.log("upsertitemreceived", itemResponse.item());

@@ -1,14 +1,5 @@
 # Air Roadmap
 
-# Sync verification
-- [] tree saved in a hashmap & serialised (maybe not necessary in JS if it's fast enough to booststrap - big if) - good idea in sqlite?
-- [] hot path = server time-1hr?
-- [] day granularity until 1hr ago (server time)
-- [] clean-ups required! in-binary job on community version..?
-- [] Calculate hashes within sqlite statement? or in application?
-- [] On front-end, keep live hash structure that persists on update... probably need same for server-side.
-- [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)
-
 ## 2025 Q3 Working Alpha Prototype Sqlite
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes)
 - [] transactions for bulk merging items (sql-side... idb side?)
@@ -44,6 +35,16 @@
 - [] get all libraries
 - [] handling browser tabs?!
 - [] cors review
+
+# Sync verification
+- [] Node index should be based on id or created time (what timestamp?)
+- [] tree saved in a hashmap & serialised (maybe not necessary in JS if it's fast enough to booststrap - big if) - good idea in sqlite?
+- [] hot path = server time-1hr?
+- [] day granularity until 1hr ago (server time)
+- [] clean-ups required! in-binary job on community version..?
+- [] Calculate hashes within sqlite statement? or in application?
+- [] On front-end, keep live hash structure that persists on update... probably need same for server-side.
+- [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)
 
 # Span issues!
 - [] send back span from server

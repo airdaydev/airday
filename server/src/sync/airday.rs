@@ -25,8 +25,7 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    AddItem { item: Item, action_id: Uuid }, // TODO: possible properties not this
-                                             // DeleteItem { id: String },
+    UpsertItem { item: Item, action_id: Uuid },
 }
 
 impl AirdayMessage {
@@ -67,9 +66,9 @@ impl AirdayMessage {
                         session_token: String::from(token),
                     })
                 }
-                AirdayActionProto::UpsertItemActionProto => {
+                AirdayActionProto::SyncItemActionProto => {
                     let action = batch_component
-                        .action_as_upsert_item_action_proto()
+                        .action_as_sync_item_action_proto()
                         .ok_or(AppError::ValidationError(String::from(
                             "Could not parse add item action",
                         )))
@@ -95,13 +94,10 @@ impl AirdayMessage {
                             text: Some(text_lww),
                         },
                     };
-                    actions.push(AirdayAction::AddItem { item, action_id });
+                    actions.push(AirdayAction::UpsertItem { item, action_id });
                 }
-                AirdayActionProto::DeleteItemActionProto => {
-                    let action = batch_component
-                        .action_as_delete_item_action_proto()
-                        .unwrap();
-                    println!("Received delete item message {:?}", action.id().unwrap());
+                AirdayActionProto::SyncStreamReqProto => {
+                    let action = batch_component.action_as_sync_stream_req_proto().unwrap();
                 }
                 _ => {
                     println!("BROKEN");
@@ -177,7 +173,7 @@ pub async fn message_handler(
                     }
                 }
             }
-            AirdayAction::AddItem { item, action_id } => {
+            AirdayAction::UpsertItem { item, action_id } => {
                 let Some(user_id) = conn.user_id else {
                     // Unauthorised, ignore
                     // TODO: ...
