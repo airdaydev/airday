@@ -225,7 +225,7 @@ pub async fn message_handler(
                 library_id,
                 resource,
             } => {
-                // 1. check that user has access to library (TODO: Create cached authorisation functions/framework! and consolidate with above)
+                // 1. check that user has access to library
                 // 2. loop through requested resources and send until end
                 // on end (OR ERROR), send a end message to close the stream
                 // TODO: Ensure this attempts in an own thread (i forget context)

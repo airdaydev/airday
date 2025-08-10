@@ -37,6 +37,7 @@
 - [] cors review
 - [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
+- [] Message bus for fanning out incl. cache busting on postgres version
 
 # Sync verification
 - [] Node index should be based on id or created time (what timestamp?)
