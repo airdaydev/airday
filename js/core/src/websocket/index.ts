@@ -204,7 +204,7 @@ export class WebsocketManager {
           const itemResponse = new SyncItemActionProto();
           component.action(itemResponse);
           // TODO: Validate and add item to storage
-          console.log("upsertitemreceived", itemResponse.item());
+          console.log("syncitemreceived", itemResponse.item());
           break;
         case AirdayActionProto.LibrarySyncResponseProto:
           tracer.addTag(span, "msg_type", "LibrarySyncResponseProto");

@@ -39,7 +39,7 @@ export const tests = async () => {
         text: LWWRegisterString.fromString("test"),
       },
     });
-    let action = core.sync.upsertItems([newItem])[0];
+    let action = core.sync.syncItems([newItem])[0];
     const pending = core.sync.pendingActions.get(action.id.toHex());
     assert(pending?.id === action.id, "message gets placed on pending queue");
     await new Promise((resolve) => {
@@ -84,7 +84,7 @@ export const tests = async () => {
         }),
       );
     }
-    core.sync.upsertItems(items);
+    core.sync.syncItems(items);
     await core.ws.flush();
     const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     assert(res.length === 100, "res length");
@@ -104,7 +104,7 @@ export const tests = async () => {
         text: oldText,
       },
     });
-    core.sync.upsertItems([item]);
+    core.sync.syncItems([item]);
     await core.sync.flush();
     // Update item AFTER flush
     const newText = LWWRegisterString.fromString("new_text");
@@ -115,7 +115,7 @@ export const tests = async () => {
     item.merge({ text: newText });
     assert(item.attributes.text?.data === newText.data, "merge success");
     assert(item.isSynced() === false, "item considered not synced");
-    core.sync.upsertItems([item]);
+    core.sync.syncItems([item]);
     assert(item.isSynced() === false, "item considered not synced");
     await core.sync.flush();
     assert(item.isSynced() === true, "item now considered as synced");
@@ -138,7 +138,7 @@ export const tests = async () => {
         }),
       );
     }
-    core.sync.upsertItems(items);
+    core.sync.syncItems(items);
     await core.sync.flush();
     // Clear database
     await core.db.handle?.clear("item");

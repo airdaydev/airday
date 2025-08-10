@@ -25,7 +25,7 @@ pub struct AirdayMessage {
 
 pub enum AirdayAction {
     Authenticate { session_token: String },
-    UpsertItem { item: Item, action_id: Uuid },
+    SyncItem { item: Item, action_id: Uuid },
 }
 
 impl AirdayMessage {
@@ -94,7 +94,7 @@ impl AirdayMessage {
                             text: Some(text_lww),
                         },
                     };
-                    actions.push(AirdayAction::UpsertItem { item, action_id });
+                    actions.push(AirdayAction::SyncItem { item, action_id });
                 }
                 AirdayActionProto::SyncStreamReqProto => {
                     let action = batch_component.action_as_sync_stream_req_proto().unwrap();
@@ -173,7 +173,7 @@ pub async fn message_handler(
                     }
                 }
             }
-            AirdayAction::UpsertItem { item, action_id } => {
+            AirdayAction::SyncItem { item, action_id } => {
                 let Some(user_id) = conn.user_id else {
                     // Unauthorised, ignore
                     // TODO: ...

@@ -4,7 +4,7 @@ import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB } from "../storage/idb";
 import { AckEvent } from "../websocket";
-import { UpsertItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
+import { SyncItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
 import { ItemSyncStream, SyncStream } from "./stream";
@@ -75,7 +75,7 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  upsertItems(items: AirdayItem[]) {
+  syncItems(items: AirdayItem[]) {
     // Filter out items currently in sync
     const actions = items
       .filter((item) => {
@@ -83,7 +83,7 @@ export class AirdaySync {
       })
       .map((item) => {
         item.startSync();
-        const action = new UpsertItemAction(item);
+        const action = new SyncItemAction(item);
         // TODO: Ensure this works for updated items too
         this.idb?.item.upsert([item]); // optimistic update
         this.pendingActions.set(action.id.toHex(), action);
@@ -104,7 +104,7 @@ export class AirdaySync {
   handleAck(ack: AckEvent) {
     const action = this.pendingActions.get(ack.actionId.toHex());
 
-    if (action instanceof UpsertItemAction) {
+    if (action instanceof SyncItemAction) {
       // TODO: targeted change instead of blunt (pass in idb to endSync?)
       this.idb?.item.upsert([action.item]).catch((err) => {
         console.log(err);
@@ -117,7 +117,7 @@ export class AirdaySync {
       }
       // If item has changes applied during sync, sync them
       if (!action.item.isSynced()) {
-        this.upsertItems([action.item]);
+        this.syncItems([action.item]);
       }
     }
     // TODO: More acks? e.g. list ack

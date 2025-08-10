@@ -124,7 +124,7 @@ export class AuthenticateAction extends AirdayAction {
   }
 }
 
-export class UpsertItemAction extends AirdayAction {
+export class SyncItemAction extends AirdayAction {
   item: AirdayItem;
   dirty = false;
   actionProto = AirdayActionProto.SyncItemActionProto;
@@ -152,7 +152,7 @@ export class UpsertItemAction extends AirdayAction {
     //     data: text.data() || "",
     //   });
     // }
-    // return new UpsertItemAction(fields);
+    // return new SyncItemAction(fields);
   }
   addToFlatBuffer(builder: Builder) {
     let textOffset;
