@@ -12,7 +12,7 @@ use crate::{
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
             AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
-            UuidProto,
+            ResourceType, UuidProto,
         },
         websocket::send_to_client,
     },
@@ -24,11 +24,21 @@ pub struct AirdayMessage {
 }
 
 pub enum AirdayAction {
-    Authenticate { session_token: String },
-    SyncItem { item: Item, action_id: Uuid },
+    Authenticate {
+        session_token: String,
+    },
+    SyncItem {
+        item: Item,
+        action_id: Uuid,
+    },
+    StreamReq {
+        library_id: Uuid,
+        resource: ResourceType,
+    },
 }
 
 impl AirdayMessage {
+    // TODO: Deal with unwraps
     pub fn from_proto(message: &AirdayMessageProto) -> Result<Self, AppError> {
         let mut actions = Vec::new();
         let batch = message
@@ -98,6 +108,11 @@ impl AirdayMessage {
                 }
                 AirdayActionProto::SyncStreamReqProto => {
                     let action = batch_component.action_as_sync_stream_req_proto().unwrap();
+                    let library_id = proto_uuid_to_uuid(action.library_id());
+                    actions.push(AirdayAction::StreamReq {
+                        library_id,
+                        resource: action.resource(),
+                    })
                 }
                 _ => {
                     println!("BROKEN");
@@ -205,6 +220,15 @@ pub async fn message_handler(
                 action_offsets.push(ack_offset);
                 // TODO: fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
+            }
+            AirdayAction::StreamReq {
+                library_id,
+                resource,
+            } => {
+                // 1. check that user has access to library
+                // 2. loop through requested resources and send until end
+                // on end (OR ERROR), send a end message to close the stream
+                // TODO: Ensure this attempts in an own thread (i forget context)
             }
         }
     }
