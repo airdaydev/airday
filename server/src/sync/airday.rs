@@ -8,6 +8,7 @@ use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
     item::model::{Item, ItemAttributes},
     sync::{
+        auth::has_library_access,
         outgoing::{ack, create_airday_message_with_builder},
         proto_generated::proto::{
             AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
@@ -34,6 +35,7 @@ pub enum AirdayAction {
     StreamReq {
         library_id: Uuid,
         resource: ResourceType,
+        timestamp: i64,
     },
 }
 
@@ -189,30 +191,8 @@ pub async fn message_handler(
                 }
             }
             AirdayAction::SyncItem { item, action_id } => {
-                let Some(user_id) = conn.user_id else {
-                    // Unauthorised, ignore
-                    // TODO: ...
+                if !has_library_access(state, conn.user_id, item.library_id).await {
                     return Ok(());
-                };
-                // Confirm user has access (TODO: Cache user's main workspace in memory somewhere - ws map?)
-                // // TODO: Don't panic
-                let Some(user) = state.db.user.get_by_id(&user_id).await.unwrap() else {
-                    // User doesn't exist!
-                    return Err(AppError::ServerError(String::from(
-                        "cannot find user referenced in ws conn map - deleted?",
-                    )));
-                };
-
-                // TODO: Extend for shared access
-                let user_has_access = match user.primary_library {
-                    Some(lib) => lib.id == item.library_id,
-                    None => false,
-                };
-
-                if !user_has_access {
-                    return Err(AppError::AuthorisationError(String::from(
-                        "User does not have access to this library",
-                    )));
                 }
                 // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
@@ -224,9 +204,21 @@ pub async fn message_handler(
             AirdayAction::StreamReq {
                 library_id,
                 resource,
+                timestamp,
             } => {
-                // 1. check that user has access to library
-                // 2. loop through requested resources and send until end
+                if !has_library_access(state, conn.user_id, *library_id).await {
+                    return Ok(());
+                }
+                // loop through requested resources and send until end
+                // match resource {
+                //   ResourceType.Item => {
+
+                //   }
+                //   ResourceType.List => {
+
+                //   }
+                // }
+                // send_to_client(state, socket_id, message).await;
                 // on end (OR ERROR), send a end message to close the stream
                 // TODO: Ensure this attempts in an own thread (i forget context)
             }

@@ -7,6 +7,7 @@ mod common {
 }
 mod sync {
     pub mod airday;
+    pub mod auth;
     pub mod outgoing;
     #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
     pub mod proto_generated;
