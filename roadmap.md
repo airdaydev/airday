@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes)
+- [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes) - TRUST THE WALL CLOCK - it's a pretty good system
 - [] sync stream clean up
 - [] transactions for bulk merging items (sql-side... idb side?)
 - [] Merge attribute macro and/or hashmap!

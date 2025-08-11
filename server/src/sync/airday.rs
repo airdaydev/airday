@@ -1,5 +1,8 @@
 use axum::extract::ws::Message;
-use crdt::{LWWRegister, timestamp::LWWTimestamp};
+use crdt::{
+    LWWRegister,
+    timestamp::{LWWTimestamp, now_micros},
+};
 use flatbuffers::FlatBufferBuilder;
 use uuid::Uuid;
 
@@ -35,7 +38,7 @@ pub enum AirdayAction {
     StreamReq {
         library_id: Uuid,
         resource: ResourceType,
-        timestamp: i64,
+        timestamp: u64,
     },
 }
 
@@ -112,6 +115,7 @@ impl AirdayMessage {
                     let action = batch_component.action_as_sync_stream_req_proto().unwrap();
                     let library_id = proto_uuid_to_uuid(action.library_id());
                     actions.push(AirdayAction::StreamReq {
+                        timestamp: now_micros(),
                         library_id,
                         resource: action.resource(),
                     })
@@ -210,14 +214,15 @@ pub async fn message_handler(
                     return Ok(());
                 }
                 // loop through requested resources and send until end
-                // match resource {
-                //   ResourceType.Item => {
-
-                //   }
-                //   ResourceType.List => {
-
-                //   }
-                // }
+                match *resource {
+                    ResourceType::Item => {
+                        // get items affected since timestamp - 1minute
+                    }
+                    ResourceType::List => {
+                        // get lists affected since timestamp - 1minute
+                    }
+                    _ => {}
+                }
                 // send_to_client(state, socket_id, message).await;
                 // on end (OR ERROR), send a end message to close the stream
                 // TODO: Ensure this attempts in an own thread (i forget context)

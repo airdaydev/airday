@@ -53,6 +53,7 @@ impl WebsocketState {
     }
 }
 
+// TODO: If message bus setup, this will redirect messages through external bus
 // type WSRoomName = String;
 // pub type WSSubMap = Arc<Mutex<HashMap<WSRoomName, WebsocketConn>>>;
 // pub fn build_ws_sub_map() -> WSSubMap {

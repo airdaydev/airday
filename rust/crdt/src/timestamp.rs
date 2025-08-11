@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static PID: OnceLock<u64> = OnceLock::new();
 
 // Singleton, filled once, microsecond res clock,
-// should be good to year 2225 in JS land from memory
+// should be good to year 2225 for F64 representation
 static CLOCK: MonotonicClock = MonotonicClock {
     last_micros: AtomicU64::new(0),
 };
