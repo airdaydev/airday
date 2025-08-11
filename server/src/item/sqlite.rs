@@ -2,8 +2,8 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use futures_util::{Stream, StreamExt};
-use sqlx::{Sqlite, SqlitePool, Transaction, sqlite::SqliteRow};
+use futures_util::StreamExt;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
@@ -33,7 +33,8 @@ impl ItemModel for ItemModelSqlite {
         let result = sqlx::query_as!(
             SqlItem,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
-            updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes" FROM item
+            updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes"
+            FROM item
             WHERE library_id = ? AND id = ?"#,
             item.library_id,
             item.id,
@@ -113,12 +114,24 @@ impl ItemModel for ItemModelSqlite {
 
         Ok(())
     }
-    async fn get_by_library(
-        &self,
-        // library: &Uuid,
-    ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>> {
-        let stream = sqlx::query_as!(Item, r#""#).fetch(&self.pool);
-        let mapped_stream = stream.map(|result| result.map_err(|err| AppError::from(err)));
-        Box::pin(mapped_stream)
+    fn get_by_library_stream<'a>(
+        &'a self,
+        library_id: &Uuid,
+        server_timestamp: u64,
+        limit: i32,
+    ) -> Pin<
+        Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
+    > {
+        sqlx::query_as::<_, SqlItem>(
+            r#"SELECT id, library_id, updated_utc, tombstone_utc, attributes
+            FROM item
+            WHERE library_id = ? AND updated_utc >= ?
+            ORDER BY updated_utc ASC
+            LIMIT ?"#,
+        )
+        .bind(library_id.clone())
+        .bind(server_timestamp as i64)
+        .bind(limit)
+        .fetch(&self.pool)
     }
 }

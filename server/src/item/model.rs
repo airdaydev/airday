@@ -5,9 +5,8 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
-use futures_util::Stream;
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::SqliteRow;
+use sqlx::prelude::FromRow;
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -39,6 +38,8 @@ pub struct Item {
     pub id: Uuid,
     pub library_id: Uuid,
     pub attributes: ItemAttributes,
+    pub updated_utc: Option<u64>,
+    pub tombstone_utc: Option<u64>,
 }
 
 impl ItemAttributes {
@@ -107,6 +108,7 @@ impl ItemAttributes {
 
 pub type JsonAttributes = Option<serde_json::Value>;
 
+#[derive(FromRow)]
 pub struct SqlItem {
     // static attrs
     pub id: Uuid,
@@ -138,10 +140,14 @@ pub struct SqlItem {
 #[async_trait]
 pub trait ItemModel: Send + Sync {
     // Accept query options
-    async fn get_by_library(
-        &self,
-        // library: &Uuid,
-    ) -> Pin<Box<dyn Stream<Item = Result<SqliteRow, AppError>> + Send>>;
+    fn get_by_library_stream<'a>(
+        &'a self,
+        library_id: &Uuid,
+        server_timestamp: u64,
+        limit: i32,
+    ) -> Pin<
+        Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
+    >;
     async fn merge(&self, item: &Item) -> Result<(), AppError>;
     async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;

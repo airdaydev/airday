@@ -105,6 +105,8 @@ impl AirdayMessage {
                     let item = Item {
                         id,
                         library_id,
+                        updated_utc: Some(now_micros()),
+                        tombstone_utc: None,
                         attributes: ItemAttributes {
                             text: Some(text_lww),
                         },

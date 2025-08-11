@@ -1,6 +1,4 @@
 use crate::{
-    AppState,
-    auth::session::UserSession,
     common::{error::AppError, sql::Db},
     library::model::Library,
 };
@@ -9,7 +7,7 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, SaltString, rand_core::OsRng},
 };
 use async_trait::async_trait;
-use axum::{Json, extract::State, http::StatusCode};
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;

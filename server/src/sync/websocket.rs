@@ -13,7 +13,7 @@ use opentelemetry::{SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use tracing::{Instrument, Span, error, info, info_span};
+use tracing::{Instrument, Span, error, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
