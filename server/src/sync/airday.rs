@@ -15,9 +15,7 @@ use crate::{
         auth::has_library_access,
         outgoing::{ack, create_airday_message_with_builder},
         proto_generated::proto::{
-            AirdayActionProto, AirdayBatchComponentProto, AirdayBatchComponentProtoArgs,
-            AirdayMessageProto, AuthenticateResponseProto, AuthenticateResponseProtoArgs,
-            ResourceType, UuidProto,
+            AuthenticateResponseProto, AuthenticateResponseProtoArgs, ResourceType, UuidProto,
         },
         websocket::send_to_client,
     },
@@ -25,16 +23,13 @@ use crate::{
 
 pub struct AirdayMessage {
     // TODO: We should match the id 100%, interior actions just need a tick
-    pub actions: Vec<AirdayAction>,
+    // pub actions: Vec<AirdayAction>,
 }
 
-pub enum AirdayAction {
+// TODO: Temporary name
+pub enum AirdayMessageType {
     Authenticate {
         session_token: String,
-    },
-    SyncItem {
-        item: Item,
-        action_id: Uuid,
     },
     StreamReq {
         library_id: Uuid,
@@ -43,9 +38,13 @@ pub enum AirdayAction {
     },
 }
 
+pub enum BatchAction {
+    SyncItem { item: Item, action_id: Uuid },
+}
+
 impl AirdayMessage {
     // TODO: Deal with unwraps
-    pub fn from_proto(message: &AirdayMessageProto) -> Result<Self, AppError> {
+    pub fn from_proto(message: &MessageProto) -> Result<Self, AppError> {
         let mut actions = Vec::new();
         let batch = message
             .batch()
@@ -151,52 +150,7 @@ pub async fn message_handler(
     // let mut items = Vec::new();
     for action in &message.actions {
         match action {
-            AirdayAction::Authenticate { session_token } => {
-                // TODO: We should ok_or this and propagate errors up
-                let session_option = state.db.session.get_by_token(&session_token).await.unwrap();
-                // TODO: SECURITY! VALIDATE THE SESSION!!
-                if let Some(sesh) = session_option {
-                    let set_conn_user_id: bool = {
-                        // Mutex scope
-                        let mut map = state.ws.conn_map.lock().unwrap();
-                        if let Some(conn) = map.get_mut(&socket_id) {
-                            conn.user_id = Some(sesh.user_id);
-                            true
-                        } else {
-                            false
-                        }
-                    };
-                    if set_conn_user_id == false {
-                        // TODO: SPAN!?
-                        println!("WS: User disconnected while authenticating");
-                        return Ok(());
-                    }
-                    // TODO: Span?
-                    println!("User {:?} authenticated!", sesh.user_id);
-                    // TODO: Don't panic!
-                    if let Some(user) = state.db.user.get_by_id(&sesh.user_id).await.unwrap() {
-                        let action_offset = AuthenticateResponseProto::create(
-                            &mut builder,
-                            &AuthenticateResponseProtoArgs {
-                                user_id: Some(&UuidProto::new(sesh.user_id.as_bytes())),
-                                library_id: Some(&UuidProto::new(
-                                    user.primary_library.unwrap().id.as_bytes(),
-                                )),
-                            },
-                        )
-                        .as_union_value();
-                        let offset = AirdayBatchComponentProto::create(
-                            &mut builder,
-                            &AirdayBatchComponentProtoArgs {
-                                action_type: AirdayActionProto::AuthenticateResponseProto,
-                                action: Some(action_offset),
-                                action_id: None,
-                            },
-                        );
-                        action_offsets.push(offset);
-                    }
-                }
-            }
+            AirdayAction::Authenticate { session_token } => {}
             AirdayAction::SyncItem { item, action_id } => {
                 if !has_library_access(state, conn.user_id, item.library_id).await {
                     return Ok(());

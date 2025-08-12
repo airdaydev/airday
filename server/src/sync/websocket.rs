@@ -1,7 +1,9 @@
-use super::proto_generated::proto::root_as_airday_message_proto;
 use crate::AppState;
+use crate::auth::auth::auth_websocket;
 use crate::sync::airday::{AirdayMessage, message_handler};
-use crate::sync::proto_generated::proto::AirdayMessageProto;
+use crate::sync::proto_generated::proto::{
+    MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
+};
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
@@ -79,7 +81,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     tokio::spawn(write(sender, rx));
 }
 
-fn extract_span_ctx<'a>(wrapper: AirdayMessageProto<'a>) -> SpanContext {
+fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
     let mut otel_trace_id: TraceId = TraceId::INVALID;
     let mut otel_span_id = SpanId::INVALID;
     if let Some(span_context) = wrapper.span_context() {
@@ -108,19 +110,40 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 Ok(Message::Binary(b)) => {
                     cur_span.set_attribute("message_type", "binary");
                     // Set trace id
-                    let msg = root_as_airday_message_proto(&b).unwrap();
+                    let msg = root_as_message_wrapper_proto(&b).unwrap();
                     // TODO: Separate function
                     let span_ctx = extract_span_ctx(msg);
                     let parent_ctx = Context::current().with_remote_span_context(span_ctx);
                     cur_span.set_parent(parent_ctx);
-                    let parsed_message = AirdayMessage::from_proto(&msg);
-                    if let Ok(msg) = parsed_message {
-                        cur_span.set_attribute("action_count", msg.actions.len().to_string());
-                        // TODO: Do something with a bad result!
-                        message_handler(&state, &msg, &socket_id).await.unwrap();
-                    } else if let Err(err) = parsed_message {
-                        // TODO & test if there are no actions
-                        error!("Error parsing Airday message: {:?}", err);
+                    match msg.message_type() {
+                        MessageProto::AuthenticateActionProto => {
+                            let Some(msg) = msg.message_as_authenticate_action_proto() else {
+                                // TODO: Authentication invalid response
+                                return ();
+                            };
+                            let Some(session_token) = msg.session_token() else {
+                                // TODO: Authentication invalid response
+                                return ();
+                            };
+                            if let Err(err) =
+                                auth_websocket(&state, session_token, &socket_id).await
+                            {
+                                // TODO: Authentication invalid response
+                                return ();
+                            };
+                            // Authenticate user
+                        }
+                        MessageProto::BatchSyncProto => {
+                            let parsed_message = msg.message_as_batch_sync_proto();
+                            // Validate and start accepting items
+                        }
+                        MessageProto::SyncStreamReqProto => {
+                            let parsed_message = msg.message_as_sync_stream_req_proto();
+                            // Validate and start sync stream
+                        }
+                        _ => {
+                            // Ignore message
+                        }
                     }
                     ()
                 }

@@ -2,9 +2,11 @@ use crate::{
     AppState,
     auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
+    sync::proto_generated::proto::AuthenticateResponseProto,
     user::model::{PublicUser, verify_login},
 };
 use axum::{extract::State, response::Json};
+use flatbuffers::FlatBufferBuilder;
 use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
@@ -99,4 +101,35 @@ pub async fn create_user(
     let user = state.db.user.create(&email, &password).await?;
     let public_user: PublicUser = user.into();
     Ok(Json(public_user))
+}
+
+// TODO: SECURITY! Session not properly validated
+pub async fn auth_websocket(
+    state: &AppState,
+    session_token: &str,
+    socket_id: &Uuid,
+) -> Result<(), AppError> {
+    let user_session = state.db.session.get_by_token(&session_token).await?;
+    // TODO: SECURITY! VALIDATE THE SESSION!!
+    if let Some(sesh) = user_session {
+        let set_conn_user_id: bool = {
+            // Mutex scope
+            let mut map = state.ws.conn_map.lock().unwrap();
+            if let Some(conn) = map.get_mut(&socket_id) {
+                conn.user_id = Some(sesh.user_id);
+                true
+            } else {
+                false
+            }
+        };
+        if set_conn_user_id == false {
+            // TODO: SPAN!?
+            println!("WS: User disconnected while authenticating");
+            return Ok(());
+        }
+        // TODO: Span?
+        println!("User {:?} authenticated!", sesh.user_id);
+        // TODO: Don't panic!
+    }
+    Ok(())
 }
