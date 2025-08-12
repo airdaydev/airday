@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] clean up messaging protocol
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes) - TRUST THE WALL CLOCK - it's a pretty good system
 - [] sync stream clean up
 - [] transactions for bulk merging items (sql-side... idb side?)
@@ -38,6 +39,7 @@
 - [] Postgresql adapter with personal library setup on account creation
 - [] Text encryption
 - [] Message bus for fanning out incl. cache busting on postgres version
+- [] Benchmarking https://github.com/bheisler/criterion.rs
 
 # Sync verification
 - [] Node index should be based on id or created time (what timestamp?)

@@ -2,7 +2,6 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use futures_util::StreamExt;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -26,7 +25,7 @@ impl ItemModelSqlite {
 
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
-    // TODO: Break this into parts
+    async fn bulk_merge(&self, item: &Item) -> Result<(), AppError> {}
     async fn merge(&self, item: &Item) -> Result<(), AppError> {
         // 1. Select (we could grab multiple l8a?)
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
@@ -84,13 +83,13 @@ impl ItemModel for ItemModelSqlite {
             return Ok(());
         } else {
             // Item does not exist, insert new item
-            let _ = self.insert(item).await.unwrap();
+            tx.commit().await.map_err(|err| AppError::from(err))?;
+            self.insert(item).await?;
             Ok(())
         }
     }
+    // TODO: Error on fail!
     async fn insert(&self, item: &Item) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
-
         // Convert ItemAttributes to JsonAttributes
         let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
 
@@ -106,11 +105,9 @@ impl ItemModel for ItemModelSqlite {
             now,
             Option::<NaiveDateTime>::None
         )
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await
         .map_err(|err| AppError::from(err))?;
-
-        tx.commit().await.map_err(|err| AppError::from(err))?;
 
         Ok(())
     }
@@ -134,29 +131,21 @@ impl ItemModel for ItemModelSqlite {
     }
 }
 
-// fn mock_item() -> Item {
-//   pub id: Uuid,
-//   pub library_id: Uuid,
-//   pub attributes: ItemAttributes,
-//   pub updated_utc: Option<u64>,
-//   pub tombstone_utc: Option<u64>,
-// }
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util;
+    use crate::test_util::{self, mock_item};
+    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn test_get_by_library_stream() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("test@test.com")).await;
         let primary_library_id = user.primary_library.unwrap().id;
-        // db.item.merge(item).await;
-        // Get stream
+        let qty = 10;
+        for _ in 0..qty {
+            db.item.merge(&mock_item(primary_library_id)).await.unwrap()
+        }
         let mut stream = db.item.get_by_library_stream(&primary_library_id, 0u64);
-
-        // Consume stream (should be empty for new database)
         let mut count = 0;
         while let Some(result) = stream.next().await {
             match result {
@@ -165,6 +154,6 @@ mod tests {
             }
         }
 
-        assert_eq!(count, 0);
+        assert_eq!(count, qty);
     }
 }

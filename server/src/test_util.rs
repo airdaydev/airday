@@ -1,11 +1,11 @@
-use sqlx::SqlitePool;
-use uuid::Uuid;
-
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
+    item::model::{Item, ItemAttributes},
     user::model::User,
 };
+use sqlx::SqlitePool;
+use uuid::Uuid;
 
 pub async fn create_test_db() -> Db {
     let pool = SqlitePool::connect(":memory:")
@@ -34,4 +34,14 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     )
     .await
     .unwrap()
+}
+
+pub fn mock_item(library_id: Uuid) -> Item {
+    Item {
+        id: Uuid::new_v4(),
+        library_id,
+        attributes: ItemAttributes { text: None },
+        updated_utc: None,
+        tombstone_utc: None,
+    }
 }

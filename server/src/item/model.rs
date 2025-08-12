@@ -148,6 +148,7 @@ pub trait ItemModel: Send + Sync {
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;
     async fn merge(&self, item: &Item) -> Result<(), AppError>;
+    async fn bulk_merge(&self, item: &Item) -> Result<(), AppError>;
     async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
