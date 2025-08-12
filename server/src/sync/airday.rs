@@ -4,6 +4,7 @@ use crdt::{
     timestamp::{LWWTimestamp, now_micros},
 };
 use flatbuffers::FlatBufferBuilder;
+use futures_util::StreamExt;
 use uuid::Uuid;
 
 use crate::{
@@ -202,8 +203,8 @@ pub async fn message_handler(
                 }
                 // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
-                let ack_offset = ack(&mut builder, action_id).await?;
-                action_offsets.push(ack_offset);
+                let action_offset = ack(&mut builder, action_id).await?;
+                action_offsets.push(action_offset);
                 // TODO: fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }
@@ -219,6 +220,12 @@ pub async fn message_handler(
                 match *resource {
                     ResourceType::Item => {
                         // get items affected since timestamp - 1minute
+                        let stream = state.db.item.get_by_library_stream(library_id, *timestamp);
+                        let mut chunked_stream = stream.chunks(50);
+                        // TODO: Chunk and send, batches of 50-100?
+                        while let Some(value) = chunked_stream.next().await {
+                            // println!("hello! {:?}", value);
+                        }
                     }
                     ResourceType::List => {
                         // get lists affected since timestamp - 1minute

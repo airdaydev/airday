@@ -144,7 +144,6 @@ pub trait ItemModel: Send + Sync {
         &'a self,
         library_id: &Uuid,
         server_timestamp: u64,
-        limit: i32,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;

@@ -114,11 +114,11 @@ impl ItemModel for ItemModelSqlite {
 
         Ok(())
     }
+    // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
         server_timestamp: u64,
-        limit: i32,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     > {
@@ -126,12 +126,45 @@ impl ItemModel for ItemModelSqlite {
             r#"SELECT id, library_id, updated_utc, tombstone_utc, attributes
             FROM item
             WHERE library_id = ? AND updated_utc >= ?
-            ORDER BY updated_utc ASC
-            LIMIT ?"#,
+            ORDER BY updated_utc ASC"#,
         )
         .bind(library_id.clone())
         .bind(server_timestamp as i64)
-        .bind(limit)
         .fetch(&self.pool)
+    }
+}
+
+// fn mock_item() -> Item {
+//   pub id: Uuid,
+//   pub library_id: Uuid,
+//   pub attributes: ItemAttributes,
+//   pub updated_utc: Option<u64>,
+//   pub tombstone_utc: Option<u64>,
+// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util;
+
+    #[tokio::test]
+    async fn test_get_by_library_stream() {
+        let db = test_util::create_test_db().await;
+        let user = test_util::mock_user(&db, String::from("test@test.com")).await;
+        let primary_library_id = user.primary_library.unwrap().id;
+        // db.item.merge(item).await;
+        // Get stream
+        let mut stream = db.item.get_by_library_stream(&primary_library_id, 0u64);
+
+        // Consume stream (should be empty for new database)
+        let mut count = 0;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(_item) => count += 1,
+                Err(e) => panic!("Stream error: {}", e),
+            }
+        }
+
+        assert_eq!(count, 0);
     }
 }
