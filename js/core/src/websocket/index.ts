@@ -1,11 +1,13 @@
 import { ByteBuffer } from "flatbuffers";
 import {
   SyncItemActionProto,
-  AirdayActionProto,
-  AirdayMessageProto,
+  ActionProto,
+  MessageWrapperProto,
   AuthenticateResponseProto,
   LibrarySyncResponseProto,
   AckResponseProto,
+  MessageProto,
+  BatchSyncProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
@@ -106,7 +108,7 @@ export class WebsocketManager {
       const uint8Array = new Uint8Array(messageEvent.data);
 
       const bb = new ByteBuffer(uint8Array);
-      const msg = AirdayMessageProto.getRootAsAirdayMessageProto(bb);
+      const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
       const span = spanFromFlatbuffer(msg.spanContext(), "ws:receive");
       // TODO: Unwrap span dedicated function
       // TODO: Validate batch/extract span
@@ -167,63 +169,76 @@ export class WebsocketManager {
     });
   }
   // TODO Consider moving this into subhandler
-  private handleAirdayMessage(span: ULSpan, message: AirdayMessageProto) {
-    if (!message) return;
+  private handleAirdayMessage(span: ULSpan, wrapper: MessageWrapperProto) {
+    if (!wrapper) return;
 
-    const batchLength = message.batchLength();
+    const type = wrapper.messageType();
+    switch (type) {
+      case MessageProto.AuthenticateResponseProto: {
+        tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
+        const authResponse = new AuthenticateResponseProto();
+        wrapper.message(authResponse);
+        const userId = Uuidv4.fromFBProto(authResponse.userId());
+        const libraryId = Uuidv4.fromFBProto(authResponse.libraryId());
+        // Confirm things make sense and authorise
+        // TODO: Confirm library id valid
+        this.authorised = this.core.session?.userId === stringify(userId);
+        this.core.library.id = libraryId; // TODO: Handle previous library/store?
+        if (!this.authorised) {
+          console.warn(this.core.session?.userId, stringify(userId), "huh");
+        } else {
+          this.events.emit("authenticated", {
+            userId,
+            libraryId,
+          });
+        }
+        // TODO: Consider "auth" notification using JS native events
+        this.start();
+        break;
+      }
+      case MessageProto.LibrarySyncResponseProto: {
+        tracer.addTag(span, "msg_type", "LibrarySyncResponseProto");
+        const libraryResponse = new LibrarySyncResponseProto();
+        wrapper.message(libraryResponse);
+        const primaryLibraryBuffer = libraryResponse.primaryLibrary();
+        if (primaryLibraryBuffer) {
+          // TODO: Validate and add item to storage
+          let id = Uuidv4.fromFBProto(primaryLibraryBuffer.id());
+          let name = primaryLibraryBuffer.name() || "";
+          this.core.library = new Library({
+            id,
+            name,
+            local: true,
+          });
+          console.log(this.core.library);
+        }
+        break;
+      }
+      case MessageProto.BatchSyncProto: {
+        const batchMsg = new BatchSyncProto();
+        wrapper.message(batchMsg);
+        this.processBatchMessage(span, batchMsg);
+      }
+    }
+  }
+  private processBatchMessage(span: ULSpan, batchMsg: BatchSyncProto) {
+    // TODO: Check stream info
+    const batchLength = batchMsg.batchLength();
     for (let i = 0; i < batchLength; i++) {
-      const component = message.batch(i);
+      const component = batchMsg.batch(i);
       if (!component) continue;
 
       const actionType = component.actionType();
 
       switch (actionType) {
-        case AirdayActionProto.AuthenticateResponseProto:
-          tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
-          const authResponse = new AuthenticateResponseProto();
-          component.action(authResponse);
-          const userId = Uuidv4.fromFBProto(authResponse.userId());
-          const libraryId = Uuidv4.fromFBProto(authResponse.libraryId());
-          // Confirm things make sense and authorise
-          // TODO: Confirm library id valid
-          this.authorised = this.core.session?.userId === stringify(userId);
-          this.core.library.id = libraryId; // TODO: Handle previous library/store?
-          if (!this.authorised) {
-            console.warn(this.core.session?.userId, stringify(userId), "huh");
-          } else {
-            this.events.emit("authenticated", {
-              userId,
-              libraryId,
-            });
-          }
-          // TODO: Consider "auth" notification using JS native events
-          this.start();
-          break;
-        case AirdayActionProto.SyncItemActionProto:
+        case ActionProto.SyncItemActionProto:
           tracer.addTag(span, "msg_type", "SyncItemActionProto");
           const itemResponse = new SyncItemActionProto();
           component.action(itemResponse);
           // TODO: Validate and add item to storage
           console.log("syncitemreceived", itemResponse.item());
           break;
-        case AirdayActionProto.LibrarySyncResponseProto:
-          tracer.addTag(span, "msg_type", "LibrarySyncResponseProto");
-          const libraryResponse = new LibrarySyncResponseProto();
-          component.action(libraryResponse);
-          const primaryLibraryBuffer = libraryResponse.primaryLibrary();
-          if (primaryLibraryBuffer) {
-            // TODO: Validate and add item to storage
-            let id = Uuidv4.fromFBProto(primaryLibraryBuffer.id());
-            let name = primaryLibraryBuffer.name() || "";
-            this.core.library = new Library({
-              id,
-              name,
-              local: true,
-            });
-            console.log(this.core.library);
-          }
-          break;
-        case AirdayActionProto.AckResponseProto: {
+        case ActionProto.AckResponseProto: {
           tracer.addTag(span, "msg_type", "AckResponseProto");
           const ackResponse = new AckResponseProto();
           component.action(ackResponse);

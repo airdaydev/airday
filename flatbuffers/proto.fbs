@@ -69,13 +69,13 @@ table SyncStreamReqProto {
   server_timestamp: uint8;
 }
 
-union BatchActionProto {
+union ActionProto {
   SyncItemActionProto, // Syncs a single item
   AckResponseProto, // TODO: Per action, this needs a server timestamp
 }
 
 table BatchComponentProto {
-  action: BatchActionProto (required);
+  action: ActionProto (required);
 }
 
 table BatchSyncProto {
