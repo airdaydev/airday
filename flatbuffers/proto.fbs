@@ -58,9 +58,6 @@ table AckResponseProto {
   success: bool;
 }
 
-// TODO: LibrarySync
-// TODO: Merkle checks of items, lists (e.g. ItemDiffReqProto)
-
 enum ResourceType: byte {
   Item,
   List,
@@ -72,19 +69,28 @@ table SyncStreamReqProto {
   server_timestamp: uint8;
 }
 
-union AirdayActionProto {
-  SyncStreamReqProto, // Starts a stream from a server_timestamp
+union BatchActionProto {
   SyncItemActionProto, // Syncs a single item
-  AuthenticateActionProto, // Authenticates user
-  AuthenticateResponseProto, // Responds with authenticated state
-  LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
   AckResponseProto, // TODO: Per action, this needs a server timestamp
 }
 
-table AirdayBatchComponentProto {
-  // Initially, set on client only
-  action_id: UuidProto;
-  action: AirdayActionProto;
+table BatchComponentProto {
+  action: BatchActionProto (required);
+}
+
+table BatchSyncProto {
+  stream_context: StreamContext; // Only set when streaming to client from server
+  batch: [BatchComponentProto] (required);
+}
+
+// TODO: LibrarySync
+// TODO: Merkle check proto of items, lists (e.g. ItemDiffReqProto)
+union MessageProto {
+  AuthenticateActionProto, // Authenticates user
+  AuthenticateResponseProto, // Responds with authenticated state
+  LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
+  SyncStreamReqProto, // Starts a stream from a server_timestamp
+  BatchSyncProto, // Used in all directions
 }
 
 enum StreamEvent: byte {
@@ -99,10 +105,9 @@ struct StreamContext {
   event: StreamEvent;
 }
 
-table AirdayMessageProto {
+table MessageWrapperProto {
   span_context: SpanContextProto;
-  stream_context: StreamContext;
-  batch: [AirdayBatchComponentProto];
+  message: MessageProto (required);
 }
 
 // TODO: Struct these
@@ -111,4 +116,4 @@ table SpanContextProto {
   span_id: uint64; // 8 byte (64 bit) as per otlp spec
 }
 
-root_type AirdayMessageProto;
+root_type MessageWrapperProto;
