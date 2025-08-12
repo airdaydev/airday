@@ -1,7 +1,7 @@
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
 import { ResourceType } from "../proto";
-import { AirdayBatchMessage, SyncReqAction } from "./actions";
+import { SyncStreamReqMessage } from "./actions";
 
 // Subprotocols for AirdayCore streams
 // Activated on connect/reconnect
@@ -20,12 +20,11 @@ export class SyncStream {
   }
   start(serverTimestamp: number | null) {
     this.syncing = true;
-    const action = new SyncReqAction(
+    const message = new SyncStreamReqMessage(
       this.resource,
       this.libraryId,
       serverTimestamp,
     );
-    const message = new AirdayBatchMessage([action]);
     this.core.ws.enqueueAirdayMessage(message);
   }
   // listen: on data
@@ -35,24 +34,22 @@ export class SyncStream {
 
 export class ItemSyncStream extends SyncStream {
   getSince(serverTimestamp: number | null) {
-    const action = new SyncReqAction(
+    const message = new SyncStreamReqMessage(
       ResourceType.Item,
       this.libraryId,
       serverTimestamp,
     );
-    const message = new AirdayBatchMessage([action]);
     this.core.ws.enqueueAirdayMessage(message);
   }
 }
 
 export class ListSyncStream extends SyncStream {
   getSince(serverTimestamp: number | null) {
-    const action = new SyncReqAction(
+    const message = new SyncStreamReqMessage(
       ResourceType.List,
       this.libraryId,
       serverTimestamp,
     );
-    const message = new AirdayBatchMessage([action]);
     this.core.ws.enqueueAirdayMessage(message);
   }
 }

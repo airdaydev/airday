@@ -2,9 +2,10 @@ import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
+import { MessageWrapperProto } from "../proto";
 import { AirdayIDB } from "../storage/idb";
 import { AckEvent } from "../websocket";
-import { SyncItemAction, AirdayAction, AirdayBatchMessage } from "./actions";
+import { BatchAction, BatchSyncMessage, SyncItemAction } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
 import { ItemSyncStream, SyncStream } from "./stream";
@@ -19,7 +20,7 @@ interface SyncEventMap {
 export class AirdaySync {
   private idb: AirdayIDB | null = null;
   core: AirdayCore;
-  pendingActions = new Map<string, AirdayAction>(); // string = hex type
+  pendingActions = new Map<string, BatchAction>(); // string = hex type
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerTimestamp: number | null = null;
@@ -89,7 +90,7 @@ export class AirdaySync {
         this.pendingActions.set(action.id.toHex(), action);
         return action;
       });
-    const message = new AirdayBatchMessage(actions);
+    const message = new BatchSyncMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
   }

@@ -30,7 +30,7 @@ interface WSEventMap {
 }
 
 export interface MQMessage {
-  toFlatBuffer(): Uint8Array;
+  serialise(): Uint8Array;
 }
 
 export interface QueuedMessage {
