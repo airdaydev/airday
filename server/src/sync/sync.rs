@@ -81,12 +81,11 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    // let mut trx; // TODO: Ensure drop!!!
+    // We may need to collect tx reqs and run together...
     for batch_component in &message.batch() {
         match batch_component.action_type() {
             ActionProto::SyncItemActionProto => {
                 let Some(action) = batch_component.action_as_sync_item_action_proto() else {
-                    // Error!
                     responses.push(BatchAction::Error {
                         action_id: None,
                         message: String::from("invalid message"),
@@ -101,7 +100,6 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                // TODO: Construct item
                 let item = Item::from_item_proto(&action.item());
                 let _ = state.db.item.merge(&item).await;
                 responses.push(BatchAction::Ack {
