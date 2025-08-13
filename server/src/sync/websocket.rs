@@ -1,9 +1,9 @@
 use crate::AppState;
 use crate::auth::auth::auth_websocket;
-use crate::sync::airday::process_sync_batch;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
+use crate::sync::response::build_error_response_message;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
@@ -15,7 +15,7 @@ use opentelemetry::{SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use tracing::{Instrument, Span, error, info_span};
+use tracing::{Instrument, Span, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -118,17 +118,29 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                     match msg.message_type() {
                         MessageProto::AuthenticateActionProto => {
                             let Some(msg) = msg.message_as_authenticate_action_proto() else {
-                                // TODO: Authentication invalid response
+                                let err_msg = build_error_response_message(
+                                    &String::from("Failed to parse authentication method"),
+                                    None,
+                                );
+                                send_to_client(&state, &socket_id, err_msg).await;
                                 return ();
                             };
                             let Some(session_token) = msg.session_token() else {
-                                // TODO: Authentication invalid response
+                                let err_msg = build_error_response_message(
+                                    &String::from("No session token provided"),
+                                    None,
+                                );
+                                send_to_client(&state, &socket_id, err_msg).await;
                                 return ();
                             };
                             if let Err(err) =
                                 auth_websocket(&state, session_token, &socket_id).await
                             {
-                                // TODO: Authentication invalid response
+                                let err_msg = build_error_response_message(
+                                    &String::from("Invalid session token"),
+                                    None,
+                                );
+                                send_to_client(&state, &socket_id, err_msg).await;
                                 return ();
                             };
                             // Authenticate user
@@ -175,7 +187,7 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
     // println!("Ending write");
 }
 
-pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message) {
+pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Vec<u8>) {
     let sender = {
         let mut connections = state.ws.conn_map.lock().unwrap();
         connections
@@ -183,7 +195,7 @@ pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Message
             .map(|client| client.sender.clone())
     };
     if let Some(sender) = sender {
-        if let Err(err) = sender.send(message).await {
+        if let Err(err) = sender.send(Message::Binary(message.into())).await {
             eprintln!("Failed to send message to client {}: {:?}", client_id, err);
             // TODO: Consider disconnecting?
         }

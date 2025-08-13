@@ -1,10 +1,8 @@
-use axum::extract::ws::Message;
 use crdt::{
     LWWRegister,
     timestamp::{LWWTimestamp, now_micros},
 };
 use flatbuffers::FlatBufferBuilder;
-use futures_util::StreamExt;
 use uuid::Uuid;
 
 use crate::{
@@ -13,8 +11,8 @@ use crate::{
     item::model::{Item, ItemAttributes},
     sync::{
         auth::has_library_access,
-        outgoing::{ack, create_airday_message, create_batch_sync_message},
         proto_generated::proto::{MessageProto, ResourceType},
+        response::{ack, create_batch_sync_message, wrap_message},
         websocket::send_to_client,
     },
 };
@@ -145,7 +143,7 @@ pub async fn process_sync_batch(
         }
     }
     let message_offset = create_batch_sync_message(&mut builder, action_offsets);
-    let wrapper = create_airday_message(&mut builder, MessageProto::BatchSyncProto, message_offset);
-    send_to_client(&state, &socket_id, Message::Binary(wrapper.into())).await;
+    let wrapper = wrap_message(&mut builder, MessageProto::BatchSyncProto, message_offset);
+    send_to_client(&state, &socket_id, wrapper).await;
     Ok(())
 }

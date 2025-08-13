@@ -7,8 +7,9 @@ use crate::{
     common::error::AppError,
     sync::proto_generated::proto::{
         AckResponseProto, AckResponseProtoArgs, ActionProto, BatchComponentProto,
-        BatchComponentProtoArgs, BatchSyncProto, BatchSyncProtoArgs, MessageProto,
-        MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
+        BatchComponentProtoArgs, BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto,
+        ErrorResponseProtoArgs, MessageProto, MessageWrapperProto, MessageWrapperProtoArgs,
+        UuidProto,
     },
 };
 
@@ -105,7 +106,36 @@ pub fn create_batch_sync_message<'a>(
     message_offset.as_union_value()
 }
 
-pub fn create_airday_message<'a>(
+pub fn create_error_response<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    message_id: Option<&Uuid>,
+    error: &str,
+) -> WIPOffset<UnionWIPOffset> {
+    let uuid;
+    let message_id = if let Some(id) = message_id {
+        uuid = UuidProto::new(id.as_bytes());
+        Some(&uuid)
+    } else {
+        None
+    };
+    let error_offset = builder.create_string(error);
+    let message_offset = ErrorResponseProto::create(
+        builder,
+        &ErrorResponseProtoArgs {
+            message_id: message_id,
+            error: Some(error_offset),
+        },
+    );
+    message_offset.as_union_value()
+}
+
+pub fn build_error_response_message<'a>(error: &str, message_id: Option<&Uuid>) -> Vec<u8> {
+    let mut builder = FlatBufferBuilder::new();
+    let offset = create_error_response(&mut builder, message_id, error);
+    wrap_message(&mut builder, MessageProto::ErrorResponseProto, offset)
+}
+
+pub fn wrap_message<'a>(
     builder: &mut FlatBufferBuilder<'a>,
     message_type: MessageProto,
     message_offset: WIPOffset<UnionWIPOffset>,
