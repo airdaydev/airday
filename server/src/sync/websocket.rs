@@ -5,6 +5,7 @@ use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
 use crate::sync::response::{build_error_response_message, create_auth_response, wrap_message};
+use crate::sync::sync::{build_batch_sync_msg, process_sync_batch};
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
@@ -170,8 +171,30 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 );
                                 return send_to_client(&state, &socket_id, err_msg).await;
                             };
-                            // Validate and start accepting items
-                            // process_sync_batch(state,)
+                            let Some(conn) = state.ws.get_conn(&socket_id) else {
+                                // Connection no longer exists
+                                // TODO: Log
+                                return ();
+                            };
+                            let Some(user_id) = conn.user_id else {
+                                let err_msg = build_error_response_message(
+                                    &String::from("Unauthorised session"),
+                                    None,
+                                );
+                                // TODO: Close connection!
+                                return send_to_client(&state, &socket_id, err_msg).await;
+                            };
+                            // Run transactions
+                            let responses = process_sync_batch(&state, &msg, &user_id).await;
+                            // Send response batch
+                            let mut builder = FlatBufferBuilder::new();
+                            let message_offset = build_batch_sync_msg(&mut builder, responses);
+                            let wrapper = wrap_message(
+                                &mut builder,
+                                MessageProto::BatchSyncProto,
+                                message_offset,
+                            );
+                            send_to_client(&state, &socket_id, wrapper).await;
                         }
                         MessageProto::SyncStreamReqProto => {
                             let Some(msg) = msg.message_as_sync_stream_req_proto() else {
@@ -181,6 +204,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 );
                                 return send_to_client(&state, &socket_id, err_msg).await;
                             };
+                            // TODO: Authorise
                             // Validate and start sync stream
                             let library_id = proto_uuid_to_uuid(msg.library_id());
                             // Start stream;

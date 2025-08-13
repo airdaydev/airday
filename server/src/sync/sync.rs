@@ -1,24 +1,24 @@
-use crdt::{
-    LWWRegister,
-    timestamp::{LWWTimestamp, now_micros},
-};
-use flatbuffers::FlatBufferBuilder;
-use uuid::Uuid;
-
 use crate::{
     AppState,
     common::{error::AppError, utils::proto_uuid_to_uuid},
     item::model::{Item, ItemAttributes},
     sync::{
         auth::has_library_access,
-        proto_generated::proto::{ActionProto, BatchSyncProto, MessageProto},
-        response::{ack, create_batch_sync_message, wrap_message},
-        websocket::send_to_client,
+        proto_generated::proto::{ActionProto, BatchSyncProto, BatchSyncProtoArgs},
+        response::ack,
     },
 };
+use crdt::{
+    LWWRegister,
+    timestamp::{LWWTimestamp, now_micros},
+};
+use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
+use uuid::Uuid;
 
 pub enum BatchAction {
     SyncItem { item: Item, action_id: Uuid },
+    Ack { item: Item, action_id: Uuid },
+    Error { message: String },
 }
 
 pub struct BatchSync {
@@ -81,36 +81,55 @@ impl BatchSync {
 }
 
 // TODO: Create error resposes for each message
-pub async fn process_sync_batch(
+pub async fn process_sync_batch<'a>(
     state: &AppState,
-    message: &BatchSync,
-    socket_id: &Uuid,
-) -> Result<(), AppError> {
-    let mut builder = FlatBufferBuilder::new();
+    message: &BatchSyncProto<'a>,
+    user_id: &Uuid,
+) -> Vec<BatchAction> {
     let mut action_offsets = vec![];
-    let Some(conn) = state.ws.get_conn(socket_id) else {
-        // Connection may have ended before messages were processed
-        return Ok(());
-    };
-    // Collect items for trx merge
-    // let mut items = Vec::new();
-    for action in &message.actions {
-        match action {
-            AirdayAction::SyncItem { item, action_id } => {
-                if !has_library_access(state, conn.user_id, item.library_id).await {
-                    return Ok(());
+    let mut responses = Vec::new();
+    let mut itemTrx;
+    let mut listTrx;
+    for batch_component in &message.batch() {
+        match batch_component.action_type() {
+            ActionProto::SyncItemActionProto => {
+                let Some(action) = batch_component.action_as_sync_item_action_proto() else {
+                    // Error!
+                    responses.push(BatchAction::Error {
+                        message: String::from("invalid message"),
+                    });
+                    continue;
+                };
+                let library_id = action.item().library_id();
+                if !has_library_access(state, user_id, library_id).await {
+                    responses.push()
                 }
                 // items.push(item.clone());
                 let _ = state.db.item.merge(&item).await;
-                let action_offset = ack(&mut builder, action_id).await?;
+                let action_offset = ack(&mut builder, action_id).await;
                 action_offsets.push(action_offset);
                 // TODO: fan out notification
                 // (channels(?) for single server, redis fb w channel name for multi server)
             }
+            _ => {
+                // Generate error
+            }
         }
     }
-    let message_offset = create_batch_sync_message(&mut builder, action_offsets);
-    let wrapper = wrap_message(&mut builder, MessageProto::BatchSyncProto, message_offset);
-    send_to_client(&state, &socket_id, wrapper).await;
-    Ok(())
+    responses
+}
+
+pub fn build_batch_sync_msg<'a>(
+    builder: &'a mut FlatBufferBuilder,
+    _actions: Vec<BatchAction>,
+) -> WIPOffset<UnionWIPOffset> {
+    let batch_offset = BatchSyncProto::create(
+        builder,
+        &BatchSyncProtoArgs {
+            stream_context: None,
+            batch: None,
+        },
+    )
+    .as_union_value();
+    batch_offset
 }
