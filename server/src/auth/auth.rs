@@ -106,7 +106,7 @@ pub async fn auth_websocket(
     state: &AppState,
     session_token: &str,
     socket_id: &Uuid,
-) -> Result<(), AppError> {
+) -> Result<UserSession, AppError> {
     let user_session = state.db.session.get_by_token(&session_token).await?;
     // TODO: SECURITY! VALIDATE THE SESSION!!
     if let Some(sesh) = user_session {
@@ -123,11 +123,15 @@ pub async fn auth_websocket(
         if set_conn_user_id == false {
             // TODO: SPAN!?
             println!("WS: User disconnected while authenticating");
-            return Ok(());
+            return Err(AppError::ValidationError(String::from(
+                "User disconnected while authenticating",
+            )));
         }
         // TODO: Span?
         println!("User {:?} authenticated!", sesh.user_id);
-        // TODO: Don't panic!
+        return Ok(sesh);
     }
-    Ok(())
+    Err(AppError::ValidationError(String::from(
+        "Authorisation error",
+    )))
 }

@@ -3,10 +3,11 @@ use crate::auth::auth::auth_websocket;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
-use crate::sync::response::build_error_response_message;
+use crate::sync::response::{build_error_response_message, create_auth_response, wrap_message};
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
+use flatbuffers::FlatBufferBuilder;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use opentelemetry::trace::{SpanContext, TraceContextExt, TraceState};
@@ -101,7 +102,6 @@ fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
     )
 }
 
-// TODO: The name itself could further be differentiated into message types
 async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
         async {
@@ -133,9 +133,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 send_to_client(&state, &socket_id, err_msg).await;
                                 return ();
                             };
-                            if let Err(err) =
-                                auth_websocket(&state, session_token, &socket_id).await
-                            {
+                            let Ok(sesh) = auth_websocket(&state, session_token, &socket_id).await
+                            else {
                                 let err_msg = build_error_response_message(
                                     &String::from("Invalid session token"),
                                     None,
@@ -143,6 +142,27 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 send_to_client(&state, &socket_id, err_msg).await;
                                 return ();
                             };
+                            if let Ok(result) = state.db.user.get_by_id(&sesh.user_id).await {
+                                if let Some(user) = result {
+                                    let mut builder = FlatBufferBuilder::new();
+                                    let auth_offset = create_auth_response(&mut builder, &user);
+                                    let msg = wrap_message(
+                                        &mut builder,
+                                        MessageProto::AuthenticateResponseProto,
+                                        auth_offset,
+                                    );
+                                    send_to_client(&state, &socket_id, msg);
+                                    return ();
+                                }
+                            } else {
+                                // User does not exist
+                                let err_msg = build_error_response_message(
+                                    &String::from("Invalid session token"),
+                                    None,
+                                );
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return ();
+                            }
                             // Authenticate user
                         }
                         MessageProto::BatchSyncProto => {

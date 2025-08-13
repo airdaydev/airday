@@ -1,38 +1,16 @@
-use axum::extract::ws::Message;
-// TODO: Create airday message
 use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
     sync::proto_generated::proto::{
-        AckResponseProto, AckResponseProtoArgs, ActionProto, BatchComponentProto,
-        BatchComponentProtoArgs, BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto,
-        ErrorResponseProtoArgs, MessageProto, MessageWrapperProto, MessageWrapperProtoArgs,
-        UuidProto,
+        AckResponseProto, AckResponseProtoArgs, ActionProto, AuthenticateResponseProto,
+        AuthenticateResponseProtoArgs, BatchComponentProto, BatchComponentProtoArgs,
+        BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
+        MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
     },
+    user::model::User,
 };
-
-pub async fn authentication_response<'a>(builder: &mut FlatBufferBuilder<'a>) {
-    if let Some(user) = state.db.user.get_by_id(&sesh.user_id).await? {
-        let action_offset = AuthenticateResponseProto::create(
-            &mut builder,
-            &AuthenticateResponseProtoArgs {
-                user_id: Some(&UuidProto::new(sesh.user_id.as_bytes())),
-                library_id: Some(&UuidProto::new(user.primary_library.unwrap().id.as_bytes())),
-            },
-        )
-        .as_union_value();
-        let offset = AirdayBatchComponentProto::create(
-            &mut builder,
-            &AirdayBatchComponentProtoArgs {
-                action_type: AirdayActionProto::AuthenticateResponseProto,
-                action: Some(action_offset),
-                action_id: None,
-            },
-        );
-    }
-}
 
 pub async fn ack<'a>(
     builder: &mut FlatBufferBuilder<'a>,
@@ -133,6 +111,22 @@ pub fn build_error_response_message<'a>(error: &str, message_id: Option<&Uuid>) 
     let mut builder = FlatBufferBuilder::new();
     let offset = create_error_response(&mut builder, message_id, error);
     wrap_message(&mut builder, MessageProto::ErrorResponseProto, offset)
+}
+
+pub fn create_auth_response<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    user: &User,
+) -> WIPOffset<UnionWIPOffset> {
+    let primary_library = user.primary_library.as_ref().unwrap();
+    let action_offset = AuthenticateResponseProto::create(
+        builder,
+        &AuthenticateResponseProtoArgs {
+            user_id: Some(&UuidProto::new(user.id.as_bytes())),
+            library_id: Some(&UuidProto::new(primary_library.id.as_bytes())),
+        },
+    )
+    .as_union_value();
+    action_offset
 }
 
 pub fn wrap_message<'a>(
