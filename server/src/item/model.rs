@@ -1,10 +1,13 @@
 use std::pin::Pin;
 
-use crate::common::error::AppError;
+use crate::{
+    common::{error::AppError, utils::proto_uuid_to_uuid},
+    sync::proto_generated::proto::ItemProto,
+};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
+use crdt::{LWWRegister, timestamp::now_micros};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use uuid::Uuid;
@@ -40,6 +43,29 @@ pub struct Item {
     pub attributes: ItemAttributes,
     pub updated_utc: Option<u64>,
     pub tombstone_utc: Option<u64>,
+}
+
+impl Item {
+    pub fn from_item_proto<'a>(item_proto: &'a ItemProto) -> Item {
+        let lww = item_proto.text().unwrap();
+        let timestamp = lww.timestamp().unwrap();
+        let text_lww = LWWRegister {
+            timestamp: LWWTimestamp {
+                utc: timestamp.utc() as u64,
+                pid: timestamp.pid() as u64,
+            },
+            data: lww.data().unwrap().to_string(),
+        };
+        Item {
+            id: proto_uuid_to_uuid(item_proto.id()),
+            library_id: proto_uuid_to_uuid(item_proto.library_id()),
+            updated_utc: Some(now_micros()), // TODO?
+            attributes: ItemAttributes {
+                text: Some(text_lww),
+            },
+            tombstone_utc: None,
+        }
+    }
 }
 
 impl ItemAttributes {

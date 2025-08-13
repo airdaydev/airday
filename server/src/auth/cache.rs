@@ -22,8 +22,8 @@ impl AuthCache {
             .build();
         AuthCache { cache }
     }
-    pub async fn check(&self, state: &AppState, user_id: Uuid, library_id: Uuid) -> bool {
-        let key = (user_id, library_id);
+    pub async fn check(&self, state: &AppState, user_id: &Uuid, library_id: &Uuid) -> bool {
+        let key = (user_id.clone(), library_id.clone());
         if let Some(val) = self.cache.get(&key) {
             return val;
         }
