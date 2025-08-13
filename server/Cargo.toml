@@ -26,6 +26,7 @@ chrono = { version = "0.4.41", features = ["serde"] }
 futures-util = "0.3.31"
 flatbuffers = "25.2.10"
 async-trait = "0.1.88"
+mini-moka = "0.10.3"
 tracing-subscriber = { version = "0.3.19" }
 tower-http = { version = "0.6.6", features = ["trace", "cors"] }
 tracing = "0.1.41"

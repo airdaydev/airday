@@ -6,7 +6,6 @@ mod common {
     pub mod utils;
 }
 mod sync {
-    pub mod auth;
     #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
     pub mod proto_generated;
     pub mod response;
@@ -27,6 +26,7 @@ mod telemetry {
 }
 mod auth {
     pub mod auth;
+    pub mod cache;
     pub mod session;
 }
 mod item {
@@ -34,6 +34,7 @@ mod item {
     pub mod sqlite;
 }
 mod root;
+use crate::auth::cache::AuthCache;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
 use axum::Router;
@@ -54,7 +55,7 @@ struct AppState {
     db: Db,
     config: AirdayConfig,
     ws: sync::websocket::WebsocketState,
-    // ws_sub_map: sync::websocket::WSSubMap,
+    auth_cache: AuthCache, // ws_sub_map: sync::websocket::WSSubMap,
 }
 
 #[derive(Bpaf, Debug, Clone)]
@@ -97,6 +98,7 @@ async fn main() {
         db: db,
         config: cfg.clone(),
         ws: sync::websocket::WebsocketState::new(),
+        auth_cache: AuthCache::new(),
     };
 
     let cors = CorsLayer::new()
