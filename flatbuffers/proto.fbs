@@ -84,14 +84,21 @@ table BatchSyncProto {
   batch: [BatchComponentProto] (required);
 }
 
+table ErrorResponseProto {
+  message_id: UuidProto;
+  error: string;
+}
+
+
 // TODO: LibrarySync
 // TODO: Merkle check proto of items, lists (e.g. ItemDiffReqProto)
 union MessageProto {
-  AuthenticateActionProto, // Authenticates user
-  AuthenticateResponseProto, // Responds with authenticated state
+  AuthenticateActionProto, // Websocket authentication request
+  SyncStreamReqProto, // Requests a stream from server
+  BatchSyncProto, // Bidirectional data sync batches
+  AuthenticateResponseProto, // Server response for succesful authentication
   LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
-  SyncStreamReqProto, // Starts a stream from a server_timestamp
-  BatchSyncProto, // Used in all directions
+  ErrorResponseProto, // Informs client of bad message
 }
 
 enum StreamEvent: byte {
@@ -107,6 +114,7 @@ struct StreamContext {
 }
 
 table MessageWrapperProto {
+  message_id: UuidProto;
   span_context: SpanContextProto;
   message: MessageProto (required);
 }

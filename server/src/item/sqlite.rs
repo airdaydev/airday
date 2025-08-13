@@ -25,7 +25,7 @@ impl ItemModelSqlite {
 
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
-    async fn bulk_merge(&self, item: &Item) -> Result<(), AppError> {}
+    // async fn bulk_merge(&self, item: &Item) -> Result<(), AppError> {}
     async fn merge(&self, item: &Item) -> Result<(), AppError> {
         // 1. Select (we could grab multiple l8a?)
         let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;

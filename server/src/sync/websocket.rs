@@ -1,6 +1,6 @@
 use crate::AppState;
 use crate::auth::auth::auth_websocket;
-use crate::sync::airday::{AirdayMessage, message_handler};
+use crate::sync::airday::process_sync_batch;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
@@ -136,6 +136,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                         MessageProto::BatchSyncProto => {
                             let parsed_message = msg.message_as_batch_sync_proto();
                             // Validate and start accepting items
+                            // process_sync_batch(state,)
                         }
                         MessageProto::SyncStreamReqProto => {
                             let parsed_message = msg.message_as_sync_stream_req_proto();

@@ -2,11 +2,9 @@ use crate::{
     AppState,
     auth::session::{UserSession, get_client_meta},
     common::{config::AirdayConfig, error::AppError, sql::Db},
-    sync::proto_generated::proto::AuthenticateResponseProto,
     user::model::{PublicUser, verify_login},
 };
 use axum::{extract::State, response::Json};
-use flatbuffers::FlatBufferBuilder;
 use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;

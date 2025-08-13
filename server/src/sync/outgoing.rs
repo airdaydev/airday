@@ -1,12 +1,14 @@
+use axum::extract::ws::Message;
 // TODO: Create airday message
-use flatbuffers::{FlatBufferBuilder, WIPOffset};
+use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
     sync::proto_generated::proto::{
         AckResponseProto, AckResponseProtoArgs, ActionProto, BatchComponentProto,
-        BatchComponentProtoArgs, MessageWrapperProto, UuidProto,
+        BatchComponentProtoArgs, BatchSyncProto, BatchSyncProtoArgs, MessageProto,
+        MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
     },
 };
 
@@ -88,16 +90,33 @@ pub async fn ack<'a>(
 //     )))
 // }
 
-pub fn create_airday_message_with_builder<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
+pub fn create_batch_sync_message<'a>(
+    builder: &'a mut FlatBufferBuilder<'a>,
     action_offsets: Vec<WIPOffset<BatchComponentProto<'a>>>,
-) -> Vec<u8> {
-    // 1. Build AirdayMessageProto (contains batches)
+) -> WIPOffset<UnionWIPOffset> {
     let batch = builder.create_vector(&action_offsets);
+    let message_offset = BatchSyncProto::create(
+        builder,
+        &BatchSyncProtoArgs {
+            batch: Some(batch),
+            ..Default::default()
+        },
+    );
+    message_offset.as_union_value()
+}
+
+pub fn create_airday_message<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    message_type: MessageProto,
+    message_offset: WIPOffset<UnionWIPOffset>,
+) -> Vec<u8> {
+    // 1. Build MessageProto (contains batches)
+    // 2. Wrap in MessageWrapper
     let message_offset = MessageWrapperProto::create(
         builder,
-        &AirdayMessageProtoArgs {
-            batch: Some(batch),
+        &MessageWrapperProtoArgs {
+            message_type,
+            message: Some(message_offset),
             ..Default::default()
         },
     );
