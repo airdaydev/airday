@@ -40,6 +40,7 @@
 - [] Text encryption
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
+- [] TODO: more cohesive error messaging system for websockets
 
 # Sync verification
 - [] Node index should be based on id or created time (what timestamp?)

@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::auth::auth::auth_websocket;
+use crate::common::utils::proto_uuid_to_uuid;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
@@ -119,19 +120,18 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                         MessageProto::AuthenticateActionProto => {
                             let Some(msg) = msg.message_as_authenticate_action_proto() else {
                                 let err_msg = build_error_response_message(
-                                    &String::from("Failed to parse authentication method"),
+                                    &String::from("Failed to parse AuthenticateActionProto"),
                                     None,
                                 );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return ();
+                                return send_to_client(&state, &socket_id, err_msg).await;
                             };
+                            // TODO: A validate session token function that returns session & user
                             let Some(session_token) = msg.session_token() else {
                                 let err_msg = build_error_response_message(
                                     &String::from("No session token provided"),
                                     None,
                                 );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return ();
+                                return send_to_client(&state, &socket_id, err_msg).await;
                             };
                             let Ok(sesh) = auth_websocket(&state, session_token, &socket_id).await
                             else {
@@ -139,8 +139,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Invalid session token"),
                                     None,
                                 );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return ();
+                                return send_to_client(&state, &socket_id, err_msg).await;
                             };
                             if let Ok(result) = state.db.user.get_by_id(&sesh.user_id).await {
                                 if let Some(user) = result {
@@ -151,8 +150,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                         MessageProto::AuthenticateResponseProto,
                                         auth_offset,
                                     );
-                                    send_to_client(&state, &socket_id, msg);
-                                    return ();
+                                    return send_to_client(&state, &socket_id, msg).await;
                                 }
                             } else {
                                 // User does not exist
@@ -160,19 +158,35 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Invalid session token"),
                                     None,
                                 );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return ();
+                                return send_to_client(&state, &socket_id, err_msg).await;
                             }
                             // Authenticate user
                         }
                         MessageProto::BatchSyncProto => {
-                            let parsed_message = msg.message_as_batch_sync_proto();
+                            let Some(msg) = msg.message_as_batch_sync_proto() else {
+                                let err_msg = build_error_response_message(
+                                    &String::from("Failed to parse BatchSyncProto"),
+                                    None,
+                                );
+                                return send_to_client(&state, &socket_id, err_msg).await;
+                            };
                             // Validate and start accepting items
                             // process_sync_batch(state,)
                         }
                         MessageProto::SyncStreamReqProto => {
-                            let parsed_message = msg.message_as_sync_stream_req_proto();
+                            let Some(msg) = msg.message_as_sync_stream_req_proto() else {
+                                let err_msg = build_error_response_message(
+                                    &String::from("Failed to parse SyncStreamReqProto"),
+                                    None,
+                                );
+                                return send_to_client(&state, &socket_id, err_msg).await;
+                            };
                             // Validate and start sync stream
+                            let library_id = proto_uuid_to_uuid(msg.library_id());
+                            // Start stream;
+                            //                                 timestamp: now_micros(),
+                            // library_id,
+                            // resource: action.resource(),
                         }
                         _ => {
                             // Ignore message
