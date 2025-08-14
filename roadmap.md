@@ -6,16 +6,13 @@
 - [] sync stream clean up
 - [] Merge attribute macro and/or hashmap!
 - [] push live updates!
-- [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] delete items (tombstones, same api)
-- [] cache library authorisation
-- [] Compute unsynced deltas on load (track last sync) (coarse at first)
+- [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] inbox = default = virtual list! (where orphans go too!)
-- [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
-- [] deal with orphaned items (no list reference found - they just show up in the bin! - slightly weird as there's no put back opt, also a partially synced move could push items into the bin erroneously)
+- [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)
 - [] GLUE CORE TO APP!!
 - [] UI - Create items
 - [] UI - Update items
@@ -24,10 +21,9 @@
 - [] UI - Kanban
 - [] @airday/core - repeat tasks
 - [] @airday/core - repeat tasks (shuffle)?
-- [] Robust dummy data system
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
-- [] @airday/core - tracing
+- [] @airday/core - tracing fixes
 - [] Add license https://mariadb.com/bsl-faq-adopting/
 - [] Consider AGPL-3.0
 - [] Put up website
@@ -120,6 +116,7 @@
 - [] Drag divider to change view size!
 - [] Update focus mode to be a floating pomodoro timer that can maximise, without the corny hold to end
 - [] Nice empty list states
+- [] Weekly roll-over view
 
 ## Stickers
 - [] Consider less abstract stickers (create sets with AI? artists?)
