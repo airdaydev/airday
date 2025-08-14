@@ -82,23 +82,35 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64,
     let now = now_micros();
     let now_i64 = now as i64;
 
-    sqlx::query!(
+    let last_updated = item.updated_utc.unwrap() as i64;
+
+    // TODO: Concurrent updates on same items can lead to failures!
+    let result = sqlx::query!(
         r#"UPDATE item
              SET attributes = ?, updated_utc = ?
-             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL"#,
+             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND updated_utc = ?"#,
         updated_attributes_json,
         now_i64,
         item.id,
-        item.library_id
+        item.library_id,
+        last_updated,
     )
     .execute(tx.as_mut())
     .await?;
+
+    // TODO: This could happen during concurrent merges & should be mitigated
+    if result.rows_affected() == 0 {
+        return Err(AppError::ServerError(String::from(
+            "Concurrent update failure",
+        )));
+    }
+
     Ok(now)
 }
 
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
-    // TODO: This is currently all-or-nothing, maybe consider options
+    // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
     async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<u64>>, AppError> {
         let mut results: Vec<Option<u64>> = vec![];
         let mut tx = self.pool.begin().await?;
@@ -142,7 +154,7 @@ mod tests {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("test@test.com")).await;
         let primary_library_id = user.primary_library.unwrap().id;
-        let qty = 10;
+        let qty = 100;
         let mut items = vec![];
         for _ in 0..qty {
             items.push(mock_item(primary_library_id))
