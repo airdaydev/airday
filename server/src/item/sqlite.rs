@@ -40,6 +40,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64
     Ok(now)
 }
 
+// TODO: Optimise this for speed by consolidating into one select statements by library
 async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
