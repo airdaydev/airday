@@ -22,7 +22,7 @@ impl ItemModelSqlite {
     }
 }
 
-async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64, AppError> {
+async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
     let now = now_micros();
     let now_i64 = now as i64;
@@ -41,7 +41,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64
 }
 
 // TODO: Optimise this for speed by consolidating into one select statements by library
-async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64, AppError> {
+async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
         SqlItem,
@@ -112,8 +112,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64,
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
     // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<u64>>, AppError> {
-        let mut results: Vec<Option<u64>> = vec![];
+    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<i64>>, AppError> {
+        let mut results: Vec<Option<i64>> = vec![];
         let mut tx = self.pool.begin().await?;
         for item in item {
             let Ok(server_timestamp) = merge(&mut tx, item).await else {
@@ -129,7 +129,7 @@ impl ItemModel for ItemModelSqlite {
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
-        server_timestamp: u64,
+        server_timestamp: i64,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     > {
@@ -140,7 +140,7 @@ impl ItemModel for ItemModelSqlite {
             ORDER BY updated_utc ASC"#,
         )
         .bind(library_id.clone())
-        .bind(server_timestamp as i64)
+        .bind(server_timestamp)
         .fetch(&self.pool)
     }
 }
@@ -161,7 +161,7 @@ mod tests {
             items.push(mock_item(primary_library_id))
         }
         db.item.merge_many(&items).await.unwrap();
-        let mut stream = db.item.get_by_library_stream(&primary_library_id, 0u64);
+        let mut stream = db.item.get_by_library_stream(&primary_library_id, 0i64);
         let mut count = 0;
         while let Some(result) = stream.next().await {
             match result {

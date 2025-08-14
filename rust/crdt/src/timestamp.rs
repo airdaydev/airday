@@ -1,28 +1,28 @@
 use rand::Rng;
 use std::cmp::Ordering;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicI64, Ordering as AtomicOrdering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-static PID: OnceLock<u64> = OnceLock::new();
+static PID: OnceLock<i64> = OnceLock::new();
 
 // Singleton, filled once, microsecond res clock,
-// should be good to year 2225 for F64 representation
+// Good to year 2255 in F64 representation in JS version - or just a BigInt
 static CLOCK: MonotonicClock = MonotonicClock {
-    last_micros: AtomicU64::new(0),
+    last_micros: AtomicI64::new(0),
 };
 
 struct MonotonicClock {
     // thread-safe uint64, hardware handled op
-    last_micros: AtomicU64,
+    last_micros: AtomicI64,
 }
 
 impl MonotonicClock {
-    fn now(&self) -> u64 {
+    fn now(&self) -> i64 {
         let system_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("SystemTime::now() failed")
-            .as_micros() as u64;
+            .as_micros() as i64;
         loop {
             // Acquire ensures we have seen all previous writes
             let last = self.last_micros.load(AtomicOrdering::Acquire);
@@ -44,25 +44,25 @@ impl MonotonicClock {
 }
 
 // Public API
-pub fn now_micros() -> u64 {
+pub fn now_micros() -> i64 {
     CLOCK.now()
 }
 
 /// Generate a random process ID (js MAX_SAFE_INTEGER compatible)
-pub fn gen_pid() -> u64 {
-    rand::rng().random_range(1..=9007199254740991u64)
+pub fn gen_pid() -> i64 {
+    rand::rng().random_range(1..=9007199254740991i64)
 }
 
 /// LWW timestamp for ordering operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LWWTimestamp {
-    pub utc: u64, // Monotonic wall clock in microseconds
-    pub pid: u64, // Process ID
+    pub utc: i64, // Monotonic wall clock in microseconds
+    pub pid: i64, // Process ID
 }
 
 impl LWWTimestamp {
     /// Create a new timestamp
-    pub fn new(utc: Option<u64>, pid: Option<u64>) -> Self {
+    pub fn new(utc: Option<i64>, pid: Option<i64>) -> Self {
         let utc = utc.unwrap_or_else(|| now_micros());
 
         let static_pid = *PID.get_or_init(|| gen_pid());

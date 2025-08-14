@@ -15,7 +15,7 @@ use uuid::Uuid;
 pub enum BatchAction {
     Applied {
         action_id: Uuid,
-        server_timestamp: u64,
+        server_timestamp: i64,
     },
     Error {
         action_id: Option<Uuid>,

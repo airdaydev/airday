@@ -21,8 +21,8 @@ struct LWWDefinitionJson<T> {
 impl<T: Clone> LWWDefinitionJson<T> {
     pub fn to_lww(&self) -> LWWRegister<T> {
         let timestamp = LWWTimestamp {
-            utc: self.utc as u64,
-            pid: self.pid as u64,
+            utc: self.utc as i64,
+            pid: self.pid as i64,
         };
         LWWRegister {
             timestamp,
@@ -40,8 +40,8 @@ pub struct Item {
     pub id: Uuid,
     pub library_id: Uuid,
     pub attributes: ItemAttributes,
-    pub updated_utc: Option<u64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
-    pub tombstone_utc: Option<u64>,
+    pub updated_utc: Option<i64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
+    pub tombstone_utc: Option<i64>,
 }
 
 impl Item {
@@ -50,8 +50,8 @@ impl Item {
         let timestamp = lww.timestamp().unwrap();
         let text_lww = LWWRegister {
             timestamp: LWWTimestamp {
-                utc: timestamp.utc() as u64,
-                pid: timestamp.pid() as u64,
+                utc: timestamp.utc() as i64,
+                pid: timestamp.pid() as i64,
             },
             data: lww.data().unwrap().to_string(),
         };
@@ -168,12 +168,12 @@ pub trait ItemModel: Send + Sync {
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
-        server_timestamp: u64,
+        server_timestamp: i64,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;
     // async fn merge(&self, item: &Item) -> Result<(), AppError>;
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<u64>>, AppError>;
+    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<i64>>, AppError>;
     // async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
