@@ -55,7 +55,7 @@ table LibrarySyncResponseProto {
 table BatchResponseProto {
   success: bool;
   error: string;
-  server_timestamp: uint64;
+  server_timestamp: double;
 }
 
 enum ResourceType: byte {
