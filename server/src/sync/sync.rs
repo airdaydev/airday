@@ -3,9 +3,9 @@ use crate::{
     common::utils::proto_uuid_to_uuid,
     item::model::Item,
     sync::proto_generated::proto::{
-        AckResponseProto, AckResponseProtoArgs, ActionProto, BatchComponentProto,
-        BatchComponentProtoArgs, BatchErrorResponseProtoBuilder, BatchSyncProto,
-        BatchSyncProtoArgs, UuidProto,
+        ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
+        BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, BatchSyncProtoArgs,
+        UuidProto,
     },
 };
 use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 // TODO: Reconsider need for intermediate object
 pub enum BatchAction {
-    Ack {
+    Applied {
         action_id: Uuid,
     },
     Error {
@@ -29,15 +29,21 @@ impl BatchAction {
     ) -> WIPOffset<BatchComponentProto<'a>> {
         let offset;
         match self {
-            BatchAction::Ack { action_id } => {
+            BatchAction::Applied { action_id } => {
                 let id_proto = UuidProto::new(action_id.as_bytes());
-                let union_offset =
-                    AckResponseProto::create(fbb, &AckResponseProtoArgs {}).as_union_value();
+                let union_offset = BatchResponseProto::create(
+                    fbb,
+                    &BatchResponseProtoArgs {
+                        success: true,
+                        error: None,
+                    },
+                )
+                .as_union_value();
                 offset = BatchComponentProto::create(
                     fbb,
                     &BatchComponentProtoArgs {
                         action_id: Some(&id_proto),
-                        action_type: ActionProto::AckResponseProto,
+                        action_type: ActionProto::BatchResponseProto,
                         action: Some(union_offset),
                     },
                 );
@@ -52,14 +58,15 @@ impl BatchAction {
                     }
                     None => None,
                 };
-                let mut err_fbb = BatchErrorResponseProtoBuilder::new(fbb);
-                err_fbb.add_message(err_message);
+                let mut err_fbb = BatchResponseProtoBuilder::new(fbb);
+                err_fbb.add_success(false);
+                err_fbb.add_error(err_message);
                 let union_offset = err_fbb.finish().as_union_value();
                 offset = BatchComponentProto::create(
                     fbb,
                     &BatchComponentProtoArgs {
                         action_id: action_id,
-                        action_type: ActionProto::BatchErrorResponseProto,
+                        action_type: ActionProto::BatchResponseProto,
                         action: Some(union_offset),
                     },
                 );
@@ -81,7 +88,7 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    let mut items: Vec<Item> = Vec::new();
+    let mut items: Vec<(Uuid, Item)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
             ActionProto::SyncItemActionProto => {
@@ -92,29 +99,28 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 };
+                let action_id = proto_uuid_to_uuid(batch_component.action_id());
                 let library_id = proto_uuid_to_uuid(action.item().library_id());
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {
-                        action_id: Some(proto_uuid_to_uuid(batch_component.action_id())),
+                        action_id: Some(action_id),
                         message: String::from("unauthorised"),
                     });
                     continue;
                 }
                 let item = Item::from_item_proto(&action.item());
-                items.push(item);
-                responses.push(BatchAction::Ack {
-                    action_id: proto_uuid_to_uuid(batch_component.action_id()),
-                });
+                items.push((action_id, item));
             }
             _ => {
                 // Generate error
             }
         }
     }
-    let Ok(result) = state.db.item.merge_many(&items).await else {
+    let items = &items.iter().map(|record| record.1);
+    let Ok(result) = state.db.item.merge_many().await else {
         // This should be equivalent to a full rollback
-      return responses;
-    }
+        return responses;
+    };
     // run merge operations
     responses
 }

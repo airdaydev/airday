@@ -94,7 +94,8 @@
 - [] Next board (referenced items!)
 - [] Drag items into list nav
 - [] Performance board
-- [] Pin views (arrangements of panes) - after trying out workspaces (they suck) this is the right move
+- [] Pin views (arrangements of panes) - after trying out workspaces (they suck) pin may be useful
+- [] Protection against sending the same resource in a single update?
 
 ## Frontend Lifecycle
 - [] Add entire history of Done items chronology
