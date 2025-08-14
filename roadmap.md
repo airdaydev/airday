@@ -1,14 +1,12 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] clean up messaging protocol
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes) - TRUST THE WALL CLOCK - it's a pretty good system
 - [] sync stream clean up
-- [] transactions for bulk merging items (sql-side... idb side?)
 - [] Merge attribute macro and/or hashmap!
-- [] and... push items from server!
+- [] push live updates!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
-- [] delete items
+- [] delete items (tombstones, same api)
 - [] cache library authorisation
 - [] Compute unsynced deltas on load (track last sync) (coarse at first)
 - [] inbox = default = virtual list! (where orphans go too!)
@@ -16,7 +14,6 @@
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
-- [] @airday/core - make an element-set crdt for
 - [] deal with orphaned items (no list reference found - they just show up in the bin! - slightly weird as there's no put back opt, also a partially synced move could push items into the bin erroneously)
 - [] GLUE CORE TO APP!!
 - [] UI - Create items

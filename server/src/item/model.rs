@@ -40,7 +40,7 @@ pub struct Item {
     pub id: Uuid,
     pub library_id: Uuid,
     pub attributes: ItemAttributes,
-    pub updated_utc: Option<u64>,
+    pub updated_utc: Option<u64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
     pub tombstone_utc: Option<u64>,
 }
 
@@ -58,7 +58,7 @@ impl Item {
         Item {
             id: proto_uuid_to_uuid(item_proto.id()),
             library_id: proto_uuid_to_uuid(item_proto.library_id()),
-            updated_utc: Some(now_micros()), // TODO?
+            updated_utc: None,
             attributes: ItemAttributes {
                 text: Some(text_lww),
             },
