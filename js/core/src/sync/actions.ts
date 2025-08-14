@@ -93,13 +93,13 @@ export class BatchAction {
 export class SyncStreamReqMessage extends AirdayMessage {
   id = new Uuidv4();
   libraryId: Uuidv4;
-  serverTimestamp: number | null = null;
+  serverTimestamp: bigint | null = null;
   type = MessageProto.SyncStreamReqProto;
   resourceType: ResourceType;
   constructor(
     resourceType: ResourceType,
     libraryId: Uuidv4,
-    serverTimestamp: number | null = null,
+    serverTimestamp: bigint | null = null,
   ) {
     super();
     this.resourceType = resourceType;

@@ -5,12 +5,12 @@ import {
   MessageWrapperProto,
   AuthenticateResponseProto,
   LibrarySyncResponseProto,
-  AckResponseProto,
   MessageProto,
   BatchSyncProto,
+  BatchResponseProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
-import { AuthenticateAction, AirdayBatchMessage } from "../sync/actions";
+import { AirdayMessage, AuthenticateAction } from "../sync/actions";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
@@ -82,10 +82,9 @@ export class WebsocketManager {
       console.warn("Cannot websocket bearer auth, no bearer token");
       return;
     }
-    const action = new AuthenticateAction(this.core.session.token);
-    const msg = new AirdayBatchMessage([action]);
-    console.debug("WS: Sending", msg.actions.length, "action");
-    this.ws.send(msg.toFlatBuffer());
+    const msg = new AuthenticateAction(this.core.session.token);
+    console.debug("WS: Sending", msg, "action");
+    this.ws.send(msg.serialise());
     msg.complete();
   }
   send(data: any) {
@@ -148,7 +147,7 @@ export class WebsocketManager {
   }
   async wsSend(batch: Array<QueuedMessage>) {
     batch.map((item) => {
-      this.send(item.message.toFlatBuffer());
+      this.send(item.message.serialise());
     });
   }
   stop() {
@@ -228,6 +227,7 @@ export class WebsocketManager {
       const component = batchMsg.batch(i);
       if (!component) continue;
 
+      const actionId = Uuidv4.fromFBProto(component.actionId());
       const actionType = component.actionType();
 
       switch (actionType) {
@@ -238,14 +238,14 @@ export class WebsocketManager {
           // TODO: Validate and add item to storage
           console.log("syncitemreceived", itemResponse.item());
           break;
-        case ActionProto.AckResponseProto: {
+        case ActionProto.BatchResponseProto: {
           tracer.addTag(span, "msg_type", "AckResponseProto");
-          const ackResponse = new AckResponseProto();
-          component.action(ackResponse);
-          let actionId = Uuidv4.fromFBProto(ackResponse.messageId());
+          const batchResponse = new BatchResponseProto();
+          component.action(batchResponse);
+          // TODO: "ack" -> Batch response
           this.events.emit("ack", {
             actionId,
-            success: ackResponse.success(),
+            success: batchResponse.success(),
           });
           break;
         }

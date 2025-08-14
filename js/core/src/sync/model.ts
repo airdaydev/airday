@@ -13,8 +13,8 @@ export interface AirdayItemConstructorOpts {
   // LWW attributes
   attributes: AirdayItemAttributes;
   // Client-only
-  lastSync?: number | null;
-  lastModified?: number | null;
+  lastSync?: bigint | null;
+  lastModified?: bigint | null;
 }
 
 const AirdayItemSerialisedSchema = v.object({
@@ -25,8 +25,8 @@ const AirdayItemSerialisedSchema = v.object({
       text: LWWSerialiseSchema,
     })
     .required(),
-  lastSync: v.anyOf([v.number().gte(0), v.null()]),
-  lastModified: v.anyOf([v.number().gte(0), v.null()]),
+  lastSync: v.anyOf([v.unknown(), v.null()]),
+  lastModified: v.anyOf([v.unknown(), v.null()]),
 });
 
 export type AirdayItemSerialised = TypeOf<typeof AirdayItemSerialisedSchema>;
@@ -39,9 +39,9 @@ export class AirdayItem {
   id: Uuidv4;
   libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
-  syncStarted: number | null = null; // in flight sync
-  lastSync: number | null = null; // Last sync (incl. time of first pull)
-  lastModified: number; // Last local modification (incl. time of first pull)
+  syncStarted: bigint | null = null; // in flight sync
+  lastSync: bigint | null = null; // Last sync (incl. time of first pull)
+  lastModified: bigint; // Last local modification (incl. time of first pull)
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
@@ -104,8 +104,8 @@ export class AirdayItem {
       id: Uuidv4.fromHex(typed.id),
       libraryId: Uuidv4.fromHex(typed.libraryId),
       attributes,
-      lastSync: typed.lastSync,
-      lastModified: typed.lastModified,
+      lastSync: typed.lastSync as bigint,
+      lastModified: typed.lastModified as bigint,
     });
   }
 }
