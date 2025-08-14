@@ -1,9 +1,4 @@
-import {
-  globalTSProducer,
-  LWWRegister,
-  LWWRegisterString,
-  LWWSerialiseSchema,
-} from "../crdt/lww";
+import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 

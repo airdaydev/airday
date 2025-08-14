@@ -14,12 +14,14 @@ Simple LWW-Register CRDTs are used with both Rust & JS implementations. Tombston
 - `pnpm run test-core`: Tests entire JS core, automatically resets DB & runs server with in-mem sqlite against it
 - `pnpm run serverd`: Runs server in background, resetting DB
 - `pnpm run jaeger`: Runs dev jaeger in background
+- `pnpm --dir js/core test test/sync.spec.ts`: This tests the sync engine e2e
 
 ## Important file locations and conventions
 - Flatbuffer definitions: './flatbuffers/proto.fbs'
 - JS Client Core: './js/core'
 - Server: './server'
 - Sqlite db schema: './sqlite/migrations/000_dev.sql'
+- Sync tests compiled to be run in playwright: 'js/core/src/test/browser.ts'
 
 ## Dependencies and setup instructions
 Everything is setup

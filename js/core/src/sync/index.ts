@@ -2,7 +2,6 @@ import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { MessageWrapperProto } from "../proto";
 import { AirdayIDB } from "../storage/idb";
 import { AckEvent } from "../websocket";
 import { BatchAction, BatchSyncMessage, SyncItemAction } from "./actions";
