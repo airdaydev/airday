@@ -5,7 +5,7 @@
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes) - TRUST THE WALL CLOCK - it's a pretty good system
 - [] sync stream clean up
 - [] Merge attribute macro and/or hashmap!
-- [] push live updates!
+- [] fan out live updates!
 - [] delete items (tombstones, same api)
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
 - [] inbox = default = virtual list! (where orphans go too!)
