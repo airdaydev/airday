@@ -26,7 +26,7 @@ pub enum BatchAction {
 impl BatchAction {
     fn build_flatbuffer<'a>(
         &self,
-        fbb: &'a mut FlatBufferBuilder,
+        fbb: &mut FlatBufferBuilder<'a>,
     ) -> WIPOffset<BatchComponentProto<'a>> {
         let offset;
         match self {
@@ -79,11 +79,6 @@ impl BatchAction {
         }
         return offset;
     }
-}
-
-pub struct BatchSync {
-    // TODO: We should match the id 100%, interior actions just need a tick
-    pub actions: Vec<BatchAction>,
 }
 
 // TODO: Consider maintaining input<->output positional correspondence (Use initially sparse index w options)
@@ -152,14 +147,21 @@ pub async fn process_sync_batch<'a>(
 }
 
 pub fn build_batch_sync_msg<'a>(
-    builder: &'a mut FlatBufferBuilder,
-    _actions: Vec<BatchAction>,
+    builder: &mut FlatBufferBuilder<'a>,
+    actions: Vec<BatchAction>,
 ) -> WIPOffset<UnionWIPOffset> {
+    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(actions.len());
+    for action in actions {
+        comps.push(action.build_flatbuffer(builder));
+    }
+
+    let batch_vector = builder.create_vector(&comps);
+
     let batch_offset = BatchSyncProto::create(
         builder,
         &BatchSyncProtoArgs {
             stream_context: None,
-            batch: None,
+            batch: Some(batch_vector),
         },
     )
     .as_union_value();
