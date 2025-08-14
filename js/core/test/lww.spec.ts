@@ -7,18 +7,22 @@ import {
 import { Builder, ByteBuffer } from "flatbuffers";
 import { LWWRegisterStringProto } from "../src/proto";
 
+// TODO: This should really include toJSON as well
 test("LWWRegister parsing", async () => {
-  const utc = 1750820219953;
-  const pid = 1750820210000;
+  const utc = BigInt(1750820219953);
+  const pid = BigInt(1750820210000);
   const data = "hello";
-  const lww = LWWRegister.fromJSON({ timestamp: { utc, pid }, data });
+  const lww = LWWRegister.fromJSON({
+    timestamp: { utc: utc.toString(), pid: pid.toString() },
+    data,
+  });
   expect(lww.timestamp.pid).toBe(pid);
   expect(lww.timestamp.utc).toBe(utc);
   expect(lww.data).toBe(data);
 });
 
 test("LWWRegister automatic + merge", async () => {
-  const gen = new TimestampProducer(1234);
+  const gen = new TimestampProducer(BigInt(1234));
   const lww = new LWWRegister({
     timestamp: gen.timestamp(),
     data: "hello",
@@ -34,7 +38,7 @@ test("LWWRegister automatic + merge", async () => {
 });
 
 test("LWWRegister identical instance merge", async () => {
-  const gen = new TimestampProducer(1234);
+  const gen = new TimestampProducer(BigInt(1234));
   const timestamp = gen.timestamp();
   const lww1 = new LWWRegister({
     timestamp,
@@ -55,7 +59,7 @@ test("LWWRegister identical instance merge", async () => {
 });
 
 test("LWWRegister timestamp collision with different data should throw", async () => {
-  const gen = new TimestampProducer(1234);
+  const gen = new TimestampProducer(BigInt(1234));
   const timestamp = gen.timestamp();
   const lww1 = new LWWRegister({
     timestamp,
@@ -77,13 +81,12 @@ test("LWWRegister timestamp collision with different data should throw", async (
 
 test("LWWRegisterString flat buffer serialisation & deserialisation", async () => {
   const data = "hello";
-  const gen = new TimestampProducer(1234);
+  const gen = new TimestampProducer(BigInt(1234));
   const timestamp = gen.timestamp();
   const lww = new LWWRegisterString({
     timestamp,
     data: data,
   });
-
   const builder = new Builder(1024);
   const lwwOffset = lww.addToFlatBuffer(builder);
   builder.finish(lwwOffset);
@@ -91,6 +94,6 @@ test("LWWRegisterString flat buffer serialisation & deserialisation", async () =
   let bb = new ByteBuffer(uint8);
   let parsedLWW = LWWRegisterStringProto.getRootAsLWWRegisterStringProto(bb);
   expect(parsedLWW.data()).toBe(data);
-  expect(Number(parsedLWW.timestamp()?.utc())).toBe(timestamp.utc);
-  expect(Number(parsedLWW.timestamp()?.pid())).toBe(timestamp.pid);
+  expect(parsedLWW.timestamp()?.utc()).toBe(timestamp.utc);
+  expect(parsedLWW.timestamp()?.pid()).toBe(timestamp.pid);
 });

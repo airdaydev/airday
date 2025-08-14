@@ -2,11 +2,10 @@
 
 namespace proto;
 
-// Doubles makes sense here bc we are only allowing max_safe_integer currently & maps straight to number JS side, obviously,
 // Rust will still deal in U64s before IO
 struct LWWTimestampProto {
-  utc: double;
-  pid: double;
+  utc: long;
+  pid: long;
 }
 
 table LWWRegisterStringProto {

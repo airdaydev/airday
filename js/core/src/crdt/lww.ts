@@ -45,8 +45,8 @@ export class LWWTimestamp {
   addToFlatBuffer(builder: Builder) {
     return LWWTimestampProto.createLWWTimestampProto(
       builder,
-      Number(this.utc),
-      Number(this.pid),
+      this.utc,
+      this.pid,
     );
   }
   toJSON() {
