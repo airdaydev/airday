@@ -6,28 +6,49 @@ use crate::{
     sync::proto_generated::proto::{
         AckResponseProto, AckResponseProtoArgs, ActionProto, AuthenticateResponseProto,
         AuthenticateResponseProtoArgs, BatchComponentProto, BatchComponentProtoArgs,
-        BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
-        MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
+        BatchErrorResponseProto, BatchErrorResponseProtoArgs, BatchSyncProto, BatchSyncProtoArgs,
+        ErrorResponseProto, ErrorResponseProtoArgs, MessageProto, MessageWrapperProto,
+        MessageWrapperProtoArgs, UuidProto,
     },
     user::model::User,
 };
 
-pub async fn ack<'a>(
+pub async fn ack_batch_response<'a>(
     builder: &mut FlatBufferBuilder<'a>,
-    message_id: &Uuid,
+    action_id: &Uuid,
 ) -> Result<WIPOffset<BatchComponentProto<'a>>, AppError> {
-    let message_id = UuidProto::new(message_id.as_bytes());
-    let ack_args = AckResponseProtoArgs {
-        message_id: Some(&message_id),
-        success: true,
-    };
-    let action_offset = AckResponseProto::create(builder, &ack_args).as_union_value();
+    let action_id = UuidProto::new(action_id.as_bytes());
+    let action_offset =
+        AckResponseProto::create(builder, &AckResponseProtoArgs {}).as_union_value();
     let batch_offset = BatchComponentProto::create(
         builder,
         &BatchComponentProtoArgs {
             action_type: ActionProto::AckResponseProto,
             action: Some(action_offset),
-            action_id: Some(&message_id),
+            action_id: Some(&action_id),
+        },
+    );
+    return Ok(batch_offset);
+}
+
+pub async fn err_batch_response<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    action_id: &Uuid,
+    message: &str,
+) -> Result<WIPOffset<BatchComponentProto<'a>>, AppError> {
+    let action_id = UuidProto::new(action_id.as_bytes());
+    let str = builder.create_string(message);
+    let action_offset = BatchErrorResponseProto::create(
+        builder,
+        &BatchErrorResponseProtoArgs { message: Some(str) },
+    )
+    .as_union_value();
+    let batch_offset = BatchComponentProto::create(
+        builder,
+        &BatchComponentProtoArgs {
+            action_type: ActionProto::AckResponseProto,
+            action: Some(action_offset),
+            action_id: Some(&action_id),
         },
     );
     return Ok(batch_offset);
