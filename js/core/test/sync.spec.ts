@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import "./sync.d.ts";
 
 // TODO Test bulk sync
-test.only("Item sync", async ({ page }) => {
+test("Item sync", async ({ page }) => {
   page.on("console", (msg) => {
     console.log(`🌐 Browser: ${msg.text()}`);
   });

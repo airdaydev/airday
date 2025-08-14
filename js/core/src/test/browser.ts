@@ -31,7 +31,7 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.test("Sync item", async (assert) => {
+  suite.only("Sync item", async (assert) => {
     const core = await createTestCore();
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
@@ -124,7 +124,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.only("Get all items since beginning from server", async (assert) => {
+  suite.test("Get all items since beginning from server", async (assert) => {
     const core = await createTestCore();
     // create 50 items
     let items = [];
@@ -154,11 +154,11 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.skip("Get diff items", async (assert) => {});
-  suite.skip("Get all libraries", async (assert) => {});
-  suite.skip("Get all lists", async (assert) => {});
-  suite.skip("Get diff lists", async (assert) => {});
-  suite.skip("Sync local pending changes from idb", async (assert) => {});
+  // suite.skip("Get diff items", async (assert) => {});
+  // suite.skip("Get all libraries", async (assert) => {});
+  // suite.skip("Get all lists", async (assert) => {});
+  // suite.skip("Get diff lists", async (assert) => {});
+  // suite.skip("Sync local pending changes from idb", async (assert) => {});
 
   const results = await suite.run();
   log("Flushing");

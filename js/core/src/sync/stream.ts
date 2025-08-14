@@ -18,7 +18,7 @@ export class SyncStream {
   get key() {
     return `${this.libraryId.toHex()}:${this.resource}`;
   }
-  start(serverTimestamp: number | null) {
+  start(serverTimestamp: bigint | null) {
     this.syncing = true;
     const message = new SyncStreamReqMessage(
       this.resource,
@@ -33,7 +33,7 @@ export class SyncStream {
 }
 
 export class ItemSyncStream extends SyncStream {
-  getSince(serverTimestamp: number | null) {
+  getSince(serverTimestamp: bigint | null) {
     const message = new SyncStreamReqMessage(
       ResourceType.Item,
       this.libraryId,
@@ -44,7 +44,7 @@ export class ItemSyncStream extends SyncStream {
 }
 
 export class ListSyncStream extends SyncStream {
-  getSince(serverTimestamp: number | null) {
+  getSince(serverTimestamp: bigint | null) {
     const message = new SyncStreamReqMessage(
       ResourceType.List,
       this.libraryId,
