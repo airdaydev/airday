@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{common::error::AppError, sync::proto_generated::proto::UuidProto};
 
 /// Legacy flatbuffer variable version (FB doesn't compile static sized vars in some langs e.g. Swift)
-pub fn fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, AppError> {
+pub fn _fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, AppError> {
     let id_bytes: [u8; 16] = id_buffer
         .bytes()
         .try_into()

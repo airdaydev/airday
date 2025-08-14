@@ -206,7 +206,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             };
                             // TODO: Authorise
                             // Validate and start sync stream
-                            let library_id = proto_uuid_to_uuid(msg.library_id());
+                            let _library_id = proto_uuid_to_uuid(msg.library_id());
                             // Start stream;
                             //                                 timestamp: now_micros(),
                             // library_id,

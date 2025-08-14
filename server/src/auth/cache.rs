@@ -30,7 +30,7 @@ impl AuthCache {
         // Fall through
         if let Some(user) = state.db.user.get_by_id(&user_id).await.unwrap() {
             if let Some(primary_library) = user.primary_library {
-                if primary_library.id == library_id {
+                if primary_library.id == *library_id {
                     self.cache.insert(key, true);
                     return true;
                 }

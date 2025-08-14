@@ -2,57 +2,13 @@ use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
-    common::error::AppError,
     sync::proto_generated::proto::{
-        AckResponseProto, AckResponseProtoArgs, ActionProto, AuthenticateResponseProto,
-        AuthenticateResponseProtoArgs, BatchComponentProto, BatchComponentProtoArgs,
-        BatchErrorResponseProto, BatchErrorResponseProtoArgs, BatchSyncProto, BatchSyncProtoArgs,
-        ErrorResponseProto, ErrorResponseProtoArgs, MessageProto, MessageWrapperProto,
-        MessageWrapperProtoArgs, UuidProto,
+        AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
+        BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
+        MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
     },
     user::model::User,
 };
-
-pub async fn ack_batch_response<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
-    action_id: &Uuid,
-) -> Result<WIPOffset<BatchComponentProto<'a>>, AppError> {
-    let action_id = UuidProto::new(action_id.as_bytes());
-    let action_offset =
-        AckResponseProto::create(builder, &AckResponseProtoArgs {}).as_union_value();
-    let batch_offset = BatchComponentProto::create(
-        builder,
-        &BatchComponentProtoArgs {
-            action_type: ActionProto::AckResponseProto,
-            action: Some(action_offset),
-            action_id: Some(&action_id),
-        },
-    );
-    return Ok(batch_offset);
-}
-
-pub async fn err_batch_response<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
-    action_id: &Uuid,
-    message: &str,
-) -> Result<WIPOffset<BatchComponentProto<'a>>, AppError> {
-    let action_id = UuidProto::new(action_id.as_bytes());
-    let str = builder.create_string(message);
-    let action_offset = BatchErrorResponseProto::create(
-        builder,
-        &BatchErrorResponseProtoArgs { message: Some(str) },
-    )
-    .as_union_value();
-    let batch_offset = BatchComponentProto::create(
-        builder,
-        &BatchComponentProtoArgs {
-            action_type: ActionProto::AckResponseProto,
-            action: Some(action_offset),
-            action_id: Some(&action_id),
-        },
-    );
-    return Ok(batch_offset);
-}
 
 // TODO: Needs updating to new code
 // pub async fn send_shared_libraries<'a>(
