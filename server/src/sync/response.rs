@@ -2,10 +2,13 @@ use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
-    sync::proto_generated::proto::{
-        AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
-        BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
-        MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
+    sync::{
+        proto_generated::proto::{
+            AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
+            BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
+            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
+        },
+        sync::BatchAction,
     },
     user::model::User,
 };
@@ -46,19 +49,26 @@ use crate::{
 //     )))
 // }
 
-pub fn create_batch_sync_message<'a>(
-    builder: &'a mut FlatBufferBuilder<'a>,
-    action_offsets: Vec<WIPOffset<BatchComponentProto<'a>>>,
+pub fn build_batch_sync_msg<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    actions: Vec<BatchAction>,
 ) -> WIPOffset<UnionWIPOffset> {
-    let batch = builder.create_vector(&action_offsets);
-    let message_offset = BatchSyncProto::create(
+    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(actions.len());
+    for action in actions {
+        comps.push(action.build_flatbuffer(builder));
+    }
+
+    let batch_vector = builder.create_vector(&comps);
+
+    let batch_offset = BatchSyncProto::create(
         builder,
         &BatchSyncProtoArgs {
-            batch: Some(batch),
-            ..Default::default()
+            stream_context: None,
+            batch: Some(batch_vector),
         },
-    );
-    message_offset.as_union_value()
+    )
+    .as_union_value();
+    batch_offset
 }
 
 pub fn create_error_response<'a>(

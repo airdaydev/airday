@@ -4,8 +4,10 @@ use crate::common::utils::proto_uuid_to_uuid;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
 };
-use crate::sync::response::{build_error_response_message, create_auth_response, wrap_message};
-use crate::sync::sync::{build_batch_sync_msg, process_sync_batch};
+use crate::sync::response::{
+    build_batch_sync_msg, build_error_response_message, create_auth_response, wrap_message,
+};
+use crate::sync::sync::process_sync_batch;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;

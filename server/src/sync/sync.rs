@@ -24,7 +24,7 @@ pub enum BatchAction {
 }
 
 impl BatchAction {
-    fn build_flatbuffer<'a>(
+    pub fn build_flatbuffer<'a>(
         &self,
         fbb: &mut FlatBufferBuilder<'a>,
     ) -> WIPOffset<BatchComponentProto<'a>> {
@@ -144,26 +144,4 @@ pub async fn process_sync_batch<'a>(
         }
     }
     responses
-}
-
-pub fn build_batch_sync_msg<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
-    actions: Vec<BatchAction>,
-) -> WIPOffset<UnionWIPOffset> {
-    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(actions.len());
-    for action in actions {
-        comps.push(action.build_flatbuffer(builder));
-    }
-
-    let batch_vector = builder.create_vector(&comps);
-
-    let batch_offset = BatchSyncProto::create(
-        builder,
-        &BatchSyncProtoArgs {
-            stream_context: None,
-            batch: Some(batch_vector),
-        },
-    )
-    .as_union_value();
-    batch_offset
 }
