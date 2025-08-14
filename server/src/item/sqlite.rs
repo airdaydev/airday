@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use sqlx::SqlitePool;
+use sqlx::{Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 use crate::{
@@ -23,92 +23,86 @@ impl ItemModelSqlite {
     }
 }
 
+async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), AppError> {
+    let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
+    let now = chrono::Utc::now().naive_utc();
+    sqlx::query!(
+        r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
+           VALUES (?, ?, ?, ?, ?)"#,
+        item.id,
+        item.library_id,
+        attributes_json,
+        now,
+        Option::<NaiveDateTime>::None
+    )
+    .execute(tx.as_mut())
+    .await?;
+    Ok(())
+}
+
+async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), AppError> {
+    // Select for merge
+    let result = sqlx::query_as!(
+        SqlItem,
+        r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
+        updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes"
+        FROM item
+        WHERE library_id = ? AND id = ?"#,
+        item.library_id,
+        item.id,
+    )
+    .fetch_optional(tx.as_mut())
+    .await?;
+    // 2. Check if item exists
+    let Some(sql_item) = result else {
+        // Item does not exist, insert new item
+        insert(tx, item).await?;
+        return Ok(());
+    };
+    if let Some(_) = sql_item.tombstone_utc {
+        // Item is tombstones - discard changes
+        // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
+        return Err(AppError::ValidationError(String::from(
+            "item is tombstoned",
+        )));
+    }
+    // Get existing attributes
+    // TODO: How to handle parsing error...? Parsing must be VERY robust
+    let mut src_attrs: ItemAttributes = sql_item
+        .attributes
+        .as_ref()
+        .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
+        .map(ItemAttributes::from)
+        .unwrap();
+    println!("existing_attrs {:?}", src_attrs);
+    src_attrs.merge(&item.attributes);
+
+    // Update!
+    let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
+    let now = chrono::Utc::now().naive_utc();
+
+    sqlx::query!(
+        r#"UPDATE item
+             SET attributes = ?, updated_utc = ?
+             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL"#,
+        updated_attributes_json,
+        now,
+        item.id,
+        item.library_id
+    )
+    .execute(tx.as_mut())
+    .await?;
+    Ok(())
+}
+
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
-    // async fn bulk_merge(&self, item: &Item) -> Result<(), AppError> {}
-    async fn merge(&self, item: &Item) -> Result<(), AppError> {
-        // 1. Select (we could grab multiple l8a?)
-        let mut tx = self.pool.begin().await.map_err(|err| AppError::from(err))?;
-        let result = sqlx::query_as!(
-            SqlItem,
-            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
-            updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes"
-            FROM item
-            WHERE library_id = ? AND id = ?"#,
-            item.library_id,
-            item.id,
-        )
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(|err| AppError::from(err))?;
-        // 2. Check if item exists
-        if let Some(sql_item) = result {
-            if let Some(_) = sql_item.tombstone_utc {
-                // Item is tombstones - discard changes
-                // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
-                return Err(AppError::ValidationError(String::from(
-                    "item is tombstoned",
-                )));
-            }
-            // Get existing attributes
-            // TODO: How to handle parsing error...? Parsing must be VERY robust
-            let mut src_attrs: ItemAttributes = sql_item
-                .attributes
-                .as_ref()
-                .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
-                .map(ItemAttributes::from)
-                .unwrap();
-            println!("existing_attrs {:?}", src_attrs);
-            src_attrs.merge(&item.attributes);
-
-            // Update!
-            let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
-            let now = chrono::Utc::now().naive_utc();
-
-            sqlx::query!(
-                r#"UPDATE item
-                 SET attributes = ?, updated_utc = ?
-                 WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL"#,
-                updated_attributes_json,
-                now,
-                item.id,
-                item.library_id
-            )
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| AppError::from(err))?;
-
-            tx.commit().await.map_err(|err| AppError::from(err))?;
-            println!("merged_attrs {:?}", src_attrs);
-            return Ok(());
-        } else {
-            // Item does not exist, insert new item
-            tx.commit().await.map_err(|err| AppError::from(err))?;
-            self.insert(item).await?;
-            Ok(())
+    async fn merge_many(&self, item: &Vec<Item>) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
+        for item in item {
+            merge(&mut tx, item).await?;
         }
-    }
-    // TODO: Error on fail!
-    async fn insert(&self, item: &Item) -> Result<(), AppError> {
-        // Convert ItemAttributes to JsonAttributes
-        let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
-
-        // Insert the item with current timestamp
-        let now = chrono::Utc::now().naive_utc();
-
-        sqlx::query!(
-            r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
-               VALUES (?, ?, ?, ?, ?)"#,
-            item.id,
-            item.library_id,
-            attributes_json,
-            now,
-            Option::<NaiveDateTime>::None
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|err| AppError::from(err))?;
-
+        tx.commit().await?;
         Ok(())
     }
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
@@ -142,9 +136,11 @@ mod tests {
         let user = test_util::mock_user(&db, String::from("test@test.com")).await;
         let primary_library_id = user.primary_library.unwrap().id;
         let qty = 10;
+        let mut items = vec![];
         for _ in 0..qty {
-            db.item.merge(&mock_item(primary_library_id)).await.unwrap()
+            items.push(mock_item(primary_library_id))
         }
+        db.item.merge_many(&items).await.unwrap();
         let mut stream = db.item.get_by_library_stream(&primary_library_id, 0u64);
         let mut count = 0;
         while let Some(result) = stream.next().await {

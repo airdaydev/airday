@@ -81,7 +81,7 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    // We may need to collect tx reqs and run together...
+    let mut items: Vec<Item> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
             ActionProto::SyncItemActionProto => {
@@ -96,12 +96,12 @@ pub async fn process_sync_batch<'a>(
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {
                         action_id: Some(proto_uuid_to_uuid(batch_component.action_id())),
-                        message: String::from("permission error"),
+                        message: String::from("unauthorised"),
                     });
                     continue;
                 }
                 let item = Item::from_item_proto(&action.item());
-                let _ = state.db.item.merge(&item).await;
+                items.push(item);
                 responses.push(BatchAction::Ack {
                     action_id: proto_uuid_to_uuid(batch_component.action_id()),
                 });
@@ -111,6 +111,11 @@ pub async fn process_sync_batch<'a>(
             }
         }
     }
+    let Ok(result) = state.db.item.merge_many(&items).await else {
+        // This should be equivalent to a full rollback
+      return responses;
+    }
+    // run merge operations
     responses
 }
 
