@@ -2,6 +2,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
@@ -23,24 +24,25 @@ impl ItemModelSqlite {
     }
 }
 
-async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), AppError> {
+async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64, AppError> {
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
-    let now = chrono::Utc::now().naive_utc();
+    let now = now_micros();
+    let now_i64 = now as i64;
     sqlx::query!(
         r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
         item.id,
         item.library_id,
         attributes_json,
-        now,
-        Option::<NaiveDateTime>::None
+        now_i64,
+        Option::<i64>::None
     )
     .execute(tx.as_mut())
     .await?;
-    Ok(())
+    Ok(now)
 }
 
-async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), AppError> {
+async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<u64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
         SqlItem,
@@ -56,8 +58,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), 
     // 2. Check if item exists
     let Some(sql_item) = result else {
         // Item does not exist, insert new item
-        insert(tx, item).await?;
-        return Ok(());
+        let server_timestamp = insert(tx, item).await?;
+        return Ok(server_timestamp);
     };
     if let Some(_) = sql_item.tombstone_utc {
         // Item is tombstones - discard changes
@@ -79,31 +81,38 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<(), 
 
     // Update!
     let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
-    let now = chrono::Utc::now().naive_utc();
+    let now = now_micros();
+    let now_i64 = now as i64;
 
     sqlx::query!(
         r#"UPDATE item
              SET attributes = ?, updated_utc = ?
              WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL"#,
         updated_attributes_json,
-        now,
+        now_i64,
         item.id,
         item.library_id
     )
     .execute(tx.as_mut())
     .await?;
-    Ok(())
+    Ok(now)
 }
 
 #[async_trait]
 impl ItemModel for ItemModelSqlite {
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<(), AppError> {
+    // TODO: This is currently all-or-nothing, maybe consider options
+    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<u64>>, AppError> {
+        let mut results: Vec<Option<u64>> = vec![];
         let mut tx = self.pool.begin().await?;
         for item in item {
-            merge(&mut tx, item).await?;
+            let Ok(server_timestamp) = merge(&mut tx, item).await else {
+                results.push(None);
+                continue;
+            };
+            results.push(Some(server_timestamp));
         }
         tx.commit().await?;
-        Ok(())
+        Ok(results)
     }
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
     fn get_by_library_stream<'a>(

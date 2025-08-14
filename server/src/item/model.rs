@@ -5,7 +5,6 @@ use crate::{
     sync::proto_generated::proto::ItemProto,
 };
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
 use crdt::timestamp::LWWTimestamp;
 use crdt::{LWWRegister, timestamp::now_micros};
 use serde::{Deserialize, Serialize};
@@ -142,8 +141,8 @@ pub struct SqlItem {
     // dynamic attrs (lww-map)
     pub attributes: JsonAttributes,
     // metadata
-    pub updated_utc: NaiveDateTime,
-    pub tombstone_utc: Option<NaiveDateTime>,
+    pub updated_utc: i64,
+    pub tombstone_utc: Option<i64>,
 }
 
 // TODO: Implement Item * Item from SqlItem (Maybe?)
@@ -174,7 +173,7 @@ pub trait ItemModel: Send + Sync {
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;
     // async fn merge(&self, item: &Item) -> Result<(), AppError>;
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<(), AppError>;
+    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<u64>>, AppError>;
     // async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

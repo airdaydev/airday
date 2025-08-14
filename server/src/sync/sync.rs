@@ -15,6 +15,7 @@ use uuid::Uuid;
 pub enum BatchAction {
     Applied {
         action_id: Uuid,
+        server_timestamp: u64,
     },
     Error {
         action_id: Option<Uuid>,
@@ -29,13 +30,17 @@ impl BatchAction {
     ) -> WIPOffset<BatchComponentProto<'a>> {
         let offset;
         match self {
-            BatchAction::Applied { action_id } => {
+            BatchAction::Applied {
+                action_id,
+                server_timestamp,
+            } => {
                 let id_proto = UuidProto::new(action_id.as_bytes());
                 let union_offset = BatchResponseProto::create(
                     fbb,
                     &BatchResponseProtoArgs {
                         success: true,
                         error: None,
+                        server_timestamp: *server_timestamp,
                     },
                 )
                 .as_union_value();
@@ -81,14 +86,15 @@ pub struct BatchSync {
     pub actions: Vec<BatchAction>,
 }
 
-// TODO: Create error resposes for each message
+// TODO: Consider maintaining input<->output positional correspondence (Use initially sparse index w options)
 pub async fn process_sync_batch<'a>(
     state: &AppState,
     message: &BatchSyncProto<'a>,
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    let mut items: Vec<(Uuid, Item)> = Vec::new();
+    let mut items: Vec<Item> = Vec::new();
+    let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
             ActionProto::SyncItemActionProto => {
@@ -109,19 +115,39 @@ pub async fn process_sync_batch<'a>(
                     continue;
                 }
                 let item = Item::from_item_proto(&action.item());
-                items.push((action_id, item));
+                action_index.push((action_id, items.len()));
+                items.push(item);
             }
             _ => {
-                // Generate error
+                responses.push(BatchAction::Error {
+                    action_id: None,
+                    message: String::from("invalid action_type"),
+                });
             }
         }
     }
-    let items = &items.iter().map(|record| record.1);
-    let Ok(result) = state.db.item.merge_many().await else {
-        // This should be equivalent to a full rollback
+    let Ok(result) = state.db.item.merge_many(&items).await else {
+        for (action_id, _) in action_index {
+            responses.push(BatchAction::Error {
+                action_id: Some(action_id),
+                message: String::from("unauthorised"),
+            });
+        }
         return responses;
     };
-    // run merge operations
+    for (action_id, index) in action_index {
+        if let Some(server_timestamp) = result[index] {
+            responses.push(BatchAction::Applied {
+                action_id: action_id,
+                server_timestamp: server_timestamp,
+            });
+        } else {
+            responses.push(BatchAction::Error {
+                action_id: Some(action_id),
+                message: String::from("merge error"),
+            })
+        }
+    }
     responses
 }
 

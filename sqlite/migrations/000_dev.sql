@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS item (
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
   -- metadata & tombstone
-  updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  tombstone_utc TIMESTAMP NULL
+  updated_utc INTEGER NOT NULL,
+  tombstone_utc INTEGER NULL
   -- TODO: deleted by?
 );
 
