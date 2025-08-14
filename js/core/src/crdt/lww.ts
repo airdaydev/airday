@@ -2,32 +2,30 @@ import { Builder } from "flatbuffers";
 import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
 import { type TypeOf, v, ensure } from "suretype";
 
-// 53-bit number (safe integer limit) generated from high entropy-source, if available
-export const genPid = (): number => {
+// BigInt process ID generated from high entropy-source, if available
+export const genPid = (): bigint => {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     const array = new Uint32Array(2);
     crypto.getRandomValues(array);
-    // create 53-bit number (JavaScript's safe integer limit)
-    // 1. Drop 11 high bits from first Uint32 (& 0 them out of existence), leaving 21 low bits
-    // 2. Multiply 21 low bits from first Uint32, effectively shifting them to high place of 64bit number i.e. 32 bits to left
-    // 3. Add all array[1] bits
-    return (array[0] & 0x1fffff) * 0x100000000 + array[1];
+    // Create 64-bit BigInt from two 32-bit values
+    return (BigInt(array[0]) << 32n) | BigInt(array[1]);
   }
   // Fallback for environments without crypto
-  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+  return BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
 };
 
 const initialOffsetMs = Date.now() - performance.now();
-const nextMicro = () => Math.floor(initialOffsetMs + performance.now() / 1000);
+const nextMicro = () =>
+  BigInt(Math.floor(initialOffsetMs + performance.now() / 1000));
 
 interface TimestampConstructorOps {
-  utc: number;
-  pid: number;
+  utc: bigint;
+  pid: bigint;
 }
 
 export class LWWTimestamp {
-  utc: number; // Monotonic client wall clock in microseconds
-  pid: number; // Process id
+  utc: bigint; // Monotonic client wall clock in microseconds
+  pid: bigint; // Process id
   constructor(opts: TimestampConstructorOps) {
     this.utc = opts.utc;
     this.pid = opts.pid;
@@ -47,22 +45,22 @@ export class LWWTimestamp {
   addToFlatBuffer(builder: Builder) {
     return LWWTimestampProto.createLWWTimestampProto(
       builder,
-      this.utc,
-      this.pid,
+      Number(this.utc),
+      Number(this.pid),
     );
   }
   toJSON() {
     return {
-      utc: this.utc,
-      pid: this.pid,
+      utc: this.utc.toString(),
+      pid: this.pid.toString(),
     };
   }
 }
 
 export class TimestampProducer {
-  private pid: number;
-  private lastUtc: number = 0;
-  constructor(pid: number = genPid()) {
+  private pid: bigint;
+  private lastUtc: bigint = 0n;
+  constructor(pid: bigint = genPid()) {
     this.pid = pid;
   }
   timestamp(): LWWTimestamp {
@@ -90,8 +88,8 @@ interface LWWRegisterConstructorOpts<T> {
 const LwwJSON = v.object({
   timestamp: v
     .object({
-      utc: v.number().required(),
-      pid: v.number().required(),
+      utc: v.string().required(),
+      pid: v.string().required(),
     })
     .required(),
   data: v.any(),
@@ -109,7 +107,10 @@ export class LWWRegister<T> {
   static fromJSON<T>(json: any): LWWRegister<T> {
     ensure(LwwJSON, json);
     let typed = json as TypeOf<typeof LwwJSON>;
-    const timestamp = new LWWTimestamp(typed.timestamp);
+    const timestamp = new LWWTimestamp({
+      utc: BigInt(typed.timestamp.utc),
+      pid: BigInt(typed.timestamp.pid),
+    });
     return new LWWRegister<T>({ timestamp, data: typed.data as T });
   }
   toJSON() {
@@ -161,8 +162,8 @@ export class LWWRegisterString extends LWWRegister<string> {
 }
 
 export const TimestampSchema = v.object({
-  utc: v.number(),
-  pid: v.number(),
+  utc: v.string(),
+  pid: v.string(),
 });
 
 export const LWWSerialiseSchema = v.object({
