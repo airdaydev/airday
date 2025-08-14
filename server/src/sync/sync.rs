@@ -4,14 +4,12 @@ use crate::{
     item::model::Item,
     sync::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
-        BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, BatchSyncProtoArgs,
-        UuidProto,
+        BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
     },
 };
-use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
+use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
-// TODO: Reconsider need for intermediate object
 pub enum BatchAction {
     Applied {
         action_id: Uuid,

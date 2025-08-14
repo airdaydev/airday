@@ -121,8 +121,6 @@ pub fn wrap_message<'a>(
     message_type: MessageProto,
     message_offset: WIPOffset<UnionWIPOffset>,
 ) -> Vec<u8> {
-    // 1. Build MessageProto (contains batches)
-    // 2. Wrap in MessageWrapper
     let message_offset = MessageWrapperProto::create(
         builder,
         &MessageWrapperProtoArgs {
