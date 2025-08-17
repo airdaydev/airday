@@ -243,7 +243,6 @@ export class WebsocketManager {
           tracer.addTag(span, "msg_type", "AckResponseProto");
           const batchResponse = new BatchResponseProto();
           component.action(batchResponse);
-          // TODO: "ack" -> Batch response
           this.events.emit("batch-response", {
             actionId,
             success: batchResponse.success(),
