@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::auth::auth::auth_websocket;
+use crate::common::error::AppError;
 use crate::common::utils::proto_uuid_to_uuid;
 use crate::sync::proto_generated::proto::{
     MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
@@ -67,6 +68,10 @@ impl WebsocketState {
 //     Arc::new(Mutex::new(HashMap::new()))
 // }
 
+fn handle_websocket_error(_app_state: &AppState, _socket: Uuid, error: AppError) {
+    println!("Websocket reply error!!, {:?}", error);
+}
+
 async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
     let (sender, receiver) = socket.split();
@@ -108,13 +113,15 @@ fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
 
 async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
     while let Some(msg) = receiver.next().await {
-        async {
+        let result: Result<(), AppError> = async {
             let cur_span = Span::current();
             match msg {
                 Ok(Message::Binary(b)) => {
                     cur_span.set_attribute("message_type", "binary");
                     // Set trace id
-                    let msg = root_as_message_wrapper_proto(&b).unwrap();
+                    let msg = root_as_message_wrapper_proto(&b)
+                        .map_err(|err| AppError::ValidationError(String::from("Bad Message")))?;
+                    // TODO: Let's catch errors here to hit back error to client
                     // TODO: Separate function
                     let span_ctx = extract_span_ctx(msg);
                     let parent_ctx = Context::current().with_remote_span_context(span_ctx);
@@ -126,7 +133,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Failed to parse AuthenticateActionProto"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             // TODO: A validate session token function that returns session & user
                             let Some(session_token) = msg.session_token() else {
@@ -134,7 +142,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("No session token provided"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             let Ok(sesh) = auth_websocket(&state, session_token, &socket_id).await
                             else {
@@ -142,7 +151,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Invalid session token"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             if let Ok(result) = state.db.user.get_by_id(&sesh.user_id).await {
                                 if let Some(user) = result {
@@ -153,7 +163,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                         MessageProto::AuthenticateResponseProto,
                                         auth_offset,
                                     );
-                                    return send_to_client(&state, &socket_id, msg).await;
+                                    send_to_client(&state, &socket_id, msg).await;
+                                    return Ok(());
                                 }
                             } else {
                                 // User does not exist
@@ -161,7 +172,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Invalid session token"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             }
                             // Authenticate user
                         }
@@ -171,12 +183,13 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Failed to parse BatchSyncProto"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             let Some(conn) = state.ws.get_conn(&socket_id) else {
                                 // Connection no longer exists
                                 // TODO: Log
-                                return ();
+                                return Ok(());
                             };
                             let Some(user_id) = conn.user_id else {
                                 let err_msg = build_error_response_message(
@@ -184,7 +197,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     None,
                                 );
                                 // TODO: Close connection!
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             // Run transactions
                             let responses = process_sync_batch(&state, &msg, &user_id).await;
@@ -204,7 +218,8 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     &String::from("Failed to parse SyncStreamReqProto"),
                                     None,
                                 );
-                                return send_to_client(&state, &socket_id, err_msg).await;
+                                send_to_client(&state, &socket_id, err_msg).await;
+                                return Ok(());
                             };
                             // TODO: Authorise
                             // Validate and start sync stream
@@ -218,21 +233,27 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             // Ignore message
                         }
                     }
-                    ()
+                    Ok(())
                 }
                 Ok(Message::Close(_)) => {
                     cur_span.record("message_type", "close");
+                    Ok(())
                 }
                 Err(_) => {
                     cur_span.record("message_type", "error");
+                    Ok(())
                 }
                 _ => {
                     // Discard
+                    Ok(())
                 }
             }
         }
         .instrument(info_span!("ws_receive", socket_id = %socket_id))
-        .await
+        .await;
+        if let Err(err) = result {
+            handle_websocket_error(&state, socket_id, err);
+        }
     }
     state.ws.conn_map.lock().unwrap().remove(&socket_id);
 }

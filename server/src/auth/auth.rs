@@ -5,7 +5,7 @@ use crate::{
     user::model::{PublicUser, verify_login},
 };
 use axum::{extract::State, response::Json};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
 
