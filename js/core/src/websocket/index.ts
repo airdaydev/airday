@@ -10,22 +10,23 @@ import {
   BatchResponseProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
-import { AirdayMessage, AuthenticateAction } from "../sync/actions";
+import { AuthenticateAction } from "../sync/actions";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 
-export interface AckEvent {
+export interface BatchResponseEvent {
   actionId: Uuidv4;
   success: boolean;
+  serverTimestamp?: bigint; // TODO
   error?: string;
 }
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ack: AckEvent;
+  ["batch-response"]: BatchResponseEvent;
   flushed: {};
 }
 
@@ -243,7 +244,7 @@ export class WebsocketManager {
           const batchResponse = new BatchResponseProto();
           component.action(batchResponse);
           // TODO: "ack" -> Batch response
-          this.events.emit("ack", {
+          this.events.emit("batch-response", {
             actionId,
             success: batchResponse.success(),
           });

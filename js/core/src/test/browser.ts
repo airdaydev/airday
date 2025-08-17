@@ -43,7 +43,7 @@ export const tests = async () => {
     const pending = core.sync.pendingActions.get(action.id.toHex());
     assert(pending?.id === action.id, "message gets placed on pending queue");
     await new Promise((resolve) => {
-      core.ws.events.once("ack", (data) => {
+      core.ws.events.once("batch-response", (data) => {
         resolve(null);
       });
     });

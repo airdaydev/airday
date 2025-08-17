@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { AirdayIDB } from "../storage/idb";
-import { AckEvent } from "../websocket";
+import { BatchResponseEvent } from "../websocket";
 import { BatchAction, BatchSyncMessage, SyncItemAction } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
@@ -26,7 +26,9 @@ export class AirdaySync {
   streams = new Map<string, SyncStream>();
   constructor(core: AirdayCore) {
     this.core = core;
-    this.core.ws.events.on("ack", (ack) => this.handleAck(ack));
+    this.core.ws.events.on("batch-response", (res) =>
+      this.handleBatchResponse(res),
+    );
   }
   // Wait for pending acknowledgements
   flush() {
@@ -101,15 +103,15 @@ export class AirdaySync {
   }
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
-  handleAck(ack: AckEvent) {
-    const action = this.pendingActions.get(ack.actionId.toHex());
+  handleBatchResponse(res: BatchResponseEvent) {
+    const action = this.pendingActions.get(res.actionId.toHex());
 
     if (action instanceof SyncItemAction) {
       // TODO: targeted change instead of blunt (pass in idb to endSync?)
       this.idb?.item.upsert([action.item]).catch((err) => {
         console.log(err);
       });
-      this.pendingActions.delete(ack.actionId.toHex());
+      this.pendingActions.delete(res.actionId.toHex());
       action.item.endSync();
       if (this.pendingActions.size === 0) {
         // Consider renaming: no pending acknowledgements remaining
