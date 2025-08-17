@@ -5,8 +5,8 @@ use crate::{
     sync::proto_generated::proto::ItemProto,
 };
 use async_trait::async_trait;
+use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
-use crdt::{LWWRegister, timestamp::now_micros};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use uuid::Uuid;
@@ -64,12 +64,6 @@ impl Item {
             },
             tombstone_utc: None,
         }
-    }
-}
-
-impl ItemAttributes {
-    fn new() -> Self {
-        ItemAttributes { text: None }
     }
 }
 

@@ -15,12 +15,6 @@ pub struct PasswordAuthorisationReq {
     pub password: String,
 }
 
-#[derive(Serialize)]
-pub struct AuthResponse {
-    pub session: UserSession,
-    pub libary_id: String,
-}
-
 pub fn build_session_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
     Cookie::build(("session_token", String::from(token)))
         .http_only(true)

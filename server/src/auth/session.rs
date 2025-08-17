@@ -335,11 +335,6 @@ pub async fn get_user_sessions(
     Ok(Json(GetUserSessionsResponse { data: sessions }))
 }
 
-#[derive(Serialize)]
-pub struct RefreshSessionResponse {
-    id: String,
-}
-
 #[derive(Deserialize)]
 pub struct RefreshSessionReq {
     pub id: String,
