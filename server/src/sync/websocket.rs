@@ -119,8 +119,10 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 Ok(Message::Binary(b)) => {
                     cur_span.set_attribute("message_type", "binary");
                     // Set trace id
-                    let msg = root_as_message_wrapper_proto(&b)
-                        .map_err(|err| AppError::ValidationError(String::from("Bad Message")))?;
+                    let msg = root_as_message_wrapper_proto(&b).map_err(|err| {
+                        println!("{:?}", err);
+                        AppError::ValidationError(String::from("Bad Message"))
+                    })?;
                     // TODO: Let's catch errors here to hit back error to client
                     // TODO: Separate function
                     let span_ctx = extract_span_ctx(msg);

@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Handle flatbuffers::InvalidFlatbuffer
 - [] Repair e2e sync
 - [] get items sync stream! record last sync (resource.last_server_microseconds (f64) hashes) - TRUST THE WALL CLOCK - it's a pretty good system
 - [] Merge attribute macro and/or hashmap!
