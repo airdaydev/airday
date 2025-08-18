@@ -46,7 +46,6 @@ CREATE TABLE IF NOT EXISTS item (
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
   -- metadata & tombstone
-  server_version INTEGER NOT NULL, -- used to negotiate merge
   updated_utc INTEGER NOT NULL, -- used to negotiate sync
   tombstone_utc INTEGER NULL
   -- TODO: deleted by?

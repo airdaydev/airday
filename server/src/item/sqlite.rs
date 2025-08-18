@@ -119,9 +119,14 @@ impl ItemModel for ItemModelSqlite {
         let mut results: Vec<Option<i64>> = vec![];
         let mut tx = self.pool.begin().await?;
         for item in item {
-            let Ok(server_timestamp) = merge(&mut tx, item).await else {
-                results.push(None);
-                continue;
+            let server_timestamp = match merge(&mut tx, item).await {
+                Ok(ts) => ts,
+                Err(err) => {
+                    // TODO: Propagate merge error to client?!
+                    println!("{:?}", err);
+                    results.push(None);
+                    continue;
+                }
             };
             results.push(Some(server_timestamp));
         }
