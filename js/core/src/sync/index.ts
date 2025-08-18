@@ -26,11 +26,9 @@ export class AirdaySync {
   streams = new Map<string, SyncStream>();
   constructor(core: AirdayCore) {
     this.core = core;
-    this.core.ws.events.on("batch-response", (res) =>
-      this.handleBatchResponse(res),
-    );
+    this.core.ws.events.on("batch-response", this.handleBatchResponse);
   }
-  // Wait for pending acknowledgements
+  // TODO: rename as this only awaits pending batch response completions
   flush() {
     return new Promise((resolve) => {
       if (this.pendingActions.size === 0) resolve(null);

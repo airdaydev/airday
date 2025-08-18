@@ -31,7 +31,7 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.only("Sync item", async (assert) => {
+  suite.test("Sync item", async (assert) => {
     const core = await createTestCore();
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
@@ -94,7 +94,7 @@ export const tests = async () => {
   });
 
   // TODO: Test update before flush!
-  suite.test("Merge text same message", async (assert) => {
+  suite.only("Merge text same message", async (assert) => {
     const core = await createTestCore();
     // Create item
     const oldText = LWWRegisterString.fromString("old_text");
@@ -117,7 +117,8 @@ export const tests = async () => {
     assert(item.isSynced() === false, "item considered not synced");
     core.sync.syncItems([item]);
     assert(item.isSynced() === false, "item considered not synced");
-    await core.sync.flush();
+    console.log("not synced", item.isSynced() === false);
+    await core.sync.flush(); // TODO: Awaiting here indefinitely
     assert(item.isSynced() === true, "item now considered as synced");
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
