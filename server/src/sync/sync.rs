@@ -119,6 +119,7 @@ pub async fn process_sync_batch<'a>(
             }
         }
     }
+    println!("{:?}", items[0]);
     let Ok(result) = state.db.item.merge_many(&items).await else {
         for (action_id, _) in action_index {
             responses.push(BatchAction::Error {

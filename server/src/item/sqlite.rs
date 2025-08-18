@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
@@ -75,7 +76,7 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
         .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
         .map(ItemAttributes::from)
         .unwrap();
-    println!("existing_attrs {:?}", src_attrs);
+    debug!("existing_attrs {:?}", src_attrs);
     src_attrs.merge(&item.attributes);
 
     // Update!

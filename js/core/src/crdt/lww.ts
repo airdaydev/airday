@@ -7,8 +7,9 @@ export const genPid = (): bigint => {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     const array = new Uint32Array(2);
     crypto.getRandomValues(array);
-    // Create 64-bit BigInt from two 32-bit values
-    return (BigInt(array[0]) << 32n) | BigInt(array[1]);
+    // Mask the high bit to ensure it stays positive when interpreted as signed
+    const result = (BigInt(array[0]) << 32n) | BigInt(array[1]);
+    return result & 0x7fffffffffffffffn; // Ensure high bit is 0
   }
   // Fallback for environments without crypto
   return BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));

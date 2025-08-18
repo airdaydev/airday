@@ -36,6 +36,7 @@ pub struct ItemAttributes {
     pub text: Option<LWWRegister<String>>,
 }
 
+#[derive(Debug)]
 pub struct Item {
     pub id: Uuid,
     pub library_id: Uuid,
@@ -50,8 +51,8 @@ impl Item {
         let timestamp = lww.timestamp().unwrap();
         let text_lww = LWWRegister {
             timestamp: LWWTimestamp {
-                utc: timestamp.utc() as i64,
-                pid: timestamp.pid() as i64,
+                utc: timestamp.utc(),
+                pid: timestamp.pid(),
             },
             data: lww.data().unwrap().to_string(),
         };
