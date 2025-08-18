@@ -270,11 +270,11 @@ describe("Tracer OTLP Implementation", () => {
     expect(payload.resourceSpans[0].scopeSpans[0].spans.length).toBe(5);
   });
 
-  test("should handle networkEnabled option", async () => {
+  test("should handle bypass option", async () => {
     // Test with networking disabled
     const tracerDisabled = new Tracer("network-disabled-test", {
       endpoint: "http://localhost:4318/v1/traces",
-      networkEnabled: false,
+      bypass: true,
       maxBatchSize: 1, // Small batch size to trigger immediate flush
     });
 
@@ -286,14 +286,13 @@ describe("Tracer OTLP Implementation", () => {
 
     const stats = tracerDisabled.getStats();
     expect(stats.spansGenerated).toBe(1);
-    expect(stats.spansSent).toBe(1); // Should be marked as sent but not actually sent
+    expect(stats.spansSent).toBe(0);
     expect(stats.batchesSent).toBe(0); // No actual network batches sent
     expect(stats.batchesFailed).toBe(0);
 
     // Test with networking enabled - create spans but don't send
     const tracerEnabled = new Tracer("network-enabled-test", {
       endpoint: "http://localhost:4318/v1/traces",
-      networkEnabled: true,
       maxBatchSize: 100, // Large batch size to prevent auto-flush
     });
 

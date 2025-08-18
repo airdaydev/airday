@@ -87,7 +87,7 @@ interface BatchConfig {
   retryDelayMs: number; // Default: 2000ms
   useBeacon: boolean; // Default: true (for page unload)
   pauseWhenHidden: boolean; // Default: true (save battery)
-  networkEnabled: boolean; // Default: true (enable networking)
+  bypass: boolean; // Default: false (when true, skip network queue and discard traces)
 }
 
 interface TracerStats {
@@ -207,14 +207,14 @@ export class Tracer {
       retryDelayMs: 2000,
       useBeacon: true,
       pauseWhenHidden: true,
-      networkEnabled: true,
+      bypass: false,
       ...config,
     };
-
-    this.initializeBrowserFeatures();
-    this.startBatching();
+    if (!this.batchConfig.bypass) {
+      this.initializeBrowserFeatures();
+      this.startBatching();
+    }
   }
-
   startSpan(name: string, opts?: StartSpanOpts): ULSpan {
     const traceId = opts?.traceId || TracerID.generate(16);
     const spanId = TracerID.generate(8);
@@ -324,8 +324,9 @@ export class Tracer {
     const payload = this.createPayload();
 
     // If networking is disabled, just clear the spans without sending
-    if (!this.batchConfig.networkEnabled) {
-      this.stats.spansSent +=
+    if (this.batchConfig.bypass) {
+      console.log("dropping", payload.resourceSpans[0]);
+      this.stats.spansDropped +=
         payload.resourceSpans[0]?.scopeSpans[0]?.spans.length || 0;
       return;
     }
@@ -425,7 +426,6 @@ export class Tracer {
 
   private shouldFlush(): boolean {
     if (this.spans.length === 0) return false;
-    if (!this.batchConfig.networkEnabled) return false;
     if (!this.isOnline) return false;
     if (this.batchConfig.pauseWhenHidden && !this.isTabVisible) return false;
     if (Date.now() < this.circuitBreakerUntil) return false;
@@ -475,7 +475,7 @@ export class Tracer {
   // Send using beacon API for page unload
   private sendBeacon(): void {
     if (!this.beaconSupported || this.spans.length === 0) return;
-    if (!this.batchConfig.networkEnabled) return;
+    if (this.batchConfig.bypass) return;
 
     try {
       const payload = this.createPayload();

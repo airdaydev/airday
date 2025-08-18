@@ -11,6 +11,16 @@ test("simple span", async () => {
   await tracer.send("http://localhost:4318/v1/traces");
 });
 
+test("span bypass", async () => {
+  const tracer = new Tracer("otlp-tester", {
+    bypass: true,
+  });
+  const span = tracer.startSpan("simple-span");
+  tracer.endSpan(span);
+  await tracer.send("http://localhost:4318/v1/traces");
+  expect(tracer.getStats().spansSent).toBe(0);
+});
+
 test("complex spans with nested operations", async () => {
   const tracer = new Tracer("otlp-complex-tester");
 
