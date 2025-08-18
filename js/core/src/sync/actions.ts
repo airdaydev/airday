@@ -47,7 +47,9 @@ export class AirdayMessage implements MQMessage {
     MessageWrapperProto.addSpanContext(builder, spanContextOffset);
     MessageWrapperProto.addMessageType(builder, this.type);
     MessageWrapperProto.addMessage(builder, messageOffset);
-    builder.finish(messageOffset);
+    const messageWrapperOffset =
+      MessageWrapperProto.endMessageWrapperProto(builder);
+    builder.finish(messageWrapperOffset);
     return builder.asUint8Array();
   }
   complete() {
@@ -194,6 +196,7 @@ export class BatchSyncMessage extends AirdayMessage {
     BatchSyncProto.startBatchSyncProto(builder);
     BatchSyncProto.addBatch(builder, batch);
     let batchOffset = BatchSyncProto.endBatchSyncProto(builder);
+    console.log("making batch offset", batchOffset);
     return batchOffset;
   }
 }

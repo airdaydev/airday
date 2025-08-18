@@ -1,6 +1,7 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use flatbuffers::InvalidFlatbuffer;
 use serde_json::json;
 use tracing::{Span, error, warn};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -54,5 +55,11 @@ impl From<serde_json::Error> for AppError {
 impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
         AppError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<InvalidFlatbuffer> for AppError {
+    fn from(err: InvalidFlatbuffer) -> Self {
+        AppError::ValidationError(err.to_string())
     }
 }
