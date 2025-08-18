@@ -59,8 +59,8 @@ export const tests = async () => {
       "correct libraryId stored in idb",
     );
     assert(
-      typeof item.lastSync === "number" && item.lastSync > item.lastModified,
-      "Item timestamps = considered sync",
+      typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
+      "Item timestamps = considered in sync",
     );
     await new Promise((resolve) => {
       if (core.sync.pendingActions.size === 0) {

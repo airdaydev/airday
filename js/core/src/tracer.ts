@@ -1,7 +1,9 @@
 import { Tracer, TracerID } from "@airday/tracer";
 import { SpanContextProto } from "./proto";
 
-export const tracer = new Tracer("airday_js");
+export const tracer = new Tracer("airday_js", {
+  bypass: true,
+});
 
 export function spanFromFlatbuffer(ctx: SpanContextProto | null, name: string) {
   if (ctx) {
