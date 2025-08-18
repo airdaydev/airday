@@ -155,6 +155,6 @@ async fn main() {
             }),
         );
 
+    info!(port = 3000, address = "0.0.0.0", "Starting Airday server");
     axum::serve(listener, app).await.unwrap();
-    info!(port = 3000, address = "0.0.0.0", "Airday server started");
 }
