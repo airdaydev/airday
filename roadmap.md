@@ -34,6 +34,11 @@
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
+- [] Indexing for last_updated
+```sql
+CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, updated_utc DESC);
+SELECT updated_utc FROM item WHERE library_id = ? ORDER BY updated_utc DESC, id DESC LIMIT 1;
+```
 
 # Sync verification
 - [] Node index should be based on id or created time (what timestamp?)

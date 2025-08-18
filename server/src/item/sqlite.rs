@@ -41,6 +41,11 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64
 }
 
 // TODO: Optimise this for speed by consolidating into one select statements by library
+// TODO: The update_utc check works in the sqlite version, because it is monotonic!
+// If 2 threads read from the same data, at same clock time (but different real time)
+// This could result in both clients merging into the same read data
+// However, only one writer will succeed, as the writer must match the last_updated_utc date
+// from the record they read - which will not happen if it has been updated in the interim.
 async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
@@ -84,9 +89,6 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
 
     let last_updated = sql_item.updated_utc as i64;
 
-    // TODO: The update_utc check is imperfect
-    // If 2 servers are operating on the same data, at same clock time (but different real time)
-    // This could result in a situation where clients converge on different data
     let result = sqlx::query!(
         r#"UPDATE item
              SET attributes = ?, updated_utc = ?

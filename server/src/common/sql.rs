@@ -5,6 +5,7 @@ use crate::{
     library::{model::LibraryModel, sqlite::LibraryModelSqlite},
     user::{model::UserModel, sqlite::UserModelSqlite},
 };
+use crdt::timestamp::{now_micros, seed_clock};
 use sqlx::{
     Pool, Sqlite,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -61,5 +62,19 @@ pub async fn connect_sqlite(config: &AirdayConfig) -> Db {
             err
         ),
     };
+    seed_sqlite_clock_from_db(&pool).await;
     Db::from_sqlite_pool(pool)
+}
+
+// This ensures we never go backwards, even on restarts
+async fn seed_sqlite_clock_from_db(pool: &Pool<Sqlite>) {
+    let db_max =
+        sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(updated_utc), 0) as db_max FROM item")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+    let utc_now = now_micros();
+    let seed = db_max.max(utc_now);
+    seed_clock(seed);
+    ()
 }

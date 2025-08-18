@@ -41,11 +41,32 @@ impl MonotonicClock {
             }
         }
     }
+    fn update(&self, latest: i64) {
+        loop {
+            let current = self.last_micros.load(AtomicOrdering::Acquire);
+            if latest <= current {
+                return;
+            }
+            match self.last_micros.compare_exchange_weak(
+                current,
+                latest,
+                AtomicOrdering::Release,
+                AtomicOrdering::Relaxed,
+            ) {
+                Ok(_) => return,
+                Err(_) => continue, // Retry if another thread updated concurrently
+            }
+        }
+    }
 }
 
 // Public API
 pub fn now_micros() -> i64 {
     CLOCK.now()
+}
+
+pub fn seed_clock(latest: i64) {
+    CLOCK.update(latest);
 }
 
 /// Generate a random process ID (js MAX_SAFE_INTEGER compatible)
