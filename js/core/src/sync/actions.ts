@@ -186,7 +186,7 @@ export class BatchSyncMessage extends AirdayMessage {
     super();
     this.actions = actions;
   }
-  toFlatBuffer(builder: Builder) {
+  addToFlatBuffer(builder: Builder) {
     // 1. Build action batch components
     const batchOffsets = this.actions
       .map((action) => action.addToFlatBuffer(builder))
@@ -196,7 +196,6 @@ export class BatchSyncMessage extends AirdayMessage {
     BatchSyncProto.startBatchSyncProto(builder);
     BatchSyncProto.addBatch(builder, batch);
     let batchOffset = BatchSyncProto.endBatchSyncProto(builder);
-    console.log("making batch offset", batchOffset);
     return batchOffset;
   }
 }

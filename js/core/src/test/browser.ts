@@ -47,7 +47,6 @@ export const tests = async () => {
         resolve(null);
       });
     });
-    console.log("sync 4");
     assert(
       core.sync.pendingActions.size === 0,
       "ack message received & pending queue back to 0",
