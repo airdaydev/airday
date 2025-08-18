@@ -26,14 +26,13 @@ impl ItemModelSqlite {
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
     let now = now_micros();
-    let now_i64 = now as i64;
     sqlx::query!(
         r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
         item.id,
         item.library_id,
         attributes_json,
-        now_i64,
+        now,
         Option::<i64>::None
     )
     .execute(tx.as_mut())
@@ -82,17 +81,18 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
     // Update!
     let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
     let now = now_micros();
-    let now_i64 = now as i64;
 
-    let last_updated = item.updated_utc.unwrap() as i64;
+    let last_updated = sql_item.updated_utc as i64;
 
-    // TODO: Concurrent updates on same items can lead to failures!
+    // TODO: The update_utc check is imperfect
+    // If 2 servers are operating on the same data, at same clock time (but different real time)
+    // This could result in a situation where clients converge on different data
     let result = sqlx::query!(
         r#"UPDATE item
              SET attributes = ?, updated_utc = ?
              WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND updated_utc = ?"#,
         updated_attributes_json,
-        now_i64,
+        now,
         item.id,
         item.library_id,
         last_updated,
