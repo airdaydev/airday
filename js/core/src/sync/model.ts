@@ -40,8 +40,9 @@ export class AirdayItem {
   libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
   syncStarted: bigint | null = null; // in flight sync
-  lastSync: bigint | null = null; // Last sync (incl. time of first pull)
-  lastModified: bigint; // Last local modification (incl. time of first pull)
+  lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
+  lastModified: bigint; // Local time of last local modification (incl. time of first pull)
+  serverTimestamp: bigint | null = null; // Last known seen server time
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {
@@ -68,7 +69,6 @@ export class AirdayItem {
     if (!this.lastSync) return false;
     return this.lastSync >= this.lastModified;
   }
-  // TODO: Custom logic MAY be necessary
   merge(attrs: AirdayItemAttributes) {
     (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map((key) => {
       if (attrs[key]) {

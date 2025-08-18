@@ -29,6 +29,7 @@ export class AirdaySync {
     this.core.ws.events.on("batch-response", this.handleBatchResponse);
   }
   // TODO: rename as this only awaits pending batch response completions
+  // TODO: Timeout!
   flush() {
     return new Promise((resolve) => {
       if (this.pendingActions.size === 0) resolve(null);
@@ -89,6 +90,7 @@ export class AirdaySync {
         this.pendingActions.set(action.id.toHex(), action);
         return action;
       });
+    console.log("sending actions", actions.length);
     const message = new BatchSyncMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
@@ -101,7 +103,7 @@ export class AirdaySync {
   }
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
-  handleBatchResponse(res: BatchResponseEvent) {
+  handleBatchResponse = (res: BatchResponseEvent) => {
     const action = this.pendingActions.get(res.actionId.toHex());
 
     if (action instanceof SyncItemAction) {
@@ -117,9 +119,12 @@ export class AirdaySync {
       }
       // If item has changes applied during sync, sync them
       if (!action.item.isSynced()) {
+        // console.log(
+        //   `action is in sync lastModified=${action.item.lastModified}, lastSync=${action.item.lastSync}`,
+        // );
         this.syncItems([action.item]);
       }
     }
     // TODO: More acks? e.g. list ack
-  }
+  };
 }

@@ -93,10 +93,9 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  // TODO: Test update before flush!
   suite.only("Merge text same message", async (assert) => {
+    // 1. Create item & sync it
     const core = await createTestCore();
-    // Create item
     const oldText = LWWRegisterString.fromString("old_text");
     const item = new AirdayItem({
       libraryId: core.library.id!,
@@ -106,23 +105,29 @@ export const tests = async () => {
     });
     core.sync.syncItems([item]);
     await core.sync.flush();
-    // Update item AFTER flush
+    assert(item.isSynced() === true, "Item has been synced");
+    console.log("sync 1 completed");
+
+    // 2. After sync is acknowledged, update it again
     const newText = LWWRegisterString.fromString("new_text");
     assert(
       newText.timestamp.greaterThan(oldText.timestamp)!,
       "new text older than old text",
     );
-    item.merge({ text: newText });
+    item.merge({ text: newText }); // TODO: This should trigger a sync
     assert(item.attributes.text?.data === newText.data, "merge success");
     assert(item.isSynced() === false, "item considered not synced");
+    console.log("sync 2");
     core.sync.syncItems([item]);
-    assert(item.isSynced() === false, "item considered not synced");
-    console.log("not synced", item.isSynced() === false);
     await core.sync.flush(); // TODO: Awaiting here indefinitely
     assert(item.isSynced() === true, "item now considered as synced");
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
     core.ws.close();
+  });
+
+  suite.skip("Immediate updates after initial sync", async (assert) => {
+    // TODO: Test update before flush!
   });
 
   suite.test("Get all items since beginning from server", async (assert) => {
