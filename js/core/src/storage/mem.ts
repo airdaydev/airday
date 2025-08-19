@@ -2,44 +2,37 @@
 import { AirdayItem } from "../sync/model";
 
 // Core types (no Solid imports)
-type ListId = string;
+type ContainerId = string;
 type ItemId = string;
 
-type List = { id: ListId; name: string; archived?: boolean /* ... */ };
+// TODO: These could just be the serialised versions... or play dangerous and use true references?
+type Container = { id: ContainerId; name: string; archived?: boolean };
 type Item = {
   id: ItemId;
-  listId: ListId;
+  listId: ContainerId;
   title: string;
-  completed?: boolean /* ... */;
+  completed?: boolean;
 };
 
+// Fulfil example: Remote application of moving from one list to another
+// Goal: Ensure the item is removed from one list & moved into another!
+// Is this possible without going through every single list!?
+
 type Patch =
-  | { kind: "container/upsert"; container: List[] }
-  | { kind: "container/remove"; ids: ListId[] }
-  | { kind: "container/field"; id: ListId; changes: Partial<List> }
+  | { kind: "container/upsert"; container: Container[] }
+  | { kind: "container/remove"; ids: ContainerId[] }
   | { kind: "items/upsert"; items: Item[] }
   | { kind: "items/remove"; ids: ItemId[] }
-  | { kind: "items/field"; id: ItemId; changes: Partial<Item> }
-  // Membership & ordering (coalesced per txn)
-  | {
-      kind: "index/add";
-      listId: ListId;
-      itemIds: ItemId[];
-      beforeId?: ItemId | null;
-    }
-  | { kind: "index/remove"; listId: ListId; itemIds: ItemId[] }
-  | {
-      kind: "index/move";
-      listId: ListId;
-      itemId: ItemId;
-      beforeId?: ItemId | null;
-    }
-  | { kind: "index/reset"; listId: ListId; itemIds: ItemId[] }
   // Optional counters so UI can omit heavy data
-  | { kind: "counters"; listId: ListId; completedCount: number };
+  | { kind: "counters"; listId: ContainerId; completedCount: number };
 
 class MemStorage {
   items: Map<string, AirdayItem> = new Map();
   constructor() {}
   subscribe() {}
+}
+
+class SolidAdapterExample {
+  items: Map<string, AirdayItem> = new Map(); // reactive
+  containers: Map<string, AirdayContainer> = new Map(); // reactive
 }

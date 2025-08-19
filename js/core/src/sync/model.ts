@@ -2,20 +2,19 @@ import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 
+export interface SyncObjectParams {
+  id: Uuidv4;
+  libraryId: Uuidv4;
+  lastModified?: bigint;
+  lastSync?: bigint;
+}
+
 export interface AirdayItemAttributes {
   text?: LWWRegister<string>;
 }
 
-export interface AirdayItemConstructorOpts {
-  // Immutable
-  id?: Uuidv4;
-  libraryId: Uuidv4;
-  // LWW attributes
+export interface AirdayItemConstructorOpts extends SyncObjectParams {
   attributes: AirdayItemAttributes;
-  // Client-only
-  lastSync?: bigint | null;
-  lastModified?: bigint | null;
-  // TODO: Dirty attributes calculation!
 }
 
 const AirdayItemSerialisedSchema = v.object({
@@ -36,19 +35,18 @@ const ensureSerialisedItem = compile(AirdayItemSerialisedSchema, {
   ensure: true,
 });
 
-export class AirdayItem {
+export class SyncObject {
   id: Uuidv4;
   libraryId: Uuidv4;
-  attributes: AirdayItemAttributes;
+  // Sync state concerns
   syncStarted: bigint | null = null; // Local time of flight sync req
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
   serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
   dirtyAttrs: Set<string> = new Set();
-  constructor(params: AirdayItemConstructorOpts) {
+  constructor(params: SyncObjectParams) {
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
-    this.attributes = params.attributes;
     if (params.lastModified) {
       this.lastModified = params.lastModified;
     } else {
@@ -68,6 +66,15 @@ export class AirdayItem {
   isSynced() {
     if (!this.lastSync) return false;
     return this.lastSync >= this.lastModified;
+  }
+}
+
+// TODO: Move merge concerns to sync object
+export class AirdayItem extends SyncObject {
+  attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
+  constructor(params: AirdayItemConstructorOpts) {
+    super(params);
+    this.attributes = params.attributes;
   }
   merge(attrs: AirdayItemAttributes, local: boolean) {
     const keys = (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map(
