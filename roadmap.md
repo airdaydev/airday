@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] protection against future dates
 - [] get items since
 - [] delete items (tombstones, same api)
 - [] fan out live updates!
@@ -35,10 +34,11 @@
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
-- [] Indexing for last_updated
+- [] protection against future dates
+- [] Indexing for server_seq
 ```sql
-CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, updated_utc DESC);
-SELECT updated_utc FROM item WHERE library_id = ? ORDER BY updated_utc DESC, id DESC LIMIT 1;
+CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);
+SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DESC LIMIT 1;
 ```
 
 # Sync verification

@@ -54,7 +54,7 @@ table LibrarySyncResponseProto {
 table BatchResponseProto {
   success: bool;
   error: string;
-  server_timestamp: long;
+  server_seq: long;
 }
 
 enum ResourceType: byte {
@@ -65,7 +65,7 @@ enum ResourceType: byte {
 table SyncStreamReqProto {
   resource: ResourceType;
   library_id: UuidProto (required);
-  server_timestamp: long;
+  server_seq: long;
 }
 
 union ActionProto {

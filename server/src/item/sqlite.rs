@@ -25,19 +25,19 @@ impl ItemModelSqlite {
 
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
-    let now = now_micros();
+    let server_seq = now_micros();
     sqlx::query!(
         r#"INSERT INTO item (id, library_id, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
         item.id,
         item.library_id,
         attributes_json,
-        now,
+        server_seq,
         Option::<i64>::None
     )
     .execute(tx.as_mut())
     .await?;
-    Ok(now)
+    Ok(server_seq)
 }
 
 // TODO: Potentially optimise this for speed by consolidating into one select statements by library
@@ -66,8 +66,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
         // 2. Check if item exists
         let Some(sql_item) = result else {
             // Item does not exist, insert new item
-            let server_timestamp = insert(tx, item).await?;
-            return Ok(server_timestamp);
+            let server_seq = insert(tx, item).await?;
+            return Ok(server_seq);
         };
         if let Some(_) = sql_item.tombstone_utc {
             // Item is tombstones - discard changes
@@ -89,25 +89,25 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
         src_attrs.merge(&item.attributes);
 
         let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
-        let now = now_micros();
+        let server_seq = now_micros();
 
-        let last_updated = sql_item.server_seq as i64;
+        let last_server_seq = sql_item.server_seq as i64;
 
         let result = sqlx::query!(
             r#"UPDATE item
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
             updated_attributes_json,
-            now,
+            server_seq,
             item.id,
             item.library_id,
-            last_updated,
+            last_server_seq,
         )
         .execute(tx.as_mut())
         .await?;
 
         if result.rows_affected() == 1 {
-            return Ok(now);
+            return Ok(server_seq);
         } else {
             retries = retries + 1;
         }
@@ -124,7 +124,7 @@ impl ItemModel for ItemModelSqlite {
         let mut results: Vec<Option<i64>> = vec![];
         let mut tx = self.pool.begin().await?;
         for item in item {
-            let server_timestamp = match merge(&mut tx, item).await {
+            let server_seq = match merge(&mut tx, item).await {
                 Ok(ts) => ts,
                 Err(err) => {
                     // TODO: Propagate merge error to client?!
@@ -133,7 +133,7 @@ impl ItemModel for ItemModelSqlite {
                     continue;
                 }
             };
-            results.push(Some(server_timestamp));
+            results.push(Some(server_seq));
         }
         tx.commit().await?;
         Ok(results)
@@ -142,7 +142,7 @@ impl ItemModel for ItemModelSqlite {
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
-        server_timestamp: i64,
+        server_seq: i64,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     > {
@@ -153,7 +153,7 @@ impl ItemModel for ItemModelSqlite {
             ORDER BY server_seq ASC"#,
         )
         .bind(library_id.clone())
-        .bind(server_timestamp)
+        .bind(server_seq)
         .fetch(&self.pool)
     }
 }

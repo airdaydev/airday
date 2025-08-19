@@ -13,7 +13,7 @@ use uuid::Uuid;
 pub enum BatchAction {
     Applied {
         action_id: Uuid,
-        server_timestamp: i64,
+        server_seq: i64,
     },
     Error {
         action_id: Option<Uuid>,
@@ -30,7 +30,7 @@ impl BatchAction {
         match self {
             BatchAction::Applied {
                 action_id,
-                server_timestamp,
+                server_seq,
             } => {
                 let id_proto = UuidProto::new(action_id.as_bytes());
                 let union_offset = BatchResponseProto::create(
@@ -38,7 +38,7 @@ impl BatchAction {
                     &BatchResponseProtoArgs {
                         success: true,
                         error: None,
-                        server_timestamp: *server_timestamp,
+                        server_seq: *server_seq,
                     },
                 )
                 .as_union_value();
@@ -130,10 +130,10 @@ pub async fn process_sync_batch<'a>(
         return responses;
     };
     for (action_id, index) in action_index {
-        if let Some(server_timestamp) = result[index] {
+        if let Some(server_seq) = result[index] {
             responses.push(BatchAction::Applied {
                 action_id: action_id,
-                server_timestamp: server_timestamp,
+                server_seq: server_seq,
             });
         } else {
             responses.push(BatchAction::Error {

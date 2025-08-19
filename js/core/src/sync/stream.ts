@@ -18,12 +18,12 @@ export class SyncStream {
   get key() {
     return `${this.libraryId.toHex()}:${this.resource}`;
   }
-  start(serverTimestamp: bigint | null) {
+  start(serverSeq: bigint | null) {
     this.syncing = true;
     const message = new SyncStreamReqMessage(
       this.resource,
       this.libraryId,
-      serverTimestamp,
+      serverSeq,
     );
     this.core.ws.enqueueAirdayMessage(message);
   }
@@ -33,22 +33,22 @@ export class SyncStream {
 }
 
 export class ItemSyncStream extends SyncStream {
-  getSince(serverTimestamp: bigint | null) {
+  getSince(serverSeq: bigint | null) {
     const message = new SyncStreamReqMessage(
       ResourceType.Item,
       this.libraryId,
-      serverTimestamp,
+      serverSeq,
     );
     this.core.ws.enqueueAirdayMessage(message);
   }
 }
 
 export class ListSyncStream extends SyncStream {
-  getSince(serverTimestamp: bigint | null) {
+  getSince(serverSeq: bigint | null) {
     const message = new SyncStreamReqMessage(
       ResourceType.List,
       this.libraryId,
-      serverTimestamp,
+      serverSeq,
     );
     this.core.ws.enqueueAirdayMessage(message);
   }

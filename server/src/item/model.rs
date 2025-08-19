@@ -163,7 +163,7 @@ pub trait ItemModel: Send + Sync {
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
-        server_timestamp: i64,
+        server_seq: i64,
     ) -> Pin<
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;

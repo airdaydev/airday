@@ -20,7 +20,7 @@ import { ULSpan } from "@airday/tracer";
 export interface BatchResponseEvent {
   actionId: Uuidv4;
   success: boolean;
-  serverTimestamp?: bigint; // TODO
+  serverSeq?: bigint; // TODO
   error?: string;
 }
 

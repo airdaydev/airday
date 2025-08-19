@@ -42,7 +42,7 @@ export class AirdayItem {
   syncStarted: bigint | null = null; // in flight sync
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
-  serverTimestamp: bigint | null = null; // Last known seen server time
+  serverSeq: bigint | null = null; // Last known seen server time
   // TODO: isCreating attribute
   // TODO: Find fields with pending updates
   constructor(params: AirdayItemConstructorOpts) {

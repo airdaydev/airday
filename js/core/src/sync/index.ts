@@ -22,7 +22,7 @@ export class AirdaySync {
   pendingActions = new Map<string, BatchAction>(); // string = hex type
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
-  lastServerTimestamp: number | null = null;
+  lastServerSeq: number | null = null;
   streams = new Map<string, SyncStream>();
   constructor(core: AirdayCore) {
     this.core = core;
