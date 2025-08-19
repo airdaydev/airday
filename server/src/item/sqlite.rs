@@ -40,76 +40,81 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64
     Ok(now)
 }
 
-// TODO: Optimise this for speed by consolidating into one select statements by library
-// TODO: The update_utc check works in the sqlite version, because it is monotonic!
+// TODO: Potentially optimise this for speed by consolidating into one select statements by library
+// But note, retries must still be selected individually
+// nb. the sqlite version is single server, but monotonic server_seq across threads
 // If 2 threads read from the same data, at same clock time (but different real time)
 // This could result in both clients merging into the same read data
 // However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
 async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
-    // Select for merge
-    let result = sqlx::query_as!(
-        SqlItem,
-        r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
-        server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
-        FROM item
-        WHERE library_id = ? AND id = ?"#,
-        item.library_id,
-        item.id,
-    )
-    .fetch_optional(tx.as_mut())
-    .await?;
-    // 2. Check if item exists
-    let Some(sql_item) = result else {
-        // Item does not exist, insert new item
-        let server_timestamp = insert(tx, item).await?;
-        return Ok(server_timestamp);
-    };
-    if let Some(_) = sql_item.tombstone_utc {
-        // Item is tombstones - discard changes
-        // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
-        return Err(AppError::ValidationError(String::from(
-            "item is tombstoned",
-        )));
+    // We allow 3x retries when contending with competing thread
+    let mut retries = 0;
+    while retries < 3 {
+        // Select for merge
+        let result = sqlx::query_as!(
+            SqlItem,
+            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
+          server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
+          FROM item
+          WHERE library_id = ? AND id = ?"#,
+            item.library_id,
+            item.id,
+        )
+        .fetch_optional(tx.as_mut())
+        .await?;
+        // 2. Check if item exists
+        let Some(sql_item) = result else {
+            // Item does not exist, insert new item
+            let server_timestamp = insert(tx, item).await?;
+            return Ok(server_timestamp);
+        };
+        if let Some(_) = sql_item.tombstone_utc {
+            // Item is tombstones - discard changes
+            // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
+            return Err(AppError::ValidationError(String::from(
+                "item is tombstoned",
+            )));
+        }
+        // Get existing attributes
+        // TODO: How to handle parsing error...? Parsing must be VERY robust
+        // TODO: Put future timestamp protection here
+        let mut src_attrs: ItemAttributes = sql_item
+            .attributes
+            .as_ref()
+            .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
+            .map(ItemAttributes::from)
+            .unwrap();
+        debug!("existing_attrs {:?}", src_attrs);
+        src_attrs.merge(&item.attributes);
+
+        let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
+        let now = now_micros();
+
+        let last_updated = sql_item.server_seq as i64;
+
+        let result = sqlx::query!(
+            r#"UPDATE item
+               SET attributes = ?, server_seq = ?
+               WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
+            updated_attributes_json,
+            now,
+            item.id,
+            item.library_id,
+            last_updated,
+        )
+        .execute(tx.as_mut())
+        .await?;
+
+        if result.rows_affected() == 1 {
+            return Ok(now);
+        } else {
+            retries = retries + 1;
+        }
     }
-    // Get existing attributes
-    // TODO: How to handle parsing error...? Parsing must be VERY robust
-    let mut src_attrs: ItemAttributes = sql_item
-        .attributes
-        .as_ref()
-        .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
-        .map(ItemAttributes::from)
-        .unwrap();
-    debug!("existing_attrs {:?}", src_attrs);
-    src_attrs.merge(&item.attributes);
-
-    // Update!
-    let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
-    let now = now_micros();
-
-    let last_updated = sql_item.server_seq as i64;
-
-    let result = sqlx::query!(
-        r#"UPDATE item
-             SET attributes = ?, server_seq = ?
-             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-        updated_attributes_json,
-        now,
-        item.id,
-        item.library_id,
-        last_updated,
-    )
-    .execute(tx.as_mut())
-    .await?;
-
-    // TODO: This could happen during concurrent merges & should be mitigated
-    if result.rows_affected() == 0 {
-        return Err(AppError::ServerError(String::from(
-            "Concurrent update failure",
-        )));
-    }
-
-    Ok(now)
+    return Err(AppError::ServerError(String::from(
+        "Concurrent update failure",
+    )));
 }
 
 #[async_trait]
@@ -168,6 +173,8 @@ mod tests {
         for _ in 0..qty {
             items.push(mock_item(primary_library_id))
         }
+        db.item.merge_many(&items).await.unwrap();
+        // intentional (smoke test): a second merge that effectively does nothing
         db.item.merge_many(&items).await.unwrap();
         let mut stream = db.item.get_by_library_stream(&primary_library_id, 0i64);
         let mut count = 0;

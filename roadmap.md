@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] protection against future dates
 - [] get items since
 - [] delete items (tombstones, same api)
 - [] fan out live updates!
