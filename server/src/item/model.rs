@@ -41,7 +41,7 @@ pub struct Item {
     pub id: Uuid,
     pub library_id: Uuid,
     pub attributes: ItemAttributes,
-    pub updated_utc: Option<i64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
+    pub server_seq: Option<i64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
     pub tombstone_utc: Option<i64>,
 }
 
@@ -59,7 +59,7 @@ impl Item {
         Item {
             id: proto_uuid_to_uuid(item_proto.id()),
             library_id: proto_uuid_to_uuid(item_proto.library_id()),
-            updated_utc: None,
+            server_seq: None,
             attributes: ItemAttributes {
                 text: Some(text_lww),
             },
@@ -136,7 +136,7 @@ pub struct SqlItem {
     // dynamic attrs (lww-map)
     pub attributes: JsonAttributes,
     // metadata
-    pub updated_utc: i64,
+    pub server_seq: i64,
     pub tombstone_utc: Option<i64>,
 }
 

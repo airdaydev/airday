@@ -1,11 +1,11 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] consider migrating to change seq version # now - for postgresql adapter...? - investigate can current version interop with postgresql version?
-- [] Merge attribute macro and/or hashmap!
-- [] fan out live updates!
+- [] get items since
 - [] delete items (tombstones, same api)
+- [] fan out live updates!
 - [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
+- [] Merge attribute macro and/or hashmap! (Start with list attribute)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
@@ -29,6 +29,7 @@
 - [] handling browser tabs?!
 - [] cors review
 - [] Postgresql adapter with personal library setup on account creation
+- [] consider migrating to change seq version # now - for postgresql adapter...? - investigate can current version interop with postgresql version?
 - [] Text encryption
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs

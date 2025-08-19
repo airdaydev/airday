@@ -1,10 +1,6 @@
-This is a summary of a conversation w/chatgpt5 re. adapting merge for postgresql while keeping valid CRDT properties across servers:
-
-Perfect—if `updated_utc` is provably monotonic on a **single writer process** (your server), your CAS is sound and you’re done for now. Just keep the tiny retry loop and you’re golden.
-
-Since you’ll later add a PostgreSQL adapter (multi-server), here’s a compact checklist you can drop in when you switch:
-
-# Postgres-ready checklist (for multi-server)
+# Postgres adapter CAS note
+- Basically we will defer updated_utc's atomocity into a per library seq.
+- change col to server_seq
 
 1. **Keep CAS on a version counter**
 
@@ -84,3 +80,4 @@ CREATE TABLE IF NOT EXISTS item_change_log(
 
 * If PG runs single-primary (typical), the sequence and row locks already serialize writers—no HLC needed.
 * If you ever go multi-primary or sharded, switch to HLC or `(shard_id, seq)` pairs for global ordering.
+s`

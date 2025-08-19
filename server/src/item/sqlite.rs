@@ -27,7 +27,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
     let now = now_micros();
     sqlx::query!(
-        r#"INSERT INTO item (id, library_id, attributes, updated_utc, tombstone_utc)
+        r#"INSERT INTO item (id, library_id, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
         item.id,
         item.library_id,
@@ -44,14 +44,14 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64
 // TODO: The update_utc check works in the sqlite version, because it is monotonic!
 // If 2 threads read from the same data, at same clock time (but different real time)
 // This could result in both clients merging into the same read data
-// However, only one writer will succeed, as the writer must match the last_updated_utc date
+// However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
 async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
         SqlItem,
         r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
-        updated_utc, tombstone_utc, attributes as "attributes: JsonAttributes"
+        server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
         FROM item
         WHERE library_id = ? AND id = ?"#,
         item.library_id,
@@ -87,12 +87,12 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
     let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
     let now = now_micros();
 
-    let last_updated = sql_item.updated_utc as i64;
+    let last_updated = sql_item.server_seq as i64;
 
     let result = sqlx::query!(
         r#"UPDATE item
-             SET attributes = ?, updated_utc = ?
-             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND updated_utc = ?"#,
+             SET attributes = ?, server_seq = ?
+             WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
         updated_attributes_json,
         now,
         item.id,
@@ -142,10 +142,10 @@ impl ItemModel for ItemModelSqlite {
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     > {
         sqlx::query_as::<_, SqlItem>(
-            r#"SELECT id, library_id, updated_utc, tombstone_utc, attributes
+            r#"SELECT id, library_id, server_seq, tombstone_utc, attributes
             FROM item
-            WHERE library_id = ? AND updated_utc >= ?
-            ORDER BY updated_utc ASC"#,
+            WHERE library_id = ? AND server_seq >= ?
+            ORDER BY server_seq ASC"#,
         )
         .bind(library_id.clone())
         .bind(server_timestamp)

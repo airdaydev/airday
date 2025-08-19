@@ -41,7 +41,7 @@ pub fn mock_item(library_id: Uuid) -> Item {
         id: Uuid::new_v4(),
         library_id,
         attributes: ItemAttributes { text: None },
-        updated_utc: None,
+        server_seq: None,
         tombstone_utc: None,
     }
 }

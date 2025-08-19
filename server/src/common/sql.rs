@@ -69,7 +69,7 @@ pub async fn connect_sqlite(config: &AirdayConfig) -> Db {
 // This ensures we never go backwards, even on restarts
 async fn seed_sqlite_clock_from_db(pool: &Pool<Sqlite>) {
     let db_max =
-        sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(updated_utc), 0) as db_max FROM item")
+        sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(server_seq), 0) as db_max FROM item")
             .fetch_one(pool)
             .await
             .unwrap_or(0);

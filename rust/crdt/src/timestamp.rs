@@ -12,6 +12,7 @@ static CLOCK: MonotonicClock = MonotonicClock {
     last_micros: AtomicI64::new(0),
 };
 
+// TODO: No longer needs this to be related to utc for server_seq purpose (consider a separate clock)
 struct MonotonicClock {
     // thread-safe uint64, hardware handled op
     last_micros: AtomicI64,

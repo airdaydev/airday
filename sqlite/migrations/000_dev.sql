@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS item (
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
   -- metadata & tombstone
-  updated_utc INTEGER NOT NULL, -- used to negotiate sync
+  server_seq INTEGER NOT NULL, -- used to negotiate sync
   tombstone_utc INTEGER NULL
   -- TODO: deleted by?
 );
@@ -58,6 +58,6 @@ CREATE TABLE IF NOT EXISTS container (
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- metadata & tombtone
-  updated_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  server_seq TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   tombstone_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
