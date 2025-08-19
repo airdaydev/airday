@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] consider: ONE TABLE FOR ALL SYNC RESOURCES (oh-oh)
 - [] add in-memory list to core with subscription
 - [] attribute level change sets (ensure sync respects dirty set)
 - [] complete get items since streaming api
@@ -36,7 +37,6 @@
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
 - [] protection against future dates being encoded in LWWRegisters
-- [] consider: ONE TABLE FOR ALL SYNC RESOURCES (oh-oh)
 - [] Indexing for server_seq
 ```sql
 CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);
