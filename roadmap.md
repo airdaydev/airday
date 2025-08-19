@@ -35,7 +35,8 @@
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
-- [] protection against future dates
+- [] protection against future dates being encoded in LWWRegisters
+- [] consider: ONE TABLE FOR ALL SYNC RESOURCES (oh-oh)
 - [] Indexing for server_seq
 ```sql
 CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);

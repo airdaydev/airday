@@ -14,7 +14,7 @@ type Item = {
   completed?: boolean;
 };
 
-// Fulfil example: Remote application of moving from one list to another
+// Fulfill example: Remote application of moving from one list to another
 // Goal: Ensure the item is removed from one list & moved into another!
 // Is this possible without going through every single list!?
 
@@ -26,13 +26,24 @@ type Patch =
   // Optional counters so UI can omit heavy data
   | { kind: "counters"; listId: ContainerId; completedCount: number };
 
+// TODO: Boot cold items
 class MemStorage {
   items: Map<string, AirdayItem> = new Map();
   constructor() {}
-  subscribe() {}
+  subscribe() {
+    // Ensure this happens in batches
+  }
+  getById() {
+    // This allows source referencing from UI Items
+    // with fallback to idb
+  }
 }
 
+// Examples for the solid adapter within the web app:
+class AirdayUIItem {}
+class AirdayUIContainer {}
+
 class SolidAdapterExample {
-  items: Map<string, AirdayItem> = new Map(); // reactive
-  containers: Map<string, AirdayContainer> = new Map(); // reactive
+  items: Map<string, AirdayUIItem> = new Map(); // reactive
+  containers: Map<string, AirdayUIContainer> = new Map(); // reactive
 }
