@@ -56,6 +56,9 @@ export class LWWTimestamp {
       pid: this.pid.toString(),
     };
   }
+  clone() {
+    return new LWWTimestamp({ utc: this.utc, pid: this.pid });
+  }
 }
 
 export class TimestampProducer {
@@ -96,14 +99,17 @@ const LwwJSON = v.object({
   data: v.any(),
 });
 
+interface MergeResult<T> {
+  source: "left" | "right";
+  register: LWWRegister<T>;
+}
+
 export class LWWRegister<T> {
   timestamp: LWWTimestamp;
   data: T;
-  dirty = false;
   constructor(opts: LWWRegisterConstructorOpts<T>) {
     this.timestamp = opts.timestamp || globalTSProducer.timestamp();
     this.data = opts.data;
-    this.dirty = this.dirty ?? false;
   }
   static fromJSON<T>(json: any): LWWRegister<T> {
     ensure(LwwJSON, json);
@@ -118,27 +124,32 @@ export class LWWRegister<T> {
     return {
       data: this.data,
       timestamp: this.timestamp.toJSON(),
-      dirty: this.dirty,
     };
   }
-  merge(other: LWWRegister<T>): LWWRegister<T> {
+  clone() {
+    // TODO: Consider using this later to avoid aliasing bugs
+    new LWWRegister<T>({ timestamp: this.timestamp.clone(), data: this.data });
+  }
+  merge(right: LWWRegister<T>): MergeResult<T> {
     // If timestamps are equal, check data consistency
-    if (this.timestamp.equals(other.timestamp)) {
-      // Same timestamp with different data is an error
-      if (this.data !== other.data) {
-        throw new Error(
+    if (this.timestamp.equals(right.timestamp)) {
+      if (this.data !== right.data) {
+        // TODO: Same timestamp but different data suggests something has gone bad!
+        // In any case we will keep the right data (most likely from server)
+        console.warn(
           "Timestamp collision detected on merge between different data",
         );
+        return { source: "right", register: right };
       }
       // Same timestamp with same data - this is the same instance, return either one
-      return this;
+      return { source: "left", register: this };
     }
 
     // Different timestamps - last write wins
-    if (this.timestamp.greaterThan(other.timestamp)) {
-      return this;
+    if (this.timestamp.greaterThan(right.timestamp)) {
+      return { source: "left", register: this };
     }
-    return other;
+    return { source: "right", register: right };
   }
 }
 
