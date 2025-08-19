@@ -132,9 +132,10 @@ export class AirdaySync {
         }
       }
     } else {
-      // failure!
       console.error("Failed to sync item", res.error);
+      // Failure!
+      // TODO: Retries!
     }
-    // TODO: More acks? e.g. list ack
+    // TODO: Other resource types
   };
 }

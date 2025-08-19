@@ -15,6 +15,7 @@ export interface AirdayItemConstructorOpts {
   // Client-only
   lastSync?: bigint | null;
   lastModified?: bigint | null;
+  // TODO: Dirty attributes calculation!
 }
 
 const AirdayItemSerialisedSchema = v.object({
