@@ -1,5 +1,5 @@
 // Memory storage for items (or all resources?)
-import { AirdayItem } from "../sync/model";
+import { AirdayContainer, AirdayItem } from "../sync/model";
 
 // Core types (no Solid imports)
 type ContainerId = string;

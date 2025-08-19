@@ -69,6 +69,9 @@ export class SyncObject {
   }
 }
 
+// TODO: Complete item
+export class AirdayContainer extends SyncObject {}
+
 // TODO: Move merge concerns to sync object
 export class AirdayItem extends SyncObject {
   attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
