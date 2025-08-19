@@ -1,11 +1,12 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] get items since
+- [] add in-memory list to core with subscription
+- [] attribute level change sets (ensure sync respects dirty set)
+- [] complete get items since streaming api
 - [] delete items (tombstones, same api)
-- [] fan out live updates!
-- [] add in-memory list to core... right? (or at least API to keep updated! will need solid compatibility)
-- [] Merge attribute macro and/or hashmap! (Start with list attribute)
+- [] fan out live updates - maintain local library subscription map for sqlite version
+- [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
