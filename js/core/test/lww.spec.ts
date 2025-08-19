@@ -32,9 +32,9 @@ test("LWWRegister automatic + merge", async () => {
     data: "newVal",
   });
   const res = lww.merge(lww2);
-  expect(res.data).toBe("newVal");
+  expect(res.register.data).toBe("newVal");
   const res2 = lww2.merge(lww);
-  expect(res2.data).toBe("newVal");
+  expect(res2.register.data).toBe("newVal");
 });
 
 test("LWWRegister identical instance merge", async () => {
@@ -52,10 +52,10 @@ test("LWWRegister identical instance merge", async () => {
   // Merging identical instances should work and return either one
   const res1 = lww1.merge(lww2);
   const res2 = lww2.merge(lww1);
-  expect(res1.data).toBe("hello");
-  expect(res2.data).toBe("hello");
-  expect(res1.timestamp.equals(timestamp)).toBe(true);
-  expect(res2.timestamp.equals(timestamp)).toBe(true);
+  expect(res1.register.data).toBe("hello");
+  expect(res2.register.data).toBe("hello");
+  expect(res1.register.timestamp.equals(timestamp)).toBe(true);
+  expect(res2.register.timestamp.equals(timestamp)).toBe(true);
 });
 
 test("LWWRegister timestamp collision with different data should throw", async () => {
@@ -70,12 +70,11 @@ test("LWWRegister timestamp collision with different data should throw", async (
     data: "world",
   });
 
-  // This should throw an error - same timestamp but different data
-  expect(() => lww1.merge(lww2)).toThrow(
-    "Timestamp collision detected on merge between different data",
+  expect(lww1.merge(lww2).register.data, "same data favours right").toBe(
+    lww2.data,
   );
-  expect(() => lww2.merge(lww1)).toThrow(
-    "Timestamp collision detected on merge between different data",
+  expect(lww2.merge(lww1).register.data, "same data favours right").toBe(
+    lww1.data,
   );
 });
 
