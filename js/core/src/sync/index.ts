@@ -2,6 +2,7 @@ import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
+import { BatchResponseProto } from "../proto";
 import { AirdayIDB } from "../storage/idb";
 import { BatchResponseEvent } from "../websocket";
 import { BatchAction, BatchSyncMessage, SyncItemAction } from "./actions";
@@ -107,23 +108,32 @@ export class AirdaySync {
     const action = this.pendingActions.get(res.actionId.toHex());
 
     if (action instanceof SyncItemAction) {
-      // TODO: targeted change instead of blunt (pass in idb to endSync?)
-      this.idb?.item.upsert([action.item]).catch((err) => {
-        console.log(err);
-      });
-      this.pendingActions.delete(res.actionId.toHex());
-      action.item.endSync();
-      if (this.pendingActions.size === 0) {
-        // Consider renaming: no pending acknowledgements remaining
-        this.events.emit("flushed", {});
+      if (res.success) {
+        // TODO: Maybe separate success message is a good thing!
+        if (res.serverSeq) {
+          action.item.serverSeq = res.serverSeq;
+        }
+        // TODO: targeted change instead of blunt (pass in idb to endSync?)
+        this.idb?.item.upsert([action.item]).catch((err) => {
+          console.log(err);
+        });
+        this.pendingActions.delete(res.actionId.toHex());
+        action.item.endSync();
+        if (this.pendingActions.size === 0) {
+          // Consider renaming: no pending acknowledgements remaining
+          this.events.emit("flushed", {});
+        }
+        // If item has changes applied during sync, sync them
+        if (!action.item.isSynced()) {
+          // console.log(
+          //   `action is in sync lastModified=${action.item.lastModified}, lastSync=${action.item.lastSync}`,
+          // );
+          this.syncItems([action.item]);
+        }
       }
-      // If item has changes applied during sync, sync them
-      if (!action.item.isSynced()) {
-        // console.log(
-        //   `action is in sync lastModified=${action.item.lastModified}, lastSync=${action.item.lastSync}`,
-        // );
-        this.syncItems([action.item]);
-      }
+    } else {
+      // failure!
+      console.error("Failed to sync item", res.error);
     }
     // TODO: More acks? e.g. list ack
   };

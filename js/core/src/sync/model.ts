@@ -39,7 +39,7 @@ export class AirdayItem {
   id: Uuidv4;
   libraryId: Uuidv4;
   attributes: AirdayItemAttributes;
-  syncStarted: bigint | null = null; // in flight sync
+  syncStarted: bigint | null = null; // Local time of flight sync req
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
   serverSeq: bigint | null = null; // Last known seen server time

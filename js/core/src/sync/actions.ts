@@ -123,9 +123,9 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
+// TODO: Replace the item reference with an item id look up ref
 export class SyncItemAction extends BatchAction {
   item: AirdayItem;
-  dirty = false;
   actionProto = ActionProto.SyncItemActionProto;
   constructor(item: AirdayItem) {
     super();

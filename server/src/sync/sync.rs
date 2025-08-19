@@ -119,7 +119,7 @@ pub async fn process_sync_batch<'a>(
             }
         }
     }
-    println!("{:?}", items[0]);
+    // Merge, returning back server_seqs or errors
     let Ok(result) = state.db.item.merge_many(&items).await else {
         for (action_id, _) in action_index {
             responses.push(BatchAction::Error {
@@ -138,7 +138,7 @@ pub async fn process_sync_batch<'a>(
         } else {
             responses.push(BatchAction::Error {
                 action_id: Some(action_id),
-                message: String::from("merge error"),
+                message: String::from("Merge error"),
             })
         }
     }
