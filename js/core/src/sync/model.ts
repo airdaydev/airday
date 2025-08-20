@@ -100,7 +100,7 @@ export class SyncObject {
       });
     }
     if (syncObject.type === "container") {
-      const attributes = {};
+      const attributes = {}; // TODO: Get specific attributes for container
       return new AirdayItem({
         id: Uuidv4.fromHex(syncObject.id),
         libraryId: Uuidv4.fromHex(syncObject.libraryId),

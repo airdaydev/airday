@@ -10,6 +10,7 @@ export interface AirdayDBSchema extends DBSchema {
     value: any;
     indexes: {
       libraryId: string;
+      type: "item" | "container";
     };
   };
   [LIBRARY_STORE_NAME]: {
@@ -25,7 +26,6 @@ export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 // Front-end persistent storage for Airday JS apps
 export class AirdayIDB {
   handle: AirdayIDBPDatabase | null = null;
-  syncable = new SyncableIDB(this);
   constructor() {}
   connect = async () => {
     this.handle = await openDB("test", 1, {
@@ -34,23 +34,15 @@ export class AirdayIDB {
           keyPath: "id",
         });
         objects.createIndex("libraryId", "libraryId");
+        objects.createIndex("type", "type");
         const library = db.createObjectStore(LIBRARY_STORE_NAME, {
           keyPath: "id",
         });
       },
     });
   };
-}
-
-// TODO: Get archived objects separately (Decide what should be archived and provide common index)
-export class SyncableIDB {
-  db: AirdayIDB;
-  storeName = SYNC_STORE_NAME;
-  constructor(db: AirdayIDB) {
-    this.db = db;
-  }
   upsert = async (objects: SyncObject[]) => {
-    const tx = this.db.handle!.transaction(SYNC_STORE_NAME, "readwrite");
+    const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);
     const b = await store.getAll();
     // TODO: We also need to extract indexes in JSON version (e.g. done)!
@@ -62,7 +54,7 @@ export class SyncableIDB {
     await tx.done;
   };
   getByLibrary = async (libraryId: string) => {
-    const res = await this.db.handle!.getAllFromIndex(
+    const res = await this.handle!.getAllFromIndex(
       SYNC_STORE_NAME,
       "libraryId",
       libraryId,
@@ -79,7 +71,7 @@ export class SyncableIDB {
   };
   delete = async (hexIds: string[]) => {
     // await this.db!.handle?.delete(SYNC_STORE_NAME, id);
-    const tx = this.db.handle!.transaction(SYNC_STORE_NAME, "readwrite");
+    const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);
     await Promise.all(hexIds.map((id) => store.delete(id)));
     await tx.done;

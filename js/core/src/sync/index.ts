@@ -18,7 +18,6 @@ interface SyncEventMap {
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
 export class AirdaySync {
-  private idb: AirdayIDB | null = null;
   core: AirdayCore;
   pendingActions = new Map<string, BatchAction>(); // string = hex type
   events = new EventEmitter<SyncEventMap>();
@@ -39,10 +38,6 @@ export class AirdaySync {
   }
   timestamp() {
     return globalTSProducer.timestamp();
-  }
-  // TODO: Use account
-  setDB(idb: AirdayIDB) {
-    this.idb = idb;
   }
   // To be run after login
   initialSync() {
@@ -87,7 +82,8 @@ export class AirdaySync {
         item.startSync();
         const action = new SyncItemAction(item);
         // TODO: Ensure this works for updated items too
-        this.idb?.item.upsert([item]); // optimistic update
+        // TODO: idb direct access?
+        this.core.storage.idb.upsert([item]); // optimistic update
         this.pendingActions.set(action.id.toHex(), action);
         return action;
       });
@@ -114,7 +110,7 @@ export class AirdaySync {
           action.item.serverSeq = res.serverSeq;
         }
         // TODO: targeted change instead of blunt (pass in idb to endSync?)
-        this.idb?.item.upsert([action.item]).catch((err) => {
+        this.core.storage.idb?.upsert([action.item]).catch((err) => {
           console.log(err);
         });
         this.pendingActions.delete(res.actionId.toHex());

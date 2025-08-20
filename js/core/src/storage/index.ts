@@ -28,12 +28,12 @@ export class AirdayStorage {
       this.items.set(item.id.toHex(), item);
     });
     // TODO: Trigger subscription upsert!
-    await this.idb.item.upsert(items);
+    await this.idb.upsert(items);
   }
   async removeItems(ids: Uuidv4[]) {
     const hexes = ids.map((id) => id.toHex());
     hexes.forEach((hex) => this.items.delete(hex));
-    await this.idb.item.deleteItems(hexes);
+    await this.idb.delete(hexes);
     // TODO: trigger subscription remove event!
   }
   // TODO: Trigger patch?

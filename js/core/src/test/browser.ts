@@ -21,8 +21,7 @@ export async function createTestCore() {
     authMode: AuthMode.BearerToken,
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
-  await core.db.connect();
-  core.sync.setDB(core.db);
+  await core.storage.idb.connect();
   core.ws.connect();
   await core.ws.events.onceAsync("authenticated");
   return core;
@@ -52,7 +51,7 @@ export const tests = async () => {
       "ack message received & pending queue back to 0",
     );
     const item = (
-      await core.db.item.getItemsByLibrary(core.library.id!.toHex())
+      await core.storage.idb.getByLibrary(core.library.id!.toHex())
     )[0];
     assert(
       item.libraryId.toHex() === core.library.id!.toHex(),
@@ -86,7 +85,7 @@ export const tests = async () => {
     }
     core.sync.syncItems(items);
     await core.ws.flush();
-    const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    const res = await core.storage.idb.getByLibrary(core.library.id!.toHex());
     assert(res.length === 100, "res length");
     // TODO: Get all items
     // core.sync.getItemSince(core.library.id!, null);
@@ -146,9 +145,10 @@ export const tests = async () => {
     }
     core.sync.syncItems(items);
     await core.sync.flush();
-    // Clear database
-    await core.db.handle?.clear("item");
-    const emptyRes = await core.db.item.getItemsByLibrary(
+    // Clear database (TODO: Direct access??)
+    await core.storage.idb.handle?.clear("syncable");
+    await core.storage.idb.handle?.clear("library");
+    const emptyRes = await core.storage.idb.getByLibrary(
       core.library.id!.toHex(),
     );
     assert(emptyRes.length === 0, "idb has been emptied");
