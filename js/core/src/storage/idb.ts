@@ -1,18 +1,19 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import { AirdayItem, type AirdayItemSerialised } from "../sync/model";
+import { AirdayItem, SyncObject } from "../sync/model";
+
+const SYNC_STORE_NAME = "syncable";
+const LIBRARY_STORE_NAME = "library";
 
 export interface AirdayDBSchema extends DBSchema {
-  item: {
+  [SYNC_STORE_NAME]: {
     key: string;
     value: any;
     indexes: {
       libraryId: string;
-      // listId: string;
-      // order: [string, string, string];
-      // done: string;
+      // archived
     };
   };
-  container: {
+  [LIBRARY_STORE_NAME]: {
     key: string;
     value: any;
     indexes: {};
@@ -22,8 +23,6 @@ export interface AirdayDBSchema extends DBSchema {
 export type AirdayIDBPDatabase = IDBPDatabase<AirdayDBSchema>;
 export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 
-const ITEM_STORE_NAME = "item";
-
 // Front-end persistent storage for Airday JS apps
 export class AirdayIDB {
   handle: AirdayIDBPDatabase | null = null;
@@ -32,12 +31,14 @@ export class AirdayIDB {
   connect = async () => {
     this.handle = await openDB("test", 1, {
       upgrade(db) {
-        const items = db.createObjectStore(ITEM_STORE_NAME, { keyPath: "id" });
+        const items = db.createObjectStore(SYNC_STORE_NAME, { keyPath: "id" });
         items.createIndex("libraryId", "libraryId");
         // items.createIndex("listId", "listId");
         // items.createIndex("order", ["listId", "orderKey", "id"]);
         // items.createIndex("done", ["doneTS"]); // TODO: Done timestamp?
-        const container = db.createObjectStore("container", { keyPath: "id" });
+        const container = db.createObjectStore(LIBRARY_STORE_NAME, {
+          keyPath: "id",
+        });
       },
     });
   };
@@ -46,13 +47,13 @@ export class AirdayIDB {
 // TODO: Get completed items separately
 export class ItemIDBModel {
   db: AirdayIDB;
-  storeName = ITEM_STORE_NAME;
+  storeName = SYNC_STORE_NAME;
   constructor(db: AirdayIDB) {
     this.db = db;
   }
-  upsert = async (items: AirdayItem[]) => {
-    const tx = this.db.handle!.transaction(ITEM_STORE_NAME, "readwrite");
-    const store = tx.objectStore(ITEM_STORE_NAME);
+  upsert = async (items: SyncObject[]) => {
+    const tx = this.db.handle!.transaction(SYNC_STORE_NAME, "readwrite");
+    const store = tx.objectStore(SYNC_STORE_NAME);
     const b = await store.getAll();
     // TODO: We also need to extract indexes in JSON version (e.g. done)!
     await Promise.all(
@@ -64,21 +65,25 @@ export class ItemIDBModel {
   };
   getItemsByLibrary = async (libraryId: string) => {
     const res = await this.db.handle!.getAllFromIndex(
-      ITEM_STORE_NAME,
+      SYNC_STORE_NAME,
       "libraryId",
       libraryId,
     );
-    const items: AirdayItem[] = [];
+    const items: SyncObject[] = [];
     res.forEach((row) => {
       try {
-        items.push(AirdayItem.fromJSON(row));
+        items.push(SyncObject.fromJSON(row));
       } catch (err) {
         console.warn("Could not parse row from db", row, err);
       }
     });
     return items;
   };
-  deleteItem = async (id: string) => {
-    await this.db!.handle?.delete(ITEM_STORE_NAME, id);
+  deleteItems = async (hexIds: string[]) => {
+    // await this.db!.handle?.delete(SYNC_STORE_NAME, id);
+    const tx = this.db.handle!.transaction(SYNC_STORE_NAME, "readwrite");
+    const store = tx.objectStore(SYNC_STORE_NAME);
+    await Promise.all(hexIds.map((id) => store.delete(id)));
+    await tx.done;
   };
 }

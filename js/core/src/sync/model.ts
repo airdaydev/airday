@@ -17,6 +17,15 @@ export interface AirdayItemConstructorOpts extends SyncObjectParams {
   attributes: AirdayItemAttributes;
 }
 
+export interface SerialisedSyncObject {
+  id: string;
+  libraryId: string;
+  serverSeq: bigint | null;
+  lastSync: bigint | null;
+  lastModified: bigint | null;
+  attributes: any;
+}
+
 const AirdayItemSerialisedSchema = v.object({
   id: v.string().required(),
   libraryId: v.string().required(),
@@ -35,7 +44,10 @@ const ensureSerialisedItem = compile(AirdayItemSerialisedSchema, {
   ensure: true,
 });
 
+type SyncObjectType = "item" | "container" | "none";
+
 export class SyncObject {
+  type: SyncObjectType = "none";
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
@@ -67,13 +79,42 @@ export class SyncObject {
     if (!this.lastSync) return false;
     return this.lastSync >= this.lastModified;
   }
+  toJSON(): SerialisedSyncObject {
+    const attributes = {};
+    return {
+      id: this.id.toHex(),
+      libraryId: this.libraryId.toHex(),
+      serverSeq: this.serverSeq,
+      lastSync: this.lastSync,
+      lastModified: this.lastModified,
+      attributes,
+    };
+  }
+  static fromJSON(json: any) {
+    ensureSerialisedItem(json); // TODO: First check if syncobject is good, then do attributes
+    let typed = json as AirdayItemSerialised;
+    const attributes: AirdayItemAttributes = {};
+    if (typed.attributes.text) {
+      attributes.text = LWWRegister.fromJSON(typed.attributes.text);
+    }
+    return new AirdayItem({
+      id: Uuidv4.fromHex(typed.id),
+      libraryId: Uuidv4.fromHex(typed.libraryId),
+      attributes,
+      lastSync: typed.lastSync as bigint,
+      lastModified: typed.lastModified as bigint,
+    });
+  }
 }
 
 // TODO: Complete item
-export class AirdayContainer extends SyncObject {}
+export class AirdayContainer extends SyncObject {
+  type: SyncObjectType = "container";
+}
 
 // TODO: Move merge concerns to sync object
 export class AirdayItem extends SyncObject {
+  type: SyncObjectType = "item";
   attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
   constructor(params: AirdayItemConstructorOpts) {
     super(params);
@@ -109,31 +150,5 @@ export class AirdayItem extends SyncObject {
   }
   applyRemote(attrs: AirdayItemAttributes) {
     this.merge(attrs, false);
-  }
-  toJSON() {
-    // TODO: Clean up id requirement
-    let obj: AirdayItemSerialised = {
-      id: this.id.toHex(),
-      libraryId: this.libraryId.toHex(),
-      attributes: {}, // TODO: Attributes!
-      lastSync: this.lastSync,
-      lastModified: this.lastModified,
-    };
-    return obj;
-  }
-  static fromJSON(json: any) {
-    ensureSerialisedItem(json);
-    let typed = json as AirdayItemSerialised;
-    const attributes: AirdayItemAttributes = {};
-    if (typed.attributes.text) {
-      attributes.text = LWWRegister.fromJSON(typed.attributes.text);
-    }
-    return new AirdayItem({
-      id: Uuidv4.fromHex(typed.id),
-      libraryId: Uuidv4.fromHex(typed.libraryId),
-      attributes,
-      lastSync: typed.lastSync as bigint,
-      lastModified: typed.lastModified as bigint,
-    });
   }
 }
