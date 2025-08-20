@@ -44,7 +44,7 @@ export class AirdayIDB {
   };
 }
 
-// TODO: Get completed items separately
+// TODO: Get archived items separately (Decide what should be archived and provide common index)
 export class ItemIDBModel {
   db: AirdayIDB;
   storeName = SYNC_STORE_NAME;

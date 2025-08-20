@@ -2,6 +2,8 @@ import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 
+type SyncObjectType = "item" | "container" | "none";
+
 export interface SyncObjectParams {
   id?: Uuidv4;
   libraryId: Uuidv4;
@@ -17,34 +19,25 @@ export interface AirdayItemConstructorOpts extends SyncObjectParams {
   attributes: AirdayItemAttributes;
 }
 
-export interface SerialisedSyncObject {
-  id: string;
-  libraryId: string;
-  serverSeq: bigint | null;
-  lastSync: bigint | null;
-  lastModified: bigint | null;
-  attributes: any;
-}
-
-const AirdayItemSerialisedSchema = v.object({
+const SyncObjectSerialisedSchema = v.object({
   id: v.string().required(),
+  type: v.anyOf([v.string().const("item"), v.string().const("container")]),
   libraryId: v.string().required(),
   attributes: v
     .object({
       text: LWWSerialiseSchema,
     })
     .required(),
+  serverSeq: v.anyOf([v.unknown(), v.null()]),
   lastSync: v.anyOf([v.unknown(), v.null()]),
   lastModified: v.anyOf([v.unknown(), v.null()]),
 });
 
-export type AirdayItemSerialised = TypeOf<typeof AirdayItemSerialisedSchema>;
+export type SerialisedSyncObject = TypeOf<typeof SyncObjectSerialisedSchema>;
 
-const ensureSerialisedItem = compile(AirdayItemSerialisedSchema, {
+const ensureSerialisedSyncObject = compile(SyncObjectSerialisedSchema, {
   ensure: true,
 });
-
-type SyncObjectType = "item" | "container" | "none";
 
 export class SyncObject {
   type: SyncObjectType = "none";
@@ -90,20 +83,34 @@ export class SyncObject {
       attributes,
     };
   }
-  static fromJSON(json: any) {
-    ensureSerialisedItem(json); // TODO: First check if syncobject is good, then do attributes
-    let typed = json as AirdayItemSerialised;
-    const attributes: AirdayItemAttributes = {};
-    if (typed.attributes.text) {
-      attributes.text = LWWRegister.fromJSON(typed.attributes.text);
+  static fromJSON(json: any): AirdayItem | AirdayContainer {
+    ensureSerialisedSyncObject(json); // TODO: First check if syncobject is good, then do attributes
+    let syncObject = json as SerialisedSyncObject;
+    if (syncObject.type === "item") {
+      const attributes: AirdayItemAttributes = {};
+      if (syncObject.attributes.text) {
+        attributes.text = LWWRegister.fromJSON(syncObject.attributes.text);
+      }
+      return new AirdayItem({
+        id: Uuidv4.fromHex(syncObject.id),
+        libraryId: Uuidv4.fromHex(syncObject.libraryId),
+        attributes,
+        lastSync: syncObject.lastSync as bigint,
+        lastModified: syncObject.lastModified as bigint,
+      });
     }
-    return new AirdayItem({
-      id: Uuidv4.fromHex(typed.id),
-      libraryId: Uuidv4.fromHex(typed.libraryId),
-      attributes,
-      lastSync: typed.lastSync as bigint,
-      lastModified: typed.lastModified as bigint,
-    });
+    if (syncObject.type === "container") {
+      const attributes = {};
+      return new AirdayItem({
+        id: Uuidv4.fromHex(syncObject.id),
+        libraryId: Uuidv4.fromHex(syncObject.libraryId),
+        attributes,
+        lastSync: syncObject.lastSync as bigint,
+        lastModified: syncObject.lastModified as bigint,
+      });
+    }
+    // TODO: Handle error (or null return) upstream
+    throw new Error("Type not found");
   }
 }
 
