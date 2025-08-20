@@ -1,5 +1,5 @@
 import { Builder } from "flatbuffers";
-import { LWWRegisterStringProto, LWWTimestampProto } from "../proto";
+import { LWWTimestampProto } from "../proto";
 import { type TypeOf, v, ensure } from "suretype";
 
 // BigInt process ID generated from high entropy-source, if available
@@ -150,26 +150,6 @@ export class LWWRegister<T> {
       return { source: "left", register: this };
     }
     return { source: "right", register: right };
-  }
-}
-
-export class LWWRegisterString extends LWWRegister<string> {
-  constructor(opts: LWWRegisterConstructorOpts<string>) {
-    super(opts);
-  }
-  static fromString(string: string) {
-    return new LWWRegisterString({
-      data: string,
-    });
-  }
-  addToFlatBuffer(builder: Builder) {
-    const dataOffset = builder.createString(this.data);
-    const tsOffset = this.timestamp.addToFlatBuffer(builder);
-    return LWWRegisterStringProto.createLWWRegisterStringProto(
-      builder,
-      tsOffset,
-      dataOffset,
-    );
   }
 }
 

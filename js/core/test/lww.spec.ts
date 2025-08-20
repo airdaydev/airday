@@ -1,11 +1,6 @@
 import { expect, test } from "@playwright/test";
-import {
-  LWWRegister,
-  TimestampProducer,
-  LWWRegisterString,
-} from "../src/crdt/lww";
+import { LWWRegister, TimestampProducer } from "../src/crdt/lww";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { LWWRegisterStringProto } from "../src/proto";
 
 // TODO: This should really include toJSON as well
 test("LWWRegister parsing", async () => {
@@ -76,23 +71,4 @@ test("LWWRegister timestamp collision with different data should throw", async (
   expect(lww2.merge(lww1).register.data, "same data favours right").toBe(
     lww1.data,
   );
-});
-
-test("LWWRegisterString flat buffer serialisation & deserialisation", async () => {
-  const data = "hello";
-  const gen = new TimestampProducer(BigInt(1234));
-  const timestamp = gen.timestamp();
-  const lww = new LWWRegisterString({
-    timestamp,
-    data: data,
-  });
-  const builder = new Builder(1024);
-  const lwwOffset = lww.addToFlatBuffer(builder);
-  builder.finish(lwwOffset);
-  const uint8 = builder.asUint8Array();
-  let bb = new ByteBuffer(uint8);
-  let parsedLWW = LWWRegisterStringProto.getRootAsLWWRegisterStringProto(bb);
-  expect(parsedLWW.data()).toBe(data);
-  expect(parsedLWW.timestamp()?.utc()).toBe(timestamp.utc);
-  expect(parsedLWW.timestamp()?.pid()).toBe(timestamp.pid);
 });

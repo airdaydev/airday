@@ -5,10 +5,10 @@ import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseProto } from "../proto";
 import { AirdayIDB } from "../storage/idb";
 import { BatchResponseEvent } from "../websocket";
-import { BatchAction, BatchSyncMessage, SyncItemAction } from "./actions";
+import { BatchAction, BatchSyncMessage, SyncObjectAction } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { AirdayItem } from "./model";
-import { ItemSyncStream, SyncStream } from "./stream";
+import { SyncStream } from "./stream";
 
 interface SyncEventMap {
   flushed: {};
@@ -60,7 +60,7 @@ export class AirdaySync {
     // i.e. lists
   }
   streamItems(libraryId: Uuidv4) {
-    const itemStream = new ItemSyncStream(this.core, libraryId);
+    const itemStream = new SyncStream(this.core, libraryId);
     const existingStream = this.streams.get(itemStream.key);
     if (existingStream && existingStream.syncing) {
       console.warn(`Existing stream [key=${itemStream.key}] already running`);
@@ -80,7 +80,7 @@ export class AirdaySync {
       })
       .map((item) => {
         item.startSync();
-        const action = new SyncItemAction(item);
+        const action = new SyncObjectAction(item);
         // TODO: Ensure this works for updated items too
         // TODO: idb direct access?
         this.core.storage.idb.upsert([item]); // optimistic update
@@ -103,7 +103,7 @@ export class AirdaySync {
   handleBatchResponse = (res: BatchResponseEvent) => {
     const action = this.pendingActions.get(res.actionId.toHex());
 
-    if (action instanceof SyncItemAction) {
+    if (action instanceof SyncObjectAction) {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
         if (res.serverSeq) {

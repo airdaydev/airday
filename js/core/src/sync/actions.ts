@@ -1,14 +1,17 @@
 import { AirdayItem } from "./model";
 import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
-  ItemProto,
-  LWWRegisterStringProto,
-  SyncItemActionProto,
+  SyncObjectActionProto,
+  ObjectTypeProto,
+  AttributeProto,
+  StringValueProto,
+  BoolValueProto,
+  FieldValueProto,
+  LWWTimestampProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
   SyncStreamReqProto,
-  ResourceType,
   MessageProto,
   ActionProto,
   MessageWrapperProto,
@@ -97,14 +100,8 @@ export class SyncStreamReqMessage extends AirdayMessage {
   libraryId: Uuidv4;
   serverSeq: bigint | null = null;
   type = MessageProto.SyncStreamReqProto;
-  resourceType: ResourceType;
-  constructor(
-    resourceType: ResourceType,
-    libraryId: Uuidv4,
-    serverSeq: bigint | null = null,
-  ) {
+  constructor(libraryId: Uuidv4, serverSeq: bigint | null = null) {
     super();
-    this.resourceType = resourceType;
     this.libraryId = libraryId;
     this.serverSeq = serverSeq;
   }
@@ -112,9 +109,8 @@ export class SyncStreamReqMessage extends AirdayMessage {
     SyncStreamReqProto.startSyncStreamReqProto(builder);
     SyncStreamReqProto.addLibraryId(
       builder,
-      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
+      UuidProto.createUuidProto(builder, this.libraryId.toUUIDProto()),
     );
-    SyncStreamReqProto.addResource(builder, ResourceType.Item);
     if (this.serverSeq) {
       SyncStreamReqProto.addServerSeq(builder, this.serverSeq);
     }
@@ -123,41 +119,55 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
-// TODO: Replace the item reference with an item id look up ref
-export class SyncItemAction extends BatchAction {
+export class SyncObjectAction extends BatchAction {
   item: AirdayItem;
-  actionProto = ActionProto.SyncItemActionProto;
+  actionProto = ActionProto.SyncObjectActionProto;
   constructor(item: AirdayItem) {
     super();
     this.item = item;
   }
   addToFlatBuffer(builder: Builder) {
-    let textOffset;
+    const attributes = [];
+
+    // Convert item attributes to AttributeProto array
     if (this.item.attributes.text) {
       const valueOffset = builder.createString(this.item.attributes.text.data);
-      LWWRegisterStringProto.startLWWRegisterStringProto(builder);
-      const timestampOffset =
-        this.item.attributes.text.timestamp.addToFlatBuffer(builder);
-      LWWRegisterStringProto.addTimestamp(builder, timestampOffset);
-      LWWRegisterStringProto.addData(builder, valueOffset);
-      textOffset = LWWRegisterStringProto.endLWWRegisterStringProto(builder);
+      const stringValueOffset = StringValueProto.createStringValueProto(
+        builder,
+        valueOffset,
+      );
+
+      const fieldOffset = builder.createString("text");
+      AttributeProto.startAttributeProto(builder);
+      AttributeProto.addField(builder, fieldOffset);
+      AttributeProto.addValueType(builder, FieldValueProto.StringValueProto);
+      AttributeProto.addValue(builder, stringValueOffset);
+      AttributeProto.addTimestamp(
+        builder,
+        this.item.attributes.text.timestamp.addToFlatBuffer(builder),
+      );
+      const textAttributeOffset = AttributeProto.endAttributeProto(builder);
+      attributes.push(textAttributeOffset);
     }
-    ItemProto.startItemProto(builder);
-    if (textOffset) {
-      ItemProto.addText(builder, textOffset);
-    }
-    ItemProto.addId(
+
+    const attributesVector = SyncObjectActionProto.createAttributesVector(
+      builder,
+      attributes,
+    );
+
+    SyncObjectActionProto.startSyncObjectActionProto(builder);
+    SyncObjectActionProto.addType(builder, ObjectTypeProto.Item);
+    SyncObjectActionProto.addId(
       builder,
       UuidProto.createUuidProto(builder, this.item.id.toUUIDProto()),
     );
-    ItemProto.addLibraryId(
+    SyncObjectActionProto.addLibraryId(
       builder,
       UuidProto.createUuidProto(builder, this.item.libraryId.toUUIDProto()),
     );
-    const itemOffset = ItemProto.endItemProto(builder);
-    SyncItemActionProto.startSyncItemActionProto(builder);
-    SyncItemActionProto.addItem(builder, itemOffset);
-    const actionOffset = SyncItemActionProto.endSyncItemActionProto(builder);
+    SyncObjectActionProto.addAttributes(builder, attributesVector);
+    const actionOffset =
+      SyncObjectActionProto.endSyncObjectActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }

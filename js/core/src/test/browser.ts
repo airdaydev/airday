@@ -1,10 +1,9 @@
 import { BrowserRunner, log } from "./runner";
 import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
-import { LWWRegisterString } from "../crdt/lww";
 import { tracer } from "../tracer";
+import { LWWRegister } from "../crdt/lww";
 
 // TODO: Performance testing!
-
 export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
   await createUser(core, {
@@ -35,7 +34,9 @@ export const tests = async () => {
     const newItem = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
-        text: LWWRegisterString.fromString("test"),
+        text: new LWWRegister({
+          data: "test",
+        }),
       },
     });
     let action = core.sync.syncItems([newItem])[0];
@@ -78,7 +79,7 @@ export const tests = async () => {
         new AirdayItem({
           libraryId: core.library.id!,
           attributes: {
-            text: LWWRegisterString.fromString("test"),
+            text: new LWWRegister({ data: "test" }),
           },
         }),
       );
@@ -95,7 +96,7 @@ export const tests = async () => {
   suite.only("Merge text same message", async (assert) => {
     // 1. Create item & sync it
     const core = await createTestCore();
-    const oldText = LWWRegisterString.fromString("old_text");
+    const oldText = new LWWRegister({ data: "old_text" });
     const item = new AirdayItem({
       libraryId: core.library.id!,
       attributes: {
@@ -108,7 +109,7 @@ export const tests = async () => {
     console.log("sync 1 completed");
 
     // 2. After sync is acknowledged, update it again
-    const newText = LWWRegisterString.fromString("new_text");
+    const newText = new LWWRegister({ data: "new_text" });
     assert(
       newText.timestamp.greaterThan(oldText.timestamp)!,
       "new text older than old text",
@@ -138,7 +139,7 @@ export const tests = async () => {
         new AirdayItem({
           libraryId: core.library.id!,
           attributes: {
-            text: LWWRegisterString.fromString("test"),
+            text: new LWWRegister({ data: "test" }),
           },
         }),
       );
