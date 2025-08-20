@@ -1,7 +1,7 @@
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
-    item::model::{Item, ItemAttributes},
+    sync_object::model::{ItemAttributes, SyncObject},
     user::model::User,
 };
 use sqlx::SqlitePool;
@@ -36,8 +36,8 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     .unwrap()
 }
 
-pub fn mock_item(library_id: Uuid) -> Item {
-    Item {
+pub fn mock_item(library_id: Uuid) -> SyncObject {
+    SyncObject {
         id: Uuid::new_v4(),
         library_id,
         attributes: ItemAttributes { text: None },

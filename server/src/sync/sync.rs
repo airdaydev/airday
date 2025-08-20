@@ -1,11 +1,11 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
-    item::model::Item,
     sync::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
     },
+    sync_object::model::SyncObject,
 };
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
@@ -86,7 +86,7 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    let mut items: Vec<Item> = Vec::new();
+    let mut items: Vec<SyncObject> = Vec::new();
     let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
@@ -107,7 +107,7 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let item = Item::from_item_proto(&action.item());
+                let item = SyncObject::from_item_proto(&action.item());
                 action_index.push((action_id, items.len()));
                 items.push(item);
             }
@@ -120,7 +120,7 @@ pub async fn process_sync_batch<'a>(
         }
     }
     // Merge, returning back server_seqs or errors
-    let Ok(result) = state.db.item.merge_many(&items).await else {
+    let Ok(result) = state.db.sync_object.merge_many(&items).await else {
         for (action_id, _) in action_index {
             responses.push(BatchAction::Error {
                 action_id: Some(action_id),

@@ -37,7 +37,7 @@ pub struct ItemAttributes {
 }
 
 #[derive(Debug)]
-pub struct Item {
+pub struct SyncObject {
     pub id: Uuid,
     pub library_id: Uuid,
     pub attributes: ItemAttributes,
@@ -45,8 +45,8 @@ pub struct Item {
     pub tombstone_utc: Option<i64>,
 }
 
-impl Item {
-    pub fn from_item_proto<'a>(item_proto: &'a ItemProto) -> Item {
+impl SyncObject {
+    pub fn from_item_proto<'a>(item_proto: &'a ItemProto) -> SyncObject {
         let lww = item_proto.text().unwrap();
         let timestamp = lww.timestamp().unwrap();
         let text_lww = LWWRegister {
@@ -56,7 +56,7 @@ impl Item {
             },
             data: lww.data().unwrap().to_string(),
         };
-        Item {
+        SyncObject {
             id: proto_uuid_to_uuid(item_proto.id()),
             library_id: proto_uuid_to_uuid(item_proto.library_id()),
             server_seq: None,
@@ -158,7 +158,7 @@ pub struct SqlItem {
 // }
 
 #[async_trait]
-pub trait ItemModel: Send + Sync {
+pub trait SyncObjectModel: Send + Sync {
     // Accept query options
     fn get_by_library_stream<'a>(
         &'a self,
@@ -168,7 +168,7 @@ pub trait ItemModel: Send + Sync {
         Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
     >;
     // async fn merge(&self, item: &Item) -> Result<(), AppError>;
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<i64>>, AppError>;
+    async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError>;
     // async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

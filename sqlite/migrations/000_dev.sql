@@ -38,10 +38,11 @@ CREATE TABLE IF NOT EXISTS user_library (
   PRIMARY KEY (user_id, library_id)
 );
 
-CREATE TABLE IF NOT EXISTS item (
-  -- static vals
+CREATE TABLE IF NOT EXISTS sync_object (
+  -- static, immutable vals
   id UUID NOT NULL PRIMARY KEY,
   library_id UUID NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('item', 'container')),
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)
@@ -49,15 +50,4 @@ CREATE TABLE IF NOT EXISTS item (
   server_seq INTEGER NOT NULL, -- used to negotiate sync
   tombstone_utc INTEGER NULL
   -- TODO: deleted by?
-);
-
-CREATE TABLE IF NOT EXISTS container (
-  library_id UUID NOT NULL,
-  id UUID NOT NULL PRIMARY KEY,
-  -- later, specific container type could be static here
-  -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
-  attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
-  -- metadata & tombtone
-  server_seq TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  tombstone_utc TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

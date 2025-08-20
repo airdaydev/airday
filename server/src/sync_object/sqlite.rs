@@ -7,27 +7,27 @@ use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
-    item::model::{
-        Item, ItemAttributes, ItemAttributesJson, ItemModel, JsonAttributes, SqlItem,
+    sync_object::model::{
+        ItemAttributes, ItemAttributesJson, JsonAttributes, SqlItem, SyncObject, SyncObjectModel,
         convert_item_attributes_to_json,
     },
 };
 
-pub struct ItemModelSqlite {
+pub struct SyncObjectModelSqlite {
     pool: SqlitePool,
 }
 
-impl ItemModelSqlite {
+impl SyncObjectModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
-async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
+async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
     let server_seq = now_micros();
     sqlx::query!(
-        r#"INSERT INTO item (id, library_id, attributes, server_seq, tombstone_utc)
+        r#"INSERT INTO sync_object (id, library_id, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
         item.id,
         item.library_id,
@@ -47,7 +47,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64
 // This could result in both clients merging into the same read data
 // However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
-async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64, AppError> {
+async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
     // We allow 3x retries when contending with competing thread
     let mut retries = 0;
     while retries < 3 {
@@ -56,7 +56,7 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
             SqlItem,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
           server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
-          FROM item
+          FROM sync_object
           WHERE library_id = ? AND id = ?"#,
             item.library_id,
             item.id,
@@ -94,7 +94,7 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
         let last_server_seq = sql_item.server_seq as i64;
 
         let result = sqlx::query!(
-            r#"UPDATE item
+            r#"UPDATE sync_object
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
             updated_attributes_json,
@@ -118,9 +118,9 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &Item) -> Result<i64,
 }
 
 #[async_trait]
-impl ItemModel for ItemModelSqlite {
+impl SyncObjectModel for SyncObjectModelSqlite {
     // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
-    async fn merge_many(&self, item: &Vec<Item>) -> Result<Vec<Option<i64>>, AppError> {
+    async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];
         let mut tx = self.pool.begin().await?;
         for item in item {
@@ -173,10 +173,12 @@ mod tests {
         for _ in 0..qty {
             items.push(mock_item(primary_library_id))
         }
-        db.item.merge_many(&items).await.unwrap();
+        db.sync_object.merge_many(&items).await.unwrap();
         // intentional (smoke test): a second merge that effectively does nothing
-        db.item.merge_many(&items).await.unwrap();
-        let mut stream = db.item.get_by_library_stream(&primary_library_id, 0i64);
+        db.sync_object.merge_many(&items).await.unwrap();
+        let mut stream = db
+            .sync_object
+            .get_by_library_stream(&primary_library_id, 0i64);
         let mut count = 0;
         while let Some(result) = stream.next().await {
             match result {

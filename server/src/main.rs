@@ -29,7 +29,7 @@ mod auth {
     pub mod cache;
     pub mod session;
 }
-mod item {
+mod sync_object {
     pub mod model;
     pub mod sqlite;
 }
