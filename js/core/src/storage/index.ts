@@ -1,5 +1,8 @@
 // Memory storage for items (or all resources?)
+import { Uuidv4 } from "../common/uuid";
+import { AirdayCore } from "../core";
 import { AirdayContainer, AirdayItem } from "../sync/model";
+import { AirdayIDB } from "./idb";
 
 // Core types (no Solid imports)
 type ContainerId = string;
@@ -27,23 +30,28 @@ type Patch =
   | { kind: "counters"; listId: ContainerId; completedCount: number };
 
 // TODO: Boot cold items
-class MemStorage {
-  items: Map<string, AirdayItem> = new Map();
-  constructor() {}
+export class AirdayStorage {
+  core: AirdayCore;
+  idb = new AirdayIDB();
+  items: Map<string, AirdayItem> = new Map(); // hex-id-backed index
+  constructor(core: AirdayCore) {
+    this.core = core;
+  }
+  upsertItems(items: AirdayItem[]) {
+    items.map((item) => {
+      this.items.set(item.id.toHex(), item);
+    });
+    // TODO: Trigger upsert
+  }
+  removeItems(ids: Uuidv4[]) {
+    ids.forEach((id) => this.items.delete(id.toHex()));
+    // TODO: trigger remove
+  }
+  // TODO: Trigger patch?
   subscribe() {
     // Ensure this happens in batches
   }
-  getById() {
-    // This allows source referencing from UI Items
-    // with fallback to idb
+  getById(id: Uuidv4) {
+    return this.items.get(id.toHex());
   }
-}
-
-// Examples for the solid adapter within the web app:
-class AirdayUIItem {}
-class AirdayUIContainer {}
-
-class SolidAdapterExample {
-  items: Map<string, AirdayUIItem> = new Map(); // reactive
-  containers: Map<string, AirdayUIContainer> = new Map(); // reactive
 }

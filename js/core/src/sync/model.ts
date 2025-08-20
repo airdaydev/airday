@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 
 export interface SyncObjectParams {
-  id: Uuidv4;
+  id?: Uuidv4;
   libraryId: Uuidv4;
   lastModified?: bigint;
   lastSync?: bigint;

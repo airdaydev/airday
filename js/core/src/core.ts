@@ -5,11 +5,11 @@ import {
   refreshBearer,
   refreshCookie,
 } from "./http/auth";
-import { AirdayIDB } from "./storage/idb";
 import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
 import type { Uuidv4 } from "./common/uuid";
+import { AirdayStorage } from "./storage";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -61,14 +61,14 @@ export class AirdayCore {
   });
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
-  db: AirdayIDB; // persistence layer
+  storage: AirdayStorage; // mem & idb storage layer
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
     this.sync = new AirdaySync(this);
-    this.db = new AirdayIDB();
+    this.storage = new AirdayStorage(this);
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);

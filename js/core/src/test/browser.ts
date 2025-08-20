@@ -114,7 +114,7 @@ export const tests = async () => {
       newText.timestamp.greaterThan(oldText.timestamp)!,
       "new text older than old text",
     );
-    item.merge({ text: newText }); // TODO: This should trigger a sync
+    item.applyLocal({ text: newText }); // TODO: This should trigger a sync
     assert(item.attributes.text?.data === newText.data, "merge success");
     assert(item.isSynced() === false, "item considered not synced");
     console.log("sync 2");
@@ -158,6 +158,18 @@ export const tests = async () => {
     // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
     // console.log("items returned", res.length);
     core.ws.close();
+  });
+
+  suite.skip("mem adapter", () => {
+    // // Examples for the solid adapter within the web app:
+    // class AirdayUIItem {}
+    // class AirdayUIContainer {}
+    // class SolidAdapterExample {
+    //   items: Map<string, AirdayUIItem> = new Map(); // reactive
+    //   containers: Map<string, AirdayUIContainer> = new Map(); // reactive
+    //   constructor() {}
+    // }
+    // const solidAdapter = new SolidAdapterExample();
   });
 
   // suite.skip("Get diff items", async (assert) => {});

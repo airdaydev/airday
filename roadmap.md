@@ -1,10 +1,11 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] consider: ONE TABLE FOR ALL SYNC RESOURCES (oh-oh)
-- [] add in-memory list to core with subscription
-- [] attribute level change sets (ensure sync respects dirty set)
+- [] unify in-memory list & persistent idb list
+- [] add subscription to in-memory list to core
 - [] complete get items since streaming api
+- [] consider: ONE TABLE FOR ALL SYNC RESOURCES (oh-oh)
+- [] attribute level change sets (ensure sync respects dirty set)
 - [] delete items (tombstones, same api)
 - [] fan out live updates - maintain local library subscription map for sqlite version
 - [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)
