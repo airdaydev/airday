@@ -90,8 +90,8 @@ pub async fn process_sync_batch<'a>(
     let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
-            ActionProto::SyncItemActionProto => {
-                let Some(action) = batch_component.action_as_sync_item_action_proto() else {
+            ActionProto::SyncObjectActionProto => {
+                let Some(action) = batch_component.action_as_sync_object_action_proto() else {
                     responses.push(BatchAction::Error {
                         action_id: None,
                         message: String::from("invalid message"),
@@ -99,7 +99,7 @@ pub async fn process_sync_batch<'a>(
                     continue;
                 };
                 let action_id = proto_uuid_to_uuid(batch_component.action_id());
-                let library_id = proto_uuid_to_uuid(action.item().library_id());
+                let library_id = proto_uuid_to_uuid(action.library_id());
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {
                         action_id: Some(action_id),
@@ -107,7 +107,7 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let item = SyncObject::from_item_proto(&action.item());
+                let item = SyncObject::from_sync_object_proto(&action);
                 action_index.push((action_id, items.len()));
                 items.push(item);
             }

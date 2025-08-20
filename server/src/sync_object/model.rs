@@ -1,14 +1,13 @@
-use std::pin::Pin;
-
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync::proto_generated::proto::ItemProto,
+    sync::proto_generated::proto::{FieldValueProto, SyncObjectActionProto},
 };
 use async_trait::async_trait;
 use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
+use std::pin::Pin;
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -46,23 +45,42 @@ pub struct SyncObject {
 }
 
 impl SyncObject {
-    pub fn from_item_proto<'a>(item_proto: &'a ItemProto) -> SyncObject {
-        let lww = item_proto.text().unwrap();
-        let timestamp = lww.timestamp().unwrap();
-        let text_lww = LWWRegister {
-            timestamp: LWWTimestamp {
-                utc: timestamp.utc(),
-                pid: timestamp.pid(),
-            },
-            data: lww.data().unwrap().to_string(),
-        };
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> SyncObject {
+        let mut attributes = ItemAttributes { text: None };
+
+        // TODO: Reliability + all other attributes
+        // Process attributes array
+        if let Some(attrs) = sync_obj_proto.attributes() {
+            for i in 0..attrs.len() {
+                let attr = attrs.get(i);
+                if attr.field() == Some("text") {
+                    match attr.value_type() {
+                        FieldValueProto::StringValueProto => {
+                            if let Some(string_val) = attr.value_as_string_value_proto() {
+                                if let Some(text_data) = string_val.v() {
+                                    let timestamp = attr.timestamp().unwrap();
+                                    let text_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: text_data.to_string(),
+                                    };
+                                    attributes.text = Some(text_lww);
+                                }
+                            }
+                        }
+                        _ => {} // Handle other value types if needed
+                    }
+                }
+            }
+        }
+
         SyncObject {
-            id: proto_uuid_to_uuid(item_proto.id()),
-            library_id: proto_uuid_to_uuid(item_proto.library_id()),
+            id: proto_uuid_to_uuid(sync_obj_proto.id()),
+            library_id: proto_uuid_to_uuid(sync_obj_proto.library_id()),
             server_seq: None,
-            attributes: ItemAttributes {
-                text: Some(text_lww),
-            },
+            attributes,
             tombstone_utc: None,
         }
     }
