@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { LWWRegister, TimestampProducer } from "../src/crdt/lww";
-import { Builder, ByteBuffer } from "flatbuffers";
 
 // TODO: This should really include toJSON as well
 test("LWWRegister parsing", async () => {

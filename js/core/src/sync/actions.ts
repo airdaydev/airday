@@ -1,5 +1,5 @@
 import { AirdayItem } from "./model";
-import { Builder, ByteBuffer, type Offset } from "flatbuffers";
+import { Builder, type Offset } from "flatbuffers";
 import {
   SyncObjectActionProto,
   ObjectTypeProto,
