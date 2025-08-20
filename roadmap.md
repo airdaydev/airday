@@ -1,8 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] clean up after unify flatbuffer types & actions
 - [] share db for both items & lists - all variant props in attributes (Differentiate on input & output!)
-- [] unify flatbuffer types & actions...?
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api

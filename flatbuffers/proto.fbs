@@ -2,31 +2,13 @@
 
 namespace proto;
 
-// Rust will still deal in U64s before IO
 struct LWWTimestampProto {
   utc: long;
   pid: long;
 }
 
-table LWWRegisterStringProto {
-  timestamp: LWWTimestampProto;
-  data: string;
-}
-
-struct LWWRegisterBoolProto {
-  timestamp: LWWTimestampProto;
-  data: bool;
-}
-
 struct UuidProto {
   value: [uint8:16];
-}
-
-table ItemProto {
-  library_id: UuidProto (required);
-  id: UuidProto (required);
-  text: LWWRegisterStringProto;
-  completed: LWWRegisterBoolProto;
 }
 
 table LibraryProto {
@@ -34,8 +16,32 @@ table LibraryProto {
   name: string;
 }
 
-table SyncItemActionProto {
-  item: ItemProto (required);
+enum ObjectTypeProto: byte {
+  Item,
+  Container,
+}
+
+table StrVal { v: string; }
+table BoolVal { v: bool; }
+table UuidVal { v: UuidProto; }
+
+union FieldVal {
+  StrVal,
+  BoolVal,
+  UuidVal,
+}
+
+table AttributeProto {
+  field: string; // Arbitrary field name (TODO: Non-arbitrary i.e. enum?)
+  val: FieldVal;
+  timestamp: LWWTimestampProto;
+}
+
+table SyncObjectActionProto {
+  type: ObjectTypeProto;
+  library_id: UuidProto (required);
+  id: UuidProto (required);
+  attributes: [AttributeProto];
 }
 
 table AuthenticateActionProto {
@@ -57,19 +63,13 @@ table BatchResponseProto {
   server_seq: long;
 }
 
-enum ResourceType: byte {
-  Item,
-  List,
-}
-
 table SyncStreamReqProto {
-  resource: ResourceType;
   library_id: UuidProto (required);
   server_seq: long;
 }
 
 union ActionProto {
-  SyncItemActionProto, // Syncs a single item
+  SyncObjectActionProto, // Syncs a single object
   BatchResponseProto,
 }
 
@@ -88,9 +88,8 @@ table ErrorResponseProto {
   error: string;
 }
 
-
 // TODO: LibrarySync
-// TODO: Merkle check proto of items, lists (e.g. ItemDiffReqProto)
+// TODO: Merkle check proto of objects (e.g. ObjectDiffReqProto)
 union MessageProto {
   AuthenticateActionProto, // Websocket authentication request
   SyncStreamReqProto, // Requests a stream from server
