@@ -21,19 +21,17 @@ enum ObjectTypeProto: byte {
   Container,
 }
 
-table StrVal { v: string; }
-table BoolVal { v: bool; }
-table UuidVal { v: UuidProto; }
+table StringValueProto { v: string; }
+table BoolValueProto { v: bool; }
 
-union FieldVal {
-  StrVal,
-  BoolVal,
-  UuidVal,
+union FieldValueProto {
+  StringValueProto,
+  BoolValueProto,
 }
 
 table AttributeProto {
   field: string; // Arbitrary field name (TODO: Non-arbitrary i.e. enum?)
-  val: FieldVal;
+  value: FieldValueProto;
   timestamp: LWWTimestampProto;
 }
 
