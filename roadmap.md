@@ -182,32 +182,31 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 
 ## Multiplatform goals
 - [] PWA
-- [] Linux Tauri release (?)
-- [] MacOS Tauri release (?)
 - [] Rust core
 - [] Native iOS release
 - [] Native Android release
+- [] Linux Tauri release (?)
+- [] MacOS Tauri release (?)
 
 ## Features
-- [] User switching
+- [] @airday/core - export database to json
 - [] CalDAV support
-- [] Experiment with sounds (e.g. speaking llm prompts)
+- [] User switching
 - [] List cal view
 - [] Monthly cal view
 - [] Annual cal view
-- [] Kanban board
-- [] Webgl shadows/pickup
 - [] Markdown descriptions
-- [] LLM Prompting / MCP
+- [] Collaborative text fields
 - [] Custom fields
 - [] JSON export
 - [] Shared libraries (Enforce library limits (3 per user?))
-- [] qwen3-1.7B exploration
-- [] @airday/core - export database to json
-- [] Consider jmap calendar support
 - [] Locations/Map?
 - [] voice notes
+- [] Experiment with sounds (e.g. speaking llm prompts)
 - [] Print styles
+- [] LLM Prompting / MCP
+- [] qwen3-1.7B exploration
+- [] Consider jmap calendar support
 
 ## Multi-region goals:
 - Postgresql multi-region cluster (write in US) (no sharding necessary)
