@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS sync_object (
   -- static, immutable vals
   id UUID NOT NULL PRIMARY KEY,
   library_id UUID NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('item', 'container')),
+  obj_type INT NOT NULL CHECK (obj_type BETWEEN 0 AND 65535),
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
   attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
   -- TODO: We can implement dynamic attributes here (perhaps even enforce a schema)

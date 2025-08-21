@@ -2,13 +2,18 @@ use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
+use tokio::task::id;
 use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
     common::error::AppError,
-    sync_object::model::{
-        ItemAttributes, ItemAttributesJson, JsonAttributes, SqlItem, SyncObject, SyncObjectModel,
+    sync_object::{
+        model::{
+            ItemAttributes, ItemAttributesJson, JsonAttributes, ListAttributes, ListAttributesJson,
+            ObjectKind, SqlSyncObject, SyncObject, SyncObjectMeta, SyncObjectModel,
+        },
+        types::{SyncObjectType, sync_object_type},
     },
 };
 
@@ -52,8 +57,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
     while retries < 3 {
         // Select for merge
         let result = sqlx::query_as!(
-            SqlItem,
-            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
+            SqlSyncObject,
+            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
           server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
@@ -75,15 +80,43 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
                 "item is tombstoned",
             )));
         }
-        // Get existing attributes
+        let meta = SyncObjectMeta {
+            id: sql_item.id,
+            library_id: sql_item.library_id,
+            server_seq: Some(sql_item.server_seq),
+            tombstone_utc: sql_item.tombstone_utc,
+        };
+        let sync_object: SyncObject = match sql_item.obj_type {
+            sync_object_type::ITEM_TYPE => {
+                let mut attrs: ItemAttributes = sql_item
+                    .attributes
+                    .as_ref()
+                    .and_then(|json| {
+                        serde_json::from_value::<ItemAttributesJson>(json.clone()).ok()
+                    })
+                    .map(ItemAttributes::from)
+                    .unwrap();
+                SyncObject::Item { meta, attrs }
+            }
+            sync_object_type::CONTAINER_TYPE => {
+                let mut attrs: ListAttributes = sql_item
+                    .attributes
+                    .as_ref()
+                    .and_then(|json| {
+                        serde_json::from_value::<ListAttributesJson>(json.clone()).ok()
+                    })
+                    .map(ListAttributes::from)
+                    .unwrap();
+                SyncObject::Container { meta, attrs }
+            }
+            other_type => {
+                // Unknown type, throw
+                return Err(AppError::DatabaseError(format!("Bad type: {}", other_type)));
+            }
+        };
+        // Get existing attributes (We need to figure out the item type ahead of time)
         // TODO: How to handle parsing error...? Parsing must be VERY robust
         // TODO: Put future timestamp protection here
-        let mut src_attrs: ItemAttributes = sql_item
-            .attributes
-            .as_ref()
-            .and_then(|json| serde_json::from_value::<ItemAttributesJson>(json.clone()).ok())
-            .map(ItemAttributes::from)
-            .unwrap();
         debug!("existing_attrs {:?}", src_attrs);
         src_attrs.merge(&item.attributes); // TODO: Merge per item!
 
@@ -143,9 +176,13 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         library_id: &Uuid,
         server_seq: i64,
     ) -> Pin<
-        Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
+        Box<
+            dyn futures_util::Stream<Item = Result<SqlSyncObject, sqlx::Error>>
+                + std::marker::Send
+                + 'a,
+        >,
     > {
-        sqlx::query_as::<_, SqlItem>(
+        sqlx::query_as::<_, SqlSyncObject>(
             r#"SELECT id, library_id, server_seq, tombstone_utc, attributes
             FROM item
             WHERE library_id = ? AND server_seq >= ?

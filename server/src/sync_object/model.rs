@@ -1,7 +1,7 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
     sync::proto_generated::proto::{FieldValueProto, ObjectTypeProto, SyncObjectActionProto},
-    sync_object::attributes::item_field_id,
+    sync_object::types::item_field_id,
 };
 use async_trait::async_trait;
 use crdt::LWWRegister;
@@ -29,12 +29,6 @@ impl<T: Clone> LWWDefinitionJson<T> {
             data: self.data.clone(),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ObjectKind {
-    Item = 0,
-    Container = 1,
 }
 
 #[derive(Debug, Clone)]
@@ -224,9 +218,10 @@ impl ItemAttributes {
 pub type JsonAttributes = Option<serde_json::Value>;
 
 #[derive(FromRow)]
-pub struct SqlItem {
+pub struct SqlSyncObject {
     // static attrs
     pub id: Uuid,
+    pub obj_type: i64,
     pub library_id: Uuid,
     // dynamic attrs (lww-map)
     pub attributes: JsonAttributes,
@@ -235,15 +230,15 @@ pub struct SqlItem {
     pub tombstone_utc: Option<i64>,
 }
 
-// TODO: Implement Item * Item from SqlItem (Maybe?)
+// TODO: Implement Item * Item from SqlSyncObject (Maybe?)
 // pub struct Item {
 //     pub id: Uuid,
 //     pub library_id: Uuid,
 //     pub text: Option<LWWRegister<>>,
 // }
 
-// impl From<SqlItem> for Item {
-//     fn from(sql_item: SqlItem) -> Self {
+// impl From<SqlSyncObject> for Item {
+//     fn from(sql_item: SqlSyncObject) -> Self {
 //         Self {
 //             id: sql_item.id,
 //             // TODO: back and forth between json type
@@ -260,7 +255,11 @@ pub trait SyncObjectModel: Send + Sync {
         library_id: &Uuid,
         server_seq: i64,
     ) -> Pin<
-        Box<dyn futures_util::Stream<Item = Result<SqlItem, sqlx::Error>> + std::marker::Send + 'a>,
+        Box<
+            dyn futures_util::Stream<Item = Result<SqlSyncObject, sqlx::Error>>
+                + std::marker::Send
+                + 'a,
+        >,
     >;
     // async fn merge(&self, item: &Item) -> Result<(), AppError>;
     async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError>;
