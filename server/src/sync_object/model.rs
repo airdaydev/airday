@@ -13,16 +13,16 @@ use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
 struct LWWDefinitionJson<T> {
-    utc: f64,
-    pid: f64,
+    utc: i64,
+    pid: i64,
     data: T,
 }
 
 impl<T: Clone> LWWDefinitionJson<T> {
     pub fn to_lww(&self) -> LWWRegister<T> {
         let timestamp = LWWTimestamp {
-            utc: self.utc as i64,
-            pid: self.pid as i64,
+            utc: self.utc,
+            pid: self.pid,
         };
         LWWRegister {
             timestamp,
@@ -45,8 +45,56 @@ pub enum SyncObject {
     },
     Container {
         meta: SyncObjectMeta,
-        attrs: ListAttrs,
+        attrs: ListAttributes,
     },
+    // TODO: Expose sync engine type defs via macros
+    // TODO: Dynamic types
+}
+
+impl SyncObject {
+    pub fn get_meta(&self) -> &SyncObjectMeta {
+        match self {
+            SyncObject::Container { meta, .. } => meta,
+            SyncObject::Item { meta, .. } => meta,
+        }
+    }
+    // TODO: Make direct functions on the attributes themselves
+    pub fn get_attributes_json(&self) -> Result<JsonAttributes, AppError> {
+        match self {
+            SyncObject::Container { attrs, .. } => {
+                let mut json_attrs = ListAttributesJson { name: None };
+                if let Some(name_lww) = &attrs.name {
+                    json_attrs.name = Some(LWWDefinitionJson {
+                        utc: name_lww.timestamp.utc,
+                        pid: name_lww.timestamp.pid,
+                        data: name_lww.data.clone(),
+                    })
+                }
+                let json_value = serde_json::to_value(json_attrs).map_err(|err| {
+                    AppError::ServerError(format!("Failed to serialize attributes: {}", err))
+                })?;
+
+                Ok(Some(json_value))
+            }
+            SyncObject::Item { attrs, .. } => {
+                let mut json_attrs = ItemAttributesJson { text: None };
+
+                if let Some(text_lww) = &attrs.text {
+                    json_attrs.text = Some(LWWDefinitionJson {
+                        utc: text_lww.timestamp.utc,
+                        pid: text_lww.timestamp.pid,
+                        data: text_lww.data.clone(),
+                    });
+                }
+
+                let json_value = serde_json::to_value(json_attrs).map_err(|err| {
+                    AppError::ServerError(format!("Failed to serialize attributes: {}", err))
+                })?;
+
+                Ok(Some(json_value))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +149,7 @@ impl ItemAttributes {
 }
 
 #[derive(Debug, Clone)]
-pub struct ListAttrs {
+pub struct ListAttributes {
     pub name: Option<LWWRegister<String>>,
 }
 
@@ -118,11 +166,11 @@ impl SyncObject {
         };
         return match sync_obj_proto.type_() {
             ObjectTypeProto::Item => {
-                let mut attrs = ItemAttributes { text: None };
+                let attrs = ItemAttributes { text: None };
                 Ok(SyncObject::Item { meta, attrs })
             }
             ObjectTypeProto::Container => {
-                let mut attrs = ListAttrs { name: None };
+                let attrs = ListAttributes { name: None };
                 Ok(SyncObject::Container { meta, attrs })
             }
             _ => Err(AppError::ValidationError(String::from(
@@ -142,31 +190,14 @@ impl From<ItemAttributesJson> for ItemAttributes {
     }
 }
 
-// Should serialize/deserialize to this
 #[derive(sqlx::FromRow, Deserialize, Serialize)]
 pub struct ItemAttributesJson {
     text: Option<LWWDefinitionJson<String>>,
 }
 
-pub fn convert_item_attributes_to_json(
-    attributes: &ItemAttributes,
-) -> Result<JsonAttributes, AppError> {
-    let mut json_attrs = ItemAttributesJson { text: None };
-
-    // Convert text attribute if it exists
-    if let Some(text_lww) = &attributes.text {
-        json_attrs.text = Some(LWWDefinitionJson {
-            utc: text_lww.timestamp.utc as f64,
-            pid: text_lww.timestamp.pid as f64,
-            data: text_lww.data.clone(),
-        });
-    }
-
-    // Serialize to JSON
-    let json_value = serde_json::to_value(json_attrs)
-        .map_err(|err| AppError::ServerError(format!("Failed to serialize attributes: {}", err)))?;
-
-    Ok(Some(json_value))
+#[derive(sqlx::FromRow, Deserialize, Serialize)]
+pub struct ListAttributesJson {
+    name: Option<LWWDefinitionJson<String>>,
 }
 
 impl ItemAttributes {

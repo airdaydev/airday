@@ -9,7 +9,6 @@ use crate::{
     common::error::AppError,
     sync_object::model::{
         ItemAttributes, ItemAttributesJson, JsonAttributes, SqlItem, SyncObject, SyncObjectModel,
-        convert_item_attributes_to_json,
     },
 };
 
@@ -24,14 +23,13 @@ impl SyncObjectModelSqlite {
 }
 
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
-    // TODO: Item or List?
-    let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
+    let attributes_json = item.get_attributes_json()?;
     let server_seq = now_micros();
     sqlx::query!(
         r#"INSERT INTO sync_object (id, library_id, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?)"#,
-        item.id,
-        item.library_id,
+        item.get_meta().id,
+        item.get_meta().library_id,
         attributes_json,
         server_seq,
         Option::<i64>::None
@@ -59,8 +57,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
           server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
-            item.library_id,
-            item.id,
+            item.get_meta().library_id,
+            item.get_meta().id,
         )
         .fetch_optional(tx.as_mut())
         .await?;
@@ -87,7 +85,7 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
             .map(ItemAttributes::from)
             .unwrap();
         debug!("existing_attrs {:?}", src_attrs);
-        src_attrs.merge(&item.attributes);
+        src_attrs.merge(&item.attributes); // TODO: Merge per item!
 
         let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
         let server_seq = now_micros();
@@ -100,8 +98,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
             updated_attributes_json,
             server_seq,
-            item.id,
-            item.library_id,
+            item.get_meta().id,
+            item.get_meta().library_id,
             last_server_seq,
         )
         .execute(tx.as_mut())
