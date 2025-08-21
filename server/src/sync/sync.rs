@@ -107,7 +107,14 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let item = SyncObject::from_sync_object_proto(&action);
+                let Ok(item) = SyncObject::from_sync_object_proto(&action) else {
+                    // TODO: Propagate error?
+                    responses.push(BatchAction::Error {
+                        action_id: Some(action_id),
+                        message: String::from("invalid object"),
+                    });
+                    continue;
+                };
                 action_index.push((action_id, items.len()));
                 items.push(item);
             }

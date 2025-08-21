@@ -30,6 +30,7 @@ mod auth {
     pub mod session;
 }
 mod sync_object {
+    pub mod attributes;
     pub mod model;
     pub mod sqlite;
 }

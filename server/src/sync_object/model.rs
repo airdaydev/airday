@@ -1,6 +1,7 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync::proto_generated::proto::{FieldValueProto, SyncObjectActionProto},
+    sync::proto_generated::proto::{FieldValueProto, ObjectTypeProto, SyncObjectActionProto},
+    sync_object::attributes::item_field_id,
 };
 use async_trait::async_trait;
 use crdt::LWWRegister;
@@ -30,59 +31,104 @@ impl<T: Clone> LWWDefinitionJson<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectKind {
+    Item = 0,
+    Container = 1,
+}
+
+#[derive(Debug, Clone)]
+pub enum SyncObject {
+    Item {
+        meta: SyncObjectMeta,
+        attrs: ItemAttributes,
+    },
+    Container {
+        meta: SyncObjectMeta,
+        attrs: ListAttrs,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncObjectMeta {
+    pub id: Uuid,
+    pub library_id: Uuid,
+    pub server_seq: Option<i64>,
+    pub tombstone_utc: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ItemAttributes {
     pub text: Option<LWWRegister<String>>,
 }
 
-#[derive(Debug)]
-pub struct SyncObject {
-    pub id: Uuid,
-    pub library_id: Uuid,
-    pub attributes: ItemAttributes,
-    pub server_seq: Option<i64>, // This is a server-side only attribute, and is not always available e.g. created from flatbuffer
-    pub tombstone_utc: Option<i64>,
-}
-
-impl SyncObject {
-    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> SyncObject {
+impl ItemAttributes {
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) {
         let mut attributes = ItemAttributes { text: None };
-
-        // TODO: Reliability + all other attributes
-        // Process attributes array
         if let Some(attrs) = sync_obj_proto.attributes() {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
-                if attr.field() == Some("text") {
-                    match attr.value_type() {
-                        FieldValueProto::StringValueProto => {
-                            if let Some(string_val) = attr.value_as_string_value_proto() {
-                                if let Some(text_data) = string_val.v() {
-                                    let timestamp = attr.timestamp().unwrap();
-                                    let text_lww = LWWRegister {
-                                        timestamp: LWWTimestamp {
-                                            utc: timestamp.utc(),
-                                            pid: timestamp.pid(),
-                                        },
-                                        data: text_data.to_string(),
-                                    };
-                                    attributes.text = Some(text_lww);
+                match attr.field_id() {
+                    item_field_id::ITEM_TEXT => {
+                        match attr.value_type() {
+                            FieldValueProto::StringValueProto => {
+                                if let Some(string_val) = attr.value_as_string_value_proto() {
+                                    if let Some(text_data) = string_val.v() {
+                                        let timestamp = attr.timestamp().unwrap();
+                                        let text_lww = LWWRegister {
+                                            timestamp: LWWTimestamp {
+                                                utc: timestamp.utc(),
+                                                pid: timestamp.pid(),
+                                            },
+                                            data: text_data.to_string(),
+                                        };
+                                        attributes.text = Some(text_lww);
+                                    }
                                 }
                             }
+                            _ => {
+                                // Ignore mistyped field, but consider adding err to span
+                            }
                         }
-                        _ => {} // Handle other value types if needed
+                    }
+                    _ => {
+                        // TODO: Ignore unknown value, but later used for custom attribute values
                     }
                 }
             }
         }
+    }
+}
 
-        SyncObject {
+#[derive(Debug, Clone)]
+pub struct ListAttrs {
+    pub name: Option<LWWRegister<String>>,
+}
+
+impl SyncObject {
+    pub fn from_sync_object_proto<'a>(
+        sync_obj_proto: &'a SyncObjectActionProto,
+    ) -> Result<SyncObject, AppError> {
+        let meta = SyncObjectMeta {
             id: proto_uuid_to_uuid(sync_obj_proto.id()),
             library_id: proto_uuid_to_uuid(sync_obj_proto.library_id()),
-            server_seq: None,
-            attributes,
+            server_seq: None, // Because these are coming from the client, typically
             tombstone_utc: None,
-        }
+            // tombstone_utc: Some(sync_obj_proto.tombstone()), so if it's 0 we can ignore it safely, right?
+        };
+        return match sync_obj_proto.type_() {
+            ObjectTypeProto::Item => {
+                let mut attrs = ItemAttributes { text: None };
+                Ok(SyncObject::Item { meta, attrs })
+            }
+            ObjectTypeProto::Container => {
+                let mut attrs = ListAttrs { name: None };
+                Ok(SyncObject::Container { meta, attrs })
+            }
+            _ => Err(AppError::ValidationError(String::from(
+                "SyncObjectType not found",
+            ))),
+        };
     }
 }
 

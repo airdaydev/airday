@@ -30,7 +30,7 @@ union FieldValueProto {
 }
 
 table AttributeProto {
-  field: string; // Arbitrary field name (TODO: Non-arbitrary i.e. enum?)
+  field_id: short;
   value: FieldValueProto;
   timestamp: LWWTimestampProto;
 }

@@ -24,6 +24,7 @@ impl SyncObjectModelSqlite {
 }
 
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
+    // TODO: Item or List?
     let attributes_json = convert_item_attributes_to_json(&item.attributes)?;
     let server_seq = now_micros();
     sqlx::query!(
