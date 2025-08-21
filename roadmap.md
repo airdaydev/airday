@@ -1,8 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] clean up after unify flatbuffer types & actions
-- [] share db for both items & lists - all variant props in attributes (Differentiate on input & output!)
+- [] continue cleanup of sync - start with merge definitions on the attributes themselves always have to make sure the item type matches!? - consider doing everything in the match block
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api

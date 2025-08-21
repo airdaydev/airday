@@ -184,6 +184,16 @@ impl From<ItemAttributesJson> for ItemAttributes {
     }
 }
 
+impl From<ListAttributesJson> for ListAttributes {
+    fn from(attr_json: ListAttributesJson) -> ListAttributes {
+        let mut attrs = ListAttributes { name: None };
+        if let Some(name) = attr_json.name {
+            attrs.name = Some(name.to_lww())
+        }
+        attrs
+    }
+}
+
 #[derive(sqlx::FromRow, Deserialize, Serialize)]
 pub struct ItemAttributesJson {
     text: Option<LWWDefinitionJson<String>>,

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-use std::pin::Pin;
+use std::{any::Any, pin::Pin};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -50,7 +50,11 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resu
 // This could result in both clients merging into the same read data
 // However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
-async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
+// TODO: We could consider cutting out the full object and just concentrating on the attributes
+async fn merge<'a>(
+    tx: &mut Transaction<'a, Sqlite>,
+    incoming_sync_obj: &SyncObject,
+) -> Result<i64, AppError> {
     // We allow 3x retries when contending with competing thread
     let mut retries = 0;
     while retries < 3 {
@@ -61,33 +65,38 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
           server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
-            item.get_meta().library_id,
-            item.get_meta().id,
+            incoming_sync_obj.get_meta().library_id,
+            incoming_sync_obj.get_meta().id,
         )
         .fetch_optional(tx.as_mut())
         .await?;
-        // 2. Check if item exists
-        let Some(sql_item) = result else {
-            // Item does not exist, insert new item
-            let server_seq = insert(tx, item).await?;
+        // 2. Check if sync_obj exists
+        let Some(sql_sync_obj) = result else {
+            // Item does not exist, insert new sync_obj
+            let server_seq = insert(tx, incoming_sync_obj).await?;
             return Ok(server_seq);
         };
-        if let Some(_) = sql_item.tombstone_utc {
+        if let Some(_) = sql_sync_obj.tombstone_utc {
             // Item is tombstones - discard changes
             // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
             return Err(AppError::ValidationError(String::from(
-                "item is tombstoned",
+                "sync_obj is tombstoned",
             )));
         }
         let meta = SyncObjectMeta {
-            id: sql_item.id,
-            library_id: sql_item.library_id,
-            server_seq: Some(sql_item.server_seq),
-            tombstone_utc: sql_item.tombstone_utc,
+            id: sql_sync_obj.id,
+            library_id: sql_sync_obj.library_id,
+            server_seq: Some(sql_sync_obj.server_seq),
+            tombstone_utc: sql_sync_obj.tombstone_utc,
         };
-        let sync_object: SyncObject = match sql_item.obj_type {
+        let sync_object: SyncObject = match sql_sync_obj.obj_type {
             sync_object_type::ITEM_TYPE => {
-                let mut attrs: ItemAttributes = sql_item
+                if !matches!(incoming_sync_obj, SyncObject::Item { .. }) {
+                    return Err(AppError::DatabaseError(String::from(
+                        "Type mismatch on merge",
+                    )));
+                }
+                let mut attrs: ItemAttributes = sql_sync_obj
                     .attributes
                     .as_ref()
                     .and_then(|json| {
@@ -98,7 +107,12 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
                 SyncObject::Item { meta, attrs }
             }
             sync_object_type::CONTAINER_TYPE => {
-                let mut attrs: ListAttributes = sql_item
+                if !matches!(incoming_sync_obj, SyncObject::Item { .. }) {
+                    return Err(AppError::DatabaseError(String::from(
+                        "Type mismatch on merge",
+                    )));
+                }
+                let mut attrs: ListAttributes = sql_sync_obj
                     .attributes
                     .as_ref()
                     .and_then(|json| {
@@ -113,16 +127,16 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
                 return Err(AppError::DatabaseError(format!("Bad type: {}", other_type)));
             }
         };
-        // Get existing attributes (We need to figure out the item type ahead of time)
-        // TODO: How to handle parsing error...? Parsing must be VERY robust
-        // TODO: Put future timestamp protection here
-        debug!("existing_attrs {:?}", src_attrs);
-        src_attrs.merge(&item.attributes); // TODO: Merge per item!
 
-        let updated_attributes_json = convert_item_attributes_to_json(&src_attrs)?;
+        // TODO: Put future timestamp protection here
+        debug!("existing_attrs {:?}", sync_object);
+        sync_object.merge(&incoming_sync_obj); // TODO: Merge per sync_obj!
+
+        // let updated_attributes_json = convert_sync_obj_attributes_to_json(&src_attrs)?;
+        // TODO: Convert back to JSON to store!
         let server_seq = now_micros();
 
-        let last_server_seq = sql_item.server_seq as i64;
+        let last_server_seq = sql_sync_obj.server_seq as i64;
 
         let result = sqlx::query!(
             r#"UPDATE sync_object
@@ -130,8 +144,8 @@ async fn merge<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Resul
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
             updated_attributes_json,
             server_seq,
-            item.get_meta().id,
-            item.get_meta().library_id,
+            incoming_sync_obj.get_meta().id,
+            incoming_sync_obj.get_meta().library_id,
             last_server_seq,
         )
         .execute(tx.as_mut())
