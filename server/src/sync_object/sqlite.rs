@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
-use tokio::task::id;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -11,9 +10,9 @@ use crate::{
     sync_object::{
         model::{
             ItemAttributes, ItemAttributesJson, JsonAttributes, ListAttributes, ListAttributesJson,
-            ObjectKind, SqlSyncObject, SyncObject, SyncObjectMeta, SyncObjectModel,
+            SqlSyncObject, SyncObject, SyncObjectMeta, SyncObjectModel,
         },
-        types::{SyncObjectType, sync_object_type},
+        types::sync_object_type,
     },
 };
 

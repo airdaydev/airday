@@ -1,9 +1,12 @@
 // use ts_rs::TS;
 
+// TODO: generate typescript types (or find higher level way)
 // #[derive(TS)]
 // #[ts(export)]
 pub mod item_field_id {
     pub const ITEM_TEXT: i16 = 0;
+    // -- TODO: item.type could be an enum (repeat, static, series, shuffle, playlist)
+    // -- TODO: repeat could be a property...
 }
 
 pub mod list_field_id {
