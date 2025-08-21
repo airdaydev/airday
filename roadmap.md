@@ -188,7 +188,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 
 ## Features
 - [] @airday/core - export database to json
-- [] CalDAV support
+- [] CalDAV bridge! (pull from event type - as opposed to event_encrypted type!)
 - [] User switching
 - [] List cal view
 - [] Monthly cal view
