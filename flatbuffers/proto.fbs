@@ -21,19 +21,23 @@ enum ObjectTypeProto: byte {
   Container,
 }
 
-table StringValueProto { v: string; }
-table BoolValueProto { v: bool; }
+enum AttrTypeProto: ubyte { NONE=0, STRING=1, BOOL=2, I64=3, F64=4, BYTES=5 }
 
-union FieldValueProto {
-  StringValueProto,
-  BoolValueProto,
-}
-
+// https://groups.google.com/g/flatbuffers/c/jcgLfSd1L0o?pli=1
+// (Messageboard discussing union vs wide table)
 table AttributeProto {
-  field_id: short;
-  value: FieldValueProto;
+  // Meta
+  field_id: ushort;
+  value_type: AttrTypeProto;
   timestamp: LWWTimestampProto;
+  // Values
+  i64_fb: long;
+  f64_fb: double;
+  string: string;
+  bytes: [ubyte];
 }
+
+table AttributeSetProto { attributes: [AttributeProto]; }
 
 table SyncObjectActionProto {
   type: ObjectTypeProto;

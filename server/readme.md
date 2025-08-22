@@ -9,7 +9,7 @@ cargo test -- --nocapture
 ```
 
 ## Additional deps to explore
-- chrono (tz package)
-- chrono-tz (tz extension?)
-- validator (validate requests)
-- automerge (maybe, crdt lib)
+- chrono (tz package, for calendar)
+- chrono-tz (tz extension, for calendar)
+- automerge (for text crdts)
+- criterion = { version = "0.7", features = ["html_reports"] }
