@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-use std::{any::Any, pin::Pin};
+use std::pin::Pin;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -91,11 +91,13 @@ async fn merge<'a>(
         };
         let sync_object: SyncObject = match sql_sync_obj.obj_type {
             sync_object_type::ITEM_TYPE => {
-                if !matches!(incoming_sync_obj, SyncObject::Item { .. }) {
+                let incoming_attrs = if let SyncObject::Item { attrs, .. } = incoming_sync_obj {
+                    attrs
+                } else {
                     return Err(AppError::DatabaseError(String::from(
                         "Type mismatch on merge",
                     )));
-                }
+                };
                 let mut attrs: ItemAttributes = sql_sync_obj
                     .attributes
                     .as_ref()
@@ -104,14 +106,18 @@ async fn merge<'a>(
                     })
                     .map(ItemAttributes::from)
                     .unwrap();
+                attrs.merge(&incoming_attrs); // Mutable
                 SyncObject::Item { meta, attrs }
             }
             sync_object_type::CONTAINER_TYPE => {
-                if !matches!(incoming_sync_obj, SyncObject::Item { .. }) {
+                let incoming_attrs = if let SyncObject::Container { attrs, .. } = incoming_sync_obj
+                {
+                    attrs
+                } else {
                     return Err(AppError::DatabaseError(String::from(
                         "Type mismatch on merge",
                     )));
-                }
+                };
                 let mut attrs: ListAttributes = sql_sync_obj
                     .attributes
                     .as_ref()
@@ -120,6 +126,7 @@ async fn merge<'a>(
                     })
                     .map(ListAttributes::from)
                     .unwrap();
+                attrs.merge(&incoming_attrs); // Mutable
                 SyncObject::Container { meta, attrs }
             }
             other_type => {
@@ -128,12 +135,12 @@ async fn merge<'a>(
             }
         };
 
-        // TODO: Put future timestamp protection here
         debug!("existing_attrs {:?}", sync_object);
-        sync_object.merge(&incoming_sync_obj); // TODO: Merge per sync_obj!
-
-        // let updated_attributes_json = convert_sync_obj_attributes_to_json(&src_attrs)?;
-        // TODO: Convert back to JSON to store!
+        let Ok(json_attributes) = sync_object.get_attributes_json() else {
+            return Err(AppError::ServerError(String::from(
+                "Failed to translate merge output to JSON",
+            )));
+        };
         let server_seq = now_micros();
 
         let last_server_seq = sql_sync_obj.server_seq as i64;
@@ -142,7 +149,7 @@ async fn merge<'a>(
             r#"UPDATE sync_object
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-            updated_attributes_json,
+            json_attributes,
             server_seq,
             incoming_sync_obj.get_meta().id,
             incoming_sync_obj.get_meta().library_id,

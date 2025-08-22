@@ -225,6 +225,27 @@ impl ItemAttributes {
     }
 }
 
+impl ListAttributes {
+    pub fn merge<'a>(&'a mut self, attrs: &ListAttributes) -> &'a ListAttributes {
+        // Merging text
+        if let Some(name) = &attrs.name {
+            if let Some(self_name) = &self.name {
+                // case 1: attr does exist, merge via app logic
+                // TODO: Ergonomics!
+                let lww_a = self_name.clone();
+                let lww_b = name.clone();
+                let merged = lww_a.merge(lww_b).unwrap();
+                self.name = Some(merged);
+            } else {
+                // case 2: attr doesn't exist on self, replace
+                self.name = Some(name.clone());
+            }
+        }
+        // TODO: Repeat for each attribute (after improving ergonomics)
+        self
+    }
+}
+
 pub type JsonAttributes = Option<serde_json::Value>;
 
 #[derive(FromRow)]
