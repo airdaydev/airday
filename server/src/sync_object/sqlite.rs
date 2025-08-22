@@ -1,10 +1,3 @@
-use async_trait::async_trait;
-use crdt::timestamp::now_micros;
-use sqlx::{Sqlite, SqlitePool, Transaction};
-use std::pin::Pin;
-use tracing::debug;
-use uuid::Uuid;
-
 use crate::{
     common::error::AppError,
     sync_object::{
@@ -15,6 +8,12 @@ use crate::{
         types::sync_object_type,
     },
 };
+use async_trait::async_trait;
+use crdt::timestamp::now_micros;
+use sqlx::{Sqlite, SqlitePool, Transaction};
+use std::pin::Pin;
+use tracing::debug;
+use uuid::Uuid;
 
 pub struct SyncObjectModelSqlite {
     pool: SqlitePool,

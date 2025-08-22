@@ -261,23 +261,6 @@ pub struct SqlSyncObject {
     pub tombstone_utc: Option<i64>,
 }
 
-// TODO: Implement Item * Item from SqlSyncObject (Maybe?)
-// pub struct Item {
-//     pub id: Uuid,
-//     pub library_id: Uuid,
-//     pub text: Option<LWWRegister<>>,
-// }
-
-// impl From<SqlSyncObject> for Item {
-//     fn from(sql_item: SqlSyncObject) -> Self {
-//         Self {
-//             id: sql_item.id,
-//             // TODO: back and forth between json type
-//             // text: LWWRegister<>::from_string(String::from("Test")),
-//         }
-//     }
-// }
-
 #[async_trait]
 pub trait SyncObjectModel: Send + Sync {
     // Accept query options
