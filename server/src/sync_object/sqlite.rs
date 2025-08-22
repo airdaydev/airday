@@ -2,8 +2,8 @@ use crate::{
     common::error::AppError,
     sync_object::{
         model::{
-            ItemAttributes, ItemAttributesJson, JsonAttributes, ListAttributes, ListAttributesJson,
-            SqlSyncObject, SyncObject, SyncObjectMeta, SyncObjectModel,
+            ItemAttributes, ListAttributes, SqlSyncObject, SyncObject, SyncObjectMeta,
+            SyncObjectModel,
         },
         types::sync_object_type,
     },
@@ -26,14 +26,19 @@ impl SyncObjectModelSqlite {
 }
 
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
-    let attributes_json = item.get_attributes_json()?;
+    let attributes_blob = item.get_attributes_blob()?;
     let server_seq = now_micros();
+    let obj_type = match item {
+        SyncObject::Item { .. } => sync_object_type::ITEM_TYPE,
+        SyncObject::Container { .. } => sync_object_type::CONTAINER_TYPE,
+    };
     sqlx::query!(
-        r#"INSERT INTO sync_object (id, library_id, attributes, server_seq, tombstone_utc)
-           VALUES (?, ?, ?, ?, ?)"#,
+        r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
+           VALUES (?, ?, ?, ?, ?, ?)"#,
         item.get_meta().id,
         item.get_meta().library_id,
-        attributes_json,
+        obj_type,
+        attributes_blob,
         server_seq,
         Option::<i64>::None
     )
@@ -61,7 +66,7 @@ async fn merge<'a>(
         let result = sqlx::query_as!(
             SqlSyncObject,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
-          server_seq, tombstone_utc, attributes as "attributes: JsonAttributes"
+          server_seq, tombstone_utc, attributes
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
             incoming_sync_obj.get_meta().library_id,
@@ -97,14 +102,11 @@ async fn merge<'a>(
                         "Type mismatch on merge",
                     )));
                 };
-                let mut attrs: ItemAttributes = sql_sync_obj
-                    .attributes
-                    .as_ref()
-                    .and_then(|json| {
-                        serde_json::from_value::<ItemAttributesJson>(json.clone()).ok()
-                    })
-                    .map(ItemAttributes::from)
-                    .unwrap();
+                let mut attrs: ItemAttributes = if let Some(blob) = &sql_sync_obj.attributes {
+                    ItemAttributes::from_attributes_blob(blob)?
+                } else {
+                    ItemAttributes { text: None }
+                };
                 attrs.merge(&incoming_attrs); // Mutable
                 SyncObject::Item { meta, attrs }
             }
@@ -117,14 +119,11 @@ async fn merge<'a>(
                         "Type mismatch on merge",
                     )));
                 };
-                let mut attrs: ListAttributes = sql_sync_obj
-                    .attributes
-                    .as_ref()
-                    .and_then(|json| {
-                        serde_json::from_value::<ListAttributesJson>(json.clone()).ok()
-                    })
-                    .map(ListAttributes::from)
-                    .unwrap();
+                let mut attrs: ListAttributes = if let Some(blob) = &sql_sync_obj.attributes {
+                    ListAttributes::from_attributes_blob(blob)?
+                } else {
+                    ListAttributes { name: None }
+                };
                 attrs.merge(&incoming_attrs); // Mutable
                 SyncObject::Container { meta, attrs }
             }
@@ -135,9 +134,9 @@ async fn merge<'a>(
         };
 
         debug!("existing_attrs {:?}", sync_object);
-        let Ok(json_attributes) = sync_object.get_attributes_json() else {
+        let Ok(attributes_blob) = sync_object.get_attributes_blob() else {
             return Err(AppError::ServerError(String::from(
-                "Failed to translate merge output to JSON",
+                "Failed to translate merge output to blob",
             )));
         };
         let server_seq = now_micros();
@@ -148,7 +147,7 @@ async fn merge<'a>(
             r#"UPDATE sync_object
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-            json_attributes,
+            attributes_blob,
             server_seq,
             incoming_sync_obj.get_meta().id,
             incoming_sync_obj.get_meta().library_id,
@@ -202,8 +201,8 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         >,
     > {
         sqlx::query_as::<_, SqlSyncObject>(
-            r#"SELECT id, library_id, server_seq, tombstone_utc, attributes
-            FROM item
+            r#"SELECT id, library_id, obj_type, server_seq, tombstone_utc, attributes
+            FROM sync_object
             WHERE library_id = ? AND server_seq >= ?
             ORDER BY server_seq ASC"#,
         )

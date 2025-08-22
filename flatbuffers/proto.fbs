@@ -27,7 +27,7 @@ enum AttrTypeProto: ubyte { NONE=0, STRING=1, BOOL=2, I64=3, F64=4, BYTES=5 }
 // (Messageboard discussing union vs wide table)
 table AttributeProto {
   // Meta
-  field_id: ushort;
+  field_id: short;
   value_type: AttrTypeProto;
   timestamp: LWWTimestampProto;
   // Values
@@ -38,6 +38,8 @@ table AttributeProto {
 }
 
 table AttributeSetProto { attributes: [AttributeProto]; }
+
+root_type AttributeSetProto;
 
 table SyncObjectActionProto {
   type: ObjectTypeProto;

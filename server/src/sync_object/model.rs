@@ -1,8 +1,9 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync::proto_generated::proto::{FieldValueProto, ObjectTypeProto, SyncObjectActionProto},
+    sync::proto_generated::proto::{AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto, AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto},
     sync_object::types::item_field_id,
 };
+use flatbuffers::FlatBufferBuilder;
 use async_trait::async_trait;
 use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
@@ -52,42 +53,59 @@ impl SyncObject {
             SyncObject::Item { meta, .. } => meta,
         }
     }
-    // TODO: Make direct functions on the attributes themselves
-    pub fn get_attributes_json(&self) -> Result<JsonAttributes, AppError> {
+    // Serialize attributes to AttributeSetProto blob
+    pub fn get_attributes_blob(&self) -> Result<AttributesBlob, AppError> {
+        let mut builder = FlatBufferBuilder::new();
+        let mut fb_attributes = Vec::new();
+
         match self {
             SyncObject::Container { attrs, .. } => {
-                let mut json_attrs = ListAttributesJson { name: None };
                 if let Some(name_lww) = &attrs.name {
-                    json_attrs.name = Some(LWWDefinitionJson {
-                        utc: name_lww.timestamp.utc,
-                        pid: name_lww.timestamp.pid,
-                        data: name_lww.data.clone(),
-                    })
+                    let timestamp = LWWTimestampProto::new(name_lww.timestamp.utc, name_lww.timestamp.pid);
+                    let name_offset = builder.create_string(&name_lww.data);
+                    
+                    let attr = AttributeProto::create(&mut builder, &AttributeProtoArgs {
+                        field_id: crate::sync_object::types::list_field_id::LIST_NAME,
+                        value_type: AttrTypeProto::STRING,
+                        timestamp: Some(&timestamp),
+                        string: Some(name_offset),
+                        bytes: None,
+                        i64_fb: 0,
+                        f64_fb: 0.0,
+                    });
+                    fb_attributes.push(attr);
                 }
-                let json_value = serde_json::to_value(json_attrs).map_err(|err| {
-                    AppError::ServerError(format!("Failed to serialize attributes: {}", err))
-                })?;
-
-                Ok(Some(json_value))
             }
             SyncObject::Item { attrs, .. } => {
-                let mut json_attrs = ItemAttributesJson { text: None };
-
                 if let Some(text_lww) = &attrs.text {
-                    json_attrs.text = Some(LWWDefinitionJson {
-                        utc: text_lww.timestamp.utc,
-                        pid: text_lww.timestamp.pid,
-                        data: text_lww.data.clone(),
+                    let timestamp = LWWTimestampProto::new(text_lww.timestamp.utc, text_lww.timestamp.pid);
+                    let text_offset = builder.create_string(&text_lww.data);
+                    
+                    let attr = AttributeProto::create(&mut builder, &AttributeProtoArgs {
+                        field_id: item_field_id::ITEM_TEXT,
+                        value_type: AttrTypeProto::STRING,
+                        timestamp: Some(&timestamp),
+                        string: Some(text_offset),
+                        bytes: None,
+                        i64_fb: 0,
+                        f64_fb: 0.0,
                     });
+                    fb_attributes.push(attr);
                 }
-
-                let json_value = serde_json::to_value(json_attrs).map_err(|err| {
-                    AppError::ServerError(format!("Failed to serialize attributes: {}", err))
-                })?;
-
-                Ok(Some(json_value))
             }
         }
+
+        if fb_attributes.is_empty() {
+            return Ok(None);
+        }
+
+        let attributes_vector = builder.create_vector(&fb_attributes);
+        let attr_set = AttributeSetProto::create(&mut builder, &AttributeSetProtoArgs {
+            attributes: Some(attributes_vector),
+        });
+        builder.finish(attr_set, None);
+        
+        Ok(Some(builder.finished_data().to_vec()))
     }
 }
 
@@ -105,7 +123,43 @@ pub struct ItemAttributes {
 }
 
 impl ItemAttributes {
-    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) {
+    pub fn from_attributes_blob(blob: &[u8]) -> Result<ItemAttributes, AppError> {
+        let attr_set = flatbuffers::root::<AttributeSetProto>(blob)
+            .map_err(|e| AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e)))?;
+        
+        let mut attributes = ItemAttributes { text: None };
+        
+        if let Some(attrs) = attr_set.attributes() {
+            for i in 0..attrs.len() {
+                let attr = attrs.get(i);
+                match attr.field_id() {
+                    item_field_id::ITEM_TEXT => {
+                        if attr.value_type() == AttrTypeProto::STRING {
+                            if let Some(text_data) = attr.string() {
+                                if let Some(timestamp) = attr.timestamp() {
+                                    let text_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: text_data.to_string(),
+                                    };
+                                    attributes.text = Some(text_lww);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // TODO: Handle unknown field IDs for custom attributes
+                    }
+                }
+            }
+        }
+        
+        Ok(attributes)
+    }
+
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ItemAttributes {
         let mut attributes = ItemAttributes { text: None };
         if let Some(attrs) = sync_obj_proto.attributes() {
             for i in 0..attrs.len() {
@@ -113,19 +167,17 @@ impl ItemAttributes {
                 match attr.field_id() {
                     item_field_id::ITEM_TEXT => {
                         match attr.value_type() {
-                            FieldValueProto::StringValueProto => {
-                                if let Some(string_val) = attr.value_as_string_value_proto() {
-                                    if let Some(text_data) = string_val.v() {
-                                        let timestamp = attr.timestamp().unwrap();
-                                        let text_lww = LWWRegister {
-                                            timestamp: LWWTimestamp {
-                                                utc: timestamp.utc(),
-                                                pid: timestamp.pid(),
-                                            },
-                                            data: text_data.to_string(),
-                                        };
-                                        attributes.text = Some(text_lww);
-                                    }
+                            AttrTypeProto::STRING => {
+                                if let Some(text_data) = attr.string() {
+                                    let timestamp = attr.timestamp().unwrap();
+                                    let text_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: text_data.to_string(),
+                                    };
+                                    attributes.text = Some(text_lww);
                                 }
                             }
                             _ => {
@@ -139,12 +191,86 @@ impl ItemAttributes {
                 }
             }
         }
+        attributes
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ListAttributes {
     pub name: Option<LWWRegister<String>>,
+}
+
+impl ListAttributes {
+    pub fn from_attributes_blob(blob: &[u8]) -> Result<ListAttributes, AppError> {
+        let attr_set = flatbuffers::root::<AttributeSetProto>(blob)
+            .map_err(|e| AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e)))?;
+        
+        let mut attributes = ListAttributes { name: None };
+        
+        if let Some(attrs) = attr_set.attributes() {
+            for i in 0..attrs.len() {
+                let attr = attrs.get(i);
+                match attr.field_id() {
+                    crate::sync_object::types::list_field_id::LIST_NAME => {
+                        if attr.value_type() == AttrTypeProto::STRING {
+                            if let Some(name_data) = attr.string() {
+                                if let Some(timestamp) = attr.timestamp() {
+                                    let name_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: name_data.to_string(),
+                                    };
+                                    attributes.name = Some(name_lww);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // TODO: Handle unknown field IDs for custom attributes
+                    }
+                }
+            }
+        }
+        
+        Ok(attributes)
+    }
+
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ListAttributes {
+        let mut attributes = ListAttributes { name: None };
+        if let Some(attrs) = sync_obj_proto.attributes() {
+            for i in 0..attrs.len() {
+                let attr = attrs.get(i);
+                match attr.field_id() {
+                    crate::sync_object::types::list_field_id::LIST_NAME => {
+                        match attr.value_type() {
+                            AttrTypeProto::STRING => {
+                                if let Some(name_data) = attr.string() {
+                                    let timestamp = attr.timestamp().unwrap();
+                                    let name_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: name_data.to_string(),
+                                    };
+                                    attributes.name = Some(name_lww);
+                                }
+                            }
+                            _ => {
+                                // Ignore mistyped field, but consider adding err to span
+                            }
+                        }
+                    }
+                    _ => {
+                        // TODO: Ignore unknown value, but later used for custom attribute values
+                    }
+                }
+            }
+        }
+        attributes
+    }
 }
 
 impl SyncObject {
@@ -160,11 +286,11 @@ impl SyncObject {
         };
         return match sync_obj_proto.type_() {
             ObjectTypeProto::Item => {
-                let attrs = ItemAttributes { text: None };
+                let attrs = ItemAttributes::from_sync_object_proto(sync_obj_proto);
                 Ok(SyncObject::Item { meta, attrs })
             }
             ObjectTypeProto::Container => {
-                let attrs = ListAttributes { name: None };
+                let attrs = ListAttributes::from_sync_object_proto(sync_obj_proto);
                 Ok(SyncObject::Container { meta, attrs })
             }
             _ => Err(AppError::ValidationError(String::from(
@@ -246,7 +372,7 @@ impl ListAttributes {
     }
 }
 
-pub type JsonAttributes = Option<serde_json::Value>;
+pub type AttributesBlob = Option<Vec<u8>>;
 
 #[derive(FromRow)]
 pub struct SqlSyncObject {
@@ -254,8 +380,8 @@ pub struct SqlSyncObject {
     pub id: Uuid,
     pub obj_type: i64,
     pub library_id: Uuid,
-    // dynamic attrs (lww-map)
-    pub attributes: JsonAttributes,
+    // dynamic attrs (flatbuffer blob)
+    pub attributes: AttributesBlob,
     // metadata
     pub server_seq: i64,
     pub tombstone_utc: Option<i64>,

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS sync_object (
   library_id UUID NOT NULL,
   obj_type INT NOT NULL CHECK (obj_type BETWEEN 0 AND 65535),
   -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
-  attributes TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(attributes) AND json_type(attributes) = 'object'),
+  attributes BLOB,
   -- TODO: Custom attributes - separate col? - or separate table (list dependent?)
   -- Metadata & tombstone
   server_seq INTEGER NOT NULL, -- used to negotiate sync

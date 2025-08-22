@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] continue cleanup of sync - start with merge definitions on the attributes themselves always have to make sure the item type matches!? - consider doing everything in the match block
+- [] get sync working again with custom attributes + flatbuffer storage
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api

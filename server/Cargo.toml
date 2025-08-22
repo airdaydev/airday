@@ -39,7 +39,3 @@ crdt = { path = "../rust/crdt" }
 
 [dev-dependencies]
 ts-rs = "11.0.1"
-
-[[bench]]
-name = "attribute_serialization"
-harness = false
