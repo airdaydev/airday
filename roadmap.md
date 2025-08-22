@@ -1,14 +1,13 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] get sync working again with custom attributes + flatbuffer storage
+- [] get sync working again with custom attributes + flatbuffer storage, remove json
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api
 - [] attribute level change sets (ensure sync respects dirty set)
 - [] delete items (tombstones, same api)
 - [] fan out live updates - maintain local library subscription map for sqlite version
-- [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
@@ -43,8 +42,9 @@
 CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);
 SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DESC LIMIT 1;
 ```
+- [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)?
 
-# Sync verification
+# Sync verification plan
 - [] Node index should be based on id or created time (what timestamp?)
 - [] tree saved in a hashmap & serialised (maybe not necessary in JS if it's fast enough to booststrap - big if) - good idea in sqlite?
 - [] hot path = server time-1hr?
@@ -85,7 +85,13 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] list switcher to switch between open files (opt+tab)
 - [] Context click on list header
 - [] touch swipe gesture left /right to hide + show sidebar
-- [] Test if drag limit is below or above diagonal line on hover!
+- [] Test if drag limit is below or above diagontstrap - big if) - good idea in sqlite?
+- [] hot path = server time-1hr?
+- [] day granularity until 1hr ago (server time)
+- [] clean-ups required! in-binary job on community version..?
+- [] Calculate hashes within sqlite statement? or in application?
+- [] On front-end, keep live hash structure that persists on update... probably need same for server-side.
+- [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)al line on hover!
 - [] on context click of nav item, select the list
 - [] Reevaluate keyboard + focus system (start with pen/paper or notes)
 - [] drag sidebar to resize
