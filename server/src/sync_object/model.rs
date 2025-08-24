@@ -1,36 +1,19 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync::proto_generated::proto::{AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto, AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto},
+    sync::proto_generated::proto::{
+        AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
+        AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto,
+    },
     sync_object::types::item_field_id,
 };
-use flatbuffers::FlatBufferBuilder;
 use async_trait::async_trait;
 use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
+use flatbuffers::FlatBufferBuilder;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use std::pin::Pin;
 use uuid::Uuid;
-
-#[derive(Deserialize, Serialize)]
-struct LWWDefinitionJson<T> {
-    utc: i64,
-    pid: i64,
-    data: T,
-}
-
-impl<T: Clone> LWWDefinitionJson<T> {
-    pub fn to_lww(&self) -> LWWRegister<T> {
-        let timestamp = LWWTimestamp {
-            utc: self.utc,
-            pid: self.pid,
-        };
-        LWWRegister {
-            timestamp,
-            data: self.data.clone(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum SyncObject {
@@ -61,35 +44,43 @@ impl SyncObject {
         match self {
             SyncObject::Container { attrs, .. } => {
                 if let Some(name_lww) = &attrs.name {
-                    let timestamp = LWWTimestampProto::new(name_lww.timestamp.utc, name_lww.timestamp.pid);
+                    let timestamp =
+                        LWWTimestampProto::new(name_lww.timestamp.utc, name_lww.timestamp.pid);
                     let name_offset = builder.create_string(&name_lww.data);
-                    
-                    let attr = AttributeProto::create(&mut builder, &AttributeProtoArgs {
-                        field_id: crate::sync_object::types::list_field_id::LIST_NAME,
-                        value_type: AttrTypeProto::STRING,
-                        timestamp: Some(&timestamp),
-                        string: Some(name_offset),
-                        bytes: None,
-                        i64_fb: 0,
-                        f64_fb: 0.0,
-                    });
+
+                    let attr = AttributeProto::create(
+                        &mut builder,
+                        &AttributeProtoArgs {
+                            field_id: crate::sync_object::types::list_field_id::LIST_NAME,
+                            value_type: AttrTypeProto::STRING,
+                            timestamp: Some(&timestamp),
+                            string: Some(name_offset),
+                            bytes: None,
+                            i64_fb: 0,
+                            f64_fb: 0.0,
+                        },
+                    );
                     fb_attributes.push(attr);
                 }
             }
             SyncObject::Item { attrs, .. } => {
                 if let Some(text_lww) = &attrs.text {
-                    let timestamp = LWWTimestampProto::new(text_lww.timestamp.utc, text_lww.timestamp.pid);
+                    let timestamp =
+                        LWWTimestampProto::new(text_lww.timestamp.utc, text_lww.timestamp.pid);
                     let text_offset = builder.create_string(&text_lww.data);
-                    
-                    let attr = AttributeProto::create(&mut builder, &AttributeProtoArgs {
-                        field_id: item_field_id::ITEM_TEXT,
-                        value_type: AttrTypeProto::STRING,
-                        timestamp: Some(&timestamp),
-                        string: Some(text_offset),
-                        bytes: None,
-                        i64_fb: 0,
-                        f64_fb: 0.0,
-                    });
+
+                    let attr = AttributeProto::create(
+                        &mut builder,
+                        &AttributeProtoArgs {
+                            field_id: item_field_id::ITEM_TEXT,
+                            value_type: AttrTypeProto::STRING,
+                            timestamp: Some(&timestamp),
+                            string: Some(text_offset),
+                            bytes: None,
+                            i64_fb: 0,
+                            f64_fb: 0.0,
+                        },
+                    );
                     fb_attributes.push(attr);
                 }
             }
@@ -100,11 +91,14 @@ impl SyncObject {
         }
 
         let attributes_vector = builder.create_vector(&fb_attributes);
-        let attr_set = AttributeSetProto::create(&mut builder, &AttributeSetProtoArgs {
-            attributes: Some(attributes_vector),
-        });
+        let attr_set = AttributeSetProto::create(
+            &mut builder,
+            &AttributeSetProtoArgs {
+                attributes: Some(attributes_vector),
+            },
+        );
         builder.finish(attr_set, None);
-        
+
         Ok(Some(builder.finished_data().to_vec()))
     }
 }
@@ -124,11 +118,12 @@ pub struct ItemAttributes {
 
 impl ItemAttributes {
     pub fn from_attributes_blob(blob: &[u8]) -> Result<ItemAttributes, AppError> {
-        let attr_set = flatbuffers::root::<AttributeSetProto>(blob)
-            .map_err(|e| AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e)))?;
-        
+        let attr_set = flatbuffers::root::<AttributeSetProto>(blob).map_err(|e| {
+            AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
+        })?;
+
         let mut attributes = ItemAttributes { text: None };
-        
+
         if let Some(attrs) = attr_set.attributes() {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
@@ -155,7 +150,7 @@ impl ItemAttributes {
                 }
             }
         }
-        
+
         Ok(attributes)
     }
 
@@ -202,11 +197,12 @@ pub struct ListAttributes {
 
 impl ListAttributes {
     pub fn from_attributes_blob(blob: &[u8]) -> Result<ListAttributes, AppError> {
-        let attr_set = flatbuffers::root::<AttributeSetProto>(blob)
-            .map_err(|e| AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e)))?;
-        
+        let attr_set = flatbuffers::root::<AttributeSetProto>(blob).map_err(|e| {
+            AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
+        })?;
+
         let mut attributes = ListAttributes { name: None };
-        
+
         if let Some(attrs) = attr_set.attributes() {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
@@ -233,7 +229,7 @@ impl ListAttributes {
                 }
             }
         }
-        
+
         Ok(attributes)
     }
 
@@ -298,36 +294,6 @@ impl SyncObject {
             ))),
         };
     }
-}
-
-impl From<ItemAttributesJson> for ItemAttributes {
-    fn from(attr_json: ItemAttributesJson) -> ItemAttributes {
-        let mut attrs = ItemAttributes { text: None };
-        if let Some(text) = attr_json.text {
-            attrs.text = Some(text.to_lww())
-        }
-        attrs
-    }
-}
-
-impl From<ListAttributesJson> for ListAttributes {
-    fn from(attr_json: ListAttributesJson) -> ListAttributes {
-        let mut attrs = ListAttributes { name: None };
-        if let Some(name) = attr_json.name {
-            attrs.name = Some(name.to_lww())
-        }
-        attrs
-    }
-}
-
-#[derive(sqlx::FromRow, Deserialize, Serialize)]
-pub struct ItemAttributesJson {
-    text: Option<LWWDefinitionJson<String>>,
-}
-
-#[derive(sqlx::FromRow, Deserialize, Serialize)]
-pub struct ListAttributesJson {
-    name: Option<LWWDefinitionJson<String>>,
 }
 
 impl ItemAttributes {
