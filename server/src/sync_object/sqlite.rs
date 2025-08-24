@@ -214,18 +214,39 @@ impl SyncObjectModel for SyncObjectModelSqlite {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::{self, mock_item};
+    use crate::{
+        sync_object::model::ItemAttributes,
+        test_util::{self, mock_item},
+    };
+    use crdt::LWWRegister;
     use futures_util::StreamExt;
 
     #[tokio::test]
-    async fn test_get_by_library_stream() {
+    async fn sqlite_sync_object_merge() {
         let db = test_util::create_test_db().await;
-        let user = test_util::mock_user(&db, String::from("test@test.com")).await;
+        let user = test_util::mock_user(&db, String::from("sync_object_merge@air.day")).await;
+        let primary_library_id = user.primary_library.unwrap().id;
+        let item = mock_item(
+            primary_library_id,
+            Some(ItemAttributes {
+                text: Some(LWWRegister::<String>::new(String::from("old_text"), None).unwrap()),
+            }),
+        );
+        db.sync_object.merge_many(&vec![item]).await.unwrap();
+        // TODO: Get one
+        // TODO: update item & merge again
+        // TODO: Get one and confirm text is correct
+    }
+
+    #[tokio::test]
+    async fn sqlite_library_stream() {
+        let db = test_util::create_test_db().await;
+        let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
         let primary_library_id = user.primary_library.unwrap().id;
         let qty = 100;
         let mut items = vec![];
         for _ in 0..qty {
-            items.push(mock_item(primary_library_id))
+            items.push(mock_item(primary_library_id, None))
         }
         db.sync_object.merge_many(&items).await.unwrap();
         // intentional (smoke test): a second merge that effectively does nothing

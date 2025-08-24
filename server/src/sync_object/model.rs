@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use crdt::LWWRegister;
 use crdt::timestamp::LWWTimestamp;
 use flatbuffers::FlatBufferBuilder;
-use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use std::pin::Pin;
 use uuid::Uuid;
@@ -25,8 +24,8 @@ pub enum SyncObject {
         meta: SyncObjectMeta,
         attrs: ListAttributes,
     },
-    // TODO: Expose sync engine type defs via macros
-    // TODO: Dynamic types
+    // TODO: Expose sync engine type defs via macros?
+    // TODO: Dynamic types?
 }
 
 impl SyncObject {

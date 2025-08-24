@@ -20,13 +20,6 @@ impl<T> LWWRegister<T> {
     }
 }
 
-/// Specialized LWW register for strings
-#[derive(Debug, Clone)]
-pub struct LWWRegisterString {
-    pub timestamp: LWWTimestamp,
-    pub data: String,
-}
-
 impl<T: PartialEq> LWWRegister<T> {
     /// Merge with another string register
     pub fn merge(self, other: Self) -> Result<Self, &'static str> {

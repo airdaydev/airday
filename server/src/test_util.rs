@@ -36,7 +36,7 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     .unwrap()
 }
 
-pub fn mock_item(library_id: Uuid) -> SyncObject {
+pub fn mock_item(library_id: Uuid, attrs: Option<ItemAttributes>) -> SyncObject {
     let meta = SyncObjectMeta {
         id: Uuid::new_v4(),
         library_id,
@@ -45,6 +45,6 @@ pub fn mock_item(library_id: Uuid) -> SyncObject {
     };
     SyncObject::Item {
         meta,
-        attrs: ItemAttributes { text: None },
+        attrs: attrs.unwrap_or(ItemAttributes { text: None }),
     }
 }

@@ -27,15 +27,6 @@ pub struct UserAttributes {
     pub last_name: Option<String>,
 }
 
-impl UserAttributes {
-    pub fn new() -> Self {
-        UserAttributes {
-            first_name: None,
-            last_name: None,
-        }
-    }
-}
-
 #[async_trait]
 pub trait UserModel: Send + Sync {
     async fn get_by_email(&self, email: &str) -> Result<Option<User>, AppError>;
