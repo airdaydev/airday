@@ -1,7 +1,7 @@
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
-    sync_object::model::{ItemAttributes, SyncObject, SyncObjectMeta},
+    sync_object::model::{ItemAttrs, SyncObject, SyncObjectAttrs, SyncObjectMeta},
     user::model::User,
 };
 use sqlx::SqlitePool;
@@ -36,15 +36,15 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     .unwrap()
 }
 
-pub fn mock_item(library_id: Uuid, attrs: Option<ItemAttributes>) -> SyncObject {
+pub fn mock_item(library_id: Uuid, attrs: Option<ItemAttrs>) -> SyncObject {
     let meta = SyncObjectMeta {
         id: Uuid::new_v4(),
         library_id,
         server_seq: None,
         tombstone_utc: None,
     };
-    SyncObject::Item {
+    SyncObject {
         meta,
-        attrs: attrs.unwrap_or(ItemAttributes { text: None }),
+        attrs: SyncObjectAttrs::Item(attrs.unwrap_or(ItemAttrs { text: None })),
     }
 }
