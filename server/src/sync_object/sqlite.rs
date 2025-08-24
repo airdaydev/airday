@@ -88,7 +88,7 @@ async fn merge<'a>(
             )));
         }
         let mut sync_object: SyncObject = sql_sync_to_sync_object(&sql_sync_obj)?;
-        sync_object.attrs.merge(&incoming_sync_obj.attrs);
+        sync_object.attrs.merge(&incoming_sync_obj.attrs)?;
 
         debug!("existing_attrs {:?}", sync_object);
         let Ok(attributes_blob) = sync_object.attrs.get_attributes_blob() else {
@@ -130,7 +130,7 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         &self,
         library_id: &Uuid,
         id: &Uuid,
-    ) -> Result<Option<SqlSyncObject>, AppError> {
+    ) -> Result<Option<SyncObject>, AppError> {
         let result = sqlx::query_as!(
             SqlSyncObject,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
@@ -151,17 +151,26 @@ impl SyncObjectModel for SyncObjectModelSqlite {
             server_seq: Some(sql_sync_object.server_seq),
             tombstone_utc: sql_sync_object.tombstone_utc,
         };
-        let sync_object = match sql_sync_object.obj_type {
+        let sync_object_attrs = match sql_sync_object.obj_type {
+            // TODO: No attributes blob?
             sync_object_type::ITEM => {
-                // TODO: Create attributes from proto
+                let item_attrs =
+                    ItemAttrs::from_attributes_blob(&sql_sync_object.attributes.unwrap())?;
+                SyncObjectAttrs::Item(item_attrs)
             }
             sync_object_type::CONTAINER => {
-                // TODO: Create attributes from proto
+                // TODO: No attributes blob?
+                let container_attrs =
+                    ContainerAttrs::from_attributes_blob(&sql_sync_object.attributes.unwrap())?;
+                SyncObjectAttrs::Container(container_attrs)
             }
             _ => return Err(AppError::DatabaseError(String::from("Bad type"))),
         };
-        // TODO: Determine type
-        Ok(sync_object)
+        let sync_object = SyncObject {
+            meta,
+            attrs: sync_object_attrs,
+        };
+        Ok(Some(sync_object))
     }
     // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
     async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError> {
@@ -209,7 +218,7 @@ impl SyncObjectModel for SyncObjectModelSqlite {
 #[cfg(test)]
 mod tests {
     use crate::{
-        sync_object::model::ItemAttributes,
+        sync_object::model::ItemAttrs,
         test_util::{self, mock_item},
     };
     use crdt::LWWRegister;
@@ -222,7 +231,7 @@ mod tests {
         let primary_library_id = user.primary_library.unwrap().id;
         let item = mock_item(
             primary_library_id,
-            Some(ItemAttributes {
+            Some(ItemAttrs {
                 text: Some(LWWRegister::<String>::new(String::from("old_text"), None).unwrap()),
             }),
         );
