@@ -3,7 +3,7 @@ use crate::{
     sync_object::{
         model::{
             ContainerAttrs, ItemAttrs, SqlSyncObject, SyncObject, SyncObjectAttrs, SyncObjectMeta,
-            SyncObjectModel,
+            SyncObjectModel, sql_sync_to_sync_object,
         },
         types::sync_object_type,
     },
@@ -87,29 +87,11 @@ async fn merge<'a>(
                 "sync_obj is tombstoned",
             )));
         }
-        let sync_object: SyncObject = sql_sync_obj.try_into()?;
-        let updated_attrs = match sync_object.attrs {
-            SyncObjectAttrs::Container(attrs) => {
-                if let SyncObjectAttrs::Container(incoming_attrs) = &incoming_sync_obj.attrs {
-                    let updated = attrs.merge(incoming_attrs);
-                    SyncObjectAttrs::Container(updated)
-                }
-            }
-            SyncObjectAttrs::Item(attrs) => {
-                if let SyncObjectAttrs::Item(incoming_attrs) = &incoming_sync_obj.attrs {
-                    attrs.merge(&incoming_attrs);
-                }
-            }
-        };
-        let meta = SyncObjectMeta {
-            id: sql_sync_obj.id,
-            library_id: sql_sync_obj.library_id,
-            server_seq: Some(sql_sync_obj.server_seq),
-            tombstone_utc: sql_sync_obj.tombstone_utc,
-        };
+        let mut sync_object: SyncObject = sql_sync_to_sync_object(&sql_sync_obj)?;
+        sync_object.attrs.merge(&incoming_sync_obj.attrs);
 
         debug!("existing_attrs {:?}", sync_object);
-        let Ok(attributes_blob) = updated_attrs.get_attributes_blob() else {
+        let Ok(attributes_blob) = sync_object.attrs.get_attributes_blob() else {
             return Err(AppError::ServerError(String::from(
                 "Failed to translate merge output to blob",
             )));
@@ -169,7 +151,15 @@ impl SyncObjectModel for SyncObjectModelSqlite {
             server_seq: Some(sql_sync_object.server_seq),
             tombstone_utc: sql_sync_object.tombstone_utc,
         };
-        match sql_sync_object.obj_type {}
+        let sync_object = match sql_sync_object.obj_type {
+            sync_object_type::ITEM => {
+                // TODO: Create attributes from proto
+            }
+            sync_object_type::CONTAINER => {
+                // TODO: Create attributes from proto
+            }
+            _ => return Err(AppError::DatabaseError(String::from("Bad type"))),
+        };
         // TODO: Determine type
         Ok(sync_object)
     }

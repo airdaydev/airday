@@ -294,40 +294,37 @@ impl SyncObject {
     }
 }
 
-impl TryFrom<SqlSyncObject> for SyncObject {
-    type Error = AppError;
-    fn try_from(sql_sync_object: SqlSyncObject) -> Result<Self, AppError> {
-        let meta = SyncObjectMeta {
-            id: sql_sync_object.id,
-            library_id: sql_sync_object.library_id,
-            server_seq: Some(sql_sync_object.server_seq),
-            tombstone_utc: sql_sync_object.tombstone_utc,
-        };
-        let sync_object_attrs: SyncObjectAttrs = match sql_sync_object.obj_type {
-            sync_object_type::ITEM => {
-                let attrs: ItemAttrs = if let Some(blob) = &sql_sync_object.attributes {
-                    ItemAttrs::from_attributes_blob(blob)?
-                } else {
-                    ItemAttrs { text: None }
-                };
-                SyncObjectAttrs::Item(attrs)
-            }
-            sync_object_type::CONTAINER => {
-                let attrs: ContainerAttrs = if let Some(blob) = &sql_sync_object.attributes {
-                    ContainerAttrs::from_attributes_blob(blob)?
-                } else {
-                    ContainerAttrs { name: None }
-                };
-                SyncObjectAttrs::Container(attrs)
-            }
-            _ => return Err(AppError::DatabaseError(String::from("Unknown object type"))),
-        };
-        let sync_object = SyncObject {
-            meta,
-            attrs: sync_object_attrs,
-        };
-        Ok(sync_object)
-    }
+pub fn sql_sync_to_sync_object(sql_sync_object: &SqlSyncObject) -> Result<SyncObject, AppError> {
+    let meta = SyncObjectMeta {
+        id: sql_sync_object.id,
+        library_id: sql_sync_object.library_id,
+        server_seq: Some(sql_sync_object.server_seq),
+        tombstone_utc: sql_sync_object.tombstone_utc,
+    };
+    let sync_object_attrs: SyncObjectAttrs = match sql_sync_object.obj_type {
+        sync_object_type::ITEM => {
+            let attrs: ItemAttrs = if let Some(blob) = &sql_sync_object.attributes {
+                ItemAttrs::from_attributes_blob(blob)?
+            } else {
+                ItemAttrs { text: None }
+            };
+            SyncObjectAttrs::Item(attrs)
+        }
+        sync_object_type::CONTAINER => {
+            let attrs: ContainerAttrs = if let Some(blob) = &sql_sync_object.attributes {
+                ContainerAttrs::from_attributes_blob(blob)?
+            } else {
+                ContainerAttrs { name: None }
+            };
+            SyncObjectAttrs::Container(attrs)
+        }
+        _ => return Err(AppError::DatabaseError(String::from("Unknown object type"))),
+    };
+    let sync_object = SyncObject {
+        meta,
+        attrs: sync_object_attrs,
+    };
+    Ok(sync_object)
 }
 
 impl ItemAttrs {
@@ -369,6 +366,24 @@ impl ContainerAttrs {
         }
         // TODO: Repeat for each attribute (after improving ergonomics)
         self
+    }
+}
+
+impl SyncObjectAttrs {
+    pub fn merge<'a>(&'a mut self, other: &SyncObjectAttrs) -> Result<(), AppError> {
+        match (self, other) {
+            (SyncObjectAttrs::Item(self_attrs), SyncObjectAttrs::Item(other_attrs)) => {
+                self_attrs.merge(other_attrs);
+                Ok(())
+            }
+            (SyncObjectAttrs::Container(self_attrs), SyncObjectAttrs::Container(other_attrs)) => {
+                self_attrs.merge(other_attrs);
+                Ok(())
+            }
+            _ => Err(AppError::ValidationError(String::from(
+                "wrong variant on merge",
+            ))),
+        }
     }
 }
 
