@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] moving to syncobject with typed attr
 - [] get sync working again with custom attributes + flatbuffer storage, remove json
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core

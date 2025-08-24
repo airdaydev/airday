@@ -15,6 +15,6 @@ pub mod list_field_id {
 }
 
 pub mod sync_object_type {
-    pub const ITEM_TYPE: i64 = 0;
-    pub const CONTAINER_TYPE: i64 = 1;
+    pub const ITEM: i64 = 0;
+    pub const CONTAINER: i64 = 1;
 }

@@ -2,7 +2,7 @@ use crate::{
     common::error::AppError,
     sync_object::{
         model::{
-            ItemAttributes, ListAttributes, SqlSyncObject, SyncObject, SyncObjectMeta,
+            ContainerAttrs, ItemAttrs, SqlSyncObject, SyncObject, SyncObjectAttrs, SyncObjectMeta,
             SyncObjectModel,
         },
         types::sync_object_type,
@@ -26,17 +26,17 @@ impl SyncObjectModelSqlite {
 }
 
 async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
-    let attributes_blob = item.get_attributes_blob()?;
+    let attributes_blob = item.attrs.get_attributes_blob()?;
     let server_seq = now_micros();
-    let obj_type = match item {
-        SyncObject::Item { .. } => sync_object_type::ITEM_TYPE,
-        SyncObject::Container { .. } => sync_object_type::CONTAINER_TYPE,
+    let obj_type = match &item.attrs {
+        SyncObjectAttrs::Item(_) => sync_object_type::ITEM,
+        SyncObjectAttrs::Container(_) => sync_object_type::CONTAINER,
     };
     sqlx::query!(
         r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?, ?)"#,
-        item.get_meta().id,
-        item.get_meta().library_id,
+        item.meta.id,
+        item.meta.library_id,
         obj_type,
         attributes_blob,
         server_seq,
@@ -69,8 +69,8 @@ async fn merge<'a>(
           server_seq, tombstone_utc, attributes
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
-            incoming_sync_obj.get_meta().library_id,
-            incoming_sync_obj.get_meta().id,
+            incoming_sync_obj.meta.library_id,
+            incoming_sync_obj.meta.id,
         )
         .fetch_optional(tx.as_mut())
         .await?;
@@ -82,59 +82,34 @@ async fn merge<'a>(
         };
         if let Some(_) = sql_sync_obj.tombstone_utc {
             // Item is tombstones - discard changes
-            // TODO: The user SHOULD not encounter this, and if they do, be informed of it.
+            // TODO: Hints that user has not received, or is receiving this update - send the tombstone back somehow
             return Err(AppError::ValidationError(String::from(
                 "sync_obj is tombstoned",
             )));
         }
+        let sync_object: SyncObject = sql_sync_obj.try_into()?;
+        let updated_attrs = match sync_object.attrs {
+            SyncObjectAttrs::Container(attrs) => {
+                if let SyncObjectAttrs::Container(incoming_attrs) = &incoming_sync_obj.attrs {
+                    let updated = attrs.merge(incoming_attrs);
+                    SyncObjectAttrs::Container(updated)
+                }
+            }
+            SyncObjectAttrs::Item(attrs) => {
+                if let SyncObjectAttrs::Item(incoming_attrs) = &incoming_sync_obj.attrs {
+                    attrs.merge(&incoming_attrs);
+                }
+            }
+        };
         let meta = SyncObjectMeta {
             id: sql_sync_obj.id,
             library_id: sql_sync_obj.library_id,
             server_seq: Some(sql_sync_obj.server_seq),
             tombstone_utc: sql_sync_obj.tombstone_utc,
         };
-        let sync_object: SyncObject = match sql_sync_obj.obj_type {
-            sync_object_type::ITEM_TYPE => {
-                let incoming_attrs = if let SyncObject::Item { attrs, .. } = incoming_sync_obj {
-                    attrs
-                } else {
-                    return Err(AppError::DatabaseError(String::from(
-                        "Type mismatch on merge",
-                    )));
-                };
-                let mut attrs: ItemAttributes = if let Some(blob) = &sql_sync_obj.attributes {
-                    ItemAttributes::from_attributes_blob(blob)?
-                } else {
-                    ItemAttributes { text: None }
-                };
-                attrs.merge(&incoming_attrs); // Mutable
-                SyncObject::Item { meta, attrs }
-            }
-            sync_object_type::CONTAINER_TYPE => {
-                let incoming_attrs = if let SyncObject::Container { attrs, .. } = incoming_sync_obj
-                {
-                    attrs
-                } else {
-                    return Err(AppError::DatabaseError(String::from(
-                        "Type mismatch on merge",
-                    )));
-                };
-                let mut attrs: ListAttributes = if let Some(blob) = &sql_sync_obj.attributes {
-                    ListAttributes::from_attributes_blob(blob)?
-                } else {
-                    ListAttributes { name: None }
-                };
-                attrs.merge(&incoming_attrs); // Mutable
-                SyncObject::Container { meta, attrs }
-            }
-            other_type => {
-                // Unknown type, throw
-                return Err(AppError::DatabaseError(format!("Bad type: {}", other_type)));
-            }
-        };
 
         debug!("existing_attrs {:?}", sync_object);
-        let Ok(attributes_blob) = sync_object.get_attributes_blob() else {
+        let Ok(attributes_blob) = updated_attrs.get_attributes_blob() else {
             return Err(AppError::ServerError(String::from(
                 "Failed to translate merge output to blob",
             )));
@@ -149,8 +124,8 @@ async fn merge<'a>(
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
             attributes_blob,
             server_seq,
-            incoming_sync_obj.get_meta().id,
-            incoming_sync_obj.get_meta().library_id,
+            incoming_sync_obj.meta.id,
+            incoming_sync_obj.meta.library_id,
             last_server_seq,
         )
         .execute(tx.as_mut())
@@ -169,6 +144,35 @@ async fn merge<'a>(
 
 #[async_trait]
 impl SyncObjectModel for SyncObjectModelSqlite {
+    async fn get_by_id(
+        &self,
+        library_id: &Uuid,
+        id: &Uuid,
+    ) -> Result<Option<SqlSyncObject>, AppError> {
+        let result = sqlx::query_as!(
+            SqlSyncObject,
+            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
+            obj_type, server_seq, attributes, tombstone_utc
+            FROM sync_object WHERE library_id = ? AND id = ? LIMIT 1"#,
+            library_id,
+            id,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        let sql_sync_object = match result {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+        let meta = SyncObjectMeta {
+            id: sql_sync_object.id,
+            library_id: sql_sync_object.library_id,
+            server_seq: Some(sql_sync_object.server_seq),
+            tombstone_utc: sql_sync_object.tombstone_utc,
+        };
+        match sql_sync_object.obj_type {}
+        // TODO: Determine type
+        Ok(sync_object)
+    }
     // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
     async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];

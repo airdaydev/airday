@@ -4,7 +4,7 @@ use crate::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto,
     },
-    sync_object::types::item_field_id,
+    sync_object::types::{item_field_id, sync_object_type},
 };
 use async_trait::async_trait;
 use crdt::LWWRegister;
@@ -14,35 +14,31 @@ use sqlx::prelude::FromRow;
 use std::pin::Pin;
 use uuid::Uuid;
 
+// TODO: Start with user defined SyncObject::<type> macro & determine everything via macro
+
 #[derive(Debug, Clone)]
-pub enum SyncObject {
-    Item {
-        meta: SyncObjectMeta,
-        attrs: ItemAttributes,
-    },
-    Container {
-        meta: SyncObjectMeta,
-        attrs: ListAttributes,
-    },
+pub enum SyncObjectAttrs {
+    Item(ItemAttrs),
+    Container(ContainerAttrs),
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncObject {
+    pub meta: SyncObjectMeta,
+    pub attrs: SyncObjectAttrs,
     // TODO: Expose sync engine type defs via macros?
     // TODO: Dynamic types?
 }
 
-impl SyncObject {
-    pub fn get_meta(&self) -> &SyncObjectMeta {
-        match self {
-            SyncObject::Container { meta, .. } => meta,
-            SyncObject::Item { meta, .. } => meta,
-        }
-    }
+impl SyncObjectAttrs {
     // Serialize attributes to AttributeSetProto blob
     pub fn get_attributes_blob(&self) -> Result<AttributesBlob, AppError> {
         let mut builder = FlatBufferBuilder::new();
         let mut fb_attributes = Vec::new();
 
         match self {
-            SyncObject::Container { attrs, .. } => {
-                if let Some(name_lww) = &attrs.name {
+            SyncObjectAttrs::Container(val) => {
+                if let Some(name_lww) = &val.name {
                     let timestamp =
                         LWWTimestampProto::new(name_lww.timestamp.utc, name_lww.timestamp.pid);
                     let name_offset = builder.create_string(&name_lww.data);
@@ -62,8 +58,8 @@ impl SyncObject {
                     fb_attributes.push(attr);
                 }
             }
-            SyncObject::Item { attrs, .. } => {
-                if let Some(text_lww) = &attrs.text {
+            SyncObjectAttrs::Item(val) => {
+                if let Some(text_lww) = &val.text {
                     let timestamp =
                         LWWTimestampProto::new(text_lww.timestamp.utc, text_lww.timestamp.pid);
                     let text_offset = builder.create_string(&text_lww.data);
@@ -111,17 +107,17 @@ pub struct SyncObjectMeta {
 }
 
 #[derive(Debug, Clone)]
-pub struct ItemAttributes {
+pub struct ItemAttrs {
     pub text: Option<LWWRegister<String>>,
 }
 
-impl ItemAttributes {
-    pub fn from_attributes_blob(blob: &[u8]) -> Result<ItemAttributes, AppError> {
+impl ItemAttrs {
+    pub fn from_attributes_blob(blob: &[u8]) -> Result<ItemAttrs, AppError> {
         let attr_set = flatbuffers::root::<AttributeSetProto>(blob).map_err(|e| {
             AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
         })?;
 
-        let mut attributes = ItemAttributes { text: None };
+        let mut attributes = ItemAttrs { text: None };
 
         if let Some(attrs) = attr_set.attributes() {
             for i in 0..attrs.len() {
@@ -153,8 +149,8 @@ impl ItemAttributes {
         Ok(attributes)
     }
 
-    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ItemAttributes {
-        let mut attributes = ItemAttributes { text: None };
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ItemAttrs {
+        let mut attributes = ItemAttrs { text: None };
         if let Some(attrs) = sync_obj_proto.attributes() {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
@@ -190,17 +186,17 @@ impl ItemAttributes {
 }
 
 #[derive(Debug, Clone)]
-pub struct ListAttributes {
+pub struct ContainerAttrs {
     pub name: Option<LWWRegister<String>>,
 }
 
-impl ListAttributes {
-    pub fn from_attributes_blob(blob: &[u8]) -> Result<ListAttributes, AppError> {
+impl ContainerAttrs {
+    pub fn from_attributes_blob(blob: &[u8]) -> Result<ContainerAttrs, AppError> {
         let attr_set = flatbuffers::root::<AttributeSetProto>(blob).map_err(|e| {
             AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
         })?;
 
-        let mut attributes = ListAttributes { name: None };
+        let mut attributes = ContainerAttrs { name: None };
 
         if let Some(attrs) = attr_set.attributes() {
             for i in 0..attrs.len() {
@@ -232,8 +228,8 @@ impl ListAttributes {
         Ok(attributes)
     }
 
-    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ListAttributes {
-        let mut attributes = ListAttributes { name: None };
+    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ContainerAttrs {
+        let mut attributes = ContainerAttrs { name: None };
         if let Some(attrs) = sync_obj_proto.attributes() {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
@@ -281,12 +277,15 @@ impl SyncObject {
         };
         return match sync_obj_proto.type_() {
             ObjectTypeProto::Item => {
-                let attrs = ItemAttributes::from_sync_object_proto(sync_obj_proto);
-                Ok(SyncObject::Item { meta, attrs })
+                let attrs =
+                    SyncObjectAttrs::Item(ItemAttrs::from_sync_object_proto(sync_obj_proto));
+                Ok(SyncObject { meta, attrs })
             }
             ObjectTypeProto::Container => {
-                let attrs = ListAttributes::from_sync_object_proto(sync_obj_proto);
-                Ok(SyncObject::Container { meta, attrs })
+                let attrs = SyncObjectAttrs::Container(ContainerAttrs::from_sync_object_proto(
+                    sync_obj_proto,
+                ));
+                Ok(SyncObject { meta, attrs })
             }
             _ => Err(AppError::ValidationError(String::from(
                 "SyncObjectType not found",
@@ -295,8 +294,44 @@ impl SyncObject {
     }
 }
 
-impl ItemAttributes {
-    pub fn merge<'a>(&'a mut self, attrs: &ItemAttributes) -> &'a ItemAttributes {
+impl TryFrom<SqlSyncObject> for SyncObject {
+    type Error = AppError;
+    fn try_from(sql_sync_object: SqlSyncObject) -> Result<Self, AppError> {
+        let meta = SyncObjectMeta {
+            id: sql_sync_object.id,
+            library_id: sql_sync_object.library_id,
+            server_seq: Some(sql_sync_object.server_seq),
+            tombstone_utc: sql_sync_object.tombstone_utc,
+        };
+        let sync_object_attrs: SyncObjectAttrs = match sql_sync_object.obj_type {
+            sync_object_type::ITEM => {
+                let attrs: ItemAttrs = if let Some(blob) = &sql_sync_object.attributes {
+                    ItemAttrs::from_attributes_blob(blob)?
+                } else {
+                    ItemAttrs { text: None }
+                };
+                SyncObjectAttrs::Item(attrs)
+            }
+            sync_object_type::CONTAINER => {
+                let attrs: ContainerAttrs = if let Some(blob) = &sql_sync_object.attributes {
+                    ContainerAttrs::from_attributes_blob(blob)?
+                } else {
+                    ContainerAttrs { name: None }
+                };
+                SyncObjectAttrs::Container(attrs)
+            }
+            _ => return Err(AppError::DatabaseError(String::from("Unknown object type"))),
+        };
+        let sync_object = SyncObject {
+            meta,
+            attrs: sync_object_attrs,
+        };
+        Ok(sync_object)
+    }
+}
+
+impl ItemAttrs {
+    pub fn merge<'a>(&'a mut self, attrs: &ItemAttrs) -> &'a ItemAttrs {
         // Merging text
         if let Some(text) = &attrs.text {
             if let Some(self_text) = &self.text {
@@ -316,8 +351,8 @@ impl ItemAttributes {
     }
 }
 
-impl ListAttributes {
-    pub fn merge<'a>(&'a mut self, attrs: &ListAttributes) -> &'a ListAttributes {
+impl ContainerAttrs {
+    pub fn merge<'a>(&'a mut self, attrs: &ContainerAttrs) -> &'a ContainerAttrs {
         // Merging text
         if let Some(name) = &attrs.name {
             if let Some(self_name) = &self.name {
@@ -354,6 +389,8 @@ pub struct SqlSyncObject {
 
 #[async_trait]
 pub trait SyncObjectModel: Send + Sync {
+    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid)
+    -> Result<Option<SyncObject>, AppError>;
     // Accept query options
     fn get_by_library_stream<'a>(
         &'a self,
