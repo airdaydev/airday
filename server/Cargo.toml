@@ -36,6 +36,3 @@ opentelemetry_sdk = "0.30.0"
 opentelemetry = "0.30.0"
 opentelemetry-stdout = "0.30.0"
 crdt = { path = "../rust/crdt" }
-
-[dev-dependencies]
-ts-rs = "11.0.1"
