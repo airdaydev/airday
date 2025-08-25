@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] generate typescript type ints from Rust
 - [] concurrent merge tests
 - [] ensure sync works well
 - [] unify in-memory list & persistent idb list

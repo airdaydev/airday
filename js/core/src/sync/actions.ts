@@ -4,9 +4,7 @@ import {
   SyncObjectActionProto,
   ObjectTypeProto,
   AttributeProto,
-  StringValueProto,
-  BoolValueProto,
-  FieldValueProto,
+  AttrTypeProto,
   LWWTimestampProto,
   AuthenticateActionProto,
   SpanContextProto,
@@ -22,6 +20,21 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
+
+// Field ID constants matching server/src/sync_object/types.rs
+export const ItemFieldId = {
+  ITEM_TEXT: 0,
+} as const;
+
+export const ListFieldId = {
+  LIST_NAME: 256,
+  LIST_DESCRIPTION: 257,
+} as const;
+
+export const SyncObjectType = {
+  ITEM: 0,
+  CONTAINER: 1,
+} as const;
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -131,21 +144,16 @@ export class SyncObjectAction extends BatchAction {
 
     // Convert item attributes to AttributeProto array
     if (this.item.attributes.text) {
-      const valueOffset = builder.createString(this.item.attributes.text.data);
-      const stringValueOffset = StringValueProto.createStringValueProto(
-        builder,
-        valueOffset,
-      );
+      const stringOffset = builder.createString(this.item.attributes.text.data);
 
-      const fieldOffset = builder.createString("text");
       AttributeProto.startAttributeProto(builder);
-      AttributeProto.addField(builder, fieldOffset);
-      AttributeProto.addValueType(builder, FieldValueProto.StringValueProto);
-      AttributeProto.addValue(builder, stringValueOffset);
+      AttributeProto.addFieldId(builder, ItemFieldId.ITEM_TEXT);
+      AttributeProto.addValueType(builder, AttrTypeProto.STRING);
       AttributeProto.addTimestamp(
         builder,
         this.item.attributes.text.timestamp.addToFlatBuffer(builder),
       );
+      AttributeProto.addString(builder, stringOffset);
       const textAttributeOffset = AttributeProto.endAttributeProto(builder);
       attributes.push(textAttributeOffset);
     }

@@ -17,8 +17,8 @@ table LibraryProto {
 }
 
 enum ObjectTypeProto: byte {
-  Item,
-  Container,
+  Item = 0,
+  Container = 1,
 }
 
 // TODO: This is ~probably~ unnecessary if it is typed from the outside!
@@ -40,6 +40,7 @@ table AttributeProto {
 
 table AttributeSetProto { attributes: [AttributeProto]; }
 
+// AttributeSetProto is used for database storage of attrs
 root_type AttributeSetProto;
 
 table SyncObjectActionProto {
