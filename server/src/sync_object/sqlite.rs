@@ -299,6 +299,8 @@ mod tests {
         }
     }
 
+    // TODO: concurrent_merge tests
+
     #[tokio::test]
     async fn sqlite_library_stream() {
         let db = test_util::create_test_db().await;

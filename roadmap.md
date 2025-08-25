@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] ensure CAS failures are retried with new read (finish tx & attempt failures)
+- [] concurrent merge tests
 - [] ensure sync works well
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
