@@ -336,7 +336,7 @@ impl ItemAttrs {
                 // TODO: Ergonomics!
                 let lww_a = self_text.clone();
                 let lww_b = text.clone();
-                let merged = lww_a.merge(lww_b).unwrap();
+                let merged = lww_a.merge(lww_b);
                 self.text = Some(merged);
             } else {
                 // case 2: attr doesn't exist on self, replace
@@ -357,7 +357,7 @@ impl ContainerAttrs {
                 // TODO: Ergonomics!
                 let lww_a = self_name.clone();
                 let lww_b = name.clone();
-                let merged = lww_a.merge(lww_b).unwrap();
+                let merged = lww_a.merge(lww_b);
                 self.name = Some(merged);
             } else {
                 // case 2: attr doesn't exist on self, replace

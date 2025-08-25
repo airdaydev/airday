@@ -10,27 +10,29 @@ pub struct LWWRegister<T> {
 
 impl<T> LWWRegister<T> {
     /// Create a new LWW register
-    pub fn new(data: T, timestamp: Option<LWWTimestamp>) -> Result<Self, &'static str> {
+    pub fn new(data: T, timestamp: Option<LWWTimestamp>) -> Self {
         let timestamp = match timestamp {
             Some(ts) => ts,
             None => LWWTimestamp::new(None, None),
         };
 
-        Ok(Self { timestamp, data })
+        Self { timestamp, data }
     }
 }
 
 impl<T: PartialEq> LWWRegister<T> {
     /// Merge with another string register
-    pub fn merge(self, other: Self) -> Result<Self, &'static str> {
+    pub fn merge(self, other: Self) -> Self {
         if self.timestamp == other.timestamp && self.data != other.data {
-            return Err("Timestamp collision detected on merge");
+            println!("WARNING: Same timestamp, different data");
+            // TODO: ALERT RE. POSSIBLE SYSTEMIC ISSUE
+            return self;
         }
 
         if self.timestamp > other.timestamp {
-            Ok(self)
+            self
         } else {
-            Ok(other)
+            other
         }
     }
 }
@@ -59,22 +61,22 @@ mod tests {
         let ts1 = LWWTimestamp::new(Some(1000), Some(1));
         let ts2 = LWWTimestamp::new(Some(1001), Some(1));
 
-        let reg1 = LWWRegister::new(String::from("hello"), Some(ts1)).unwrap();
-        let reg2 = LWWRegister::new(String::from("world"), Some(ts2)).unwrap();
+        let reg1 = LWWRegister::new(String::from("hello"), Some(ts1));
+        let reg2 = LWWRegister::new(String::from("world"), Some(ts2));
 
-        let merged = reg1.merge(reg2).unwrap();
+        let merged = reg1.merge(reg2);
         assert_eq!(merged.data, "world");
     }
 
     #[test]
-    fn test_timestamp_collision_error() {
+    fn test_timestamp_collision() {
         let ts = LWWTimestamp::new(Some(1000), Some(1));
-        let reg1 = LWWRegister::new(String::from("hello"), Some(ts.clone())).unwrap();
-        let reg2 = LWWRegister::new(String::from("world"), Some(ts)).unwrap();
+        let reg1 = LWWRegister::new(String::from("hello"), Some(ts.clone()));
+        let reg2 = LWWRegister::new(String::from("world"), Some(ts));
 
         let result = reg1.merge(reg2);
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Timestamp collision detected on merge");
+        // No change
+        assert_eq!(result.data, String::from("hello"));
     }
 
     #[test]

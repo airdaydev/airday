@@ -234,8 +234,10 @@ impl SyncObjectModel for SyncObjectModelSqlite {
 
 #[cfg(test)]
 mod tests {
+    use std::panic;
+
     use crate::{
-        sync_object::model::ItemAttrs,
+        sync_object::model::{ItemAttrs, SyncObjectAttrs},
         test_util::{self, mock_item},
     };
     use crdt::LWWRegister;
@@ -246,16 +248,55 @@ mod tests {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("sync_object_merge@air.day")).await;
         let primary_library_id = user.primary_library.unwrap().id;
-        let item = mock_item(
+        let mut item = mock_item(
             primary_library_id,
             Some(ItemAttrs {
-                text: Some(LWWRegister::<String>::new(String::from("old_text"), None).unwrap()),
+                text: Some(LWWRegister::<String>::new(String::from("old_text"), None)),
             }),
         );
-        db.sync_object.merge_many(&vec![item]).await.unwrap();
-        // TODO: Get one
-        // TODO: update item & merge again
-        // TODO: Get one and confirm text is correct
+        db.sync_object
+            .merge_many(&vec![item.clone()])
+            .await
+            .unwrap();
+        let Ok(Some(res)) = db
+            .sync_object
+            .get_by_id(&item.meta.library_id, &item.meta.id)
+            .await
+        else {
+            panic!("Failed to retrieve item after initial merge");
+        };
+        match res.attrs {
+            SyncObjectAttrs::Item(val) => {
+                assert_eq!(val.text.unwrap().data, String::from("old_text"));
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+        // Update and run again
+        let updated_attrs = SyncObjectAttrs::Item(ItemAttrs {
+            text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
+        });
+        item.attrs.merge(&updated_attrs).unwrap();
+        db.sync_object
+            .merge_many(&vec![item.clone()])
+            .await
+            .unwrap();
+        let Ok(Some(res_2)) = db
+            .sync_object
+            .get_by_id(&item.meta.library_id, &item.meta.id)
+            .await
+        else {
+            panic!("Failed to retrieve item after initial merge");
+        };
+        match res_2.attrs {
+            SyncObjectAttrs::Item(val) => {
+                assert_eq!(val.text.unwrap().data, String::from("new_text"));
+            }
+            _ => {
+                assert!(false);
+            }
+        }
     }
 
     #[tokio::test]
