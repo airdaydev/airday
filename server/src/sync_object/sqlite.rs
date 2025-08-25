@@ -1,12 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_object::{
-        model::{
-            ContainerAttrs, ItemAttrs, SqlSyncObject, SyncObject, SyncObjectAttrs, SyncObjectMeta,
-            SyncObjectModel, sql_sync_to_sync_object,
-        },
-        types::sync_object_type,
-    },
+    sync_object::model::{SqlSyncObject, SyncObject, SyncObjectModel, sql_sync_to_sync_object},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -25,18 +19,18 @@ impl SyncObjectModelSqlite {
     }
 }
 
-async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, item: &SyncObject) -> Result<i64, AppError> {
-    let attributes_blob = item.attrs.get_attributes_blob()?;
+async fn insert<'a>(
+    tx: &mut Transaction<'a, Sqlite>,
+    sync_obj: &SyncObject,
+) -> Result<i64, AppError> {
+    let attributes_blob = sync_obj.attrs.get_attributes_blob()?;
     let server_seq = now_micros();
-    let obj_type = match &item.attrs {
-        SyncObjectAttrs::Item(_) => sync_object_type::ITEM,
-        SyncObjectAttrs::Container(_) => sync_object_type::CONTAINER,
-    };
+    let obj_type = sync_obj.attrs.get_type_int();
     sqlx::query!(
         r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?, ?)"#,
-        item.meta.id,
-        item.meta.library_id,
+        sync_obj.meta.id,
+        sync_obj.meta.library_id,
         obj_type,
         attributes_blob,
         server_seq,
@@ -73,12 +67,12 @@ async fn merge<'a>(
     .await?;
     // 2. Check if sync_obj exists
     let Some(sql_sync_obj) = result else {
-        // Item does not exist, insert new sync_obj
+        // Obj does not exist, insert new sync_obj
         let server_seq = insert(tx, incoming_sync_obj).await?;
         return Ok(server_seq);
     };
     if let Some(_) = sql_sync_obj.tombstone_utc {
-        // Item is tombstones - discard changes
+        // obj is tombstones - discard changes
         // TODO: Hints that user has not received, or is receiving this update - send the tombstone back somehow
         return Err(AppError::ValidationError(String::from(
             "sync_obj is tombstoned",
@@ -138,47 +132,26 @@ impl SyncObjectModel for SyncObjectModelSqlite {
             Some(v) => v,
             None => return Ok(None),
         };
-        let meta = SyncObjectMeta {
-            id: sql_sync_object.id,
-            library_id: sql_sync_object.library_id,
-            server_seq: Some(sql_sync_object.server_seq),
-            tombstone_utc: sql_sync_object.tombstone_utc,
-        };
-        let sync_object_attrs = match sql_sync_object.obj_type {
-            // TODO: No attributes blob?
-            sync_object_type::ITEM => {
-                let item_attrs =
-                    ItemAttrs::from_attributes_blob(&sql_sync_object.attributes.unwrap())?;
-                SyncObjectAttrs::Item(item_attrs)
-            }
-            sync_object_type::CONTAINER => {
-                // TODO: No attributes blob?
-                let container_attrs =
-                    ContainerAttrs::from_attributes_blob(&sql_sync_object.attributes.unwrap())?;
-                SyncObjectAttrs::Container(container_attrs)
-            }
-            _ => return Err(AppError::DatabaseError(String::from("Bad type"))),
-        };
-        let sync_object = SyncObject {
-            meta,
-            attrs: sync_object_attrs,
-        };
+        let sync_object = sql_sync_to_sync_object(&sql_sync_object)?;
         Ok(Some(sync_object))
     }
-    // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
-    async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError> {
+    // TODO: Break up this function so we are batching these, else each sync_object necessitates at least 2 individual transactions
+    async fn merge_many(
+        &self,
+        sync_objects: &Vec<SyncObject>,
+    ) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];
         let mut retries = vec![];
         let mut tx = self.pool.begin().await?;
         let idx = 0;
-        for item in item {
-            let server_seq = match merge(&mut tx, item).await {
+        for sync_object in sync_objects {
+            let server_seq = match merge(&mut tx, sync_object).await {
                 Ok(seq) => seq,
                 Err(err) => {
                     println!("{:?}", err);
                     if let AppError::RetryReq() = err {
                         // Likely a contended result
-                        retries.push((idx, item));
+                        retries.push((idx, sync_object));
                     } else {
                         results.push(None);
                     }
@@ -191,11 +164,11 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         tx.commit().await?;
         // Slow batch retry (most likely, due to contention)
         // TODO: Try multiple times?
-        for item in retries {
+        for sync_object in retries {
             let mut tx = self.pool.begin().await?;
-            match merge(&mut tx, item.1).await {
+            match merge(&mut tx, sync_object.1).await {
                 Ok(seq) => {
-                    results[item.0] = Some(seq);
+                    results[sync_object.0] = Some(seq);
                 }
                 Err(err) => {
                     println!("Merge retry failure: {:?}", err);

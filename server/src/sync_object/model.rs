@@ -31,6 +31,12 @@ pub struct SyncObject {
 }
 
 impl SyncObjectAttrs {
+    pub fn get_type_int(&self) -> i64 {
+        match self {
+            SyncObjectAttrs::Item(_) => sync_object_type::ITEM,
+            SyncObjectAttrs::Container(_) => sync_object_type::CONTAINER,
+        }
+    }
     // Serialize attributes to AttributeSetProto blob
     pub fn get_attributes_blob(&self) -> Result<AttributesBlob, AppError> {
         let mut builder = FlatBufferBuilder::new();
