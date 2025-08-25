@@ -1,7 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] get sync working again with custom attributes + flatbuffer storage, remove json
+- [] ensure CAS failures are retried with new read (finish tx & attempt failures)
+- [] ensure sync works well
 - [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api
@@ -37,6 +38,7 @@
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
 - [] protection against future dates being encoded in LWWRegisters
+- [] enforce batch size limits
 - [] Indexing for server_seq
 ```sql
 CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);

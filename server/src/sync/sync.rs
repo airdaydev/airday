@@ -128,10 +128,11 @@ pub async fn process_sync_batch<'a>(
     }
     // Merge, returning back server_seqs or errors
     let Ok(result) = state.db.sync_object.merge_many(&items).await else {
+        // Total Failure state
         for (action_id, _) in action_index {
             responses.push(BatchAction::Error {
                 action_id: Some(action_id),
-                message: String::from("unauthorised"),
+                message: String::from("Merge error"),
             });
         }
         return responses;

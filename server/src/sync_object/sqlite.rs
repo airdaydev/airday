@@ -59,69 +59,62 @@ async fn merge<'a>(
     tx: &mut Transaction<'a, Sqlite>,
     incoming_sync_obj: &SyncObject,
 ) -> Result<i64, AppError> {
-    // We allow 3x retries when contending with competing thread
-    let mut retries = 0;
-    while retries < 3 {
-        // Select for merge
-        let result = sqlx::query_as!(
-            SqlSyncObject,
-            r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
+    // Select for merge
+    let result = sqlx::query_as!(
+        SqlSyncObject,
+        r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
           server_seq, tombstone_utc, attributes
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
-            incoming_sync_obj.meta.library_id,
-            incoming_sync_obj.meta.id,
-        )
-        .fetch_optional(tx.as_mut())
-        .await?;
-        // 2. Check if sync_obj exists
-        let Some(sql_sync_obj) = result else {
-            // Item does not exist, insert new sync_obj
-            let server_seq = insert(tx, incoming_sync_obj).await?;
-            return Ok(server_seq);
-        };
-        if let Some(_) = sql_sync_obj.tombstone_utc {
-            // Item is tombstones - discard changes
-            // TODO: Hints that user has not received, or is receiving this update - send the tombstone back somehow
-            return Err(AppError::ValidationError(String::from(
-                "sync_obj is tombstoned",
-            )));
-        }
-        let mut sync_object: SyncObject = sql_sync_to_sync_object(&sql_sync_obj)?;
-        sync_object.attrs.merge(&incoming_sync_obj.attrs)?;
+        incoming_sync_obj.meta.library_id,
+        incoming_sync_obj.meta.id,
+    )
+    .fetch_optional(tx.as_mut())
+    .await?;
+    // 2. Check if sync_obj exists
+    let Some(sql_sync_obj) = result else {
+        // Item does not exist, insert new sync_obj
+        let server_seq = insert(tx, incoming_sync_obj).await?;
+        return Ok(server_seq);
+    };
+    if let Some(_) = sql_sync_obj.tombstone_utc {
+        // Item is tombstones - discard changes
+        // TODO: Hints that user has not received, or is receiving this update - send the tombstone back somehow
+        return Err(AppError::ValidationError(String::from(
+            "sync_obj is tombstoned",
+        )));
+    }
+    let mut sync_object: SyncObject = sql_sync_to_sync_object(&sql_sync_obj)?;
+    sync_object.attrs.merge(&incoming_sync_obj.attrs)?;
 
-        debug!("existing_attrs {:?}", sync_object);
-        let Ok(attributes_blob) = sync_object.attrs.get_attributes_blob() else {
-            return Err(AppError::ServerError(String::from(
-                "Failed to translate merge output to blob",
-            )));
-        };
-        let server_seq = now_micros();
+    debug!("existing_attrs {:?}", sync_object);
+    let Ok(attributes_blob) = sync_object.attrs.get_attributes_blob() else {
+        return Err(AppError::ServerError(String::from(
+            "Failed to translate merge output to blob",
+        )));
+    };
+    let server_seq = now_micros();
 
-        let last_server_seq = sql_sync_obj.server_seq as i64;
+    let last_server_seq = sql_sync_obj.server_seq as i64;
 
-        let result = sqlx::query!(
-            r#"UPDATE sync_object
+    let result = sqlx::query!(
+        r#"UPDATE sync_object
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-            attributes_blob,
-            server_seq,
-            incoming_sync_obj.meta.id,
-            incoming_sync_obj.meta.library_id,
-            last_server_seq,
-        )
-        .execute(tx.as_mut())
-        .await?;
+        attributes_blob,
+        server_seq,
+        incoming_sync_obj.meta.id,
+        incoming_sync_obj.meta.library_id,
+        last_server_seq,
+    )
+    .execute(tx.as_mut())
+    .await?;
 
-        if result.rows_affected() == 1 {
-            return Ok(server_seq);
-        } else {
-            retries = retries + 1;
-        }
+    if result.rows_affected() == 1 {
+        return Ok(server_seq);
+    } else {
+        return Err(AppError::RetryReq());
     }
-    return Err(AppError::ServerError(String::from(
-        "Concurrent update failure",
-    )));
 }
 
 #[async_trait]
@@ -175,20 +168,44 @@ impl SyncObjectModel for SyncObjectModelSqlite {
     // TODO: Break up this function so we are batching these, else each item necessitates at least 2 individual transactions
     async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];
+        let mut retries = vec![];
         let mut tx = self.pool.begin().await?;
+        let idx = 0;
         for item in item {
             let server_seq = match merge(&mut tx, item).await {
-                Ok(ts) => ts,
+                Ok(seq) => seq,
                 Err(err) => {
-                    // TODO: Propagate merge error to client?!
                     println!("{:?}", err);
-                    results.push(None);
+                    if let AppError::RetryReq() = err {
+                        // Likely a contended result
+                        retries.push((idx, item));
+                    } else {
+                        results.push(None);
+                    }
+                    // TODO: Propagate merge error to client?!
                     continue;
                 }
             };
             results.push(Some(server_seq));
         }
         tx.commit().await?;
+        // Slow batch retry (most likely, due to contention)
+        // TODO: Try multiple times?
+        for item in retries {
+            let mut tx = self.pool.begin().await?;
+            match merge(&mut tx, item.1).await {
+                Ok(seq) => {
+                    results[item.0] = Some(seq);
+                }
+                Err(err) => {
+                    println!("Merge retry failure: {:?}", err);
+                    // TODO: Leave Failure
+                }
+            }
+            if let Err(msg) = tx.commit().await {
+                println!("Merge retry failure {}", msg);
+            }
+        }
         Ok(results)
     }
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
