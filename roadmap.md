@@ -182,6 +182,9 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 
 # FUTURE GOALS FOR AIRDAY
 
+## Sync engine extraction
+- [] Full macro mode
+
 ## Multilingual goals
 - [] Spanish (EU) localisation
 - [] Japanese localisation
