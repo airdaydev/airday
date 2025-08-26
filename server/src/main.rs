@@ -34,6 +34,9 @@ mod sync_object {
     pub mod sqlite;
     pub mod types;
 }
+mod sync_object_v2 {
+    pub mod v2;
+}
 mod root;
 use crate::auth::cache::AuthCache;
 use crate::common::config::AirdayConfig;

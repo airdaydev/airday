@@ -1,3 +1,5 @@
+use crate::{common::error::AppError, sync::proto_generated::proto};
+
 pub mod item_field_id {
     pub const ITEM_TEXT: i16 = 0;
     // TODO: item.type could be an enum (repeat, static, series, shuffle, playlist)
