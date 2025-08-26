@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Entirely separate sync_object from variant (#[derive(sync_object)]? - but we need a type match too for serialization)
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests
 - [] ensure sync works well
