@@ -5,7 +5,7 @@ mod common {
     pub mod sql;
     pub mod utils;
 }
-mod sync {
+mod sync_transport {
     #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
     pub mod proto_generated;
     pub mod response;
@@ -57,7 +57,7 @@ use tracing::{info, info_span};
 struct AppState {
     db: Db,
     config: AirdayConfig,
-    ws: sync::websocket::WebsocketState,
+    ws: sync_transport::websocket::WebsocketState,
     auth_cache: AuthCache, // ws_sub_map: sync::websocket::WSSubMap,
 }
 
@@ -100,7 +100,7 @@ async fn main() {
     let state = AppState {
         db: db,
         config: cfg.clone(),
-        ws: sync::websocket::WebsocketState::new(),
+        ws: sync_transport::websocket::WebsocketState::new(),
         auth_cache: AuthCache::new(),
     };
 
@@ -128,7 +128,7 @@ async fn main() {
         )
         .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions))
-        .route("/ws", any(sync::websocket::handler));
+        .route("/ws", any(sync_transport::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await

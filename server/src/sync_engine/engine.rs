@@ -1,7 +1,7 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync::proto_generated::proto::SyncObjectActionProto,
     sync_engine::any::SqlSyncObject,
+    sync_transport::proto_generated::proto::SyncObjectActionProto,
 };
 use async_trait::async_trait;
 use std::{fmt::Debug, pin::Pin};

@@ -1,11 +1,11 @@
 // These are the user defined types!
 use crate::{
     common::error::AppError,
-    sync::proto_generated::proto::{
+    sync_engine::engine::{AttributesBlob, FromActionProto, SyncAttrs, SyncObject},
+    sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto,
     },
-    sync_engine::engine::{AttributesBlob, FromActionProto, SyncAttrs, SyncObject},
 };
 use crdt::{LWWRegister, timestamp::LWWTimestamp};
 use flatbuffers::FlatBufferBuilder;

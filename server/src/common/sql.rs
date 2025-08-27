@@ -2,7 +2,7 @@ use crate::{
     auth::session::{SessionModel, SessionModelSqlite},
     common::config::AirdayConfig,
     library::{model::LibraryModel, sqlite::LibraryModelSqlite},
-    sync_engine::{model::SyncObjectModel, sqlite::SyncObjectModelSqlite},
+    sync_engine::{engine::SyncObjectModel, sqlite::SyncObjectModelSqlite},
     user::{model::UserModel, sqlite::UserModelSqlite},
 };
 use crdt::timestamp::{now_micros, seed_clock};

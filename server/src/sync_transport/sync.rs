@@ -1,11 +1,11 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
-    sync::proto_generated::proto::{
+    sync_engine::engine::SyncObject,
+    sync_transport::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
     },
-    sync_object::model::SyncObject,
 };
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;

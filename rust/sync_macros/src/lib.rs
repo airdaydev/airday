@@ -302,14 +302,14 @@ pub fn derive_sync_object(input: TokenStream) -> TokenStream {
             fn encode_attrs(
                 &self,
                 fbb: &mut flatbuffers::FlatBufferBuilder<'_>,
-                out: &mut Vec<flatbuffers::WIPOffset<crate::sync::proto_generated::proto::AttributeProto<'_>>>,
+                out: &mut Vec<flatbuffers::WIPOffset<crate::sync_transport::proto_generated::proto::AttributeProto<'_>>>,
             ) {
-                use crate::sync::proto_generated::proto as proto;
+                use crate::sync_transport::proto_generated::proto as proto;
                 #(#enc_arms)*
             }
 
-            fn decode_attrs(attr_set: &crate::sync::proto_generated::proto::AttributeSetProto<'_>) -> Self {
-                use crate::sync::proto_generated::proto as proto;
+            fn decode_attrs(attr_set: &crate::sync_transport::proto_generated::proto::AttributeSetProto<'_>) -> Self {
+                use crate::sync_transport::proto_generated::proto as proto;
                 let mut s = Self { #(#dec_init_fields),* };
                 if let Some(attrs) = attr_set.attributes() {
                     for i in 0..attrs.len() {
@@ -357,7 +357,7 @@ pub fn sync_objects(input: TokenStream) -> TokenStream {
     let encode_match = idents.iter().map(|id| {
         quote! {
             SyncObjectAttrs::#id(v) => {
-                use crate::sync::proto_generated::proto as proto;
+                use crate::sync_transport::proto_generated::proto as proto;
                 let mut fbb = flatbuffers::FlatBufferBuilder::new();
                 let mut vec_attrs = Vec::new();
                 v.encode_attrs(&mut fbb, &mut vec_attrs);
