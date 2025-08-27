@@ -30,6 +30,7 @@ mod auth {
     pub mod session;
 }
 mod sync_engine {
+    pub mod any;
     pub mod container;
     pub mod engine;
     pub mod item;

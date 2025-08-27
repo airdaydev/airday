@@ -1,10 +1,13 @@
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{SyncAttrs, SyncObject},
+    sync_engine::{
+        any::SqlSyncObject,
+        engine::{SyncAttrs, SyncObject, SyncObjectModel},
+    },
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
-use sqlx::{Sqlite, SqlitePool, Transaction, prelude::FromRow};
+use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
 use tracing::debug;
 use uuid::Uuid;
@@ -17,21 +20,6 @@ impl SyncObjectModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-}
-
-pub type AttributesBlob = Option<Vec<u8>>;
-
-#[derive(FromRow)]
-pub struct SqlSyncObject {
-    // static attrs
-    pub id: Uuid,
-    pub obj_type: i64,
-    pub library_id: Uuid,
-    // dynamic attrs (flatbuffer blob)
-    pub attributes: AttributesBlob,
-    // metadata
-    pub server_seq: i64,
-    pub tombstone_utc: Option<i64>,
 }
 
 async fn insert<'a, A: SyncAttrs>(
@@ -225,7 +213,7 @@ mod tests {
     use std::panic;
 
     use crate::{
-        sync_object::model::{ItemAttrs, SyncObjectAttrs},
+        sync_engine::item::ItemAttrs,
         test_util::{self, mock_item},
     };
     use crdt::LWWRegister;
@@ -262,7 +250,7 @@ mod tests {
             }
         }
         // Update and run again
-        let updated_attrs = SyncObjectAttrs::Item(ItemAttrs {
+        let updated_attrs = SyncObjectAttr::Item(ItemAttrs {
             text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
         });
         item.attrs.merge(&updated_attrs).unwrap();

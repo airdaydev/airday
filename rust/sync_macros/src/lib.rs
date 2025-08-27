@@ -1,3 +1,7 @@
+// This is GPT-5 generated semi-slop - bad target
+// But is a good reference as it did work for what it did
+// TODO: Replace
+
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, quote_spanned};

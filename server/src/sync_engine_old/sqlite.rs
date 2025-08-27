@@ -19,28 +19,6 @@ impl SyncObjectModelSqlite {
     }
 }
 
-async fn insert_trait_version<'a>(
-    tx: &mut Transaction<'a, Sqlite>,
-    sync_obj: &SyncObject,
-) -> Result<i64, AppError> {
-    let attributes_blob = sync_obj.attrs.to_attr_blob()?;
-    let server_seq = now_micros();
-    let obj_type = sync_obj.attrs.get_type_int();
-    sqlx::query!(
-        r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
-           VALUES (?, ?, ?, ?, ?, ?)"#,
-        sync_obj.meta.id,
-        sync_obj.meta.library_id,
-        obj_type,
-        attributes_blob,
-        server_seq,
-        Option::<i64>::None
-    )
-    .execute(tx.as_mut())
-    .await?;
-    Ok(server_seq)
-}
-
 async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
     sync_obj: &SyncObject,
