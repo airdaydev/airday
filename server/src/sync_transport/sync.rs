@@ -1,7 +1,7 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
-    sync_engine::engine::SyncObject,
+    sync_engine::{any::AnySyncObject, engine::SyncObject},
     sync_transport::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
@@ -86,7 +86,7 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    let mut items: Vec<SyncObject> = Vec::new();
+    let mut items: Vec<AnySyncObject> = Vec::new();
     let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
