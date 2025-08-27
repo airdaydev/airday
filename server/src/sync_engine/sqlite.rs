@@ -28,7 +28,7 @@ async fn insert<'a, A: SyncAttrs>(
 ) -> Result<i64, AppError> {
     let attributes_blob = sync_obj.attrs.to_attr_blob()?;
     let server_seq = now_micros();
-    let obj_type = sync_obj.attrs.get_type_int();
+    let obj_type = sync_obj.obj_type();
     sqlx::query!(
         r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?, ?)"#,

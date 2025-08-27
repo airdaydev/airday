@@ -1,6 +1,6 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_engine::any::SqlSyncObject,
+    sync_engine::any::{AnySyncObject, SqlSyncObject},
     sync_transport::proto_generated::proto::SyncObjectActionProto,
 };
 use async_trait::async_trait;
@@ -72,8 +72,11 @@ impl<A: SyncAttrs + FromActionProto> SyncObject<A> {
 
 #[async_trait]
 pub trait SyncObjectModel: Send + Sync {
-    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid)
-    -> Result<Option<SyncObject>, AppError>;
+    async fn get_by_id(
+        &self,
+        library_id: &Uuid,
+        id: &Uuid,
+    ) -> Result<Option<AnySyncObject>, AppError>;
     // Accept query options
     fn get_by_library_stream<'a>(
         &'a self,
@@ -87,7 +90,7 @@ pub trait SyncObjectModel: Send + Sync {
         >,
     >;
     // async fn merge(&self, item: &Item) -> Result<(), AppError>;
-    async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError>;
+    async fn merge_many(&self, item: &Vec<AnySyncObject>) -> Result<Vec<Option<i64>>, AppError>;
     // async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

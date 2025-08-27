@@ -6,9 +6,9 @@ use uuid::Uuid;
 use crate::{
     common::error::AppError,
     sync_engine::{
-        container::ContainerAttrs,
+        container::{CONTAINER, ContainerAttrs},
         engine::{SyncObject, SyncObjectMeta},
-        item::ItemAttrs,
+        item::{ITEM, ItemAttrs},
     },
 };
 
@@ -46,7 +46,7 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
         };
 
         match row.obj_type {
-            x if x == ItemAttrs::OBJ_TYPE => {
+            x if x == ITEM => {
                 let attrs = if let Some(b) = &row.attributes {
                     ItemAttrs::from_attr_blob(b)?
                 } else {
@@ -54,7 +54,7 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
                 };
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
-            x if x == ContainerAttrs::OBJ_TYPE => {
+            x if x == CONTAINER => {
                 let attrs = if let Some(b) = &row.attributes {
                     ContainerAttrs::from_attr_blob(b)?
                 } else {
