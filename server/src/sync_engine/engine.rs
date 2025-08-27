@@ -1,13 +1,15 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
     sync::proto_generated::proto::SyncObjectActionProto,
+    sync_engine::sqlite::SqlSyncObject,
 };
-use std::fmt::Debug;
+use async_trait::async_trait;
+use std::{fmt::Debug, pin::Pin};
 use uuid::Uuid;
 
 pub type AttributesBlob = Option<Vec<u8>>;
 
-pub trait SyncAttrs: Sized {
+pub trait SyncAttrs {
     const OBJ_TYPE: i64;
     /// Append this struct’s attributes into a FlatBuffers builder.
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError>;
@@ -66,4 +68,26 @@ impl<A: SyncAttrs + FromActionProto> SyncObject<A> {
         let attrs = A::attrs_from_proto(p)?;
         Ok(SyncObject { meta, attrs })
     }
+}
+
+#[async_trait]
+pub trait SyncObjectModel: Send + Sync {
+    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid)
+    -> Result<Option<SyncObject>, AppError>;
+    // Accept query options
+    fn get_by_library_stream<'a>(
+        &'a self,
+        library_id: &Uuid,
+        server_seq: i64,
+    ) -> Pin<
+        Box<
+            dyn futures_util::Stream<Item = Result<SqlSyncObject, sqlx::Error>>
+                + std::marker::Send
+                + 'a,
+        >,
+    >;
+    // async fn merge(&self, item: &Item) -> Result<(), AppError>;
+    async fn merge_many(&self, item: &Vec<SyncObject>) -> Result<Vec<Option<i64>>, AppError>;
+    // async fn insert(&self, item: &Item) -> Result<(), AppError>;
+    // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

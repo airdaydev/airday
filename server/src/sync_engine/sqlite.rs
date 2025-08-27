@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{Sqlite, SqlitePool, Transaction, prelude::FromRow};
 use std::pin::Pin;
 use tracing::debug;
 use uuid::Uuid;
@@ -17,6 +17,21 @@ impl SyncObjectModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
+}
+
+pub type AttributesBlob = Option<Vec<u8>>;
+
+#[derive(FromRow)]
+pub struct SqlSyncObject {
+    // static attrs
+    pub id: Uuid,
+    pub obj_type: i64,
+    pub library_id: Uuid,
+    // dynamic attrs (flatbuffer blob)
+    pub attributes: AttributesBlob,
+    // metadata
+    pub server_seq: i64,
+    pub tombstone_utc: Option<i64>,
 }
 
 async fn insert<'a, A: SyncAttrs>(
