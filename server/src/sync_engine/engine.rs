@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 pub type AttributesBlob = Option<Vec<u8>>;
 
-pub trait SyncAttrs {
+pub trait SyncAttrs: Sized {
     const OBJ_TYPE: i64;
     /// Append this struct’s attributes into a FlatBuffers builder.
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError>;

@@ -7,7 +7,7 @@ use crate::{
     common::error::AppError,
     sync_engine::{
         container::{CONTAINER, ContainerAttrs},
-        engine::{SyncObject, SyncObjectMeta},
+        engine::{SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
 };
