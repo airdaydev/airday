@@ -29,13 +29,11 @@ mod auth {
     pub mod cache;
     pub mod session;
 }
-mod sync_object {
-    pub mod model;
-    pub mod sqlite;
-    pub mod types;
-}
 mod sync_engine {
+    pub mod container;
     pub mod engine;
+    pub mod item;
+    pub mod sqlite;
 }
 mod root;
 use crate::auth::cache::AuthCache;

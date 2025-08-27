@@ -1,6 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_object::model::{SqlSyncObject, SyncObject, SyncObjectModel, sql_sync_to_sync_object},
+    sync_engine::engine::{SyncAttrs, SyncObject},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -19,11 +19,11 @@ impl SyncObjectModelSqlite {
     }
 }
 
-async fn insert<'a>(
+async fn insert<'a, A: SyncAttrs>(
     tx: &mut Transaction<'a, Sqlite>,
-    sync_obj: &SyncObject,
+    sync_obj: &SyncObject<A>,
 ) -> Result<i64, AppError> {
-    let attributes_blob = sync_obj.attrs.get_attributes_blob()?;
+    let attributes_blob = sync_obj.attrs.to_attr_blob()?;
     let server_seq = now_micros();
     let obj_type = sync_obj.attrs.get_type_int();
     sqlx::query!(
@@ -49,9 +49,9 @@ async fn insert<'a>(
 // However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
 // TODO: We could consider cutting out the full object and just concentrating on the attributes
-async fn merge<'a>(
+async fn merge<'a, A: SyncAttrs>(
     tx: &mut Transaction<'a, Sqlite>,
-    incoming_sync_obj: &SyncObject,
+    incoming_sync_obj: &SyncObject<A>,
 ) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
@@ -82,7 +82,7 @@ async fn merge<'a>(
     sync_object.attrs.merge(&incoming_sync_obj.attrs)?;
 
     debug!("existing_attrs {:?}", sync_object);
-    let Ok(attributes_blob) = sync_object.attrs.get_attributes_blob() else {
+    let Ok(attributes_blob) = sync_object.attrs.to_attr_blob() else {
         return Err(AppError::ServerError(String::from(
             "Failed to translate merge output to blob",
         )));

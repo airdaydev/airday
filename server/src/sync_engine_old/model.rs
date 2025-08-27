@@ -38,7 +38,7 @@ impl SyncObjectAttrs {
         }
     }
     // Serialize attributes to AttributeSetProto blob
-    pub fn get_attributes_blob(&self) -> Result<AttributesBlob, AppError> {
+    pub fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
         let mut builder = FlatBufferBuilder::new();
         let mut fb_attributes = Vec::new();
 
