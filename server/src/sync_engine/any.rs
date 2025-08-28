@@ -2,7 +2,7 @@ use crate::{
     common::error::AppError,
     sync_engine::{
         container::{CONTAINER, ContainerAttrs},
-        engine::{SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
+        engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
 };
@@ -37,10 +37,22 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
 }
 
 impl AnySyncObject {
-    pub fn meta(&self) -> SyncObjectMeta {
+    pub fn meta(&self) -> &SyncObjectMeta {
         match self {
-            AnySyncObject::Item(o) => o.meta.clone(),
-            AnySyncObject::Container(o) => o.meta.clone(),
+            AnySyncObject::Item(o) => &o.meta,
+            AnySyncObject::Container(o) => &o.meta,
+        }
+    }
+    pub fn obj_type(&self) -> i64 {
+        match self {
+            AnySyncObject::Item(o) => o.obj_type(),
+            AnySyncObject::Container(o) => o.obj_type(),
+        }
+    }
+    pub fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
+        match self {
+            AnySyncObject::Item(o) => o.to_attr_blob(),
+            AnySyncObject::Container(o) => o.to_attr_blob(),
         }
     }
     pub fn merge_into(&mut self, other: &AnySyncObject) -> Result<(), AppError> {

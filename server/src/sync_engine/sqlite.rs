@@ -2,7 +2,7 @@ use crate::{
     common::error::AppError,
     sync_engine::{
         any::AnySyncObject,
-        engine::{SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta, SyncObjectModel},
+        engine::{SqlSyncObject, SyncObjectModel},
     },
 };
 use async_trait::async_trait;
@@ -21,18 +21,18 @@ impl SyncObjectModelSqlite {
     }
 }
 
-async fn insert<'a, A: SyncAttrs>(
+async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    sync_obj: &SyncObject<A>,
+    sync_obj: &AnySyncObject,
 ) -> Result<i64, AppError> {
-    let attributes_blob = sync_obj.attrs.to_attr_blob()?;
+    let attributes_blob = sync_obj.to_attr_blob()?;
     let server_seq = now_micros();
     let obj_type = sync_obj.obj_type();
     sqlx::query!(
         r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?, ?)"#,
-        sync_obj.meta.id,
-        sync_obj.meta.library_id,
+        sync_obj.meta().id,
+        sync_obj.meta().library_id,
         obj_type,
         attributes_blob,
         server_seq,
@@ -51,9 +51,9 @@ async fn insert<'a, A: SyncAttrs>(
 // However, only one writer will succeed, as the writer must match the server_seq
 // from the record they read - which will not happen if it has been updated in the interim.
 // TODO: We could consider cutting out the full object and just concentrating on the attributes
-async fn merge<'a, A: SyncAttrs>(
+async fn merge<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    incoming_sync_obj: &SyncObject<A>,
+    incoming_sync_obj: &AnySyncObject,
 ) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
@@ -62,8 +62,8 @@ async fn merge<'a, A: SyncAttrs>(
           server_seq, tombstone_utc, attributes
           FROM sync_object
           WHERE library_id = ? AND id = ?"#,
-        incoming_sync_obj.meta.library_id,
-        incoming_sync_obj.meta.id,
+        incoming_sync_obj.meta().library_id,
+        incoming_sync_obj.meta().id,
     )
     .fetch_optional(tx.as_mut())
     .await?;
@@ -85,28 +85,25 @@ async fn merge<'a, A: SyncAttrs>(
             "Incorrect merge type",
         )));
     }
-    let meta = SyncObjectMeta::from_sql_row(&sql_sync_obj);
-    let attrs = A::from_attr_blob(sql_sync_obj.attributes)?; // This will always be here, right?
-    let mut sync_object: SyncObject<A> = SyncObject { meta, attrs };
-    sync_object.merge_attrs(&incoming_sync_obj.attrs);
+    let last_server_seq = sql_sync_obj.server_seq as i64;
+    let mut existing_object: AnySyncObject = sql_sync_obj.try_into()?;
+    existing_object.merge_into(&incoming_sync_obj);
 
-    let Ok(attributes_blob) = sync_object.attrs.to_attr_blob() else {
+    let Ok(attr_blob) = existing_object.to_attr_blob() else {
         return Err(AppError::ServerError(String::from(
             "Failed to translate merge output to blob",
         )));
     };
     let server_seq = now_micros();
 
-    let last_server_seq = sql_sync_obj.server_seq as i64;
-
     let result = sqlx::query!(
         r#"UPDATE sync_object
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-        attributes_blob,
+        attr_blob,
         server_seq,
-        incoming_sync_obj.meta.id,
-        incoming_sync_obj.meta.library_id,
+        incoming_sync_obj.meta().id,
+        incoming_sync_obj.meta().library_id,
         last_server_seq,
     )
     .execute(tx.as_mut())
@@ -140,13 +137,13 @@ impl SyncObjectModel for SyncObjectModelSqlite {
             Some(v) => v,
             None => return Ok(None),
         };
-        let sync_object = sql_sync_to_sync_object(&sql_sync_object)?;
+        let sync_object: AnySyncObject = sql_sync_object.try_into()?;
         Ok(Some(sync_object))
     }
     // TODO: Break up this function so we are batching these, else each sync_object necessitates at least 2 individual transactions
     async fn merge_many(
         &self,
-        sync_objects: &Vec<SyncObject>,
+        sync_objects: &Vec<AnySyncObject>,
     ) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];
         let mut retries = vec![];
@@ -218,8 +215,8 @@ mod tests {
     use std::panic;
 
     use crate::{
-        sync_engine::item::ItemAttrs,
-        test_util::{self, mock_item},
+        sync_engine::{any::AnySyncObject, item::ItemAttrs},
+        test_util::{self, mock_item, mock_item_any},
     };
     use crdt::LWWRegister;
     use futures_util::StreamExt;
@@ -231,36 +228,44 @@ mod tests {
         let primary_library_id = user.primary_library.unwrap().id;
         let mut item = mock_item(
             primary_library_id,
+            None,
             Some(ItemAttrs {
                 text: Some(LWWRegister::<String>::new(String::from("old_text"), None)),
             }),
         );
+        let wrapped_item = AnySyncObject::Item(item.clone());
         db.sync_object
-            .merge_many(&vec![item.clone()])
+            .merge_many(&vec![wrapped_item])
             .await
             .unwrap();
         let Ok(Some(res)) = db
             .sync_object
-            .get_by_id(&item.meta.library_id, &item.meta.id)
+            .get_by_id(&item.meta.library_id.clone(), &item.meta.id.clone())
             .await
         else {
             panic!("Failed to retrieve item after initial merge");
         };
-        match res.attrs {
-            SyncObjectAttrs::Item(val) => {
-                assert_eq!(val.text.unwrap().data, String::from("old_text"));
+        match res {
+            AnySyncObject::Item(val) => {
+                assert_eq!(val.attrs.text.unwrap().data, String::from("old_text"));
             }
             _ => {
                 assert!(false);
+                return;
             }
-        }
+        };
         // Update and run again
-        let updated_attrs = SyncObjectAttr::Item(ItemAttrs {
-            text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
-        });
-        item.attrs.merge(&updated_attrs).unwrap();
+        let updated_item = mock_item(
+            item.meta.library_id,
+            Some(item.meta.id),
+            Some(ItemAttrs {
+                text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
+            }),
+        );
+        item.merge_attrs(&updated_item.attrs);
+        let wrapped_updated = AnySyncObject::Item(item.clone());
         db.sync_object
-            .merge_many(&vec![item.clone()])
+            .merge_many(&vec![wrapped_updated.clone()])
             .await
             .unwrap();
         let Ok(Some(res_2)) = db
@@ -270,9 +275,9 @@ mod tests {
         else {
             panic!("Failed to retrieve item after initial merge");
         };
-        match res_2.attrs {
-            SyncObjectAttrs::Item(val) => {
-                assert_eq!(val.text.unwrap().data, String::from("new_text"));
+        match res_2 {
+            AnySyncObject::Item(val) => {
+                assert_eq!(val.attrs.text.unwrap().data, String::from("new_text"));
             }
             _ => {
                 assert!(false);
@@ -290,7 +295,7 @@ mod tests {
         let qty = 100;
         let mut items = vec![];
         for _ in 0..qty {
-            items.push(mock_item(primary_library_id, None))
+            items.push(mock_item_any(primary_library_id, None, None));
         }
         db.sync_object.merge_many(&items).await.unwrap();
         // intentional (smoke test): a second merge that effectively does nothing
