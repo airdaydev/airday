@@ -8,7 +8,7 @@ use sqlx::prelude::FromRow;
 use std::{fmt::Debug, pin::Pin};
 use uuid::Uuid;
 
-pub type AttributesBlob = Option<Vec<u8>>;
+pub type AttributesBlob = Vec<u8>;
 
 #[derive(FromRow)]
 pub struct SqlSyncObject {

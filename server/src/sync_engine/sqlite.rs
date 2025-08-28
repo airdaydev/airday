@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
-use tracing::debug;
 use uuid::Uuid;
 
 pub struct SyncObjectModelSqlite {

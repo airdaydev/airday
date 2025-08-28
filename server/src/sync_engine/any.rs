@@ -24,19 +24,11 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
 
         match row.obj_type {
             x if x == ITEM => {
-                let attrs = if let Some(b) = &row.attributes {
-                    ItemAttrs::from_attr_blob(b)?
-                } else {
-                    ItemAttrs::default()
-                };
+                let attrs = ItemAttrs::from_attr_blob(&row.attributes)?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
             x if x == CONTAINER => {
-                let attrs = if let Some(b) = &row.attributes {
-                    ContainerAttrs::from_attr_blob(b)?
-                } else {
-                    ContainerAttrs::default()
-                };
+                let attrs = ContainerAttrs::from_attr_blob(&row.attributes)?;
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::DatabaseError("Unknown object type".into())),

@@ -92,10 +92,6 @@ impl SyncAttrs for ItemAttrs {
             );
             fb_attributes.push(attr);
         }
-
-        if fb_attributes.is_empty() {
-            return Ok(None);
-        }
         let vec_off = builder.create_vector(&fb_attributes);
         let set_off = AttributeSetProto::create(
             &mut builder,
@@ -104,7 +100,7 @@ impl SyncAttrs for ItemAttrs {
             },
         );
         builder.finish(set_off, None);
-        Ok(Some(builder.finished_data().to_vec()))
+        Ok(builder.finished_data().to_vec())
     }
 
     fn from_attr_blob(blob: &[u8]) -> Result<Self, AppError> {
