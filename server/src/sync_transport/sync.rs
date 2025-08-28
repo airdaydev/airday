@@ -1,7 +1,7 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
-    sync_engine::{any::AnySyncObject, engine::SyncObject},
+    sync_engine::any::AnySyncObject,
     sync_transport::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
@@ -107,7 +107,7 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let Ok(item) = SyncObject::from_sync_object_proto(&action) else {
+                let Ok(item) = AnySyncObject::from_sync_object_proto(&action) else {
                     // TODO: Propagate error?
                     responses.push(BatchAction::Error {
                         action_id: Some(action_id),
