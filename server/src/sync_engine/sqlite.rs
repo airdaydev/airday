@@ -1,8 +1,8 @@
 use crate::{
     common::error::AppError,
     sync_engine::{
-        any::SqlSyncObject,
-        engine::{SyncAttrs, SyncObject, SyncObjectModel},
+        any::AnySyncObject,
+        engine::{SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta, SyncObjectModel},
     },
 };
 use async_trait::async_trait;
@@ -81,10 +81,16 @@ async fn merge<'a, A: SyncAttrs>(
             "sync_obj is tombstoned",
         )));
     }
-    let mut sync_object: SyncObject = sql_sync_to_sync_object(&sql_sync_obj)?;
-    sync_object.attrs.merge(&incoming_sync_obj.attrs)?;
+    if sql_sync_obj.obj_type != incoming_sync_obj.obj_type() {
+        return Err(AppError::DatabaseError(String::from(
+            "Incorrect merge type",
+        )));
+    }
+    let meta = SyncObjectMeta::from_sql_row(&sql_sync_obj);
+    let attrs = A::from_attr_blob(sql_sync_obj.attributes)?; // This will always be here, right?
+    let mut sync_object: SyncObject<A> = SyncObject { meta, attrs };
+    sync_object.merge_attrs(&incoming_sync_obj.attrs);
 
-    debug!("existing_attrs {:?}", sync_object);
     let Ok(attributes_blob) = sync_object.attrs.to_attr_blob() else {
         return Err(AppError::ServerError(String::from(
             "Failed to translate merge output to blob",
@@ -120,7 +126,7 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         &self,
         library_id: &Uuid,
         id: &Uuid,
-    ) -> Result<Option<SyncObject>, AppError> {
+    ) -> Result<Option<AnySyncObject>, AppError> {
         let result = sqlx::query_as!(
             SqlSyncObject,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",

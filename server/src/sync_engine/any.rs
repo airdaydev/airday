@@ -1,31 +1,13 @@
-use sqlx::prelude::FromRow;
-use uuid::Uuid;
-
-// This is some indirection required for cases where we need to store Vecs of SyncObjects generically
-// TODO: Procmacro target
 use crate::{
     common::error::AppError,
     sync_engine::{
         container::{CONTAINER, ContainerAttrs},
-        engine::{SyncAttrs, SyncObject, SyncObjectMeta},
+        engine::{SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
 };
-
-pub type AttributesBlob = Option<Vec<u8>>;
-
-#[derive(FromRow)]
-pub struct SqlSyncObject {
-    // static attrs
-    pub id: Uuid,
-    pub obj_type: i64,
-    pub library_id: Uuid,
-    // dynamic attrs (flatbuffer blob)
-    pub attributes: AttributesBlob,
-    // metadata
-    pub server_seq: i64,
-    pub tombstone_utc: Option<i64>,
-}
+// This is some indirection required for cases where we need to store Vecs of SyncObjects generically
+// TODO: Procmacro target
 
 // TODO: Procmacro target from here
 #[derive(Debug, Clone)]
@@ -38,12 +20,7 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
     type Error = AppError;
 
     fn try_from(row: SqlSyncObject) -> Result<Self, Self::Error> {
-        let meta = SyncObjectMeta {
-            id: row.id,
-            library_id: row.library_id,
-            server_seq: Some(row.server_seq),
-            tombstone_utc: row.tombstone_utc,
-        };
+        let meta = SyncObjectMeta::from_sql_row(&row);
 
         match row.obj_type {
             x if x == ITEM => {
@@ -63,6 +40,28 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::DatabaseError("Unknown object type".into())),
+        }
+    }
+}
+
+impl AnySyncObject {
+    pub fn meta(&self) -> SyncObjectMeta {
+        match self {
+            AnySyncObject::Item(o) => o.meta.clone(),
+            AnySyncObject::Container(o) => o.meta.clone(),
+        }
+    }
+    pub fn merge_into(&mut self, other: &AnySyncObject) -> Result<(), AppError> {
+        match (self, other) {
+            (AnySyncObject::Item(a), AnySyncObject::Item(b)) => {
+                a.attrs.merge_into(&b.attrs);
+                Ok(())
+            }
+            (AnySyncObject::Container(a), AnySyncObject::Container(b)) => {
+                a.attrs.merge_into(&b.attrs);
+                Ok(())
+            }
+            _ => Err(AppError::ValidationError("wrong variant on merge".into())),
         }
     }
 }

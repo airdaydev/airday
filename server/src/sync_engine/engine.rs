@@ -1,13 +1,27 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_engine::any::{AnySyncObject, SqlSyncObject},
+    sync_engine::any::AnySyncObject,
     sync_transport::proto_generated::proto::SyncObjectActionProto,
 };
 use async_trait::async_trait;
+use sqlx::prelude::FromRow;
 use std::{fmt::Debug, pin::Pin};
 use uuid::Uuid;
 
 pub type AttributesBlob = Option<Vec<u8>>;
+
+#[derive(FromRow)]
+pub struct SqlSyncObject {
+    // static attrs
+    pub id: Uuid,
+    pub obj_type: i64,
+    pub library_id: Uuid,
+    // dynamic attrs (flatbuffer blob)
+    pub attributes: AttributesBlob,
+    // metadata
+    pub server_seq: i64,
+    pub tombstone_utc: Option<i64>,
+}
 
 pub trait SyncAttrs: Sized {
     const OBJ_TYPE: i64;
@@ -19,6 +33,9 @@ pub trait SyncAttrs: Sized {
 
     /// Merge field-by-field (LWW, union, min/max, etc.)
     fn merge_into(&mut self, other: &Self);
+
+    /// Validate the proto type and extract this A
+    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError>;
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +44,17 @@ pub struct SyncObjectMeta {
     pub library_id: Uuid,
     pub server_seq: Option<i64>,
     pub tombstone_utc: Option<i64>,
+}
+
+impl SyncObjectMeta {
+    pub fn from_sql_row(row: &SqlSyncObject) -> SyncObjectMeta {
+        SyncObjectMeta {
+            id: row.id,
+            library_id: row.library_id,
+            server_seq: Some(row.server_seq),
+            tombstone_utc: row.tombstone_utc,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,12 +80,7 @@ impl<A: SyncAttrs> SyncObject<A> {
     }
 }
 
-pub trait FromActionProto: Sized {
-    /// Validate the proto type and extract this A
-    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError>;
-}
-
-impl<A: SyncAttrs + FromActionProto> SyncObject<A> {
+impl<A: SyncAttrs> SyncObject<A> {
     pub fn from_action_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
         let meta = SyncObjectMeta {
             id: proto_uuid_to_uuid(p.id()),

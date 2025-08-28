@@ -1,7 +1,7 @@
 // These are the user defined types!
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{AttributesBlob, FromActionProto, SyncAttrs, SyncObject},
+    sync_engine::engine::{AttributesBlob, SyncAttrs, SyncObject},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto,
@@ -132,6 +132,14 @@ impl SyncAttrs for ContainerAttrs {
         Ok(attributes)
     }
 
+    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
+        if p.type_() != ObjectTypeProto::Container {
+            return Err(AppError::ValidationError("wrong proto type".into()));
+        }
+        // your existing loop:
+        Ok(ContainerAttrs::from_sync_object_proto(p))
+    }
+
     fn merge_into(&mut self, other: &Self) {
         if let Some(name) = &other.name {
             if let Some(self_name) = &self.name {
@@ -145,13 +153,3 @@ impl SyncAttrs for ContainerAttrs {
 }
 
 pub type ContainerObject = SyncObject<ContainerAttrs>;
-
-impl FromActionProto for ContainerAttrs {
-    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
-        if p.type_() != ObjectTypeProto::Container {
-            return Err(AppError::ValidationError("wrong proto type".into()));
-        }
-        // your existing loop:
-        Ok(ContainerAttrs::from_sync_object_proto(p))
-    }
-}
