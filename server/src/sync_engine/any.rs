@@ -5,6 +5,7 @@ use crate::{
         engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
+    sync_transport::proto_generated::proto::SyncObjectActionProto,
 };
 // This is some indirection required for cases where we need to store Vecs of SyncObjects generically
 // TODO: Procmacro target
@@ -23,15 +24,35 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
         let meta = SyncObjectMeta::from_sql_row(&row);
 
         match row.obj_type {
-            x if x == ITEM => {
+            x if x == ITEM as i64 => {
                 let attrs = ItemAttrs::from_attr_blob(&row.attributes)?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
-            x if x == CONTAINER => {
+            x if x == CONTAINER as i64 => {
                 let attrs = ContainerAttrs::from_attr_blob(&row.attributes)?;
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::DatabaseError("Unknown object type".into())),
+        }
+    }
+}
+
+impl<'a> TryFrom<SyncObjectActionProto<'a>> for AnySyncObject {
+    type Error = AppError;
+
+    fn try_from(p: SyncObjectActionProto<'a>) -> Result<Self, Self::Error> {
+        let meta = SyncObjectMeta::from_action_proto(&p);
+
+        match p.obj_type() {
+            x if x == ITEM => {
+                // let attrs = ItemAttrs::from_attr_blob(&p.attributes())?;
+                Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
+            }
+            x if x == CONTAINER => {
+                // let attrs = ContainerAttrs::from_attr_blob(&row.attributes)?;
+                Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
+            }
+            _ => Err(AppError::ValidationError("Unknown object type".into())),
         }
     }
 }
@@ -43,7 +64,7 @@ impl AnySyncObject {
             AnySyncObject::Container(o) => &o.meta,
         }
     }
-    pub fn obj_type(&self) -> i64 {
+    pub fn obj_type(&self) -> i16 {
         match self {
             AnySyncObject::Item(o) => o.obj_type(),
             AnySyncObject::Container(o) => o.obj_type(),

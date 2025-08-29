@@ -24,7 +24,7 @@ pub struct SqlSyncObject {
 }
 
 pub trait SyncAttrs: Sized {
-    const OBJ_TYPE: i64;
+    const OBJ_TYPE: i16;
     /// Append this struct’s attributes into a FlatBuffers builder.
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError>;
 
@@ -55,6 +55,14 @@ impl SyncObjectMeta {
             tombstone_utc: row.tombstone_utc,
         }
     }
+    pub fn from_action_proto(p: &SyncObjectActionProto) -> SyncObjectMeta {
+        SyncObjectMeta {
+            id: proto_uuid_to_uuid(p.id()),
+            library_id: proto_uuid_to_uuid(p.library_id()),
+            server_seq: None,
+            tombstone_utc: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +73,7 @@ pub struct SyncObject<A: SyncAttrs> {
 
 impl<A: SyncAttrs> SyncObject<A> {
     #[inline]
-    pub fn obj_type(&self) -> i64 {
+    pub fn obj_type(&self) -> i16 {
         A::OBJ_TYPE
     }
 
@@ -82,12 +90,7 @@ impl<A: SyncAttrs> SyncObject<A> {
 
 impl<A: SyncAttrs> SyncObject<A> {
     pub fn from_action_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
-        let meta = SyncObjectMeta {
-            id: proto_uuid_to_uuid(p.id()),
-            library_id: proto_uuid_to_uuid(p.library_id()),
-            server_seq: None,
-            tombstone_utc: None,
-        };
+        let meta = SyncObjectMeta::from_action_proto(p);
         let attrs = A::attrs_from_proto(p)?;
         Ok(SyncObject { meta, attrs })
     }

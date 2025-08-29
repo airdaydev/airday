@@ -4,13 +4,13 @@ use crate::{
     sync_engine::engine::{AttributesBlob, SyncAttrs, SyncObject},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
-        AttributeSetProtoArgs, LWWTimestampProto, ObjectTypeProto, SyncObjectActionProto,
+        AttributeSetProtoArgs, LWWTimestampProto, SyncObjectActionProto,
     },
 };
 use crdt::{LWWRegister, timestamp::LWWTimestamp};
 use flatbuffers::FlatBufferBuilder;
 
-pub const CONTAINER: i64 = 1;
+pub const CONTAINER: i16 = 1;
 
 pub mod container_field_id {
     pub const CONTAINER_NAME: i16 = 256;
@@ -66,7 +66,7 @@ impl Default for ContainerAttrs {
 }
 
 impl SyncAttrs for ContainerAttrs {
-    const OBJ_TYPE: i64 = CONTAINER;
+    const OBJ_TYPE: i16 = CONTAINER;
 
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
         // Your existing builder logic, just moved here:
@@ -129,7 +129,7 @@ impl SyncAttrs for ContainerAttrs {
     }
 
     fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
-        if p.type_() != ObjectTypeProto::Container {
+        if p.obj_type() != CONTAINER {
             return Err(AppError::ValidationError("wrong proto type".into()));
         }
         // your existing loop:
