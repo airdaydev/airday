@@ -1,5 +1,5 @@
-import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
-import { SyncObjectParams } from "./model";
+import { globalTSProducer, LWWRegister } from "../crdt/lww";
+import { SyncObject, SyncObjectParams } from "./model";
 
 export const ITEM = 0;
 
@@ -26,7 +26,7 @@ export interface AirdayItemConstructorOpts extends SyncObjectParams {
 
 // TODO: Move merge concerns to sync object
 export class AirdayItem extends SyncObject {
-  type: SyncObjectType = "item";
+  objectType = ITEM;
   attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
   constructor(params: AirdayItemConstructorOpts) {
     super(params);

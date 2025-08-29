@@ -1,4 +1,3 @@
-import { AirdayItem } from "./model";
 import { Builder, type Offset } from "flatbuffers";
 import {
   SyncObjectActionProto,
@@ -18,7 +17,7 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
-import { ItemFieldId, SyncObjectType } from "./types";
+import { SyncObject } from "./model";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -117,25 +116,27 @@ export class SyncStreamReqMessage extends AirdayMessage {
 }
 
 export class SyncObjectAction extends BatchAction {
-  item: AirdayItem;
+  syncObject: SyncObject;
   actionProto = ActionProto.SyncObjectActionProto;
-  constructor(item: AirdayItem) {
+  constructor(syncObject: SyncObject) {
     super();
-    this.item = item;
+    this.syncObject = syncObject;
   }
   addToFlatBuffer(builder: Builder) {
     const attributes = [];
 
-    // Convert item attributes to AttributeProto array
-    if (this.item.attributes.text) {
-      const stringOffset = builder.createString(this.item.attributes.text.data);
+    // Convert syncObject attributes to AttributeProto array
+    if (this.syncObject.attributes.text) {
+      const stringOffset = builder.createString(
+        this.syncObject.attributes.text.data,
+      );
 
       AttributeProto.startAttributeProto(builder);
       AttributeProto.addFieldId(builder, ItemFieldId.ITEM_TEXT);
       AttributeProto.addValueType(builder, AttrTypeProto.STRING);
       AttributeProto.addTimestamp(
         builder,
-        this.item.attributes.text.timestamp.addToFlatBuffer(builder),
+        this.syncObject.attributes.text.timestamp.addToFlatBuffer(builder),
       );
       AttributeProto.addString(builder, stringOffset);
       const textAttributeOffset = AttributeProto.endAttributeProto(builder);
@@ -151,11 +152,14 @@ export class SyncObjectAction extends BatchAction {
     SyncObjectActionProto.addObjType(builder, SyncObjectType.CONTAINER);
     SyncObjectActionProto.addId(
       builder,
-      UuidProto.createUuidProto(builder, this.item.id.toUUIDProto()),
+      UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
     );
     SyncObjectActionProto.addLibraryId(
       builder,
-      UuidProto.createUuidProto(builder, this.item.libraryId.toUUIDProto()),
+      UuidProto.createUuidProto(
+        builder,
+        this.syncObject.libraryId.toUUIDProto(),
+      ),
     );
     SyncObjectActionProto.addAttributes(builder, attributesVector);
     const actionOffset =
