@@ -1,7 +1,6 @@
-// These are the user defined types!
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs, SyncObject},
+    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto,
@@ -14,8 +13,6 @@ pub const ITEM: i16 = 0;
 
 pub mod item_field_id {
     pub const ITEM_TEXT: i16 = 0;
-    // TODO: item.type could be an enum (repeat, static, series, shuffle, playlist)
-    // TODO: repeat could be a property...
 }
 
 #[derive(Debug, Clone)]
@@ -111,5 +108,3 @@ impl SyncAttrs for ItemAttrs {
         }
     }
 }
-
-pub type ItemObject = SyncObject<ItemAttrs>;

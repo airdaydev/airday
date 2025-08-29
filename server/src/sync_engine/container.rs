@@ -1,7 +1,6 @@
-// These are the user defined types!
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs, SyncObject},
+    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto,
@@ -14,7 +13,6 @@ pub const CONTAINER: i16 = 1;
 
 pub mod container_field_id {
     pub const CONTAINER_NAME: i16 = 256;
-    pub const CONTAINER_DESCRIPTION: i16 = 257;
 }
 
 #[derive(Debug, Clone)]
@@ -110,5 +108,3 @@ impl SyncAttrs for ContainerAttrs {
         }
     }
 }
-
-pub type ContainerObject = SyncObject<ContainerAttrs>;

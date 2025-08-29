@@ -7,10 +7,7 @@ use crate::{
     },
     sync_transport::proto_generated::proto::{AttributeSetProto, SyncObjectActionProto},
 };
-// This is some indirection required for cases where we need to store Vecs of SyncObjects generically
-// TODO: Procmacro target
 
-// TODO: Procmacro target from here
 #[derive(Debug, Clone)]
 pub enum AnySyncObject {
     Item(SyncObject<ItemAttrs>),
