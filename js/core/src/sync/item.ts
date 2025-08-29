@@ -32,35 +32,29 @@ export class AirdayItem extends SyncObject {
     super(params);
     this.attributes = params.attributes;
   }
-  merge(attrs: AirdayItemAttributes, local: boolean) {
-    const keys = (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map(
-      (key) => {
-        if (attrs[key]) {
-          if (!this.attributes[key]) {
-            this.attributes[key] = attrs[key];
-          } else {
-            const result = this.attributes[key].merge(attrs[key]);
-            // Local change gets overruled
-            if (local === false && result.source === "right") {
-              this.dirtyAttrs.delete(key);
-            }
-            this.attributes[key] = result.register;
+  merge(other: AirdayItem, local: boolean) {
+    const otherAttrs = other.attributes;
+    const keys = (
+      Object.keys(otherAttrs) as Array<keyof AirdayItemAttributes>
+    ).map((key) => {
+      if (otherAttrs[key]) {
+        if (!this.attributes[key]) {
+          this.attributes[key] = otherAttrs[key];
+        } else {
+          const result = this.attributes[key].merge(otherAttrs[key]);
+          // Local change gets overruled
+          if (local === false && result.source === "right") {
+            this.dirtyAttrs.delete(key);
           }
+          this.attributes[key] = result.register;
         }
-        return key;
-      },
-    );
+      }
+      return key;
+    });
     if (local) {
       // Local change gets added to dirty register
       keys.map((key) => this.dirtyAttrs.add(key));
       this.lastModified = globalTSProducer.timestamp().utc;
     }
-  }
-  // Merges & flags local changes
-  applyLocal(attrs: AirdayItemAttributes) {
-    this.merge(attrs, true);
-  }
-  applyRemote(attrs: AirdayItemAttributes) {
-    this.merge(attrs, false);
   }
 }

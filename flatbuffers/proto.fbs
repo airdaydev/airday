@@ -27,10 +27,13 @@ table AttributeProto {
   value_type: AttrTypeProto;
   timestamp: LWWTimestampProto;
   // Values
+  bool: bool;
   i64_fb: long;
   f64_fb: double;
   string: string;
   bytes: [ubyte];
+  // TODO: Mark as removed (always overriden)
+  clear: bool;
 }
 
 table AttributeSetProto { attributes: [AttributeProto]; }
