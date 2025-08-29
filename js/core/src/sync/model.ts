@@ -19,6 +19,7 @@ export interface AirdayItemConstructorOpts extends SyncObjectParams {
   attributes: AirdayItemAttributes;
 }
 
+// TODO: Delete this in favour of custom-built meta and attributes (split)
 const SyncObjectSerialisedSchema = v.object({
   id: v.string().required(),
   type: v.anyOf([v.string().const("item"), v.string().const("container")]),
