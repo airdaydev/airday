@@ -2,34 +2,29 @@
 // and generated from Rust version (server/src/sync_engine)
 // Field ID constants matching server/src/sync_object/types.rs
 
-import { AirdayContainer } from "./container";
-import { AirdayItem } from "./item";
+import { AirdayContainer, CONTAINER } from "./container";
+import { AirdayItem, ITEM } from "./item";
+import { parseGenericSyncObject } from "./model";
 
 // Used for reading from IDB
-function syncObjectFromJSON(json: any): AirdayItem | AirdayContainer {
-  ensureSerialisedSyncObject(json); // TODO: First check if syncobject is good, then do attributes
-  let syncObject = json as SerialisedSyncObject;
-  const meta = {
-    id: Uuidv4.fromHex(syncObject.id),
-    libraryId: Uuidv4.fromHex(syncObject.libraryId),
-    lastSync: syncObject.lastSync as bigint,
-    lastModified: syncObject.lastModified as bigint,
-  };
-  if (syncObject.type === "item") {
+function parseTypedSyncObject(json: any): AirdayItem | AirdayContainer {
+  const genericObj = parseGenericSyncObject(json);
+  if (genericObj.objectType === ITEM) {
+    // TODO: Type me
     const attributes: AirdayItemAttributes = {};
-    if (syncObject.attributes.text) {
-      attributes.text = LWWRegister.fromJSON(syncObject.attributes.text);
+    if (genericObj.attributes.text) {
+      attributes.text = LWWRegister.fromJSON(genericObj.attributes.text);
     }
     return new AirdayItem({
-      ...meta,
+      ...genericObj,
       attributes,
     });
   }
-  if (syncObject.type === "container") {
+  if (genericObj.objectType === CONTAINER) {
     const attributes = {}; // TODO: Get specific attributes for container
     return new AirdayContainer({
-      ...meta,
-      // attributes,
+      ...genericObj,
+      attributes,
     });
   }
   // TODO: Handle error (or null return) upstream

@@ -1,4 +1,4 @@
-import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
+import { globalTSProducer } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 
@@ -36,7 +36,7 @@ class AttributeCodec {
 // TODO: Delete this in favour of custom-built meta and attributes (split)
 const SyncObjectSerialisedSchema = v.object({
   id: v.string().required(),
-  type: v.anyOf([v.string().const("item"), v.string().const("container")]),
+  objectType: v.number().required(),
   libraryId: v.string().required(),
   serverSeq: v.anyOf([v.unknown(), v.null()]),
   lastSync: v.anyOf([v.unknown(), v.null()]),
@@ -46,12 +46,27 @@ const SyncObjectSerialisedSchema = v.object({
 
 export type SerialisedSyncObject = TypeOf<typeof SyncObjectSerialisedSchema>;
 
+// TODO: Does IDB actually return JSON?
+export function parseGenericSyncObject(json: any) {
+  ensureSerialisedSyncObject(json); // TODO: First check if syncobject is good, then do attributes
+  let syncObject = json as SerialisedSyncObject;
+  const meta = {
+    id: Uuidv4.fromHex(syncObject.id),
+    objectType: syncObject.objectType,
+    libraryId: Uuidv4.fromHex(syncObject.libraryId),
+    lastSync: syncObject.lastSync as bigint,
+    lastModified: syncObject.lastModified as bigint,
+    attributes: syncObject.attributes,
+  };
+  return meta;
+}
+
 const ensureSerialisedSyncObject = compile(SyncObjectSerialisedSchema, {
   ensure: true,
 });
 
 export class SyncObject {
-  objectType: number;
+  readonly objectType: number = -1; // Requires class
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
@@ -61,7 +76,6 @@ export class SyncObject {
   serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
   dirtyAttrs: Set<string> = new Set();
   constructor(params: SyncObjectParams) {
-    this.objectType = params.objectType;
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
     if (params.lastModified) {
@@ -88,6 +102,7 @@ export class SyncObject {
     const attributes = {};
     return {
       id: this.id.toHex(),
+      objectType: this.objectType,
       libraryId: this.libraryId.toHex(),
       serverSeq: this.serverSeq,
       lastSync: this.lastSync,

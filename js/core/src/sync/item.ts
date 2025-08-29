@@ -26,7 +26,7 @@ export interface AirdayItemConstructorOpts extends SyncObjectParams {
 
 // TODO: Move merge concerns to sync object
 export class AirdayItem extends SyncObject {
-  objectType = ITEM;
+  readonly objectType = ITEM;
   attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
   constructor(params: AirdayItemConstructorOpts) {
     super(params);

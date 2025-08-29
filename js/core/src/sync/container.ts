@@ -1,3 +1,5 @@
+import { SyncObject } from "./model";
+
 export const CONTAINER = 0;
 
 export const ContainerFieldId = {
@@ -18,5 +20,5 @@ export const ContainerFieldId = {
 
 // TODO: Complete item
 export class AirdayContainer extends SyncObject {
-  type: SyncObjectType = "container";
+  readonly objectType = CONTAINER;
 }
