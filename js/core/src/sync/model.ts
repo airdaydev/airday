@@ -86,27 +86,27 @@ export class SyncObject {
   static fromJSON(json: any): AirdayItem | AirdayContainer {
     ensureSerialisedSyncObject(json); // TODO: First check if syncobject is good, then do attributes
     let syncObject = json as SerialisedSyncObject;
+    const meta = {
+      id: Uuidv4.fromHex(syncObject.id),
+      libraryId: Uuidv4.fromHex(syncObject.libraryId),
+      lastSync: syncObject.lastSync as bigint,
+      lastModified: syncObject.lastModified as bigint,
+    };
     if (syncObject.type === "item") {
       const attributes: AirdayItemAttributes = {};
       if (syncObject.attributes.text) {
         attributes.text = LWWRegister.fromJSON(syncObject.attributes.text);
       }
       return new AirdayItem({
-        id: Uuidv4.fromHex(syncObject.id),
-        libraryId: Uuidv4.fromHex(syncObject.libraryId),
+        ...meta,
         attributes,
-        lastSync: syncObject.lastSync as bigint,
-        lastModified: syncObject.lastModified as bigint,
       });
     }
     if (syncObject.type === "container") {
       const attributes = {}; // TODO: Get specific attributes for container
-      return new AirdayItem({
-        id: Uuidv4.fromHex(syncObject.id),
-        libraryId: Uuidv4.fromHex(syncObject.libraryId),
-        attributes,
-        lastSync: syncObject.lastSync as bigint,
-        lastModified: syncObject.lastModified as bigint,
+      return new AirdayContainer({
+        ...meta,
+        // attributes,
       });
     }
     // TODO: Handle error (or null return) upstream

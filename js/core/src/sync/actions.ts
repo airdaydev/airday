@@ -2,10 +2,8 @@ import { AirdayItem } from "./model";
 import { Builder, type Offset } from "flatbuffers";
 import {
   SyncObjectActionProto,
-  ObjectTypeProto,
   AttributeProto,
   AttrTypeProto,
-  LWWTimestampProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
@@ -20,21 +18,7 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
-
-// Field ID constants matching server/src/sync_object/types.rs
-export const ItemFieldId = {
-  ITEM_TEXT: 0,
-} as const;
-
-export const ListFieldId = {
-  LIST_NAME: 256,
-  LIST_DESCRIPTION: 257,
-} as const;
-
-export const SyncObjectType = {
-  ITEM: 0,
-  CONTAINER: 1,
-} as const;
+import { ItemFieldId, SyncObjectType } from "./types";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -164,7 +148,7 @@ export class SyncObjectAction extends BatchAction {
     );
 
     SyncObjectActionProto.startSyncObjectActionProto(builder);
-    SyncObjectActionProto.addType(builder, ObjectTypeProto.Item);
+    SyncObjectActionProto.addObjType(builder, SyncObjectType.CONTAINER);
     SyncObjectActionProto.addId(
       builder,
       UuidProto.createUuidProto(builder, this.item.id.toUUIDProto()),
