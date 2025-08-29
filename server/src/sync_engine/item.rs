@@ -1,10 +1,10 @@
 // These are the user defined types!
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{AttributesBlob, SyncAttrs, SyncObject},
+    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs, SyncObject},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
-        AttributeSetProtoArgs, LWWTimestampProto, SyncObjectActionProto,
+        AttributeSetProtoArgs, LWWTimestampProto,
     },
 };
 use crdt::{LWWRegister, timestamp::LWWTimestamp};
@@ -21,44 +21,6 @@ pub mod item_field_id {
 #[derive(Debug, Clone)]
 pub struct ItemAttrs {
     pub text: Option<LWWRegister<String>>,
-}
-
-// TODO: ...?
-impl ItemAttrs {
-    pub fn from_sync_object_proto<'a>(sync_obj_proto: &'a SyncObjectActionProto) -> ItemAttrs {
-        let mut attributes = ItemAttrs { text: None };
-        if let Some(attrs) = sync_obj_proto.attributes() {
-            for i in 0..attrs.len() {
-                let attr = attrs.get(i);
-                match attr.field_id() {
-                    item_field_id::ITEM_TEXT => {
-                        match attr.value_type() {
-                            AttrTypeProto::STRING => {
-                                if let Some(text_data) = attr.string() {
-                                    let timestamp = attr.timestamp().unwrap();
-                                    let text_lww = LWWRegister {
-                                        timestamp: LWWTimestamp {
-                                            utc: timestamp.utc(),
-                                            pid: timestamp.pid(),
-                                        },
-                                        data: text_data.to_string(),
-                                    };
-                                    attributes.text = Some(text_lww);
-                                }
-                            }
-                            _ => {
-                                // Ignore mistyped field, but consider adding err to span
-                            }
-                        }
-                    }
-                    _ => {
-                        // TODO: Ignore unknown value, but later used for custom attribute values
-                    }
-                }
-            }
-        }
-        attributes
-    }
 }
 
 impl Default for ItemAttrs {
@@ -103,39 +65,39 @@ impl SyncAttrs for ItemAttrs {
         Ok(builder.finished_data().to_vec())
     }
 
-    fn from_attr_blob(blob: &[u8]) -> Result<Self, AppError> {
-        let attr_set = flatbuffers::root::<AttributeSetProto>(blob).map_err(|e| {
-            AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
-        })?;
+    fn from_attr_vec<'a>(attr_vec: AttributeFBVec<'a>) -> Result<Self, AppError> {
         let mut attributes = ItemAttrs::default();
-
-        if let Some(attrs) = attr_set.attributes() {
+        if let Some(attrs) = attr_vec {
             for i in 0..attrs.len() {
                 let attr = attrs.get(i);
-                if attr.field_id() == item_field_id::ITEM_TEXT
-                    && attr.value_type() == AttrTypeProto::STRING
-                {
-                    if let (Some(s), Some(ts)) = (attr.string(), attr.timestamp()) {
-                        attributes.text = Some(LWWRegister {
-                            timestamp: LWWTimestamp {
-                                utc: ts.utc(),
-                                pid: ts.pid(),
-                            },
-                            data: s.to_string(),
-                        });
+                match attr.field_id() {
+                    item_field_id::ITEM_TEXT => {
+                        match attr.value_type() {
+                            AttrTypeProto::STRING => {
+                                if let Some(text_data) = attr.string() {
+                                    let timestamp = attr.timestamp().unwrap();
+                                    let text_lww = LWWRegister {
+                                        timestamp: LWWTimestamp {
+                                            utc: timestamp.utc(),
+                                            pid: timestamp.pid(),
+                                        },
+                                        data: text_data.to_string(),
+                                    };
+                                    attributes.text = Some(text_lww);
+                                }
+                            }
+                            _ => {
+                                // Ignore mistyped field, but consider adding err to span
+                            }
+                        }
+                    }
+                    _ => {
+                        // TODO: Ignore unknown value, but later used for custom attribute values
                     }
                 }
             }
         }
         Ok(attributes)
-    }
-
-    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
-        if p.obj_type() != ITEM {
-            return Err(AppError::ValidationError("wrong proto type".into()));
-        }
-        // your existing loop:
-        Ok(ItemAttrs::from_sync_object_proto(p))
     }
 
     fn merge_into(&mut self, other: &Self) {

@@ -1,7 +1,7 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
     sync_engine::any::AnySyncObject,
-    sync_transport::proto_generated::proto::SyncObjectActionProto,
+    sync_transport::proto_generated::proto::{AttributeProto, SyncObjectActionProto},
 };
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
@@ -9,6 +9,9 @@ use std::{fmt::Debug, pin::Pin};
 use uuid::Uuid;
 
 pub type AttributesBlob = Vec<u8>;
+
+pub type AttributeFBVec<'a> =
+    Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
 #[derive(FromRow)]
 pub struct SqlSyncObject {
@@ -28,14 +31,11 @@ pub trait SyncAttrs: Sized {
     /// Append this struct’s attributes into a FlatBuffers builder.
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError>;
 
-    /// Decode from a full AttributeSetProto into Self (partial allowed).
-    fn from_attr_blob(blob: &[u8]) -> Result<Self, AppError>;
+    /// Decode from vector of attributes (db & object action)
+    fn from_attr_vec<'a>(attr_vec: AttributeFBVec<'a>) -> Result<Self, AppError>;
 
     /// Merge field-by-field (LWW, union, min/max, etc.)
     fn merge_into(&mut self, other: &Self);
-
-    /// Validate the proto type and extract this A
-    fn attrs_from_proto(p: &SyncObjectActionProto) -> Result<Self, AppError>;
 }
 
 #[derive(Debug, Clone)]
@@ -91,7 +91,7 @@ impl<A: SyncAttrs> SyncObject<A> {
 impl<A: SyncAttrs> SyncObject<A> {
     pub fn from_action_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
         let meta = SyncObjectMeta::from_action_proto(p);
-        let attrs = A::attrs_from_proto(p)?;
+        let attrs = A::from_attr_vec(p.attributes())?;
         Ok(SyncObject { meta, attrs })
     }
 }

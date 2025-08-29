@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Complete process_sync_batch, then test
+- [] More complete sync tests
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests
 - [] ensure sync works well

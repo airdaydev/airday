@@ -80,7 +80,7 @@ async fn merge<'a>(
             "sync_obj is tombstoned",
         )));
     }
-    if sql_sync_obj.obj_type != incoming_sync_obj.obj_type() {
+    if sql_sync_obj.obj_type as i16 != incoming_sync_obj.obj_type() {
         return Err(AppError::DatabaseError(String::from(
             "Incorrect merge type",
         )));

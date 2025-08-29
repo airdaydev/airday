@@ -5,7 +5,7 @@ use crate::{
         engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
-    sync_transport::proto_generated::proto::SyncObjectActionProto,
+    sync_transport::proto_generated::proto::{AttributeSetProto, SyncObjectActionProto},
 };
 // This is some indirection required for cases where we need to store Vecs of SyncObjects generically
 // TODO: Procmacro target
@@ -22,14 +22,17 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
 
     fn try_from(row: SqlSyncObject) -> Result<Self, Self::Error> {
         let meta = SyncObjectMeta::from_sql_row(&row);
+        let root = flatbuffers::root::<AttributeSetProto>(&row.attributes).map_err(|e| {
+            AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
+        })?;
 
         match row.obj_type {
             x if x == ITEM as i64 => {
-                let attrs = ItemAttrs::from_attr_blob(&row.attributes)?;
+                let attrs = ItemAttrs::from_attr_vec(root.attributes())?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
             x if x == CONTAINER as i64 => {
-                let attrs = ContainerAttrs::from_attr_blob(&row.attributes)?;
+                let attrs = ContainerAttrs::from_attr_vec(root.attributes())?;
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::DatabaseError("Unknown object type".into())),
@@ -42,14 +45,15 @@ impl<'a> TryFrom<SyncObjectActionProto<'a>> for AnySyncObject {
 
     fn try_from(p: SyncObjectActionProto<'a>) -> Result<Self, Self::Error> {
         let meta = SyncObjectMeta::from_action_proto(&p);
+        p.attributes();
 
         match p.obj_type() {
             x if x == ITEM => {
-                // let attrs = ItemAttrs::from_attr_blob(&p.attributes())?;
+                let attrs = ItemAttrs::from_attr_vec(p.attributes())?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
             x if x == CONTAINER => {
-                // let attrs = ContainerAttrs::from_attr_blob(&row.attributes)?;
+                let attrs = ContainerAttrs::from_attr_vec(p.attributes())?;
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::ValidationError("Unknown object type".into())),
