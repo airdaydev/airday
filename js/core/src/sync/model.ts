@@ -11,12 +11,27 @@ export interface SyncObjectParams {
   lastSync?: bigint;
 }
 
-export interface AirdayItemAttributes {
-  text?: LWWRegister<string>;
+enum AttributeType {
+  "STRING",
+  "BOOL",
+  "INT",
+  "BIGINT",
 }
 
-export interface AirdayItemConstructorOpts extends SyncObjectParams {
-  attributes: AirdayItemAttributes;
+interface Attribute {
+  fieldId: number;
+  name: string;
+  type: AttributeType;
+}
+
+class AttributeCodec {
+  id: number;
+  name: string;
+  index = new Map<number, string>();
+  constructor(id: number, name: string) {
+    this.id = id;
+    this.name = name;
+  }
 }
 
 // TODO: Delete this in favour of custom-built meta and attributes (split)
@@ -112,51 +127,5 @@ export class SyncObject {
     }
     // TODO: Handle error (or null return) upstream
     throw new Error("Type not found");
-  }
-}
-
-// TODO: Complete item
-export class AirdayContainer extends SyncObject {
-  type: SyncObjectType = "container";
-}
-
-// TODO: Move merge concerns to sync object
-export class AirdayItem extends SyncObject {
-  type: SyncObjectType = "item";
-  attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
-  constructor(params: AirdayItemConstructorOpts) {
-    super(params);
-    this.attributes = params.attributes;
-  }
-  merge(attrs: AirdayItemAttributes, local: boolean) {
-    const keys = (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map(
-      (key) => {
-        if (attrs[key]) {
-          if (!this.attributes[key]) {
-            this.attributes[key] = attrs[key];
-          } else {
-            const result = this.attributes[key].merge(attrs[key]);
-            // Local change gets overruled
-            if (local === false && result.source === "right") {
-              this.dirtyAttrs.delete(key);
-            }
-            this.attributes[key] = result.register;
-          }
-        }
-        return key;
-      },
-    );
-    if (local) {
-      // Local change gets added to dirty register
-      keys.map((key) => this.dirtyAttrs.add(key));
-      this.lastModified = globalTSProducer.timestamp().utc;
-    }
-  }
-  // Merges & flags local changes
-  applyLocal(attrs: AirdayItemAttributes) {
-    this.merge(attrs, true);
-  }
-  applyRemote(attrs: AirdayItemAttributes) {
-    this.merge(attrs, false);
   }
 }
