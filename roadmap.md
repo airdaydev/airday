@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Procmacro version of sync engine
+- [] Typed, dynamic attrs in JS
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests
 - [] ensure sync works well
@@ -161,7 +161,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 # FUTURE GOALS FOR AIRDAY
 
 ## Sync engine extraction
-- [] Full macro mode
+- [] Develop procmacros once initial use case is proven
 
 ## Multilingual goals
 - [] Spanish (EU) localisation

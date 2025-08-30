@@ -2,12 +2,10 @@ import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { BatchResponseProto } from "../proto";
-import { AirdayIDB } from "../storage/idb";
 import { BatchResponseEvent } from "../websocket";
 import { BatchAction, BatchSyncMessage, SyncObjectAction } from "./actions";
 import { ChecksumStore } from "./checksum";
-import { AirdayItem } from "./model";
+import { AirdayItem } from "./item";
 import { SyncStream } from "./stream";
 
 interface SyncEventMap {

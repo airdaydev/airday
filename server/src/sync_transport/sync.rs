@@ -1,7 +1,7 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
-    sync_engine::{any::AnySyncObject, engine::SyncObject},
+    sync_engine::any::AnySyncObject,
     sync_transport::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
@@ -107,13 +107,16 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let Ok(item) = SyncObject::from_sync_object_proto(&action) else {
-                    // TODO: Propagate error?
-                    responses.push(BatchAction::Error {
-                        action_id: Some(action_id),
-                        message: String::from("invalid object"),
-                    });
-                    continue;
+                let item: AnySyncObject = match action.try_into() {
+                    Ok(val) => val,
+                    Err(e) => {
+                        println!("{e:?}"); // TODO: Telemetry
+                        responses.push(BatchAction::Error {
+                            action_id: Some(action_id),
+                            message: String::from("invalid object"),
+                        });
+                        continue;
+                    }
                 };
                 action_index.push((action_id, items.len()));
                 items.push(item);

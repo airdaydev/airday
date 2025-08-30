@@ -1,46 +1,126 @@
-import { globalTSProducer, LWWRegister, LWWSerialiseSchema } from "../crdt/lww";
+import { globalTSProducer } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 
-type SyncObjectType = "item" | "container" | "none";
-
 export interface SyncObjectParams {
+  objectType: number;
   id?: Uuidv4;
   libraryId: Uuidv4;
   lastModified?: bigint;
   lastSync?: bigint;
 }
 
-export interface AirdayItemAttributes {
-  text?: LWWRegister<string>;
+enum AttributeType {
+  "STRING",
+  "BOOL",
+  "INT",
+  "BIGINT",
 }
 
-export interface AirdayItemConstructorOpts extends SyncObjectParams {
-  attributes: AirdayItemAttributes;
+interface Attribute {
+  fieldId: number;
+  name: string;
+  type: AttributeType;
 }
 
-const SyncObjectSerialisedSchema = v.object({
+interface AttributeSet {}
+
+class AttributeCodec {
+  index = new Map<number, string>();
+  namesAttached = false;
+  constructor(map: Record<string, number>) {
+    this.attachMap(map);
+  }
+  fromFlatBuffer() {
+    // create attribute set
+    // loop through fields
+    // from id, get name map & type, save to name
+    return; // a named, live attribute set
+  }
+  toFlatBuffer(attributeSet: any) {
+    // serialise a named attribute set
+  }
+  // TODO: LLM generated - right idea but change application
+  attachMap(map: Record<string, number>) {
+    const descMap: PropertyDescriptorMap = {};
+    for (const [name, id] of Object.entries(map)) {
+      descMap[name] = {
+        configurable: false,
+        enumerable: true,
+        get: () => {
+          const v = this.getById(id);
+          if (!v) return null;
+          switch (v.t) {
+            case T.I64_FB:
+              return v.i64;
+            case T.F64_FB:
+              return v.f64;
+            case T.STRING:
+              return v.str;
+            case T.BYTES:
+              return v.bytes;
+            case T.BOOL_FB:
+              return v.bool;
+          }
+        },
+        set: (val: any) => {
+          // You decide typing by registry; here are two examples:
+          if (typeof val === "string") {
+            this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
+          } else if (typeof val === "boolean") {
+            this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
+          } else if (typeof val === "bigint") {
+            this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
+          } else if (typeof val === "number") {
+            this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
+          } else if (val instanceof Uint8Array) {
+            this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
+          } else {
+            throw new Error(`Unsupported value for ${name}`);
+          }
+        },
+      };
+    }
+    Object.defineProperties(this as any, descMap);
+    return this as any; // now has friendly props
+  }
+}
+
+const item = new AttributeCodec();
+
+// TODO: Delete this in favour of custom-built meta and attributes (split)
+const DBSyncObjectSchema = v.object({
   id: v.string().required(),
-  type: v.anyOf([v.string().const("item"), v.string().const("container")]),
+  objectType: v.number().required(),
   libraryId: v.string().required(),
-  attributes: v
-    .object({
-      text: LWWSerialiseSchema,
-    })
-    .required(),
   serverSeq: v.anyOf([v.unknown(), v.null()]),
   lastSync: v.anyOf([v.unknown(), v.null()]),
   lastModified: v.anyOf([v.unknown(), v.null()]),
+  attributes: v.any(), // TODO: Blob?
 });
 
-export type SerialisedSyncObject = TypeOf<typeof SyncObjectSerialisedSchema>;
+export type DBSyncObject = TypeOf<typeof DBSyncObjectSchema>;
 
-const ensureSerialisedSyncObject = compile(SyncObjectSerialisedSchema, {
+export function parseGenericSyncObject(record: any) {
+  ensureDBSyncObject(record); // TODO: First check if syncobject is good, then do attributes
+  let syncObject = record as DBSyncObject;
+  const meta = {
+    id: Uuidv4.fromHex(syncObject.id),
+    objectType: syncObject.objectType,
+    libraryId: Uuidv4.fromHex(syncObject.libraryId),
+    lastSync: syncObject.lastSync as bigint, // TODO: or null?
+    lastModified: syncObject.lastModified as bigint, // TODO: or null?
+    attributes: syncObject.attributes,
+  };
+  return meta;
+}
+
+const ensureDBSyncObject = compile(DBSyncObjectSchema, {
   ensure: true,
 });
 
 export class SyncObject {
-  type: SyncObjectType = "none";
+  readonly objectType: number = -1; // Requires class
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
@@ -61,6 +141,18 @@ export class SyncObject {
       this.lastSync = params.lastSync;
     }
   }
+  // Local = do not add to change register
+  merge(other: SyncObject, local: boolean) {
+    // not yet implemented
+  }
+  // Merges & flags local changes
+  applyLocal(attrs: SyncObject) {
+    // TODO: Type check here?
+    this.merge(attrs, true);
+  }
+  applyRemote(attrs: SyncObject) {
+    this.merge(attrs, false);
+  }
   startSync() {
     this.syncStarted = globalTSProducer.timestamp().utc;
   }
@@ -72,90 +164,16 @@ export class SyncObject {
     if (!this.lastSync) return false;
     return this.lastSync >= this.lastModified;
   }
-  toJSON(): SerialisedSyncObject {
+  toDB(): DBSyncObject {
     const attributes = {};
     return {
       id: this.id.toHex(),
+      objectType: this.objectType,
       libraryId: this.libraryId.toHex(),
       serverSeq: this.serverSeq,
       lastSync: this.lastSync,
       lastModified: this.lastModified,
       attributes,
     };
-  }
-  static fromJSON(json: any): AirdayItem | AirdayContainer {
-    ensureSerialisedSyncObject(json); // TODO: First check if syncobject is good, then do attributes
-    let syncObject = json as SerialisedSyncObject;
-    if (syncObject.type === "item") {
-      const attributes: AirdayItemAttributes = {};
-      if (syncObject.attributes.text) {
-        attributes.text = LWWRegister.fromJSON(syncObject.attributes.text);
-      }
-      return new AirdayItem({
-        id: Uuidv4.fromHex(syncObject.id),
-        libraryId: Uuidv4.fromHex(syncObject.libraryId),
-        attributes,
-        lastSync: syncObject.lastSync as bigint,
-        lastModified: syncObject.lastModified as bigint,
-      });
-    }
-    if (syncObject.type === "container") {
-      const attributes = {}; // TODO: Get specific attributes for container
-      return new AirdayItem({
-        id: Uuidv4.fromHex(syncObject.id),
-        libraryId: Uuidv4.fromHex(syncObject.libraryId),
-        attributes,
-        lastSync: syncObject.lastSync as bigint,
-        lastModified: syncObject.lastModified as bigint,
-      });
-    }
-    // TODO: Handle error (or null return) upstream
-    throw new Error("Type not found");
-  }
-}
-
-// TODO: Complete item
-export class AirdayContainer extends SyncObject {
-  type: SyncObjectType = "container";
-}
-
-// TODO: Move merge concerns to sync object
-export class AirdayItem extends SyncObject {
-  type: SyncObjectType = "item";
-  attributes: AirdayItemAttributes; // TODO: Consider a prototype for SyncObject
-  constructor(params: AirdayItemConstructorOpts) {
-    super(params);
-    this.attributes = params.attributes;
-  }
-  merge(attrs: AirdayItemAttributes, local: boolean) {
-    const keys = (Object.keys(attrs) as Array<keyof AirdayItemAttributes>).map(
-      (key) => {
-        if (attrs[key]) {
-          if (!this.attributes[key]) {
-            this.attributes[key] = attrs[key];
-          } else {
-            const result = this.attributes[key].merge(attrs[key]);
-            // Local change gets overruled
-            if (local === false && result.source === "right") {
-              this.dirtyAttrs.delete(key);
-            }
-            this.attributes[key] = result.register;
-          }
-        }
-        return key;
-      },
-    );
-    if (local) {
-      // Local change gets added to dirty register
-      keys.map((key) => this.dirtyAttrs.add(key));
-      this.lastModified = globalTSProducer.timestamp().utc;
-    }
-  }
-  // Merges & flags local changes
-  applyLocal(attrs: AirdayItemAttributes) {
-    this.merge(attrs, true);
-  }
-  applyRemote(attrs: AirdayItemAttributes) {
-    this.merge(attrs, false);
   }
 }

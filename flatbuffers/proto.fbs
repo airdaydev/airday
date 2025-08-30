@@ -16,11 +16,6 @@ table LibraryProto {
   name: string;
 }
 
-enum ObjectTypeProto: byte {
-  Item = 0,
-  Container = 1,
-}
-
 // TODO: This is ~probably~ unnecessary if it is typed from the outside!
 enum AttrTypeProto: ubyte { NONE=0, STRING=1, BOOL=2, I64=3, F64=4, BYTES=5 }
 
@@ -32,10 +27,13 @@ table AttributeProto {
   value_type: AttrTypeProto;
   timestamp: LWWTimestampProto;
   // Values
+  bool: bool;
   i64_fb: long;
   f64_fb: double;
   string: string;
   bytes: [ubyte];
+  // TODO: Mark as removed (always overriden)
+  clear: bool;
 }
 
 table AttributeSetProto { attributes: [AttributeProto]; }
@@ -44,7 +42,7 @@ table AttributeSetProto { attributes: [AttributeProto]; }
 root_type AttributeSetProto;
 
 table SyncObjectActionProto {
-  type: ObjectTypeProto;
+  obj_type: short;
   library_id: UuidProto (required);
   id: UuidProto (required);
   attributes: [AttributeProto];

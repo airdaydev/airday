@@ -1,33 +1,13 @@
-use sqlx::prelude::FromRow;
-use uuid::Uuid;
-
-// This is some indirection required for cases where we need to store Vecs of SyncObjects generically
-// TODO: Procmacro target
 use crate::{
     common::error::AppError,
     sync_engine::{
         container::{CONTAINER, ContainerAttrs},
-        engine::{SyncAttrs, SyncObject, SyncObjectMeta},
+        engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
+    sync_transport::proto_generated::proto::{AttributeSetProto, SyncObjectActionProto},
 };
 
-pub type AttributesBlob = Option<Vec<u8>>;
-
-#[derive(FromRow)]
-pub struct SqlSyncObject {
-    // static attrs
-    pub id: Uuid,
-    pub obj_type: i64,
-    pub library_id: Uuid,
-    // dynamic attrs (flatbuffer blob)
-    pub attributes: AttributesBlob,
-    // metadata
-    pub server_seq: i64,
-    pub tombstone_utc: Option<i64>,
-}
-
-// TODO: Procmacro target from here
 #[derive(Debug, Clone)]
 pub enum AnySyncObject {
     Item(SyncObject<ItemAttrs>),
@@ -38,31 +18,76 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
     type Error = AppError;
 
     fn try_from(row: SqlSyncObject) -> Result<Self, Self::Error> {
-        let meta = SyncObjectMeta {
-            id: row.id,
-            library_id: row.library_id,
-            server_seq: Some(row.server_seq),
-            tombstone_utc: row.tombstone_utc,
-        };
+        let meta = SyncObjectMeta::from_sql_row(&row);
+        let root = flatbuffers::root::<AttributeSetProto>(&row.attributes).map_err(|e| {
+            AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
+        })?;
 
         match row.obj_type {
-            x if x == ITEM => {
-                let attrs = if let Some(b) = &row.attributes {
-                    ItemAttrs::from_attr_blob(b)?
-                } else {
-                    ItemAttrs::default()
-                };
+            x if x == ITEM as i64 => {
+                let attrs = ItemAttrs::from_attr_vec(root.attributes())?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
             }
-            x if x == CONTAINER => {
-                let attrs = if let Some(b) = &row.attributes {
-                    ContainerAttrs::from_attr_blob(b)?
-                } else {
-                    ContainerAttrs::default()
-                };
+            x if x == CONTAINER as i64 => {
+                let attrs = ContainerAttrs::from_attr_vec(root.attributes())?;
                 Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
             }
             _ => Err(AppError::DatabaseError("Unknown object type".into())),
+        }
+    }
+}
+
+impl<'a> TryFrom<SyncObjectActionProto<'a>> for AnySyncObject {
+    type Error = AppError;
+
+    fn try_from(p: SyncObjectActionProto<'a>) -> Result<Self, Self::Error> {
+        let meta = SyncObjectMeta::from_action_proto(&p);
+        p.attributes();
+
+        match p.obj_type() {
+            x if x == ITEM => {
+                let attrs = ItemAttrs::from_attr_vec(p.attributes())?;
+                Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
+            }
+            x if x == CONTAINER => {
+                let attrs = ContainerAttrs::from_attr_vec(p.attributes())?;
+                Ok(AnySyncObject::Container(SyncObject { meta, attrs }))
+            }
+            _ => Err(AppError::ValidationError("Unknown object type".into())),
+        }
+    }
+}
+
+impl AnySyncObject {
+    pub fn meta(&self) -> &SyncObjectMeta {
+        match self {
+            AnySyncObject::Item(o) => &o.meta,
+            AnySyncObject::Container(o) => &o.meta,
+        }
+    }
+    pub fn obj_type(&self) -> i16 {
+        match self {
+            AnySyncObject::Item(o) => o.obj_type(),
+            AnySyncObject::Container(o) => o.obj_type(),
+        }
+    }
+    pub fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
+        match self {
+            AnySyncObject::Item(o) => o.to_attr_blob(),
+            AnySyncObject::Container(o) => o.to_attr_blob(),
+        }
+    }
+    pub fn merge_into(&mut self, other: &AnySyncObject) -> Result<(), AppError> {
+        match (self, other) {
+            (AnySyncObject::Item(a), AnySyncObject::Item(b)) => {
+                a.attrs.merge_into(&b.attrs);
+                Ok(())
+            }
+            (AnySyncObject::Container(a), AnySyncObject::Container(b)) => {
+                a.attrs.merge_into(&b.attrs);
+                Ok(())
+            }
+            _ => Err(AppError::ValidationError("wrong variant on merge".into())),
         }
     }
 }
