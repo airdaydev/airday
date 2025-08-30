@@ -27,8 +27,6 @@
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
 - [] @airday/core - tracing fixes
-- [] Add license https://mariadb.com/bsl-faq-adopting/
-- [] Consider AGPL-3.0
 - [] Put up website
 - [] get all libraries
 - [] handling browser tabs?!
@@ -151,33 +149,12 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 ## Predeploy, meta app
 - [] API abuse mitigation / define limits
 - [] Verify keyboard only, accessibility
-- [] Friends alpha and testing
 - [] PWA update strategy
-- [] optionally enable magic login with email
-- [] Paid web service with introductory prices
-- [] web app @ air.day/app
-- [] BSL vs AGPL?
-
-## Marketing, community
-- [] Website (Astro) + waitlist
-- [] Consider https://form-data.com/ for backend form (or just vibecode some bullshit)
-- [] Consider Zulip/matrix+element/discord (chat)
-- [] Consider https://motion.dev/ (Animation library)
-- [] Consider https://www.screen.studio/ (Screen recordings)
-- [] Consider https://forwardemail.net/en/private-business-email?pricing=true#enhanced
-- Pricing https://scastiel.dev/implement-ppp-fair-pricing-for-your-product
-- Pricing https://www.principlesofpricing.com/the-customer
 
 ## Bugs?
 - [] can't multiselect nav due to automatically activating pane on list open
 - [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
 - [] Maybe: show active pane border highlighted, then fade
-
-## Production phase 1:
-- Postgresql single-region cluster (can I upgrade later without downtime?)
-- 3 nodes with docker swarm or nomad in Australia
-- lb to any node, some sort of health indicator so lb can stop routing to dead nodes
-- users can be in conceptually the same room but in different regions, thus message broker must exist between ws servers, redis streams is fine.
 
 ---
 
@@ -196,8 +173,8 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] Rust core
 - [] Native iOS release
 - [] Native Android release
-- [] Linux Tauri release (?)
-- [] MacOS Tauri release (?)
+- [] MacOS or native Tauri release (?)
+- [] Linux Tauri (or other) release (?)
 
 ## Features
 - [] @airday/core - export database to json
@@ -218,10 +195,6 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] LLM Prompting / MCP
 - [] qwen3-1.7B exploration
 - [] Consider jmap calendar support
-
-## Multi-region goals:
-- Postgresql multi-region cluster (write in US) (no sharding necessary)
-- 1+ websocket server per region
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
