@@ -47,6 +47,8 @@ impl SyncAttrs for ItemAttrs {
                     bytes: None,
                     i64_fb: 0,
                     f64_fb: 0.0,
+                    bool: false,
+                    clear: false,
                 },
             );
             fb_attributes.push(attr);
