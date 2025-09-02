@@ -184,7 +184,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] Monthly cal view
 - [] Annual cal view
 - [] Markdown descriptions
-- [] Collaborative text fields
+- [] Text CRDT (text_snapshot, text_id) fields - linked via link_id
 - [] Custom fields
 - [] JSON export
 - [] Shared libraries (Enforce library limits (3 per user?))
@@ -204,3 +204,6 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 ## Fractional indexing
 - https://observablehq.com/@dgreensp/implementing-fractional-indexing
 - www.figma.com/blog/realtime-editing-of-ordered-sequences/
+
+## Optimisations
+- Flatbuffer in flatbuffer for predictable sync engine user types (instead of current "AttributeProto")
