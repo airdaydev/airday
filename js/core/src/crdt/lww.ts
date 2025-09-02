@@ -56,6 +56,13 @@ export class LWWTimestamp {
       pid: this.pid.toString(),
     };
   }
+  static fromProto(proto: LWWTimestampProto) {
+    // TODO: Bounds checking?
+    return new LWWTimestamp({
+      utc: proto.utc(),
+      pid: proto.pid(),
+    });
+  }
   clone() {
     return new LWWTimestamp({ utc: this.utc, pid: this.pid });
   }

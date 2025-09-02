@@ -1,6 +1,9 @@
-import { globalTSProducer } from "../crdt/lww";
+import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
+import { Builder } from "flatbuffers";
+import { AttributeProto, AttributeSetProto } from "../proto";
+import { ITEM_SCHEMA } from "./item";
 
 export interface SyncObjectParams {
   objectType: number;
@@ -10,83 +13,175 @@ export interface SyncObjectParams {
   lastSync?: bigint;
 }
 
-enum AttributeType {
-  "STRING",
-  "BOOL",
-  "INT",
-  "BIGINT",
+export enum AttrType {
+  string,
+  boolean,
+  number,
+  bigint,
+}
+type AttrSpec<T extends AttrType = AttrType, N extends string = string> = {
+  readonly name: N;
+  readonly t: T;
+};
+export type AttributeSchema = Record<number, AttrSpec>;
+
+type FieldIdOf<A extends AttributeSchema> = Extract<keyof A, number>;
+type NameOf<A extends AttributeSchema> = {
+  [K in keyof A]: A[K] extends { readonly name: infer N extends string }
+    ? N
+    : never;
+}[keyof A];
+
+type TsType<T extends AttrType> = T extends AttrType.string
+  ? LWWRegister<string>
+  : T extends AttrType.boolean
+    ? LWWRegister<boolean>
+    : T extends AttrType.number
+      ? LWWRegister<number>
+      : T extends AttrType.bigint
+        ? LWWRegister<bigint>
+        : never;
+
+type ValuesById<A extends AttributeSchema> = {
+  [F in FieldIdOf<A>]?: A[F] extends { readonly t: infer T extends AttrType }
+    ? TsType<T>
+    : never;
+};
+
+type ByName<A extends AttributeSchema> = {
+  [F in keyof A as A[F] extends { readonly name: infer N extends string }
+    ? N
+    : never]?: A[F] extends { readonly t: infer T extends AttrType }
+    ? TsType<T>
+    : never;
+};
+
+type IdForName<A extends AttributeSchema, N extends NameOf<A>> = {
+  [F in keyof A]: A[F] extends { readonly name: N } ? F : never;
+}[keyof A] &
+  FieldIdOf<A>;
+
+type NameToId<A extends AttributeSchema> = {
+  [N in NameOf<A>]: IdForName<A, N>;
+};
+
+// type ByName<A extends AttributeSchema> = {
+//   [F in keyof A as A[F]["name"] & string]?: TsType<A[F]["t"]>;
+// };
+// type NameOf<A extends AttributeSchema> = keyof ByName<A>;
+// type ValueForName<
+//   A extends AttributeSchema,
+//   N extends NameOf<A>,
+// > = ByName<A>[N];
+
+// Build a *trusted* inverse map directly from the schema.
+function invertSchema<A extends AttributeSchema>(schema: A): NameToId<A> {
+  const m = {} as any;
+  for (const id in schema) m[schema[id as any].name] = Number(id);
+  return m;
 }
 
-interface Attribute {
-  fieldId: number;
-  name: string;
-  type: AttributeType;
-}
-
-interface AttributeSet {}
-
-class AttributeCodec {
-  index = new Map<number, string>();
-  namesAttached = false;
-  constructor(map: Record<string, number>) {
-    this.attachMap(map);
+export class AttributeSet<A extends AttributeSchema> {
+  readonly schema: Readonly<A>;
+  readonly nameToId: Readonly<NameToId<A>>;
+  // Underlying LWWRegisters
+  private values: ValuesById<A> = {} as any;
+  constructor(schema: A) {
+    this.schema = schema;
+    // TODO: No we can't do this on every object!
+    this.nameToId = invertSchema(schema);
+  }
+  // Name based accessors
+  getAttr<N extends NameOf<A>>(name: N): ByName<A>[N] | undefined {
+    const id: IdForName<A, N> = this.nameToId[name];
+    return this.values[id] as ByName<A>[N] | undefined;
+  }
+  setAttr<N extends NameOf<A>>(name: N, v: ByName<A>[N]) {
+    const id: IdForName<A, N> = this.nameToId[name];
+    this.values[id] = v as any;
+  }
+  // id based accessors
+  getById<F extends FieldIdOf<A>>(id: F) {
+    return this.values[id];
+  }
+  setById<F extends FieldIdOf<A>>(id: F, v: ValuesById<A>[F]) {
+    this.values[id] = v;
   }
   fromFlatBuffer() {
-    // create attribute set
-    // loop through fields
-    // from id, get name map & type, save to name
+    const as = new AttributeSetProto();
+    for (let i = 0; i <= as.attributesLength(); i++) {
+      const attr = as.attributes(i);
+      if (attr) {
+        try {
+          // TODO: Correct decoding based on type!
+          const lww = this.decodeAttribute(attr);
+          const fieldId = attr.fieldId();
+          if (Object.hasOwn(this.schema, fieldId)) {
+            // TODO: Validate?
+            this.setById(fieldId as Extract<keyof A, number>, lww as any);
+          }
+        } catch (err) {
+          console.warn("error creating item from flatbuffer", err);
+        }
+      }
+    }
     return; // a named, live attribute set
   }
-  toFlatBuffer(attributeSet: any) {
+  private decodeAttribute(attr: AttributeProto) {
+    const id = attr.valueType();
+    const schema = this.schema[id];
+    const rawTimestamp = attr.timestamp();
+    if (!rawTimestamp) {
+      throw new Error(`No timestamp found while decoding attr!`);
+    }
+    const timestamp = LWWTimestamp.fromProto(rawTimestamp);
+    if (!schema) throw new Error(`No ${id} on ITEM_SCHEMA`);
+    let data;
+    switch (schema.t) {
+      case AttrType.string: {
+        data = attr.string;
+        break;
+      }
+      case AttrType.boolean: {
+        data = attr.bool;
+        break;
+      }
+      case AttrType.number: {
+        data = attr.f64Fb;
+        break;
+      }
+      case AttrType.bigint: {
+        data = attr.i64Fb;
+        break;
+      }
+      default: {
+        console.warn("not found");
+      }
+    }
+    return new LWWRegister({
+      data,
+      timestamp,
+    });
+  }
+  toFlatBuffer(builder: Builder, attributeSet: any) {
     // serialise a named attribute set
   }
-  // TODO: LLM generated - right idea but change application
-  attachMap(map: Record<string, number>) {
-    const descMap: PropertyDescriptorMap = {};
-    for (const [name, id] of Object.entries(map)) {
-      descMap[name] = {
-        configurable: false,
-        enumerable: true,
-        get: () => {
-          const v = this.getById(id);
-          if (!v) return null;
-          switch (v.t) {
-            case T.I64_FB:
-              return v.i64;
-            case T.F64_FB:
-              return v.f64;
-            case T.STRING:
-              return v.str;
-            case T.BYTES:
-              return v.bytes;
-            case T.BOOL_FB:
-              return v.bool;
-          }
-        },
-        set: (val: any) => {
-          // You decide typing by registry; here are two examples:
-          if (typeof val === "string") {
-            this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
-          } else if (typeof val === "boolean") {
-            this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
-          } else if (typeof val === "bigint") {
-            this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
-          } else if (typeof val === "number") {
-            this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
-          } else if (val instanceof Uint8Array) {
-            this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
-          } else {
-            throw new Error(`Unsupported value for ${name}`);
-          }
-        },
-      };
+  setVal(val) {
+    if (typeof val === "string") {
+      this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
+    } else if (typeof val === "boolean") {
+      this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
+    } else if (typeof val === "bigint") {
+      this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
+    } else if (typeof val === "number") {
+      this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
+    } else if (val instanceof Uint8Array) {
+      this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
+    } else {
+      throw new Error(`Unsupported value for ${name}`);
     }
-    Object.defineProperties(this as any, descMap);
-    return this as any; // now has friendly props
   }
 }
-
-const item = new AttributeCodec();
 
 // TODO: Delete this in favour of custom-built meta and attributes (split)
 const DBSyncObjectSchema = v.object({
@@ -143,7 +238,30 @@ export class SyncObject {
   }
   // Local = do not add to change register
   merge(other: SyncObject, local: boolean) {
-    // not yet implemented
+    // TODO: Reinstate merge function
+    // const otherAttrs = other.attributes;
+    // const keys = (
+    //   Object.keys(otherAttrs) as Array<keyof AirdayItemAttributes>
+    // ).map((key) => {
+    //   if (otherAttrs[key]) {
+    //     if (!this.attributes[key]) {
+    //       this.attributes[key] = otherAttrs[key];
+    //     } else {
+    //       const result = this.attributes[key].merge(otherAttrs[key]);
+    //       // Local change gets overruled
+    //       if (local === false && result.source === "right") {
+    //         this.dirtyAttrs.delete(key);
+    //       }
+    //       this.attributes[key] = result.register;
+    //     }
+    //   }
+    //   return key;
+    // });
+    // if (local) {
+    //   // Local change gets added to dirty register
+    //   keys.map((key) => this.dirtyAttrs.add(key));
+    //   this.lastModified = globalTSProducer.timestamp().utc;
+    // }
   }
   // Merges & flags local changes
   applyLocal(attrs: SyncObject) {
