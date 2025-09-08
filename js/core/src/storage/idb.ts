@@ -1,5 +1,5 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import { SyncObject } from "../sync/model";
+import { SyncObject } from "../sync/sync-object";
 
 const SYNC_STORE_NAME = "syncable";
 const LIBRARY_STORE_NAME = "library";

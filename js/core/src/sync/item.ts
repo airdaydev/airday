@@ -1,11 +1,12 @@
-import { globalTSProducer, LWWRegister } from "../crdt/lww";
+import { LWWRegister } from "../crdt/lww";
 import {
   AttributeSet,
   AttributeSchema,
   AttrType,
   SyncObject,
   SyncObjectParams,
-} from "./model";
+  invertSchema,
+} from "./sync-object";
 
 export const ITEM = 0;
 
@@ -28,8 +29,19 @@ export const ITEM_SCHEMA = {
   3: { name: "bigId", t: AttrType.bigint },
 } as const satisfies AttributeSchema;
 
-// TODO: Move merge concerns to sync object
+class ItemAttributes extends AttributeSet<typeof ITEM_SCHEMA> {
+  schema = ITEM_SCHEMA;
+  invert = invertSchema(ITEM_SCHEMA); // TODO: Profile
+}
+
 export class AirdayItem extends SyncObject {
   readonly objectType = ITEM;
-  attributes = new AttributeSet(ITEM_SCHEMA);
+  attributes = new ItemAttributes();
+  updateText(text: string) {
+    const textLWW = new LWWRegister({
+      data: "test",
+    });
+    const attrs = new ItemAttributes();
+    attrs.setById(0, textLWW);
+  }
 }

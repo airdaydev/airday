@@ -155,6 +155,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] can't multiselect nav due to automatically activating pane on list open
 - [] moving solo list item should not count as a click! e.g. try to move it into a dead zone
 - [] Maybe: show active pane border highlighted, then fade
+- [] Deal with merge issue with advanced foreign / late local clock by 1) restricting valid times 2) on local update, also refer to locally stored time
 
 ---
 

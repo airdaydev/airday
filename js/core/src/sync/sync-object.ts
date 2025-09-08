@@ -3,10 +3,8 @@ import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder } from "flatbuffers";
 import { AttributeProto, AttributeSetProto } from "../proto";
-import { ITEM_SCHEMA } from "./item";
 
 export interface SyncObjectParams {
-  objectType: number;
   id?: Uuidv4;
   libraryId: Uuidv4;
   lastModified?: bigint;
@@ -65,39 +63,27 @@ type NameToId<A extends AttributeSchema> = {
   [N in NameOf<A>]: IdForName<A, N>;
 };
 
-// type ByName<A extends AttributeSchema> = {
-//   [F in keyof A as A[F]["name"] & string]?: TsType<A[F]["t"]>;
-// };
-// type NameOf<A extends AttributeSchema> = keyof ByName<A>;
-// type ValueForName<
-//   A extends AttributeSchema,
-//   N extends NameOf<A>,
-// > = ByName<A>[N];
-
 // Build a *trusted* inverse map directly from the schema.
-function invertSchema<A extends AttributeSchema>(schema: A): NameToId<A> {
+export function invertSchema<A extends AttributeSchema>(
+  schema: A,
+): NameToId<A> {
   const m = {} as any;
   for (const id in schema) m[schema[id as any].name] = Number(id);
   return m;
 }
 
-export class AttributeSet<A extends AttributeSchema> {
-  readonly schema: Readonly<A>;
-  readonly nameToId: Readonly<NameToId<A>>;
+export abstract class AttributeSet<A extends AttributeSchema> {
+  abstract readonly schema: Readonly<A>;
+  abstract readonly invert: Readonly<NameToId<A>>;
   // Underlying LWWRegisters
   private values: ValuesById<A> = {} as any;
-  constructor(schema: A) {
-    this.schema = schema;
-    // TODO: No we can't do this on every object!
-    this.nameToId = invertSchema(schema);
-  }
   // Name based accessors
   getAttr<N extends NameOf<A>>(name: N): ByName<A>[N] | undefined {
-    const id: IdForName<A, N> = this.nameToId[name];
+    const id: IdForName<A, N> = this.invert[name];
     return this.values[id] as ByName<A>[N] | undefined;
   }
   setAttr<N extends NameOf<A>>(name: N, v: ByName<A>[N]) {
-    const id: IdForName<A, N> = this.nameToId[name];
+    const id: IdForName<A, N> = this.invert[name];
     this.values[id] = v as any;
   }
   // id based accessors
@@ -214,8 +200,8 @@ const ensureDBSyncObject = compile(DBSyncObjectSchema, {
   ensure: true,
 });
 
-export class SyncObject {
-  readonly objectType: number = -1; // Requires class
+export abstract class SyncObject {
+  abstract readonly objectType: number;
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
