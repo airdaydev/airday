@@ -2,7 +2,7 @@
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
-import { AirdayContainer, AirdayItem, SyncObject } from "../sync/model";
+import { SyncObject } from "../sync/sync-object";
 import { AirdayIDB } from "./idb";
 
 interface StorageEventMap {
@@ -18,12 +18,12 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   idb = new AirdayIDB();
-  items: Map<string, AirdayItem> = new Map(); // hex-id-backed index
+  items: Map<string, SyncObject> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore) {
     this.core = core;
   }
-  async upsertItems(items: AirdayItem[]) {
+  async upsertItems(items: SyncObject[]) {
     items.map((item) => {
       this.items.set(item.id.toHex(), item);
     });

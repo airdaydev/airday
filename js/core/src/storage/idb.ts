@@ -1,5 +1,5 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import { SyncObject } from "../sync/sync-object";
+import { parseGenericSyncObject, SyncObject } from "../sync/sync-object";
 
 const SYNC_STORE_NAME = "syncable";
 const LIBRARY_STORE_NAME = "library";
@@ -48,7 +48,7 @@ export class AirdayIDB {
     // TODO: We also need to extract indexes in JSON version (e.g. done)!
     await Promise.all(
       objects.map((obj) => {
-        return store.put(obj.toJSON());
+        return store.put(obj.toDB());
       }),
     );
     await tx.done;
@@ -62,6 +62,8 @@ export class AirdayIDB {
     const objects: SyncObject[] = [];
     res.forEach((row) => {
       try {
+        const meta = parseGenericSyncObject(row);
+        // TODO: Get attributes & build object
         objects.push(SyncObject.fromJSON(row));
       } catch (err) {
         console.warn("Could not parse row from db", row, err);

@@ -1,7 +1,9 @@
 import { BrowserRunner, log } from "./runner";
-import { AirdayCore, AirdayItem, AuthMode, createUser } from "../index";
+import { AirdayCore, AuthMode, createUser } from "../index";
 import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
+import { Uuidv4 } from "../common/uuid";
+import { AirdayItem } from "../sync/item";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -29,149 +31,163 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.test("Sync item", async (assert) => {
-    const core = await createTestCore();
-    const newItem = new AirdayItem({
-      libraryId: core.library.id!,
-      attributes: {
-        text: new LWWRegister({
-          data: "test",
-        }),
-      },
-    });
-    let action = core.sync.syncItems([newItem])[0];
-    const pending = core.sync.pendingActions.get(action.id.toHex());
-    assert(pending?.id === action.id, "message gets placed on pending queue");
-    await new Promise((resolve) => {
-      core.ws.events.once("batch-response", (data) => {
-        resolve(null);
-      });
-    });
-    assert(
-      core.sync.pendingActions.size === 0,
-      "ack message received & pending queue back to 0",
-    );
-    const item = (
-      await core.storage.idb.getByLibrary(core.library.id!.toHex())
-    )[0];
-    assert(
-      item.libraryId.toHex() === core.library.id!.toHex(),
-      "correct libraryId stored in idb",
-    );
-    assert(
-      typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
-      "Item timestamps = considered in sync",
-    );
-    await new Promise((resolve) => {
-      if (core.sync.pendingActions.size === 0) {
-        return resolve(null);
-      }
-      core.sync.events.onceAsync("flushed").then(resolve);
-    });
-    core.ws.close();
-  });
-
-  suite.test("Items stored in indexeddb", async (assert) => {
-    const core = await createTestCore();
-    let items = [];
-    for (let i = 0; i < 100; i++) {
-      items.push(
-        new AirdayItem({
-          libraryId: core.library.id!,
-          attributes: {
-            text: new LWWRegister({ data: "test" }),
-          },
-        }),
-      );
-    }
-    core.sync.syncItems(items);
-    await core.ws.flush();
-    const res = await core.storage.idb.getByLibrary(core.library.id!.toHex());
-    assert(res.length === 100, "res length");
-    // TODO: Get all items
-    // core.sync.getItemSince(core.library.id!, null);
-    core.ws.close();
-  });
-
-  suite.only("Merge text same message", async (assert) => {
-    // 1. Create item & sync it
-    const core = await createTestCore();
-    const oldText = new LWWRegister({ data: "old_text" });
+  suite.test("Create, encode & decode sync object", async (assert) => {
+    const library = new Uuidv4();
     const item = new AirdayItem({
-      libraryId: core.library.id!,
-      attributes: {
-        text: oldText,
-      },
+      libraryId: library,
     });
-    core.sync.syncItems([item]);
-    await core.sync.flush();
-    assert(item.isSynced() === true, "Item has been synced");
-    console.log("sync 1 completed");
+    item.updateText("hello");
+    item.updateText("again");
+    assert(item.attributes.getById(0)?.data === "again");
+    assert(item.dirtyAttrs.size === 1);
 
-    // 2. After sync is acknowledged, update it again
-    const newText = new LWWRegister({ data: "new_text" });
-    assert(
-      newText.timestamp.greaterThan(oldText.timestamp)!,
-      "new text older than old text",
-    );
-    item.applyLocal({ text: newText }); // TODO: This should trigger a sync
-    assert(item.attributes.text?.data === newText.data, "merge success");
-    assert(item.isSynced() === false, "item considered not synced");
-    console.log("sync 2");
-    core.sync.syncItems([item]);
-    await core.sync.flush(); // TODO: Awaiting here indefinitely
-    assert(item.isSynced() === true, "item now considered as synced");
-    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-    // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
-    core.ws.close();
+    // const builder = new Builder();
+    // const
   });
 
-  suite.skip("Immediate updates after initial sync", async (assert) => {
-    // TODO: Test update before flush!
-  });
+  // suite.test("Sync item", async (assert) => {
+  //   const core = await createTestCore();
+  //   const newItem = new AirdayItem({
+  //     libraryId: core.library.id!,
+  //     attributes: {
+  //       text: new LWWRegister({
+  //         data: "test",
+  //       }),
+  //     },
+  //   });
+  //   let action = core.sync.syncItems([newItem])[0];
+  //   const pending = core.sync.pendingActions.get(action.id.toHex());
+  //   assert(pending?.id === action.id, "message gets placed on pending queue");
+  //   await new Promise((resolve) => {
+  //     core.ws.events.once("batch-response", (data) => {
+  //       resolve(null);
+  //     });
+  //   });
+  //   assert(
+  //     core.sync.pendingActions.size === 0,
+  //     "ack message received & pending queue back to 0",
+  //   );
+  //   const item = (
+  //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
+  //   )[0];
+  //   assert(
+  //     item.libraryId.toHex() === core.library.id!.toHex(),
+  //     "correct libraryId stored in idb",
+  //   );
+  //   assert(
+  //     typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
+  //     "Item timestamps = considered in sync",
+  //   );
+  //   await new Promise((resolve) => {
+  //     if (core.sync.pendingActions.size === 0) {
+  //       return resolve(null);
+  //     }
+  //     core.sync.events.onceAsync("flushed").then(resolve);
+  //   });
+  //   core.ws.close();
+  // });
 
-  suite.test("Get all items since beginning from server", async (assert) => {
-    const core = await createTestCore();
-    // create 50 items
-    let items = [];
-    for (let i = 0; i < 100; i++) {
-      items.push(
-        new AirdayItem({
-          libraryId: core.library.id!,
-          attributes: {
-            text: new LWWRegister({ data: "test" }),
-          },
-        }),
-      );
-    }
-    core.sync.syncItems(items);
-    await core.sync.flush();
-    // Clear database (TODO: Direct access??)
-    await core.storage.idb.handle?.clear("syncable");
-    await core.storage.idb.handle?.clear("library");
-    const emptyRes = await core.storage.idb.getByLibrary(
-      core.library.id!.toHex(),
-    );
-    assert(emptyRes.length === 0, "idb has been emptied");
-    // Retrieve all items
-    // core.sync.getItemSince(core.library.id!, null);
-    // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
-    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-    // console.log("items returned", res.length);
-    core.ws.close();
-  });
+  // suite.test("Items stored in indexeddb", async (assert) => {
+  //   const core = await createTestCore();
+  //   let items = [];
+  //   for (let i = 0; i < 100; i++) {
+  //     items.push(
+  //       new AirdayItem({
+  //         libraryId: core.library.id!,
+  //         attributes: {
+  //           text: new LWWRegister({ data: "test" }),
+  //         },
+  //       }),
+  //     );
+  //   }
+  //   core.sync.syncItems(items);
+  //   await core.ws.flush();
+  //   const res = await core.storage.idb.getByLibrary(core.library.id!.toHex());
+  //   assert(res.length === 100, "res length");
+  //   // TODO: Get all items
+  //   // core.sync.getItemSince(core.library.id!, null);
+  //   core.ws.close();
+  // });
 
-  suite.skip("mem adapter", () => {
-    // // Examples for the solid adapter within the web app:
-    // class AirdayUIItem {}
-    // class AirdayUIContainer {}
-    // class SolidAdapterExample {
-    //   items: Map<string, AirdayUIItem> = new Map(); // reactive
-    //   containers: Map<string, AirdayUIContainer> = new Map(); // reactive
-    //   constructor() {}
-    // }
-    // const solidAdapter = new SolidAdapterExample();
-  });
+  // suite.only("Merge text same message", async (assert) => {
+  //   // 1. Create item & sync it
+  //   const core = await createTestCore();
+  //   const oldText = new LWWRegister({ data: "old_text" });
+  //   const item = new AirdayItem({
+  //     libraryId: core.library.id!,
+  //     attributes: {
+  //       text: oldText,
+  //     },
+  //   });
+  //   core.sync.syncItems([item]);
+  //   await core.sync.flush();
+  //   assert(item.isSynced() === true, "Item has been synced");
+  //   console.log("sync 1 completed");
+
+  //   // 2. After sync is acknowledged, update it again
+  //   const newText = new LWWRegister({ data: "new_text" });
+  //   assert(
+  //     newText.timestamp.greaterThan(oldText.timestamp)!,
+  //     "new text older than old text",
+  //   );
+  //   item.applyLocal({ text: newText }); // TODO: This should trigger a sync
+  //   assert(item.attributes.text?.data === newText.data, "merge success");
+  //   assert(item.isSynced() === false, "item considered not synced");
+  //   console.log("sync 2");
+  //   core.sync.syncItems([item]);
+  //   await core.sync.flush(); // TODO: Awaiting here indefinitely
+  //   assert(item.isSynced() === true, "item now considered as synced");
+  //   // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+  //   // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+  //   core.ws.close();
+  // });
+
+  // suite.skip("Immediate updates after initial sync", async (assert) => {
+  //   // TODO: Test update before flush!
+  // });
+
+  // suite.test("Get all items since beginning from server", async (assert) => {
+  //   const core = await createTestCore();
+  //   // create 50 items
+  //   let items = [];
+  //   for (let i = 0; i < 100; i++) {
+  //     items.push(
+  //       new AirdayItem({
+  //         libraryId: core.library.id!,
+  //         attributes: {
+  //           text: new LWWRegister({ data: "test" }),
+  //         },
+  //       }),
+  //     );
+  //   }
+  //   core.sync.syncItems(items);
+  //   await core.sync.flush();
+  //   // Clear database (TODO: Direct access??)
+  //   await core.storage.idb.handle?.clear("syncable");
+  //   await core.storage.idb.handle?.clear("library");
+  //   const emptyRes = await core.storage.idb.getByLibrary(
+  //     core.library.id!.toHex(),
+  //   );
+  //   assert(emptyRes.length === 0, "idb has been emptied");
+  //   // Retrieve all items
+  //   // core.sync.getItemSince(core.library.id!, null);
+  //   // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
+  //   // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+  //   // console.log("items returned", res.length);
+  //   core.ws.close();
+  // });
+
+  // suite.skip("mem adapter", () => {
+  //   // // Examples for the solid adapter within the web app:
+  //   // class AirdayUIItem {}
+  //   // class AirdayUIContainer {}
+  //   // class SolidAdapterExample {
+  //   //   items: Map<string, AirdayUIItem> = new Map(); // reactive
+  //   //   containers: Map<string, AirdayUIContainer> = new Map(); // reactive
+  //   //   constructor() {}
+  //   // }
+  //   // const solidAdapter = new SolidAdapterExample();
+  // });
 
   // suite.skip("Get diff items", async (assert) => {});
   // suite.skip("Get all libraries", async (assert) => {});

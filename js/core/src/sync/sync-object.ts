@@ -205,9 +205,6 @@ export abstract class AttributeSet<A extends AttributeSchema> {
       timestamp,
     });
   }
-  toFlatBuffer(builder: Builder, attributeSet: any) {
-    // serialise a named attribute set
-  }
   setVal(val) {
     if (typeof val === "string") {
       this.putById(id, { t: T.STRING, str: val, ts: nowLww() });

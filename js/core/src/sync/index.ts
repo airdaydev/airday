@@ -5,8 +5,8 @@ import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
 import { BatchAction, BatchSyncMessage, SyncObjectAction } from "./actions";
 import { ChecksumStore } from "./checksum";
-import { AirdayItem } from "./item";
 import { SyncStream } from "./stream";
+import { SyncObject } from "./sync-object";
 
 interface SyncEventMap {
   flushed: {};
@@ -70,7 +70,7 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  syncItems(items: AirdayItem[]) {
+  syncItems(items: SyncObject[]) {
     // Filter out items currently in sync
     const actions = items
       .filter((item) => {
@@ -105,24 +105,24 @@ export class AirdaySync {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
         if (res.serverSeq) {
-          action.item.serverSeq = res.serverSeq;
+          action.syncObject.serverSeq = res.serverSeq;
         }
         // TODO: targeted change instead of blunt (pass in idb to endSync?)
-        this.core.storage.idb?.upsert([action.item]).catch((err) => {
+        this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {
           console.log(err);
         });
         this.pendingActions.delete(res.actionId.toHex());
-        action.item.endSync();
+        action.syncObject.endSync();
         if (this.pendingActions.size === 0) {
           // Consider renaming: no pending acknowledgements remaining
           this.events.emit("flushed", {});
         }
         // If item has changes applied during sync, sync them
-        if (!action.item.isSynced()) {
+        if (!action.syncObject.isSynced()) {
           // console.log(
           //   `action is in sync lastModified=${action.item.lastModified}, lastSync=${action.item.lastSync}`,
           // );
-          this.syncItems([action.item]);
+          this.syncItems([action.syncObject]);
         }
       }
     } else {

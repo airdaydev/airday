@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Front-end fix type issues
 - [] Typed, dynamic attrs in JS
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests
