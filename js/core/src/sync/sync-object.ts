@@ -76,7 +76,7 @@ export abstract class AttributeSet<A extends AttributeSchema> {
   abstract readonly schema: Readonly<A>;
   abstract readonly invert: Readonly<NameToId<A>>;
   // Underlying LWWRegisters
-  private values: ValuesById<A> = {} as any;
+  values: ValuesById<A> = {} as any;
   // Name based accessors
   getAttr<N extends NameOf<A>>(name: N): ByName<A>[N] | undefined {
     const id: IdForName<A, N> = this.invert[name];
@@ -99,22 +99,24 @@ export abstract class AttributeSet<A extends AttributeSchema> {
     }
   }
   // TODO: Complete implementation
-  mergeMany(other: A) {
-    const keys = Object.keys(other).map((key) => {
-      if (otherAttrs[key]) {
-        if (!this.attributes[key]) {
-          this.attributes[key] = otherAttrs[key];
-        } else {
-          const result = this.attributes[key].merge(otherAttrs[key]);
-          // Local change gets overruled
-          if (local === false && result.source === "right") {
-            this.dirtyAttrs.delete(key);
-          }
-          this.attributes[key] = result.register;
+  mergeAttrSet(other: AttributeSet<A>) {
+    for (const keyStr in other.values) {
+      const key = Number(keyStr) as Extract<keyof A, number>;
+      const curVal = this.getById(key);
+      if (!curVal) {
+        this.setById(key, curVal);
+      } else {
+        const otherVal = other.getById(key);
+        if (!otherVal) throw new Error("val is set but not populated");
+        const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
+        if (result.source === "right" && local === false) {
+          this.dirtyAttrs.delete(key);
         }
+        this.setById(key, result.register);
       }
-      return key;
-    });
+      // TODO: Figure out dirty attrs!?
+      // TODO: Link to dirty attrs?
+    }
   }
   // id based accessors
   getById<F extends FieldIdOf<A>>(id: F) {
