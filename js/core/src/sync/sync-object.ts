@@ -2,7 +2,7 @@ import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder } from "flatbuffers";
-import { AttributeProto, AttributeSetProto } from "../proto";
+import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
 
 export interface SyncObjectParams {
   id?: Uuidv4;
@@ -98,6 +98,7 @@ export abstract class AttributeSet<A extends AttributeSchema> {
       this.setById(id, val.register as any); // TODO: Fix up types
     }
   }
+  // TODO: Complete implementation
   mergeMany(other: A) {
     const keys = Object.keys(other).map((key) => {
       if (otherAttrs[key]) {
@@ -141,6 +142,32 @@ export abstract class AttributeSet<A extends AttributeSchema> {
       }
     }
     return; // a named, live attribute set
+  }
+  encodeAttribute<F extends FieldIdOf<A>>(builder: Builder, fieldId: F) {
+    const field = this.getById(fieldId);
+    if (!field) {
+      console.warn(`Could not find field ${fieldId} to encode`);
+      return false;
+    }
+    console.log(field.data);
+    let dataOffset;
+    // TODO: Better typing
+    if (typeof field.data === "string") {
+      // TODO: If non-scalar type
+      dataOffset = builder.createString(field.data);
+    }
+    AttributeProto.startAttributeProto(builder);
+    AttributeProto.addFieldId(builder, fieldId);
+    AttributeProto.addValueType(builder, AttrTypeProto.STRING);
+    AttributeProto.addTimestamp(
+      builder,
+      field?.timestamp.addToFlatBuffer(builder),
+    );
+    if (dataOffset) {
+      // TODO: Correct type
+      AttributeProto.addString(builder, dataOffset);
+    }
+    return AttributeProto.endAttributeProto(builder);
   }
   private decodeAttribute(attr: AttributeProto) {
     const id = attr.valueType();
@@ -238,7 +265,8 @@ export abstract class SyncObject {
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
   serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
-  dirtyAttrs: Set<string> = new Set();
+  dirtyAttrs: Set<number> = new Set();
+  abstract attributes: AttributeSet<any>;
   constructor(params: SyncObjectParams) {
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;

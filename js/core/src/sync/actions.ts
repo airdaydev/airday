@@ -17,7 +17,7 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
-import { SyncObject } from "./model";
+import { SyncObject } from "./sync-object";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -122,34 +122,23 @@ export class SyncObjectAction extends BatchAction {
     super();
     this.syncObject = syncObject;
   }
+  // Adds dirty properties only
   addToFlatBuffer(builder: Builder) {
-    const attributes = [];
-
-    // Convert syncObject attributes to AttributeProto array
-    if (this.syncObject.attributes.text) {
-      const stringOffset = builder.createString(
-        this.syncObject.attributes.text.data,
-      );
-
-      AttributeProto.startAttributeProto(builder);
-      AttributeProto.addFieldId(builder, ItemFieldId.ITEM_TEXT);
-      AttributeProto.addValueType(builder, AttrTypeProto.STRING);
-      AttributeProto.addTimestamp(
+    const attributes: number[] = [];
+    this.syncObject.dirtyAttrs.forEach((fieldId) => {
+      const offset = this.syncObject.attributes.encodeAttribute(
         builder,
-        this.syncObject.attributes.text.timestamp.addToFlatBuffer(builder),
+        fieldId,
       );
-      AttributeProto.addString(builder, stringOffset);
-      const textAttributeOffset = AttributeProto.endAttributeProto(builder);
-      attributes.push(textAttributeOffset);
-    }
-
+      if (typeof offset === "number") attributes.push(offset);
+    });
     const attributesVector = SyncObjectActionProto.createAttributesVector(
       builder,
       attributes,
     );
 
     SyncObjectActionProto.startSyncObjectActionProto(builder);
-    SyncObjectActionProto.addObjType(builder, SyncObjectType.CONTAINER);
+    SyncObjectActionProto.addObjType(builder, this.syncObject.objectType);
     SyncObjectActionProto.addId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
