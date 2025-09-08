@@ -86,6 +86,35 @@ export abstract class AttributeSet<A extends AttributeSchema> {
     const id: IdForName<A, N> = this.invert[name];
     this.values[id] = v as any;
   }
+  merge<F extends FieldIdOf<A>>(id: F, data: ValuesById<A>[F]) {
+    // TODO: Left vs right so we can skip misses?
+    const src = this.values[id] as LWWRegister<any> | undefined;
+    if (!data)
+      throw new Error("No data found when attempting to merge. Expected LWW.");
+    if (!src) {
+      this.setById(id, data);
+    } else {
+      const val = src.merge(data);
+      this.setById(id, val.register as any); // TODO: Fix up types
+    }
+  }
+  mergeMany(other: A) {
+    const keys = Object.keys(other).map((key) => {
+      if (otherAttrs[key]) {
+        if (!this.attributes[key]) {
+          this.attributes[key] = otherAttrs[key];
+        } else {
+          const result = this.attributes[key].merge(otherAttrs[key]);
+          // Local change gets overruled
+          if (local === false && result.source === "right") {
+            this.dirtyAttrs.delete(key);
+          }
+          this.attributes[key] = result.register;
+        }
+      }
+      return key;
+    });
+  }
   // id based accessors
   getById<F extends FieldIdOf<A>>(id: F) {
     return this.values[id];
@@ -224,25 +253,6 @@ export abstract class SyncObject {
   }
   // Local = do not add to change register
   merge(other: SyncObject, local: boolean) {
-    // TODO: Reinstate merge function
-    // const otherAttrs = other.attributes;
-    // const keys = (
-    //   Object.keys(otherAttrs) as Array<keyof AirdayItemAttributes>
-    // ).map((key) => {
-    //   if (otherAttrs[key]) {
-    //     if (!this.attributes[key]) {
-    //       this.attributes[key] = otherAttrs[key];
-    //     } else {
-    //       const result = this.attributes[key].merge(otherAttrs[key]);
-    //       // Local change gets overruled
-    //       if (local === false && result.source === "right") {
-    //         this.dirtyAttrs.delete(key);
-    //       }
-    //       this.attributes[key] = result.register;
-    //     }
-    //   }
-    //   return key;
-    // });
     // if (local) {
     //   // Local change gets added to dirty register
     //   keys.map((key) => this.dirtyAttrs.add(key));

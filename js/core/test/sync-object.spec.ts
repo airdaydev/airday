@@ -10,4 +10,8 @@ test("Create, encode & decode sync object", async () => {
   const item = new AirdayItem({
     libraryId: library,
   });
+  item.updateText("hello");
+  item.updateText("again");
+  expect(item.attributes.getById(0)?.data).toBe("again");
+  expect(item.dirtyAttrs.size).toBe(1);
 });
