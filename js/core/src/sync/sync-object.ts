@@ -77,6 +77,7 @@ export abstract class AttributeSet<A extends AttributeSchema> {
   abstract readonly invert: Readonly<NameToId<A>>;
   // Underlying LWWRegisters
   values: ValuesById<A> = {} as any;
+  dirty: Set<number> = new Set();
   // Name based accessors
   getAttr<N extends NameOf<A>>(name: N): ByName<A>[N] | undefined {
     const id: IdForName<A, N> = this.invert[name];
@@ -99,7 +100,7 @@ export abstract class AttributeSet<A extends AttributeSchema> {
     }
   }
   // TODO: Complete implementation
-  mergeAttrSet(other: AttributeSet<A>) {
+  mergeAttrSet(other: AttributeSet<A>, local: boolean) {
     for (const keyStr in other.values) {
       const key = Number(keyStr) as Extract<keyof A, number>;
       const curVal = this.getById(key);
@@ -110,12 +111,11 @@ export abstract class AttributeSet<A extends AttributeSchema> {
         if (!otherVal) throw new Error("val is set but not populated");
         const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
         if (result.source === "right" && local === false) {
-          this.dirtyAttrs.delete(key);
+          this.dirty.delete(key);
         }
-        this.setById(key, result.register);
+        // TODO: Type issue?
+        this.setById(key, result.register as any);
       }
-      // TODO: Figure out dirty attrs!?
-      // TODO: Link to dirty attrs?
     }
   }
   // id based accessors
@@ -255,7 +255,7 @@ const ensureDBSyncObject = compile(DBSyncObjectSchema, {
   ensure: true,
 });
 
-export abstract class SyncObject {
+export abstract class SyncObject<A extends AttributeSchema> {
   abstract readonly objectType: number;
   id: Uuidv4;
   libraryId: Uuidv4;
@@ -264,8 +264,7 @@ export abstract class SyncObject {
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
   serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
-  dirtyAttrs: Set<number> = new Set();
-  abstract attributes: AttributeSet<any>;
+  abstract attributes: AttributeSet<A>;
   constructor(params: SyncObjectParams) {
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
@@ -279,7 +278,7 @@ export abstract class SyncObject {
     }
   }
   // Local = do not add to change register
-  merge(other: SyncObject, local: boolean) {
+  merge(other: SyncObject<A>, local: boolean) {
     // if (local) {
     //   // Local change gets added to dirty register
     //   keys.map((key) => this.dirtyAttrs.add(key));
@@ -287,11 +286,11 @@ export abstract class SyncObject {
     // }
   }
   // Merges & flags local changes
-  applyLocal(attrs: SyncObject) {
+  applyLocal(attrs: SyncObject<A>) {
     // TODO: Type check here?
     this.merge(attrs, true);
   }
-  applyRemote(attrs: SyncObject) {
+  applyRemote(attrs: SyncObject<A>) {
     this.merge(attrs, false);
   }
   startSync() {

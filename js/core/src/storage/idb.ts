@@ -41,7 +41,7 @@ export class AirdayIDB {
       },
     });
   };
-  upsert = async (objects: SyncObject[]) => {
+  upsert = async (objects: SyncObject<any>[]) => {
     const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);
     const b = await store.getAll();
@@ -59,12 +59,12 @@ export class AirdayIDB {
       "libraryId",
       libraryId,
     );
-    const objects: SyncObject[] = [];
+    const objects: SyncObject<any>[] = [];
     res.forEach((row) => {
       try {
         const meta = parseGenericSyncObject(row);
         // TODO: Get attributes & build object
-        objects.push(SyncObject.fromJSON(row));
+        // objects.push(SyncObject());
       } catch (err) {
         console.warn("Could not parse row from db", row, err);
       }

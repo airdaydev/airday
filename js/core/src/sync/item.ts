@@ -34,7 +34,7 @@ class ItemAttributes extends AttributeSet<typeof ITEM_SCHEMA> {
   invert = invertSchema(ITEM_SCHEMA); // TODO: Profile
 }
 
-export class AirdayItem extends SyncObject {
+export class AirdayItem extends SyncObject<typeof ITEM_SCHEMA> {
   readonly objectType = ITEM;
   attributes = new ItemAttributes();
   updateText(text: string) {
@@ -42,6 +42,5 @@ export class AirdayItem extends SyncObject {
       data: text,
     });
     this.attributes.merge(0, newText);
-    this.dirtyAttrs.add("text");
   }
 }
