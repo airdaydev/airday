@@ -1,11 +1,10 @@
 import { LWWRegister } from "../crdt/lww";
 import {
   AttributeSet,
-  AttributeSchema,
-  AttrType,
   SyncObject,
   SyncObjectParams,
-  invertSchema,
+  RegisterMap,
+  KeyMap,
 } from "./sync-object";
 
 export const ITEM = 0;
@@ -14,27 +13,25 @@ export const ItemFieldId = {
   ITEM_TEXT: 0,
 } as const;
 
-export interface AirdayItemAttributes {
+export const ITEM_KEY_MAP = {
+  text: 0,
+  done: 1,
+  count: 2,
+  bigId: 3,
+} as const satisfies KeyMap;
+
+export interface ItemAttrs extends RegisterMap<typeof ITEM_KEY_MAP> {
   text?: LWWRegister<string>;
+  done?: LWWRegister<boolean>;
+  count?: LWWRegister<number>;
+  bigId?: LWWRegister<bigint>;
 }
 
-export interface AirdayItemConstructorOpts extends SyncObjectParams {
-  attributes: AirdayItemAttributes;
+class ItemAttributes extends AttributeSet<typeof ITEM_KEY_MAP> {
+  keyMap = ITEM_KEY_MAP;
 }
 
-export const ITEM_SCHEMA = {
-  0: { name: "text", t: AttrType.string },
-  1: { name: "done", t: AttrType.boolean },
-  2: { name: "count", t: AttrType.number },
-  3: { name: "bigId", t: AttrType.bigint },
-} as const satisfies AttributeSchema;
-
-class ItemAttributes extends AttributeSet<typeof ITEM_SCHEMA> {
-  schema = ITEM_SCHEMA;
-  invert = invertSchema(ITEM_SCHEMA); // TODO: Profile
-}
-
-export class AirdayItem extends SyncObject<typeof ITEM_SCHEMA> {
+export class AirdayItem extends SyncObject<typeof ITEM_KEY_MAP> {
   readonly objectType = ITEM;
   attributes = new ItemAttributes();
   updateText(text: string) {

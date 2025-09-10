@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Front-end fix type issues
+- [] front-end: keep shaped objects, ints only for serialisation
 - [] Typed, dynamic attrs in JS
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests

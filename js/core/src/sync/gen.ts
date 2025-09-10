@@ -4,17 +4,14 @@
 
 import { AirdayContainer, CONTAINER } from "./container";
 import { AirdayItem, ITEM } from "./item";
-import { parseGenericSyncObject } from "./model";
+import { parseGenericSyncObject } from "./sync-object";
 
 // Used for reading from IDB
 function parseTypedSyncObject(json: any): AirdayItem | AirdayContainer {
   const genericObj = parseGenericSyncObject(json);
   if (genericObj.objectType === ITEM) {
     // TODO: Type me
-    const attributes: AirdayItemAttributes = {};
-    if (genericObj.attributes.text) {
-      attributes.text = LWWRegister.fromJSON(genericObj.attributes.text);
-    }
+    const attributes: AirdayItemAttributes;
     return new AirdayItem({
       ...genericObj,
       attributes,

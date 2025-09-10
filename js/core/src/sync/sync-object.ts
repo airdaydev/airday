@@ -11,82 +11,32 @@ export interface SyncObjectParams {
   lastSync?: bigint;
 }
 
-export enum AttrType {
-  string,
-  boolean,
-  number,
-  bigint,
-}
-type AttrSpec<T extends AttrType = AttrType, N extends string = string> = {
-  readonly name: N;
-  readonly t: T;
+export type KeyMap = { readonly [k: string]: number };
+export type RegisterMap<K extends KeyMap> = {
+  [P in keyof K]?: LWWRegister<any>;
 };
-export type AttributeSchema = Record<number, AttrSpec>;
+type IdToName<K extends KeyMap, Id extends K[keyof K]> = {
+  [P in keyof K]: K[P] extends Id ? P : never;
+}[keyof K];
 
-type FieldIdOf<A extends AttributeSchema> = Extract<keyof A, number>;
-type NameOf<A extends AttributeSchema> = {
-  [K in keyof A]: A[K] extends { readonly name: infer N extends string }
-    ? N
-    : never;
-}[keyof A];
+export abstract class AttributeSet<K extends KeyMap> {
+  abstract readonly keyMap: Readonly<K>;
+  values: Partial<RegisterMap<K>> = {};
+  dirty: Set<keyof RegisterMap<K>> = new Set(); // Dirty keys
 
-type TsType<T extends AttrType> = T extends AttrType.string
-  ? LWWRegister<string>
-  : T extends AttrType.boolean
-    ? LWWRegister<boolean>
-    : T extends AttrType.number
-      ? LWWRegister<number>
-      : T extends AttrType.bigint
-        ? LWWRegister<bigint>
-        : never;
-
-type ValuesById<A extends AttributeSchema> = {
-  [F in FieldIdOf<A>]?: A[F] extends { readonly t: infer T extends AttrType }
-    ? TsType<T>
-    : never;
-};
-
-type ByName<A extends AttributeSchema> = {
-  [F in keyof A as A[F] extends { readonly name: infer N extends string }
-    ? N
-    : never]?: A[F] extends { readonly t: infer T extends AttrType }
-    ? TsType<T>
-    : never;
-};
-
-type IdForName<A extends AttributeSchema, N extends NameOf<A>> = {
-  [F in keyof A]: A[F] extends { readonly name: N } ? F : never;
-}[keyof A] &
-  FieldIdOf<A>;
-
-type NameToId<A extends AttributeSchema> = {
-  [N in NameOf<A>]: IdForName<A, N>;
-};
-
-// Build a *trusted* inverse map directly from the schema.
-export function invertSchema<A extends AttributeSchema>(
-  schema: A,
-): NameToId<A> {
-  const m = {} as any;
-  for (const id in schema) m[schema[id as any].name] = Number(id);
-  return m;
-}
-
-export abstract class AttributeSet<A extends AttributeSchema> {
-  abstract readonly schema: Readonly<A>;
-  abstract readonly invert: Readonly<NameToId<A>>;
-  // Underlying LWWRegisters
-  values: ValuesById<A> = {} as any;
-  dirty: Set<number> = new Set();
-  // Name based accessors
-  getAttr<N extends NameOf<A>>(name: N): ByName<A>[N] | undefined {
-    const id: IdForName<A, N> = this.invert[name];
-    return this.values[id] as ByName<A>[N] | undefined;
+  getAttr<N extends keyof K & keyof RegisterMap<K>>(
+    name: N,
+  ): RegisterMap<K>[N] | undefined {
+    return this.values[name] as RegisterMap<K>[N] | undefined;
   }
-  setAttr<N extends NameOf<A>>(name: N, v: ByName<A>[N]) {
-    const id: IdForName<A, N> = this.invert[name];
-    this.values[id] = v as any;
+  setAttr<N extends keyof K & keyof RegisterMap<K>>(
+    name: N,
+    v: RegisterMap<K>[N] | Exclude<RegisterMap<K>[N], undefined>,
+  ) {
+    this.values[name] = v;
+    this.dirty.add(name);
   }
+  // TODO: Fix up from here
   merge<F extends FieldIdOf<A>>(id: F, data: ValuesById<A>[F]) {
     // TODO: Left vs right so we can skip misses?
     const src = this.values[id] as LWWRegister<any> | undefined;
@@ -117,13 +67,6 @@ export abstract class AttributeSet<A extends AttributeSchema> {
         this.setById(key, result.register as any);
       }
     }
-  }
-  // id based accessors
-  getById<F extends FieldIdOf<A>>(id: F) {
-    return this.values[id];
-  }
-  setById<F extends FieldIdOf<A>>(id: F, v: ValuesById<A>[F]) {
-    this.values[id] = v;
   }
   fromFlatBuffer() {
     const as = new AttributeSetProto();
