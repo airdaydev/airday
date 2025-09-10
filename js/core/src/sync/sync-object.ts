@@ -18,6 +18,9 @@ export type RegisterMap<K extends KeyMap> = {
 type IdToName<K extends KeyMap, Id extends K[keyof K]> = {
   [P in keyof K]: K[P] extends Id ? P : never;
 }[keyof K];
+type AssociatedValue<K extends KeyMap, N extends keyof K> =
+  | RegisterMap<K>[N]
+  | Exclude<RegisterMap<K>[N], undefined>;
 
 export abstract class AttributeSet<K extends KeyMap> {
   abstract readonly keyMap: Readonly<K>;
@@ -31,40 +34,40 @@ export abstract class AttributeSet<K extends KeyMap> {
   }
   setAttr<N extends keyof K & keyof RegisterMap<K>>(
     name: N,
-    v: RegisterMap<K>[N] | Exclude<RegisterMap<K>[N], undefined>,
+    v: AssociatedValue<K, N>,
   ) {
     this.values[name] = v;
     this.dirty.add(name);
   }
-  // TODO: Fix up from here
-  merge<F extends FieldIdOf<A>>(id: F, data: ValuesById<A>[F]) {
+  merge<N extends keyof K & keyof RegisterMap<K>>(
+    id: keyof K,
+    data: AssociatedValue<K, N>,
+  ) {
     // TODO: Left vs right so we can skip misses?
     const src = this.values[id] as LWWRegister<any> | undefined;
     if (!data)
       throw new Error("No data found when attempting to merge. Expected LWW.");
     if (!src) {
-      this.setById(id, data);
+      this.setAttr(id, data);
     } else {
       const val = src.merge(data);
-      this.setById(id, val.register as any); // TODO: Fix up types
+      this.setAttr(id, val.register as any); // TODO: Fix up types
     }
   }
   // TODO: Complete implementation
-  mergeAttrSet(other: AttributeSet<A>, local: boolean) {
-    for (const keyStr in other.values) {
-      const key = Number(keyStr) as Extract<keyof A, number>;
-      const curVal = this.getById(key);
+  mergeAttrSet(other: AttributeSet<K>, local: boolean) {
+    for (const key in other.values) {
+      const curVal = this.getAttr(key);
       if (!curVal) {
-        this.setById(key, curVal);
+        this.setAttr(key, curVal);
       } else {
-        const otherVal = other.getById(key);
+        const otherVal = other.getAttr(key);
         if (!otherVal) throw new Error("val is set but not populated");
         const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
         if (result.source === "right" && local === false) {
           this.dirty.delete(key);
         }
-        // TODO: Type issue?
-        this.setById(key, result.register as any);
+        this.setAttr(key, result.register as any);
       }
     }
   }
@@ -77,9 +80,10 @@ export abstract class AttributeSet<K extends KeyMap> {
           // TODO: Correct decoding based on type!
           const lww = this.decodeAttribute(attr);
           const fieldId = attr.fieldId();
-          if (Object.hasOwn(this.schema, fieldId)) {
+          if (Object.hasOwn(this.keyMap, fieldId)) {
             // TODO: Validate?
-            this.setById(fieldId as Extract<keyof A, number>, lww as any);
+            // TODO: Get key by id!
+            // this.setAttr(fieldId as Extract<keyof A, number>, lww as any);
           }
         } catch (err) {
           console.warn("error creating item from flatbuffer", err);
@@ -116,15 +120,15 @@ export abstract class AttributeSet<K extends KeyMap> {
   }
   private decodeAttribute(attr: AttributeProto) {
     const id = attr.valueType();
-    const schema = this.schema[id];
+    const keyMap = this.keyMap[id];
     const rawTimestamp = attr.timestamp();
     if (!rawTimestamp) {
       throw new Error(`No timestamp found while decoding attr!`);
     }
     const timestamp = LWWTimestamp.fromProto(rawTimestamp);
-    if (!schema) throw new Error(`No ${id} on ITEM_SCHEMA`);
+    if (!keyMap) throw new Error(`No ${id} on ITEM_SCHEMA`);
     let data;
-    switch (schema.t) {
+    switch (keyMap.t) {
       case AttrType.string: {
         data = attr.string;
         break;
