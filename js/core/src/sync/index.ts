@@ -70,7 +70,7 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  syncItems(items: SyncObject[]) {
+  syncItems(items: SyncObject<any>[]) {
     // Filter out items currently in sync
     const actions = items
       .filter((item) => {

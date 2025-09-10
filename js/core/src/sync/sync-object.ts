@@ -207,21 +207,21 @@ export abstract class AttributeSet<A extends AttributeSchema> {
       timestamp,
     });
   }
-  setVal(val) {
-    if (typeof val === "string") {
-      this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
-    } else if (typeof val === "boolean") {
-      this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
-    } else if (typeof val === "bigint") {
-      this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
-    } else if (typeof val === "number") {
-      this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
-    } else if (val instanceof Uint8Array) {
-      this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
-    } else {
-      throw new Error(`Unsupported value for ${name}`);
-    }
-  }
+  // setVal(val) {
+  //   if (typeof val === "string") {
+  //     this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
+  //   } else if (typeof val === "boolean") {
+  //     this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
+  //   } else if (typeof val === "bigint") {
+  //     this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
+  //   } else if (typeof val === "number") {
+  //     this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
+  //   } else if (val instanceof Uint8Array) {
+  //     this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
+  //   } else {
+  //     throw new Error(`Unsupported value for ${name}`);
+  //   }
+  // }
 }
 
 // TODO: Delete this in favour of custom-built meta and attributes (split)

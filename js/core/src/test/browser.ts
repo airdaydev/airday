@@ -39,7 +39,7 @@ export const tests = async () => {
     item.updateText("hello");
     item.updateText("again");
     assert(item.attributes.getById(0)?.data === "again");
-    assert(item.dirtyAttrs.size === 1);
+    assert(item.attributes.dirty.size === 1);
 
     // const builder = new Builder();
     // const

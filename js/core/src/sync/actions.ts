@@ -116,16 +116,16 @@ export class SyncStreamReqMessage extends AirdayMessage {
 }
 
 export class SyncObjectAction extends BatchAction {
-  syncObject: SyncObject;
+  syncObject: SyncObject<any>;
   actionProto = ActionProto.SyncObjectActionProto;
-  constructor(syncObject: SyncObject) {
+  constructor(syncObject: SyncObject<any>) {
     super();
     this.syncObject = syncObject;
   }
   // Adds dirty properties only
   addToFlatBuffer(builder: Builder) {
     const attributes: number[] = [];
-    this.syncObject.dirtyAttrs.forEach((fieldId) => {
+    this.syncObject.attributes.dirty.forEach((fieldId) => {
       const offset = this.syncObject.attributes.encodeAttribute(
         builder,
         fieldId,

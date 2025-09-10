@@ -6,7 +6,7 @@ import { SyncObject } from "../sync/sync-object";
 import { AirdayIDB } from "./idb";
 
 interface StorageEventMap {
-  upsert: { objects: SyncObject[] };
+  upsert: { objects: SyncObject<any>[] };
   delete: { ids: string[] };
 }
 
@@ -18,12 +18,12 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   idb = new AirdayIDB();
-  items: Map<string, SyncObject> = new Map(); // hex-id-backed index
+  items: Map<string, SyncObject<any>> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore) {
     this.core = core;
   }
-  async upsertItems(items: SyncObject[]) {
+  async upsertItems(items: SyncObject<any>[]) {
     items.map((item) => {
       this.items.set(item.id.toHex(), item);
     });
