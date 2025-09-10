@@ -39,6 +39,10 @@ export abstract class AttributeSet<K extends KeyMap> {
     this.values[name] = v;
     this.dirty.add(name);
   }
+  private nameOfId(id: number): keyof K {
+    for (const k in this.keyMap) if (this.keyMap[k] === id) return k as keyof K;
+    throw new Error(`Unknown id: ${id}`);
+  }
   merge<N extends keyof K & keyof RegisterMap<K>>(
     id: keyof K,
     data: AssociatedValue<K, N>,
@@ -82,7 +86,14 @@ export abstract class AttributeSet<K extends KeyMap> {
           const fieldId = attr.fieldId();
           if (Object.hasOwn(this.keyMap, fieldId)) {
             // TODO: Validate?
-            // TODO: Get key by id!
+            try {
+              const key = this.nameOfId(fieldId);
+              // TODO: get value! (based on type)
+              this.setAttr(key, value);
+            } catch (err) {
+              // TODO: Alert that an attr was skipped
+              continue;
+            }
             // this.setAttr(fieldId as Extract<keyof A, number>, lww as any);
           }
         } catch (err) {

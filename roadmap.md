@@ -1,7 +1,9 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] front-end: keep shaped objects, ints only for serialisation
+- [] preserve all vals from server (may have new info)! or merkle tree is kapoot, SO the key here is that we need our persistent storage layer to be even more agnostic re. shape of object. The "shape" is literally just meta + Record<number, LWWRegister<any>> but as a binary. The question is when to materialise these as typed objects
+- [] clear separation of materialised objects from sync objects
+- [] consider zero-knowledge server
 - [] Typed, dynamic attrs in JS
 - [] generate typescript type ints from Rust
 - [] concurrent merge tests
