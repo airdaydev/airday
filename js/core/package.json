@@ -13,12 +13,13 @@
     "build_run_fe_test_server": "pnpm run build && pnpm run fe_test_server",
     "test_only": "bun playwright test",
     "test": "pnpm run -w serverd && bun run build && bun playwright test",
+    "sync_tests": "pnpm run build && bun playwright test test/sync.spec.ts",
     "tsc": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist"
   },
   "devDependencies": {
-    "@playwright/test": "1.54.1",
+    "@playwright/test": "1.55.0",
     "bun-plugin-dts": "0.3.0",
-    "playwright": "1.54.1",
+    "playwright": "1.55.0",
     "typescript": "5.8.3"
   },
   "dependencies": {

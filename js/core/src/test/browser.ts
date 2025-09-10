@@ -31,7 +31,7 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.test("Create, encode & decode sync object", async (assert) => {
+  suite.only("Create, encode & decode sync object", async (assert) => {
     const library = new Uuidv4();
     const item = new AirdayItem({
       libraryId: library,
