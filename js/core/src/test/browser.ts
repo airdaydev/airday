@@ -31,15 +31,15 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.only("Create, encode & decode sync object", async (assert) => {
+  suite.only("Create, encode & decode sync object", async (ctx) => {
     const library = new Uuidv4();
     const item = new AirdayItem({
       libraryId: library,
     });
     item.updateText("hello");
     item.updateText("again");
-    assert(item.attributes.getById(0)?.data === "again");
-    assert(item.attributes.dirty.size === 1);
+    ctx.assertEq(item.attributes.getById(0)?.data, "again");
+    ctx.assertEq(item.attributes.dirty.size, 1);
 
     // const builder = new Builder();
     // const

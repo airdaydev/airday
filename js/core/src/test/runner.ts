@@ -13,26 +13,30 @@ export interface TestSuite {
   total: number;
 }
 
-type Assert = (condition: boolean, message?: string) => void;
+export interface TestContext {
+  assertions: number;
+  assert: (condition: boolean, message?: string) => void;
+  assertEq: <T>(actual: T, expected: T, message?: string) => void;
+}
 
 export class BrowserRunner {
   skipped = 0;
   private tests: Array<{
     name: string;
     only?: boolean;
-    fn: (assert: Assert) => void | Promise<void>;
+    fn: (ctx: TestContext) => void | Promise<void>;
   }> = [];
 
-  test(name: string, fn: (assert: Assert) => void | Promise<void>) {
+  test(name: string, fn: (ctx: TestContext) => void | Promise<void>) {
     this.tests.push({ name, fn });
   }
 
-  skip(name: string, fn: (assert: Assert) => void | Promise<void>) {
+  skip(name: string, fn: (ctx: TestContext) => void | Promise<void>) {
     log(`skipping test ${name}`);
     this.skipped++;
   }
 
-  only(name: string, fn: (assert: Assert) => void | Promise<void>) {
+  only(name: string, fn: (ctx: TestContext) => void | Promise<void>) {
     this.tests.push({ name, fn, only: true });
   }
 
@@ -50,10 +54,9 @@ export class BrowserRunner {
 
     for (const { name, fn } of tests) {
       console.log(`running test: ${name}`, fn);
-      let ctx = { assertions: 0 };
-      let assert = assertWrap(ctx);
+      let ctx = createTestContext();
       try {
-        await fn(assert);
+        await fn(ctx);
         results.push({ name, assertions: ctx.assertions, passed: true });
       } catch (error) {
         results.push({
@@ -82,12 +85,28 @@ export class BrowserRunner {
   }
 }
 
-export function assertWrap(ctx: { assertions: number }) {
-  return (condition: boolean, message = "Assertion failed") => {
+export function createTestContext(): TestContext {
+  const ctx = { assertions: 0 };
+  
+  const assert = (condition: boolean, message = "Assertion failed") => {
     if (!condition) {
       throw new Error(message);
     }
     ctx.assertions++;
+  };
+
+  const assertEq = <T>(actual: T, expected: T, message?: string) => {
+    const defaultMessage = `Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+    if (actual !== expected) {
+      throw new Error(message || defaultMessage);
+    }
+    ctx.assertions++;
+  };
+
+  return {
+    get assertions() { return ctx.assertions; },
+    assert,
+    assertEq
   };
 }
 
