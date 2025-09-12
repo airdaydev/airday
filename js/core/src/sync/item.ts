@@ -27,12 +27,15 @@ export interface ItemAttrs extends RegisterMap<typeof ITEM_KEY_MAP> {
   bigId?: LWWRegister<bigint>;
 }
 
-class ItemAttributes extends AttributeSet<typeof ITEM_KEY_MAP> {
+class ItemAttributesCodec {
   keyMap = ITEM_KEY_MAP;
+  // takes name translates to number
+  // takes number translates to name
+  // runs validation in... both directions?
 }
 
 export class AirdayItem {
-  attributes = new ItemAttributes();
+  attributes = new ItemAttributesCodec();
   updateText(text: string) {
     const newText = new LWWRegister({
       data: text,
@@ -40,3 +43,14 @@ export class AirdayItem {
     this.attributes.merge(0, newText);
   }
 }
+
+// getAttr(name: N): RegisterMap<K>[N] | undefined {
+//   return this.values[name] as RegisterMap<K>[N] | undefined;
+// }
+// setAttr<N extends keyof K & keyof RegisterMap<K>>(
+//   name: N,
+//   v: AssociatedValue<K, N>,
+// ) {
+//   this.values[name] = v;
+//   this.dirty.add(name);
+// }
