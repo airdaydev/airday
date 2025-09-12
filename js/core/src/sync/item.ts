@@ -31,8 +31,7 @@ class ItemAttributes extends AttributeSet<typeof ITEM_KEY_MAP> {
   keyMap = ITEM_KEY_MAP;
 }
 
-export class AirdayItem extends SyncObject<typeof ITEM_KEY_MAP> {
-  readonly objectType = ITEM;
+export class AirdayItem {
   attributes = new ItemAttributes();
   updateText(text: string) {
     const newText = new LWWRegister({

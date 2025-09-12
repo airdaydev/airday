@@ -4,13 +4,6 @@ import { compile, v, type TypeOf } from "suretype";
 import { Builder } from "flatbuffers";
 import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
 
-export interface SyncObjectParams {
-  id?: Uuidv4;
-  libraryId: Uuidv4;
-  lastModified?: bigint;
-  lastSync?: bigint;
-}
-
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
   [P in keyof K]?: LWWRegister<any>;
@@ -22,56 +15,30 @@ type AssociatedValue<K extends KeyMap, N extends keyof K> =
   | RegisterMap<K>[N]
   | Exclude<RegisterMap<K>[N], undefined>;
 
-export abstract class AttributeSet<K extends KeyMap> {
-  abstract readonly keyMap: Readonly<K>;
-  values: Partial<RegisterMap<K>> = {};
-  dirty: Set<keyof RegisterMap<K>> = new Set(); // Dirty keys
+// <K extends KeyMap>
 
-  getAttr<N extends keyof K & keyof RegisterMap<K>>(
-    name: N,
-  ): RegisterMap<K>[N] | undefined {
-    return this.values[name] as RegisterMap<K>[N] | undefined;
-  }
-  setAttr<N extends keyof K & keyof RegisterMap<K>>(
-    name: N,
-    v: AssociatedValue<K, N>,
-  ) {
-    this.values[name] = v;
-    this.dirty.add(name);
-  }
-  private nameOfId(id: number): keyof K {
-    for (const k in this.keyMap) if (this.keyMap[k] === id) return k as keyof K;
-    throw new Error(`Unknown id: ${id}`);
-  }
-  merge<N extends keyof K & keyof RegisterMap<K>>(
-    id: keyof K,
-    data: AssociatedValue<K, N>,
-  ) {
-    // TODO: Left vs right so we can skip misses?
-    const src = this.values[id] as LWWRegister<any> | undefined;
-    if (!data)
-      throw new Error("No data found when attempting to merge. Expected LWW.");
-    if (!src) {
-      this.setAttr(id, data);
-    } else {
-      const val = src.merge(data);
-      this.setAttr(id, val.register as any); // TODO: Fix up types
-    }
-  }
+export type NumericAttrMap = { [k: number]: LWWRegister<any> };
+
+// All variants
+export class AttributeSet {
+  raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
+  values: NumericAttrMap = {};
+  dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
+
   // TODO: Complete implementation
-  mergeAttrSet(other: AttributeSet<K>, local: boolean) {
+  merge(other: AttributeSet, local: boolean) {
     for (const key in other.values) {
-      const curVal = this.getAttr(key);
+      const curVal = this.values[key];
       if (!curVal) {
-        this.setAttr(key, curVal);
+        this.values[key] = curVal;
       } else {
-        const otherVal = other.getAttr(key);
+        const otherVal = other.values[key];
         if (!otherVal) throw new Error("val is set but not populated");
         const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
         if (result.source === "right" && local === false) {
           this.dirty.delete(key);
         }
-        this.setAttr(key, result.register as any);
+        this.values[key] = result.register;
       }
     }
   }
@@ -80,31 +47,75 @@ export abstract class AttributeSet<K extends KeyMap> {
     for (let i = 0; i <= as.attributesLength(); i++) {
       const attr = as.attributes(i);
       if (attr) {
+        const fieldId = attr.fieldId();
         try {
-          // TODO: Correct decoding based on type!
-          const lww = this.decodeAttribute(attr);
-          const fieldId = attr.fieldId();
-          if (Object.hasOwn(this.keyMap, fieldId)) {
-            // TODO: Validate?
-            try {
-              const key = this.nameOfId(fieldId);
-              // TODO: get value! (based on type)
-              this.setAttr(key, value);
-            } catch (err) {
-              // TODO: Alert that an attr was skipped
-              continue;
-            }
-            // this.setAttr(fieldId as Extract<keyof A, number>, lww as any);
-          }
+          const decodedAttr = this.decodeAttribute(attr);
+          this.values[fieldId] = decodedAttr;
         } catch (err) {
           console.warn("error creating item from flatbuffer", err);
         }
       }
     }
-    return; // a named, live attribute set
+    // TODO: Should we make this a static method?
+    return;
   }
-  encodeAttribute<F extends FieldIdOf<A>>(builder: Builder, fieldId: F) {
-    const field = this.getById(fieldId);
+  private decodeAttribute(attr: AttributeProto) {
+    const id = attr.fieldId();
+    const type = attr.valueType();
+    const rawTimestamp = attr.timestamp();
+    if (!rawTimestamp) {
+      throw new Error(`No timestamp found while decoding attr!`);
+    }
+    const timestamp = LWWTimestamp.fromProto(rawTimestamp);
+    let data;
+    switch (type) {
+      case AttrTypeProto.BOOL: {
+        data = attr.string;
+        break;
+      }
+      case AttrTypeProto.STRING: {
+        data = attr.bool;
+        break;
+      }
+      case AttrTypeProto.I64: {
+        data = attr.f64Fb;
+        break;
+      }
+      case AttrTypeProto.F64: {
+        data = attr.i64Fb;
+        break;
+      }
+      case AttrTypeProto.BYTES: {
+        data = attr.i64Fb;
+        break;
+      }
+      default: {
+        throw new Error(`Unknown type - cannot decode`);
+      }
+    }
+    return new LWWRegister({
+      data,
+      timestamp,
+    });
+  }
+  // @dirtyOnly: Serialise only dirty attributes to flatbuffer (for efficient sync)
+  toFlatBuffer(builder: Builder, dirtyOnly: boolean = false) {
+    const attributes: number[] = [];
+    if (!this.dirty.size) {
+      // TODO: Figure out usage patterns
+      throw new Error("no dirty attributes to send");
+    }
+    for (let key of Object.keys(this.values)) {
+      if (dirtyOnly && !this.dirty.has(key)) {
+        // Skip non-dirty key
+        continue;
+      }
+      // TODO: careful translating direct
+      const offset = this.encodeAttribute(builder, Number(key));
+    }
+  }
+  encodeAttribute(builder: Builder, fieldId: number) {
+    const field = this.values[fieldId];
     if (!field) {
       console.warn(`Could not find field ${fieldId} to encode`);
       return false;
@@ -128,42 +139,6 @@ export abstract class AttributeSet<K extends KeyMap> {
       AttributeProto.addString(builder, dataOffset);
     }
     return AttributeProto.endAttributeProto(builder);
-  }
-  private decodeAttribute(attr: AttributeProto) {
-    const id = attr.valueType();
-    const keyMap = this.keyMap[id];
-    const rawTimestamp = attr.timestamp();
-    if (!rawTimestamp) {
-      throw new Error(`No timestamp found while decoding attr!`);
-    }
-    const timestamp = LWWTimestamp.fromProto(rawTimestamp);
-    if (!keyMap) throw new Error(`No ${id} on ITEM_SCHEMA`);
-    let data;
-    switch (keyMap.t) {
-      case AttrType.string: {
-        data = attr.string;
-        break;
-      }
-      case AttrType.boolean: {
-        data = attr.bool;
-        break;
-      }
-      case AttrType.number: {
-        data = attr.f64Fb;
-        break;
-      }
-      case AttrType.bigint: {
-        data = attr.i64Fb;
-        break;
-      }
-      default: {
-        console.warn("not found");
-      }
-    }
-    return new LWWRegister({
-      data,
-      timestamp,
-    });
   }
   // setVal(val) {
   //   if (typeof val === "string") {
@@ -213,8 +188,16 @@ const ensureDBSyncObject = compile(DBSyncObjectSchema, {
   ensure: true,
 });
 
-export abstract class SyncObject<A extends AttributeSchema> {
-  abstract readonly objectType: number;
+export interface SyncObjectParams {
+  id?: Uuidv4;
+  libraryId: Uuidv4;
+  lastModified?: bigint;
+  lastSync?: bigint;
+  objectType: number;
+}
+
+export class SyncObject {
+  readonly objectType: number;
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
@@ -222,8 +205,9 @@ export abstract class SyncObject<A extends AttributeSchema> {
   lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
   lastModified: bigint; // Local time of last local modification (incl. time of first pull)
   serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
-  abstract attributes: AttributeSet<A>;
+  attributes: AttributeSet = new AttributeSet();
   constructor(params: SyncObjectParams) {
+    this.objectType = params.objectType;
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
     if (params.lastModified) {
