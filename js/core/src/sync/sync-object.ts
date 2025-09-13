@@ -22,17 +22,52 @@ type AssociatedValue<K extends KeyMap, N extends keyof K> =
 
 // <K extends KeyMap>
 
-export type NumericAttrMap = { [k: number]: LWWRegister<any> };
+// str representation of a (hopefully) int
+export type NumericAttrMap = { [k: string]: LWWRegister<any> };
+export type Change = [id: string, reg?: LWWRegister<any>];
+type Listener = (reg: Change) => void;
 
 // All variants
 export class AttributeSet {
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   values: NumericAttrMap = {};
   dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
+  // Reactivity
+  private subs = new Set<Listener>();
+  private pending = new Map<string, LWWRegister<any> | undefined>();
+  private scheduled = false;
+
+  subscribe(cb: Listener): () => void {
+    this.subs.add(cb);
+    return () => this.subs.delete(cb);
+  }
+
+  private notify(val: any) {
+    for (const cb of this.subs.values()) {
+      cb(val);
+    }
+  }
+
+  private markChanged(id: string, reg?: LWWRegister<any>) {
+    this.pending.set(id, reg);
+    if (!this.scheduled) {
+      this.scheduled = true;
+      queueMicrotask(() => {
+        this.scheduled = false;
+        if (!this.pending.size) return;
+        const out: Change[] = [];
+        for (const [id, reg] of this.pending) {
+          out.push([id, reg]);
+        }
+        this.pending.clear();
+        this.notify(out);
+      });
+    }
+  }
 
   // TODO: Complete implementation
   merge(other: AttributeSet, local: boolean) {
-    for (const key in other.values) {
+    for (const key of Object.keys(other.values)) {
       const curVal = this.values[key];
       if (!curVal) {
         this.values[key] = curVal;
@@ -44,6 +79,7 @@ export class AttributeSet {
           this.dirty.delete(key);
         }
         this.values[key] = result.register;
+        this.markChanged(key, result.register);
       }
     }
   }
@@ -74,23 +110,23 @@ export class AttributeSet {
     let data;
     switch (type) {
       case AttrTypeProto.BOOL: {
-        data = attr.string;
+        data = attr.string();
         break;
       }
       case AttrTypeProto.STRING: {
-        data = attr.bool;
+        data = attr.bool();
         break;
       }
       case AttrTypeProto.I64: {
-        data = attr.f64Fb;
+        data = attr.f64Fb();
         break;
       }
       case AttrTypeProto.F64: {
-        data = attr.i64Fb;
+        data = attr.i64Fb();
         break;
       }
       case AttrTypeProto.BYTES: {
-        data = attr.i64Fb;
+        data = attr.i64Fb();
         break;
       }
       default: {

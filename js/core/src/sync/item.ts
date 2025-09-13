@@ -5,6 +5,7 @@ import {
   SyncObjectParams,
   RegisterMap,
   KeyMap,
+  Change,
 } from "./sync-object";
 
 export const ITEM = 0;
@@ -35,22 +36,20 @@ class ItemAttributesCodec {
 }
 
 export class AirdayItem {
-  attributes = new ItemAttributesCodec();
+  syncObject: SyncObject;
+  // TODO: create signal
+  constructor(syncObject: SyncObject) {
+    this.syncObject = syncObject;
+    this.syncObject.attributes.subscribe(this.react);
+  }
+  react(change: Change) {
+    // TODO: Map each change to update correct signal
+  }
   updateText(text: string) {
+    // TODO: The merge needs to be monotonic from the last seen timestamp, not just the last generated
     const newText = new LWWRegister({
       data: text,
     });
-    this.attributes.merge(0, newText);
+    // this.attributes.merge(0, newText);
   }
 }
-
-// getAttr(name: N): RegisterMap<K>[N] | undefined {
-//   return this.values[name] as RegisterMap<K>[N] | undefined;
-// }
-// setAttr<N extends keyof K & keyof RegisterMap<K>>(
-//   name: N,
-//   v: AssociatedValue<K, N>,
-// ) {
-//   this.values[name] = v;
-//   this.dirty.add(name);
-// }
