@@ -13,22 +13,23 @@ export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
   [P in keyof K]?: LWWRegister<any>;
 };
-type IdToName<K extends KeyMap, Id extends K[keyof K]> = {
-  [P in keyof K]: K[P] extends Id ? P : never;
-}[keyof K];
-type AssociatedValue<K extends KeyMap, N extends keyof K> =
-  | RegisterMap<K>[N]
-  | Exclude<RegisterMap<K>[N], undefined>;
 
-// <K extends KeyMap>
-
-// str representation of a (hopefully) int
+// n.b. keys arrive as ints but internally we use strs to avoid constant type changes
 export type NumericAttrMap = { [k: string]: LWWRegister<any> };
 export type Change = [id: string, reg?: LWWRegister<any>];
 type Listener = (reg: Change) => void;
 
 // All variants
-export class AttributeSet {
+export class SyncObject {
+  readonly objectType: number;
+  id: Uuidv4;
+  libraryId: Uuidv4;
+  // Sync state concerns
+  syncStarted: bigint | null = null; // Local time of flight sync req
+  lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
+  lastModified: bigint; // Local time of last local modification (incl. time of first pull)
+  serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
+  //
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   values: NumericAttrMap = {};
   dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
@@ -36,6 +37,20 @@ export class AttributeSet {
   private subs = new Set<Listener>();
   private pending = new Map<string, LWWRegister<any> | undefined>();
   private scheduled = false;
+
+  constructor(params: SyncObjectParams) {
+    this.objectType = params.objectType;
+    this.id = params.id || new Uuidv4();
+    this.libraryId = params.libraryId;
+    if (params.lastModified) {
+      this.lastModified = params.lastModified;
+    } else {
+      this.lastModified = globalTSProducer.timestamp().utc;
+    }
+    if (params.lastSync) {
+      this.lastSync = params.lastSync;
+    }
+  }
 
   subscribe(cb: Listener): () => void {
     this.subs.add(cb);
@@ -65,8 +80,39 @@ export class AttributeSet {
     }
   }
 
+  applyLocal(attrs: SyncObject) {
+    // TODO: Type check here?
+    this.merge(attrs, true);
+  }
+  applyRemote(attrs: SyncObject) {
+    this.merge(attrs, false);
+  }
+  startSync() {
+    this.syncStarted = globalTSProducer.timestamp().utc;
+  }
+  endSync() {
+    this.lastSync = this.syncStarted;
+    this.syncStarted = null;
+  }
+  isSynced() {
+    if (!this.lastSync) return false;
+    return this.lastSync >= this.lastModified;
+  }
+  toDB(): DBSyncObject {
+    const attributes = {};
+    return {
+      id: this.id.toHex(),
+      objectType: this.objectType,
+      libraryId: this.libraryId.toHex(),
+      serverSeq: this.serverSeq,
+      lastSync: this.lastSync,
+      lastModified: this.lastModified,
+      attributes,
+    };
+  }
+
   // TODO: Complete implementation
-  merge(other: AttributeSet, local: boolean) {
+  merge(other: SyncObject, local: boolean) {
     for (const key of Object.keys(other.values)) {
       const curVal = this.values[key];
       if (!curVal) {
@@ -247,68 +293,4 @@ export interface SyncObjectParams {
   lastModified?: bigint;
   lastSync?: bigint;
   objectType: number;
-}
-
-export class SyncObject {
-  readonly objectType: number;
-  id: Uuidv4;
-  libraryId: Uuidv4;
-  // Sync state concerns
-  syncStarted: bigint | null = null; // Local time of flight sync req
-  lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
-  lastModified: bigint; // Local time of last local modification (incl. time of first pull)
-  serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
-  attributes: AttributeSet = new AttributeSet();
-  constructor(params: SyncObjectParams) {
-    this.objectType = params.objectType;
-    this.id = params.id || new Uuidv4();
-    this.libraryId = params.libraryId;
-    if (params.lastModified) {
-      this.lastModified = params.lastModified;
-    } else {
-      this.lastModified = globalTSProducer.timestamp().utc;
-    }
-    if (params.lastSync) {
-      this.lastSync = params.lastSync;
-    }
-  }
-  // Local = do not add to change register
-  merge(other: SyncObject, local: boolean) {
-    // if (local) {
-    //   // Local change gets added to dirty register
-    //   keys.map((key) => this.dirtyAttrs.add(key));
-    //   this.lastModified = globalTSProducer.timestamp().utc;
-    // }
-  }
-  // Merges & flags local changes
-  applyLocal(attrs: SyncObject) {
-    // TODO: Type check here?
-    this.merge(attrs, true);
-  }
-  applyRemote(attrs: SyncObject) {
-    this.merge(attrs, false);
-  }
-  startSync() {
-    this.syncStarted = globalTSProducer.timestamp().utc;
-  }
-  endSync() {
-    this.lastSync = this.syncStarted;
-    this.syncStarted = null;
-  }
-  isSynced() {
-    if (!this.lastSync) return false;
-    return this.lastSync >= this.lastModified;
-  }
-  toDB(): DBSyncObject {
-    const attributes = {};
-    return {
-      id: this.id.toHex(),
-      objectType: this.objectType,
-      libraryId: this.libraryId.toHex(),
-      serverSeq: this.serverSeq,
-      lastSync: this.lastSync,
-      lastModified: this.lastModified,
-      attributes,
-    };
-  }
 }

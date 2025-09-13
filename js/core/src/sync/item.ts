@@ -1,12 +1,5 @@
 import { LWWRegister } from "../crdt/lww";
-import {
-  AttributeSet,
-  SyncObject,
-  SyncObjectParams,
-  RegisterMap,
-  KeyMap,
-  Change,
-} from "./sync-object";
+import { SyncObject, RegisterMap, KeyMap, Change } from "./sync-object";
 
 export const ITEM = 0;
 
@@ -40,7 +33,7 @@ export class AirdayItem {
   // TODO: create signal
   constructor(syncObject: SyncObject) {
     this.syncObject = syncObject;
-    this.syncObject.attributes.subscribe(this.react);
+    this.syncObject.subscribe(this.react);
   }
   react(change: Change) {
     // TODO: Map each change to update correct signal
