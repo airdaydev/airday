@@ -116,27 +116,14 @@ export class SyncStreamReqMessage extends AirdayMessage {
 }
 
 export class SyncObjectAction extends BatchAction {
-  syncObject: SyncObject<any>;
+  syncObject: SyncObject;
   actionProto = ActionProto.SyncObjectActionProto;
-  constructor(syncObject: SyncObject<any>) {
+  constructor(syncObject: SyncObject) {
     super();
     this.syncObject = syncObject;
   }
-  // Adds dirty properties only
   addToFlatBuffer(builder: Builder) {
-    const attributes: number[] = [];
-    this.syncObject.attributes.dirty.forEach((fieldId) => {
-      const offset = this.syncObject.attributes.encodeAttribute(
-        builder,
-        fieldId,
-      );
-      if (typeof offset === "number") attributes.push(offset);
-    });
-    const attributesVector = SyncObjectActionProto.createAttributesVector(
-      builder,
-      attributes,
-    );
-
+    const vectorOffset = this.syncObject.attributes.toFlatBuffer(builder, true);
     SyncObjectActionProto.startSyncObjectActionProto(builder);
     SyncObjectActionProto.addObjType(builder, this.syncObject.objectType);
     SyncObjectActionProto.addId(
@@ -150,7 +137,7 @@ export class SyncObjectAction extends BatchAction {
         this.syncObject.libraryId.toUUIDProto(),
       ),
     );
-    SyncObjectActionProto.addAttributes(builder, attributesVector);
+    SyncObjectActionProto.addAttributes(builder, vectorOffset);
     const actionOffset =
       SyncObjectActionProto.endSyncObjectActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);

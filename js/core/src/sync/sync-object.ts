@@ -2,7 +2,12 @@ import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder } from "flatbuffers";
-import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
+import {
+  AttributeProto,
+  AttributeSetProto,
+  AttrTypeProto,
+  SyncObjectActionProto,
+} from "../proto";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
@@ -60,7 +65,6 @@ export class AttributeSet {
     return;
   }
   private decodeAttribute(attr: AttributeProto) {
-    const id = attr.fieldId();
     const type = attr.valueType();
     const rawTimestamp = attr.timestamp();
     if (!rawTimestamp) {
@@ -101,8 +105,8 @@ export class AttributeSet {
   // @dirtyOnly: Serialise only dirty attributes to flatbuffer (for efficient sync)
   toFlatBuffer(builder: Builder, dirtyOnly: boolean = false) {
     const attributes: number[] = [];
-    if (!this.dirty.size) {
-      // TODO: Figure out usage patterns
+    if (dirtyOnly && !this.dirty.size) {
+      // TODO: Figure out usage patterns to determine if an error is appropriate
       throw new Error("no dirty attributes to send");
     }
     for (let key of Object.keys(this.values)) {
@@ -112,7 +116,15 @@ export class AttributeSet {
       }
       // TODO: careful translating direct
       const offset = this.encodeAttribute(builder, Number(key));
+      if (offset) {
+        attributes.push(offset);
+      }
     }
+    const vectorOffset = SyncObjectActionProto.createAttributesVector(
+      builder,
+      attributes,
+    );
+    return vectorOffset;
   }
   encodeAttribute(builder: Builder, fieldId: number) {
     const field = this.values[fieldId];
@@ -120,41 +132,46 @@ export class AttributeSet {
       console.warn(`Could not find field ${fieldId} to encode`);
       return false;
     }
-    console.log(field.data);
-    let dataOffset;
-    // TODO: Better typing
-    if (typeof field.data === "string") {
-      // TODO: If non-scalar type
-      dataOffset = builder.createString(field.data);
+    let strOffset;
+    let valueType;
+    switch (typeof field.data) {
+      case "string": {
+        valueType = AttrTypeProto.STRING;
+        strOffset = builder.createString(field.data);
+        break;
+      }
+      case "boolean": {
+        valueType = AttrTypeProto.BOOL;
+        break;
+      }
+      case "number": {
+        valueType = AttrTypeProto.F64;
+        break;
+      }
+      default: {
+        console.warn(`unable to encode type=${typeof field.data}`);
+        return false;
+      }
     }
     AttributeProto.startAttributeProto(builder);
     AttributeProto.addFieldId(builder, fieldId);
-    AttributeProto.addValueType(builder, AttrTypeProto.STRING);
+    AttributeProto.addValueType(builder, valueType);
     AttributeProto.addTimestamp(
       builder,
-      field?.timestamp.addToFlatBuffer(builder),
+      field.timestamp.addToFlatBuffer(builder),
     );
-    if (dataOffset) {
-      // TODO: Correct type
-      AttributeProto.addString(builder, dataOffset);
+    if (strOffset) {
+      AttributeProto.addString(builder, strOffset);
+    }
+    // TODO: Double type check...?
+    if (valueType === AttrTypeProto.F64 && typeof field.data === "number") {
+      AttributeProto.addF64Fb(builder, field.data);
+    }
+    if (valueType === AttrTypeProto.BOOL && typeof field.data === "boolean") {
+      AttributeProto.addBool(builder, field.data);
     }
     return AttributeProto.endAttributeProto(builder);
   }
-  // setVal(val) {
-  //   if (typeof val === "string") {
-  //     this.putById(id, { t: T.STRING, str: val, ts: nowLww() });
-  //   } else if (typeof val === "boolean") {
-  //     this.putById(id, { t: T.BOOL_FB, bool: val, ts: nowLww() });
-  //   } else if (typeof val === "bigint") {
-  //     this.putById(id, { t: T.I64_FB, i64: val, ts: nowLww() });
-  //   } else if (typeof val === "number") {
-  //     this.putById(id, { t: T.F64_FB, f64: val, ts: nowLww() });
-  //   } else if (val instanceof Uint8Array) {
-  //     this.putById(id, { t: T.BYTES, bytes: val, ts: nowLww() });
-  //   } else {
-  //     throw new Error(`Unsupported value for ${name}`);
-  //   }
-  // }
 }
 
 // TODO: Delete this in favour of custom-built meta and attributes (split)
@@ -220,7 +237,7 @@ export class SyncObject {
     }
   }
   // Local = do not add to change register
-  merge(other: SyncObject<A>, local: boolean) {
+  merge(other: SyncObject, local: boolean) {
     // if (local) {
     //   // Local change gets added to dirty register
     //   keys.map((key) => this.dirtyAttrs.add(key));
@@ -228,11 +245,11 @@ export class SyncObject {
     // }
   }
   // Merges & flags local changes
-  applyLocal(attrs: SyncObject<A>) {
+  applyLocal(attrs: SyncObject) {
     // TODO: Type check here?
     this.merge(attrs, true);
   }
-  applyRemote(attrs: SyncObject<A>) {
+  applyRemote(attrs: SyncObject) {
     this.merge(attrs, false);
   }
   startSync() {
