@@ -136,8 +136,8 @@ export class SyncObject {
       if (attr) {
         const fieldId = attr.fieldId();
         try {
-          const decodedAttr = this.decodeAttribute(attr);
-          this.values[fieldId] = decodedAttr;
+          const deserialised = this.deserialiseAttr(attr);
+          this.values[fieldId] = deserialised;
         } catch (err) {
           console.warn("error creating item from flatbuffer", err);
         }
@@ -146,11 +146,11 @@ export class SyncObject {
     // TODO: Should we make this a static method?
     return;
   }
-  private decodeAttribute(attr: AttributeProto) {
+  private deserialiseAttr(attr: AttributeProto) {
     const type = attr.valueType();
     const rawTimestamp = attr.timestamp();
     if (!rawTimestamp) {
-      throw new Error(`No timestamp found while decoding attr!`);
+      throw new Error(`No timestamp found while deserialising attr!`);
     }
     const timestamp = LWWTimestamp.fromProto(rawTimestamp);
     let data;
@@ -176,7 +176,7 @@ export class SyncObject {
         break;
       }
       default: {
-        throw new Error(`Unknown type - cannot decode`);
+        throw new Error(`Unknown type - cannot deserialise`);
       }
     }
     return new LWWRegister({
@@ -197,7 +197,7 @@ export class SyncObject {
         continue;
       }
       // TODO: careful translating direct
-      const offset = this.encodeAttribute(builder, Number(key));
+      const offset = this.serialiseAttr(builder, Number(key));
       if (offset) {
         attributes.push(offset);
       }
@@ -208,10 +208,10 @@ export class SyncObject {
     );
     return vectorOffset;
   }
-  encodeAttribute(builder: Builder, fieldId: number) {
+  serialiseAttr(builder: Builder, fieldId: number) {
     const field = this.values[fieldId];
     if (!field) {
-      console.warn(`Could not find field ${fieldId} to encode`);
+      console.warn(`Could not find field ${fieldId} to serialise`);
       return false;
     }
     let strOffset;
@@ -231,7 +231,7 @@ export class SyncObject {
         break;
       }
       default: {
-        console.warn(`unable to encode type=${typeof field.data}`);
+        console.warn(`unable to deserialise type=${typeof field.data}`);
         return false;
       }
     }

@@ -34,9 +34,11 @@ export class AirdayItem {
   constructor(syncObject: SyncObject) {
     this.syncObject = syncObject;
     this.syncObject.subscribe(this.react);
+    // Initial population
   }
   react(change: Change) {
     // TODO: Map each change to update correct signal
+    // i.e. decode & react
   }
   updateText(text: string) {
     // TODO: The merge needs to be monotonic from the last seen timestamp, not just the last generated
