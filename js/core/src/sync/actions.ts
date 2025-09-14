@@ -123,7 +123,7 @@ export class SyncObjectAction extends BatchAction {
     this.syncObject = syncObject;
   }
   addToFlatBuffer(builder: Builder) {
-    const vectorOffset = this.syncObject.attributes.toFlatBuffer(builder, true);
+    const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
     SyncObjectActionProto.startSyncObjectActionProto(builder);
     SyncObjectActionProto.addObjType(builder, this.syncObject.objectType);
     SyncObjectActionProto.addId(

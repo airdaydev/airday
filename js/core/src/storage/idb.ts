@@ -41,7 +41,7 @@ export class AirdayIDB {
       },
     });
   };
-  upsert = async (objects: SyncObject<any>[]) => {
+  upsert = async (objects: SyncObject[]) => {
     const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);
     const b = await store.getAll();
@@ -59,7 +59,7 @@ export class AirdayIDB {
       "libraryId",
       libraryId,
     );
-    const objects: SyncObject<any>[] = [];
+    const objects: SyncObject[] = [];
     res.forEach((row) => {
       try {
         const meta = parseGenericSyncObject(row);

@@ -45,7 +45,7 @@ table SyncObjectActionProto {
   obj_type: short;
   library_id: UuidProto (required);
   id: UuidProto (required);
-  attributes: [AttributeProto];
+  attributes: AttributeSetProto;
   tombstone: long;
 }
 

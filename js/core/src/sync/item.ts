@@ -49,7 +49,7 @@ export class AirdayItem {
   get libraryId() {
     return this.syncObject.libraryId;
   }
-  get text() {
+  get text(): Accessor<string> {
     return this.$text[0];
   }
   // TODO: This may not be necessary with initial population

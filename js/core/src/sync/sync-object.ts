@@ -1,7 +1,7 @@
 import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
-import { Builder } from "flatbuffers";
+import { Builder, ByteBuffer } from "flatbuffers";
 import {
   AttributeProto,
   AttributeSetProto,
@@ -99,6 +99,7 @@ export class SyncObject {
     return this.lastSync >= this.lastModified;
   }
   toDB(): DBSyncObject {
+    // Create attribute flatbuffer blob
     const attributes = {};
     return {
       id: this.id.toHex(),
@@ -129,23 +130,37 @@ export class SyncObject {
       }
     }
   }
-  fromFlatBuffer() {
-    const as = new AttributeSetProto();
-    for (let i = 0; i <= as.attributesLength(); i++) {
-      const attr = as.attributes(i);
+  parseAttrSet(buffer: Uint8Array) {
+    const bb = new ByteBuffer(buffer);
+    const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
+    for (let i = 0; i < attrSet.attributesLength(); i++) {
+      const attr = attrSet.attributes(i);
       if (attr) {
-        const fieldId = attr.fieldId();
-        try {
-          const deserialised = this.deserialiseAttr(attr);
-          this.values[fieldId] = deserialised;
-        } catch (err) {
-          console.warn("error creating item from flatbuffer", err);
-        }
+        const lww = this.deserialiseAttr(attr);
+        this.values[attr.fieldId()] = lww;
       }
     }
-    // TODO: Should we make this a static method?
-    return;
   }
+
+  static fromFlatBuffer(buffer: Uint8Array) {}
+  // TODO: Attributes only?
+  // fromFlatBuffer() {
+  //   const as = new AttributeSetProto();
+  //   for (let i = 0; i <= as.attributesLength(); i++) {
+  //     const attr = as.attributes(i);
+  //     if (attr) {
+  //       const fieldId = attr.fieldId();
+  //       try {
+  //         const deserialised = this.deserialiseAttr(attr);
+  //         this.values[fieldId] = deserialised;
+  //       } catch (err) {
+  //         console.warn("error creating item from flatbuffer", err);
+  //       }
+  //     }
+  //   }
+  //   // TODO: Should we make this a static method?
+  //   return;
+  // }
   private deserialiseAttr(attr: AttributeProto) {
     const type = attr.valueType();
     const rawTimestamp = attr.timestamp();
@@ -156,23 +171,24 @@ export class SyncObject {
     let data;
     switch (type) {
       case AttrTypeProto.BOOL: {
-        data = attr.string();
-        break;
-      }
-      case AttrTypeProto.STRING: {
         data = attr.bool();
         break;
       }
-      case AttrTypeProto.I64: {
-        data = attr.f64Fb();
+      case AttrTypeProto.STRING: {
+        data = attr.string();
         break;
       }
       case AttrTypeProto.F64: {
+        data = attr.f64Fb();
+        break;
+      }
+      case AttrTypeProto.I64: {
         data = attr.i64Fb();
         break;
       }
       case AttrTypeProto.BYTES: {
-        data = attr.i64Fb();
+        // TODO: Bytes is currently obviously not working
+        data = attr.bytes(0);
         break;
       }
       default: {
@@ -202,11 +218,15 @@ export class SyncObject {
         attributes.push(offset);
       }
     }
-    const vectorOffset = SyncObjectActionProto.createAttributesVector(
+    const attributesOffset = AttributeSetProto.createAttributesVector(
       builder,
       attributes,
     );
-    return vectorOffset;
+    const offset = AttributeSetProto.createAttributeSetProto(
+      builder,
+      attributesOffset,
+    );
+    return offset;
   }
   serialiseAttr(builder: Builder, fieldId: number) {
     const field = this.values[fieldId];

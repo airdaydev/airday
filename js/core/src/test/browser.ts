@@ -4,6 +4,9 @@ import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayItem } from "../sync/item";
+import { SyncObject } from "../sync/sync-object";
+import { Builder } from "flatbuffers";
+import { SyncObjectActionProto } from "../proto";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -31,18 +34,58 @@ export async function createTestCore() {
 export const tests = async () => {
   const suite = new BrowserRunner();
 
-  suite.only("Create, encode & decode sync object", async (ctx) => {
+  // TODO: Null values to clear? or explicit clear field?
+  suite.only("Create, encode & decode SyncObject", async (ctx) => {
+    const libraryId = new Uuidv4();
+    // Create an object
+    const syncObj = new SyncObject({
+      objectType: 0,
+      libraryId,
+    });
+    syncObj.values[0] = new LWWRegister({
+      data: "hello",
+    });
+    syncObj.values[1] = new LWWRegister({
+      data: 32,
+    });
+    syncObj.values[2] = new LWWRegister({
+      data: false,
+    });
+    const builder = new Builder();
+    const offset = syncObj.toFlatBuffer(builder);
+    builder.finish(offset);
+    const buffer = builder.asUint8Array();
+    ctx.assertEq(buffer.byteLength, 184);
+    // Parse
+    const syncObjB = new SyncObject({
+      objectType: 0,
+      libraryId,
+    });
+    const attrs = syncObjB.parseAttrSet(buffer);
+    ctx.assertEq(syncObjB.values[0].data, "hello");
+    ctx.assertEq(syncObjB.values[1].data, 32);
+    ctx.assertEq(syncObjB.values[2].data, false);
+  });
+
+  suite.test("Merge a SyncObject", async (ctx) => {
     const library = new Uuidv4();
-    const item = new AirdayItem({
+    // Create an object
+    const syncObj = new SyncObject({
+      objectType: 0,
       libraryId: library,
     });
-    item.updateText("hello");
-    item.updateText("again");
-    ctx.assertEq(item.attributes.getById(0)?.data, "again");
-    ctx.assertEq(item.attributes.dirty.size, 1);
+    syncObj.values[0] = new LWWRegister({
+      data: "hello",
+    });
 
-    // const builder = new Builder();
-    // const
+    // Create a patch
+    const patch = new SyncObject({
+      objectType: 0,
+      libraryId: library,
+    });
+    syncObj.values[0] = new LWWRegister({
+      data: "hello again",
+    });
   });
 
   // suite.test("Sync item", async (assert) => {
