@@ -35,7 +35,7 @@ export const tests = async () => {
   const suite = new BrowserRunner();
 
   // TODO: Null values to clear? or explicit clear field?
-  suite.only("Create, encode & decode SyncObject", async (ctx) => {
+  suite.test("Create, encode & decode SyncObject", async (ctx) => {
     const libraryId = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
@@ -61,13 +61,13 @@ export const tests = async () => {
       objectType: 0,
       libraryId,
     });
-    const attrs = syncObjB.parseAttrSet(buffer);
+    syncObjB.parseAttrSet(buffer);
     ctx.assertEq(syncObjB.values[0].data, "hello");
     ctx.assertEq(syncObjB.values[1].data, 32);
     ctx.assertEq(syncObjB.values[2].data, false);
   });
 
-  suite.test("Merge a SyncObject", async (ctx) => {
+  suite.only("Merge a SyncObject", async (ctx) => {
     const library = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
@@ -76,6 +76,9 @@ export const tests = async () => {
     });
     syncObj.values[0] = new LWWRegister({
       data: "hello",
+    });
+    syncObj.values[1] = new LWWRegister({
+      data: 32,
     });
 
     // Create a patch
@@ -86,6 +89,13 @@ export const tests = async () => {
     syncObj.values[0] = new LWWRegister({
       data: "hello again",
     });
+    syncObj.values[1] = new LWWRegister({
+      data: 64,
+    });
+
+    syncObj.merge(patch, true);
+    ctx.assertEq(syncObj.values[0].data, "hello again");
+    ctx.assertEq(syncObj.values[1].data, 64);
   });
 
   // suite.test("Sync item", async (assert) => {
