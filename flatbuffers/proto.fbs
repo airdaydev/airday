@@ -16,7 +16,6 @@ table LibraryProto {
   name: string;
 }
 
-// TODO: This is ~probably~ unnecessary if it is typed from the outside!
 enum AttrTypeProto: ubyte { NONE=0, STRING=1, BOOL=2, I64=3, F64=4, BYTES=5 }
 
 // https://groups.google.com/g/flatbuffers/c/jcgLfSd1L0o?pli=1
@@ -39,13 +38,14 @@ table AttributeProto {
 table AttributeSetProto { attributes: [AttributeProto]; }
 
 // AttributeSetProto is used for database storage of attrs
+// and is typically encrypted
 root_type AttributeSetProto;
 
-table SyncObjectActionProto {
-  obj_type: short;
+table SyncOpActionProto {
   library_id: UuidProto (required);
   id: UuidProto (required);
-  attributes: AttributeSetProto;
+  obj_type: short;
+  payload: [uint8];
   tombstone: long;
 }
 
@@ -74,7 +74,7 @@ table SyncStreamReqProto {
 }
 
 union ActionProto {
-  SyncObjectActionProto, // Syncs a single object
+  SyncOpActionProto, // Syncs a single object
   BatchResponseProto,
 }
 
