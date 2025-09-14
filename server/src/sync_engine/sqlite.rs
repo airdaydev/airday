@@ -1,8 +1,8 @@
 use crate::{
     common::error::AppError,
     sync_engine::{
-        any::AnySyncObject,
-        engine::{SqlSyncObject, SyncObjectModel},
+        any::SyncOp,
+        engine::{SqlSyncOp, SyncObjectModel},
     },
 };
 use async_trait::async_trait;
@@ -23,13 +23,13 @@ impl SyncObjectModelSqlite {
 
 async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    sync_obj: &AnySyncObject,
+    sync_op: &SqlSyncOp,
 ) -> Result<i64, AppError> {
-    let attributes_blob = sync_obj.to_attr_blob()?;
+    let attributes_blob = sync_op.to_attr_blob()?; // TODO: Copy direct from client
     let server_seq = now_micros();
-    let obj_type = sync_obj.obj_type();
+    let obj_type = sync_op.obj_type();
     sqlx::query!(
-        r#"INSERT INTO sync_object (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
+        r#"INSERT INTO sync_op (id, library_id, obj_type, attributes, server_seq, tombstone_utc)
            VALUES (?, ?, ?, ?, ?, ?)"#,
         sync_obj.meta().id,
         sync_obj.meta().library_id,
@@ -43,24 +43,17 @@ async fn insert<'a>(
     Ok(server_seq)
 }
 
-// TODO: Potentially optimise this for speed by consolidating into one select statements by library
-// But note, retries must still be selected individually
-// nb. the sqlite version is single server, but monotonic server_seq across threads
-// If 2 threads read from the same data, at same clock time (but different real time)
-// This could result in both clients merging into the same read data
-// However, only one writer will succeed, as the writer must match the server_seq
-// from the record they read - which will not happen if it has been updated in the interim.
-// TODO: We could consider cutting out the full object and just concentrating on the attributes
+// TODO: We are no longer CASing but will leave this temporarily for reference
 async fn merge<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    incoming_sync_obj: &AnySyncObject,
+    incoming_sync_obj: &SyncOp,
 ) -> Result<i64, AppError> {
     // Select for merge
     let result = sqlx::query_as!(
-        SqlSyncObject,
+        SqlSyncOp,
         r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
           server_seq, tombstone_utc, attributes
-          FROM sync_object
+          FROM sync_op
           WHERE library_id = ? AND id = ?"#,
         incoming_sync_obj.meta().library_id,
         incoming_sync_obj.meta().id,
@@ -86,7 +79,7 @@ async fn merge<'a>(
         )));
     }
     let last_server_seq = sql_sync_obj.server_seq as i64;
-    let mut existing_object: AnySyncObject = sql_sync_obj.try_into()?;
+    let mut existing_object: SyncOp = sql_sync_obj.try_into()?;
     existing_object.merge_into(&incoming_sync_obj);
 
     let Ok(attr_blob) = existing_object.to_attr_blob() else {
@@ -97,7 +90,7 @@ async fn merge<'a>(
     let server_seq = now_micros();
 
     let result = sqlx::query!(
-        r#"UPDATE sync_object
+        r#"UPDATE sync_op
                SET attributes = ?, server_seq = ?
                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
         attr_blob,
@@ -118,45 +111,38 @@ async fn merge<'a>(
 
 #[async_trait]
 impl SyncObjectModel for SyncObjectModelSqlite {
-    async fn get_by_id(
-        &self,
-        library_id: &Uuid,
-        id: &Uuid,
-    ) -> Result<Option<AnySyncObject>, AppError> {
+    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid) -> Result<Option<SyncOp>, AppError> {
         let result = sqlx::query_as!(
-            SqlSyncObject,
+            SqlSyncOp,
             r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid",
             obj_type, server_seq, attributes, tombstone_utc
-            FROM sync_object WHERE library_id = ? AND id = ? LIMIT 1"#,
+            FROM sync_op WHERE library_id = ? AND id = ? LIMIT 1"#,
             library_id,
             id,
         )
         .fetch_optional(&self.pool)
         .await?;
-        let sql_sync_object = match result {
+        let sql_sync_op = match result {
             Some(v) => v,
             None => return Ok(None),
         };
-        let sync_object: AnySyncObject = sql_sync_object.try_into()?;
-        Ok(Some(sync_object))
+        let sync_op: SyncOp = sql_sync_op.try_into()?;
+        Ok(Some(sync_op))
     }
-    // TODO: Break up this function so we are batching these, else each sync_object necessitates at least 2 individual transactions
-    async fn merge_many(
-        &self,
-        sync_objects: &Vec<AnySyncObject>,
-    ) -> Result<Vec<Option<i64>>, AppError> {
+    // TODO: Break up this function so we are batching these, else each sync_op necessitates at least 2 individual transactions
+    async fn merge_many(&self, sync_ops: &Vec<SyncOp>) -> Result<Vec<Option<i64>>, AppError> {
         let mut results: Vec<Option<i64>> = vec![];
         let mut retries = vec![];
         let mut tx = self.pool.begin().await?;
         let idx = 0;
-        for sync_object in sync_objects {
-            let server_seq = match merge(&mut tx, sync_object).await {
+        for sync_op in sync_ops {
+            let server_seq = match merge(&mut tx, sync_op).await {
                 Ok(seq) => seq,
                 Err(err) => {
                     println!("{:?}", err);
                     if let AppError::RetryReq() = err {
                         // Likely a contended result
-                        retries.push((idx, sync_object));
+                        retries.push((idx, sync_op));
                     } else {
                         results.push(None);
                     }
@@ -169,11 +155,11 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         tx.commit().await?;
         // Slow batch retry (most likely, due to contention)
         // TODO: Try multiple times?
-        for sync_object in retries {
+        for sync_op in retries {
             let mut tx = self.pool.begin().await?;
-            match merge(&mut tx, sync_object.1).await {
+            match merge(&mut tx, sync_op.1).await {
                 Ok(seq) => {
-                    results[sync_object.0] = Some(seq);
+                    results[sync_op.0] = Some(seq);
                 }
                 Err(err) => {
                     println!("Merge retry failure: {:?}", err);
@@ -193,14 +179,14 @@ impl SyncObjectModel for SyncObjectModelSqlite {
         server_seq: i64,
     ) -> Pin<
         Box<
-            dyn futures_util::Stream<Item = Result<SqlSyncObject, sqlx::Error>>
+            dyn futures_util::Stream<Item = Result<SqlSyncOp, sqlx::Error>>
                 + std::marker::Send
                 + 'a,
         >,
     > {
-        sqlx::query_as::<_, SqlSyncObject>(
+        sqlx::query_as::<_, SqlSyncOp>(
             r#"SELECT id, library_id, obj_type, server_seq, tombstone_utc, attributes
-            FROM sync_object
+            FROM sync_op
             WHERE library_id = ? AND server_seq >= ?
             ORDER BY server_seq ASC"#,
         )
@@ -215,16 +201,16 @@ mod tests {
     use std::panic;
 
     use crate::{
-        sync_engine::{any::AnySyncObject, item::ItemAttrs},
+        sync_engine::{any::SyncOp, item::ItemAttrs},
         test_util::{self, mock_item, mock_item_any},
     };
     use crdt::LWWRegister;
     use futures_util::StreamExt;
 
     #[tokio::test]
-    async fn sqlite_sync_object_merge() {
+    async fn sqlite_sync_op_merge() {
         let db = test_util::create_test_db().await;
-        let user = test_util::mock_user(&db, String::from("sync_object_merge@air.day")).await;
+        let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
         let primary_library_id = user.primary_library.unwrap().id;
         let mut item = mock_item(
             primary_library_id,
@@ -233,20 +219,17 @@ mod tests {
                 text: Some(LWWRegister::<String>::new(String::from("old_text"), None)),
             }),
         );
-        let wrapped_item = AnySyncObject::Item(item.clone());
-        db.sync_object
-            .merge_many(&vec![wrapped_item])
-            .await
-            .unwrap();
+        let wrapped_item = SyncOp::Item(item.clone());
+        db.sync_op.merge_many(&vec![wrapped_item]).await.unwrap();
         let Ok(Some(res)) = db
-            .sync_object
+            .sync_op
             .get_by_id(&item.meta.library_id.clone(), &item.meta.id.clone())
             .await
         else {
             panic!("Failed to retrieve item after initial merge");
         };
         match res {
-            AnySyncObject::Item(val) => {
+            SyncOp::Item(val) => {
                 assert_eq!(val.attrs.text.unwrap().data, String::from("old_text"));
             }
             _ => {
@@ -263,20 +246,20 @@ mod tests {
             }),
         );
         item.merge_attrs(&updated_item.attrs);
-        let wrapped_updated = AnySyncObject::Item(item.clone());
-        db.sync_object
+        let wrapped_updated = SyncOp::Item(item.clone());
+        db.sync_op
             .merge_many(&vec![wrapped_updated.clone()])
             .await
             .unwrap();
         let Ok(Some(res_2)) = db
-            .sync_object
+            .sync_op
             .get_by_id(&item.meta.library_id, &item.meta.id)
             .await
         else {
             panic!("Failed to retrieve item after initial merge");
         };
         match res_2 {
-            AnySyncObject::Item(val) => {
+            SyncOp::Item(val) => {
                 assert_eq!(val.attrs.text.unwrap().data, String::from("new_text"));
             }
             _ => {
@@ -297,12 +280,10 @@ mod tests {
         for _ in 0..qty {
             items.push(mock_item_any(primary_library_id, None, None));
         }
-        db.sync_object.merge_many(&items).await.unwrap();
+        db.sync_op.merge_many(&items).await.unwrap();
         // intentional (smoke test): a second merge that effectively does nothing
-        db.sync_object.merge_many(&items).await.unwrap();
-        let mut stream = db
-            .sync_object
-            .get_by_library_stream(&primary_library_id, 0i64);
+        db.sync_op.merge_many(&items).await.unwrap();
+        let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
         let mut count = 0;
         while let Some(result) = stream.next().await {
             match result {

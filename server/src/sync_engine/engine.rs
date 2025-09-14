@@ -8,34 +8,31 @@ use sqlx::prelude::FromRow;
 use std::{fmt::Debug, pin::Pin};
 use uuid::Uuid;
 
-pub type AttributesBlob = Vec<u8>;
+pub type PayloadBlob = Vec<u8>;
+pub type Sha256 = Vec<u8>;
 
 pub type AttributeFBVec<'a> =
     Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
 #[derive(FromRow)]
-pub struct SqlSyncObject {
+pub struct SqlSyncOp {
+    // sync concerns
+    pub seq: i64,
+    pub base_seq: i64, // snapshot seq base
+    pub op_kind: i64,  // TODO: Specify allowable enums
+    pub enc: bool,
     // static attrs
-    pub id: Uuid,
-    pub obj_type: i64,
     pub library_id: Uuid,
-    // dynamic attrs (flatbuffer blob)
-    pub attributes: AttributesBlob,
+    pub obj_id: Uuid,
+    pub path: Option<i64>,
+    pub obj_type: i64,
+    // flatbuffer blob (may be encrypted)
+    pub payload: PayloadBlob,
+    pub payload_sha256: Option<Sha256>,
     // metadata
-    pub server_seq: i64,
     pub tombstone_utc: Option<i64>,
-}
-
-pub trait SyncAttrs: Sized {
-    const OBJ_TYPE: i16;
-    /// Append this struct’s attributes into a FlatBuffers builder.
-    fn to_attr_blob(&self) -> Result<AttributesBlob, AppError>;
-
-    /// Decode from vector of attributes (db & object action)
-    fn from_attr_vec<'a>(attr_vec: AttributeFBVec<'a>) -> Result<Self, AppError>;
-
-    /// Merge field-by-field (LWW, union, min/max, etc.)
-    fn merge_into(&mut self, other: &Self);
+    pub created_utc: Option<i64>,
+    pub client_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +44,7 @@ pub struct SyncObjectMeta {
 }
 
 impl SyncObjectMeta {
-    pub fn from_sql_row(row: &SqlSyncObject) -> SyncObjectMeta {
+    pub fn from_sql_row(row: &SqlSyncOp) -> SyncObjectMeta {
         SyncObjectMeta {
             id: row.id,
             library_id: row.library_id,
@@ -62,29 +59,6 @@ impl SyncObjectMeta {
             server_seq: None,
             tombstone_utc: None,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SyncObject<A: SyncAttrs> {
-    pub meta: SyncObjectMeta,
-    pub attrs: A,
-}
-
-impl<A: SyncAttrs> SyncObject<A> {
-    #[inline]
-    pub fn obj_type(&self) -> i16 {
-        A::OBJ_TYPE
-    }
-
-    #[inline]
-    pub fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
-        self.attrs.to_attr_blob()
-    }
-
-    #[inline]
-    pub fn merge_attrs(&mut self, other: &A) {
-        self.attrs.merge_into(other);
     }
 }
 
@@ -110,13 +84,11 @@ pub trait SyncObjectModel: Send + Sync {
         server_seq: i64,
     ) -> Pin<
         Box<
-            dyn futures_util::Stream<Item = Result<SqlSyncObject, sqlx::Error>>
+            dyn futures_util::Stream<Item = Result<SqlSyncOp, sqlx::Error>>
                 + std::marker::Send
                 + 'a,
         >,
     >;
-    // async fn merge(&self, item: &Item) -> Result<(), AppError>;
-    async fn merge_many(&self, item: &Vec<AnySyncObject>) -> Result<Vec<Option<i64>>, AppError>;
     // async fn insert(&self, item: &Item) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
