@@ -32,16 +32,22 @@ CREATE TABLE IF NOT EXISTS user_library (
   PRIMARY KEY (user_id, library_id)
 );
 
-CREATE TABLE IF NOT EXISTS sync_object (
-  -- static, immutable vals
-  id UUID NOT NULL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS sync_op (
+  -- sync concerns
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, -- server_seq number
+  base_seq INTEGER, -- snapshot seq base (renders lower seqs as void)
+  op_kind INTEGER NOT NULL, -- 0=patch, 1=snapshot, 2=delete (potentially extend for text ops)
+  enc BOOLEAN NOT NULL, -- encrypted or plain text
+  -- static, immutable, identifiers
+  obj_id UUID NOT NULL,
   library_id UUID NOT NULL,
+  path INT NULL, -- useful for complex subtypes i.e. text crdt on a item
   obj_type INT NOT NULL CHECK (obj_type BETWEEN 0 AND 65535),
-  -- core, mutable attributes via JSON{} Record<key, {utc: number, pid: number, data: any}> i.e. a map of LWWRegisters
-  attributes BLOB NOT NULL,
-  -- TODO: Custom attributes - separate col? - or separate table (list dependent?)
+  -- (encrypted) map of lww-registers
+  payload BLOB NOT NULL,
+  payload_sha256 BLOB NOT NULL,
   -- Metadata & tombstone
-  server_seq INTEGER NOT NULL, -- used to negotiate sync
-  tombstone_utc INTEGER NULL
-  -- TODO: deleted by...?
+  tombstone_utc INTEGER NULL,
+  created_utc INTEGER NULL,
+  client_id UUID NULL
 );
