@@ -1,7 +1,6 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_engine::any::AnySyncObject,
-    sync_transport::proto_generated::proto::{AttributeProto, SyncObjectActionProto},
+    sync_transport::proto_generated::proto::{AttributeProto, SyncOpActionProto},
 };
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
@@ -35,53 +34,50 @@ pub struct SqlSyncOp {
     pub client_id: Option<Uuid>,
 }
 
+// TODO: This may no longer be required
 #[derive(Debug, Clone)]
-pub struct SyncObjectMeta {
+pub struct SyncOpMeta {
     pub id: Uuid,
     pub library_id: Uuid,
-    pub server_seq: Option<i64>,
+    pub seq: Option<i64>,
     pub tombstone_utc: Option<i64>,
 }
 
-impl SyncObjectMeta {
-    pub fn from_sql_row(row: &SqlSyncOp) -> SyncObjectMeta {
-        SyncObjectMeta {
-            id: row.id,
+impl SyncOpMeta {
+    pub fn from_sql_row(row: &SqlSyncOp) -> SyncOpMeta {
+        SyncOpMeta {
+            id: row.obj_id,
             library_id: row.library_id,
-            server_seq: Some(row.server_seq),
+            seq: Some(row.seq),
             tombstone_utc: row.tombstone_utc,
         }
     }
-    pub fn from_action_proto(p: &SyncObjectActionProto) -> SyncObjectMeta {
-        SyncObjectMeta {
+    pub fn from_action_proto(p: &SyncOpActionProto) -> SyncOpMeta {
+        SyncOpMeta {
             id: proto_uuid_to_uuid(p.id()),
             library_id: proto_uuid_to_uuid(p.library_id()),
-            server_seq: None,
+            seq: None,
             tombstone_utc: None,
         }
     }
 }
 
-impl<A: SyncAttrs> SyncObject<A> {
-    pub fn from_action_proto(p: &SyncObjectActionProto) -> Result<Self, AppError> {
-        let meta = SyncObjectMeta::from_action_proto(p);
-        let attrs = A::from_attr_vec(p.attributes())?;
-        Ok(SyncObject { meta, attrs })
-    }
-}
+// impl<A: SyncAttrs> SyncObject<A> {
+//     pub fn from_action_proto(p: &SyncOpActionProto) -> Result<Self, AppError> {
+//         let meta = SyncOpMeta::from_action_proto(p);
+//         let attrs = A::from_attr_vec(p.attributes())?; // TODO: is this encrypted or not?
+//         Ok(SyncObject { meta, attrs })
+//     }
+// }
 
 #[async_trait]
 pub trait SyncObjectModel: Send + Sync {
-    async fn get_by_id(
-        &self,
-        library_id: &Uuid,
-        id: &Uuid,
-    ) -> Result<Option<AnySyncObject>, AppError>;
+    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid) -> Result<Option<SqlSyncOp>, AppError>;
     // Accept query options
     fn get_by_library_stream<'a>(
         &'a self,
         library_id: &Uuid,
-        server_seq: i64,
+        seq: i64,
     ) -> Pin<
         Box<
             dyn futures_util::Stream<Item = Result<SqlSyncOp, sqlx::Error>>
