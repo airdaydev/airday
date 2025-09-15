@@ -5,7 +5,11 @@ The flatbuffer definition is the source of truth for sync communication over web
 
 The goal of this repo is to have a community edition backed by sqlite and a SaaS edition backed by Postgresql.
 
-Simple LWW-Register CRDTs are used with both Rust & JS implementations. Tombstones are also implemented to provide an LWW-Register element-set CRDT - this is a one way system.
+I am moving this repo from a CAS server to an (almost) zero-knowledge e2ee server. Each SyncOp has an encrypted payload defining a map of LWW-Registers of various registers. In this way it is forward/back-compat. Snapshots are to be created by clients in a not yet determined means.
+
+App domain-specific objects are materialised on the client, the type determined by their obj_kind.
+
+I will also, later, implement text CRDTs
 
 ## Key commands
 - `pnpm run db`: Resets the database

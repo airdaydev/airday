@@ -1,20 +1,14 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] decide how to handle changeset tracking & outbox
 - [] full op mode
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
-- [] preserve all vals from server (may have new info)! or merkle tree is kapoot, SO the key here is that we need our persistent storage layer to be even more agnostic re. shape of object. The "shape" is literally just meta + Record<number, LWWRegister<any>> but as a binary. The question is when to materialise these as typed objects
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
-- [] clear separation of materialised objects from sync objects
-- [] consider zero-knowledge server
-- [] Typed, dynamic attrs in JS
-- [] generate typescript type ints from Rust
 - [] concurrent merge tests
 - [] ensure sync works well
-- [] unify in-memory list & persistent idb list
 - [] add subscription to in-memory list to core
 - [] complete get items since streaming api
-- [] attribute level change sets (ensure sync respects dirty set)
 - [] delete items (tombstones, same api)
 - [] fan out live updates - maintain local library subscription map for sqlite version
 - [] inbox = default = virtual list! (where orphans go too!)
@@ -168,6 +162,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 # FUTURE GOALS FOR AIRDAY
 
 ## Sync engine extraction
+- [] generate typescript type ints from Rust (l8a?)
 - [] Develop procmacros once initial use case is proven
 
 ## Multilingual goals

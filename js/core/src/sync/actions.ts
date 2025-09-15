@@ -1,6 +1,6 @@
 import { Builder, type Offset } from "flatbuffers";
 import {
-  SyncObjectActionProto,
+  SyncOpActionProto,
   AttributeProto,
   AttrTypeProto,
   AuthenticateActionProto,
@@ -12,6 +12,7 @@ import {
   MessageWrapperProto,
   BatchSyncProto,
   BatchComponentProto,
+  OpKind,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -115,31 +116,30 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
-export class SyncObjectAction extends BatchAction {
+export class SyncOpAction extends BatchAction {
   syncObject: SyncObject;
-  actionProto = ActionProto.SyncObjectActionProto;
+  actionProto = ActionProto.SyncOpActionProto;
   constructor(syncObject: SyncObject) {
     super();
     this.syncObject = syncObject;
   }
   addToFlatBuffer(builder: Builder) {
     const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
-    SyncObjectActionProto.startSyncObjectActionProto(builder);
-    SyncObjectActionProto.addObjType(builder, this.syncObject.objectType);
-    SyncObjectActionProto.addId(
+    SyncOpActionProto.startSyncOpActionProto(builder);
+    SyncOpActionProto.addObjType(builder, this.syncObject.objectType);
+    SyncOpActionProto.addId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
     );
-    SyncObjectActionProto.addLibraryId(
+    SyncOpActionProto.addLibraryId(
       builder,
       UuidProto.createUuidProto(
         builder,
         this.syncObject.libraryId.toUUIDProto(),
       ),
     );
-    SyncObjectActionProto.addAttributes(builder, vectorOffset);
-    const actionOffset =
-      SyncObjectActionProto.endSyncObjectActionProto(builder);
+    SyncOpActionProto.addAttributes(builder, vectorOffset);
+    const actionOffset = SyncOpActionProto.endSyncOpActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }
