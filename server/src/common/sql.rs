@@ -2,7 +2,7 @@ use crate::{
     auth::session::{SessionModel, SessionModelSqlite},
     common::config::AirdayConfig,
     library::{model::LibraryModel, sqlite::LibraryModelSqlite},
-    sync_engine::{engine::SyncObjectModel, sqlite::SyncObjectModelSqlite},
+    sync_engine::{engine::SyncOpModel, sqlite::SyncOpModelSqlite},
     user::{model::UserModel, sqlite::UserModelSqlite},
 };
 use crdt::timestamp::{now_micros, seed_clock};
@@ -24,7 +24,7 @@ pub struct Db {
     pub library: Arc<dyn LibraryModel>,
     pub user: Arc<dyn UserModel>,
     pub session: Arc<dyn SessionModel>,
-    pub sync_object: Arc<dyn SyncObjectModel>,
+    pub sync_op: Arc<dyn SyncOpModel>,
 }
 
 impl Db {
@@ -34,7 +34,7 @@ impl Db {
             library: Arc::new(LibraryModelSqlite::new(pool.clone())),
             user: Arc::new(UserModelSqlite::new(pool.clone())),
             session: Arc::new(SessionModelSqlite::new(pool.clone())),
-            sync_object: Arc::new(SyncObjectModelSqlite::new(pool.clone())),
+            sync_op: Arc::new(SyncOpModelSqlite::new(pool.clone())),
         }
     }
     // fn from_pg_pool(pool: Pool<Pg>) -> Self {

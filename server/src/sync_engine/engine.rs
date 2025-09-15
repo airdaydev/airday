@@ -71,7 +71,7 @@ impl SyncOpMeta {
 // }
 
 #[async_trait]
-pub trait SyncObjectModel: Send + Sync {
+pub trait SyncOpModel: Send + Sync {
     async fn get_by_id(&self, library_id: &Uuid, id: &Uuid) -> Result<Option<SqlSyncOp>, AppError>;
     // Accept query options
     fn get_by_library_stream<'a>(

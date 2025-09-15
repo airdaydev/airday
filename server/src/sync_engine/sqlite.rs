@@ -1,7 +1,7 @@
 use crate::{
     common::error::AppError,
     sync_engine::{
-        engine::{SqlSyncOp, SyncObjectModel},
+        engine::{SqlSyncOp, SyncOpModel},
     },
 };
 use async_trait::async_trait;
@@ -10,11 +10,11 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
 use uuid::Uuid;
 
-pub struct SyncObjectModelSqlite {
+pub struct SyncOpModelSqlite {
     pool: SqlitePool,
 }
 
-impl SyncObjectModelSqlite {
+impl SyncOpModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
@@ -105,7 +105,7 @@ async fn insert<'a>(
 // }
 
 #[async_trait]
-impl SyncObjectModel for SyncObjectModelSqlite {
+impl SyncOpModel for SyncOpModelSqlite {
     async fn get_by_id(&self, library_id: &Uuid, obj_id: &Uuid) -> Result<Option<SqlSyncOp>, AppError> {
         let result = sqlx::query_as!(
             SqlSyncOp,
