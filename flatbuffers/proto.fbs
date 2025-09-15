@@ -41,12 +41,18 @@ table AttributeSetProto { attributes: [AttributeProto]; }
 // and is typically encrypted
 root_type AttributeSetProto;
 
+enum OpType: byte {
+  Patch = 0,
+  Delete = 1,
+  Snapshots = 2
+}
+
 table SyncOpActionProto {
   library_id: UuidProto (required);
-  id: UuidProto (required);
+  obj_id: UuidProto (required);
   obj_type: short;
-  payload: [uint8];
-  tombstone: long;
+  op_type: OpType;
+  payload: [uint8]; // encrypted payload
 }
 
 table AuthenticateActionProto {

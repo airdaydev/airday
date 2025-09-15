@@ -85,7 +85,7 @@ pub async fn process_sync_batch<'a>(
     user_id: &Uuid,
 ) -> Vec<BatchAction> {
     let mut responses: Vec<BatchAction> = Vec::new();
-    let mut items: Vec<AnySyncObject> = Vec::new();
+    let mut ops: Vec<SyncOp> = Vec::new();
     let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
@@ -106,7 +106,7 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
-                let item: AnySyncObject = match action.try_into() {
+                let item: SyncOp = match action.try_into() {
                     Ok(val) => val,
                     Err(e) => {
                         println!("{e:?}"); // TODO: Telemetry

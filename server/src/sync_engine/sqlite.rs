@@ -1,7 +1,7 @@
 use crate::{
     common::error::AppError,
     sync_engine::{
-        engine::{SqlSyncOp, SyncOpModel},
+        engine::{SyncOp, SyncOpModel},
     },
 };
 use async_trait::async_trait;
@@ -22,7 +22,7 @@ impl SyncOpModelSqlite {
 
 async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    sync_op: &SqlSyncOp,
+    sync_op: &SyncOp,
 ) -> Result<i64, AppError> {
     let server_seq = now_micros();
     sqlx::query!(
@@ -106,22 +106,23 @@ async fn insert<'a>(
 
 #[async_trait]
 impl SyncOpModel for SyncOpModelSqlite {
-    async fn get_by_id(&self, library_id: &Uuid, obj_id: &Uuid) -> Result<Option<SqlSyncOp>, AppError> {
+    async fn get_by_id(&self, library_id: &Uuid, obj_id: &Uuid) -> Result<Option<SyncOp>, AppError> {
         let result = sqlx::query_as!(
-            SqlSyncOp,
-            r#"SELECT obj_id as "obj_id: Uuid", library_id as "library_id: Uuid",
-            obj_type, seq, payload, tombstone_utc
+            SyncOp,
+            r#"SELECT seq, base_seq, op_kind, enc, library_id as "library_id: Uuid",
+            obj_id as "obj_id: Uuid", path, obj_type, payload, payload_sha256,
+            tombstone_utc, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND obj_id = ?"#,
             library_id,
             obj_id,
         )
         .fetch_optional(&self.pool)
         .await?;
-        let sql_sync_op = match result {
+        let sync_op = match result {
             Some(v) => v,
             None => return Ok(None),
         };
-        Ok(Some(sql_sync_op))
+        Ok(Some(sync_op))
     }
     // TODO: Break up this function so we are batching these, else each sync_op necessitates at least 2 individual transactions
     // async fn merge_many(&self, sync_ops: &Vec<SyncOp>) -> Result<Vec<Option<i64>>, AppError> {
@@ -173,16 +174,17 @@ impl SyncOpModel for SyncOpModelSqlite {
         server_seq: i64,
     ) -> Pin<
         Box<
-            dyn futures_util::Stream<Item = Result<SqlSyncOp, sqlx::Error>>
+            dyn futures_util::Stream<Item = Result<SyncOp, sqlx::Error>>
                 + std::marker::Send
                 + 'a,
         >,
     > {
-        sqlx::query_as::<_, SqlSyncOp>(
-            r#"SELECT id, library_id, obj_type, server_seq, tombstone_utc, attributes
+        sqlx::query_as::<_, SyncOp>(
+            r#"SELECT seq, base_seq, op_kind, enc, library_id, obj_id, path, obj_type,
+            payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
-            WHERE library_id = ? AND server_seq >= ?
-            ORDER BY server_seq ASC"#,
+            WHERE library_id = ? AND seq >= ?
+            ORDER BY seq ASC"#,
         )
         .bind(library_id.clone())
         .bind(server_seq)
