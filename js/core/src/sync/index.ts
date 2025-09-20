@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
-import { BatchAction, BatchSyncMessage, SyncObjectAction } from "./actions";
+import { BatchAction, BatchSyncMessage, SyncOpAction } from "./actions";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
@@ -78,7 +78,7 @@ export class AirdaySync {
       })
       .map((item) => {
         item.startSync();
-        const action = new SyncObjectAction(item);
+        const action = new SyncOpAction(item);
         // TODO: Ensure this works for updated items too
         // TODO: idb direct access?
         this.core.storage.idb.upsert([item]); // optimistic update
@@ -101,7 +101,7 @@ export class AirdaySync {
   handleBatchResponse = (res: BatchResponseEvent) => {
     const action = this.pendingActions.get(res.actionId.toHex());
 
-    if (action instanceof SyncObjectAction) {
+    if (action instanceof SyncOpAction) {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
         if (res.serverSeq) {

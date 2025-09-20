@@ -18,6 +18,11 @@ pnpm exec playwright install # install all browsers
 pnpx playwright install firefox # install ff only
 ```
 
+## Outbox plan
+I am bringing back a message outbox to ensure that local changes do make it into a history. V1 will be a literal change by change history, V2 will group (or remove in case of a tombstone) changes where possible (optimisation). Outbox will be patched with OG item in a transaction. This will retain even local history (maybe undesired, tbh). For now we do not need to store changesets on items, merely the inbox itself.
+
+V2 could have different compacting configs.
+
 ## Undo/redo notes
 something like this
 

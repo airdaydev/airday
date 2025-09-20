@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] decide how to handle changeset tracking & outbox
+- [] Changeset outbox, though consider diff fallbacks
 - [] full op mode
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
