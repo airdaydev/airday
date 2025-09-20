@@ -2,6 +2,8 @@
 
 [Airday](https://air.day/) calendar & tasks app monorepo
 
+ATTN: Airday is in alpha & undergoes extensive and frequent changes, it is not ready to use.
+
 ```
 📁 monorepo
 ├── 📂 flatbuffers  → Protocol definitions and code gen
@@ -15,7 +17,7 @@
 ```
 
 ## Self-hosting
-Coming soon
+Coming 2026
 
 ## Development Requirements
 - Rust
