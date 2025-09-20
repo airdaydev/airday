@@ -66,7 +66,7 @@ export const tests = async () => {
     ctx.assertEq(syncObjB.values[2].data, false);
   });
 
-  suite.test("Merge a SyncObject", async (ctx) => {
+  suite.test("Merge SyncObject", async (ctx) => {
     const library = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
@@ -98,55 +98,51 @@ export const tests = async () => {
       data: 64,
     });
 
-    // TODO: Soemthing like this
-    // syncEngine.applyLocal(id, patch);
     syncObj.mergePatch(patch, true);
-    // Transaction: Persist patch to outbox, persist (and hash) merged object state to idb
     ctx.assertEq(syncObj.values[0].data, "hello again");
     ctx.assertEq(syncObj.values[1].data, 64);
   });
 
-  // suite.test("Sync item", async (assert) => {
-  //   const core = await createTestCore();
-  //   const newItem = new AirdayItem({
-  //     libraryId: core.library.id!,
-  //     attributes: {
-  //       text: new LWWRegister({
-  //         data: "test",
-  //       }),
-  //     },
-  //   });
-  //   let action = core.sync.syncItems([newItem])[0];
-  //   const pending = core.sync.pendingActions.get(action.id.toHex());
-  //   assert(pending?.id === action.id, "message gets placed on pending queue");
-  //   await new Promise((resolve) => {
-  //     core.ws.events.once("batch-response", (data) => {
-  //       resolve(null);
-  //     });
-  //   });
-  //   assert(
-  //     core.sync.pendingActions.size === 0,
-  //     "ack message received & pending queue back to 0",
-  //   );
-  //   const item = (
-  //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
-  //   )[0];
-  //   assert(
-  //     item.libraryId.toHex() === core.library.id!.toHex(),
-  //     "correct libraryId stored in idb",
-  //   );
-  //   assert(
-  //     typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
-  //     "Item timestamps = considered in sync",
-  //   );
-  //   await new Promise((resolve) => {
-  //     if (core.sync.pendingActions.size === 0) {
-  //       return resolve(null);
-  //     }
-  //     core.sync.events.onceAsync("flushed").then(resolve);
-  //   });
-  //   core.ws.close();
-  // });
+  suite.only("Sync generic object", async (ctx) => {
+    const core = await createTestCore();
+    const syncObj = new SyncObject({
+      objectType: 0,
+      libraryId: core.library.id!,
+    });
+    syncObj.values[0].data = new LWWRegister({
+      data: "hello",
+    });
+    let action = core.sync.syncItems([syncObj])[0];
+    const outbox = core.sync.outbox.get(action.id.toHex());
+    ctx.assertEq(outbox?.id, action.id, "message gets placed in outbox");
+    //   await new Promise((resolve) => {
+    //     core.ws.events.once("batch-response", (data) => {
+    //       resolve(null);
+    //     });
+    //   });
+    //   assert(
+    //     core.sync.pendingActions.size === 0,
+    //     "ack message received & pending queue back to 0",
+    //   );
+    //   const item = (
+    //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
+    //   )[0];
+    //   assert(
+    //     item.libraryId.toHex() === core.library.id!.toHex(),
+    //     "correct libraryId stored in idb",
+    //   );
+    //   assert(
+    //     typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
+    //     "Item timestamps = considered in sync",
+    //   );
+    //   await new Promise((resolve) => {
+    //     if (core.sync.pendingActions.size === 0) {
+    //       return resolve(null);
+    //     }
+    //     core.sync.events.onceAsync("flushed").then(resolve);
+    //   });
+    //   core.ws.close();
+  });
 
   // suite.test("Items stored in indexeddb", async (assert) => {
   //   const core = await createTestCore();

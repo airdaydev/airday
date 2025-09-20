@@ -17,7 +17,7 @@ interface SyncEventMap {
 // TODO: Failure thresholds + offline!!!
 export class AirdaySync {
   core: AirdayCore;
-  outbox = new Map<HexUuid, BatchAction>();
+  outbox = new Map<HexUuid, BatchAction>(); // Queued, in-flight or failed messages
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;
