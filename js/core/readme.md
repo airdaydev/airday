@@ -8,8 +8,7 @@ Airday JS client lib for browser handling:
 - TODO: Undo/redo
 - TODO: cross-tab management
 - TODO: E2EE management
-- TODO: Calendar management
-- TODO: Profile uuid string vs bytes representation
+- TODO: Caldav adapter
 
 ## Tests
 Using real browser - bun test was nice, but lack of idb means reliance on polyfill which in practice was too slow and we have to do perf tests anyway, so here we are
@@ -23,21 +22,7 @@ I am bringing back a message outbox to ensure that local changes do make it into
 
 V2 could have different compacting configs.
 
-## Undo/redo notes
-something like this
-
-Action[]
-
-where Action {
-resourceType,
-resourceId,
-resourceAttribute,
-}
-
-i might hash/index for lookup and comparison perf
-
-anyway if an update comes in that matches that same type/id/attribute combo, i will simply remove it from the undo/redo stack
-
-i will also have to create a redo stack much the same but inverses the action
-
-i will consider put a slight debounce on committing these updates as u can fire through them quite rapidly
+## Undo/redo
+Create a change stack that implements intention to inverse an action to current user's previous change.
+Remove id/attr combos that have been since affected by other users
+Inverse now tombstoned items get dropped too - hard delete
