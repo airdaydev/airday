@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS sync_op (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, -- server_seq number
   base_seq INTEGER, -- snapshot seq base (renders lower seqs as void)
   op_kind INTEGER NOT NULL, -- 0=patch, 1=snapshot, 2=delete (potentially extend for text ops)
-  enc BOOLEAN NOT NULL, -- encrypted or plain text
   -- static, immutable, identifiers
   library_id UUID NOT NULL,
   obj_id UUID NOT NULL,

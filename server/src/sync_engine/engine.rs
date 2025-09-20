@@ -18,13 +18,11 @@ pub struct SyncOp {
     // sync concerns
     pub seq: i64,
     pub base_seq: Option<i64>, // snapshot seq base
-    pub op_kind: i64,          // TODO: Specify allowable enums
-    pub enc: bool,
     // static attrs
     pub library_id: Uuid,
+    pub op_kind: i64, // TODO: Specify allowable enums
     pub obj_id: Uuid,
     pub path: Option<i64>, // used for complex subfields e.g. text crdts
-    pub obj_type: i64,
     // flatbuffer blob (may be encrypted)
     pub payload: PayloadBlob,
     pub payload_sha256: Option<Sha256>,

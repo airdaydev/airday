@@ -1,7 +1,7 @@
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
-    sync_engine::engine::{SyncOp, SyncOpMeta},
+    sync_engine::engine::SyncOp,
     user::model::User,
 };
 use sqlx::SqlitePool;
@@ -36,27 +36,21 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     .unwrap()
 }
 
-pub fn mock_item(
-    library_id: Uuid,
-    id: Option<Uuid>,
-    attrs: Option<ItemAttrs>,
-) -> SyncObject<ItemAttrs> {
-    let meta = SyncObjectMeta {
-        id: id.unwrap_or(Uuid::new_v4()),
+pub fn mock_full_item_op(library_id: Uuid, id: Option<Uuid>) -> SyncOp {
+    SyncOp {
+        seq: 0, // Do better
+        base_seq: None,
+        // static attrs
         library_id,
-        server_seq: None,
+        op_kind: 0,
+        obj_id: id.unwrap_or(Uuid::new_v4()),
+        path: None,
+        // flatbuffer
+        payload: vec![],
+        payload_sha256: None,
+        // metadata
         tombstone_utc: None,
-    };
-    SyncObject {
-        meta,
-        attrs: attrs.unwrap_or(ItemAttrs { text: None }),
+        created_utc: None,
+        client_id: None,
     }
-}
-
-pub fn mock_item_any(
-    library_id: Uuid,
-    id: Option<Uuid>,
-    attrs: Option<ItemAttrs>,
-) -> AnySyncObject {
-    AnySyncObject::Item(mock_item(library_id, id, attrs))
 }

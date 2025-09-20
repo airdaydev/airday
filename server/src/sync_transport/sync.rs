@@ -1,6 +1,7 @@
 use crate::{
     AppState,
     common::utils::proto_uuid_to_uuid,
+    sync_engine::engine::SyncOp,
     sync_transport::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,

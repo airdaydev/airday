@@ -109,7 +109,7 @@ impl SyncOpModel for SyncOpModelSqlite {
     async fn get_by_id(&self, library_id: &Uuid, obj_id: &Uuid) -> Result<Option<SyncOp>, AppError> {
         let result = sqlx::query_as!(
             SyncOp,
-            r#"SELECT seq, base_seq, op_kind, enc, library_id as "library_id: Uuid",
+            r#"SELECT seq, base_seq, op_kind, library_id as "library_id: Uuid",
             obj_id as "obj_id: Uuid", path, obj_type, payload, payload_sha256,
             tombstone_utc, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND obj_id = ?"#,
@@ -180,7 +180,7 @@ impl SyncOpModel for SyncOpModelSqlite {
         >,
     > {
         sqlx::query_as::<_, SyncOp>(
-            r#"SELECT seq, base_seq, op_kind, enc, library_id, obj_id, path, obj_type,
+            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_type,
             payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
             WHERE library_id = ? AND seq >= ?
