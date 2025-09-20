@@ -6,7 +6,6 @@ import { Uuidv4 } from "../common/uuid";
 import { AirdayItem } from "../sync/item";
 import { SyncObject } from "../sync/sync-object";
 import { Builder } from "flatbuffers";
-import { SyncObjectActionProto } from "../proto";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -80,6 +79,7 @@ export const tests = async () => {
     syncObj.values[1] = new LWWRegister({
       data: 32,
     });
+    // TODO: Outbox nor persistence layer yet affected
 
     // Create a patch
     const patch = new SyncObject({
@@ -92,6 +92,7 @@ export const tests = async () => {
     syncObj.values[1] = new LWWRegister({
       data: 64,
     });
+    // TODO: Outbox nor persistence layer yet affected
 
     syncObj.merge(patch, true);
     ctx.assertEq(syncObj.values[0].data, "hello again");

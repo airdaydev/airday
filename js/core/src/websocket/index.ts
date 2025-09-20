@@ -1,6 +1,6 @@
 import { ByteBuffer } from "flatbuffers";
 import {
-  SyncObjectActionProto,
+  SyncOpActionProto,
   ActionProto,
   MessageWrapperProto,
   AuthenticateResponseProto,
@@ -232,9 +232,9 @@ export class WebsocketManager {
       const actionType = component.actionType();
 
       switch (actionType) {
-        case ActionProto.SyncObjectActionProto:
-          tracer.addTag(span, "msg_type", "SyncObjectActionProto");
-          const objectResponse = new SyncObjectActionProto();
+        case ActionProto.SyncOpActionProto:
+          tracer.addTag(span, "msg_type", "SyncOpActionProto");
+          const objectResponse = new SyncOpActionProto();
           component.action(objectResponse);
           // TODO: Validate and add object to storage
           console.log("syncobjectreceived", objectResponse);

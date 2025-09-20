@@ -5,7 +5,7 @@ use crate::{
         engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},
     },
-    sync_transport::proto_generated::proto::{AttributeSetProto, SyncObjectActionProto},
+    sync_transport::proto_generated::proto::{AttributeSetProto, SyncOpActionProto},
 };
 
 #[derive(Debug, Clone)]
@@ -37,10 +37,10 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
     }
 }
 
-impl<'a> TryFrom<SyncObjectActionProto<'a>> for AnySyncObject {
+impl<'a> TryFrom<SyncOpActionProto<'a>> for AnySyncObject {
     type Error = AppError;
 
-    fn try_from(p: SyncObjectActionProto<'a>) -> Result<Self, Self::Error> {
+    fn try_from(p: SyncOpActionProto<'a>) -> Result<Self, Self::Error> {
         let meta = SyncObjectMeta::from_action_proto(&p);
         p.attributes();
 

@@ -2,12 +2,7 @@ import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder, ByteBuffer } from "flatbuffers";
-import {
-  AttributeProto,
-  AttributeSetProto,
-  AttrTypeProto,
-  SyncObjectActionProto,
-} from "../proto";
+import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {

@@ -89,8 +89,8 @@ pub async fn process_sync_batch<'a>(
     let mut action_index: Vec<(Uuid, usize)> = Vec::new();
     for batch_component in &message.batch() {
         match batch_component.action_type() {
-            ActionProto::SyncObjectActionProto => {
-                let Some(action) = batch_component.action_as_sync_object_action_proto() else {
+            ActionProto::SyncOpActionProto => {
+                let Some(action) = batch_component.action_as_sync_op_action_proto() else {
                     responses.push(BatchAction::Error {
                         action_id: None,
                         message: String::from("invalid message"),
