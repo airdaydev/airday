@@ -127,7 +127,7 @@ export class SyncOpAction extends BatchAction {
     const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
     SyncOpActionProto.startSyncOpActionProto(builder);
     SyncOpActionProto.addObjType(builder, this.syncObject.objectType);
-    SyncOpActionProto.addId(
+    SyncOpActionProto.addObjId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
     );
@@ -138,7 +138,9 @@ export class SyncOpAction extends BatchAction {
         this.syncObject.libraryId.toUUIDProto(),
       ),
     );
-    SyncOpActionProto.addAttributes(builder, vectorOffset);
+    // TODO: This should be opaque for now but encrypted before release
+    // SyncOpActionProto.addPayload(builder, vectorOffset);
+    // SyncOpActionProto.addPayloadSha256(builder, vectorOffset);
     const actionOffset = SyncOpActionProto.endSyncOpActionProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }

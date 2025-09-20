@@ -62,6 +62,7 @@ export class SyncObject {
     this.pending.set(id, reg);
     if (!this.scheduled) {
       this.scheduled = true;
+      // TODO: Point of microtask is to batch changes made in same code path
       queueMicrotask(() => {
         this.scheduled = false;
         if (!this.pending.size) return;
@@ -73,14 +74,6 @@ export class SyncObject {
         this.notify(out);
       });
     }
-  }
-
-  applyLocal(attrs: SyncObject) {
-    // TODO: Type check here?
-    this.merge(attrs, true);
-  }
-  applyRemote(attrs: SyncObject) {
-    this.merge(attrs, false);
   }
   startSync() {
     this.syncStarted = globalTSProducer.timestamp().utc;
@@ -115,6 +108,23 @@ export class SyncObject {
         this.values[key] = curVal;
       } else {
         const otherVal = other.values[key];
+        if (!otherVal) throw new Error("val is set but not populated");
+        const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
+        if (result.source === "right" && local === false) {
+          this.dirty.delete(key);
+        }
+        this.values[key] = result.register;
+        this.markChanged(key, result.register); // UI reaction
+      }
+    }
+  }
+  mergePatch(map: NumericAttrMap, local: boolean) {
+    for (const key of Object.keys(map)) {
+      const curVal = this.values[key];
+      if (!curVal) {
+        this.values[key] = curVal;
+      } else {
+        const otherVal = map[key];
         if (!otherVal) throw new Error("val is set but not populated");
         const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
         if (result.source === "right" && local === false) {

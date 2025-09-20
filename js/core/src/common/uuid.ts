@@ -4,6 +4,8 @@ import { parse, stringify, v4 } from "uuid";
 import { hexToUint8Array, uint8ArrayToHex } from "uint8array-extras";
 import { UuidProto } from "../proto";
 
+export type HexUuid = string; // for hash storage
+
 export class Uuidv4 extends Uint8Array {
   constructor(props: Uint8Array = parse(v4())) {
     super(props);

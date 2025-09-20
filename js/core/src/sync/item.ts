@@ -70,7 +70,8 @@ export class AirdayItem {
   }
   set text(val: string) {
     // TODO: The merge needs to be monotonic from the last seen timestamp, not just the last generated
-    const newText = new LWWRegister({
+    // i.e. step 1 = get current timestamp if found
+    const patch = new LWWRegister({
       data: val,
     });
     // this.attributes.merge(0, newText);

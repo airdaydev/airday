@@ -1,5 +1,5 @@
 import { EventEmitter } from "../common/events";
-import { Uuidv4 } from "../common/uuid";
+import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
@@ -17,7 +17,7 @@ interface SyncEventMap {
 // TODO: Failure thresholds + offline!!!
 export class AirdaySync {
   core: AirdayCore;
-  pendingActions = new Map<string, BatchAction>(); // string = hex type
+  outbox = new Map<HexUuid, BatchAction>();
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;
@@ -30,7 +30,7 @@ export class AirdaySync {
   // TODO: Timeout!
   flush() {
     return new Promise((resolve) => {
-      if (this.pendingActions.size === 0) resolve(null);
+      if (this.outbox.size === 0) resolve(null);
       this.events.once("flushed", resolve);
     });
   }
@@ -47,6 +47,15 @@ export class AirdaySync {
     // TODO: Later, prioritise by active items, tombstoned items, completed items
 
     // TODO: Collect pending items, containers, libraries for pushing
+  }
+  applyLocal(patches: SyncObject[]) {
+    for (let patch of patches) {
+    }
+    // this.core.storage.getById
+    // 1. Find & merge object (checking cache first, then persistent layer), allowing UI to react
+    // 2. Transaction of
+    // -- persist merged object with hash
+    // -- persist patch in outbox
   }
   getLibraries() {
     console.log("hit getLibraries noop");
@@ -82,7 +91,7 @@ export class AirdaySync {
         // TODO: Ensure this works for updated items too
         // TODO: idb direct access?
         this.core.storage.idb.upsert([item]); // optimistic update
-        this.pendingActions.set(action.id.toHex(), action);
+        this.outbox.set(action.id.toHex(), action);
         return action;
       });
     console.log("sending actions", actions.length);
@@ -90,7 +99,7 @@ export class AirdaySync {
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
   }
-  syncPendingItems() {
+  initOutbox() {
     // Collects pending items from database to sync on boot
   }
   deleteItem(id: String) {
@@ -99,7 +108,7 @@ export class AirdaySync {
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
   handleBatchResponse = (res: BatchResponseEvent) => {
-    const action = this.pendingActions.get(res.actionId.toHex());
+    const action = this.outbox.get(res.actionId.toHex());
 
     if (action instanceof SyncOpAction) {
       if (res.success) {
@@ -111,9 +120,9 @@ export class AirdaySync {
         this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {
           console.log(err);
         });
-        this.pendingActions.delete(res.actionId.toHex());
+        this.outbox.delete(res.actionId.toHex());
         action.syncObject.endSync();
-        if (this.pendingActions.size === 0) {
+        if (this.outbox.size === 0) {
           // Consider renaming: no pending acknowledgements remaining
           this.events.emit("flushed", {});
         }

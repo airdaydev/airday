@@ -4,7 +4,7 @@ import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayItem } from "../sync/item";
-import { SyncObject } from "../sync/sync-object";
+import { NumericAttrMap, SyncObject } from "../sync/sync-object";
 import { Builder } from "flatbuffers";
 
 // TODO: Performance testing!
@@ -66,7 +66,7 @@ export const tests = async () => {
     ctx.assertEq(syncObjB.values[2].data, false);
   });
 
-  suite.only("Merge a SyncObject", async (ctx) => {
+  suite.test("Merge a SyncObject", async (ctx) => {
     const library = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
@@ -82,19 +82,26 @@ export const tests = async () => {
     // TODO: Outbox nor persistence layer yet affected
 
     // Create a patch
-    const patch = new SyncObject({
-      objectType: 0,
-      libraryId: library,
-    });
+    // So, a patch is a partial attribute set that merges with object (persistent) + hits persistent outbox
+    const patch: NumericAttrMap = {
+      0: new LWWRegister({
+        data: "hello again",
+      }),
+      1: new LWWRegister({
+        data: 64,
+      }),
+    };
     syncObj.values[0] = new LWWRegister({
       data: "hello again",
     });
     syncObj.values[1] = new LWWRegister({
       data: 64,
     });
-    // TODO: Outbox nor persistence layer yet affected
 
-    syncObj.merge(patch, true);
+    // TODO: Soemthing like this
+    // syncEngine.applyLocal(id, patch);
+    syncObj.mergePatch(patch, true);
+    // Transaction: Persist patch to outbox, persist (and hash) merged object state to idb
     ctx.assertEq(syncObj.values[0].data, "hello again");
     ctx.assertEq(syncObj.values[1].data, 64);
   });
