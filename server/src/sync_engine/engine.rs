@@ -1,4 +1,7 @@
-use crate::{common::error::AppError, sync_transport::proto_generated::proto::AttributeProto};
+use crate::{
+    common::{error::AppError, utils::proto_uuid_to_uuid},
+    sync_transport::proto_generated::proto::{AttributeProto, SyncOpActionProto},
+};
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
 use std::pin::Pin;
@@ -13,21 +16,42 @@ pub type AttributeFBVec<'a> =
 #[derive(FromRow)]
 pub struct SyncOp {
     // sync concerns
-    pub seq: i64,
-    pub base_seq: Option<i64>, // snapshot seq base
-    pub op_kind: i64,          // TODO: Specify allowable enums
+    pub seq: Option<i64>,
+    pub base_seq: i64, // snapshot seq base
+    pub op_kind: i8,   // TODO: Specify allowable enums
     // static attrs
     pub library_id: Uuid,
     pub obj_id: Uuid,
-    pub obj_kind: i64,
+    pub obj_kind: i16,
     pub path: Option<i64>, // used for complex subfields e.g. text crdts
     // flatbuffer blob (may be encrypted)
-    pub payload: PayloadBlob,
+    pub payload: Option<PayloadBlob>,
     pub payload_sha256: Option<Sha256>,
     // metadata
     pub tombstone_utc: Option<i64>,
     pub created_utc: Option<i64>,
     pub client_id: Option<Uuid>,
+}
+
+// TODO: We might only want a partial interim step not all of this
+impl<'a> TryFrom<SyncOpActionProto<'a>> for SyncOp {
+    type Error = AppError;
+
+    fn try_from(p: SyncOpActionProto<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            seq: None,
+            base_seq: p.base_seq(), // TODO: Treat 0 as None?
+            op_kind: p.op_kind().0,
+            library_id: proto_uuid_to_uuid(p.library_id()),
+            obj_id: proto_uuid_to_uuid(p.obj_id()),
+            obj_kind: p.obj_kind(),
+            path: None, // TODO: Later
+            payload: p.payload(),
+            tombstone_utc: None,
+            created_utc: None,
+            client_id: None,
+        })
+    }
 }
 
 // TODO: Keep this?

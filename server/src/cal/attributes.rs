@@ -1,6 +1,6 @@
 // TODO: This will only become relevant if we decide to allow non-e2ee attrs (e.g. in the case of a caldav adapter)
 // pub trait SyncAttrs: Sized {
-//     const OBJ_TYPE: i16;
+//     const OBJ_KIND: i16;
 //     /// Append this struct’s attributes into a FlatBuffers builder.
 //     fn to_attr_blob(&self) -> Result<PayloadBlob, AppError>;
 
@@ -16,8 +16,8 @@
 
 // impl<A: SyncAttrs> SyncObject<A> {
 //     #[inline]
-//     pub fn obj_type(&self) -> i16 {
-//         A::OBJ_TYPE
+//     pub fn obj_kind(&self) -> i16 {
+//         A::OBJ_KIND
 //     }
 
 //     #[inline]

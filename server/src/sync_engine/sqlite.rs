@@ -41,7 +41,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Resul
 //     // Select for merge
 //     let result = sqlx::query_as!(
 //         SqlSyncOp,
-//         r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_type,
+//         r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_kind,
 //           server_seq, tombstone_utc, attributes
 //           FROM sync_op
 //           WHERE library_id = ? AND id = ?"#,
@@ -63,7 +63,7 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Resul
 //             "sync_obj is tombstoned",
 //         )));
 //     }
-//     if sql_sync_obj.obj_type as i16 != incoming_sync_obj.obj_type() {
+//     if sql_sync_obj.obj_kind as i16 != incoming_sync_obj.obj_kind() {
 //         return Err(AppError::DatabaseError(String::from(
 //             "Incorrect merge type",
 //         )));

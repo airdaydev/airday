@@ -23,7 +23,7 @@ impl TryFrom<SqlSyncObject> for AnySyncObject {
             AppError::ServerError(format!("Failed to parse AttributeSetProto: {}", e))
         })?;
 
-        match row.obj_type {
+        match row.obj_kind {
             x if x == ITEM as i64 => {
                 let attrs = ItemAttrs::from_attr_vec(root.attributes())?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
@@ -44,7 +44,7 @@ impl<'a> TryFrom<SyncOpActionProto<'a>> for AnySyncObject {
         let meta = SyncObjectMeta::from_action_proto(&p);
         p.attributes();
 
-        match p.obj_type() {
+        match p.obj_kind() {
             x if x == ITEM => {
                 let attrs = ItemAttrs::from_attr_vec(p.attributes())?;
                 Ok(AnySyncObject::Item(SyncObject { meta, attrs }))
@@ -65,10 +65,10 @@ impl AnySyncObject {
             AnySyncObject::Container(o) => &o.meta,
         }
     }
-    pub fn obj_type(&self) -> i16 {
+    pub fn obj_kind(&self) -> i16 {
         match self {
-            AnySyncObject::Item(o) => o.obj_type(),
-            AnySyncObject::Container(o) => o.obj_type(),
+            AnySyncObject::Item(o) => o.obj_kind(),
+            AnySyncObject::Container(o) => o.obj_kind(),
         }
     }
     pub fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {

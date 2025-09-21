@@ -100,6 +100,7 @@ pub async fn process_sync_batch<'a>(
                 };
                 let action_id = proto_uuid_to_uuid(batch_component.action_id());
                 let library_id = proto_uuid_to_uuid(action.library_id());
+                // Check if requester has edit permissions for lib?
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {
                         action_id: Some(action_id),
@@ -107,6 +108,7 @@ pub async fn process_sync_batch<'a>(
                     });
                     continue;
                 }
+                // TBC
                 let item: SyncOp = match action.try_into() {
                     Ok(val) => val,
                     Err(e) => {

@@ -27,7 +27,7 @@ impl Default for ItemAttrs {
 }
 
 impl SyncAttrs for ItemAttrs {
-    const OBJ_TYPE: i16 = ITEM;
+    const OBJ_KIND: i16 = ITEM;
 
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
         // Your existing builder logic, just moved here:

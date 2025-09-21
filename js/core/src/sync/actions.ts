@@ -126,7 +126,7 @@ export class SyncOpAction extends BatchAction {
   addToFlatBuffer(builder: Builder) {
     const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
     SyncOpActionProto.startSyncOpActionProto(builder);
-    SyncOpActionProto.addObjType(builder, this.syncObject.objectType);
+    SyncOpActionProto.addObjKind(builder, this.syncObject.objectType);
     SyncOpActionProto.addObjId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),

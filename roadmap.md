@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Determine how batches/transactions should work with all ops (snapshot/append/delete)
 - [] Changeset outbox, though consider diff fallbacks
 - [] full op mode
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm

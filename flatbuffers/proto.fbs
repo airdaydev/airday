@@ -55,7 +55,7 @@ table SyncOpActionProto {
   // path
   library_id: UuidProto (required);
   obj_id: UuidProto (required);
-  obj_type: short; // TODO: consider
+  obj_kind: short; // TODO: consider
   path: short;
   // data
   payload: [uint8]; // encrypted payload
