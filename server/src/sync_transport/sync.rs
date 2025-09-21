@@ -130,7 +130,7 @@ pub async fn process_sync_batch<'a>(
         }
     }
     // Merge, returning back server_seqs or errors
-    let Ok(result) = state.db.sync_object.merge_many(&items).await else {
+    let Ok(result) = state.db.sync_op.merge_many(&items).await else {
         // Total Failure state
         for (action_id, _) in action_index {
             responses.push(BatchAction::Error {

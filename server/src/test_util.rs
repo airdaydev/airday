@@ -40,9 +40,10 @@ pub fn mock_full_item_op(library_id: Uuid, id: Option<Uuid>) -> SyncOp {
     SyncOp {
         seq: 0, // Do better
         base_seq: None,
+        op_kind: 0,
         // static attrs
         library_id,
-        op_kind: 0,
+        obj_kind: 0,
         obj_id: id.unwrap_or(Uuid::new_v4()),
         path: None,
         // flatbuffer

@@ -1,8 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_engine::{
-        engine::{SyncOp, SyncOpModel},
-    },
+    sync_engine::engine::{SyncOp, SyncOpModel},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -20,17 +18,14 @@ impl SyncOpModelSqlite {
     }
 }
 
-async fn insert<'a>(
-    tx: &mut Transaction<'a, Sqlite>,
-    sync_op: &SyncOp,
-) -> Result<i64, AppError> {
+async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Result<i64, AppError> {
     let server_seq = now_micros();
     sqlx::query!(
-        r#"INSERT INTO sync_op (obj_id, library_id, obj_type, payload)
+        r#"INSERT INTO sync_op (obj_id, library_id, obj_kind, payload)
            VALUES (?, ?, ?, ?)"#,
         sync_op.obj_id,
         sync_op.library_id,
-        sync_op.obj_type,
+        sync_op.obj_kind,
         sync_op.payload,
     )
     .execute(tx.as_mut())
@@ -106,11 +101,15 @@ async fn insert<'a>(
 
 #[async_trait]
 impl SyncOpModel for SyncOpModelSqlite {
-    async fn get_by_id(&self, library_id: &Uuid, obj_id: &Uuid) -> Result<Option<SyncOp>, AppError> {
+    async fn get_by_id(
+        &self,
+        library_id: &Uuid,
+        obj_id: &Uuid,
+    ) -> Result<Option<SyncOp>, AppError> {
         let result = sqlx::query_as!(
             SyncOp,
             r#"SELECT seq, base_seq, op_kind, library_id as "library_id: Uuid",
-            obj_id as "obj_id: Uuid", path, obj_type, payload, payload_sha256,
+            obj_id as "obj_id: Uuid", path, obj_kind, payload, payload_sha256,
             tombstone_utc, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND obj_id = ?"#,
             library_id,
@@ -173,14 +172,10 @@ impl SyncOpModel for SyncOpModelSqlite {
         library_id: &Uuid,
         server_seq: i64,
     ) -> Pin<
-        Box<
-            dyn futures_util::Stream<Item = Result<SyncOp, sqlx::Error>>
-                + std::marker::Send
-                + 'a,
-        >,
+        Box<dyn futures_util::Stream<Item = Result<SyncOp, sqlx::Error>> + std::marker::Send + 'a>,
     > {
         sqlx::query_as::<_, SyncOp>(
-            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_type,
+            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind,
             payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
             WHERE library_id = ? AND seq >= ?
@@ -192,101 +187,101 @@ impl SyncOpModel for SyncOpModelSqlite {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::panic;
+// #[cfg(test)]
+// mod tests {
+//     use std::panic;
 
-    use crate::{
-        // sync_engine::{any::SyncOp, item::ItemAttrs},
-        // test_util::{self, mock_item, mock_item_any},
-    };
-    // use crdt::LWWRegister;
-    use futures_util::StreamExt;
+//     use crate::{
+//         // sync_engine::{any::SyncOp, item::ItemAttrs},
+//         // test_util::{self, mock_item, mock_item_any},
+//     };
+//     // use crdt::LWWRegister;
+//     use futures_util::StreamExt;
 
-    // #[tokio::test]
-    // async fn sqlite_sync_op_merge() {
-    //     let db = test_util::create_test_db().await;
-    //     let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
-    //     let primary_library_id = user.primary_library.unwrap().id;
-    //     let mut item = mock_item(
-    //         primary_library_id,
-    //         None,
-    //         Some(ItemAttrs {
-    //             text: Some(LWWRegister::<String>::new(String::from("old_text"), None)),
-    //         }),
-    //     );
-    //     let wrapped_item = SyncOp::Item(item.clone());
-    //     db.sync_op.merge_many(&vec![wrapped_item]).await.unwrap();
-    //     let Ok(Some(res)) = db
-    //         .sync_op
-    //         .get_by_id(&item.meta.library_id.clone(), &item.meta.id.clone())
-    //         .await
-    //     else {
-    //         panic!("Failed to retrieve item after initial merge");
-    //     };
-    //     match res {
-    //         SyncOp::Item(val) => {
-    //             assert_eq!(val.attrs.text.unwrap().data, String::from("old_text"));
-    //         }
-    //         _ => {
-    //             assert!(false);
-    //             return;
-    //         }
-    //     };
-    //     // Update and run again
-    //     let updated_item = mock_item(
-    //         item.meta.library_id,
-    //         Some(item.meta.id),
-    //         Some(ItemAttrs {
-    //             text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
-    //         }),
-    //     );
-    //     item.merge_attrs(&updated_item.attrs);
-    //     let wrapped_updated = SyncOp::Item(item.clone());
-    //     db.sync_op
-    //         .merge_many(&vec![wrapped_updated.clone()])
-    //         .await
-    //         .unwrap();
-    //     let Ok(Some(res_2)) = db
-    //         .sync_op
-    //         .get_by_id(&item.meta.library_id, &item.meta.id)
-    //         .await
-    //     else {
-    //         panic!("Failed to retrieve item after initial merge");
-    //     };
-    //     match res_2 {
-    //         SyncOp::Item(val) => {
-    //             assert_eq!(val.attrs.text.unwrap().data, String::from("new_text"));
-    //         }
-    //         _ => {
-    //             assert!(false);
-    //         }
-    //     }
-    // }
+//     // #[tokio::test]
+//     // async fn sqlite_sync_op_merge() {
+//     //     let db = test_util::create_test_db().await;
+//     //     let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
+//     //     let primary_library_id = user.primary_library.unwrap().id;
+//     //     let mut item = mock_item(
+//     //         primary_library_id,
+//     //         None,
+//     //         Some(ItemAttrs {
+//     //             text: Some(LWWRegister::<String>::new(String::from("old_text"), None)),
+//     //         }),
+//     //     );
+//     //     let wrapped_item = SyncOp::Item(item.clone());
+//     //     db.sync_op.merge_many(&vec![wrapped_item]).await.unwrap();
+//     //     let Ok(Some(res)) = db
+//     //         .sync_op
+//     //         .get_by_id(&item.meta.library_id.clone(), &item.meta.id.clone())
+//     //         .await
+//     //     else {
+//     //         panic!("Failed to retrieve item after initial merge");
+//     //     };
+//     //     match res {
+//     //         SyncOp::Item(val) => {
+//     //             assert_eq!(val.attrs.text.unwrap().data, String::from("old_text"));
+//     //         }
+//     //         _ => {
+//     //             assert!(false);
+//     //             return;
+//     //         }
+//     //     };
+//     //     // Update and run again
+//     //     let updated_item = mock_item(
+//     //         item.meta.library_id,
+//     //         Some(item.meta.id),
+//     //         Some(ItemAttrs {
+//     //             text: Some(LWWRegister::<String>::new(String::from("new_text"), None)),
+//     //         }),
+//     //     );
+//     //     item.merge_attrs(&updated_item.attrs);
+//     //     let wrapped_updated = SyncOp::Item(item.clone());
+//     //     db.sync_op
+//     //         .merge_many(&vec![wrapped_updated.clone()])
+//     //         .await
+//     //         .unwrap();
+//     //     let Ok(Some(res_2)) = db
+//     //         .sync_op
+//     //         .get_by_id(&item.meta.library_id, &item.meta.id)
+//     //         .await
+//     //     else {
+//     //         panic!("Failed to retrieve item after initial merge");
+//     //     };
+//     //     match res_2 {
+//     //         SyncOp::Item(val) => {
+//     //             assert_eq!(val.attrs.text.unwrap().data, String::from("new_text"));
+//     //         }
+//     //         _ => {
+//     //             assert!(false);
+//     //         }
+//     //     }
+//     // }
 
-    // TODO: concurrent_merge tests
-    // #[tokio::test]
-    // async fn sqlite_library_stream() {
-    //     let db = test_util::create_test_db().await;
-    //     let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
-    //     let primary_library_id = user.primary_library.unwrap().id;
-    //     let qty = 100;
-    //     let mut items = vec![];
-    //     for _ in 0..qty {
-    //         items.push(mock_item_any(primary_library_id, None, None));
-    //     }
-    //     db.sync_op.merge_many(&items).await.unwrap();
-    //     // intentional (smoke test): a second merge that effectively does nothing
-    //     db.sync_op.merge_many(&items).await.unwrap();
-    //     let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
-    //     let mut count = 0;
-    //     while let Some(result) = stream.next().await {
-    //         match result {
-    //             Ok(_item) => count += 1,
-    //             Err(e) => panic!("Stream error: {}", e),
-    //         }
-    //     }
+//     // TODO: concurrent_merge tests
+//     // #[tokio::test]
+//     // async fn sqlite_library_stream() {
+//     //     let db = test_util::create_test_db().await;
+//     //     let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
+//     //     let primary_library_id = user.primary_library.unwrap().id;
+//     //     let qty = 100;
+//     //     let mut items = vec![];
+//     //     for _ in 0..qty {
+//     //         items.push(mock_item_any(primary_library_id, None, None));
+//     //     }
+//     //     db.sync_op.merge_many(&items).await.unwrap();
+//     //     // intentional (smoke test): a second merge that effectively does nothing
+//     //     db.sync_op.merge_many(&items).await.unwrap();
+//     //     let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
+//     //     let mut count = 0;
+//     //     while let Some(result) = stream.next().await {
+//     //         match result {
+//     //             Ok(_item) => count += 1,
+//     //             Err(e) => panic!("Stream error: {}", e),
+//     //         }
+//     //     }
 
-    //     assert_eq!(count, qty);
-    // }
-}
+//     //     assert_eq!(count, qty);
+//     // }
+// }

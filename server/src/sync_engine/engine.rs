@@ -1,7 +1,4 @@
-use crate::{
-    common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_transport::proto_generated::proto::{AttributeProto, SyncOpActionProto},
-};
+use crate::{common::error::AppError, sync_transport::proto_generated::proto::AttributeProto};
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
 use std::pin::Pin;
@@ -18,10 +15,11 @@ pub struct SyncOp {
     // sync concerns
     pub seq: i64,
     pub base_seq: Option<i64>, // snapshot seq base
+    pub op_kind: i64,          // TODO: Specify allowable enums
     // static attrs
     pub library_id: Uuid,
-    pub op_kind: i64, // TODO: Specify allowable enums
     pub obj_id: Uuid,
+    pub obj_kind: i64,
     pub path: Option<i64>, // used for complex subfields e.g. text crdts
     // flatbuffer blob (may be encrypted)
     pub payload: PayloadBlob,
