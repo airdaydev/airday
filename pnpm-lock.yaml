@@ -59,6 +59,9 @@ importers:
       idb:
         specifier: ^8.0.3
         version: 8.0.3
+      solid-js:
+        specifier: 1.9.9
+        version: 1.9.9
       suretype:
         specifier: ^3.3.1
         version: 3.3.1
@@ -81,9 +84,6 @@ importers:
       playwright:
         specifier: 1.55.0
         version: 1.55.0
-      solid-js:
-        specifier: 1.9.9
-        version: 1.9.9
       typescript:
         specifier: 5.8.3
         version: 5.8.3
