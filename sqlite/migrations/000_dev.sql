@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS sync_op (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, -- server_seq number
   base_seq INTEGER, -- snapshot seq base (renders lower seqs as void)
   op_kind INTEGER NOT NULL, -- 0=patch, 1=snapshot, 2=delete (potentially extend for text ops)
+  archived BOOLEAN NOT NULL DEFAULT TRUE, -- to be deleted, depending on server compaction policy
   -- static, immutable, identifiers
   library_id UUID NOT NULL,
   obj_id UUID NOT NULL,
@@ -47,6 +48,6 @@ CREATE TABLE IF NOT EXISTS sync_op (
   payload_sha256 BLOB NOT NULL,
   -- Metadata & tombstone
   tombstone_utc INTEGER NULL,
-  created_utc INTEGER NULL,
+  created_utc INTEGER NOT NULL,
   client_id UUID NULL
 );

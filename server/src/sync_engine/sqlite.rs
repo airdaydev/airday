@@ -1,6 +1,7 @@
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{SyncOp, SyncOpModel},
+    sync_engine::engine::{SyncOp, SyncOpModel, SyncOpSql},
+    sync_transport::{proto_generated::proto::SyncOpActionProto, sync},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -27,6 +28,24 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Resul
         sync_op.library_id,
         sync_op.obj_kind,
         sync_op.payload,
+    )
+    .execute(tx.as_mut())
+    .await?;
+    Ok(server_seq)
+}
+
+async fn insert_proto<'a, 'b>(
+    tx: &mut Transaction<'a, Sqlite>,
+    sync_op: &SyncOpActionProto<'b>,
+) -> Result<i64, AppError> {
+    let server_seq = now_micros();
+    sqlx::query!(
+        r#"INSERT INTO sync_op (library_id, obj_id, obj_kind, payload)
+           VALUES (?, ?, ?, ?)"#,
+        sync_op.library_id(),
+        sync_op.obj_id(),
+        sync_op.obj_id(),
+        sync_op.obj_id(),
     )
     .execute(tx.as_mut())
     .await?;
@@ -105,11 +124,13 @@ impl SyncOpModel for SyncOpModelSqlite {
         &self,
         library_id: &Uuid,
         obj_id: &Uuid,
-    ) -> Result<Option<SyncOp>, AppError> {
+    ) -> Result<Option<SyncOpSql>, AppError> {
         let result = sqlx::query_as!(
-            SyncOp,
-            r#"SELECT seq, base_seq, op_kind, library_id as "library_id: Uuid",
-            obj_id as "obj_id: Uuid", path, obj_kind, payload, payload_sha256,
+            SyncOpSql,
+            r#"SELECT seq, base_seq, archived, op_kind,
+            library_id as "library_id: Uuid",
+            obj_id as "obj_id: Uuid", path, obj_kind,
+            payload, payload_sha256,
             tombstone_utc, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND obj_id = ?"#,
             library_id,
@@ -172,9 +193,13 @@ impl SyncOpModel for SyncOpModelSqlite {
         library_id: &Uuid,
         server_seq: i64,
     ) -> Pin<
-        Box<dyn futures_util::Stream<Item = Result<SyncOp, sqlx::Error>> + std::marker::Send + 'a>,
+        Box<
+            dyn futures_util::Stream<Item = Result<SyncOpSql, sqlx::Error>>
+                + std::marker::Send
+                + 'a,
+        >,
     > {
-        sqlx::query_as::<_, SyncOp>(
+        sqlx::query_as::<_, SyncOpSql>(
             r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind,
             payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
