@@ -93,7 +93,7 @@ union ActionProto {
 }
 
 table BatchComponentProto {
-  action_id: UuidProto (required);
+  op_id: UuidProto (required);
   action: ActionProto (required);
 }
 

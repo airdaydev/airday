@@ -12,13 +12,14 @@ use uuid::Uuid;
 
 pub type PayloadBlob = Vec<u8>;
 pub type Sha256 = Vec<u8>;
+pub type Seq = i64;
 
 pub type AttributeFBVec<'a> =
     Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
 pub struct IncomingSyncOp {
     // sync concerns
-    pub base_seq: Option<i64>, // only for snapshots
+    pub base_seq: Option<Seq>, // only for snapshots
     pub op_id: Uuid,
     pub op_kind: i8, // TODO: CONST these types
     // static attrs
@@ -40,7 +41,7 @@ pub struct IncomingSyncOpBatch {
 #[derive(FromRow)]
 pub struct SyncOp {
     // sync concerns
-    pub seq: Option<i64>,
+    pub seq: Option<Seq>,
     pub base_seq: i64, // snapshot seq base
     pub op_kind: i8,   // TODO: Specify allowable enums
     pub archived: bool,
@@ -61,7 +62,7 @@ pub struct SyncOp {
 #[derive(FromRow)]
 pub struct SyncOpSql {
     // sync concerns
-    pub seq: i64,
+    pub seq: Seq,
     pub base_seq: Option<i64>, // snapshot seq base
     pub op_kind: i64,          // TODO: Specify allowable enums
     pub archived: bool,
@@ -108,18 +109,25 @@ async fn process_batch_ops(
         for op in batch.ops {
             if auth_cache.check(&db, &batch.user_id, &op.library_id).await == false {
                 responses.push(BatchAction::Error {
-                    action_id: Some(op.op_id),
+                    op_id: Some(op.op_id),
                     message: String::from("unauthorised"),
                 });
                 continue;
             }
             // TODO: 1x transaction for all?!
-            let Ok(result) = db.sync_op.apply(&op).await else {
-                println!("{e:?}"); // TODO: Telemetry
-                responses.push(BatchAction::Error {
-                    action_id: Some(op.op_id), // TODO: distinguish op vs action id?!
-                    message: String::from("apply_error"),
-                });
+            let response = match db.sync_op.apply(&op).await {
+                Ok(seq) => responses.push(BatchAction::Applied {
+                    op_id: op.op_id,
+                    seq: seq,
+                }),
+                Err(err) => {
+                    println!("{err:?}"); // TODO: Telemetry
+                    responses.push(BatchAction::Error {
+                        op_id: Some(op.op_id), // TODO: distinguish op vs action id?!
+                        message: String::from("apply_error"),
+                    });
+                    continue;
+                }
             };
         }
         // let Ok(result) = db.sync_op.merge_many(&items).await else {};
@@ -185,6 +193,6 @@ pub trait SyncOpModel: Send + Sync {
                 + 'a,
         >,
     >;
-    async fn apply(&self, op: &IncomingSyncOp) -> Result<(), AppError>;
+    async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

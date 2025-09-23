@@ -1,6 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync::engine::{IncomingSyncOp, SyncOp, SyncOpModel, SyncOpSql},
+    sync::engine::{IncomingSyncOp, Seq, SyncOp, SyncOpModel, SyncOpSql},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -125,7 +125,7 @@ impl SyncOpModel for SyncOpModelSqlite {
         };
         Ok(Some(sync_op))
     }
-    async fn apply(&self, _op: &IncomingSyncOp) -> Result<(), AppError> {
+    async fn apply(&self, _op: &IncomingSyncOp) -> Result<Seq, AppError> {
         // let result = sqlx::query!(
         //     r#"SELECT seq, base_seq, archived, op_kind,
         //     library_id as "library_id: Uuid",
@@ -140,7 +140,7 @@ impl SyncOpModel for SyncOpModelSqlite {
         //     Some(v) => v,
         //     None => return Ok(None),
         // };
-        Ok(())
+        Ok(0)
     }
     // TODO: Break up this function so we are batching these, else each sync_op necessitates at least 2 individual transactions
     // async fn merge_many(&self, sync_ops: &Vec<SyncOp>) -> Result<Vec<Option<i64>>, AppError> {

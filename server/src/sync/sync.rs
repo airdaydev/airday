@@ -11,11 +11,11 @@ use uuid::Uuid;
 
 pub enum BatchAction {
     Applied {
-        action_id: Uuid,
-        server_seq: i64,
+        op_id: Uuid,
+        seq: i64,
     },
     Error {
-        action_id: Option<Uuid>,
+        op_id: Option<Uuid>,
         message: String,
     },
 }
@@ -27,35 +27,32 @@ impl BatchAction {
     ) -> WIPOffset<BatchComponentProto<'a>> {
         let offset;
         match self {
-            BatchAction::Applied {
-                action_id,
-                server_seq,
-            } => {
-                let id_proto = UuidProto::new(action_id.as_bytes());
+            BatchAction::Applied { op_id, seq } => {
+                let id_proto = UuidProto::new(op_id.as_bytes());
                 let union_offset = BatchResponseProto::create(
                     fbb,
                     &BatchResponseProtoArgs {
                         success: true,
                         error: None,
-                        server_seq: *server_seq,
+                        server_seq: *seq,
                     },
                 )
                 .as_union_value();
                 offset = BatchComponentProto::create(
                     fbb,
                     &BatchComponentProtoArgs {
-                        action_id: Some(&id_proto),
+                        op_id: Some(&id_proto),
                         action_type: ActionProto::BatchResponseProto,
                         action: Some(union_offset),
                     },
                 );
             }
-            BatchAction::Error { action_id, message } => {
+            BatchAction::Error { op_id, message } => {
                 let err_message = fbb.create_string(message);
                 let id_proto;
-                let action_id = match action_id {
-                    Some(action_id) => {
-                        id_proto = UuidProto::new(action_id.as_bytes());
+                let op_id = match op_id {
+                    Some(op_id) => {
+                        id_proto = UuidProto::new(op_id.as_bytes());
                         Some(&id_proto)
                     }
                     None => None,
@@ -67,7 +64,7 @@ impl BatchAction {
                 offset = BatchComponentProto::create(
                     fbb,
                     &BatchComponentProtoArgs {
-                        action_id: action_id,
+                        op_id: op_id,
                         action_type: ActionProto::BatchResponseProto,
                         action: Some(union_offset),
                     },
@@ -93,7 +90,7 @@ pub async fn process_sync_batch<'a>(
                 // Check if requester has edit permissions for lib?
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {
-                        action_id: Some(action_id),
+                        op_id: Some(op_id),
                         message: String::from("unauthorised"),
                     });
                     continue;
@@ -104,18 +101,18 @@ pub async fn process_sync_batch<'a>(
                     Err(e) => {
                         println!("{e:?}"); // TODO: Telemetry
                         responses.push(BatchAction::Error {
-                            action_id: Some(action_id),
+                            op_id: Some(op_id),
                             message: String::from("invalid object"),
                         });
                         continue;
                     }
                 };
-                action_index.push((action_id, items.len()));
+                action_index.push((op_id, items.len()));
                 items.push(item);
             }
             _ => {
                 responses.push(BatchAction::Error {
-                    action_id: None,
+                    op_id: None,
                     message: String::from("invalid action_type"),
                 });
             }
@@ -124,23 +121,23 @@ pub async fn process_sync_batch<'a>(
     // Merge, returning back server_seqs or errors
     let Ok(result) = state.db.sync_op.merge_many(&items).await else {
         // Total Failure state
-        for (action_id, _) in action_index {
+        for (op_id, _) in action_index {
             responses.push(BatchAction::Error {
-                action_id: Some(action_id),
+                op_id: Some(op_id),
                 message: String::from("Merge error"),
             });
         }
         return responses;
     };
-    for (action_id, index) in action_index {
+    for (op_id, index) in action_index {
         if let Some(server_seq) = result[index] {
             responses.push(BatchAction::Applied {
-                action_id: action_id,
-                server_seq: server_seq,
+                op_id: op_id,
+                seq: server_seq,
             });
         } else {
             responses.push(BatchAction::Error {
-                action_id: Some(action_id),
+                op_id: Some(op_id),
                 message: String::from("Merge error"),
             })
         }
