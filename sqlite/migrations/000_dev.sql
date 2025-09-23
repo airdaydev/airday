@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS sync_op (
   -- static, immutable, identifiers
   library_id UUID NOT NULL,
   obj_id UUID NOT NULL,
-  path INT NULL, -- useful for complex subtypes i.e. text crdt on a item
+  path INT NOT NULL DEFAULT 0, -- useful for complex subtypes i.e. text crdt on a item (0 = no path)
   obj_kind INT NOT NULL CHECK (obj_kind BETWEEN 0 AND 65535),
   -- (encrypted) map of lww-registers
   payload BLOB NOT NULL,

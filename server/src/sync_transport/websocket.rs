@@ -70,8 +70,11 @@ impl WebsocketState {
 //     Arc::new(Mutex::new(HashMap::new()))
 // }
 
-fn handle_websocket_error(_app_state: &AppState, _socket: Uuid, error: AppError) {
+async fn handle_websocket_error(state: &AppState, socket_id: Uuid, error: AppError) {
     println!("Websocket reply error!!, {:?}", error);
+    let err_msg =
+        build_error_response_message(&String::from("Failed to parse SyncStreamReqProto"), None);
+    send_to_client(&state, &socket_id, err_msg).await;
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
@@ -130,30 +133,21 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                     match msg.message_type() {
                         MessageProto::AuthenticateActionProto => {
                             let Some(msg) = msg.message_as_authenticate_action_proto() else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("Failed to parse AuthenticateActionProto"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Failed to parse AuthenticateActionProto",
+                                )));
                             };
                             // TODO: A validate session token function that returns session & user
                             let Some(session_token) = msg.session_token() else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("No session token provided"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "No session token provided",
+                                )));
                             };
                             let Ok(sesh) = auth_websocket(&state, session_token, &socket_id).await
                             else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("Invalid session token"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Invalid session token",
+                                )));
                             };
                             if let Ok(result) = state.db.user.get_by_id(&sesh.user_id).await {
                                 if let Some(user) = result {
@@ -169,23 +163,17 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 }
                             } else {
                                 // User does not exist
-                                let err_msg = build_error_response_message(
-                                    &String::from("Invalid session token"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Invalid session token",
+                                )));
                             }
                             // Authenticate user
                         }
                         MessageProto::BatchSyncProto => {
                             let Some(msg) = msg.message_as_batch_sync_proto() else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("Failed to parse BatchSyncProto"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Failed to parse BatchSyncProto",
+                                )));
                             };
                             let Some(conn) = state.ws.get_conn(&socket_id) else {
                                 // Connection no longer exists
@@ -193,13 +181,9 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 return Ok(());
                             };
                             let Some(user_id) = conn.user_id else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("Unauthorised session"),
-                                    None,
-                                );
-                                // TODO: Close connection!
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Unauthorised session",
+                                )));
                             };
                             let mut op_vec: Vec<IncomingSyncMsg> = Vec::new();
                             for ap in msg.batch().iter() {
@@ -251,12 +235,9 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                         }
                         MessageProto::SyncStreamReqProto => {
                             let Some(msg) = msg.message_as_sync_stream_req_proto() else {
-                                let err_msg = build_error_response_message(
-                                    &String::from("Failed to parse SyncStreamReqProto"),
-                                    None,
-                                );
-                                send_to_client(&state, &socket_id, err_msg).await;
-                                return Ok(());
+                                return Err(AppError::ValidationError(String::from(
+                                    "Failed to parse SyncStreamReqProto",
+                                )));
                             };
                             // TODO: Authorise
                             // Validate and start sync stream
@@ -288,6 +269,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
         }
         .instrument(info_span!("ws_receive", socket_id = %socket_id))
         .await;
+        // Per message error handler
         if let Err(err) = result {
             handle_websocket_error(&state, socket_id, err);
         }
