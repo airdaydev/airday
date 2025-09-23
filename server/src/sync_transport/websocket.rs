@@ -214,13 +214,15 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     };
                                     op_vec.push(op);
                                 }
+                                // TODO: Warn on this case?
                             }
                             if op_vec.is_empty() {
-                                // Fail early
-                                panic!("lol");
+                                return Err(AppError::ValidationError(String::from(
+                                    "No valid ops found within batch",
+                                )));
                             }
                             // Run transactions
-                            // TODO: Process inside another worker, and optionally send an ack here
+                            // TODO: Send to another worker, optionally sending an immediate ack here
                             // process_ops(msg_data: Bytes::from(b), op_vec);
                             let responses = process_sync_batch(&state, &msg, &user_id).await;
                             // Send response batch
