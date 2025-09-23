@@ -2,14 +2,11 @@ use crate::AppState;
 use crate::auth::auth::auth_websocket;
 use crate::common::error::AppError;
 use crate::common::utils::proto_uuid_to_uuid;
-use crate::sync_engine::engine::IncomingSyncMsg;
-use crate::sync_engine::fb::{
-    build_batch_sync_msg, build_error_response_message, create_auth_response, wrap_message,
-};
+use crate::sync_engine::engine::{IncomingSyncOp, IncomingSyncOpBatch};
+use crate::sync_engine::fb::{build_error_response_message, create_auth_response, wrap_message};
 use crate::sync_engine::proto_generated::proto::{
     ActionProto, MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
 };
-use crate::sync_engine::sync::process_sync_batch;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
@@ -73,7 +70,7 @@ async fn handle_websocket_error(state: &AppState, socket_id: Uuid, error: AppErr
     println!("Websocket reply error!!, {:?}", error);
     let err_msg =
         build_error_response_message(&String::from("Failed to parse SyncStreamReqProto"), None);
-    send_to_client(&state, &socket_id, err_msg).await;
+    send_to_client(&state.ws, &socket_id, err_msg).await;
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
@@ -123,7 +120,10 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                 Ok(Message::Binary(b)) => {
                     cur_span.set_attribute("message_type", "binary");
                     // Set trace id
-                    let msg = root_as_message_wrapper_proto(&b)?;
+                    let cloned = b.clone();
+                    let msg = root_as_message_wrapper_proto(&cloned)?;
+                    // drop(msg);
+                    // let msg_data = ;
                     // TODO: Let's catch errors here to hit back error to client
                     // TODO: Separate function
                     let span_ctx = extract_span_ctx(msg);
@@ -157,7 +157,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                         MessageProto::AuthenticateResponseProto,
                                         auth_offset,
                                     );
-                                    send_to_client(&state, &socket_id, msg).await;
+                                    send_to_client(&state.ws, &socket_id, msg).await;
                                     return Ok(());
                                 }
                             } else {
@@ -184,7 +184,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     "Unauthorised session",
                                 )));
                             };
-                            let mut op_vec: Vec<IncomingSyncMsg> = Vec::new();
+                            let mut op_vec: Vec<IncomingSyncOp> = Vec::new();
                             for ap in msg.batch().iter() {
                                 if ap.action_type() == ActionProto::SyncOpActionProto {
                                     // TODO: Break this whole thing so we can propagate an error back to the top and send
@@ -196,43 +196,40 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     let end = start + payload_slice.len();
                                     let payload_range = start..end;
                                     let op_kind = op_raw.op_kind();
+                                    let payload = b.slice(payload_range);
                                     let base_seq = if op_kind == OpKind::SNAPSHOT {
                                         Some(op_raw.base_seq())
                                     } else {
                                         None
                                     };
-                                    let op = IncomingSyncMsg {
+                                    let op = IncomingSyncOp {
                                         base_seq: base_seq,
                                         op_kind: op_kind.0,
+                                        op_id: proto_uuid_to_uuid(op_raw.op_id()),
                                         library_id: proto_uuid_to_uuid(op_raw.library_id()),
                                         obj_id: proto_uuid_to_uuid(op_raw.obj_id()),
                                         obj_kind: op_raw.obj_kind(),
                                         path: op_raw.path(), // 0 = no path
-                                        payload_range,
+                                        payload,
                                         tombstone_utc: None, // TODO: tombstoning
                                     };
                                     op_vec.push(op);
+                                } else {
+                                    // TODO: Warn on this case?
                                 }
-                                // TODO: Warn on this case?
                             }
                             if op_vec.is_empty() {
                                 return Err(AppError::ValidationError(String::from(
                                     "No valid ops found within batch",
                                 )));
                             }
-                            // Run transactions
-                            // TODO: Send to another worker, optionally sending an immediate ack here
-                            // process_ops(msg_data: Bytes::from(b), op_vec);
-                            let responses = process_sync_batch(&state, &msg, &user_id).await;
-                            // Send response batch
-                            let mut builder = FlatBufferBuilder::new();
-                            let message_offset = build_batch_sync_msg(&mut builder, responses);
-                            let wrapper = wrap_message(
-                                &mut builder,
-                                MessageProto::BatchSyncProto,
-                                message_offset,
-                            );
-                            send_to_client(&state, &socket_id, wrapper).await;
+                            let batch = IncomingSyncOpBatch {
+                                user_id: user_id,
+                                socket_id: socket_id,
+                                ops: op_vec,
+                            };
+                            state.op_batch_processor.tx.send(batch).await;
+                            // TODO: Optional acknowledgement (is there a point)
                         }
                         MessageProto::SyncStreamReqProto => {
                             let Some(msg) = msg.message_as_sync_stream_req_proto() else {
@@ -242,7 +239,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             };
                             // TODO: Authorise
                             // Validate and start sync stream
-                            let _library_id = proto_uuid_to_uuid(msg.library_id());
+                            // let _library_id = proto_uuid_to_uuid(msg.library_id());
                             // Start stream;
                             //                                 timestamp: now_micros(),
                             // library_id,
@@ -288,9 +285,9 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
     // println!("Ending write");
 }
 
-pub async fn send_to_client(state: &AppState, client_id: &Uuid, message: Vec<u8>) {
+pub async fn send_to_client(ws: &WebsocketState, client_id: &Uuid, message: Vec<u8>) {
     let sender = {
-        let mut connections = state.ws.conn_map.lock().unwrap();
+        let mut connections = ws.conn_map.lock().unwrap();
         connections
             .get_mut(client_id)
             .map(|client| client.sender.clone())

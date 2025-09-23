@@ -1,6 +1,5 @@
 use crate::{
     AppState,
-    common::utils::proto_uuid_to_uuid,
     sync_engine::engine::SyncOp,
     sync_engine::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
@@ -91,15 +90,6 @@ pub async fn process_sync_batch<'a>(
     for batch_component in &message.batch() {
         match batch_component.action_type() {
             ActionProto::SyncOpActionProto => {
-                let Some(action) = batch_component.action_as_sync_op_action_proto() else {
-                    responses.push(BatchAction::Error {
-                        action_id: None,
-                        message: String::from("invalid message"),
-                    });
-                    continue;
-                };
-                let action_id = proto_uuid_to_uuid(batch_component.action_id());
-                let library_id = proto_uuid_to_uuid(action.library_id());
                 // Check if requester has edit permissions for lib?
                 if state.auth_cache.check(state, &user_id, &library_id).await == false {
                     responses.push(BatchAction::Error {

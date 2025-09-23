@@ -35,6 +35,7 @@ mod root;
 use crate::auth::cache::AuthCache;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
+use crate::sync_engine::engine::OpBatchProcessor;
 use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::{Method, Request};
@@ -54,6 +55,7 @@ struct AppState {
     config: AirdayConfig,
     ws: sync_engine::websocket::WebsocketState,
     auth_cache: AuthCache, // ws_sub_map: sync::websocket::WSSubMap,
+    op_batch_processor: OpBatchProcessor,
 }
 
 #[derive(Bpaf, Debug, Clone)]
@@ -90,13 +92,17 @@ async fn main() {
     // Database
     // TODO: Match config to make correct connection (pg vs sql)
     let db = common::sql::connect_sqlite(&cfg).await;
+    let ws = sync_engine::websocket::WebsocketState::new();
+    let auth_cache = AuthCache::new();
+    let op_batch_processor = OpBatchProcessor::new(&ws, &auth_cache, &db);
 
     // App state
     let state = AppState {
         db: db,
         config: cfg.clone(),
-        ws: sync_engine::websocket::WebsocketState::new(),
-        auth_cache: AuthCache::new(),
+        ws,
+        auth_cache,
+        op_batch_processor,
     };
 
     let cors = CorsLayer::new()

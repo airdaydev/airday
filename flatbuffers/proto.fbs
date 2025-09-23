@@ -51,6 +51,7 @@ table SyncOpActionProto {
   // sync meta
   proto_version: ushort = 1;
   op_kind: OpKind;
+  op_id: UuidProto (required);
   base_seq: long; // for snapshot only
   // path
   library_id: UuidProto (required);

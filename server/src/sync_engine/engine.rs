@@ -1,7 +1,15 @@
-use crate::{common::error::AppError, sync_engine::proto_generated::proto::AttributeProto};
+use crate::{
+    auth::cache::AuthCache,
+    common::{error::AppError, sql::Db},
+    sync_engine::{
+        proto_generated::proto::AttributeProto, sync::BatchAction, websocket::WebsocketState,
+    },
+};
 use async_trait::async_trait;
+use axum::body::Bytes;
 use sqlx::prelude::FromRow;
-use std::{ops::Range, pin::Pin};
+use std::pin::Pin;
+use tokio::sync::mpsc::{self, Sender};
 use uuid::Uuid;
 
 pub type PayloadBlob = Vec<u8>;
@@ -10,10 +18,11 @@ pub type Sha256 = Vec<u8>;
 pub type AttributeFBVec<'a> =
     Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
-pub struct IncomingSyncMsg {
+pub struct IncomingSyncOp {
     // sync concerns
     pub base_seq: Option<i64>, // only for snapshots
-    pub op_kind: i8,           // TODO: CONST these types
+    pub op_id: Uuid,
+    pub op_kind: i8, // TODO: CONST these types
     // static attrs
     pub library_id: Uuid, //
     pub obj_id: Uuid,
@@ -21,7 +30,13 @@ pub struct IncomingSyncMsg {
     pub path: i16,
     pub tombstone_utc: Option<i16>,
     // payload
-    pub payload_range: Range<usize>,
+    pub payload: Bytes,
+}
+
+pub struct IncomingSyncOpBatch {
+    pub socket_id: Uuid,
+    pub user_id: Uuid,
+    pub ops: Vec<IncomingSyncOp>,
 }
 
 #[derive(FromRow)]
@@ -64,6 +79,55 @@ pub struct SyncOpSql {
     pub tombstone_utc: Option<i64>,
     pub created_utc: i64,
     pub client_id: Option<Uuid>,
+}
+
+pub fn process_op_batch() {}
+
+#[derive(Clone)]
+pub struct OpBatchProcessor {
+    pub tx: Sender<IncomingSyncOpBatch>,
+}
+
+impl OpBatchProcessor {
+    pub fn new(ws: &WebsocketState, auth_cache: &AuthCache, db: &Db) -> Self {
+        let (tx, rx) = mpsc::channel::<IncomingSyncOpBatch>(100);
+        // rx to hook up to batch_processor
+        process_batch_ops(rx, ws.clone(), auth_cache.clone(), db.clone());
+        Self { tx }
+    }
+}
+
+async fn process_batch_ops(
+    // Uhh but we need access to app state...?
+    mut rx: mpsc::Receiver<IncomingSyncOpBatch>,
+    ws: WebsocketState,
+    auth_cache: AuthCache,
+    db: Db,
+) {
+    while let Some(batch) = rx.recv().await {
+        let mut responses: Vec<BatchAction> = Vec::new();
+        // TODO: Local cache for batch.user_id?
+        for op in batch.ops {
+            // Check if requester has edit permissions for lib?
+            if auth_cache.check(&db, &batch.user_id, &op.library_id).await == false {
+                responses.push(BatchAction::Error {
+                    action_id: Some(op.op_id),
+                    message: String::from("unauthorised"),
+                });
+                continue;
+            }
+            // TODO: 1x transaction for all?!
+            let Ok(result) = db.sync_op.apply(&op).await else {
+                println!("{e:?}"); // TODO: Telemetry
+                responses.push(BatchAction::Error {
+                    action_id: Some(op.op_id), // TODO: distinguish op vs action id?!
+                    message: String::from("apply_error"),
+                });
+            };
+        }
+        // let Ok(result) = db.sync_op.merge_many(&items).await else {};
+        // send_to_client(&ws, &batch.socket_id, message).await;
+    }
 }
 
 // TODO: We might only want a partial interim step not all of this
@@ -124,6 +188,6 @@ pub trait SyncOpModel: Send + Sync {
                 + 'a,
         >,
     >;
-    // async fn insert(&self, item: &Item) -> Result<(), AppError>;
+    async fn apply(&self, op: &IncomingSyncOp) -> Result<(), AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
