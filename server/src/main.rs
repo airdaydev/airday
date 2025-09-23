@@ -38,7 +38,7 @@ use crate::common::sql::Db;
 use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::{Method, Request};
-use axum::routing::{any, get, post, put};
+use axum::routing::{get, post, put};
 use bpaf::Bpaf;
 use std::fs;
 use tower_cookies::CookieManagerLayer;

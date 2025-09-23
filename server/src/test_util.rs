@@ -1,7 +1,6 @@
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
-    sync_engine::engine::SyncOp,
     user::model::User,
 };
 use sqlx::SqlitePool;

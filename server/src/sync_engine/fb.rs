@@ -6,8 +6,7 @@ use crate::{
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
             BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
-            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, SyncOpActionProto,
-            UuidProto,
+            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
         },
         sync::BatchAction,
     },

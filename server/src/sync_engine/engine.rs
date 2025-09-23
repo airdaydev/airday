@@ -1,7 +1,4 @@
-use crate::{
-    common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_engine::proto_generated::proto::{AttributeProto, SyncOpActionProto},
-};
+use crate::{common::error::AppError, sync_engine::proto_generated::proto::AttributeProto};
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
 use std::{ops::Range, pin::Pin};

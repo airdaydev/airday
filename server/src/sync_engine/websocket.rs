@@ -13,7 +13,6 @@ use crate::sync_engine::sync::process_sync_batch;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
-use bytes::Bytes;
 use flatbuffers::FlatBufferBuilder;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
