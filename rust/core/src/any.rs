@@ -1,6 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_engine::{
+    sync::{
         container::{CONTAINER, ContainerAttrs},
         engine::{AttributesBlob, SqlSyncObject, SyncAttrs, SyncObject, SyncObjectMeta},
         item::{ITEM, ItemAttrs},

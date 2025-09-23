@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::{common::error::AppError, sync_engine::proto_generated::proto::UuidProto};
+use crate::{common::error::AppError, sync::proto_generated::proto::UuidProto};
 
 /// Legacy flatbuffer variable version (FB doesn't compile static sized vars in some langs e.g. Swift)
 pub fn _fbv_to_uuid<'a>(id_buffer: flatbuffers::Vector<'a, u8>) -> Result<Uuid, AppError> {

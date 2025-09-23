@@ -1,6 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{IncomingSyncOp, SyncOp, SyncOpModel, SyncOpSql},
+    sync::engine::{IncomingSyncOp, SyncOp, SyncOpModel, SyncOpSql},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -215,7 +215,7 @@ impl SyncOpModel for SyncOpModelSqlite {
 //     use std::panic;
 
 //     use crate::{
-//         // sync_engine::{any::SyncOp, item::ItemAttrs},
+//         // sync::{any::SyncOp, item::ItemAttrs},
 //         // test_util::{self, mock_item, mock_item_any},
 //     };
 //     // use crdt::LWWRegister;

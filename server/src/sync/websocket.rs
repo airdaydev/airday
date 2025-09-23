@@ -2,9 +2,9 @@ use crate::AppState;
 use crate::auth::auth::auth_websocket;
 use crate::common::error::AppError;
 use crate::common::utils::proto_uuid_to_uuid;
-use crate::sync_engine::engine::{IncomingSyncOp, IncomingSyncOpBatch};
-use crate::sync_engine::fb::{build_error_response_message, create_auth_response, wrap_message};
-use crate::sync_engine::proto_generated::proto::{
+use crate::sync::engine::{IncomingSyncOp, IncomingSyncOpBatch};
+use crate::sync::fb::{build_error_response_message, create_auth_response, wrap_message};
+use crate::sync::proto_generated::proto::{
     ActionProto, MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
 };
 use axum::extract::State;

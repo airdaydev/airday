@@ -293,12 +293,12 @@ pub fn derive_sync_object(input: TokenStream) -> TokenStream {
             #(#consts)*
         }
 
-        impl crate::sync_engine::engine::SyncKind for #struct_ident {
+        impl crate::sync::engine::SyncKind for #struct_ident {
             const KIND_ID: i64 = #kind_id;
             const NAME: &'static str = #name;
         }
 
-        impl crate::sync_engine::engine::AttrCodec for #struct_ident {
+        impl crate::sync::engine::AttrCodec for #struct_ident {
             fn encode_attrs(
                 &self,
                 fbb: &mut flatbuffers::FlatBufferBuilder<'_>,
@@ -350,7 +350,7 @@ pub fn sync_objects(input: TokenStream) -> TokenStream {
 
     let kind_id_match = idents.iter().map(|id| {
         quote! {
-            SyncObjectAttrs::#id(_) => <#id as crate::sync_engine::engine::SyncKind>::KIND_ID
+            SyncObjectAttrs::#id(_) => <#id as crate::sync::engine::SyncKind>::KIND_ID
         }
     });
 
@@ -379,9 +379,9 @@ pub fn sync_objects(input: TokenStream) -> TokenStream {
     });
 
     let decode_if = idents.iter().map(|id| quote! {
-        if kind_id == <#id as crate::sync_engine::engine::SyncKind>::KIND_ID {
+        if kind_id == <#id as crate::sync::engine::SyncKind>::KIND_ID {
             let set = flatbuffers::root::<crate::sync::proto_generated::proto::AttributeSetProto>(blob).ok()?;
-            let v = <#id as crate::sync_engine::engine::AttrCodec>::decode_attrs(&set);
+            let v = <#id as crate::sync::engine::AttrCodec>::decode_attrs(&set);
             return Some(SyncObjectAttrs::#id(v));
         }
     });

@@ -1,5 +1,5 @@
 // TODO: This should be a thin slice of code that sits with object definitions (e.g. item, container)
-// and generated from Rust version (server/src/sync_engine)
+// and generated from Rust version (server/src/sync)
 // Field ID constants matching server/src/sync_object/types.rs
 
 import { AirdayContainer, CONTAINER } from "./container";

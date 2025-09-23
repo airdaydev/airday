@@ -14,6 +14,7 @@ pub struct AuthCache {
 
 // TODO: Revocation
 // TODO: Shared library checks
+// TODO: Read vs write permissions
 impl AuthCache {
     pub fn new() -> Self {
         let cache = Cache::builder()

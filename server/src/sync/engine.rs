@@ -1,9 +1,7 @@
 use crate::{
     auth::cache::AuthCache,
     common::{error::AppError, sql::Db},
-    sync_engine::{
-        proto_generated::proto::AttributeProto, sync::BatchAction, websocket::WebsocketState,
-    },
+    sync::{proto_generated::proto::AttributeProto, sync::BatchAction, websocket::WebsocketState},
 };
 use async_trait::async_trait;
 use axum::body::Bytes;
@@ -106,9 +104,8 @@ async fn process_batch_ops(
 ) {
     while let Some(batch) = rx.recv().await {
         let mut responses: Vec<BatchAction> = Vec::new();
-        // TODO: Local cache for batch.user_id?
+        // TODO: Optimisation: Local cache for batch.user_id?
         for op in batch.ops {
-            // Check if requester has edit permissions for lib?
             if auth_cache.check(&db, &batch.user_id, &op.library_id).await == false {
                 responses.push(BatchAction::Error {
                     action_id: Some(op.op_id),

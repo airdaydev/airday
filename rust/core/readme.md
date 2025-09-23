@@ -2,4 +2,4 @@
 To back Android & iOS apps
 
 
-// Note: any/container/item pulled from a previous version of sync_engine but may (or probably won't be) useful here
+// Note: any/container/item pulled from a previous version of sync but may (or probably won't be) useful here

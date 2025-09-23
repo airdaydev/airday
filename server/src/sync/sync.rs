@@ -1,7 +1,7 @@
 use crate::{
     AppState,
-    sync_engine::engine::SyncOp,
-    sync_engine::proto_generated::proto::{
+    sync::engine::SyncOp,
+    sync::proto_generated::proto::{
         ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
         BatchResponseProtoArgs, BatchResponseProtoBuilder, BatchSyncProto, UuidProto,
     },

@@ -1,6 +1,6 @@
 use crate::{
     common::error::AppError,
-    sync_engine::engine::{AttributeFBVec, AttributesBlob, SyncAttrs},
+    sync::engine::{AttributeFBVec, AttributesBlob, SyncAttrs},
     sync_transport::proto_generated::proto::{
         AttrTypeProto, AttributeProto, AttributeProtoArgs, AttributeSetProto,
         AttributeSetProtoArgs, LWWTimestampProto,

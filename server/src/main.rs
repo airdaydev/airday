@@ -21,7 +21,7 @@ mod auth {
     pub mod cache;
     pub mod session;
 }
-mod sync_engine {
+mod sync {
     pub mod engine;
     pub mod fb;
     #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
@@ -35,7 +35,7 @@ mod root;
 use crate::auth::cache::AuthCache;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
-use crate::sync_engine::engine::OpBatchProcessor;
+use crate::sync::engine::OpBatchProcessor;
 use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::{Method, Request};
@@ -53,7 +53,7 @@ use tracing::{info, info_span};
 struct AppState {
     db: Db,
     config: AirdayConfig,
-    ws: sync_engine::websocket::WebsocketState,
+    ws: sync::websocket::WebsocketState,
     auth_cache: AuthCache, // ws_sub_map: sync::websocket::WSSubMap,
     op_batch_processor: OpBatchProcessor,
 }
@@ -92,7 +92,7 @@ async fn main() {
     // Database
     // TODO: Match config to make correct connection (pg vs sql)
     let db = common::sql::connect_sqlite(&cfg).await;
-    let ws = sync_engine::websocket::WebsocketState::new();
+    let ws = sync::websocket::WebsocketState::new();
     let auth_cache = AuthCache::new();
     let op_batch_processor = OpBatchProcessor::new(&ws, &auth_cache, &db);
 
@@ -129,7 +129,7 @@ async fn main() {
         )
         .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions));
-    // .route("/ws", any(sync_engine::websocket::handler));
+    // .route("/ws", any(sync::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
