@@ -5,14 +5,6 @@ mod common {
     pub mod sql;
     pub mod utils;
 }
-mod sync_transport {
-    pub mod fb;
-    #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
-    pub mod proto_generated;
-    pub mod stream;
-    pub mod sync;
-    pub mod websocket;
-}
 mod user {
     pub mod model;
     pub mod sqlite;
@@ -31,7 +23,13 @@ mod auth {
 }
 mod sync_engine {
     pub mod engine;
+    pub mod fb;
+    #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
+    pub mod proto_generated;
     pub mod sqlite;
+    pub mod stream;
+    pub mod sync;
+    pub mod websocket;
 }
 mod root;
 use crate::auth::cache::AuthCache;
@@ -54,7 +52,7 @@ use tracing::{info, info_span};
 struct AppState {
     db: Db,
     config: AirdayConfig,
-    ws: sync_transport::websocket::WebsocketState,
+    ws: sync_engine::websocket::WebsocketState,
     auth_cache: AuthCache, // ws_sub_map: sync::websocket::WSSubMap,
 }
 
@@ -97,7 +95,7 @@ async fn main() {
     let state = AppState {
         db: db,
         config: cfg.clone(),
-        ws: sync_transport::websocket::WebsocketState::new(),
+        ws: sync_engine::websocket::WebsocketState::new(),
         auth_cache: AuthCache::new(),
     };
 
@@ -125,7 +123,7 @@ async fn main() {
         )
         .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions));
-    // .route("/ws", any(sync_transport::websocket::handler));
+    // .route("/ws", any(sync_engine::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await

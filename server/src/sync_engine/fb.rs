@@ -2,7 +2,7 @@ use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
-    sync_transport::{
+    sync_engine::{
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
             BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,

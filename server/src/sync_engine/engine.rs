@@ -1,6 +1,6 @@
 use crate::{
     common::{error::AppError, utils::proto_uuid_to_uuid},
-    sync_transport::proto_generated::proto::{AttributeProto, SyncOpActionProto},
+    sync_engine::proto_generated::proto::{AttributeProto, SyncOpActionProto},
 };
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
@@ -70,27 +70,27 @@ pub struct SyncOpSql {
 }
 
 // TODO: We might only want a partial interim step not all of this
-impl<'a> TryFrom<SyncOpActionProto<'a>> for SyncOp {
-    type Error = AppError;
+// impl<'a> TryFrom<SyncOpActionProto<'a>> for SyncOp {
+//     type Error = AppError;
 
-    fn try_from(p: SyncOpActionProto<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            seq: None,
-            base_seq: p.base_seq(), // TODO: Treat 0 as None?
-            op_kind: p.op_kind().0,
-            archived: false,
-            library_id: proto_uuid_to_uuid(p.library_id()),
-            obj_id: proto_uuid_to_uuid(p.obj_id()),
-            obj_kind: p.obj_kind(),
-            path: None, // TODO: Later
-            payload: p.to_owned(),
-            payload_sha256: None,
-            tombstone_utc: None,
-            created_utc: None,
-            client_id: None,
-        })
-    }
-}
+//     fn try_from(p: SyncOpActionProto<'a>) -> Result<Self, Self::Error> {
+//         Ok(Self {
+//             seq: None,
+//             base_seq: p.base_seq(), // TODO: Treat 0 as None?
+//             op_kind: p.op_kind().0,
+//             archived: false,
+//             library_id: proto_uuid_to_uuid(p.library_id()),
+//             obj_id: proto_uuid_to_uuid(p.obj_id()),
+//             obj_kind: p.obj_kind(),
+//             path: None, // TODO: Later
+//             payload: p.to_owned(),
+//             payload_sha256: None,
+//             tombstone_utc: None,
+//             created_utc: None,
+//             client_id: None,
+//         })
+//     }
+// }
 
 // TODO: Keep this?
 // impl SyncOp {
