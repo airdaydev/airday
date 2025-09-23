@@ -2,16 +2,18 @@ use crate::AppState;
 use crate::auth::auth::auth_websocket;
 use crate::common::error::AppError;
 use crate::common::utils::proto_uuid_to_uuid;
+use crate::sync_engine::engine::IncomingSyncMsg;
 use crate::sync_transport::fb::{
     build_batch_sync_msg, build_error_response_message, create_auth_response, wrap_message,
 };
 use crate::sync_transport::proto_generated::proto::{
-    MessageProto, MessageWrapperProto, root_as_message_wrapper_proto,
+    ActionProto, MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
 };
 use crate::sync_transport::sync::process_sync_batch;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
+use bytes::Bytes;
 use flatbuffers::FlatBufferBuilder;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
@@ -199,7 +201,43 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 send_to_client(&state, &socket_id, err_msg).await;
                                 return Ok(());
                             };
+                            let mut op_vec: Vec<IncomingSyncMsg> = Vec::new();
+                            for ap in msg.batch().iter() {
+                                if ap.action_type() == ActionProto::SyncOpActionProto {
+                                    // TODO: Break this whole thing so we can propagate an error back to the top and send
+                                    // Zero-copy body & encapsulate
+                                    let op_raw = ap.action_as_sync_op_action_proto().unwrap();
+                                    let payload_slice = op_raw.payload().unwrap().bytes();
+                                    let start =
+                                        payload_slice.as_ptr() as usize - b.as_ptr() as usize;
+                                    let end = start + payload_slice.len();
+                                    let payload_range = start..end;
+                                    let op_kind = op_raw.op_kind();
+                                    let base_seq = if op_kind == OpKind::SNAPSHOT {
+                                        Some(op_raw.base_seq())
+                                    } else {
+                                        None
+                                    };
+                                    let op = IncomingSyncMsg {
+                                        base_seq: base_seq,
+                                        op_kind: op_kind.0,
+                                        library_id: proto_uuid_to_uuid(op_raw.library_id()),
+                                        obj_id: proto_uuid_to_uuid(op_raw.obj_id()),
+                                        obj_kind: op_raw.obj_kind(),
+                                        path: op_raw.path(), // 0 = no path
+                                        payload_range,
+                                        tombstone_utc: None, // TODO: tombstoning
+                                    };
+                                    op_vec.push(op);
+                                }
+                            }
+                            if op_vec.is_empty() {
+                                // Fail early
+                                panic!("lol");
+                            }
                             // Run transactions
+                            // TODO: Process inside another worker, and optionally send an ack here
+                            // process_ops(msg_data: Bytes::from(b), op_vec);
                             let responses = process_sync_batch(&state, &msg, &user_id).await;
                             // Send response batch
                             let mut builder = FlatBufferBuilder::new();

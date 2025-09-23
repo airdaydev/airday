@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use sqlx::prelude::FromRow;
-use std::pin::Pin;
+use std::{ops::Range, pin::Pin};
 use uuid::Uuid;
 
 pub type PayloadBlob = Vec<u8>;
@@ -13,17 +13,22 @@ pub type Sha256 = Vec<u8>;
 pub type AttributeFBVec<'a> =
     Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
-pub struct IncomingSyncOp<'a> {
-    pub base_seq: i64,
-    pub op_kind: i8,
-    pub library_id: Uuid,
+pub struct IncomingSyncMsg {
+    // sync concerns
+    pub base_seq: Option<i64>, // only for snapshots
+    pub op_kind: i8,           // TODO: CONST these types
+    // static attrs
+    pub library_id: Uuid, //
     pub obj_id: Uuid,
     pub obj_kind: i16,
-    pub path: Option<i64>,
+    pub path: i16,
+    pub tombstone_utc: Option<i16>,
+    // payload
+    pub payload_range: Range<usize>,
 }
 
 #[derive(FromRow)]
-pub struct SyncOp<'a> {
+pub struct SyncOp {
     // sync concerns
     pub seq: Option<i64>,
     pub base_seq: i64, // snapshot seq base
@@ -33,9 +38,9 @@ pub struct SyncOp<'a> {
     pub library_id: Uuid,
     pub obj_id: Uuid,
     pub obj_kind: i16,
-    pub path: Option<i16>, // used for complex subfields e.g. text crdts
+    pub path: i16, // used for complex subfields e.g. text crdts (0 = no path)
     // flatbuffer blob (may be encrypted)
-    pub payload: Option<&'a PayloadBlob>, // Tied to flatbuffer
+    pub payload: Option<PayloadBlob>, // Tied to flatbuffer
     pub payload_sha256: Option<Sha256>,
     // metadata
     pub tombstone_utc: Option<i64>,

@@ -1,7 +1,6 @@
 use crate::{
     common::error::AppError,
     sync_engine::engine::{SyncOp, SyncOpModel, SyncOpSql},
-    sync_transport::{proto_generated::proto::SyncOpActionProto, sync},
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
@@ -28,24 +27,6 @@ async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Resul
         sync_op.library_id,
         sync_op.obj_kind,
         sync_op.payload,
-    )
-    .execute(tx.as_mut())
-    .await?;
-    Ok(server_seq)
-}
-
-async fn insert_proto<'a, 'b>(
-    tx: &mut Transaction<'a, Sqlite>,
-    sync_op: &SyncOpActionProto<'b>,
-) -> Result<i64, AppError> {
-    let server_seq = now_micros();
-    sqlx::query!(
-        r#"INSERT INTO sync_op (library_id, obj_id, obj_kind, payload)
-           VALUES (?, ?, ?, ?)"#,
-        sync_op.library_id(),
-        sync_op.obj_id(),
-        sync_op.obj_id(),
-        sync_op.obj_id(),
     )
     .execute(tx.as_mut())
     .await?;

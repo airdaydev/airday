@@ -26,6 +26,7 @@ dependencies = [
  "axum",
  "base64",
  "bpaf",
+ "bytes",
  "chrono",
  "crdt",
  "flatbuffers",

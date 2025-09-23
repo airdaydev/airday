@@ -124,8 +124,8 @@ async fn main() {
             post(auth::session::refresh_session_bearer),
         )
         .route("/user", put(user::model::update_user_handler))
-        .route("/auth/sessions", post(auth::session::get_user_sessions))
-        .route("/ws", any(sync_transport::websocket::handler));
+        .route("/auth/sessions", post(auth::session::get_user_sessions));
+    // .route("/ws", any(sync_transport::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
@@ -139,13 +139,12 @@ async fn main() {
         .layer(CookieManagerLayer::new())
         .layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
-                // Log the matched route's path (with placeholders not filled in).
-                // Use request.uri() or OriginalUri if you want the real path.
                 let matched_path = request
                     .extensions()
                     .get::<MatchedPath>()
                     .map(MatchedPath::as_str);
 
+                // Consider request.uri() or OriginalUri for real path, as opposed to matched
                 info_span!(
                     "http_request",
                     method = ?request.method(),
