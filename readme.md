@@ -2,7 +2,7 @@
 
 [Airday](https://air.day/) calendar & tasks app monorepo
 
-ATTN: Airday is in alpha & undergoes extensive and frequent changes, it is not ready to use.
+⚠️ ATTN: Airday is undergoing extensive and frequent changes, it is not ready to use.
 
 ```
 📁 monorepo
