@@ -3,12 +3,12 @@ use uuid::Uuid;
 
 use crate::{
     sync::{
+        batch_response::BatchResponse,
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
             BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
             MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
         },
-        sync::BatchAction,
     },
     user::model::User,
 };
@@ -51,10 +51,10 @@ use crate::{
 
 pub fn build_batch_sync_msg<'a>(
     builder: &mut FlatBufferBuilder<'a>,
-    actions: Vec<BatchAction>,
+    responses: Vec<BatchResponse>,
 ) -> WIPOffset<UnionWIPOffset> {
-    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(actions.len());
-    for action in actions {
+    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(responses.len());
+    for action in responses {
         comps.push(action.build_flatbuffer(builder));
     }
 
