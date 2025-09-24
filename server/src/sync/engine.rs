@@ -1,7 +1,11 @@
 use crate::{
     auth::cache::AuthCache,
     common::{error::AppError, sql::Db},
-    sync::{proto_generated::proto::AttributeProto, sync::BatchAction, websocket::WebsocketState},
+    sync::{
+        proto_generated::proto::{AttributeProto, OpKind},
+        sync::BatchAction,
+        websocket::WebsocketState,
+    },
 };
 use async_trait::async_trait;
 use axum::body::Bytes;
@@ -42,8 +46,8 @@ pub struct IncomingSyncOpBatch {
 pub struct SyncOp {
     // sync concerns
     pub seq: Option<Seq>,
-    pub base_seq: i64, // snapshot seq base
-    pub op_kind: i8,   // TODO: Specify allowable enums
+    pub base_seq: i64,   // snapshot seq base
+    pub op_kind: OpKind, // TODO: Specify allowable enums
     pub archived: bool,
     // static attrs
     pub library_id: Uuid,
