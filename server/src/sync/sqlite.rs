@@ -21,19 +21,37 @@ impl SyncOpModelSqlite {
     }
 }
 
-async fn insert<'a>(tx: &mut Transaction<'a, Sqlite>, sync_op: &SyncOp) -> Result<i64, AppError> {
-    let server_seq = now_micros();
-    sqlx::query!(
-        r#"INSERT INTO sync_op (obj_id, library_id, obj_kind, payload)
-           VALUES (?, ?, ?, ?)"#,
-        sync_op.obj_id,
-        sync_op.library_id,
-        sync_op.obj_kind,
-        sync_op.payload,
+async fn insert<'a>(
+    tx: &mut Transaction<'a, Sqlite>,
+    op: &IncomingSyncOp,
+) -> Result<i64, AppError> {
+    let now = now_micros();
+    let payload = op.payload.as_ref();
+    let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
+    let result = sqlx::query!(
+        r#"INSERT INTO sync_op (
+            base_seq, archived, op_id, op_kind,
+            library_id, obj_id, path, obj_kind,
+            payload, payload_sha256,
+            tombstone_utc, created_utc, client_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+        op.base_seq,
+        false, // archived = false for new operations
+        op.op_id,
+        op.op_kind,
+        op.library_id,
+        op.obj_id,
+        op.path,
+        op.obj_kind,
+        payload,
+        payload_sha256,
+        op.tombstone_utc,
+        now,
+        None::<Uuid> // TODO: Get client_id from somewhere
     )
     .execute(tx.as_mut())
     .await?;
-    Ok(server_seq)
+    Ok(result.last_insert_rowid())
 }
 
 // TODO: We are no longer CASing but will leave this temporarily for reference
@@ -128,88 +146,23 @@ impl SyncOpModel for SyncOpModelSqlite {
         };
         Ok(Some(sync_op))
     }
+    // Baseline approach, measure and upgrade to multi-insert
     async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError> {
-        let now = now_micros();
+        let mut tx = self.pool.begin().await?;
 
         if op.op_kind == OpKind::PATCH.0 {
             // Insert a new patch operation
-            let payload = op.payload.as_ref();
-            let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
-            let result = sqlx::query!(
-                r#"INSERT INTO sync_op (
-                    base_seq, archived, op_id, op_kind,
-                    library_id, obj_id, path, obj_kind,
-                    payload, payload_sha256,
-                    tombstone_utc, created_utc, client_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-                op.base_seq,
-                false, // archived = false for new operations
-                op.op_id,
-                op.op_kind,
-                op.library_id,
-                op.obj_id,
-                op.path,
-                op.obj_kind,
-                payload,
-                payload_sha256,
-                op.tombstone_utc,
-                now,
-                None::<Uuid> // TODO: Get client_id from somewhere
-            )
-            .execute(&self.pool)
-            .await?;
+            let seq = insert(&mut tx, op).await?;
 
             // Return the seq (rowid) of the inserted operation
-            Ok(result.last_insert_rowid())
+            Ok(seq)
         } else {
             // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
             // Snapshot = archive all (library_id, obj_id), add snapshot op
             panic!("Currently only OpKind::Patch supported");
         }
     }
-    // TODO: Break up this function so we are batching these, else each sync_op necessitates at least 2 individual transactions
-    // async fn merge_many(&self, sync_ops: &Vec<SyncOp>) -> Result<Vec<Option<i64>>, AppError> {
-    //     let mut results: Vec<Option<i64>> = vec![];
-    //     let mut retries = vec![];
-    //     let mut tx = self.pool.begin().await?;
-    //     let idx = 0;
-    //     for sync_op in sync_ops {
-    //         let server_seq = match merge(&mut tx, sync_op).await {
-    //             Ok(seq) => seq,
-    //             Err(err) => {
-    //                 println!("{:?}", err);
-    //                 if let AppError::RetryReq() = err {
-    //                     // Likely a contended result
-    //                     retries.push((idx, sync_op));
-    //                 } else {
-    //                     results.push(None);
-    //                 }
-    //                 // TODO: Propagate merge error to client?!
-    //                 continue;
-    //             }
-    //         };
-    //         results.push(Some(server_seq));
-    //     }
-    //     tx.commit().await?;
-    //     // Slow batch retry (most likely, due to contention)
-    //     // TODO: Try multiple times?
-    //     for sync_op in retries {
-    //         let mut tx = self.pool.begin().await?;
-    //         match merge(&mut tx, sync_op.1).await {
-    //             Ok(seq) => {
-    //                 results[sync_op.0] = Some(seq);
-    //             }
-    //             Err(err) => {
-    //                 println!("Merge retry failure: {:?}", err);
-    //                 // TODO: Leave Failure
-    //             }
-    //         }
-    //         if let Err(msg) = tx.commit().await {
-    //             println!("Merge retry failure {}", msg);
-    //         }
-    //     }
-    //     Ok(results)
-    // }
+
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
     fn get_by_library_stream<'a>(
         &'a self,
