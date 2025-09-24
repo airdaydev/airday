@@ -7,6 +7,7 @@
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
     "db": "sqlx database reset -y --source sqlite/migrations",
     "fb": "./flatbuffers/compile.sh",
+    "kill-server": "./kill-serverd.sh",
     "test": "./test.sh",
     "test-server": "cargo test --manifest-path server/Cargo.toml",
     "test-core": "pnpm test --dir ./js/core",
