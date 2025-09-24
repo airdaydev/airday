@@ -129,27 +129,43 @@ impl SyncOpModel for SyncOpModelSqlite {
         Ok(Some(sync_op))
     }
     async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError> {
+        let now = now_micros();
+
         if op.op_kind == OpKind::PATCH.0 {
+            // Insert a new patch operation
+            let payload = op.payload.as_ref();
+            let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
             let result = sqlx::query!(
-                r#"INSERT seq, base_seq, archived, op_kind,
-                library_id as "library_id: Uuid",
-                obj_id as "obj_id: Uuid", path, obj_kind,
-                payload, payload_sha256,
-                tombstone_utc, created_utc, client_id as "client_id: Uuid"
-                FROM sync_op WHERE library_id = ? AND obj_id = ?"#,
+                r#"INSERT INTO sync_op (
+                    base_seq, archived, op_id, op_kind,
+                    library_id, obj_id, path, obj_kind,
+                    payload, payload_sha256,
+                    tombstone_utc, created_utc, client_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                op.base_seq,
+                false, // archived = false for new operations
+                op.op_id,
+                op.op_kind,
+                op.library_id,
+                op.obj_id,
+                op.path,
+                op.obj_kind,
+                payload,
+                payload_sha256,
+                op.tombstone_utc,
+                now,
+                None::<Uuid> // TODO: Get client_id from somewhere
             )
-            .fetch_optional(&self.pool)
+            .execute(&self.pool)
             .await?;
-            let sync_op = match result {
-                Some(v) => v,
-                None => return Ok(None),
-            };
+
+            // Return the seq (rowid) of the inserted operation
+            Ok(result.last_insert_rowid())
         } else {
             // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
             // Snapshot = archive all (library_id, obj_id), add snapshot op
             panic!("Currently only OpKind::Patch supported");
         }
-        Ok(0)
     }
     // TODO: Break up this function so we are batching these, else each sync_op necessitates at least 2 individual transactions
     // async fn merge_many(&self, sync_ops: &Vec<SyncOp>) -> Result<Vec<Option<i64>>, AppError> {
