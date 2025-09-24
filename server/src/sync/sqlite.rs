@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{Pool, Sqlite, SqlitePool, Transaction};
 use std::pin::Pin;
 use uuid::Uuid;
 
@@ -22,7 +22,8 @@ impl SyncOpModelSqlite {
 }
 
 async fn insert<'a>(
-    tx: &mut Transaction<'a, Sqlite>,
+    // tx: &mut Transaction<'a, Sqlite>,
+    pool: &Pool<Sqlite>,
     op: &IncomingSyncOp,
 ) -> Result<i64, AppError> {
     let now = now_micros();
@@ -49,7 +50,8 @@ async fn insert<'a>(
         now,
         None::<Uuid> // TODO: Get client_id from somewhere
     )
-    .execute(tx.as_mut())
+    .execute(pool)
+    // .execute(tx.as_mut())
     .await?;
     Ok(result.last_insert_rowid())
 }
@@ -139,11 +141,11 @@ impl SyncOpModel for SyncOpModelSqlite {
     }
     // Baseline approach, measure and upgrade to multi-insert
     async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError> {
-        let mut tx = self.pool.begin().await?;
+        // let mut tx = self.pool.begin().await?;
 
         if op.op_kind == OpKind::PATCH.0 {
             // Insert a new patch operation
-            let seq = insert(&mut tx, op).await?;
+            let seq = insert(&self.pool, op).await?;
 
             // Return the seq (rowid) of the inserted operation
             Ok(seq)
@@ -192,12 +194,10 @@ mod tests {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
         let primary_library_id = user.primary_library.unwrap().id;
-        let mut op = mock_incoming_op(primary_library_id, None);
+        let op = mock_incoming_op(primary_library_id, None);
         let seq = db.sync_op.apply(&op).await.unwrap();
         println!("The sync number is {}", seq);
         assert!(seq >= 0);
-        let bzz = db.sync_op.get_by_seq(seq).await.unwrap();
-        println!("bzz, {:?}", bzz.is_some());
         let Ok(Some(sql_op)) = db.sync_op.get_by_seq(seq).await else {
             panic!("Failed to retrieve op after apply");
         };
