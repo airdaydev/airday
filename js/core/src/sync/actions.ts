@@ -1,8 +1,6 @@
 import { Builder, type Offset } from "flatbuffers";
 import {
   SyncOpActionProto,
-  AttributeProto,
-  AttrTypeProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
@@ -86,7 +84,7 @@ export class BatchAction {
       builder,
       this.id.toUUIDProto(),
     );
-    BatchComponentProto.addActionId(builder, actionIdOffset);
+    BatchComponentProto.addOpId(builder, actionIdOffset);
     const offset = BatchComponentProto.endBatchComponentProto(builder);
     return offset;
   }

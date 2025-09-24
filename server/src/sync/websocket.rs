@@ -269,7 +269,7 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
         .await;
         // Per message error handler
         if let Err(err) = result {
-            handle_websocket_error(&state, socket_id, err);
+            handle_websocket_error(&state, socket_id, err).await;
         }
     }
     state.ws.conn_map.lock().unwrap().remove(&socket_id);

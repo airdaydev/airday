@@ -1,9 +1,7 @@
-import {
-  AttributeSet,
-  AttrType,
-  invertSchema,
-  SyncObject,
-} from "./sync-object";
+import { Accessor, createSignal, Signal } from "solid-js";
+import { LWWRegister } from "../crdt/lww";
+import { SyncObject, RegisterMap, KeyMap, Change } from "./sync-object";
+import { Uuidv4 } from "../common/uuid";
 
 export const CONTAINER = 0;
 
@@ -11,16 +9,17 @@ export const ContainerFieldId = {
   CONTAINER_NAME: 256,
 } as const;
 
-export const CONTAINER_SCHEMA = {
-  0: { name: "name", t: AttrType.string },
-};
+export const CONTAINER_KEY_MAP = {
+  name: 0,
+} as const satisfies KeyMap;
 
-class ContainerAttributes extends AttributeSet<typeof CONTAINER_SCHEMA> {
-  schema = CONTAINER_SCHEMA;
-  invert = invertSchema(CONTAINER_SCHEMA);
+export interface ContainerAttrs extends RegisterMap<typeof CONTAINER_KEY_MAP> {
+  name?: LWWRegister<string>;
 }
 
-export class AirdayContainer extends SyncObject<typeof CONTAINER_SCHEMA> {
-  attributes = new ContainerAttributes();
-  readonly objectType = CONTAINER;
+export class AirdayContainer {
+  private syncObject: SyncObject;
+  constructor(syncObject: SyncObject) {
+    this.syncObject = syncObject;
+  }
 }

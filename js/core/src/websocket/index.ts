@@ -228,7 +228,7 @@ export class WebsocketManager {
       const component = batchMsg.batch(i);
       if (!component) continue;
 
-      const actionId = Uuidv4.fromFBProto(component.actionId());
+      const actionId = Uuidv4.fromFBProto(component.opId());
       const actionType = component.actionType();
 
       switch (actionType) {
