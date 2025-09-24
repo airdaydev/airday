@@ -94,7 +94,7 @@ async fn main() {
     let db = common::sql::connect_sqlite(&cfg).await;
     let ws = sync::websocket::WebsocketState::new();
     let auth_cache = AuthCache::new();
-    let op_batch_processor = OpBatchProcessor::new(&ws, &auth_cache, &db);
+    let op_batch_processor = OpBatchProcessor::new(&ws, &auth_cache, &db).await;
 
     // App state
     let state = AppState {

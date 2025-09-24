@@ -49,6 +49,7 @@ pub async fn connect_sqlite(config: &AirdayConfig) -> Db {
         .unwrap()
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
         .synchronous(sqlx::sqlite::SqliteSynchronous::Normal);
+    // Note that leaving on Normal subjects us to rollbacks that must be dealt with in sync protocol
     // TODO: Move extension into a local addr
     // .extension("/usr/local/lib/sqlite3/uuid.so");
     let pool_res = SqlitePoolOptions::new()
