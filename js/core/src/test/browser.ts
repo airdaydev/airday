@@ -109,7 +109,7 @@ export const tests = async () => {
       objectType: 0,
       libraryId: core.library.id!,
     });
-    syncObj.values[0].data = new LWWRegister({
+    syncObj.values[0] = new LWWRegister({
       data: "hello",
     });
     let action = core.sync.syncItems([syncObj])[0];

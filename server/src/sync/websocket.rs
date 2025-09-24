@@ -228,7 +228,12 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                 socket_id: socket_id,
                                 ops: op_vec,
                             };
-                            state.op_batch_processor.tx.send(batch).await;
+                            if let Err(err) = state.op_batch_processor.tx.send(batch).await {
+                                println!("Error sending to batch processor: {}", err);
+                                return Err(AppError::ServerError(String::from(
+                                    "Server error when processing",
+                                )));
+                            };
                             // TODO: Optional acknowledgement (is there a point)
                         }
                         MessageProto::SyncStreamReqProto => {
