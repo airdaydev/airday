@@ -145,7 +145,7 @@ async fn process_batch_ops(
 
 #[async_trait]
 pub trait SyncOpModel: Send + Sync {
-    async fn get_by_id(&self, library_id: &Uuid, id: &Uuid) -> Result<Option<SyncOpSql>, AppError>;
+    async fn get_by_seq(&self, seq: i64) -> Result<Option<SyncOpSql>, AppError>;
     // Accept query options
     fn get_by_library_stream<'a>(
         &'a self,

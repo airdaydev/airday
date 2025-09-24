@@ -1,8 +1,10 @@
 use crate::{
     auth::session::{ClientMeta, UserSession},
     common::sql::Db,
+    sync::engine::IncomingSyncOp,
     user::model::User,
 };
+use axum::body::Bytes;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -35,23 +37,19 @@ pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
     .unwrap()
 }
 
-// TODO: Distinguish incoming vs server-sourced
-// pub fn mock_full_item_op(library_id: Uuid, id: Option<Uuid>) -> SyncOp {
-//     SyncOp {
-//         seq: 0, // Do better
-//         base_seq: None,
-//         op_kind: 0,
-//         // static attrs
-//         library_id,
-//         obj_kind: 0,
-//         obj_id: id.unwrap_or(Uuid::new_v4()),
-//         path: None,
-//         // flatbuffer
-//         payload: vec![],
-//         payload_sha256: None,
-//         // metadata
-//         tombstone_utc: None,
-//         created_utc: None,
-//         client_id: None,
-//     }
-// }
+pub fn mock_incoming_op(library_id: Uuid, obj_id: Option<Uuid>) -> IncomingSyncOp {
+    IncomingSyncOp {
+        op_id: Uuid::new_v4(),
+        base_seq: None,
+        op_kind: 0,
+        // static attrs
+        library_id,
+        obj_kind: 0,
+        obj_id: obj_id.unwrap_or(Uuid::new_v4()),
+        path: 0,
+        // flatbuffer
+        payload: Bytes::new(),
+        // metadata
+        tombstone_utc: None,
+    }
+}
