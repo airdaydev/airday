@@ -1,6 +1,6 @@
 import { ByteBuffer } from "flatbuffers";
 import {
-  SyncOpActionProto,
+  SyncOpProto,
   ActionProto,
   MessageWrapperProto,
   AuthenticateResponseProto,
@@ -10,7 +10,7 @@ import {
   BatchResponseProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
-import { AuthenticateAction } from "../sync/actions";
+import { AuthenticateAction } from "../sync/fb";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
@@ -232,9 +232,9 @@ export class WebsocketManager {
       const actionType = component.actionType();
 
       switch (actionType) {
-        case ActionProto.SyncOpActionProto:
-          tracer.addTag(span, "msg_type", "SyncOpActionProto");
-          const objectResponse = new SyncOpActionProto();
+        case ActionProto.SyncOpProto:
+          tracer.addTag(span, "msg_type", "SyncOpProto");
+          const objectResponse = new SyncOpProto();
           component.action(objectResponse);
           // TODO: Validate and add object to storage
           console.log("syncobjectreceived", objectResponse);

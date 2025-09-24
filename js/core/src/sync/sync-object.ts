@@ -3,6 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
+import { SyncOpFB } from "./fb";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
@@ -98,6 +99,10 @@ export class SyncObject {
       lastModified: this.lastModified,
       attributes,
     };
+  }
+
+  fullSyncOp() {
+    const op = new SyncOpFB(this);
   }
 
   // TODO: Complete implementation

@@ -1,6 +1,6 @@
 import { Builder, type Offset } from "flatbuffers";
 import {
-  SyncOpActionProto,
+  SyncOpProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
@@ -114,22 +114,22 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
-export class SyncOpAction extends BatchAction {
+export class SyncOpFB extends BatchAction {
   syncObject: SyncObject;
-  actionProto = ActionProto.SyncOpActionProto;
+  actionProto = ActionProto.SyncOpProto;
   constructor(syncObject: SyncObject) {
     super();
     this.syncObject = syncObject;
   }
   addToFlatBuffer(builder: Builder) {
     const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
-    SyncOpActionProto.startSyncOpActionProto(builder);
-    SyncOpActionProto.addObjKind(builder, this.syncObject.objectType);
-    SyncOpActionProto.addObjId(
+    SyncOpProto.startSyncOpProto(builder);
+    SyncOpProto.addObjKind(builder, this.syncObject.objectType);
+    SyncOpProto.addObjId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
     );
-    SyncOpActionProto.addLibraryId(
+    SyncOpProto.addLibraryId(
       builder,
       UuidProto.createUuidProto(
         builder,
@@ -137,9 +137,9 @@ export class SyncOpAction extends BatchAction {
       ),
     );
     // TODO: This should be opaque for now but encrypted before release
-    // SyncOpActionProto.addPayload(builder, vectorOffset);
-    // SyncOpActionProto.addPayloadSha256(builder, vectorOffset);
-    const actionOffset = SyncOpActionProto.endSyncOpActionProto(builder);
+    // SyncOpProto.addPayload(builder, vectorOffset);
+    // SyncOpProto.addPayloadSha256(builder, vectorOffset);
+    const actionOffset = SyncOpProto.endSyncOpProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }
 }

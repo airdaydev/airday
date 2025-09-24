@@ -186,10 +186,10 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                             };
                             let mut op_vec: Vec<IncomingSyncOp> = Vec::new();
                             for ap in msg.batch().iter() {
-                                if ap.action_type() == ActionProto::SyncOpActionProto {
+                                if ap.action_type() == ActionProto::SyncOpProto {
                                     // TODO: Break this whole thing so we can propagate an error back to the top and send
                                     // Zero-copy body & encapsulate
-                                    let op_raw = ap.action_as_sync_op_action_proto().unwrap();
+                                    let op_raw = ap.action_as_sync_op_proto().unwrap();
                                     let payload_slice = op_raw.payload().unwrap().bytes();
                                     let start =
                                         payload_slice.as_ptr() as usize - b.as_ptr() as usize;

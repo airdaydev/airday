@@ -3,7 +3,7 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
-import { BatchAction, BatchSyncMessage, SyncOpAction } from "./actions";
+import { BatchAction, BatchSyncMessage, SyncOpFB } from "./fb";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
@@ -87,14 +87,13 @@ export class AirdaySync {
       })
       .map((item) => {
         item.startSync();
-        const action = new SyncOpAction(item);
+        const action = new SyncOpFB(item);
         // TODO: Ensure this works for updated items too
         // TODO: idb direct access?
         this.core.storage.idb.upsert([item]); // optimistic update
         this.outbox.set(action.id.toHex(), action);
         return action;
       });
-    console.log("sending actions", actions.length);
     const message = new BatchSyncMessage(actions);
     this.core.ws.enqueueAirdayMessage(message);
     return actions;
@@ -110,7 +109,7 @@ export class AirdaySync {
   handleBatchResponse = (res: BatchResponseEvent) => {
     const action = this.outbox.get(res.actionId.toHex());
 
-    if (action instanceof SyncOpAction) {
+    if (action instanceof SyncOpFB) {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
         if (res.serverSeq) {
