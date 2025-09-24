@@ -4,12 +4,13 @@ use crate::{
     sync::{
         batch_response::BatchResponse,
         fb::{build_batch_sync_msg, wrap_message},
-        proto_generated::proto::{AttributeProto, OpKind},
-        websocket::WebsocketState,
+        proto_generated::proto::{AttributeProto, MessageProto, OpKind},
+        websocket::{WebsocketState, send_to_client},
     },
 };
 use async_trait::async_trait;
 use axum::body::Bytes;
+use flatbuffers::FlatBufferBuilder;
 use sqlx::prelude::FromRow;
 use std::pin::Pin;
 use tokio::sync::mpsc::{self, Sender};
@@ -101,8 +102,8 @@ impl OpBatchProcessor {
     }
 }
 
+// Optimisation: Transactions
 async fn process_batch_ops(
-    // Uhh but we need access to app state...?
     mut rx: mpsc::Receiver<IncomingSyncOpBatch>,
     ws: WebsocketState,
     auth_cache: AuthCache,
@@ -135,9 +136,10 @@ async fn process_batch_ops(
                 }
             };
         }
-        let offset = build_batch_sync_msg(builder, responses);
-        wrap_message(builder, message_type, message_offset)
-        // send_to_client(&ws, &batch.socket_id, message).await;
+        let mut builder = FlatBufferBuilder::new();
+        let message_offset = build_batch_sync_msg(&mut builder, responses);
+        let message = wrap_message(&mut builder, MessageProto::BatchSyncProto, message_offset);
+        send_to_client(&ws, &batch.socket_id, message).await;
     }
 }
 
