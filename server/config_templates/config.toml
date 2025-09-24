@@ -8,7 +8,7 @@ sqlx_host = "sqlite:$HOME/.config/airday/airday.db"
 
 # ░▒█ Telemetry
 log_level = "debug"
-otlp_host = "http://localhost:4318/v1/traces"
+# otlp_host = "http://localhost:4318/v1/traces"
 
 # ░▒█ Server features
 # Allow new sign ups on this instance

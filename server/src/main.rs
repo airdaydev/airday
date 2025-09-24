@@ -39,7 +39,7 @@ use crate::sync::engine::OpBatchProcessor;
 use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::{Method, Request};
-use axum::routing::{get, post, put};
+use axum::routing::{any, get, post, put};
 use bpaf::Bpaf;
 use std::fs;
 use tower_cookies::CookieManagerLayer;
@@ -128,8 +128,8 @@ async fn main() {
             post(auth::session::refresh_session_bearer),
         )
         .route("/user", put(user::model::update_user_handler))
-        .route("/auth/sessions", post(auth::session::get_user_sessions));
-    // .route("/ws", any(sync::websocket::handler));
+        .route("/auth/sessions", post(auth::session::get_user_sessions))
+        .route("/ws", any(sync::websocket::handler));
 
     let listener = tokio::net::TcpListener::bind(format!("{}", host_str))
         .await
