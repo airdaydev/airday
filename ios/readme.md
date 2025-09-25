@@ -1,7 +1,12 @@
 # Placeholder for Swift/UIKit based app
 
 ## TODO:
-- [] After JS is polished, prototype basic Rust Core + ultra basic FFI w uniffi-rs + SwiftUI
+- [] After JS is polished, prototype basic Rust Core + ultra basic FFI w uniffi-rs
+- [] Auth
+- [] Connect data layer and display static list
+- [] Build good DnD UIKit/SwiftUI
+- [] Simple calendar
+- [] Better calendar
 
 ## Resources
 - [] https://forgen.tech/en/blog/post/building-an-ios-app-with-rust-using-uniffi
