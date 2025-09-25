@@ -129,6 +129,8 @@ export const tests = async () => {
       0,
       "ack message received & pending queue back to 0",
     );
+    // seq persisted to sync object
+    ctx.assert(!!syncObj.seq && syncObj.seq > 0);
     //   const item = (
     //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
     //   )[0];

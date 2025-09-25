@@ -78,12 +78,12 @@ table LibrarySyncResponseProto {
 table BatchResponseProto {
   success: bool;
   error: string;
-  server_seq: long;
+  seq: long;
 }
 
 table SyncStreamReqProto {
   library_id: UuidProto (required);
-  server_seq: long;
+  seq: long;
 }
 
 union ActionProto {

@@ -30,7 +30,7 @@ impl BatchResponse {
                     &BatchResponseProtoArgs {
                         success: true,
                         error: None,
-                        server_seq: *seq,
+                        seq: *seq,
                     },
                 )
                 .as_union_value();

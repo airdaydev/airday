@@ -18,9 +18,9 @@ import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 
 export interface BatchResponseEvent {
-  actionId: Uuidv4;
+  opId: Uuidv4;
   success: boolean;
-  serverSeq?: bigint; // TODO
+  seq?: bigint; // TODO
   error?: string;
 }
 
@@ -228,7 +228,7 @@ export class WebsocketManager {
       const component = batchMsg.batch(i);
       if (!component) continue;
 
-      const actionId = Uuidv4.fromFBProto(component.opId());
+      const opId = Uuidv4.fromFBProto(component.opId());
       const actionType = component.actionType();
 
       switch (actionType) {
@@ -244,8 +244,9 @@ export class WebsocketManager {
           const batchResponse = new BatchResponseProto();
           component.action(batchResponse);
           this.events.emit("batch-response", {
-            actionId,
+            opId,
             success: batchResponse.success(),
+            seq: batchResponse.seq(),
           });
           break;
         }

@@ -93,12 +93,12 @@ export class BatchAction {
 export class SyncStreamReqMessage extends AirdayMessage {
   id = new Uuidv4();
   libraryId: Uuidv4;
-  serverSeq: bigint | null = null;
+  seq: bigint | null = null;
   type = MessageProto.SyncStreamReqProto;
-  constructor(libraryId: Uuidv4, serverSeq: bigint | null = null) {
+  constructor(libraryId: Uuidv4, seq: bigint | null = null) {
     super();
     this.libraryId = libraryId;
-    this.serverSeq = serverSeq;
+    this.seq = seq;
   }
   addToFlatBuffer(builder: Builder): Offset {
     SyncStreamReqProto.startSyncStreamReqProto(builder);
@@ -106,8 +106,8 @@ export class SyncStreamReqMessage extends AirdayMessage {
       builder,
       UuidProto.createUuidProto(builder, this.libraryId.toUUIDProto()),
     );
-    if (this.serverSeq) {
-      SyncStreamReqProto.addServerSeq(builder, this.serverSeq);
+    if (this.seq) {
+      SyncStreamReqProto.addSeq(builder, this.seq);
     }
     const messageOffset = SyncStreamReqProto.endSyncStreamReqProto(builder);
     return messageOffset;

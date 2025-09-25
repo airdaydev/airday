@@ -100,24 +100,19 @@ export class AirdaySync {
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
   handleBatchResponse = (res: BatchResponseEvent) => {
-    const action = this.outbox.get(res.actionId.toHex());
+    const action = this.outbox.get(res.opId.toHex());
 
     if (action instanceof SyncOp) {
       if (res.success) {
-        // TODO: Merge op!!
-        // TODO: Maybe separate success message is a good thing!
-        // if (res.seq) {
-        //   action.syncObject.seq = res.seq;
-        // }
-        // TODO: targeted change instead of blunt (pass in idb to endSync?)
+        // TODO: Return seq
+        if (res.seq) {
+          action.syncObject.seq = res.seq;
+        }
+        // TODO: persist .seq!
         // this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {
         //   console.log(err);
         // });
-        // this.outbox.delete(res.actionId.toHex());
-        // if (this.outbox.size === 0) {
-        //   // Consider renaming: no pending acknowledgements remaining
-        //   this.events.emit("flushed", {});
-        // }
+        this.outbox.delete(res.opId.toHex());
       }
     } else {
       console.error("Failed to sync item", res.error);
