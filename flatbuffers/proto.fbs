@@ -49,18 +49,17 @@ enum OpKind: byte {
 
 table SyncOpProto {
   // sync meta
-  proto_version: ushort = 1;
+  proto_version: ushort = 1; // TODO: Consider hoisting to parent
   op_kind: OpKind;
   op_id: UuidProto (required);
   base_seq: long; // for snapshot only
   // path
   library_id: UuidProto (required);
   obj_id: UuidProto (required);
-  obj_kind: short; // TODO: consider
+  obj_kind: short;
   path: short;
   // data
   payload: [uint8]; // encrypted payload
-  payload_sha256: [ubyte] (required);
 }
 
 table AuthenticateActionProto {

@@ -124,8 +124,9 @@ export const tests = async () => {
         resolve(null);
       });
     });
-    ctx.assert(
-      core.sync.outbox.size === 0,
+    ctx.assertEq(
+      core.sync.outbox.size,
+      0,
       "ack message received & pending queue back to 0",
     );
     //   const item = (

@@ -141,6 +141,7 @@ export class SyncOp extends BatchAction {
       vectorOffset = builder.createByteVector(this.payload);
     }
     SyncOpProto.startSyncOpProto(builder);
+    SyncOpProto.addProtoVersion(builder, 1);
     SyncOpProto.addOpId(
       builder,
       UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
