@@ -34,7 +34,7 @@ export const tests = async () => {
   const suite = new BrowserRunner();
 
   // TODO: Null values to clear? or explicit clear field?
-  suite.test("Create, encode & decode SyncObject", async (ctx) => {
+  suite.test("Create, encode & decode SyncOp via SyncObject", async (ctx) => {
     const libraryId = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
@@ -50,10 +50,7 @@ export const tests = async () => {
     syncObj.values[2] = new LWWRegister({
       data: false,
     });
-    const builder = new Builder();
-    const offset = syncObj.toFlatBuffer(builder);
-    builder.finish(offset);
-    const buffer = builder.asUint8Array();
+    const buffer = syncObj.getFullAttrPayload();
     ctx.assertEq(buffer.byteLength, 184);
     // Parse
     const syncObjB = new SyncObject({
@@ -68,7 +65,6 @@ export const tests = async () => {
 
   suite.test("Merge SyncObject", async (ctx) => {
     const library = new Uuidv4();
-    // Create an object
     const syncObj = new SyncObject({
       objectType: 0,
       libraryId: library,
@@ -79,10 +75,6 @@ export const tests = async () => {
     syncObj.values[1] = new LWWRegister({
       data: 32,
     });
-    // TODO: Outbox nor persistence layer yet affected
-
-    // Create a patch
-    // So, a patch is a partial attribute set that merges with object (persistent) + hits persistent outbox
     const patch: NumericAttrMap = {
       0: new LWWRegister({
         data: "hello again",

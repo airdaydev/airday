@@ -1,6 +1,6 @@
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
-import { SyncStreamReqMessage } from "./actions";
+import { SyncStreamReqMessage } from "./fb";
 
 // Subprotocols for AirdayCore streams
 // Activated on connect/reconnect

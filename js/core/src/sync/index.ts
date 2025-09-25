@@ -101,15 +101,14 @@ export class AirdaySync {
     if (action instanceof SyncOp) {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
-        if (res.serverSeq) {
-          action.syncObject.serverSeq = res.serverSeq;
-        }
+        // if (res.seq) {
+        //   action.syncObject.seq = res.seq;
+        // }
         // TODO: targeted change instead of blunt (pass in idb to endSync?)
         this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {
           console.log(err);
         });
         this.outbox.delete(res.actionId.toHex());
-        action.syncObject.endSync();
         if (this.outbox.size === 0) {
           // Consider renaming: no pending acknowledgements remaining
           this.events.emit("flushed", {});
