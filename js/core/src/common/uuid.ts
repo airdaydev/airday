@@ -59,4 +59,11 @@ export class Uuidv4 extends Uint8Array {
     }
     return result;
   }
+  equals(other: Uuidv4): boolean {
+    if (this.length !== other.length) return false;
+    for (let i = 0; i < 16; i++) {
+      if (this[i] !== other[i]) return false;
+    }
+    return true;
+  }
 }

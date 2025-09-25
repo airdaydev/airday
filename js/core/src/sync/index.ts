@@ -80,15 +80,16 @@ export class AirdaySync {
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
   async queueOps(ops: SyncOp[]) {
+    let promises = [];
     for (let op of ops) {
       // TODO: Cleaner to await, but we don't really need to?
-      this.core.storage.idb.addOps([op]).catch((err) => {
-        console.log("Error inserting ops", err);
-      });
+      promises.push(this.core.storage.idb.addOps([op]));
+      this.core.storage.setSyncObject(op.syncObject);
       this.outbox.set(op.id.toHex(), op);
     }
     const message = new BatchSyncMessage(ops);
     this.core.ws.enqueueAirdayMessage(message);
+    await Promise.all(promises);
   }
   initOutbox() {
     // Collects pending items from database to sync on boot

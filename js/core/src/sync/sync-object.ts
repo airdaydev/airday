@@ -68,7 +68,7 @@ export class SyncObject {
   toIdb(): DBSyncObject {
     // Create attribute flatbuffer blob
     return {
-      id: this.id.toHex(),
+      id: this.id,
       objKind: this.objKind,
       libraryId: this.libraryId.toHex(),
       seq: this.seq,
@@ -267,7 +267,7 @@ export class SyncObject {
 
 // TODO: Delete this in favour of custom-built meta and attributes (split)
 const DBSyncObjectSchema = v.object({
-  id: v.string().required(),
+  id: v.any().required(),
   objKind: v.number().required(),
   libraryId: v.string().required(),
   seq: v.anyOf([v.unknown(), v.null()]),

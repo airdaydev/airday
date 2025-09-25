@@ -1,6 +1,7 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { parseGenericSyncObject, SyncObject } from "../sync/sync-object";
 import { SyncOp } from "../sync/fb";
+import { Uuidv4 } from "../common/uuid";
 
 const SYNC_STORE_NAME = "sync_object";
 const LIBRARY_STORE_NAME = "library";
@@ -8,20 +9,20 @@ const OUTBOX_STORE_NAME = "outbox";
 
 export interface AirdayDBSchema extends DBSchema {
   [SYNC_STORE_NAME]: {
-    key: string;
+    key: Uint8Array;
     value: any;
     indexes: {
-      libraryId: string;
+      libraryId: Uint8Array;
       objKind: number;
     };
   };
   [LIBRARY_STORE_NAME]: {
-    key: string;
+    key: Uint8Array;
     value: any;
     indexes: {};
   };
   [OUTBOX_STORE_NAME]: {
-    key: string;
+    key: Uint8Array;
     value: any;
     indexes: {};
   };
@@ -42,10 +43,10 @@ export class AirdayIDB {
         });
         objects.createIndex("libraryId", "libraryId");
         objects.createIndex("objKind", "objKind");
-        const library = db.createObjectStore(LIBRARY_STORE_NAME, {
+        db.createObjectStore(LIBRARY_STORE_NAME, {
           keyPath: "id",
         });
-        const outbox = db.createObjectStore(OUTBOX_STORE_NAME, {
+        db.createObjectStore(OUTBOX_STORE_NAME, {
           keyPath: "id",
         });
       },
@@ -59,15 +60,16 @@ export class AirdayIDB {
     const syncStore = tx.objectStore(SYNC_STORE_NAME);
     const outboxStore = tx.objectStore(OUTBOX_STORE_NAME);
     // TODO: Extract useful indexes e.g. archived
-    const promises: Promise<string>[] = [];
+    const promises: Promise<Uint8Array>[] = [];
     ops.map((op) => {
-      promises.push(outboxStore.put(op.toIdb()));
       promises.push(syncStore.put(op.syncObject.toIdb())); // Assumption: this is latest state of objects
+      promises.push(outboxStore.put(op.toIdb()));
     });
     await Promise.all(promises);
     await tx.done;
+    console.log("transaction done with", promises.length, "promises");
   };
-  getByLibrary = async (libraryId: string) => {
+  getByLibrary = async (libraryId: Uuidv4) => {
     const res = await this.handle!.getAllFromIndex(
       SYNC_STORE_NAME,
       "libraryId",
@@ -85,7 +87,14 @@ export class AirdayIDB {
     });
     return objects;
   };
-  delete = async (hexIds: string[]) => {
+  getOutboxItem = (id: Uuidv4) => {
+    return this.handle!.get(OUTBOX_STORE_NAME, id);
+  };
+  getSyncObject = (id: Uuidv4) => {
+    console.log("calling getsyncobj with", id);
+    return this.handle!.get(SYNC_STORE_NAME, id);
+  };
+  delete = async (hexIds: Uuidv4[]) => {
     // await this.db!.handle?.delete(SYNC_STORE_NAME, id);
     const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);

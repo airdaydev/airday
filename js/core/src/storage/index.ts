@@ -18,22 +18,24 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   idb = new AirdayIDB();
-  items: Map<string, SyncObject> = new Map(); // hex-id-backed index
+  syncObjects: Map<string, SyncObject> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore) {
     this.core = core;
   }
   async removeItems(ids: Uuidv4[]) {
-    const hexes = ids.map((id) => id.toHex());
-    hexes.forEach((hex) => this.items.delete(hex));
-    await this.idb.delete(hexes);
+    ids.forEach((id) => this.syncObjects.delete(id.toHex()));
+    await this.idb.delete(ids);
     // TODO: trigger subscription remove event!
   }
   // TODO: Trigger patch?
   subscribe() {
     // Ensure this happens in batches
   }
-  getById(id: Uuidv4) {
-    return this.items.get(id.toHex());
+  setSyncObject(obj: SyncObject) {
+    this.syncObjects.set(obj.id.toHex(), obj);
+  }
+  getSyncObjectById(id: Uuidv4) {
+    return this.syncObjects.get(id.toHex());
   }
 }

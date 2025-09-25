@@ -105,19 +105,29 @@ export const tests = async () => {
       data: "hello",
     });
     const op = syncObj.fullSyncOp();
-    core.sync.queueOps([op]);
+    await core.sync.queueOps([op]);
     const outbox = core.sync.outbox.get(op.id.toHex());
-    ctx.assertEq(outbox?.id, op.id, "message gets placed in outbox");
-    // TODO: Test storage in idb of both sync object + op
-    //   await new Promise((resolve) => {
-    //     core.ws.events.once("batch-response", (data) => {
-    //       resolve(null);
-    //     });
-    //   });
-    //   assert(
-    //     core.sync.pendingActions.size === 0,
-    //     "ack message received & pending queue back to 0",
-    //   );
+    if (!outbox?.id) throw new Error("fail test early");
+    ctx.assert(op.id.equals(outbox.id), "message gets placed in-mem outbox");
+    const outboxItemIdb = await core.storage.idb.getOutboxItem(op.id);
+    ctx.assert(
+      op.id.equals(outboxItemIdb.id),
+      "modified sync object gets stored in durable memory",
+    );
+    // TODO: Test mem storage of sync item
+    const syncObject = core.storage.getSyncObjectById(op.syncObject.id);
+    ctx.assert(!!syncObject, "recent sync object is in hot storage");
+    ctx.assertEq(syncObject, op.syncObject, "Sync object is not copied");
+    // test actual sync
+    await new Promise((resolve) => {
+      core.ws.events.once("batch-response", (data) => {
+        resolve(null);
+      });
+    });
+    ctx.assert(
+      core.sync.outbox.size === 0,
+      "ack message received & pending queue back to 0",
+    );
     //   const item = (
     //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
     //   )[0];
