@@ -125,6 +125,16 @@ export class SyncOp extends BatchAction {
     this.syncObject = syncObject;
     this.opKind = opKind;
   }
+  toIdb() {
+    return {
+      id: this.id,
+      opKind: OpKind,
+      libraryId: this.syncObject.libraryId,
+      objId: this.syncObject.id,
+      objKind: this.syncObject.objKind,
+      payload: this.payload,
+    };
+  }
   addToFlatBuffer(builder: Builder) {
     let vectorOffset;
     if (this.payload) {

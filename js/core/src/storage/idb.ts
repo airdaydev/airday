@@ -1,8 +1,10 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { parseGenericSyncObject, SyncObject } from "../sync/sync-object";
+import { SyncOp } from "../sync/fb";
 
-const SYNC_STORE_NAME = "syncable";
+const SYNC_STORE_NAME = "sync_object";
 const LIBRARY_STORE_NAME = "library";
+const OUTBOX_STORE_NAME = "outbox";
 
 export interface AirdayDBSchema extends DBSchema {
   [SYNC_STORE_NAME]: {
@@ -14,6 +16,11 @@ export interface AirdayDBSchema extends DBSchema {
     };
   };
   [LIBRARY_STORE_NAME]: {
+    key: string;
+    value: any;
+    indexes: {};
+  };
+  [OUTBOX_STORE_NAME]: {
     key: string;
     value: any;
     indexes: {};
@@ -38,19 +45,26 @@ export class AirdayIDB {
         const library = db.createObjectStore(LIBRARY_STORE_NAME, {
           keyPath: "id",
         });
+        const outbox = db.createObjectStore(OUTBOX_STORE_NAME, {
+          keyPath: "id",
+        });
       },
     });
   };
-  upsert = async (objects: SyncObject[]) => {
-    const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
-    const store = tx.objectStore(SYNC_STORE_NAME);
-    const b = await store.getAll();
-    // TODO: We also need to extract indexes in JSON version (e.g. done)!
-    await Promise.all(
-      objects.map((obj) => {
-        return store.put(obj.toDB());
-      }),
+  addOps = async (ops: SyncOp[]) => {
+    const tx = this.handle!.transaction(
+      [SYNC_STORE_NAME, OUTBOX_STORE_NAME],
+      "readwrite",
     );
+    const syncStore = tx.objectStore(SYNC_STORE_NAME);
+    const outboxStore = tx.objectStore(OUTBOX_STORE_NAME);
+    // TODO: Extract useful indexes e.g. archived
+    const promises: Promise<string>[] = [];
+    ops.map((op) => {
+      promises.push(outboxStore.put(op.toIdb()));
+      promises.push(syncStore.put(op.syncObject.toIdb())); // Assumption: this is latest state of objects
+    });
+    await Promise.all(promises);
     await tx.done;
   };
   getByLibrary = async (libraryId: string) => {

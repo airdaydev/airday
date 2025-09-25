@@ -65,7 +65,7 @@ export class SyncObject {
       });
     }
   }
-  toDB(): DBSyncObject {
+  toIdb(): DBSyncObject {
     // Create attribute flatbuffer blob
     return {
       id: this.id.toHex(),
