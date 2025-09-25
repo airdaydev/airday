@@ -3,7 +3,7 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
-import { BatchAction, BatchSyncMessage, SyncOpFB } from "./fb";
+import { BatchAction, BatchSyncMessage, SyncOp } from "./fb";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
@@ -79,24 +79,13 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  syncItems(items: SyncObject[]) {
-    // Filter out items currently in sync
-    const actions = items
-      .filter((item) => {
-        return !item.syncStarted;
-      })
-      .map((item) => {
-        item.startSync();
-        const action = new SyncOpFB(item);
-        // TODO: Ensure this works for updated items too
-        // TODO: idb direct access?
-        this.core.storage.idb.upsert([item]); // optimistic update
-        this.outbox.set(action.id.toHex(), action);
-        return action;
-      });
-    const message = new BatchSyncMessage(actions);
+  queueOps(ops: SyncOp[]) {
+    for (let op of ops) {
+      this.core.storage.idb.upsert([op.syncObject]); // optimistic update
+      this.outbox.set(op.id.toHex(), op);
+    }
+    const message = new BatchSyncMessage(ops);
     this.core.ws.enqueueAirdayMessage(message);
-    return actions;
   }
   initOutbox() {
     // Collects pending items from database to sync on boot
@@ -109,7 +98,7 @@ export class AirdaySync {
   handleBatchResponse = (res: BatchResponseEvent) => {
     const action = this.outbox.get(res.actionId.toHex());
 
-    if (action instanceof SyncOpFB) {
+    if (action instanceof SyncOp) {
       if (res.success) {
         // TODO: Maybe separate success message is a good thing!
         if (res.serverSeq) {

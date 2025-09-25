@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
-import { SyncOpFB } from "./fb";
+import { SyncOp } from "./fb";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
@@ -102,7 +102,9 @@ export class SyncObject {
   }
 
   fullSyncOp() {
-    const op = new SyncOpFB(this);
+    const op = new SyncOp(this);
+    op.payload = this.getFullAttrPayload();
+    return op;
   }
 
   // TODO: Complete implementation
@@ -210,19 +212,20 @@ export class SyncObject {
       timestamp,
     });
   }
-  // @dirtyOnly: Serialise only dirty attributes to flatbuffer (for efficient sync)
-  toFlatBuffer(builder: Builder, dirtyOnly: boolean = false) {
-    const attributes: number[] = [];
-    if (dirtyOnly && !this.dirty.size) {
-      // TODO: Figure out usage patterns to determine if an error is appropriate
-      throw new Error("no dirty attributes to send");
-    }
+  getFullAttrPayload() {
+    const allKeys = new Set<string>();
     for (let key of Object.keys(this.values)) {
-      if (dirtyOnly && !this.dirty.has(key)) {
-        // Skip non-dirty key
-        continue;
-      }
-      // TODO: careful translating direct
+      allKeys.add(key);
+    }
+    return this.getAttrPayload(allKeys);
+  }
+  getAttrPayload(keySet: Set<string>) {
+    if (!keySet.size) {
+      throw new Error("building payload with size = 0");
+    }
+    const builder = new Builder();
+    const attributes: number[] = [];
+    for (let key of keySet) {
       const offset = this.serialiseAttr(builder, Number(key));
       if (offset) {
         attributes.push(offset);
@@ -236,7 +239,8 @@ export class SyncObject {
       builder,
       attributesOffset,
     );
-    return offset;
+    builder.finish(offset);
+    return builder.asUint8Array();
   }
   serialiseAttr(builder: Builder, fieldId: number) {
     const field = this.values[fieldId];

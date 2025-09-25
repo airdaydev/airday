@@ -16,7 +16,7 @@ import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
-import { SyncObject } from "./sync-object";
+import { NumericAttrMap, SyncObject } from "./sync-object";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -114,16 +114,28 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
-export class SyncOpFB extends BatchAction {
+export class SyncOp extends BatchAction {
   syncObject: SyncObject;
   actionProto = ActionProto.SyncOpProto;
-  constructor(syncObject: SyncObject) {
+  id = new Uuidv4();
+  opKind: OpKind;
+  payload?: Uint8Array;
+  constructor(syncObject: SyncObject, opKind = OpKind.PATCH) {
     super();
     this.syncObject = syncObject;
+    this.opKind = opKind;
   }
   addToFlatBuffer(builder: Builder) {
-    const vectorOffset = this.syncObject.toFlatBuffer(builder, true);
+    let vectorOffset;
+    if (this.payload) {
+      vectorOffset = builder.createByteVector(this.payload);
+    }
     SyncOpProto.startSyncOpProto(builder);
+    SyncOpProto.addOpId(
+      builder,
+      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
+    );
+    SyncOpProto.addOpKind(builder, this.opKind);
     SyncOpProto.addObjKind(builder, this.syncObject.objectType);
     SyncOpProto.addObjId(
       builder,
@@ -136,9 +148,10 @@ export class SyncOpFB extends BatchAction {
         this.syncObject.libraryId.toUUIDProto(),
       ),
     );
-    // TODO: This should be opaque for now but encrypted before release
-    // SyncOpProto.addPayload(builder, vectorOffset);
-    // SyncOpProto.addPayloadSha256(builder, vectorOffset);
+    // TODO: e2ee payload
+    if (vectorOffset) {
+      SyncOpProto.addPayload(builder, vectorOffset);
+    }
     const actionOffset = SyncOpProto.endSyncOpProto(builder);
     return this.buildBatchComponent(builder, actionOffset);
   }

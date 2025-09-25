@@ -112,9 +112,11 @@ export const tests = async () => {
     syncObj.values[0] = new LWWRegister({
       data: "hello",
     });
-    let action = core.sync.syncItems([syncObj])[0];
-    const outbox = core.sync.outbox.get(action.id.toHex());
-    ctx.assertEq(outbox?.id, action.id, "message gets placed in outbox");
+    const op = syncObj.fullSyncOp();
+    core.sync.queueOps([op]);
+    const outbox = core.sync.outbox.get(op.id.toHex());
+    ctx.assertEq(outbox?.id, op.id, "message gets placed in outbox");
+    // TODO: Test storage in idb of both sync object + op
     //   await new Promise((resolve) => {
     //     core.ws.events.once("batch-response", (data) => {
     //       resolve(null);
