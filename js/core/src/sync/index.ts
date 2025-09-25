@@ -114,13 +114,6 @@ export class AirdaySync {
           // Consider renaming: no pending acknowledgements remaining
           this.events.emit("flushed", {});
         }
-        // If item has changes applied during sync, sync them
-        if (!action.syncObject.isSynced()) {
-          // console.log(
-          //   `action is in sync lastModified=${action.item.lastModified}, lastSync=${action.item.lastSync}`,
-          // );
-          this.syncItems([action.syncObject]);
-        }
       }
     } else {
       console.error("Failed to sync item", res.error);

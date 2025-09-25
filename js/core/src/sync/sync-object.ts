@@ -1,4 +1,4 @@
-import { globalTSProducer, LWWRegister, LWWTimestamp } from "../crdt/lww";
+import { LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -21,11 +21,8 @@ export class SyncObject {
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
-  syncStarted: bigint | null = null; // Local time of flight sync req
-  lastSync: bigint | null = null; // Local time of last sync (incl. time of first pull)
-  lastModified: bigint; // Local time of last local modification (incl. time of first pull)
-  serverSeq: bigint | null = null; // Last known server seq timestamp (useful for sync diff)
-  //
+  seq: bigint | null = null; // server id
+  // Attributes
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   values: NumericAttrMap = {};
   dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
@@ -38,14 +35,6 @@ export class SyncObject {
     this.objectType = params.objectType;
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
-    if (params.lastModified) {
-      this.lastModified = params.lastModified;
-    } else {
-      this.lastModified = globalTSProducer.timestamp().utc;
-    }
-    if (params.lastSync) {
-      this.lastSync = params.lastSync;
-    }
   }
 
   subscribe(cb: Listener): () => void {
@@ -76,28 +65,14 @@ export class SyncObject {
       });
     }
   }
-  startSync() {
-    this.syncStarted = globalTSProducer.timestamp().utc;
-  }
-  endSync() {
-    this.lastSync = this.syncStarted;
-    this.syncStarted = null;
-  }
-  isSynced() {
-    if (!this.lastSync) return false;
-    return this.lastSync >= this.lastModified;
-  }
   toDB(): DBSyncObject {
     // Create attribute flatbuffer blob
-    const attributes = {};
     return {
       id: this.id.toHex(),
       objectType: this.objectType,
       libraryId: this.libraryId.toHex(),
-      serverSeq: this.serverSeq,
-      lastSync: this.lastSync,
-      lastModified: this.lastModified,
-      attributes,
+      seq: this.seq,
+      attributes: this.getFullAttrPayload(),
     };
   }
 
@@ -295,9 +270,7 @@ const DBSyncObjectSchema = v.object({
   id: v.string().required(),
   objectType: v.number().required(),
   libraryId: v.string().required(),
-  serverSeq: v.anyOf([v.unknown(), v.null()]),
-  lastSync: v.anyOf([v.unknown(), v.null()]),
-  lastModified: v.anyOf([v.unknown(), v.null()]),
+  seq: v.anyOf([v.unknown(), v.null()]),
   attributes: v.any(), // TODO: Blob?
 });
 
@@ -310,8 +283,6 @@ export function parseGenericSyncObject(record: any) {
     id: Uuidv4.fromHex(syncObject.id),
     objectType: syncObject.objectType,
     libraryId: Uuidv4.fromHex(syncObject.libraryId),
-    lastSync: syncObject.lastSync as bigint, // TODO: or null?
-    lastModified: syncObject.lastModified as bigint, // TODO: or null?
     attributes: syncObject.attributes,
   };
   return meta;
