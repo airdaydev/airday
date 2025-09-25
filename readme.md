@@ -34,6 +34,8 @@ pnpm run jaeger # to get tracing (system tests rely on this currently)
 pnpm run test # runs ALL tests aka ./test.sh
 pnpm run test-core # runs front-end + e2e tests against server (playwright)
 pnpm run test-server # runs server tests (cargo test)
+pnpm run serverd # start a bg server
+pnpm run kill-serverd # kill background server
 ```
 
 ---
