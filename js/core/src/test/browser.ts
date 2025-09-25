@@ -3,9 +3,7 @@ import { AirdayCore, AuthMode, createUser } from "../index";
 import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
-import { AirdayItem } from "../sync/item";
 import { NumericAttrMap, SyncObject } from "../sync/sync-object";
-import { Builder } from "flatbuffers";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -95,7 +93,7 @@ export const tests = async () => {
     ctx.assertEq(syncObj.values[1].data, 64);
   });
 
-  suite.only("Sync generic object", async (ctx) => {
+  suite.test("Sync generic object", async (ctx) => {
     const core = await createTestCore();
     const syncObj = new SyncObject({
       objKind: 0,
@@ -106,19 +104,21 @@ export const tests = async () => {
     });
     const op = syncObj.fullSyncOp();
     await core.sync.queueOps([op]);
+    // Test outbox - in mem version
     const outbox = core.sync.outbox.get(op.id.toHex());
     if (!outbox?.id) throw new Error("fail test early");
     ctx.assert(op.id.equals(outbox.id), "message gets placed in-mem outbox");
+    // Test outbox - idb version
     const outboxItemIdb = await core.storage.idb.getOutboxItem(op.id);
     ctx.assert(
       op.id.equals(outboxItemIdb.id),
       "modified sync object gets stored in durable memory",
     );
-    // TODO: Test mem storage of sync item
+    // Test in mem version
     const syncObject = core.storage.getSyncObjectById(op.syncObject.id);
     ctx.assert(!!syncObject, "recent sync object is in hot storage");
     ctx.assertEq(syncObject, op.syncObject, "Sync object is not copied");
-    // test actual sync
+    // test sync completion
     await new Promise((resolve) => {
       core.ws.events.once("batch-response", (data) => {
         resolve(null);
@@ -146,27 +146,25 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  // suite.test("Items stored in indexeddb", async (assert) => {
-  //   const core = await createTestCore();
-  //   let items = [];
-  //   for (let i = 0; i < 100; i++) {
-  //     items.push(
-  //       new AirdayItem({
-  //         libraryId: core.library.id!,
-  //         attributes: {
-  //           text: new LWWRegister({ data: "test" }),
-  //         },
-  //       }),
-  //     );
-  //   }
-  //   core.sync.syncItems(items);
-  //   await core.ws.flush();
-  //   const res = await core.storage.idb.getByLibrary(core.library.id!.toHex());
-  //   assert(res.length === 100, "res length");
-  //   // TODO: Get all items
-  //   // core.sync.getItemSince(core.library.id!, null);
-  //   core.ws.close();
-  // });
+  suite.only("Items stored in indexeddb", async (ctx) => {
+    const core = await createTestCore();
+    let ops = [];
+    const qty = 100;
+    for (let i = 0; i < qty; i++) {
+      const item = new SyncObject({
+        objKind: 0,
+        libraryId: core.library.id!,
+      });
+      item.values[0] = new LWWRegister({ data: "test" });
+      const op = item.fullSyncOp();
+      ops.push(op);
+    }
+    await core.sync.queueOps(ops);
+    await core.ws.flush();
+    const res = await core.storage.idb.getByLibrary(core.library.id!);
+    ctx.assertEq(res.length, qty, "correct res length");
+    core.ws.close();
+  });
 
   // suite.only("Merge text same message", async (assert) => {
   //   // 1. Create item & sync it

@@ -67,7 +67,6 @@ export class AirdayIDB {
     });
     await Promise.all(promises);
     await tx.done;
-    console.log("transaction done with", promises.length, "promises");
   };
   getByLibrary = async (libraryId: Uuidv4) => {
     return this.handle!.getAllFromIndex(
