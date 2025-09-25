@@ -23,13 +23,6 @@ export class AirdayStorage {
   constructor(core: AirdayCore) {
     this.core = core;
   }
-  async upsertItems(items: SyncObject[]) {
-    items.map((item) => {
-      this.items.set(item.id.toHex(), item);
-    });
-    // TODO: Trigger subscription upsert!
-    await this.idb.upsert(items);
-  }
   async removeItems(ids: Uuidv4[]) {
     const hexes = ids.map((id) => id.toHex());
     hexes.forEach((hex) => this.items.delete(hex));
