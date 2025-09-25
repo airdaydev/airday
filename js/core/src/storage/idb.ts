@@ -70,22 +70,11 @@ export class AirdayIDB {
     console.log("transaction done with", promises.length, "promises");
   };
   getByLibrary = async (libraryId: Uuidv4) => {
-    const res = await this.handle!.getAllFromIndex(
+    return this.handle!.getAllFromIndex(
       SYNC_STORE_NAME,
       "libraryId",
       libraryId,
     );
-    const objects: SyncObject[] = [];
-    res.forEach((row) => {
-      try {
-        const meta = parseGenericSyncObject(row);
-        // TODO: Get attributes & build object
-        // objects.push(SyncObject());
-      } catch (err) {
-        console.warn("Could not parse row from db", row, err);
-      }
-    });
-    return objects;
   };
   getOutboxItem = (id: Uuidv4) => {
     return this.handle!.get(OUTBOX_STORE_NAME, id);

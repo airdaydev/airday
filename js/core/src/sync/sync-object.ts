@@ -70,7 +70,7 @@ export class SyncObject {
     return {
       id: this.id,
       objKind: this.objKind,
-      libraryId: this.libraryId.toHex(),
+      libraryId: this.libraryId,
       seq: this.seq,
       attributes: this.getFullAttrPayload(),
     };
@@ -269,7 +269,7 @@ export class SyncObject {
 const DBSyncObjectSchema = v.object({
   id: v.any().required(),
   objKind: v.number().required(),
-  libraryId: v.string().required(),
+  libraryId: v.any(),
   seq: v.anyOf([v.unknown(), v.null()]),
   attributes: v.any(), // TODO: Blob?
 });

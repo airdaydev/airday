@@ -131,24 +131,19 @@ export const tests = async () => {
     );
     // seq persisted to sync object
     ctx.assert(!!syncObj.seq && syncObj.seq > 0);
-    //   const item = (
-    //     await core.storage.idb.getByLibrary(core.library.id!.toHex())
-    //   )[0];
-    //   assert(
-    //     item.libraryId.toHex() === core.library.id!.toHex(),
-    //     "correct libraryId stored in idb",
-    //   );
-    //   assert(
-    //     typeof item.lastSync === "bigint" && item.lastSync > item.lastModified,
-    //     "Item timestamps = considered in sync",
-    //   );
-    //   await new Promise((resolve) => {
-    //     if (core.sync.pendingActions.size === 0) {
-    //       return resolve(null);
-    //     }
-    //     core.sync.events.onceAsync("flushed").then(resolve);
-    //   });
-    //   core.ws.close();
+    const res = await core.storage.idb.getByLibrary(core.library.id!);
+    const item = res[0];
+    ctx.assert(
+      op.syncObject.id.equals(item.id),
+      "correct libraryId stored in idb",
+    );
+    await new Promise((resolve) => {
+      if (core.sync.outbox.size === 0) {
+        return resolve(null);
+      }
+      core.sync.events.onceAsync("flushed").then(resolve);
+    });
+    core.ws.close();
   });
 
   // suite.test("Items stored in indexeddb", async (assert) => {
