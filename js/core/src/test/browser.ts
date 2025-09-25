@@ -146,7 +146,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.only("Items stored in indexeddb", async (ctx) => {
+  suite.test("Items stored in indexeddb", async (ctx) => {
     const core = await createTestCore();
     let ops = [];
     const qty = 100;
@@ -166,38 +166,38 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  // suite.only("Merge text same message", async (assert) => {
-  //   // 1. Create item & sync it
-  //   const core = await createTestCore();
-  //   const oldText = new LWWRegister({ data: "old_text" });
-  //   const item = new AirdayItem({
-  //     libraryId: core.library.id!,
-  //     attributes: {
-  //       text: oldText,
-  //     },
-  //   });
-  //   core.sync.syncItems([item]);
-  //   await core.sync.flush();
-  //   assert(item.isSynced() === true, "Item has been synced");
-  //   console.log("sync 1 completed");
+  suite.only("Merge text same message", async (ctx) => {
+    // 1. Create item & sync it
+    const core = await createTestCore();
+    const oldText = new LWWRegister({ data: "old_text" });
+    const item = new SyncObject({
+      objKind: 0,
+      libraryId: core.library.id!,
+    });
+    item.values[0] = new LWWRegister({ data: "test" });
+    const op = item.fullSyncOp();
+    core.sync.queueOps([op]);
+    // TODO: Freezes on flush
+    await core.sync.flush();
+    ctx.assertEq(core.sync.outbox.size, 0, "Item has been synced");
 
-  //   // 2. After sync is acknowledged, update it again
-  //   const newText = new LWWRegister({ data: "new_text" });
-  //   assert(
-  //     newText.timestamp.greaterThan(oldText.timestamp)!,
-  //     "new text older than old text",
-  //   );
-  //   item.applyLocal({ text: newText }); // TODO: This should trigger a sync
-  //   assert(item.attributes.text?.data === newText.data, "merge success");
-  //   assert(item.isSynced() === false, "item considered not synced");
-  //   console.log("sync 2");
-  //   core.sync.syncItems([item]);
-  //   await core.sync.flush(); // TODO: Awaiting here indefinitely
-  //   assert(item.isSynced() === true, "item now considered as synced");
-  //   // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-  //   // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
-  //   core.ws.close();
-  // });
+    // 2. After sync is acknowledged, update it again
+    const newText = new LWWRegister({ data: "new_text" });
+    ctx.assert(
+      newText.timestamp.greaterThan(oldText.timestamp)!,
+      "new text older than old text",
+    );
+    // item.applyLocal({ text: newText }); // TODO: This should trigger a sync
+    // assert(item.attributes.text?.data === newText.data, "merge success");
+    // assert(item.isSynced() === false, "item considered not synced");
+    // console.log("sync 2");
+    // core.sync.syncItems([item]);
+    // await core.sync.flush(); // TODO: Awaiting here indefinitely
+    // assert(item.isSynced() === true, "item now considered as synced");
+    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+    core.ws.close();
+  });
 
   // suite.skip("Immediate updates after initial sync", async (assert) => {
   //   // TODO: Test update before flush!
