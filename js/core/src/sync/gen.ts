@@ -9,7 +9,7 @@ import { parseGenericSyncObject } from "./sync-object";
 // Used for reading from IDB
 function parseTypedSyncObject(json: any): AirdayItem | AirdayContainer {
   const genericObj = parseGenericSyncObject(json);
-  if (genericObj.objectType === ITEM) {
+  if (genericObj.objKind === ITEM) {
     // TODO: Type me
     const attributes: AirdayItemAttributes;
     return new AirdayItem({
@@ -17,7 +17,7 @@ function parseTypedSyncObject(json: any): AirdayItem | AirdayContainer {
       attributes,
     });
   }
-  if (genericObj.objectType === CONTAINER) {
+  if (genericObj.objKind === CONTAINER) {
     const attributes = {}; // TODO: Get specific attributes for container
     return new AirdayContainer({
       ...genericObj,

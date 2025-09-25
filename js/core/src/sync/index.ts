@@ -79,8 +79,10 @@ export class AirdaySync {
   createList(list: any) {}
   // TODO: Pluralise this and we can call it when a list has been synced
   // TODO: Error handling?
-  queueOps(ops: SyncOp[]) {
+  async queueOps(ops: SyncOp[]) {
     for (let op of ops) {
+      // TODO: Outbox + upsert as a transaction
+      // Cleaner to await, but we don't really need to
       this.core.storage.idb.upsert([op.syncObject]); // optimistic update
       this.outbox.set(op.id.toHex(), op);
     }

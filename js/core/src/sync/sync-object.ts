@@ -17,7 +17,7 @@ type Listener = (reg: Change) => void;
 
 // All variants
 export class SyncObject {
-  readonly objectType: number;
+  readonly objKind: number;
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
@@ -32,7 +32,7 @@ export class SyncObject {
   private scheduled = false;
 
   constructor(params: SyncObjectParams) {
-    this.objectType = params.objectType;
+    this.objKind = params.objKind;
     this.id = params.id || new Uuidv4();
     this.libraryId = params.libraryId;
   }
@@ -69,7 +69,7 @@ export class SyncObject {
     // Create attribute flatbuffer blob
     return {
       id: this.id.toHex(),
-      objectType: this.objectType,
+      objKind: this.objKind,
       libraryId: this.libraryId.toHex(),
       seq: this.seq,
       attributes: this.getFullAttrPayload(),
@@ -268,7 +268,7 @@ export class SyncObject {
 // TODO: Delete this in favour of custom-built meta and attributes (split)
 const DBSyncObjectSchema = v.object({
   id: v.string().required(),
-  objectType: v.number().required(),
+  objKind: v.number().required(),
   libraryId: v.string().required(),
   seq: v.anyOf([v.unknown(), v.null()]),
   attributes: v.any(), // TODO: Blob?
@@ -281,7 +281,7 @@ export function parseGenericSyncObject(record: any) {
   let syncObject = record as DBSyncObject;
   const meta = {
     id: Uuidv4.fromHex(syncObject.id),
-    objectType: syncObject.objectType,
+    objKind: syncObject.objKind,
     libraryId: Uuidv4.fromHex(syncObject.libraryId),
     attributes: syncObject.attributes,
   };
@@ -297,5 +297,5 @@ export interface SyncObjectParams {
   libraryId: Uuidv4;
   lastModified?: bigint;
   lastSync?: bigint;
-  objectType: number;
+  objKind: number;
 }

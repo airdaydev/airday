@@ -136,7 +136,7 @@ export class SyncOp extends BatchAction {
       UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
     );
     SyncOpProto.addOpKind(builder, this.opKind);
-    SyncOpProto.addObjKind(builder, this.syncObject.objectType);
+    SyncOpProto.addObjKind(builder, this.syncObject.objKind);
     SyncOpProto.addObjId(
       builder,
       UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),

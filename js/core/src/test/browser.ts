@@ -38,7 +38,7 @@ export const tests = async () => {
     const libraryId = new Uuidv4();
     // Create an object
     const syncObj = new SyncObject({
-      objectType: 0,
+      objKind: 0,
       libraryId,
     });
     syncObj.values[0] = new LWWRegister({
@@ -54,7 +54,7 @@ export const tests = async () => {
     ctx.assertEq(buffer.byteLength, 184);
     // Parse
     const syncObjB = new SyncObject({
-      objectType: 0,
+      objKind: 0,
       libraryId,
     });
     syncObjB.parseAttrSet(buffer);
@@ -66,7 +66,7 @@ export const tests = async () => {
   suite.test("Merge SyncObject", async (ctx) => {
     const library = new Uuidv4();
     const syncObj = new SyncObject({
-      objectType: 0,
+      objKind: 0,
       libraryId: library,
     });
     syncObj.values[0] = new LWWRegister({
@@ -98,7 +98,7 @@ export const tests = async () => {
   suite.only("Sync generic object", async (ctx) => {
     const core = await createTestCore();
     const syncObj = new SyncObject({
-      objectType: 0,
+      objKind: 0,
       libraryId: core.library.id!,
     });
     syncObj.values[0] = new LWWRegister({

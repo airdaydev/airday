@@ -10,7 +10,7 @@ export interface AirdayDBSchema extends DBSchema {
     value: any;
     indexes: {
       libraryId: string;
-      type: "item" | "container";
+      objKind: number;
     };
   };
   [LIBRARY_STORE_NAME]: {
@@ -34,7 +34,7 @@ export class AirdayIDB {
           keyPath: "id",
         });
         objects.createIndex("libraryId", "libraryId");
-        objects.createIndex("type", "type");
+        objects.createIndex("objKind", "objKind");
         const library = db.createObjectStore(LIBRARY_STORE_NAME, {
           keyPath: "id",
         });
