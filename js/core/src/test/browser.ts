@@ -189,9 +189,7 @@ export const tests = async () => {
       patch[0].timestamp.greaterThan(oldText.timestamp)!,
       "new text older than old text",
     );
-    item.mergePatch(patch, true);
-    const op2 = new SyncOp(item);
-    op2.payload = item.getAttrPayload(new Set(["0"]));
+    const op2 = item.partialSyncOp(patch);
     ctx.assertEq(item.values[0].data, patch[0].data, "merge success");
     core.sync.queueOps([op2]);
     await core.sync.flush();

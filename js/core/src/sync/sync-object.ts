@@ -82,6 +82,17 @@ export class SyncObject {
     return op;
   }
 
+  partialSyncOp(patch: NumericAttrMap) {
+    this.mergePatch(patch, true);
+    let set = new Set<string>();
+    for (const key of Object.keys(patch)) {
+      set.add(key);
+    }
+    const op = new SyncOp(this);
+    op.payload = this.getAttrPayload(set);
+    return op;
+  }
+
   // TODO: Complete implementation
   merge(other: SyncObject, local: boolean) {
     for (const key of Object.keys(other.values)) {
