@@ -86,8 +86,6 @@ pub struct SyncOpSql {
     pub client_id: Option<Uuid>,
 }
 
-pub fn process_op_batch() {}
-
 #[derive(Clone)]
 pub struct OpBatchProcessor {
     pub tx: Sender<IncomingSyncOpBatch>,
