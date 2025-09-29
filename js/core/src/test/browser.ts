@@ -4,6 +4,7 @@ import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { NumericAttrMap, SyncObject } from "../sync/sync-object";
+import { SyncOp } from "../sync/fb";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -177,31 +178,25 @@ export const tests = async () => {
     item.values[0] = new LWWRegister({ data: "test" });
     const op = item.fullSyncOp();
     core.sync.queueOps([op]);
-    // TODO: Freezes on flush
     await core.sync.flush();
-    ctx.assertEq(core.sync.outbox.size, 0, "Item has been synced");
+    ctx.assertEq(core.sync.outbox.size, 0, "outbox is clear after sync");
 
     // 2. After sync is acknowledged, update it again
-    const newText = new LWWRegister({ data: "new_text" });
+    const patch = {
+      0: new LWWRegister({ data: "new_text" }),
+    };
     ctx.assert(
-      newText.timestamp.greaterThan(oldText.timestamp)!,
+      patch[0].timestamp.greaterThan(oldText.timestamp)!,
       "new text older than old text",
     );
-    // item.applyLocal({ text: newText }); // TODO: This should trigger a sync
-    // assert(item.attributes.text?.data === newText.data, "merge success");
-    // assert(item.isSynced() === false, "item considered not synced");
-    // console.log("sync 2");
-    // core.sync.syncItems([item]);
-    // await core.sync.flush(); // TODO: Awaiting here indefinitely
-    // assert(item.isSynced() === true, "item now considered as synced");
-    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-    // assert(res.length === 101, "res length is 101"); // 101 due to previous test!!
+    item.mergePatch(patch, true);
+    const op2 = new SyncOp(item);
+    op2.payload = item.getAttrPayload(new Set(["0"]));
+    ctx.assertEq(item.values[0].data, patch[0].data, "merge success");
+    core.sync.queueOps([op2]);
+    await core.sync.flush();
     core.ws.close();
   });
-
-  // suite.skip("Immediate updates after initial sync", async (assert) => {
-  //   // TODO: Test update before flush!
-  // });
 
   // suite.test("Get all items since beginning from server", async (assert) => {
   //   const core = await createTestCore();
@@ -246,10 +241,7 @@ export const tests = async () => {
   //   // const solidAdapter = new SolidAdapterExample();
   // });
 
-  // suite.skip("Get diff items", async (assert) => {});
   // suite.skip("Get all libraries", async (assert) => {});
-  // suite.skip("Get all lists", async (assert) => {});
-  // suite.skip("Get diff lists", async (assert) => {});
   // suite.skip("Sync local pending changes from idb", async (assert) => {});
 
   const results = await suite.run();

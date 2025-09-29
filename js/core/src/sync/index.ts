@@ -113,6 +113,9 @@ export class AirdaySync {
         //   console.log(err);
         // });
         this.outbox.delete(res.opId.toHex());
+        if (this.outbox.size === 0) {
+          this.events.emit("flushed", {});
+        }
       }
     } else {
       console.error("Failed to sync item", res.error);

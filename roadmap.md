@@ -1,10 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Changeset outbox, though consider diff fallbacks
-- [] full op mode
-- [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
+- [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] concurrent merge tests
 - [] ensure sync works well
 - [] add subscription to in-memory list to core
