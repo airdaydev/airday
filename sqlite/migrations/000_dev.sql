@@ -53,3 +53,5 @@ CREATE TABLE IF NOT EXISTS sync_op (
   created_utc INTEGER NOT NULL,
   client_id UUID NULL
 );
+
+CREATE INDEX ops_library_seq ON sync_op(library_id, seq);
