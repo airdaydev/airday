@@ -167,7 +167,7 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  suite.only("Merge text same message", async (ctx) => {
+  suite.test("Merge text same message", async (ctx) => {
     // 1. Create item & sync it
     const core = await createTestCore();
     const oldText = new LWWRegister({ data: "old_text" });
@@ -196,36 +196,40 @@ export const tests = async () => {
     core.ws.close();
   });
 
-  // suite.test("Get all items since beginning from server", async (assert) => {
-  //   const core = await createTestCore();
-  //   // create 50 items
-  //   let items = [];
-  //   for (let i = 0; i < 100; i++) {
-  //     items.push(
-  //       new AirdayItem({
-  //         libraryId: core.library.id!,
-  //         attributes: {
-  //           text: new LWWRegister({ data: "test" }),
-  //         },
-  //       }),
-  //     );
-  //   }
-  //   core.sync.syncItems(items);
-  //   await core.sync.flush();
-  //   // Clear database (TODO: Direct access??)
-  //   await core.storage.idb.handle?.clear("syncable");
-  //   await core.storage.idb.handle?.clear("library");
-  //   const emptyRes = await core.storage.idb.getByLibrary(
-  //     core.library.id!.toHex(),
-  //   );
-  //   assert(emptyRes.length === 0, "idb has been emptied");
-  //   // Retrieve all items
-  //   // core.sync.getItemSince(core.library.id!, null);
-  //   // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
-  //   // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
-  //   // console.log("items returned", res.length);
-  //   core.ws.close();
-  // });
+  suite.skip("fan out to connection on same library", () => {});
+
+  suite.only("Get all items since beginning from server", async (ctx) => {
+    const core = await createTestCore();
+    // create 50 items
+    let ops = [];
+    for (let i = 0; i < 100; i++) {
+      const syncObject = new SyncObject({
+        objKind: 0,
+        libraryId: core.library.id!,
+      });
+      syncObject.values[0] = new LWWRegister({ data: "test" });
+      const op = syncObject.fullSyncOp();
+      ops.push(op);
+    }
+    core.sync.queueOps(ops);
+    await core.sync.flush();
+    // Clear database (TODO: Direct access??)
+    await core.storage.idb.handle?.clear("sync_object");
+    await core.storage.idb.handle?.clear("library");
+    const emptyRes = await core.storage.idb.getByLibrary(core.library.id!);
+    ctx.assertEq(emptyRes.length, 0, "idb has been emptied");
+    // Retrieve all items
+    // core.sync.getItemSince(core.library.id!, null);
+    // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
+    // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+    // console.log("items returned", res.length);
+    core.ws.close();
+  });
+
+  // suite.skip("Tombstones", async (assert) => {});
+  // suite.skip("Snapshots", async (assert) => {});
+  // suite.skip("Merkles", async (assert) => {});
+  // suite.skip("Double OP ids w different sha256s?", async (assert) => {});
 
   // suite.skip("mem adapter", () => {
   //   // // Examples for the solid adapter within the web app:
