@@ -1,13 +1,13 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] catch up stream api + limits via mpsc + select! + registers
+- [] delete items (tombstones, same api)
+- [] snapshot api
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
-- [] concurrent merge tests
 - [] ensure sync works well
 - [] add subscription to in-memory list to core
-- [] complete get items since streaming api
-- [] delete items (tombstones, same api)
 - [] fan out live updates - maintain local library subscription map for sqlite version
 - [] inbox = default = virtual list! (where orphans go too!)
 - [] @airday/core - create & update lists
