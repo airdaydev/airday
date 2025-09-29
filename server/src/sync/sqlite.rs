@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
-use sqlx::{Pool, Sqlite, SqlitePool, Transaction};
+use sqlx::{Pool, Sqlite, SqlitePool};
 use std::pin::Pin;
 use uuid::Uuid;
 
@@ -169,7 +169,7 @@ impl SyncOpModel for SyncOpModelSqlite {
         >,
     > {
         sqlx::query_as::<_, SyncOpSql>(
-            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind,
+            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind, archived,
             payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
             WHERE library_id = ? AND seq >= ?
@@ -196,7 +196,6 @@ mod tests {
         let primary_library_id = user.primary_library.unwrap().id;
         let op = mock_incoming_op(primary_library_id, None);
         let seq = db.sync_op.apply(&op).await.unwrap();
-        println!("The sync number is {}", seq);
         assert!(seq >= 0);
         let Ok(Some(sql_op)) = db.sync_op.get_by_seq(seq).await else {
             panic!("Failed to retrieve op after apply");
@@ -206,29 +205,28 @@ mod tests {
         assert_eq!(sql_op.payload.len(), 0); // TODO: Client id!
     }
 
-    // TODO: concurrent_merge tests
-    // #[tokio::test]
-    // async fn sqlite_library_stream() {
-    //     let db = test_util::create_test_db().await;
-    //     let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
-    //     let primary_library_id = user.primary_library.unwrap().id;
-    //     let qty = 100;
-    //     let mut items = vec![];
-    //     for _ in 0..qty {
-    //         items.push(mock_item_any(primary_library_id, None, None));
-    //     }
-    //     db.sync_op.merge_many(&items).await.unwrap();
-    //     // intentional (smoke test): a second merge that effectively does nothing
-    //     db.sync_op.merge_many(&items).await.unwrap();
-    //     let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
-    //     let mut count = 0;
-    //     while let Some(result) = stream.next().await {
-    //         match result {
-    //             Ok(_item) => count += 1,
-    //             Err(e) => panic!("Stream error: {}", e),
-    //         }
-    //     }
+    // TODO: Performance baseline of pushing objects
 
-    //     assert_eq!(count, qty);
-    // }
+    #[tokio::test]
+    async fn sqlite_library_stream() {
+        let db = test_util::create_test_db().await;
+        let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
+        let primary_library_id = user.primary_library.unwrap().id;
+        let qty = 100;
+        // let mut items = vec![];
+        for _ in 0..qty {
+            let op = mock_incoming_op(primary_library_id, None);
+            db.sync_op.apply(&op).await.unwrap();
+        }
+        let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
+        let mut count = 0;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(_item) => count += 1,
+                Err(e) => panic!("Stream error: {}", e),
+            }
+        }
+
+        assert_eq!(count, qty);
+    }
 }
