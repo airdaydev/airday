@@ -7,6 +7,7 @@ use crate::sync::fb::{build_error_response_message, create_auth_response, wrap_m
 use crate::sync::proto_generated::proto::{
     ActionProto, MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
 };
+use crate::sync::stream::{PER_USER_STREAM_LIMIT, StreamRequest, start_catchup_stream};
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
@@ -18,7 +19,9 @@ use opentelemetry::{Context, TraceId};
 use opentelemetry::{SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{Semaphore, mpsc};
+use tokio::task::JoinSet;
 use tracing::{Instrument, Span, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
@@ -34,6 +37,35 @@ pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Res
 pub struct WebsocketConn {
     pub sender: mpsc::Sender<Message>,
     pub user_id: Option<Uuid>,
+}
+
+// Cancellation via CancellationToken
+impl WebsocketConn {
+    pub async fn bootstrap_conn(&self, app_state: &AppState) -> Arc<Sender<StreamRequest>> {
+        let (tx, mut rx) = mpsc::channel::<StreamRequest>(32);
+        let stream_semaphore = Arc::new(Semaphore::new(PER_USER_STREAM_LIMIT));
+        let mut join_set = JoinSet::<()>::new();
+
+        tokio::spawn({
+            let app_state_c = app_state.clone();
+            async move {
+                while let Some(req) = rx.recv().await {
+                    let app_state_d = app_state_c.clone();
+                    let permit = match stream_semaphore.clone().try_acquire_owned() {
+                        Ok(p) => p,
+                        Err(_) => continue, // or send error back
+                    };
+                    join_set.spawn(async move {
+                        // TODO: Cancellation
+                        // TODO: Deal with error
+                        start_catchup_stream(app_state_d, req).await.unwrap();
+                        drop(permit);
+                    });
+                }
+            }
+        });
+        Arc::new(tx.clone())
+    }
 }
 
 pub type WSConnectionMap = Arc<Mutex<HashMap<Uuid, WebsocketConn>>>;
@@ -75,21 +107,22 @@ async fn handle_websocket_error(state: &AppState, socket_id: Uuid, error: AppErr
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
     // TODO: Evaluate move to async mutex after access patterns established!
-    let (sender, receiver) = socket.split();
+    let (ws_sender, ws_receiver) = socket.split();
     let (tx, rx) = mpsc::channel::<Message>(100);
     let socket_id = Uuid::new_v4();
     let connection = WebsocketConn {
         sender: tx,
         user_id: None,
     };
+    let stream_tx = connection.bootstrap_conn(&state).await;
     state
         .ws
         .conn_map
         .lock()
         .unwrap()
-        .insert(socket_id, connection);
-    tokio::spawn(read(state, receiver, socket_id));
-    tokio::spawn(write(sender, rx));
+        .insert(socket_id, connection.clone());
+    tokio::spawn(read(state.clone(), ws_receiver, socket_id, stream_tx));
+    tokio::spawn(write(ws_sender, rx));
 }
 
 fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
@@ -112,7 +145,12 @@ fn extract_span_ctx<'a>(wrapper: MessageWrapperProto<'a>) -> SpanContext {
     )
 }
 
-async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: Uuid) {
+async fn read(
+    state: AppState,
+    mut receiver: SplitStream<WebSocket>,
+    socket_id: Uuid,
+    stream_tx: Arc<Sender<StreamRequest>>,
+) {
     while let Some(msg) = receiver.next().await {
         let result: Result<(), AppError> = async {
             let cur_span = Span::current();
@@ -242,6 +280,25 @@ async fn read(state: AppState, mut receiver: SplitStream<WebSocket>, socket_id: 
                                     "Failed to parse SyncStreamReqProto",
                                 )));
                             };
+                            let Some(conn) = state.ws.get_conn(&socket_id) else {
+                                // Connection no longer exists
+                                // TODO: Log
+                                return Ok(());
+                            };
+                            let Some(user_id) = conn.user_id else {
+                                return Err(AppError::ValidationError(String::from(
+                                    "Unauthorised session",
+                                )));
+                            };
+                            let library_id = proto_uuid_to_uuid(msg.library_id());
+                            let stream_request = StreamRequest {
+                                library_id,
+                                user_id,
+                                socket_id,
+                                from_seq: msg.seq(),
+                            };
+                            stream_tx.send(stream_request).await;
+                            // let lib = msg.library_id();
                             // TODO: Authorise
                             // Validate and start sync stream
                             // let _library_id = proto_uuid_to_uuid(msg.library_id());

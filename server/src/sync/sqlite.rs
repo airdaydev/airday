@@ -165,7 +165,7 @@ impl SyncOpModel for SyncOpModelSqlite {
     }
 
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
-    async fn stream_from_seq(
+    async fn seq_range(
         &self,
         library_id: &Uuid,
         from_seq: i64,
@@ -228,7 +228,7 @@ mod tests {
         let chunk_size = 5;
         let next = db
             .sync_op
-            .stream_from_seq(&library_id, 0, head, chunk_size)
+            .seq_range(&library_id, 0, head, chunk_size)
             .await
             .unwrap();
         assert_eq!(next.len() as i64, chunk_size, "chunk length matches");
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(last_seq, chunk_size);
         let next_2 = db
             .sync_op
-            .stream_from_seq(&library_id, last_seq + 1, head, chunk_size)
+            .seq_range(&library_id, last_seq + 1, head, chunk_size)
             .await
             .unwrap();
         let first_seq = next_2[0].seq;

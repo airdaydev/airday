@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use axum::body::Bytes;
 use flatbuffers::FlatBufferBuilder;
 use sqlx::prelude::FromRow;
-use std::pin::Pin;
 use tokio::sync::mpsc::{self, Sender};
 use uuid::Uuid;
 
@@ -150,7 +149,7 @@ async fn process_batch_ops(
 pub trait SyncOpModel: Send + Sync {
     async fn get_by_seq(&self, seq: i64) -> Result<Option<SyncOpSql>, AppError>;
     // Accept query options
-    async fn stream_from_seq<'a>(
+    async fn seq_range<'a>(
         &'a self,
         library_id: &Uuid,
         from_seq: i64,

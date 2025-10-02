@@ -1,35 +1,39 @@
 // Streams: Streams resources from a library to a websocket connection until completion
 // kill connection on error
 
-// TODO: Upper bounds on stream creation = 64
-pub fn create_stream() {}
+use std::sync::{Arc, LazyLock};
+use tokio::sync::Semaphore;
+use uuid::Uuid;
 
-// AirdayAction::StreamReq {
-//     library_id,
-//     resource,
-//     timestamp,
-// } => {
-// fn idk() {
-//     if !has_library_access(state, conn.user_id, *library_id).await {
-//         return Ok(());
-//     }
-//     // loop through requested resources and send until end
-//     match *resource {
-//         ResourceType::Item => {
-//             // get items affected since timestamp - 1minute
-//             let stream = state.db.item.get_by_library_stream(library_id, *timestamp);
-//             let mut chunked_stream = stream.chunks(50);
-//             // TODO: Chunk and send, batches of 50-100?
-//             while let Some(value) = chunked_stream.next().await {
-//                 // println!("hello! {:?}", value);
-//             }
-//         }
-//         ResourceType::List => {
-//             // get lists affected since timestamp - 1minute
-//         }
-//         _ => {}
-//     }
-//     // send_to_client(state, socket_id, message).await;
-//     // on end (OR ERROR), send a end message to close the stream
-//     // TODO: Ensure this attempts in an own thread (i forget context)
-// }
+use crate::{AppState, common::error::AppError};
+
+/// Per-process limit on concurrent read chunks across all users.
+static GLOBAL_READ_SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(32)));
+
+/// Cap per-user concurrent catch-up streams.
+pub const PER_USER_STREAM_LIMIT: usize = 5;
+
+pub struct StreamRequest {
+    pub socket_id: Uuid,
+    pub user_id: Uuid,
+    pub library_id: Uuid,
+    pub from_seq: i64,
+}
+
+pub async fn start_catchup_stream(app_state: AppState, req: StreamRequest) -> Result<(), AppError> {
+    let head = app_state
+        .db
+        .sync_op
+        .get_stream_head(&req.library_id)
+        .await?;
+    let cur = 0;
+    while cur <= head {
+        let range = app_state
+            .db
+            .sync_op
+            .seq_range(&req.library_id, req.from_seq, head, 50)
+            .await?;
+        // TODO: Send stream batch off to client
+    }
+    Ok(())
+}
