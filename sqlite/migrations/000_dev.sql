@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS sync_op (
   tombstone_utc INTEGER NULL,
   created_utc INTEGER NOT NULL,
   client_id UUID NULL
+  -- TODO: Consider switch to per library seq (good bc spans acros all tables even in sqlite, )
+  -- PRIMARY KEY (library_id, seq)
 );
 
 CREATE INDEX ops_library_seq ON sync_op(library_id, seq);

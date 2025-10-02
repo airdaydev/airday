@@ -150,17 +150,14 @@ async fn process_batch_ops(
 pub trait SyncOpModel: Send + Sync {
     async fn get_by_seq(&self, seq: i64) -> Result<Option<SyncOpSql>, AppError>;
     // Accept query options
-    fn get_by_library_stream<'a>(
+    async fn stream_from_seq<'a>(
         &'a self,
         library_id: &Uuid,
-        seq: i64,
-    ) -> Pin<
-        Box<
-            dyn futures_util::Stream<Item = Result<SyncOpSql, sqlx::Error>>
-                + std::marker::Send
-                + 'a,
-        >,
-    >;
+        from_seq: i64,
+        max_seq: i64,
+        chunk_size: i64,
+    ) -> Result<Vec<SyncOpSql>, sqlx::Error>;
+    async fn get_stream_head(&self, library_id: &Uuid) -> Result<i64, AppError>;
     async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

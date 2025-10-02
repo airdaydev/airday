@@ -8,7 +8,6 @@ use crate::{
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
 use sqlx::{Pool, Sqlite, SqlitePool};
-use std::pin::Pin;
 use uuid::Uuid;
 
 pub struct SyncOpModelSqlite {
@@ -156,28 +155,36 @@ impl SyncOpModel for SyncOpModelSqlite {
         }
     }
 
+    async fn get_stream_head(&self, library_id: &Uuid) -> Result<i64, AppError> {
+        let head: i64 =
+            sqlx::query_scalar("SELECT COALESCE(MAX(seq), 0) FROM sync_op WHERE library_id = ?")
+                .bind(library_id)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(head)
+    }
+
     // TODO: Performance testing, w sqlite consider repeated smaller calls for use in stream
-    fn get_by_library_stream<'a>(
-        &'a self,
+    async fn stream_from_seq(
+        &self,
         library_id: &Uuid,
         from_seq: i64,
-    ) -> Pin<
-        Box<
-            dyn futures_util::Stream<Item = Result<SyncOpSql, sqlx::Error>>
-                + std::marker::Send
-                + 'a,
-        >,
-    > {
+        max_seq: i64,
+        chunk_size: i64,
+    ) -> Result<Vec<SyncOpSql>, sqlx::Error> {
         sqlx::query_as::<_, SyncOpSql>(
             r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind, archived,
             payload, payload_sha256, tombstone_utc, created_utc, client_id
             FROM sync_op
-            WHERE library_id = ? AND seq >= ?
-            ORDER BY seq ASC"#,
+            WHERE library_id = ? AND seq >= ? AND seq <= ?
+            ORDER BY seq ASC LIMIT ?"#,
         )
         .bind(library_id.clone())
         .bind(from_seq)
-        .fetch(&self.pool)
+        .bind(max_seq)
+        .bind(chunk_size)
+        .fetch_all(&self.pool)
+        .await
     }
 }
 
@@ -208,25 +215,33 @@ mod tests {
     // TODO: Performance baseline of pushing objects
 
     #[tokio::test]
-    async fn sqlite_library_stream() {
+    async fn sqlite_stream_from_seq() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
-        let primary_library_id = user.primary_library.unwrap().id;
+        let library_id = user.primary_library.unwrap().id;
         let qty = 100;
         // let mut items = vec![];
         for _ in 0..qty {
-            let op = mock_incoming_op(primary_library_id, None);
+            let op = mock_incoming_op(library_id, None);
             db.sync_op.apply(&op).await.unwrap();
         }
-        let mut stream = db.sync_op.get_by_library_stream(&primary_library_id, 0i64);
-        let mut count = 0;
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(_item) => count += 1,
-                Err(e) => panic!("Stream error: {}", e),
-            }
-        }
-
-        assert_eq!(count, qty);
+        let head = db.sync_op.get_stream_head(&library_id).await.unwrap();
+        let chunk_size = 5;
+        let next = db
+            .sync_op
+            .stream_from_seq(&library_id, 0, head, chunk_size)
+            .await
+            .unwrap();
+        assert_eq!(next.len() as i64, chunk_size, "chunk length matches");
+        let last_seq = next[next.len() - 1].seq;
+        assert_eq!(last_seq, chunk_size);
+        let next_2 = db
+            .sync_op
+            .stream_from_seq(&library_id, last_seq + 1, head, chunk_size)
+            .await
+            .unwrap();
+        let first_seq = next_2[0].seq;
+        assert!(first_seq > last_seq, "continue from next seq");
+        assert!(head > last_seq);
     }
 }
