@@ -194,7 +194,6 @@ mod tests {
 
     use crate::test_util::{self, mock_incoming_op};
     // use crdt::LWWRegister;
-    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn sqlite_sync_op_apply() {
