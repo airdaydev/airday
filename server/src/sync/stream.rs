@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, LazyLock};
 use tokio::sync::Semaphore;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{AppState, common::error::AppError};
@@ -20,7 +21,11 @@ pub struct StreamRequest {
     pub from_seq: i64,
 }
 
-pub async fn start_catchup_stream(app_state: AppState, req: StreamRequest) -> Result<(), AppError> {
+pub async fn start_catchup_stream(
+    app_state: AppState,
+    cancel: CancellationToken,
+    req: StreamRequest,
+) -> Result<(), AppError> {
     let head = app_state
         .db
         .sync_op
@@ -28,6 +33,10 @@ pub async fn start_catchup_stream(app_state: AppState, req: StreamRequest) -> Re
         .await?;
     let cur = 0;
     while cur <= head {
+        if (cancel.is_cancelled()) {
+            // TODO: Send cancelled stream msg
+            break;
+        }
         let range = app_state
             .db
             .sync_op

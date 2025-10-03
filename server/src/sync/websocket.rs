@@ -22,6 +22,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
@@ -39,18 +40,20 @@ pub struct WebsocketConn {
     pub user_id: Option<Uuid>,
 }
 
-// TODO: Cancellation via CancellationToken
 impl WebsocketConn {
     pub async fn bootstrap_conn(&self, app_state: &AppState) -> Sender<StreamRequest> {
+        let cancel = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel::<StreamRequest>(32);
         let stream_semaphore = Arc::new(Semaphore::new(PER_USER_STREAM_LIMIT));
         let mut join_set = JoinSet::<()>::new();
 
         tokio::spawn({
-            let app_state_c = app_state.clone();
+            let app_state = app_state.clone();
+            let cancel = cancel.clone();
             async move {
                 while let Some(req) = rx.recv().await {
-                    let app_state_d = app_state_c.clone();
+                    let app_state = app_state.clone();
+                    let cancel = cancel.clone();
                     let permit = match stream_semaphore.clone().try_acquire_owned() {
                         Ok(p) => p,
                         Err(_) => continue, // or send error back
@@ -58,7 +61,7 @@ impl WebsocketConn {
                     join_set.spawn(async move {
                         // TODO: Cancellation
                         // TODO: Deal with error
-                        start_catchup_stream(app_state_d, req).await.unwrap();
+                        start_catchup_stream(app_state, cancel, req).await.unwrap();
                         drop(permit);
                     });
                 }
