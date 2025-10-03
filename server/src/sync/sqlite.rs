@@ -123,7 +123,7 @@ async fn insert<'a>(
 
 #[async_trait]
 impl SyncOpModel for SyncOpModelSqlite {
-    async fn get_by_seq(&self, seq: i64) -> Result<Option<SyncOpSql>, AppError> {
+    async fn get_by_seq(&self, library_id: &Uuid, seq: i64) -> Result<Option<SyncOpSql>, AppError> {
         let result = sqlx::query_as!(
             SyncOpSql,
             r#"SELECT seq, base_seq, archived, op_kind,
@@ -131,7 +131,8 @@ impl SyncOpModel for SyncOpModelSqlite {
             obj_id as "obj_id: Uuid", path, obj_kind,
             payload, payload_sha256,
             tombstone_utc, created_utc, client_id as "client_id: Uuid"
-            FROM sync_op WHERE seq = ? LIMIT 1"#,
+            FROM sync_op WHERE library_id = ? AND seq = ? LIMIT 1"#,
+            library_id,
             seq,
         )
         .fetch_optional(&self.pool)
@@ -199,11 +200,11 @@ mod tests {
     async fn sqlite_sync_op_apply() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
-        let primary_library_id = user.primary_library.unwrap().id;
-        let op = mock_incoming_op(primary_library_id, None);
+        let library_id = user.primary_library.unwrap().id;
+        let op = mock_incoming_op(library_id, None);
         let seq = db.sync_op.apply(&op).await.unwrap();
         assert!(seq >= 0);
-        let Ok(Some(sql_op)) = db.sync_op.get_by_seq(seq).await else {
+        let Ok(Some(sql_op)) = db.sync_op.get_by_seq(&library_id, seq).await else {
             panic!("Failed to retrieve op after apply");
         };
         assert_eq!(sql_op.seq, seq);

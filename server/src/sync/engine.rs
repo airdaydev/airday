@@ -4,7 +4,7 @@ use crate::{
     sync::{
         batch_response::BatchResponse,
         fb::{build_batch_sync_msg, wrap_message},
-        proto_generated::proto::{AttributeProto, MessageProto, OpKind},
+        proto_generated::proto::MessageProto,
         websocket::{WebsocketState, send_to_client},
     },
 };
@@ -18,9 +18,6 @@ use uuid::Uuid;
 pub type PayloadBlob = Vec<u8>;
 pub type Sha256 = Vec<u8>;
 pub type Seq = i64;
-
-pub type AttributeFBVec<'a> =
-    Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeProto<'a>>>>;
 
 pub struct IncomingSyncOp {
     // sync concerns
@@ -41,27 +38,6 @@ pub struct IncomingSyncOpBatch {
     pub socket_id: Uuid,
     pub user_id: Uuid,
     pub ops: Vec<IncomingSyncOp>,
-}
-
-#[derive(FromRow)]
-pub struct SyncOp {
-    // sync concerns
-    pub seq: Option<Seq>,
-    pub base_seq: i64,   // snapshot seq base
-    pub op_kind: OpKind, // TODO: Specify allowable enums
-    pub archived: bool,
-    // static attrs
-    pub library_id: Uuid,
-    pub obj_id: Uuid,
-    pub obj_kind: i16,
-    pub path: i16, // used for complex subfields e.g. text crdts (0 = no path)
-    // flatbuffer blob (may be encrypted)
-    pub payload: Option<PayloadBlob>, // Tied to flatbuffer
-    pub payload_sha256: Option<Sha256>,
-    // metadata
-    pub tombstone_utc: Option<i64>,
-    pub created_utc: Option<i64>,
-    pub client_id: Option<Uuid>,
 }
 
 #[derive(FromRow)]
@@ -147,7 +123,7 @@ async fn process_batch_ops(
 
 #[async_trait]
 pub trait SyncOpModel: Send + Sync {
-    async fn get_by_seq(&self, seq: i64) -> Result<Option<SyncOpSql>, AppError>;
+    async fn get_by_seq(&self, library_id: &Uuid, seq: i64) -> Result<Option<SyncOpSql>, AppError>;
     // Accept query options
     async fn seq_range<'a>(
         &'a self,

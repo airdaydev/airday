@@ -39,9 +39,9 @@ pub struct WebsocketConn {
     pub user_id: Option<Uuid>,
 }
 
-// Cancellation via CancellationToken
+// TODO: Cancellation via CancellationToken
 impl WebsocketConn {
-    pub async fn bootstrap_conn(&self, app_state: &AppState) -> Arc<Sender<StreamRequest>> {
+    pub async fn bootstrap_conn(&self, app_state: &AppState) -> Sender<StreamRequest> {
         let (tx, mut rx) = mpsc::channel::<StreamRequest>(32);
         let stream_semaphore = Arc::new(Semaphore::new(PER_USER_STREAM_LIMIT));
         let mut join_set = JoinSet::<()>::new();
@@ -64,7 +64,7 @@ impl WebsocketConn {
                 }
             }
         });
-        Arc::new(tx.clone())
+        tx.clone()
     }
 }
 
@@ -149,7 +149,7 @@ async fn read(
     state: AppState,
     mut receiver: SplitStream<WebSocket>,
     socket_id: Uuid,
-    stream_tx: Arc<Sender<StreamRequest>>,
+    stream_tx: Sender<StreamRequest>,
 ) {
     while let Some(msg) = receiver.next().await {
         let result: Result<(), AppError> = async {
@@ -297,15 +297,12 @@ async fn read(
                                 socket_id,
                                 from_seq: msg.seq(),
                             };
-                            stream_tx.send(stream_request).await;
-                            // let lib = msg.library_id();
-                            // TODO: Authorise
-                            // Validate and start sync stream
-                            // let _library_id = proto_uuid_to_uuid(msg.library_id());
-                            // Start stream;
-                            //                                 timestamp: now_micros(),
-                            // library_id,
-                            // resource: action.resource(),
+                            if let Err(err) = stream_tx.send(stream_request).await {
+                                // TODO: log error
+                                return Err(AppError::ServerError(String::from(
+                                    "Stream failed to start",
+                                )));
+                            };
                         }
                         _ => {
                             // Ignore message
