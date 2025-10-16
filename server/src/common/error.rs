@@ -12,7 +12,6 @@ pub enum AppError {
     ValidationError(String),
     DatabaseError(String),
     ServerError(String),
-    RetryReq(),
 }
 
 impl IntoResponse for AppError {
@@ -33,14 +32,6 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, msg)
             }
             AppError::ServerError(msg) => {
-                current_span.set_attribute("error", true);
-                error!(error_type = "ServerError", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, msg)
-            }
-            AppError::RetryReq() => {
-                // This is used to signal that some behaviour should retry
-                // TODO: This should not propogate here
-                let msg = String::from("RetryReqError");
                 current_span.set_attribute("error", true);
                 error!(error_type = "ServerError", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, msg)

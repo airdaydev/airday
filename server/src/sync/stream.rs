@@ -2,11 +2,12 @@
 // kill connection on error
 
 use std::sync::{Arc, LazyLock};
+use flatbuffers::FlatBufferBuilder;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{AppState, common::error::AppError, sync::websocket::send_to_client};
+use crate::{common::error::AppError, sync::{batch_response::BatchResponse, fb::build_batch_sync_msg, websocket::send_to_client}, AppState};
 
 /// Per-process limit on concurrent read chunks across all users.
 static GLOBAL_READ_SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(32)));
@@ -26,6 +27,7 @@ pub async fn start_catchup_stream(
     cancel: CancellationToken,
     req: StreamRequest,
 ) -> Result<(), AppError> {
+    // TODO: Stream context? (TODO: Could build it in streamrequest?)
     let conn = match app_state.ws.get_conn(&req.socket_id) {
         None => {
             return Err(AppError::ServerError(String::from("Connection not found")));
@@ -37,9 +39,10 @@ pub async fn start_catchup_stream(
         .sync_op
         .get_stream_head(&req.library_id)
         .await?;
-    let cur = 0;
+    let mut cur = req.from_seq;
+    // TODO: Consider done conditions
     while cur <= head {
-        if (cancel.is_cancelled()) {
+        if cancel.is_cancelled() {
             // TODO: Send cancelled stream msg
             // send_to_client(&app_state.ws, &req.socket_id, message);
             break;
@@ -47,10 +50,16 @@ pub async fn start_catchup_stream(
         let range = app_state
             .db
             .sync_op
-            .seq_range(&req.library_id, req.from_seq, head, 50)
+            .seq_range(&req.library_id, cur, head, 50)
             .await?;
-        // TODO: Serialise and send to client
-        // send_to_client(&app_state.ws, &req.socket_id, message);
+        if range.len() < 50 {
+            // TODO: DONE!
+        }
+        let builder = FlatBufferBuilder::new();
+        let vec: Vec<BatchResponse> = vec![]; // TODO
+        let message = build_batch_sync_msg(&mut builder, responses)
+        send_to_client(&app_state.ws, &req.socket_id, message);
+        cur = range[range.len()].seq;
     }
     Ok(())
 }

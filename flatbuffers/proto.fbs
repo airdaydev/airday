@@ -75,7 +75,8 @@ table LibrarySyncResponseProto {
   primary_library: LibraryProto;
 }
 
-table BatchResponseProto {
+table ResponseProto {
+  op_id: UuidProto (required);
   success: bool;
   error: string;
   seq: long;
@@ -86,22 +87,30 @@ table SyncStreamReqProto {
   seq: long;
 }
 
-union ActionProto {
-  SyncOpProto,
-  BatchResponseProto,
+enum StreamEventProto: byte {
+  None,
+  Data,
+  End,
+  Error,
 }
 
-table BatchComponentProto {
-  op_id: UuidProto (required);
-  action: ActionProto (required);
+struct StreamContextProto {
+  id: UuidProto;
+  event: StreamEventProto;
 }
 
-table BatchSyncProto {
-  stream_context: StreamContext; // Only set when streaming to client from server
-  batch: [BatchComponentProto] (required);
+table BatchSyncOpProto {
+  stream_context: StreamContextProto; // Only set when streaming to client from server
+  batch: [SyncOpProto] (required);
+}
+
+table BatchResponseProto {
+  stream_context: StreamContextProto; // Only set when streaming to client from server
+  batch: [ResponseProto] (required);
 }
 
 table ErrorResponseProto {
+  stream_context: StreamContextProto;
   message_id: UuidProto;
   error: string;
 }
@@ -111,22 +120,11 @@ table ErrorResponseProto {
 union MessageProto {
   AuthenticateActionProto, // Websocket authentication request
   SyncStreamReqProto, // Requests a stream from server
-  BatchSyncProto, // Bidirectional data sync batches
+  BatchSyncOpProto, // Bidirectional data sync batches
+  BatchResponseProto, // Downstream batch responses for server acks
   AuthenticateResponseProto, // Server response for succesful authentication
   LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
   ErrorResponseProto, // Informs client of bad message
-}
-
-enum StreamEvent: byte {
-  None,
-  Data,
-  End,
-  Error,
-}
-
-struct StreamContext {
-  id: UuidProto;
-  event: StreamEvent;
 }
 
 table MessageWrapperProto {

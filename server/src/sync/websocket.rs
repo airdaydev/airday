@@ -45,8 +45,11 @@ impl WebsocketConn {
         let cancel = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel::<StreamRequest>(32);
         let stream_semaphore = Arc::new(Semaphore::new(PER_USER_STREAM_LIMIT));
-        let mut join_set = JoinSet::<()>::new();
+        let mut join_set = JoinSet::<()>::new(); // Keeping track of catch up streams
+        // TODO: How to access join_set and publish metrics?
+        // TODO: An alernative to a separate task would be to create a loop that loops through
 
+        // Separate task to loop for incoming streams
         tokio::spawn({
             let app_state = app_state.clone();
             let cancel = cancel.clone();
@@ -58,10 +61,12 @@ impl WebsocketConn {
                         Ok(p) => p,
                         Err(_) => continue, // or send error back
                     };
+                    // Separate task to handle & retrieve streams
                     join_set.spawn(async move {
                         // TODO: Cancellation
-                        // TODO: Deal with error
-                        start_catchup_stream(app_state, cancel, req).await.unwrap();
+                        if let Err(err) = start_catchup_stream(app_state, cancel, req).await {
+                            println!("{:?}", err); // TODO: Send error back to user
+                        }
                         drop(permit);
                     });
                 }
@@ -103,8 +108,11 @@ impl WebsocketState {
 
 async fn handle_websocket_error(state: &AppState, socket_id: Uuid, error: AppError) {
     println!("Websocket reply error!!, {:?}", error);
-    let err_msg =
-        build_error_response_message(&String::from("Failed to parse SyncStreamReqProto"), None);
+    let err_msg = build_error_response_message(
+        &String::from("Failed to parse SyncStreamReqProto"),
+        None,
+        None,
+    );
     send_to_client(&state.ws, &socket_id, err_msg).await;
 }
 
@@ -300,8 +308,8 @@ async fn read(
                                 socket_id,
                                 from_seq: msg.seq(),
                             };
-                            if let Err(err) = stream_tx.send(stream_request).await {
-                                // TODO: log error
+                            if let Err(_) = stream_tx.send(stream_request).await {
+                                // TODO: what error could this be
                                 return Err(AppError::ServerError(String::from(
                                     "Stream failed to start",
                                 )));

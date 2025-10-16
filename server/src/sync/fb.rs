@@ -7,7 +7,8 @@ use crate::{
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
             BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
-            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, UuidProto,
+            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, StreamContextProto,
+            StreamEventProto, UuidProto,
         },
     },
     user::model::User,
@@ -63,7 +64,6 @@ pub fn build_batch_sync_msg<'a>(
     let batch_offset = BatchSyncProto::create(
         builder,
         &BatchSyncProtoArgs {
-            stream_context: None,
             batch: Some(batch_vector),
         },
     )
@@ -71,10 +71,38 @@ pub fn build_batch_sync_msg<'a>(
     batch_offset
 }
 
+pub fn build_batch_hydrate_msg<'a>(
+    builder: &mut FlatBufferBuilder<'a>,
+    responses: Vec<BatchResponse>,
+) -> WIPOffset<UnionWIPOffset> {
+    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(responses.len());
+    for action in responses {
+        comps.push(action.build_flatbuffer(builder));
+    }
+
+    let batch_vector = builder.create_vector(&comps);
+
+    let batch_offset = BatchSyncProto::create(
+        builder,
+        &BatchSyncProtoArgs {
+            batch: Some(batch_vector),
+        },
+    )
+    .as_union_value();
+    batch_offset
+}
+
+#[derive(Debug)]
+pub struct StreamContext {
+    id: Uuid,
+    event: StreamEventProto,
+}
+
 pub fn create_error_response<'a>(
     builder: &mut FlatBufferBuilder<'a>,
     message_id: Option<&Uuid>,
     error: &str,
+    stream_context: Option<StreamContext>,
 ) -> WIPOffset<UnionWIPOffset> {
     let uuid;
     let message_id = if let Some(id) = message_id {
@@ -84,9 +112,17 @@ pub fn create_error_response<'a>(
         None
     };
     let error_offset = builder.create_string(error);
+    let stream_context_proto = match stream_context {
+        Some(ctx) => Some(&StreamContextProto::new(
+            &UuidProto::new(ctx.id.as_bytes()),
+            ctx.event,
+        )),
+        None => None,
+    };
     let message_offset = ErrorResponseProto::create(
         builder,
         &ErrorResponseProtoArgs {
+            stream_context: stream_context_proto,
             message_id: message_id,
             error: Some(error_offset),
         },
@@ -94,9 +130,13 @@ pub fn create_error_response<'a>(
     message_offset.as_union_value()
 }
 
-pub fn build_error_response_message<'a>(error: &str, message_id: Option<&Uuid>) -> Vec<u8> {
+pub fn build_error_response_message<'a>(
+    error: &str,
+    message_id: Option<&Uuid>,
+    stream_context: Option<StreamContext>,
+) -> Vec<u8> {
     let mut builder = FlatBufferBuilder::new();
-    let offset = create_error_response(&mut builder, message_id, error);
+    let offset = create_error_response(&mut builder, message_id, error, stream_context);
     wrap_message(&mut builder, MessageProto::ErrorResponseProto, offset)
 }
 
