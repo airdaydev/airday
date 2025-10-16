@@ -7,7 +7,7 @@ use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{common::error::AppError, sync::{batch_response::BatchResponse, fb::build_batch_sync_msg, websocket::send_to_client}, AppState};
+use crate::{common::error::AppError, sync::{batch_response::BatchResponse, fb::{build_batch_sync_msg, build_batch_sync_op_msg}, websocket::send_to_client}, AppState};
 
 /// Per-process limit on concurrent read chunks across all users.
 static GLOBAL_READ_SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(32)));
@@ -57,7 +57,7 @@ pub async fn start_catchup_stream(
         }
         let builder = FlatBufferBuilder::new();
         let vec: Vec<BatchResponse> = vec![]; // TODO
-        let message = build_batch_sync_msg(&mut builder, responses)
+        let message = build_batch_sync_op_msg(&mut builder, responses)
         send_to_client(&app_state.ws, &req.socket_id, message);
         cur = range[range.len()].seq;
     }

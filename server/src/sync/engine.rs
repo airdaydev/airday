@@ -3,7 +3,7 @@ use crate::{
     common::{error::AppError, sql::Db},
     sync::{
         batch_response::BatchResponse,
-        fb::{build_batch_sync_msg, wrap_message},
+        fb::{build_batch_response_msg, wrap_message},
         proto_generated::proto::MessageProto,
         websocket::{WebsocketState, send_to_client},
     },
@@ -115,8 +115,12 @@ async fn process_batch_ops(
             };
         }
         let mut builder = FlatBufferBuilder::new();
-        let message_offset = build_batch_sync_msg(&mut builder, responses);
-        let message = wrap_message(&mut builder, MessageProto::BatchSyncProto, message_offset);
+        let message_offset = build_batch_response_msg(&mut builder, responses);
+        let message = wrap_message(
+            &mut builder,
+            MessageProto::BatchResponseProto,
+            message_offset,
+        );
         send_to_client(&ws, &batch.socket_id, message).await;
     }
 }

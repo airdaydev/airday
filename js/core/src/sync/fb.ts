@@ -6,11 +6,9 @@ import {
   UuidProto,
   SyncStreamReqProto,
   MessageProto,
-  ActionProto,
   MessageWrapperProto,
-  BatchSyncProto,
-  BatchComponentProto,
   OpKind,
+  BatchSyncOpProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -58,38 +56,6 @@ export class AirdayMessage implements MQMessage {
   }
 }
 
-export class BatchAction {
-  id = new Uuidv4();
-  sent = 0; // send attempts over websockets
-  actionProto: ActionProto = ActionProto.NONE;
-  addToFlatBuffer(builder: Builder): Offset {
-    throw new Error("addToFlatBuffer not implemented");
-  }
-  toActionFlatBuffer(): Uint8Array {
-    const builder = new Builder(1024);
-    const actionOffset = this.addToFlatBuffer(builder);
-    builder.finish(actionOffset);
-    return builder.asUint8Array();
-  }
-  buildBatchComponent(builder: Builder, actionOffset: Offset): Offset {
-    if (this.actionProto === ActionProto.NONE) {
-      throw new Error(
-        "No action type given while constructing batch component",
-      );
-    }
-    BatchComponentProto.startBatchComponentProto(builder);
-    BatchComponentProto.addActionType(builder, this.actionProto);
-    BatchComponentProto.addAction(builder, actionOffset);
-    const actionIdOffset = UuidProto.createUuidProto(
-      builder,
-      this.id.toUUIDProto(),
-    );
-    BatchComponentProto.addOpId(builder, actionIdOffset);
-    const offset = BatchComponentProto.endBatchComponentProto(builder);
-    return offset;
-  }
-}
-
 export class SyncStreamReqMessage extends AirdayMessage {
   id = new Uuidv4();
   libraryId: Uuidv4;
@@ -114,14 +80,12 @@ export class SyncStreamReqMessage extends AirdayMessage {
   }
 }
 
-export class SyncOp extends BatchAction {
+export class SyncOp {
   syncObject: SyncObject;
-  actionProto = ActionProto.SyncOpProto;
   id = new Uuidv4();
   opKind: OpKind;
   payload?: Uint8Array;
   constructor(syncObject: SyncObject, opKind = OpKind.PATCH) {
-    super();
     this.syncObject = syncObject;
     this.opKind = opKind;
   }
@@ -163,8 +127,8 @@ export class SyncOp extends BatchAction {
     if (vectorOffset) {
       SyncOpProto.addPayload(builder, vectorOffset);
     }
-    const actionOffset = SyncOpProto.endSyncOpProto(builder);
-    return this.buildBatchComponent(builder, actionOffset);
+    const offset = SyncOpProto.endSyncOpProto(builder);
+    return offset;
   }
 }
 
@@ -186,9 +150,9 @@ export class AuthenticateAction extends AirdayMessage {
 }
 
 export class BatchSyncMessage extends AirdayMessage {
-  actions: BatchAction[];
-  type = MessageProto.BatchSyncProto;
-  constructor(actions: BatchAction[]) {
+  actions: SyncOp[];
+  type = MessageProto.BatchSyncOpProto;
+  constructor(actions: SyncOp[]) {
     super();
     this.actions = actions;
   }
@@ -198,10 +162,10 @@ export class BatchSyncMessage extends AirdayMessage {
       .map((action) => action.addToFlatBuffer(builder))
       .filter((a) => a !== null);
     // 1. Build message
-    const batch = BatchSyncProto.createBatchVector(builder, batchOffsets);
-    BatchSyncProto.startBatchSyncProto(builder);
-    BatchSyncProto.addBatch(builder, batch);
-    let batchOffset = BatchSyncProto.endBatchSyncProto(builder);
+    const batch = BatchSyncOpProto.createBatchVector(builder, batchOffsets);
+    BatchSyncOpProto.startBatchSyncOpProto(builder);
+    BatchSyncOpProto.addBatch(builder, batch);
+    let batchOffset = BatchSyncOpProto.endBatchSyncOpProto(builder);
     return batchOffset;
   }
 }

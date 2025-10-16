@@ -3,7 +3,7 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
-import { BatchAction, BatchSyncMessage, SyncOp } from "./fb";
+import { BatchSyncMessage, SyncOp } from "./fb";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
@@ -17,7 +17,7 @@ interface SyncEventMap {
 // TODO: Failure thresholds + offline!!!
 export class AirdaySync {
   core: AirdayCore;
-  outbox = new Map<HexUuid, BatchAction>(); // Queued, in-flight or failed messages
+  outbox = new Map<HexUuid, SyncOp>(); // Queued, in-flight or failed messages
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;

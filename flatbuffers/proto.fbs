@@ -105,7 +105,6 @@ table BatchSyncOpProto {
 }
 
 table BatchResponseProto {
-  stream_context: StreamContextProto; // Only set when streaming to client from server
   batch: [ResponseProto] (required);
 }
 

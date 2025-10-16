@@ -4,11 +4,13 @@ use uuid::Uuid;
 use crate::{
     sync::{
         batch_response::BatchResponse,
+        engine::{IncomingSyncOp, OutgoingSyncOp, SyncOpSql},
         proto_generated::proto::{
-            AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchComponentProto,
-            BatchSyncProto, BatchSyncProtoArgs, ErrorResponseProto, ErrorResponseProtoArgs,
-            MessageProto, MessageWrapperProto, MessageWrapperProtoArgs, StreamContextProto,
-            StreamEventProto, UuidProto,
+            AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchResponseProto,
+            BatchResponseProtoArgs, BatchSyncOpProto, BatchSyncOpProtoArgs, ErrorResponseProto,
+            ErrorResponseProtoArgs, MessageProto, MessageWrapperProto, MessageWrapperProtoArgs,
+            ResponseProto, StreamContextProto, StreamEventProto, SyncOpProto, SyncOpProtoArgs,
+            UuidProto,
         },
     },
     user::model::User,
@@ -50,20 +52,21 @@ use crate::{
 //     )))
 // }
 
-pub fn build_batch_sync_msg<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
+// Useful for acking upstream reqs
+pub fn build_batch_response_msg<'a>(
+    fbb: &mut FlatBufferBuilder<'a>,
     responses: Vec<BatchResponse>,
 ) -> WIPOffset<UnionWIPOffset> {
-    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(responses.len());
+    let mut comps: Vec<WIPOffset<ResponseProto>> = Vec::with_capacity(responses.len());
     for action in responses {
-        comps.push(action.build_flatbuffer(builder));
+        comps.push(action.build_flatbuffer(fbb));
     }
 
-    let batch_vector = builder.create_vector(&comps);
+    let batch_vector = fbb.create_vector(&comps);
 
-    let batch_offset = BatchSyncProto::create(
-        builder,
-        &BatchSyncProtoArgs {
+    let batch_offset = BatchResponseProto::create(
+        fbb,
+        &BatchResponseProtoArgs {
             batch: Some(batch_vector),
         },
     )
@@ -71,20 +74,31 @@ pub fn build_batch_sync_msg<'a>(
     batch_offset
 }
 
-pub fn build_batch_hydrate_msg<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
-    responses: Vec<BatchResponse>,
+// Useful for catch up sync
+pub fn build_batch_sync_op_msg<'a>(
+    fbb: &mut FlatBufferBuilder<'a>,
+    responses: Vec<SyncOpSql>,
 ) -> WIPOffset<UnionWIPOffset> {
-    let mut comps: Vec<WIPOffset<BatchComponentProto>> = Vec::with_capacity(responses.len());
-    for action in responses {
-        comps.push(action.build_flatbuffer(builder));
+    let mut comps: Vec<WIPOffset<SyncOpProto>> = Vec::with_capacity(responses.len());
+    for op in responses {
+        // TODO: Build the op
+        SyncOpProto::create(
+            fbb,
+            &SyncOpProtoArgs {
+                proto_version: 0,
+                op_kind: op.op_kind,
+                // op_id: op.,
+            },
+        )
+        // comps.push(action.build_flatbuffer(fbb));
     }
 
-    let batch_vector = builder.create_vector(&comps);
+    let batch_vector = fbb.create_vector(&comps);
 
-    let batch_offset = BatchSyncProto::create(
-        builder,
-        &BatchSyncProtoArgs {
+    let batch_offset = BatchSyncOpProto::create(
+        fbb,
+        &BatchSyncOpProtoArgs {
+            stream_context: None, // TODO: Include stream context
             batch: Some(batch_vector),
         },
     )

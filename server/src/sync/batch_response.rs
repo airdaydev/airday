@@ -1,7 +1,4 @@
-use crate::sync::proto_generated::proto::{
-    ActionProto, BatchComponentProto, BatchComponentProtoArgs, BatchResponseProto,
-    BatchResponseProtoArgs, BatchResponseProtoBuilder, UuidProto,
-};
+use crate::sync::proto_generated::proto::{ResponseProto, ResponseProtoArgs, UuidProto};
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
@@ -20,26 +17,17 @@ impl BatchResponse {
     pub fn build_flatbuffer<'a>(
         &self,
         fbb: &mut FlatBufferBuilder<'a>,
-    ) -> WIPOffset<BatchComponentProto<'a>> {
+    ) -> WIPOffset<ResponseProto<'a>> {
         let offset;
         match self {
             BatchResponse::Applied { op_id, seq } => {
-                let id_proto = UuidProto::new(op_id.as_bytes());
-                let union_offset = BatchResponseProto::create(
+                offset = ResponseProto::create(
                     fbb,
-                    &BatchResponseProtoArgs {
+                    &ResponseProtoArgs {
+                        op_id: Some(&UuidProto::new(op_id.as_bytes())),
                         success: true,
                         error: None,
                         seq: *seq,
-                    },
-                )
-                .as_union_value();
-                offset = BatchComponentProto::create(
-                    fbb,
-                    &BatchComponentProtoArgs {
-                        op_id: Some(&id_proto),
-                        action_type: ActionProto::BatchResponseProto,
-                        action: Some(union_offset),
                     },
                 );
             }
@@ -53,16 +41,13 @@ impl BatchResponse {
                     }
                     None => None,
                 };
-                let mut err_fbb = BatchResponseProtoBuilder::new(fbb);
-                err_fbb.add_success(false);
-                err_fbb.add_error(err_message);
-                let union_offset = err_fbb.finish().as_union_value();
-                offset = BatchComponentProto::create(
+                offset = ResponseProto::create(
                     fbb,
-                    &BatchComponentProtoArgs {
-                        op_id: op_id,
-                        action_type: ActionProto::BatchResponseProto,
-                        action: Some(union_offset),
+                    &ResponseProtoArgs {
+                        op_id,
+                        success: true,
+                        error: Some(err_message),
+                        seq: 0,
                     },
                 );
             }
