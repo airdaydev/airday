@@ -114,13 +114,9 @@ async fn process_batch_ops(
                 }
             };
         }
-        let mut builder = FlatBufferBuilder::new();
-        let message_offset = build_batch_response_msg(&mut builder, responses);
-        let message = wrap_message(
-            &mut builder,
-            MessageProto::BatchResponseProto,
-            message_offset,
-        );
+        let mut fbb = FlatBufferBuilder::new();
+        let message_offset = build_batch_response_msg(&mut fbb, responses);
+        let message = wrap_message(&mut fbb, MessageProto::BatchResponseProto, message_offset);
         send_to_client(&ws, &batch.socket_id, message).await;
     }
 }

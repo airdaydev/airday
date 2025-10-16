@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::{
     sync::{
         batch_response::BatchResponse,
-        engine::{IncomingSyncOp, OutgoingSyncOp, SyncOpSql},
+        engine::{IncomingSyncOp, SyncOpSql},
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchResponseProto,
             BatchResponseProtoArgs, BatchSyncOpProto, BatchSyncOpProtoArgs, ErrorResponseProto,
@@ -19,26 +19,26 @@ use crate::{
 // TODO: Needs updating to new code
 // pub async fn send_shared_libraries<'a>(
 //     state: &AppState,
-//     builder: &mut FlatBufferBuilder<'a>,
+//     fbb: &mut FlatBufferBuilder<'a>,
 //     user_id: &Uuid,
 // ) -> Result<WIPOffset<BatchComponentProto<'a>>, AppError> {
 //     let res = state.db.user.get_by_id(user_id).await?;
 //     if let Some(user) = res {
 //         if let Some(primary_library) = user.primary_library {
-//             let library_id_offset = builder.create_vector(primary_library.id.as_bytes());
-//             let library_name_offset = builder.create_string(&primary_library.name);
+//             let library_id_offset = fbb.create_vector(primary_library.id.as_bytes());
+//             let library_name_offset = fbb.create_string(&primary_library.name);
 //             let library_args = LibraryProtoArgs {
 //                 id: Some(library_id_offset),
 //                 name: Some(library_name_offset),
 //             };
-//             let library_offset = LibraryProto::create(builder, &library_args);
+//             let library_offset = LibraryProto::create(fbb, &library_args);
 //             let primary_library_offset = LibrarySyncResponseProtoArgs {
 //                 primary_library: Some(library_offset),
 //             };
 //             let action_offset =
-//                 LibrarySyncResponseProto::create(builder, &primary_library_offset).as_union_value();
+//                 LibrarySyncResponseProto::create(fbb, &primary_library_offset).as_union_value();
 //             let batch_offset = BatchComponentProto::create(
-//                 builder,
+//                 fbb,
 //                 &BatchComponentProtoArgs {
 //                     action_type: AirdayActionProto::LibrarySyncResponseProto,
 //                     action: Some(action_offset),
@@ -113,7 +113,7 @@ pub struct StreamContext {
 }
 
 pub fn create_error_response<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
+    fbb: &mut FlatBufferBuilder<'a>,
     message_id: Option<&Uuid>,
     error: &str,
     stream_context: Option<StreamContext>,
@@ -125,7 +125,7 @@ pub fn create_error_response<'a>(
     } else {
         None
     };
-    let error_offset = builder.create_string(error);
+    let error_offset = fbb.create_string(error);
     let stream_context_proto = match stream_context {
         Some(ctx) => Some(&StreamContextProto::new(
             &UuidProto::new(ctx.id.as_bytes()),
@@ -134,7 +134,7 @@ pub fn create_error_response<'a>(
         None => None,
     };
     let message_offset = ErrorResponseProto::create(
-        builder,
+        fbb,
         &ErrorResponseProtoArgs {
             stream_context: stream_context_proto,
             message_id: message_id,
@@ -149,18 +149,18 @@ pub fn build_error_response_message<'a>(
     message_id: Option<&Uuid>,
     stream_context: Option<StreamContext>,
 ) -> Vec<u8> {
-    let mut builder = FlatBufferBuilder::new();
-    let offset = create_error_response(&mut builder, message_id, error, stream_context);
-    wrap_message(&mut builder, MessageProto::ErrorResponseProto, offset)
+    let mut fbb = FlatBufferBuilder::new();
+    let offset = create_error_response(&mut fbb, message_id, error, stream_context);
+    wrap_message(&mut fbb, MessageProto::ErrorResponseProto, offset)
 }
 
 pub fn create_auth_response<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
+    fbb: &mut FlatBufferBuilder<'a>,
     user: &User,
 ) -> WIPOffset<UnionWIPOffset> {
     let primary_library = user.primary_library.as_ref().unwrap();
     let action_offset = AuthenticateResponseProto::create(
-        builder,
+        fbb,
         &AuthenticateResponseProtoArgs {
             user_id: Some(&UuidProto::new(user.id.as_bytes())),
             library_id: Some(&UuidProto::new(primary_library.id.as_bytes())),
@@ -171,12 +171,12 @@ pub fn create_auth_response<'a>(
 }
 
 pub fn wrap_message<'a>(
-    builder: &mut FlatBufferBuilder<'a>,
+    fbb: &mut FlatBufferBuilder<'a>,
     message_type: MessageProto,
     message_offset: WIPOffset<UnionWIPOffset>,
 ) -> Vec<u8> {
     let message_offset = MessageWrapperProto::create(
-        builder,
+        fbb,
         &MessageWrapperProtoArgs {
             message_type,
             message: Some(message_offset),
@@ -184,6 +184,6 @@ pub fn wrap_message<'a>(
         },
     );
 
-    builder.finish(message_offset, None);
-    builder.finished_data().to_vec()
+    fbb.finish(message_offset, None);
+    fbb.finished_data().to_vec()
 }

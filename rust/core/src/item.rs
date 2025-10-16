@@ -30,15 +30,15 @@ impl SyncAttrs for ItemAttrs {
     const OBJ_KIND: i16 = ITEM;
 
     fn to_attr_blob(&self) -> Result<AttributesBlob, AppError> {
-        // Your existing builder logic, just moved here:
-        let mut builder = FlatBufferBuilder::new();
+        // Your existing fbb logic, just moved here:
+        let mut fbb = FlatBufferBuilder::new();
         let mut fb_attributes = Vec::new();
 
         if let Some(text_lww) = &self.text {
             let ts = LWWTimestampProto::new(text_lww.timestamp.utc, text_lww.timestamp.pid);
-            let off = builder.create_string(&text_lww.data);
+            let off = fbb.create_string(&text_lww.data);
             let attr = AttributeProto::create(
-                &mut builder,
+                &mut fbb,
                 &AttributeProtoArgs {
                     field_id: item_field_id::ITEM_TEXT,
                     value_type: AttrTypeProto::STRING,
@@ -53,15 +53,15 @@ impl SyncAttrs for ItemAttrs {
             );
             fb_attributes.push(attr);
         }
-        let vec_off = builder.create_vector(&fb_attributes);
+        let vec_off = fbb.create_vector(&fb_attributes);
         let set_off = AttributeSetProto::create(
-            &mut builder,
+            &mut fbb,
             &AttributeSetProtoArgs {
                 attributes: Some(vec_off),
             },
         );
-        builder.finish(set_off, None);
-        Ok(builder.finished_data().to_vec())
+        fbb.finish(set_off, None);
+        Ok(fbb.finished_data().to_vec())
     }
 
     fn from_attr_vec<'a>(attr_vec: AttributeFBVec<'a>) -> Result<Self, AppError> {
