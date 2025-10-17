@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::{
     sync::{
         batch_response::BatchResponse,
-        engine::{IncomingSyncOp, SyncOpSql},
+        engine::SyncOpSql,
         proto_generated::proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchResponseProto,
             BatchResponseProtoArgs, BatchSyncOpProto, BatchSyncOpProtoArgs, ErrorResponseProto,
@@ -82,19 +82,23 @@ pub fn build_batch_sync_op_msg<'a>(
     let mut comps: Vec<WIPOffset<SyncOpProto>> = Vec::with_capacity(responses.len());
     for op in responses {
         // TODO: Build the op
-        SyncOpProto::create(
+        let offset = SyncOpProto::create(
             fbb,
             &SyncOpProtoArgs {
                 proto_version: 0,
+                base_seq: None, // TODO: May need snapshot bool
+                op_id: None,    // TODO: No ID?
                 op_kind: op.op_kind,
-                // op_id: op.,
+                library_id: None,
+                obj_id: None,
+                obj_kind: op.obj_kind,
+                path: 0,
+                payload: 0,
             },
-        )
-        // comps.push(action.build_flatbuffer(fbb));
+        );
+        comps.push(offset);
     }
-
     let batch_vector = fbb.create_vector(&comps);
-
     let batch_offset = BatchSyncOpProto::create(
         fbb,
         &BatchSyncOpProtoArgs {

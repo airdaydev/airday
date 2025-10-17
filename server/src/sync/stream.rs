@@ -12,7 +12,7 @@ use crate::{
     common::error::AppError,
     sync::{
         batch_response::BatchResponse,
-        fb::{build_batch_sync_msg, build_batch_sync_op_msg},
+        fb::{build_batch_response_msg, build_batch_sync_op_msg, build_error_response_message},
         websocket::send_to_client,
     },
 };
