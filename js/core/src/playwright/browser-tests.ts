@@ -5,6 +5,7 @@ import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { NumericAttrMap, SyncObject } from "../sync/sync-object";
 import { SyncOp } from "../sync/fb";
+import { AirdayMemStorage } from "../storage/mem";
 
 // TODO: Performance testing!
 export async function authenticate(core: AirdayCore, email: string) {
@@ -21,6 +22,7 @@ export async function createTestCore() {
   const core = new AirdayCore({
     rootUrl: "http://localhost:3000",
     authMode: AuthMode.BearerToken,
+    storageAdapter: new AirdayMemStorage(),
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
   await core.storage.adapter.connect();

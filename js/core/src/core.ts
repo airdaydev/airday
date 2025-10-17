@@ -10,6 +10,7 @@ import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
 import type { Uuidv4 } from "./common/uuid";
 import { AirdayStorage } from "./storage";
+import { StorageAdapter } from "./storage/adapter";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -19,6 +20,7 @@ export enum AuthMode {
 interface AirdayCoreOpts {
   rootUrl: string;
   authMode?: AuthMode;
+  storageAdapter?: StorageAdapter;
 }
 
 interface Session {
@@ -68,7 +70,7 @@ export class AirdayCore {
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
     this.sync = new AirdaySync(this);
-    this.storage = new AirdayStorage(this);
+    this.storage = new AirdayStorage(this, opts.storageAdapter);
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);

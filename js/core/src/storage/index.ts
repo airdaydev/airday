@@ -18,11 +18,12 @@ interface StorageEventMap {
 // TODO: Boot cold items
 export class AirdayStorage {
   core: AirdayCore;
-  adapter: StorageAdapter = new AirdayIDBStorage();
+  adapter: StorageAdapter;
   syncObjects: Map<string, SyncObject> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
-  constructor(core: AirdayCore) {
+  constructor(core: AirdayCore, adapter?: StorageAdapter) {
     this.core = core;
+    this.adapter = adapter || new AirdayIDBStorage();
   }
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.syncObjects.delete(id.toHex()));
