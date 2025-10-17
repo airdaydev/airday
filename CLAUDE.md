@@ -5,11 +5,9 @@ The flatbuffer definition is the source of truth for sync communication over web
 
 The goal of this repo is to have a community edition backed by sqlite and a SaaS edition backed by Postgresql.
 
-I am moving this repo from a CAS server to an (almost) zero-knowledge e2ee server. Each SyncOp has an encrypted payload defining a map of LWW-Registers of various registers. In this way it is forward/back-compat. Snapshots are to be created by clients in a not yet determined means.
+This is a close to zero-knowledge e2ee server. Each SyncOp has an encrypted payload defining a map of LWW-Registers of various registers, as well as some metadata. In this way it is forward/back-compat. Snapshots are to be created by clients in a not yet determined means. I will add a text CRDT into the same db table later.
 
-App domain-specific objects are materialised on the client, the type determined by their obj_kind.
-
-I will also, later, implement text CRDTs
+App domain-specific objects are materialised on the client, the type determined by their obj_kind (transparent field on db).
 
 ## Key commands
 - `pnpm run db`: Resets the database
