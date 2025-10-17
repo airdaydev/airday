@@ -100,13 +100,13 @@ export class AirdaySync {
   // TODO: Do we need ack + pending? vs retaining state on object itself?
   // Probably yes but just keep this todo here for a bit
   handleBatchResponse = (res: BatchResponseEvent) => {
-    const action = this.outbox.get(res.opId.toHex());
+    const op = this.outbox.get(res.opId.toHex());
 
-    if (action instanceof SyncOp) {
+    if (op instanceof SyncOp) {
       if (res.success) {
         // TODO: Return seq
-        if (res.seq) {
-          action.syncObject.seq = res.seq;
+        if (typeof res.seq === "bigint") {
+          op.syncObject.seq = res.seq;
         }
         // TODO: persist .seq!
         // this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {

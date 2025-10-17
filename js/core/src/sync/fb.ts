@@ -161,7 +161,7 @@ export class BatchSyncMessage extends AirdayMessage {
     const batchOffsets = this.actions
       .map((action) => action.addToFlatBuffer(builder))
       .filter((a) => a !== null);
-    // 1. Build message
+    // 2. Build message
     const batch = BatchSyncOpProto.createBatchVector(builder, batchOffsets);
     BatchSyncOpProto.startBatchSyncOpProto(builder);
     BatchSyncOpProto.addBatch(builder, batch);

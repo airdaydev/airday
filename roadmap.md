@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] TODO: JSCore should have an idb adapter, with one just being inmem, so I can run it in bun
 - [] catch up stream api + limits via mpsc + select! + registers
 - [] delete items (tombstones, same api)
 - [] snapshot api

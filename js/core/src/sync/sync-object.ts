@@ -112,6 +112,7 @@ export class SyncObject {
     }
   }
   mergePatch(map: NumericAttrMap, local: boolean) {
+    console.log("mergePatch");
     for (const key of Object.keys(map)) {
       const curVal = this.values[key];
       if (!curVal) {

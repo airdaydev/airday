@@ -2,6 +2,7 @@ import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { parseGenericSyncObject, SyncObject } from "../sync/sync-object";
 import { SyncOp } from "../sync/fb";
 import { Uuidv4 } from "../common/uuid";
+import { StorageAdapter } from "./adapter";
 
 const SYNC_STORE_NAME = "sync_object";
 const LIBRARY_STORE_NAME = "library";
@@ -32,7 +33,7 @@ export type AirdayIDBPDatabase = IDBPDatabase<AirdayDBSchema>;
 export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 
 // Front-end persistent storage for Airday JS apps
-export class AirdayIDB {
+export class AirdayIDB implements StorageAdapter {
   handle: AirdayIDBPDatabase | null = null;
   constructor() {}
   connect = async () => {

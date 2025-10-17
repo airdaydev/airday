@@ -94,7 +94,7 @@ export const tests = async () => {
     ctx.assertEq(syncObj.values[1].data, 64);
   });
 
-  suite.test("Sync generic object", async (ctx) => {
+  suite.only("Sync generic object", async (ctx) => {
     const core = await createTestCore();
     const syncObj = new SyncObject({
       objKind: 0,
@@ -104,6 +104,15 @@ export const tests = async () => {
       data: "hello",
     });
     const op = syncObj.fullSyncOp();
+    console.log("yo wut");
+    const patch = {
+      1: new LWWRegister({
+        data: "goodbye",
+      }),
+    };
+    syncObj.mergePatch(patch, true);
+    console.log("merged patch");
+    // const op2 = syncObj.partialSyncOp(patch);
     await core.sync.queueOps([op]);
     // Test outbox - in mem version
     const outbox = core.sync.outbox.get(op.id.toHex());
@@ -131,7 +140,10 @@ export const tests = async () => {
       "ack message received & pending queue back to 0",
     );
     // seq persisted to sync object
-    ctx.assert(!!syncObj.seq && syncObj.seq > 0);
+    ctx.assert(
+      !!syncObj.seq && syncObj.seq > 0,
+      "seq persisted to sync object",
+    );
     const res = await core.storage.idb.getByLibrary(core.library.id!);
     const item = res[0];
     ctx.assert(
@@ -198,7 +210,7 @@ export const tests = async () => {
 
   suite.skip("fan out to connection on same library", () => {});
 
-  suite.only("Get all items since beginning from server", async (ctx) => {
+  suite.test("Get all items since beginning from server", async (ctx) => {
     const core = await createTestCore();
     // create 50 items
     let ops = [];
