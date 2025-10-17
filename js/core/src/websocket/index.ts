@@ -1,13 +1,11 @@
 import { ByteBuffer } from "flatbuffers";
 import {
-  SyncOpProto,
-  ActionProto,
   MessageWrapperProto,
   AuthenticateResponseProto,
   LibrarySyncResponseProto,
   MessageProto,
-  BatchSyncProto,
   BatchResponseProto,
+  BatchSyncOpProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction } from "../sync/fb";
@@ -214,45 +212,44 @@ export class WebsocketManager {
         }
         break;
       }
-      case MessageProto.BatchSyncProto: {
-        const batchMsg = new BatchSyncProto();
-        wrapper.message(batchMsg);
-        this.processBatchMessage(span, batchMsg);
+      case MessageProto.BatchSyncOpProto: {
+        const msg = new BatchSyncOpProto();
+        wrapper.message(msg);
+        this.processBatchSyncOpMessage(span, msg);
+      }
+      case MessageProto.BatchResponseProto: {
+        const msg = new BatchResponseProto();
+        wrapper.message(msg);
+        this.processBatchResponseMessage(span, msg);
       }
     }
   }
-  private processBatchMessage(span: ULSpan, batchMsg: BatchSyncProto) {
+  private processBatchResponseMessage(span: ULSpan, msg: BatchResponseProto) {
+    for (let i = 0; i < msg.batchLength(); i++) {
+      const op = msg.batch(i);
+      if (!op) continue;
+      const opId = Uuidv4.fromFBProto(op.opId());
+      tracer.addTag(span, "msg_type", "ResponseProto");
+      this.events.emit("batch-response", {
+        opId,
+        success: op.success(),
+        seq: op.seq(),
+      });
+      console.log("sync res received", op);
+      tracer.endSpan(span);
+    }
+  }
+  private processBatchSyncOpMessage(span: ULSpan, msg: BatchSyncOpProto) {
     // TODO: Check stream info
-    const batchLength = batchMsg.batchLength();
-    for (let i = 0; i < batchLength; i++) {
-      const component = batchMsg.batch(i);
-      if (!component) continue;
-
-      const opId = Uuidv4.fromFBProto(component.opId());
-      const actionType = component.actionType();
-
-      switch (actionType) {
-        case ActionProto.SyncOpProto:
-          tracer.addTag(span, "msg_type", "SyncOpProto");
-          const objectResponse = new SyncOpProto();
-          component.action(objectResponse);
-          // TODO: Validate and add object to storage
-          console.log("syncobjectreceived", objectResponse);
-          break;
-        case ActionProto.BatchResponseProto: {
-          tracer.addTag(span, "msg_type", "AckResponseProto");
-          const batchResponse = new BatchResponseProto();
-          component.action(batchResponse);
-          this.events.emit("batch-response", {
-            opId,
-            success: batchResponse.success(),
-            seq: batchResponse.seq(),
-          });
-          break;
-        }
-        default:
-          console.warn(`No handler for rx action type: ${actionType}:`);
-      }
+    for (let i = 0; i < msg.batchLength(); i++) {
+      const op = msg.batch(i);
+      if (!op) continue;
+      const opId = Uuidv4.fromFBProto(op.opId());
+      tracer.addTag(span, "msg_type", "SyncOpProto");
+      // TODO: Do something with this
+      // op.action(objectResponse);
+      // TODO: Validate and add object to storage
+      console.log("sync op received", op);
       tracer.endSpan(span);
     }
   }
