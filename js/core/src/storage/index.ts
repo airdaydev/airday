@@ -3,7 +3,8 @@ import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
 import { SyncObject } from "../sync/sync-object";
-import { AirdayIDB } from "./idb";
+import { StorageAdapter } from "./adapter";
+import { AirdayIDBStorage } from "./idb";
 
 interface StorageEventMap {
   upsert: { objects: SyncObject[] };
@@ -17,7 +18,7 @@ interface StorageEventMap {
 // TODO: Boot cold items
 export class AirdayStorage {
   core: AirdayCore;
-  idb = new AirdayIDB();
+  adapter: StorageAdapter = new AirdayIDBStorage();
   syncObjects: Map<string, SyncObject> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore) {
@@ -25,7 +26,7 @@ export class AirdayStorage {
   }
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.syncObjects.delete(id.toHex()));
-    await this.idb.delete(ids);
+    await this.adapter.delete(ids);
     // TODO: trigger subscription remove event!
   }
   // TODO: Trigger patch?

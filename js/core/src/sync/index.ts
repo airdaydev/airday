@@ -83,7 +83,7 @@ export class AirdaySync {
     let promises = [];
     for (let op of ops) {
       // TODO: Cleaner to await, but we don't really need to?
-      promises.push(this.core.storage.idb.addOps([op]));
+      promises.push(this.core.storage.adapter.addOps([op]));
       this.core.storage.setSyncObject(op.syncObject);
       this.outbox.set(op.id.toHex(), op);
     }

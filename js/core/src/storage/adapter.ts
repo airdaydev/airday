@@ -9,4 +9,5 @@ export abstract class StorageAdapter {
   abstract getOutboxItem(id: Uuidv4): Promise<void>;
   abstract getSyncObject(id: Uuidv4): Promise<void>;
   abstract delete(hexIds: Uuidv4[]): Promise<void>;
+  abstract clear(hexIds: Uuidv4[]): Promise<void>;
 }

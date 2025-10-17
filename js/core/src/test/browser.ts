@@ -23,7 +23,7 @@ export async function createTestCore() {
     authMode: AuthMode.BearerToken,
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
-  await core.storage.idb.connect();
+  await core.storage.adapter.connect();
   core.ws.connect();
   await core.ws.events.onceAsync("authenticated");
   return core;
@@ -119,7 +119,7 @@ export const tests = async () => {
     if (!outbox?.id) throw new Error("fail test early");
     ctx.assert(op.id.equals(outbox.id), "message gets placed in-mem outbox");
     // Test outbox - idb version
-    const outboxItemIdb = await core.storage.idb.getOutboxItem(op.id);
+    const outboxItemIdb = await core.storage.adapter.getOutboxItem(op.id);
     ctx.assert(
       op.id.equals(outboxItemIdb.id),
       "modified sync object gets stored in durable memory",
@@ -144,7 +144,7 @@ export const tests = async () => {
       !!syncObj.seq && syncObj.seq > 0,
       "seq persisted to sync object",
     );
-    const res = await core.storage.idb.getByLibrary(core.library.id!);
+    const res = await core.storage.adapter.getByLibrary(core.library.id!);
     const item = res[0];
     ctx.assert(
       op.syncObject.id.equals(item.id),
@@ -174,7 +174,7 @@ export const tests = async () => {
     }
     await core.sync.queueOps(ops);
     await core.ws.flush();
-    const res = await core.storage.idb.getByLibrary(core.library.id!);
+    const res = await core.storage.adapter.getByLibrary(core.library.id!);
     ctx.assertEq(res.length, qty, "correct res length");
     core.ws.close();
   });
@@ -226,9 +226,8 @@ export const tests = async () => {
     core.sync.queueOps(ops);
     await core.sync.flush();
     // Clear database (TODO: Direct access??)
-    await core.storage.idb.handle?.clear("sync_object");
-    await core.storage.idb.handle?.clear("library");
-    const emptyRes = await core.storage.idb.getByLibrary(core.library.id!);
+    await core.storage.adapter.clear();
+    const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
     ctx.assertEq(emptyRes.length, 0, "idb has been emptied");
     // Retrieve all items
     // core.sync.getItemSince(core.library.id!, null);

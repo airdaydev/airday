@@ -33,7 +33,7 @@ export type AirdayIDBPDatabase = IDBPDatabase<AirdayDBSchema>;
 export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 
 // Front-end persistent storage for Airday JS apps
-export class AirdayIDB implements StorageAdapter {
+export class AirdayIDBStorage implements StorageAdapter {
   handle: AirdayIDBPDatabase | null = null;
   constructor() {}
   connect = async () => {
@@ -89,5 +89,9 @@ export class AirdayIDB implements StorageAdapter {
     const store = tx.objectStore(SYNC_STORE_NAME);
     await Promise.all(hexIds.map((id) => store.delete(id)));
     await tx.done;
+  };
+  clear = async () => {
+    await this.handle?.clear("sync_object");
+    await this.handle?.clear("library");
   };
 }
