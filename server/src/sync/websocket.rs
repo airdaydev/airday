@@ -5,7 +5,7 @@ use crate::common::utils::proto_uuid_to_uuid;
 use crate::sync::engine::{IncomingSyncOp, IncomingSyncOpBatch};
 use crate::sync::fb::{build_error_response_message, create_auth_response, wrap_message};
 use crate::sync::proto_generated::proto::{
-    ActionProto, MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
+    MessageProto, MessageWrapperProto, OpKind, root_as_message_wrapper_proto,
 };
 use crate::sync::stream::{PER_USER_STREAM_LIMIT, StreamRequest, start_catchup_stream};
 use axum::extract::State;
@@ -217,8 +217,8 @@ async fn read(
                             }
                             // Authenticate user
                         }
-                        MessageProto::BatchSyncProto => {
-                            let Some(msg) = msg.message_as_batch_sync_proto() else {
+                        MessageProto::BatchSyncOpProto => {
+                            let Some(msg) = msg.message_as_batch_sync_op_proto() else {
                                 return Err(AppError::ValidationError(String::from(
                                     "Failed to parse BatchSyncProto",
                                 )));
@@ -234,37 +234,31 @@ async fn read(
                                 )));
                             };
                             let mut op_vec: Vec<IncomingSyncOp> = Vec::new();
-                            for ap in msg.batch().iter() {
-                                if ap.action_type() == ActionProto::SyncOpProto {
-                                    // TODO: Break this whole thing so we can propagate an error back to the top and send
-                                    // Zero-copy body & encapsulate
-                                    let op_raw = ap.action_as_sync_op_proto().unwrap();
-                                    let payload_slice = op_raw.payload().unwrap().bytes();
-                                    let start =
-                                        payload_slice.as_ptr() as usize - b.as_ptr() as usize;
-                                    let end = start + payload_slice.len();
-                                    let payload_range = start..end;
-                                    let op_kind = op_raw.op_kind();
-                                    let payload = b.slice(payload_range);
-                                    let base_seq = if op_kind == OpKind::SNAPSHOT {
-                                        Some(op_raw.base_seq())
-                                    } else {
-                                        None
-                                    };
-                                    let op = IncomingSyncOp {
-                                        base_seq: base_seq,
-                                        op_kind: op_kind.0,
-                                        op_id: proto_uuid_to_uuid(op_raw.op_id()),
-                                        library_id: proto_uuid_to_uuid(op_raw.library_id()),
-                                        obj_id: proto_uuid_to_uuid(op_raw.obj_id()),
-                                        obj_kind: op_raw.obj_kind(),
-                                        path: op_raw.path(), // 0 = no path
-                                        payload,
-                                    };
-                                    op_vec.push(op);
+                            for op_raw in msg.batch().iter() {
+                                // TODO: Break this whole thing so we can propagate an error back to the top and send
+                                // Zero-copy body & encapsulate
+                                let payload_slice = op_raw.payload().unwrap().bytes();
+                                let start = payload_slice.as_ptr() as usize - b.as_ptr() as usize;
+                                let end = start + payload_slice.len();
+                                let payload_range = start..end;
+                                let op_kind = op_raw.op_kind();
+                                let payload = b.slice(payload_range);
+                                let base_seq = if op_kind == OpKind::SNAPSHOT {
+                                    Some(op_raw.base_seq())
                                 } else {
-                                    // TODO: Warn on this case?
-                                }
+                                    None
+                                };
+                                let op = IncomingSyncOp {
+                                    base_seq: base_seq,
+                                    op_kind: op_kind.0,
+                                    op_id: proto_uuid_to_uuid(op_raw.op_id()),
+                                    library_id: proto_uuid_to_uuid(op_raw.library_id()),
+                                    obj_id: proto_uuid_to_uuid(op_raw.obj_id()),
+                                    obj_kind: op_raw.obj_kind(),
+                                    path: op_raw.path(), // 0 = no path
+                                    payload,
+                                };
+                                op_vec.push(op);
                             }
                             if op_vec.is_empty() {
                                 return Err(AppError::ValidationError(String::from(
