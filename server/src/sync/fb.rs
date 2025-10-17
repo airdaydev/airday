@@ -2,6 +2,7 @@ use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use uuid::Uuid;
 
 use crate::{
+    common::error::AppError,
     sync::{
         batch_response::BatchResponse,
         engine::SyncOpSql,
@@ -9,8 +10,8 @@ use crate::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchResponseProto,
             BatchResponseProtoArgs, BatchSyncOpProto, BatchSyncOpProtoArgs, ErrorResponseProto,
             ErrorResponseProtoArgs, MessageProto, MessageWrapperProto, MessageWrapperProtoArgs,
-            ResponseProto, StreamContextProto, StreamEventProto, SyncOpProto, SyncOpProtoArgs,
-            UuidProto,
+            OpKind, ResponseProto, StreamContextProto, StreamEventProto, SyncOpProto,
+            SyncOpProtoArgs, UuidProto,
         },
     },
     user::model::User,
@@ -74,6 +75,15 @@ pub fn build_batch_response_msg<'a>(
     batch_offset
 }
 
+fn i64_to_opkind(i: i64) -> Result<OpKind, AppError> {
+    match i {
+        0 => Ok(OpKind::PATCH),
+        1 => Ok(OpKind::DELETE),
+        2 => Ok(OpKind::SNAPSHOT),
+        _ => Err(AppError::ValidationError(String::from("Unknown op-kind"))),
+    }
+}
+
 // Useful for catch up sync
 pub fn build_batch_sync_op_msg<'a>(
     fbb: &mut FlatBufferBuilder<'a>,
@@ -81,19 +91,28 @@ pub fn build_batch_sync_op_msg<'a>(
 ) -> WIPOffset<UnionWIPOffset> {
     let mut comps: Vec<WIPOffset<SyncOpProto>> = Vec::with_capacity(responses.len());
     for op in responses {
-        // TODO: Build the op
+        // UuidProto::new(op.op_id)
+        let op_kind = match i64_to_opkind(op.op_kind) {
+            Ok(kind) => kind,
+            Err(_) => {
+                // TODO: Consider forward compat etc
+                println!("TODO: Skipping unknown opkind");
+                continue;
+            }
+        };
+        let payload = fbb.create_vector(&op.payload);
         let offset = SyncOpProto::create(
             fbb,
             &SyncOpProtoArgs {
                 proto_version: 0,
-                base_seq: None, // TODO: May need snapshot bool
-                op_id: None,    // TODO: No ID?
-                op_kind: op.op_kind,
-                library_id: None,
-                obj_id: None,
-                obj_kind: op.obj_kind,
+                op_kind,
+                base_seq: op.base_seq,
+                op_id: Some(&UuidProto::new(op.op_id.as_bytes())),
+                library_id: Some(&UuidProto::new(op.library_id.as_bytes())),
+                obj_id: Some(&UuidProto::new(op.obj_id.as_bytes())),
+                obj_kind: op.obj_kind.try_into().unwrap(),
                 path: 0,
-                payload: 0,
+                payload: Some(payload),
             },
         );
         comps.push(offset);

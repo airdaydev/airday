@@ -44,8 +44,9 @@ pub struct IncomingSyncOpBatch {
 pub struct SyncOpSql {
     // sync concerns
     pub seq: Seq,
-    pub base_seq: Option<i64>, // snapshot seq base
-    pub op_kind: i64,          // TODO: Specify allowable enums
+    pub base_seq: i64, // only relevant when op_kind=2 (snapshot)
+    pub op_id: Uuid,
+    pub op_kind: i64, // 0=patch, 1=delete, 2=snapshot
     pub archived: bool,
     // static attrs
     pub library_id: Uuid,
