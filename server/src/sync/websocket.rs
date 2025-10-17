@@ -260,7 +260,6 @@ async fn read(
                                         obj_kind: op_raw.obj_kind(),
                                         path: op_raw.path(), // 0 = no path
                                         payload,
-                                        tombstone_utc: None, // TODO: tombstoning
                                     };
                                     op_vec.push(op);
                                 } else {

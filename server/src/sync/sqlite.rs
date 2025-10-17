@@ -32,8 +32,7 @@ async fn insert<'a>(
         r#"INSERT INTO sync_op (
             base_seq, archived, op_id, op_kind,
             library_id, obj_id, path, obj_kind,
-            payload, payload_sha256,
-            tombstone_utc, created_utc, client_id
+            payload, payload_sha256, created_utc, client_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         op.base_seq,
         false, // archived = false for new operations
@@ -45,7 +44,6 @@ async fn insert<'a>(
         op.obj_kind,
         payload,
         payload_sha256,
-        op.tombstone_utc,
         now,
         None::<Uuid> // TODO: Get client_id from somewhere
     )
@@ -55,82 +53,15 @@ async fn insert<'a>(
     Ok(result.last_insert_rowid())
 }
 
-// TODO: We are no longer CASing but will leave this temporarily for reference
-// async fn merge<'a>(
-//     tx: &mut Transaction<'a, Sqlite>,
-//     incoming_sync_obj: &SyncOp,
-// ) -> Result<i64, AppError> {
-//     // Select for merge
-//     let result = sqlx::query_as!(
-//         SqlSyncOp,
-//         r#"SELECT id as "id: Uuid", library_id as "library_id: Uuid", obj_kind,
-//           server_seq, tombstone_utc, attributes
-//           FROM sync_op
-//           WHERE library_id = ? AND id = ?"#,
-//         incoming_sync_obj.meta().library_id,
-//         incoming_sync_obj.meta().id,
-//     )
-//     .fetch_optional(tx.as_mut())
-//     .await?;
-//     // 2. Check if sync_obj exists
-//     let Some(sql_sync_obj) = result else {
-//         // Obj does not exist, insert new sync_obj
-//         let server_seq = insert(tx, incoming_sync_obj).await?;
-//         return Ok(server_seq);
-//     };
-//     if let Some(_) = sql_sync_obj.tombstone_utc {
-//         // obj is tombstones - discard changes
-//         // TODO: Hints that user has not received, or is receiving this update - send the tombstone back somehow
-//         return Err(AppError::ValidationError(String::from(
-//             "sync_obj is tombstoned",
-//         )));
-//     }
-//     if sql_sync_obj.obj_kind as i16 != incoming_sync_obj.obj_kind() {
-//         return Err(AppError::DatabaseError(String::from(
-//             "Incorrect merge type",
-//         )));
-//     }
-//     let last_server_seq = sql_sync_obj.server_seq as i64;
-//     let mut existing_object: SyncOp = sql_sync_obj.try_into()?;
-//     existing_object.merge_into(&incoming_sync_obj);
-
-//     let Ok(attr_blob) = existing_object.to_attr_blob() else {
-//         return Err(AppError::ServerError(String::from(
-//             "Failed to translate merge output to blob",
-//         )));
-//     };
-//     let server_seq = now_micros();
-
-//     let result = sqlx::query!(
-//         r#"UPDATE sync_op
-//                SET attributes = ?, server_seq = ?
-//                WHERE id = ? AND library_id = ? AND tombstone_utc IS NULL AND server_seq = ?"#,
-//         attr_blob,
-//         server_seq,
-//         incoming_sync_obj.meta().id,
-//         incoming_sync_obj.meta().library_id,
-//         last_server_seq,
-//     )
-//     .execute(tx.as_mut())
-//     .await?;
-
-//     if result.rows_affected() == 1 {
-//         return Ok(server_seq);
-//     } else {
-//         return Err(AppError::RetryReq());
-//     }
-// }
-
 #[async_trait]
 impl SyncOpModel for SyncOpModelSqlite {
     async fn get_by_seq(&self, library_id: &Uuid, seq: i64) -> Result<Option<SyncOpSql>, AppError> {
         let result = sqlx::query_as!(
             SyncOpSql,
-            r#"SELECT seq, base_seq, archived, op_kind,
+            r#"SELECT seq, base_seq, archived, op_kind, op_id as "op_id: Uuid",
             library_id as "library_id: Uuid",
             obj_id as "obj_id: Uuid", path, obj_kind,
-            payload, payload_sha256,
-            tombstone_utc, created_utc, client_id as "client_id: Uuid"
+            payload, payload_sha256, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND seq = ? LIMIT 1"#,
             library_id,
             seq,
@@ -175,7 +106,7 @@ impl SyncOpModel for SyncOpModelSqlite {
     ) -> Result<Vec<SyncOpSql>, sqlx::Error> {
         sqlx::query_as::<_, SyncOpSql>(
             r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind, archived,
-            payload, payload_sha256, tombstone_utc, created_utc, client_id
+            payload, payload_sha256, created_utc, client_id
             FROM sync_op
             WHERE library_id = ? AND seq >= ? AND seq <= ?
             ORDER BY seq ASC LIMIT ?"#,

@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS user_library (
 CREATE TABLE IF NOT EXISTS sync_op (
   -- sync concerns
   seq INTEGER PRIMARY KEY AUTOINCREMENT, -- server_seq number
-  base_seq INTEGER DEFAULT 0, -- snapshot seq base (renders lower seqs as void)
+  base_seq INTEGER NOT NULL DEFAULT 0, -- snapshot seq base (renders lower seqs as void)
   -- crdt concerns
   op_id UUID NOT NULL,
   op_kind INTEGER NOT NULL, -- 0=patch, 1=delete, 2=snapshot (potentially extend for text ops)
@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS sync_op (
   payload BLOB NOT NULL,
   payload_sha256 BLOB NOT NULL,
   -- Metadata & tombstone
-  tombstone_utc INTEGER NULL,
   created_utc INTEGER NOT NULL,
   client_id UUID NULL
   -- TODO: Consider switch to per library seq (good bc spans acros all tables even in sqlite, )

@@ -49,7 +49,5 @@ pub fn mock_incoming_op(library_id: Uuid, obj_id: Option<Uuid>) -> IncomingSyncO
         path: 0,
         // flatbuffer
         payload: Bytes::new(),
-        // metadata
-        tombstone_utc: None,
     }
 }

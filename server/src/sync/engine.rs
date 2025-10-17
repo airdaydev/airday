@@ -29,7 +29,6 @@ pub struct IncomingSyncOp {
     pub obj_id: Uuid,
     pub obj_kind: i16,
     pub path: i16,
-    pub tombstone_utc: Option<i16>,
     // payload
     pub payload: Bytes,
 }
@@ -51,13 +50,12 @@ pub struct SyncOpSql {
     // static attrs
     pub library_id: Uuid,
     pub obj_id: Uuid,
-    pub path: Option<i64>, // used for complex subfields e.g. text crdts
+    pub path: i64, // used for complex subfields e.g. text crdts
     pub obj_kind: i64,
     // flatbuffer blob (may be encrypted)
     pub payload: PayloadBlob,
     pub payload_sha256: Sha256,
     // metadata
-    pub tombstone_utc: Option<i64>,
     pub created_utc: i64,
     pub client_id: Option<Uuid>,
 }
