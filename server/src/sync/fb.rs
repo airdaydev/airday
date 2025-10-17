@@ -87,7 +87,7 @@ fn i64_to_opkind(i: i64) -> Result<OpKind, AppError> {
 // Useful for catch up sync
 pub fn build_batch_sync_op_msg<'a>(
     fbb: &mut FlatBufferBuilder<'a>,
-    responses: Vec<SyncOpSql>,
+    responses: &Vec<SyncOpSql>,
 ) -> WIPOffset<UnionWIPOffset> {
     let mut comps: Vec<WIPOffset<SyncOpProto>> = Vec::with_capacity(responses.len());
     for op in responses {
@@ -118,7 +118,7 @@ pub fn build_batch_sync_op_msg<'a>(
         comps.push(offset);
     }
     let batch_vector = fbb.create_vector(&comps);
-    let batch_offset = BatchSyncOpProto::create(
+    let message_offset = BatchSyncOpProto::create(
         fbb,
         &BatchSyncOpProtoArgs {
             stream_context: None, // TODO: Include stream context
@@ -126,7 +126,7 @@ pub fn build_batch_sync_op_msg<'a>(
         },
     )
     .as_union_value();
-    batch_offset
+    message_offset
 }
 
 #[derive(Debug)]

@@ -12,7 +12,11 @@ use crate::{
     common::error::AppError,
     sync::{
         batch_response::BatchResponse,
-        fb::{build_batch_response_msg, build_batch_sync_op_msg, build_error_response_message},
+        fb::{
+            build_batch_response_msg, build_batch_sync_op_msg, build_error_response_message,
+            wrap_message,
+        },
+        proto_generated::proto::{BatchSyncOpProto, MessageProto},
         websocket::send_to_client,
     },
 };
@@ -36,12 +40,12 @@ pub async fn start_catchup_stream(
     req: StreamRequest,
 ) -> Result<(), AppError> {
     // TODO: Stream context? (TODO: Could build it in streamrequest?)
-    let conn = match app_state.ws.get_conn(&req.socket_id) {
-        None => {
-            return Err(AppError::ServerError(String::from("Connection not found")));
-        }
-        Some(conn) => conn,
-    };
+    // let conn = match app_state.ws.get_conn(&req.socket_id) {
+    //     None => {
+    //         return Err(AppError::ServerError(String::from("Connection not found")));
+    //     }
+    //     Some(conn) => conn,
+    // };
     let head = app_state
         .db
         .sync_op
@@ -63,8 +67,9 @@ pub async fn start_catchup_stream(
         if range.len() < 50 {
             // TODO: DONE!
         }
-        let fbb = FlatBufferBuilder::new();
-        let message = build_batch_sync_op_msg(&mut fbb, range);
+        let mut fbb = FlatBufferBuilder::new();
+        let message_offset = build_batch_sync_op_msg(&mut fbb, &range);
+        let message = wrap_message(&mut fbb, MessageProto::BatchSyncOpProto, message_offset);
         send_to_client(&app_state.ws, &req.socket_id, message);
         cur = range[range.len()].seq;
     }

@@ -30,12 +30,11 @@ async fn insert<'a>(
     let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
     let result = sqlx::query!(
         r#"INSERT INTO sync_op (
-            base_seq, archived, op_id, op_kind,
+            base_seq, op_id, op_kind,
             library_id, obj_id, path, obj_kind,
-            payload, payload_sha256, created_utc, client_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            payload, payload_sha256, created_utc, client_id, archived
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         op.base_seq,
-        false, // archived = false for new operations
         op.op_id,
         op.op_kind,
         op.library_id,
@@ -45,7 +44,8 @@ async fn insert<'a>(
         payload,
         payload_sha256,
         now,
-        None::<Uuid> // TODO: Get client_id from somewhere
+        None::<Uuid>, // TODO: Get client_id from somewhere
+        false,        // archived = false for new operations
     )
     .execute(pool)
     // .execute(tx.as_mut())
