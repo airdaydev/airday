@@ -1,5 +1,4 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import { parseGenericSyncObject, SyncObject } from "../sync/sync-object";
 import { SyncOp } from "../sync/fb";
 import { Uuidv4 } from "../common/uuid";
 import { StorageAdapter } from "./adapter";
@@ -76,8 +75,8 @@ export class AirdayIDBStorage implements StorageAdapter {
       libraryId,
     );
   };
-  getOutboxItem = (id: Uuidv4) => {
-    return this.handle!.get(OUTBOX_STORE_NAME, id);
+  getOutboxOp = (id: Uuidv4): SyncOp => {
+    const rawItem = this.handle!.get(OUTBOX_STORE_NAME, id);
   };
   getSyncObject = (id: Uuidv4) => {
     console.log("calling getsyncobj with", id);

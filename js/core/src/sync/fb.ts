@@ -81,21 +81,25 @@ export class SyncStreamReqMessage extends AirdayMessage {
 }
 
 export class SyncOp {
-  syncObject: SyncObject;
   id = new Uuidv4();
   opKind: OpKind;
   payload?: Uint8Array;
+  libraryId: Uuidv4;
+  objId: Uuidv4;
+  objKind: number;
   constructor(syncObject: SyncObject, opKind = OpKind.PATCH) {
-    this.syncObject = syncObject;
     this.opKind = opKind;
+    this.libraryId = syncObject.libraryId;
+    this.objId = syncObject.id;
+    this.objKind = syncObject.objKind;
   }
   toIdb() {
     return {
       id: this.id,
       opKind: OpKind,
-      libraryId: this.syncObject.libraryId,
-      objId: this.syncObject.id,
-      objKind: this.syncObject.objKind,
+      libraryId: this.libraryId,
+      objId: this.id,
+      objKind: this.objKind,
       payload: this.payload,
     };
   }
@@ -111,17 +115,14 @@ export class SyncOp {
       UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
     );
     SyncOpProto.addOpKind(builder, this.opKind);
-    SyncOpProto.addObjKind(builder, this.syncObject.objKind);
+    SyncOpProto.addObjKind(builder, this.objKind);
     SyncOpProto.addObjId(
       builder,
-      UuidProto.createUuidProto(builder, this.syncObject.id.toUUIDProto()),
+      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
     );
     SyncOpProto.addLibraryId(
       builder,
-      UuidProto.createUuidProto(
-        builder,
-        this.syncObject.libraryId.toUUIDProto(),
-      ),
+      UuidProto.createUuidProto(builder, this.libraryId.toUUIDProto()),
     );
     // TODO: e2ee payload
     if (vectorOffset) {
