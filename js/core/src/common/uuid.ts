@@ -16,6 +16,11 @@ export class Uuidv4 extends Uint8Array {
   static fromString(uuidString: string) {
     return new Uuidv4(parse(uuidString));
   }
+  // Validates
+  static fromUint8Array(bytes: Uint8Array) {
+    assertUuidV4Bytes(bytes);
+    return new Uuidv4(bytes);
+  }
   static fromFBVector(id: (index: number) => number | null) {
     const bytes = new Uint8Array(16);
     for (let i = 0; i < 16; i++) {
@@ -66,4 +71,31 @@ export class Uuidv4 extends Uint8Array {
     }
     return true;
   }
+}
+
+export type UuidV4Bytes = Uint8Array & { readonly __uuidv4: unique symbol };
+
+export function isUuidV4Bytes(x: unknown): x is UuidV4Bytes {
+  if (
+    !x ||
+    typeof x !== "object" ||
+    (x as any).constructor?.name !== "Uint8Array" ||
+    (x as any).BYTES_PER_ELEMENT !== 1
+  )
+    return false;
+
+  const u8 = x as Uint8Array;
+  return (
+    u8.length === 16 &&
+    (u8[6] & 0xf0) === 0x40 && // version 4
+    (u8[8] & 0xc0) === 0x80 // RFC4122 variant
+  );
+}
+
+export function assertUuidV4Bytes(x: unknown): UuidV4Bytes {
+  if (!isUuidV4Bytes(x))
+    throw new Error(
+      "id must be a Uint8Array uuidv4 (16 bytes, v4, RFC4122 variant)",
+    );
+  return x;
 }

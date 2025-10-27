@@ -2,7 +2,12 @@ import { LWWRegister, LWWTimestamp } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { Builder, ByteBuffer } from "flatbuffers";
-import { AttributeProto, AttributeSetProto, AttrTypeProto } from "../proto";
+import {
+  AttributeProto,
+  AttributeSetProto,
+  AttrTypeProto,
+  OpKind,
+} from "../proto";
 import { SyncOp } from "./fb";
 
 export type KeyMap = { readonly [k: string]: number };
@@ -77,8 +82,15 @@ export class SyncObject {
   }
 
   fullSyncOp() {
-    const op = new SyncOp(this);
-    op.payload = this.getFullAttrPayload();
+    const params = {
+      id: this.id,
+      opKind: OpKind.PATCH,
+      libraryId: this.libraryId,
+      objId: this.id,
+      objKind: this.objKind,
+      payload: this.getFullAttrPayload(),
+    };
+    const op = new SyncOp(params);
     return op;
   }
 

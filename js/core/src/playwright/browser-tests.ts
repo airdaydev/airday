@@ -121,9 +121,9 @@ export const tests = async () => {
     if (!outbox?.id) throw new Error("fail test early");
     ctx.assert(op.id.equals(outbox.id), "message gets placed in-mem outbox");
     // Test outbox - idb version
-    const outboxItemIdb = await core.storage.adapter.getOutboxItem(op.id);
+    const outboxOpIdb = await core.storage.adapter.getOutboxOp(op.id);
     ctx.assert(
-      op.id.equals(outboxItemIdb.id),
+      op.id.equals(outboxOpIdb.id),
       "modified sync object gets stored in durable memory",
     );
     // Test in mem version

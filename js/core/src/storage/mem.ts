@@ -43,7 +43,7 @@ export class AirdayMemStorage implements StorageAdapter {
     return results;
   }
 
-  async getOutboxItem(id: Uuidv4): Promise<any> {
+  async getOutboxOp(id: Uuidv4): Promise<any> {
     return this.outbox.get(id.toHex());
   }
 

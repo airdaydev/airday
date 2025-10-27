@@ -62,6 +62,12 @@ export class AirdayIDBStorage implements StorageAdapter {
     // TODO: Extract useful indexes e.g. archived
     const promises: Promise<Uint8Array>[] = [];
     ops.map((op) => {
+      if (!op.syncObject) {
+        // TODO: Smells bad
+        throw new Error(
+          "No sync object on new op addition to persistent storage",
+        );
+      }
       promises.push(syncStore.put(op.syncObject.toIdb())); // Assumption: this is latest state of objects
       promises.push(outboxStore.put(op.toIdb()));
     });
@@ -75,8 +81,9 @@ export class AirdayIDBStorage implements StorageAdapter {
       libraryId,
     );
   };
-  getOutboxOp = (id: Uuidv4): SyncOp => {
-    const rawItem = this.handle!.get(OUTBOX_STORE_NAME, id);
+  getOutboxOp = async (id: Uuidv4): Promise<SyncOp> => {
+    const rawItem = await this.handle!.get(OUTBOX_STORE_NAME, id);
+    return SyncOp.fromIdb(rawItem);
   };
   getSyncObject = (id: Uuidv4) => {
     console.log("calling getsyncobj with", id);

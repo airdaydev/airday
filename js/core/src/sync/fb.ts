@@ -13,8 +13,10 @@ import {
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
-import { Uuidv4 } from "../common/uuid";
+import { assertUuidV4Bytes, Uuidv4 } from "../common/uuid";
 import { NumericAttrMap, SyncObject } from "./sync-object";
+import { v, ensure, compile } from "suretype";
+import { validate } from "uuid";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -77,59 +79,6 @@ export class SyncStreamReqMessage extends AirdayMessage {
     }
     const messageOffset = SyncStreamReqProto.endSyncStreamReqProto(builder);
     return messageOffset;
-  }
-}
-
-export class SyncOp {
-  id = new Uuidv4();
-  opKind: OpKind;
-  payload?: Uint8Array;
-  libraryId: Uuidv4;
-  objId: Uuidv4;
-  objKind: number;
-  constructor(syncObject: SyncObject, opKind = OpKind.PATCH) {
-    this.opKind = opKind;
-    this.libraryId = syncObject.libraryId;
-    this.objId = syncObject.id;
-    this.objKind = syncObject.objKind;
-  }
-  toIdb() {
-    return {
-      id: this.id,
-      opKind: OpKind,
-      libraryId: this.libraryId,
-      objId: this.id,
-      objKind: this.objKind,
-      payload: this.payload,
-    };
-  }
-  addToFlatBuffer(builder: Builder) {
-    let vectorOffset;
-    if (this.payload) {
-      vectorOffset = builder.createByteVector(this.payload);
-    }
-    SyncOpProto.startSyncOpProto(builder);
-    SyncOpProto.addProtoVersion(builder, 1);
-    SyncOpProto.addOpId(
-      builder,
-      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
-    );
-    SyncOpProto.addOpKind(builder, this.opKind);
-    SyncOpProto.addObjKind(builder, this.objKind);
-    SyncOpProto.addObjId(
-      builder,
-      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
-    );
-    SyncOpProto.addLibraryId(
-      builder,
-      UuidProto.createUuidProto(builder, this.libraryId.toUUIDProto()),
-    );
-    // TODO: e2ee payload
-    if (vectorOffset) {
-      SyncOpProto.addPayload(builder, vectorOffset);
-    }
-    const offset = SyncOpProto.endSyncOpProto(builder);
-    return offset;
   }
 }
 
