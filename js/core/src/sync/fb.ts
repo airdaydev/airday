@@ -1,22 +1,18 @@
 import { Builder, type Offset } from "flatbuffers";
 import {
-  SyncOpProto,
   AuthenticateActionProto,
   SpanContextProto,
   UuidProto,
   SyncStreamReqProto,
   MessageProto,
   MessageWrapperProto,
-  OpKind,
   BatchSyncOpProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
-import { assertUuidV4Bytes, Uuidv4 } from "../common/uuid";
-import { NumericAttrMap, SyncObject } from "./sync-object";
-import { v, ensure, compile } from "suretype";
-import { validate } from "uuid";
+import { Uuidv4 } from "../common/uuid";
+import { SyncOp } from "./sync-op";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;

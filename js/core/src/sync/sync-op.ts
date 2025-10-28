@@ -2,6 +2,7 @@ import { Builder } from "flatbuffers";
 import { Uuidv4 } from "../common/uuid";
 import { OpKind, SyncOpProto, UuidProto } from "../proto";
 import { SyncObject } from "./sync-object";
+import { v, compile } from "suretype";
 
 export interface SerialisedSyncOp {
   id: Uuidv4;

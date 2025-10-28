@@ -1,5 +1,5 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
-import { SyncOp } from "../sync/fb";
+import { SyncOp } from "../sync/sync-op";
 import { Uuidv4 } from "../common/uuid";
 import { StorageAdapter } from "./adapter";
 

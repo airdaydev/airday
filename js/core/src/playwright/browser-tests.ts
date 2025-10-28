@@ -4,7 +4,7 @@ import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { NumericAttrMap, SyncObject } from "../sync/sync-object";
-import { SyncOp } from "../sync/fb";
+import { SyncOp } from "../sync/sync-op";
 import { AirdayMemStorage } from "../storage/mem";
 
 // TODO: Performance testing!

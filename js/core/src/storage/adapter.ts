@@ -1,5 +1,5 @@
 import { Uuidv4 } from "../common/uuid";
-import { SyncOp } from "../sync/fb";
+import { SyncOp } from "../sync/sync-op";
 
 // Generic persistence layer
 export abstract class StorageAdapter {
@@ -9,5 +9,5 @@ export abstract class StorageAdapter {
   abstract getOutboxOp(id: Uuidv4): Promise<SyncOp>;
   abstract getSyncObject(id: Uuidv4): Promise<void>;
   abstract delete(hexIds: Uuidv4[]): Promise<void>;
-  abstract clear(hexIds: Uuidv4[]): Promise<void>;
+  abstract clear(): Promise<void>;
 }
