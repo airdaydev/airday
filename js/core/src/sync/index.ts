@@ -3,7 +3,8 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { BatchResponseEvent } from "../websocket";
-import { BatchSyncMessage, SyncOp } from "./fb";
+import { BatchSyncMessage } from "./fb";
+import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
@@ -77,19 +78,13 @@ export class AirdaySync {
     itemStream.start(null);
   }
   createList(list: any) {}
-  // TODO: Pluralise this and we can call it when a list has been synced
-  // TODO: Error handling?
-  async queueOps(ops: SyncOp[]) {
-    let promises = [];
-    for (let op of ops) {
-      // TODO: Cleaner to await, but we don't really need to?
-      promises.push(this.core.storage.adapter.addOps([op]));
-      this.core.storage.setSyncObject(op.syncObject);
-      this.outbox.set(op.id.toHex(), op);
-    }
-    const message = new BatchSyncMessage(ops);
+  async queueOp(op: SyncOp, obj: SyncObject) {
+    await this.core.storage.adapter.addOp(op, obj);
+    this.core.storage.setSyncObject(obj);
+    this.outbox.set(op.id.toHex(), op);
+    // TODO: Not really batching huh...
+    const message = new BatchSyncMessage([op]);
     this.core.ws.enqueueAirdayMessage(message);
-    await Promise.all(promises);
   }
   initOutbox() {
     // Collects pending items from database to sync on boot
@@ -106,7 +101,9 @@ export class AirdaySync {
       if (res.success) {
         // TODO: Return seq
         if (typeof res.seq === "bigint") {
-          op.syncObject.seq = res.seq;
+          const syncObject = this.core.storage.getSyncObjectById(op.objId);
+          // TODO: Update seq
+          console.log(`TODO: ${syncObject?.seq}`);
         }
         // TODO: persist .seq!
         // this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {

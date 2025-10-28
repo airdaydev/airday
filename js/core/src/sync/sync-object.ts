@@ -8,7 +8,7 @@ import {
   AttrTypeProto,
   OpKind,
 } from "../proto";
-import { SyncOp } from "./fb";
+import { SyncOp } from "./sync-op";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
@@ -20,7 +20,7 @@ export type NumericAttrMap = { [k: string]: LWWRegister<any> };
 export type Change = [id: string, reg?: LWWRegister<any>];
 type Listener = (reg: Change) => void;
 
-// All variants
+// State of sync object
 export class SyncObject {
   readonly objKind: number;
   id: Uuidv4;
@@ -100,8 +100,15 @@ export class SyncObject {
     for (const key of Object.keys(patch)) {
       set.add(key);
     }
-    const op = new SyncOp(this);
-    op.payload = this.getAttrPayload(set);
+    const params = {
+      id: this.id,
+      opKind: OpKind.PATCH,
+      libraryId: this.libraryId,
+      objId: this.id,
+      objKind: this.objKind,
+      payload: this.getAttrPayload(set),
+    };
+    const op = new SyncOp(params);
     return op;
   }
 

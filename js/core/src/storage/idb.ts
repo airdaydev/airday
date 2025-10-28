@@ -2,8 +2,9 @@ import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { SyncOp } from "../sync/sync-op";
 import { Uuidv4 } from "../common/uuid";
 import { StorageAdapter } from "./adapter";
+import { SyncObject } from "../sync/sync-object";
 
-const SYNC_STORE_NAME = "sync_object";
+const SYNC_STORE_NAME = "sync_object"; // snapshot of merged ops i.e. entire object
 const LIBRARY_STORE_NAME = "library";
 const OUTBOX_STORE_NAME = "outbox";
 
@@ -52,7 +53,7 @@ export class AirdayIDBStorage implements StorageAdapter {
       },
     });
   };
-  addOps = async (ops: SyncOp[]) => {
+  addOp = async (op: SyncOp, object: SyncObject) => {
     const tx = this.handle!.transaction(
       [SYNC_STORE_NAME, OUTBOX_STORE_NAME],
       "readwrite",
@@ -61,16 +62,8 @@ export class AirdayIDBStorage implements StorageAdapter {
     const outboxStore = tx.objectStore(OUTBOX_STORE_NAME);
     // TODO: Extract useful indexes e.g. archived
     const promises: Promise<Uint8Array>[] = [];
-    ops.map((op) => {
-      if (!op.syncObject) {
-        // TODO: Smells bad
-        throw new Error(
-          "No sync object on new op addition to persistent storage",
-        );
-      }
-      promises.push(syncStore.put(op.syncObject.toIdb())); // Assumption: this is latest state of objects
-      promises.push(outboxStore.put(op.toIdb()));
-    });
+    promises.push(syncStore.put(object.toIdb())); // Assumption: this is latest state of objects
+    promises.push(outboxStore.put(op.toIdb()));
     await Promise.all(promises);
     await tx.done;
   };

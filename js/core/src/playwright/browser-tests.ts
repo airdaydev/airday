@@ -112,10 +112,11 @@ export const tests = async () => {
         data: "goodbye",
       }),
     };
+    // TODO: Potentially roll mergePatch + queueOp into a single api
     syncObj.mergePatch(patch, true);
     console.log("merged patch");
     // const op2 = syncObj.partialSyncOp(patch);
-    await core.sync.queueOps([op]);
+    await core.sync.queueOp(op, syncObj);
     // Test outbox - in mem version
     const outbox = core.sync.outbox.get(op.id.toHex());
     if (!outbox?.id) throw new Error("fail test early");
@@ -127,7 +128,7 @@ export const tests = async () => {
       "modified sync object gets stored in durable memory",
     );
     // Test in mem version
-    const syncObject = core.storage.getSyncObjectById(op.syncObject.id);
+    const syncObject = core.storage.getSyncObjectById(syncObj.id);
     ctx.assert(!!syncObject, "recent sync object is in hot storage");
     ctx.assertEq(syncObject, op.syncObject, "Sync object is not copied");
     // test sync completion
@@ -149,7 +150,7 @@ export const tests = async () => {
     const res = await core.storage.adapter.getByLibrary(core.library.id!);
     const item = res[0];
     ctx.assert(
-      op.syncObject.id.equals(item.id),
+      syncObject!.id.equals(item.id),
       "correct libraryId stored in idb",
     );
     await new Promise((resolve) => {
@@ -173,8 +174,9 @@ export const tests = async () => {
       item.values[0] = new LWWRegister({ data: "test" });
       const op = item.fullSyncOp();
       ops.push(op);
+      // TODO: Ok we definitely need a paired version
+      await core.sync.queueOp(op, item);
     }
-    await core.sync.queueOps(ops);
     await core.ws.flush();
     const res = await core.storage.adapter.getByLibrary(core.library.id!);
     ctx.assertEq(res.length, qty, "correct res length");
@@ -191,7 +193,7 @@ export const tests = async () => {
     });
     item.values[0] = new LWWRegister({ data: "test" });
     const op = item.fullSyncOp();
-    core.sync.queueOps([op]);
+    core.sync.queueOp(op, item);
     await core.sync.flush();
     ctx.assertEq(core.sync.outbox.size, 0, "outbox is clear after sync");
 
@@ -205,7 +207,7 @@ export const tests = async () => {
     );
     const op2 = item.partialSyncOp(patch);
     ctx.assertEq(item.values[0].data, patch[0].data, "merge success");
-    core.sync.queueOps([op2]);
+    core.sync.queueOp(op2, item);
     await core.sync.flush();
     core.ws.close();
   });
@@ -215,17 +217,16 @@ export const tests = async () => {
   suite.test("Get all items since beginning from server", async (ctx) => {
     const core = await createTestCore();
     // create 50 items
-    let ops = [];
+    let objs = [];
     for (let i = 0; i < 100; i++) {
       const syncObject = new SyncObject({
         objKind: 0,
         libraryId: core.library.id!,
       });
       syncObject.values[0] = new LWWRegister({ data: "test" });
-      const op = syncObject.fullSyncOp();
-      ops.push(op);
+      objs.push(syncObject);
     }
-    core.sync.queueOps(ops);
+    objs.map((obj) => core.sync.queueOp(obj.fullSyncOp(), obj));
     await core.sync.flush();
     // Clear database (TODO: Direct access??)
     await core.storage.adapter.clear();

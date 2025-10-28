@@ -1,30 +1,28 @@
 import { Uuidv4 } from "../common/uuid";
-import { SyncOp } from "../sync/fb";
+import { SyncObject } from "../sync/sync-object";
+import { SerialisedSyncOp, SyncOp } from "../sync/sync-op";
 import { StorageAdapter } from "./adapter";
 
-// In-memory storage adapter for testing and headless environments
+// In-memory storage adapter for headless testing environments
 export class AirdayMemStorage implements StorageAdapter {
   private syncObjects: Map<string, any> = new Map();
-  private outbox: Map<string, any> = new Map();
-  private libraryIndex: Map<string, Set<string>> = new Map();
+  private outbox: Map<string, SerialisedSyncOp> = new Map();
+  private libraryIndex: Map<string, Set<string>> = new Map(); // TODO: id or outbox id?
 
   async connect() {
     console.warn("initialised mem storage adapter, no persistence enabled");
   }
 
-  async addOps(ops: SyncOp[]) {
-    for (const op of ops) {
-      const syncObj = op.syncObject.toIdb();
-      const outboxItem = op.toIdb();
-      const idKey = syncObj.id.toHex();
-      const libraryKey = syncObj.libraryId.toHex();
-      this.syncObjects.set(idKey, syncObj);
-      this.outbox.set(idKey, outboxItem);
-      if (!this.libraryIndex.has(libraryKey)) {
-        this.libraryIndex.set(libraryKey, new Set());
-      }
-      this.libraryIndex.get(libraryKey)!.add(idKey);
+  async addOp(op: SyncOp, object: SyncObject) {
+    const outboxItem = op.toIdb();
+    const opIdKey = op.id.toHex();
+    const libraryKey = op.libraryId.toHex();
+    this.syncObjects.set(object.id.toHex(), object.toIdb());
+    this.outbox.set(opIdKey, outboxItem);
+    if (!this.libraryIndex.has(libraryKey)) {
+      this.libraryIndex.set(libraryKey, new Set());
     }
+    this.libraryIndex.get(libraryKey)!.add(opIdKey);
   }
 
   async getByLibrary(libraryId: Uuidv4): Promise<any[]> {
