@@ -19,14 +19,14 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
-  snapshotCache: Map<string, SyncObject> = new Map(); // hex-id-backed index
+  stateCache: Map<string, SyncObject> = new Map(); // hex-id-backed index
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
   }
   async removeItems(ids: Uuidv4[]) {
-    ids.forEach((id) => this.snapshotCache.delete(id.toHex()));
+    ids.forEach((id) => this.stateCache.delete(id.toHex()));
     await this.adapter.delete(ids);
     // TODO: trigger subscription remove event!
   }
@@ -34,10 +34,11 @@ export class AirdayStorage {
   subscribe() {
     // Ensure this happens in batches
   }
-  setSyncObject(obj: SyncObject) {
-    this.snapshotCache.set(obj.id.toHex(), obj);
+  setStateCache(obj: SyncObject) {
+    this.stateCache.set(obj.id.toHex(), obj);
+    // TODO: Indexes
   }
-  getSyncObjectById(id: Uuidv4) {
-    return this.snapshotCache.get(id.toHex());
+  getSyncObjectFromMemState(id: Uuidv4) {
+    return this.stateCache.get(id.toHex());
   }
 }

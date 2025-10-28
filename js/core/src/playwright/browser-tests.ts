@@ -1,3 +1,4 @@
+// Browser integration tests with indexeddb
 import { BrowserRunner, log } from "./runner";
 import { AirdayCore, AuthMode, createUser } from "../index";
 import { tracer } from "../tracer";

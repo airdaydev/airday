@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { test, expect } from "bun:test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
 import { createTestCore, extractCookie, parseCookieValue } from "./utils";
