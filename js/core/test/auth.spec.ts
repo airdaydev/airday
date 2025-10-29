@@ -30,18 +30,20 @@ test("Creating a user & default library", async () => {
   expect(res.data.id.length).toBe(36);
   expect(res.data.primary_library.id).toHaveLength(36);
   expect(typeof res.data.primary_library.name).toBe("string");
+
+  // Can't create another user with the same email
   expect(
     createUser(core, {
       email: "doubleup@air.day",
       password: "fa09j20fiaj3fpaof",
     }),
-    "Can't create another user with the same email",
   ).rejects.toThrow();
+
+  // Can't create a user without a password
   expect(
     createUser(core, {
       email: "newtest@air.day",
     }),
-    "Can't create a user without a password",
   ).rejects.toThrow();
 });
 
