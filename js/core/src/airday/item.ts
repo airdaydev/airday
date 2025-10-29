@@ -1,6 +1,6 @@
 import { Accessor, createSignal, Signal } from "solid-js";
 import { LWWRegister } from "../crdt/lww";
-import { SyncObject, RegisterMap, KeyMap, Change } from "./sync-object";
+import { SyncObject, RegisterMap, KeyMap, Change } from "../sync/sync-object";
 import { Uuidv4 } from "../common/uuid";
 
 export const ITEM = 0;

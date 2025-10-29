@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-import dts from "bun-plugin-dts";
-
 // Bundle configuration for Tracer frontend distribution
 // Run with: bun run bundle.ts
 
@@ -17,7 +15,7 @@ const bundleConfig: Bun.BuildConfig = {
   // naming: "[name].[hash].js",
   sourcemap: "external",
   splitting: false,
-  plugins: [dts({})],
+  plugins: [],
   external: [],
 };
 
@@ -36,6 +34,21 @@ async function bundle() {
 
   if (!esmResult.success) {
     console.error("❌ ESM build failed:", esmResult.logs);
+    process.exit(1);
+  }
+
+  // Generate TypeScript declarations
+  console.log("📝 Generating TypeScript declarations...");
+  try {
+    await $`bunx tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist`;
+  } catch (error: any) {
+    console.error("❌ TypeScript declaration generation failed:");
+    if (error.stdout) {
+      console.error(error.stdout.toString());
+    }
+    if (error.stderr) {
+      console.error(error.stderr.toString());
+    }
     process.exit(1);
   }
 
