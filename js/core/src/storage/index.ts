@@ -38,7 +38,7 @@ export class AirdayStorage {
     this.stateCache.set(obj.id.toHex(), obj);
     // TODO: Indexes
   }
-  getSyncObjectFromMemState(id: Uuidv4) {
+  getStateCache(id: Uuidv4) {
     return this.stateCache.get(id.toHex());
   }
 }

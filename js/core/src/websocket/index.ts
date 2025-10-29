@@ -45,7 +45,7 @@ export class WebsocketManager {
   connected = false;
   authorised = false;
   // Queue
-  intervalId: number | null = null;
+  intervalId: ReturnType<typeof setTimeout> | null = null;
   maxBatch = 50; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];

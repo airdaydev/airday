@@ -80,7 +80,7 @@ export class AirdaySync {
   createList(list: any) {}
   async queueOp(op: SyncOp, obj: SyncObject) {
     await this.core.storage.adapter.addOp(op, obj);
-    this.core.storage.setSyncObject(obj);
+    this.core.storage.setStateCache(obj);
     this.outbox.set(op.id.toHex(), op);
     // TODO: Not really batching huh...
     const message = new BatchSyncMessage([op]);
@@ -101,7 +101,7 @@ export class AirdaySync {
       if (res.success) {
         // TODO: Return seq
         if (typeof res.seq === "bigint") {
-          const syncObject = this.core.storage.getSyncObjectById(op.objId);
+          const syncObject = this.core.storage.getStateCache(op.objId);
           // TODO: Update seq
           console.log(`TODO: ${syncObject?.seq}`);
         }
