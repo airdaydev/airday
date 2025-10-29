@@ -1,6 +1,7 @@
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayCore, AuthMode } from "../src/index";
 import { createUser } from "../src/index";
+import { AirdayMemStorage } from "../src/storage/mem";
 
 export function extractCookie(
   headers: Headers,
@@ -36,11 +37,17 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-export function createTestCore() {
-  return new AirdayCore({
-    rootUrl: config.API_URL,
+export async function createTestCore() {
+  const core = new AirdayCore({
+    rootUrl: "http://localhost:3000",
     authMode: AuthMode.BearerToken,
+    storageAdapter: new AirdayMemStorage(),
   });
+  await authenticate(core, `${Math.random()}@airday.com}`);
+  await core.storage.adapter.connect();
+  core.ws.connect();
+  await core.ws.events.onceAsync("authenticated");
+  return core;
 }
 
 export async function authenticate(core: AirdayCore, email: string) {

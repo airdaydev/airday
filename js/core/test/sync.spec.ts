@@ -1,1 +1,135 @@
 // Headless sync tests
+import { test, expect } from "bun:test";
+import { Uuidv4 } from "../src/common/uuid";
+import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
+import { LWWRegister } from "../src/crdt/lww";
+import { createTestCore } from "./utils";
+
+// TODO: Null values to clear? or explicit clear field?
+test("create, encode & decode SyncOp", async () => {
+  const libraryId = new Uuidv4();
+  // Create an object
+  const syncObj = new SyncObject({
+    objKind: 0,
+    libraryId,
+  });
+  syncObj.values[0] = new LWWRegister({
+    data: "hello",
+  });
+  syncObj.values[1] = new LWWRegister({
+    data: 32,
+  });
+  syncObj.values[2] = new LWWRegister({
+    data: false,
+  });
+  const buffer = syncObj.getFullAttrPayload();
+  expect(buffer.byteLength).toBe(184);
+  // Parse
+  const syncObjB = new SyncObject({
+    objKind: 0,
+    libraryId,
+  });
+  syncObjB.parseAttrSet(buffer);
+  expect(syncObjB.values[0].data).toBe("hello");
+  expect(syncObjB.values[1].data).toBe(32);
+  expect(syncObjB.values[2].data).toBe(false);
+});
+
+test("Merge SyncObject", async () => {
+  const library = new Uuidv4();
+  const syncObj = new SyncObject({
+    objKind: 0,
+    libraryId: library,
+  });
+  syncObj.values[0] = new LWWRegister({
+    data: "hello",
+  });
+  syncObj.values[1] = new LWWRegister({
+    data: 32,
+  });
+  const patch: NumericAttrMap = {
+    0: new LWWRegister({
+      data: "hello again",
+    }),
+    1: new LWWRegister({
+      data: 64,
+    }),
+  };
+  syncObj.values[0] = new LWWRegister({
+    data: "hello again",
+  });
+  syncObj.values[1] = new LWWRegister({
+    data: 64,
+  });
+
+  syncObj.mergePatch(patch, true);
+  expect(syncObj.values[0].data).toBe("hello again");
+  expect(syncObj.values[1].data).toBe(64);
+});
+
+test.only("Sync generic object", async () => {
+  const core = await createTestCore();
+  const syncObj = new SyncObject({
+    objKind: 0,
+    libraryId: core.library.id!,
+  });
+  syncObj.values[0] = new LWWRegister({
+    data: "hello",
+  });
+  const op = syncObj.fullSyncOp();
+  console.log("yo wut");
+  const patch = {
+    1: new LWWRegister({
+      data: "goodbye",
+    }),
+  };
+  // TODO: Potentially roll mergePatch + queueOp into a single api
+  syncObj.mergePatch(patch, true);
+  console.log("merged patch");
+  // const op2 = syncObj.partialSyncOp(patch);
+  await core.sync.queueOp(op, syncObj);
+  // Test outbox - in mem version
+  const outbox = core.sync.outbox.get(op.id.toHex());
+  if (!outbox?.id) throw new Error("fail test early");
+  expect(
+    op.id.equals(outbox.id),
+    "message gets placed in-mem outbox",
+  ).toBeTrue();
+  // Test outbox - idb version
+  const outboxOpIdb = await core.storage.adapter.getOutboxOp(op.id);
+  expect(
+    op.id.equals(outboxOpIdb.id),
+    "modified sync object gets stored in durable memory",
+  ).toBeTrue;
+  // Test in mem version
+  const syncObject = core.storage.getStateCache(syncObj.id);
+  expect(syncObject, "recent sync object is in hot storage").toBeTruthy();
+  expect(syncObject, "Sync object is not copied").toBe(op.syncObject);
+  // test sync completion
+  await new Promise((resolve) => {
+    core.ws.events.once("batch-response", (data) => {
+      resolve(null);
+    });
+  });
+  expect(
+    core.sync.outbox.size,
+    "ack message received & pending queue back to 0",
+  ).toBe(0);
+  // seq persisted to sync object
+  expect(!!syncObj.seq && syncObj.seq > 0, "seq persisted to sync object").toBe(
+    true,
+  );
+  const res = await core.storage.adapter.getByLibrary(core.library.id!);
+  const item = res[0];
+  expect(
+    syncObject!.id.equals(item.id),
+    "correct libraryId stored in idb",
+  ).toBeTrue();
+  await new Promise((resolve) => {
+    if (core.sync.outbox.size === 0) {
+      return resolve(null);
+    }
+    core.sync.events.onceAsync("flushed").then(resolve);
+  });
+  core.ws.close();
+});
