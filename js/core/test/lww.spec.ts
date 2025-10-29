@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "bun:test";
 import { LWWRegister, TimestampProducer } from "../src/crdt/lww";
 
 // TODO: This should really include toJSON as well

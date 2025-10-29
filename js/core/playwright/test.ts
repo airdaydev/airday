@@ -11,7 +11,7 @@ test("Item sync", async ({ page }) => {
   });
 
   const msgs: any[] = [];
-  page.exposeFunction("sendToPlaywright", (message) => {
+  page.exposeFunction("sendToPlaywright", (message: any) => {
     msgs.push(message);
   });
 
