@@ -5,7 +5,7 @@ import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { LWWRegister } from "../src/crdt/lww";
 import { createAuthenticatedCore } from "./utils";
 
-// TODO: Null values to clear? or explicit clear field?
+// TODO: Null state to clear? or explicit clear field?
 test("create, encode & decode SyncOp", async () => {
   const libraryId = new Uuidv4();
   // Create an object
@@ -13,13 +13,13 @@ test("create, encode & decode SyncOp", async () => {
     objKind: 0,
     libraryId,
   });
-  syncObj.values[0] = new LWWRegister({
+  syncObj.state[0] = new LWWRegister({
     data: "hello",
   });
-  syncObj.values[1] = new LWWRegister({
+  syncObj.state[1] = new LWWRegister({
     data: 32,
   });
-  syncObj.values[2] = new LWWRegister({
+  syncObj.state[2] = new LWWRegister({
     data: false,
   });
   const buffer = syncObj.getFullAttrPayload();
@@ -30,9 +30,9 @@ test("create, encode & decode SyncOp", async () => {
     libraryId,
   });
   syncObjB.parseAttrSet(buffer);
-  expect(syncObjB.values[0].data).toBe("hello");
-  expect(syncObjB.values[1].data).toBe(32);
-  expect(syncObjB.values[2].data).toBe(false);
+  expect(syncObjB.state[0].data).toBe("hello");
+  expect(syncObjB.state[1].data).toBe(32);
+  expect(syncObjB.state[2].data).toBe(false);
 });
 
 test("Merge SyncObject", async () => {
@@ -41,10 +41,10 @@ test("Merge SyncObject", async () => {
     objKind: 0,
     libraryId: library,
   });
-  syncObj.values[0] = new LWWRegister({
+  syncObj.state[0] = new LWWRegister({
     data: "hello",
   });
-  syncObj.values[1] = new LWWRegister({
+  syncObj.state[1] = new LWWRegister({
     data: 32,
   });
   const patch: NumericAttrMap = {
@@ -55,16 +55,16 @@ test("Merge SyncObject", async () => {
       data: 64,
     }),
   };
-  syncObj.values[0] = new LWWRegister({
+  syncObj.state[0] = new LWWRegister({
     data: "hello again",
   });
-  syncObj.values[1] = new LWWRegister({
+  syncObj.state[1] = new LWWRegister({
     data: 64,
   });
 
   syncObj.mergePatch(patch, true);
-  expect(syncObj.values[0].data).toBe("hello again");
-  expect(syncObj.values[1].data).toBe(64);
+  expect(syncObj.state[0].data).toBe("hello again");
+  expect(syncObj.state[1].data).toBe(64);
 });
 
 test.only("Sync generic object", async () => {
@@ -73,7 +73,7 @@ test.only("Sync generic object", async () => {
     objKind: 0,
     libraryId: core.library.id!,
   });
-  syncObj.values[0] = new LWWRegister({
+  syncObj.state[0] = new LWWRegister({
     data: "hello",
   });
   const op = syncObj.fullSyncOp();
@@ -98,7 +98,7 @@ test.only("Sync generic object", async () => {
   expect(
     op.id.equals(outboxOpIdb.id),
     "modified sync object gets stored in durable memory",
-  ).toBeTrue;
+  ).toBeTrue();
   // Test in mem version
   const syncObject = core.storage.getStateCache(syncObj.id);
   expect(syncObject, "recent sync object is in hot storage").toBeTruthy();

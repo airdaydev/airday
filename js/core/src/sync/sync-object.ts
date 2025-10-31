@@ -26,10 +26,14 @@ export class SyncObject {
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
-  seq: bigint | null = null; // server id
+  seq: bigint | null = null; // server id i.e. last_seq (last seen seq)
   // Attributes
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
-  values: NumericAttrMap = {};
+  state: NumericAttrMap = {}; // optimistic client state
+  committed: NumericAttrMap = {}; // We don't necessarily need this in memory...
+  // TODO: Track pending ops
+  // TODO: Last access number to determine whether to trim full obj from mem storage
+  hash?: Uint8Array; // committed hash
   dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
   // Reactivity
   private subs = new Set<Listener>();
@@ -114,27 +118,27 @@ export class SyncObject {
 
   // TODO: Complete implementation
   merge(other: SyncObject, local: boolean) {
-    for (const key of Object.keys(other.values)) {
-      const curVal = this.values[key];
+    for (const key of Object.keys(other.state)) {
+      const curVal = this.state[key];
       if (!curVal) {
-        this.values[key] = curVal;
+        this.state[key] = curVal;
       } else {
-        const otherVal = other.values[key];
+        const otherVal = other.state[key];
         if (!otherVal) throw new Error("val is set but not populated");
         const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
         if (result.source === "right" && local === false) {
           this.dirty.delete(key);
         }
-        this.values[key] = result.register;
+        this.state[key] = result.register;
         this.markChanged(key, result.register); // UI reaction
       }
     }
   }
   mergePatch(map: NumericAttrMap, local: boolean) {
     for (const key of Object.keys(map)) {
-      const curVal = this.values[key];
+      const curVal = this.state[key];
       if (!curVal) {
-        this.values[key] = curVal;
+        this.state[key] = curVal;
       } else {
         const otherVal = map[key];
         if (!otherVal) throw new Error("val is set but not populated");
@@ -142,7 +146,7 @@ export class SyncObject {
         if (result.source === "right" && local === false) {
           this.dirty.delete(key);
         }
-        this.values[key] = result.register;
+        this.state[key] = result.register;
         this.markChanged(key, result.register);
       }
     }
@@ -154,7 +158,7 @@ export class SyncObject {
       const attr = attrSet.attributes(i);
       if (attr) {
         const lww = this.deserialiseAttr(attr);
-        this.values[attr.fieldId()] = lww;
+        this.state[attr.fieldId()] = lww;
       }
     }
   }
@@ -219,7 +223,7 @@ export class SyncObject {
   }
   getFullAttrPayload() {
     const allKeys = new Set<string>();
-    for (let key of Object.keys(this.values)) {
+    for (let key of Object.keys(this.state)) {
       allKeys.add(key);
     }
     return this.getAttrPayload(allKeys);
@@ -248,7 +252,7 @@ export class SyncObject {
     return builder.asUint8Array();
   }
   serialiseAttr(builder: Builder, fieldId: number) {
-    const field = this.values[fieldId];
+    const field = this.state[fieldId];
     if (!field) {
       console.warn(`Could not find field ${fieldId} to serialise`);
       return false;

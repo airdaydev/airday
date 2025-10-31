@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] two-phase commit
 - [] per lib seq
 - [] catch up stream api + limits via mpsc + select! + registers
 - [] delete items (tombstones, same api)

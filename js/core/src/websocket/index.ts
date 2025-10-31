@@ -236,6 +236,13 @@ export class WebsocketManager {
         success: op.success(),
         seq: op.seq(),
       });
+
+      // this.core.storage.adapter.getSyncObject()
+      // - Optimistic in-memory (already done)
+      // - Optimistic persisted (already done (in a tx with op outbox))
+      // - Committed in-memory (tbd on receive seq - we must have access to op patch here to combine)
+      // - Commmitted persisted (at the same time)
+
       // op persisted locally, state computed & persisted for fast access
       // op persisted to server, returning seq
       // seq stored against persisted version (so this is really last_seq)
@@ -250,7 +257,6 @@ export class WebsocketManager {
       //
       //
       // TODO: We need to update in-memory version & db version (reactivity + persistence)
-      // this.core.storage.adapter.getSyncObject()
       console.log("sync res received", op.seq());
       tracer.endSpan(span);
     }
