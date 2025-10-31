@@ -37,7 +37,7 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-export async function createTestCore() {
+export async function createAuthenticatedCore() {
   const core = new AirdayCore({
     rootUrl: "http://localhost:3000",
     authMode: AuthMode.BearerToken,

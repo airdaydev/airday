@@ -67,7 +67,7 @@ test("Merge SyncObject", async () => {
   expect(syncObj.values[1].data).toBe(64);
 });
 
-test.only("Sync generic object", async () => {
+test("Sync generic object", async () => {
   const core = await createTestCore();
   const syncObj = new SyncObject({
     objKind: 0,

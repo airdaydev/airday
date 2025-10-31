@@ -1,16 +1,20 @@
 import { test, expect } from "bun:test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
-import { createTestCore, extractCookie, parseCookieValue } from "./utils";
-
-const core = createTestCore();
+import {
+  createAuthenticatedCore,
+  extractCookie,
+  parseCookieValue,
+} from "./utils";
 
 test("API root url & version", async () => {
+  const core = await createAuthenticatedCore();
   const d = await getRoot(core);
   expect(typeof d.data.version).toBe("string");
 });
 
 test("non-existent username & password", async () => {
+  const core = await createAuthenticatedCore();
   await core
     .loginWithPasswordBearer({
       email: "nope@nope.com",
@@ -22,6 +26,7 @@ test("non-existent username & password", async () => {
 });
 
 test("Creating a user & default library", async () => {
+  const core = await createAuthenticatedCore();
   const res = await createUser(core, {
     email: "doubleup@air.day",
     password: "fa09j20fiaj3fpaof",
@@ -62,6 +67,7 @@ test.skip("Cookie authorisation", async () => {
 });
 
 test("Bearer authorisation & refreshing sessions with bearer tokens", async () => {
+  const core = await createAuthenticatedCore();
   const email = "daniel-pw@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(core, {
