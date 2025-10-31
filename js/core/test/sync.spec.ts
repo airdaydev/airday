@@ -77,7 +77,6 @@ test.only("Sync generic object", async () => {
     data: "hello",
   });
   const op = syncObj.fullSyncOp();
-  console.log("yo wut");
   const patch = {
     1: new LWWRegister({
       data: "goodbye",
@@ -85,7 +84,6 @@ test.only("Sync generic object", async () => {
   };
   // TODO: Potentially roll mergePatch + queueOp into a single api
   syncObj.mergePatch(patch, true);
-  console.log("merged patch");
   // const op2 = syncObj.partialSyncOp(patch);
   await core.sync.queueOp(op, syncObj);
   // Test outbox - in mem version

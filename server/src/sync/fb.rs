@@ -106,7 +106,7 @@ pub fn build_batch_sync_op_msg<'a>(
             &SyncOpProtoArgs {
                 proto_version: 0,
                 op_kind,
-                base_seq: op.base_seq,
+                base_seq: op.base_seq.unwrap_or(0),
                 op_id: Some(&UuidProto::new(op.op_id.as_bytes())),
                 library_id: Some(&UuidProto::new(op.library_id.as_bytes())),
                 obj_id: Some(&UuidProto::new(op.obj_id.as_bytes())),
