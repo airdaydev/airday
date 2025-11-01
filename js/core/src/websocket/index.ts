@@ -235,7 +235,7 @@ export class WebsocketManager {
       // TODO: IMPORTANT Prevent if !success
       this.events.emit("batch-response", {
         opId,
-        success: res.success(),
+        success: res.success(), // TODO: We need an already commmitted case!
         seq,
       });
       // TODO: Ensure:
@@ -245,14 +245,16 @@ export class WebsocketManager {
       this.core.storage.adapter
         .getOutboxOp(opId)
         .then(async (op) => {
+          console.log(op.opKind); // TODO: Consider deletes/snapshots!
           const obj = await this.core.storage.getObj(op.objId);
           // Phase 2 commit: commit & persist seq
           obj.seq = seq; // TODO: Optional reactivity?
           // object.committed
-          // TODO: Retrieve the full op to merge to committed, and delete pending op!
-          // TODO: This update may be best done in a tx - unless it doesn't really matter
+          // TOOD: Second-phase commit op, then delete pending op
+          // TODO: delete pending op!
+          // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
           await this.core.storage.adapter.updateObject(obj);
-          // TODO: The case for saving op headers on the object: we may need them to ensure idempotency
+          // TODO: The case for saving op headers on the object: idempotency on hashes
         })
         .catch((err) => {
           console.error(`Error retrieving opId`, opId);

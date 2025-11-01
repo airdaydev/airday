@@ -1,8 +1,9 @@
 import { Builder } from "flatbuffers";
 import { Uuidv4 } from "../common/uuid";
-import { OpKind, SyncOpProto, UuidProto } from "../proto";
-import { SyncObject } from "./sync-object";
+import { AttributeSetProto, OpKind, SyncOpProto, UuidProto } from "../proto";
+import { NumericAttrMap, SyncObject } from "./sync-object";
 import { v, compile } from "suretype";
+import { serialiseAttr } from "./fb";
 
 export interface SerialisedSyncOp {
   id: Uuidv4;
@@ -17,6 +18,7 @@ export interface SyncOpParams {
   id?: Uuidv4;
   opKind: OpKind;
   payload?: Uint8Array;
+  patch?: NumericAttrMap;
   libraryId: Uuidv4;
   objId: Uuidv4;
   objKind: number;
@@ -54,16 +56,16 @@ export class SyncOp {
   libraryId: Uuidv4;
   objId: Uuidv4;
   objKind: number;
+  patch?: NumericAttrMap;
   payload?: Uint8Array;
-  syncObject?: SyncObject; // TODO: Consider removal - but needed in persistent tx
-  constructor(params: SyncOpParams, syncObject?: SyncObject) {
+  constructor(params: SyncOpParams) {
     this.id = new Uuidv4();
     this.opKind = params.opKind;
     this.libraryId = params.libraryId;
     this.objId = params.objId;
     this.objKind = params.objKind;
     this.payload = params.payload;
-    this.syncObject = syncObject;
+    this.patch = params.patch;
   }
   toIdb(): SerialisedSyncOp {
     return {
@@ -97,6 +99,32 @@ export class SyncOp {
       objKind: validated.objKind,
       payload: validated.payload,
     });
+  }
+  serialisePatch() {
+    if (!this.patch || !this.patch.size) {
+      throw new Error("No patch found on op");
+    }
+    if (!this.patch.size) {
+      throw new Error("building payload with size = 0");
+    }
+    const builder = new Builder();
+    const attributes: number[] = [];
+    for (const key of Object.keys(this.patch)) {
+      const offset = serialiseAttr(builder, this.patch, Number(key));
+      if (offset) {
+        attributes.push(offset);
+      }
+    }
+    const attributesOffset = AttributeSetProto.createAttributesVector(
+      builder,
+      attributes,
+    );
+    const offset = AttributeSetProto.createAttributeSetProto(
+      builder,
+      attributesOffset,
+    );
+    builder.finish(offset);
+    return builder.asUint8Array();
   }
   addToFlatBuffer(builder: Builder) {
     let vectorOffset;

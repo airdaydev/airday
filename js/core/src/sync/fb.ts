@@ -7,12 +7,15 @@ import {
   MessageProto,
   MessageWrapperProto,
   BatchSyncOpProto,
+  AttrTypeProto,
+  AttributeProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
 import { SyncOp } from "./sync-op";
+import { NumericAttrMap } from "./sync-object";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -114,4 +117,55 @@ export class BatchSyncMessage extends AirdayMessage {
     let batchOffset = BatchSyncOpProto.endBatchSyncOpProto(builder);
     return batchOffset;
   }
+}
+
+export function serialiseAttr(
+  builder: Builder,
+  patch: NumericAttrMap,
+  fieldId: number,
+) {
+  const field = patch[fieldId];
+  if (!field) {
+    console.warn(`Could not find field ${fieldId} to serialise`);
+    return false;
+  }
+  let strOffset;
+  let valueType;
+  switch (typeof field.data) {
+    case "string": {
+      valueType = AttrTypeProto.STRING;
+      strOffset = builder.createString(field.data);
+      break;
+    }
+    case "boolean": {
+      valueType = AttrTypeProto.BOOL;
+      break;
+    }
+    case "number": {
+      valueType = AttrTypeProto.F64;
+      break;
+    }
+    default: {
+      console.warn(`unable to deserialise type=${typeof field.data}`);
+      return false;
+    }
+  }
+  AttributeProto.startAttributeProto(builder);
+  AttributeProto.addFieldId(builder, fieldId);
+  AttributeProto.addValueType(builder, valueType);
+  AttributeProto.addTimestamp(
+    builder,
+    field.timestamp.addToFlatBuffer(builder),
+  );
+  if (strOffset) {
+    AttributeProto.addString(builder, strOffset);
+  }
+  // TODO: Double type check...?
+  if (valueType === AttrTypeProto.F64 && typeof field.data === "number") {
+    AttributeProto.addF64Fb(builder, field.data);
+  }
+  if (valueType === AttrTypeProto.BOOL && typeof field.data === "boolean") {
+    AttributeProto.addBool(builder, field.data);
+  }
+  return AttributeProto.endAttributeProto(builder);
 }

@@ -116,6 +116,8 @@ export class SyncObject {
     return op;
   }
 
+  commitPatch(op: SyncOp) {}
+
   // TODO: Complete implementation
   merge(other: SyncObject, local: boolean) {
     for (const key of Object.keys(other.state)) {
@@ -250,52 +252,6 @@ export class SyncObject {
     );
     builder.finish(offset);
     return builder.asUint8Array();
-  }
-  serialiseAttr(builder: Builder, fieldId: number) {
-    const field = this.state[fieldId];
-    if (!field) {
-      console.warn(`Could not find field ${fieldId} to serialise`);
-      return false;
-    }
-    let strOffset;
-    let valueType;
-    switch (typeof field.data) {
-      case "string": {
-        valueType = AttrTypeProto.STRING;
-        strOffset = builder.createString(field.data);
-        break;
-      }
-      case "boolean": {
-        valueType = AttrTypeProto.BOOL;
-        break;
-      }
-      case "number": {
-        valueType = AttrTypeProto.F64;
-        break;
-      }
-      default: {
-        console.warn(`unable to deserialise type=${typeof field.data}`);
-        return false;
-      }
-    }
-    AttributeProto.startAttributeProto(builder);
-    AttributeProto.addFieldId(builder, fieldId);
-    AttributeProto.addValueType(builder, valueType);
-    AttributeProto.addTimestamp(
-      builder,
-      field.timestamp.addToFlatBuffer(builder),
-    );
-    if (strOffset) {
-      AttributeProto.addString(builder, strOffset);
-    }
-    // TODO: Double type check...?
-    if (valueType === AttrTypeProto.F64 && typeof field.data === "number") {
-      AttributeProto.addF64Fb(builder, field.data);
-    }
-    if (valueType === AttrTypeProto.BOOL && typeof field.data === "boolean") {
-      AttributeProto.addBool(builder, field.data);
-    }
-    return AttributeProto.endAttributeProto(builder);
   }
 }
 
