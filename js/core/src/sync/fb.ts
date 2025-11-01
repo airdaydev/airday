@@ -16,6 +16,7 @@ import type { ULSpan } from "@airday/tracer";
 import { Uuidv4 } from "../common/uuid";
 import { SyncOp } from "./sync-op";
 import { NumericAttrMap } from "./sync-object";
+import { LWWRegister, LWWTimestamp } from "../crdt/lww";
 
 export class AirdayMessage implements MQMessage {
   span?: ULSpan;
@@ -169,3 +170,55 @@ export function serialiseAttr(
   }
   return AttributeProto.endAttributeProto(builder);
 }
+
+export function deserialiseAttr(attr: AttributeProto) {
+  const type = attr.valueType();
+  const rawTimestamp = attr.timestamp();
+  if (!rawTimestamp) {
+    throw new Error(`No timestamp found while deserialising attr!`);
+  }
+  const timestamp = LWWTimestamp.fromProto(rawTimestamp);
+  let data;
+  switch (type) {
+    case AttrTypeProto.BOOL: {
+      data = attr.bool();
+      break;
+    }
+    case AttrTypeProto.STRING: {
+      data = attr.string();
+      break;
+    }
+    case AttrTypeProto.F64: {
+      data = attr.f64Fb();
+      break;
+    }
+    case AttrTypeProto.I64: {
+      data = attr.i64Fb();
+      break;
+    }
+    case AttrTypeProto.BYTES: {
+      // TODO: Bytes is currently obviously not working
+      data = attr.bytes(0);
+      break;
+    }
+    default: {
+      throw new Error(`Unknown type - cannot deserialise`);
+    }
+  }
+  return new LWWRegister({
+    data,
+    timestamp,
+  });
+}
+
+// parseAttrSet(buffer: Uint8Array) {
+//   const bb = new ByteBuffer(buffer);
+//   const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
+//   for (let i = 0; i < attrSet.attributesLength(); i++) {
+//     const attr = attrSet.attributes(i);
+//     if (attr) {
+//       const lww = this.deserialiseAttr(attr);
+//       this.state[attr.fieldId()] = lww;
+//     }
+//   }
+// }

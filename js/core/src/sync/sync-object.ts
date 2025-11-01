@@ -81,61 +81,40 @@ export class SyncObject {
       objKind: this.objKind,
       libraryId: this.libraryId,
       seq: this.seq,
-      attributes: this.getFullAttrPayload(),
+      // TODO: commit & optimistic & op headers & pending
     };
   }
 
-  fullSyncOp() {
-    const params = {
-      id: this.id,
-      opKind: OpKind.PATCH,
-      libraryId: this.libraryId,
-      objId: this.id,
-      objKind: this.objKind,
-      payload: this.getFullAttrPayload(),
-    };
-    const op = new SyncOp(params);
-    return op;
-  }
-
-  partialSyncOp(patch: NumericAttrMap) {
-    this.mergePatch(patch, true);
-    let set = new Set<string>();
-    for (const key of Object.keys(patch)) {
-      set.add(key);
+  applyPatchLocal(op: SyncOp) {
+    // Affect this.state immediately
+    if (op.opKind !== OpKind.PATCH) {
+      throw new Error("this API for patch only currently");
     }
-    const params = {
-      id: this.id,
-      opKind: OpKind.PATCH,
-      libraryId: this.libraryId,
-      objId: this.id,
-      objKind: this.objKind,
-      payload: this.getAttrPayload(set),
-    };
-    const op = new SyncOp(params);
-    return op;
   }
 
-  commitPatch(op: SyncOp) {}
+  commitPatch(op: SyncOp) {
+    // Affect this.snapshot
+    if (op.opKind !== OpKind.PATCH || !op.patch) {
+      throw new Error("this API for patch only currently");
+    }
+    this.merge(this.committed, op.patch);
+  }
 
-  // TODO: Complete implementation
-  merge(other: SyncObject, local: boolean) {
-    for (const key of Object.keys(other.state)) {
-      const curVal = this.state[key];
-      if (!curVal) {
-        this.state[key] = curVal;
+  merge(target: NumericAttrMap, patch: NumericAttrMap) {
+    for (const key of Object.keys(patch)) {
+      const existingVal = target[key];
+      const patchVal = patch[key];
+      if (!existingVal) {
+        target[key] = patch[key];
       } else {
-        const otherVal = other.state[key];
-        if (!otherVal) throw new Error("val is set but not populated");
-        const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
-        if (result.source === "right" && local === false) {
-          this.dirty.delete(key);
-        }
-        this.state[key] = result.register;
+        const result = existingVal.merge(patchVal);
+        target[key] = result.register;
+        // TODO: This should be targeted - not required on commit
         this.markChanged(key, result.register); // UI reaction
       }
     }
   }
+
   mergePatch(map: NumericAttrMap, local: boolean) {
     for (const key of Object.keys(map)) {
       const curVal = this.state[key];
@@ -152,106 +131,6 @@ export class SyncObject {
         this.markChanged(key, result.register);
       }
     }
-  }
-  parseAttrSet(buffer: Uint8Array) {
-    const bb = new ByteBuffer(buffer);
-    const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
-    for (let i = 0; i < attrSet.attributesLength(); i++) {
-      const attr = attrSet.attributes(i);
-      if (attr) {
-        const lww = this.deserialiseAttr(attr);
-        this.state[attr.fieldId()] = lww;
-      }
-    }
-  }
-
-  static fromFlatBuffer(buffer: Uint8Array) {}
-  // TODO: Attributes only?
-  // fromFlatBuffer() {
-  //   const as = new AttributeSetProto();
-  //   for (let i = 0; i <= as.attributesLength(); i++) {
-  //     const attr = as.attributes(i);
-  //     if (attr) {
-  //       const fieldId = attr.fieldId();
-  //       try {
-  //         const deserialised = this.deserialiseAttr(attr);
-  //         this.values[fieldId] = deserialised;
-  //       } catch (err) {
-  //         console.warn("error creating item from flatbuffer", err);
-  //       }
-  //     }
-  //   }
-  //   // TODO: Should we make this a static method?
-  //   return;
-  // }
-  private deserialiseAttr(attr: AttributeProto) {
-    const type = attr.valueType();
-    const rawTimestamp = attr.timestamp();
-    if (!rawTimestamp) {
-      throw new Error(`No timestamp found while deserialising attr!`);
-    }
-    const timestamp = LWWTimestamp.fromProto(rawTimestamp);
-    let data;
-    switch (type) {
-      case AttrTypeProto.BOOL: {
-        data = attr.bool();
-        break;
-      }
-      case AttrTypeProto.STRING: {
-        data = attr.string();
-        break;
-      }
-      case AttrTypeProto.F64: {
-        data = attr.f64Fb();
-        break;
-      }
-      case AttrTypeProto.I64: {
-        data = attr.i64Fb();
-        break;
-      }
-      case AttrTypeProto.BYTES: {
-        // TODO: Bytes is currently obviously not working
-        data = attr.bytes(0);
-        break;
-      }
-      default: {
-        throw new Error(`Unknown type - cannot deserialise`);
-      }
-    }
-    return new LWWRegister({
-      data,
-      timestamp,
-    });
-  }
-  getFullAttrPayload() {
-    const allKeys = new Set<string>();
-    for (let key of Object.keys(this.state)) {
-      allKeys.add(key);
-    }
-    return this.getAttrPayload(allKeys);
-  }
-  getAttrPayload(keySet: Set<string>) {
-    if (!keySet.size) {
-      throw new Error("building payload with size = 0");
-    }
-    const builder = new Builder();
-    const attributes: number[] = [];
-    for (let key of keySet) {
-      const offset = this.serialiseAttr(builder, Number(key));
-      if (offset) {
-        attributes.push(offset);
-      }
-    }
-    const attributesOffset = AttributeSetProto.createAttributesVector(
-      builder,
-      attributes,
-    );
-    const offset = AttributeSetProto.createAttributeSetProto(
-      builder,
-      attributesOffset,
-    );
-    builder.finish(offset);
-    return builder.asUint8Array();
   }
 }
 
