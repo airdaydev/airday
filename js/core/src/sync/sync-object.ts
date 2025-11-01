@@ -1,13 +1,7 @@
-import { LWWRegister, LWWTimestamp } from "../crdt/lww";
+import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
-import { Builder, ByteBuffer } from "flatbuffers";
-import {
-  AttributeProto,
-  AttributeSetProto,
-  AttrTypeProto,
-  OpKind,
-} from "../proto";
+import { OpKind } from "../proto";
 import { SyncOp } from "./sync-op";
 
 export type KeyMap = { readonly [k: string]: number };

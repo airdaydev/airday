@@ -42,7 +42,7 @@ export class AirdayStorage {
   }
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.stateCache.delete(id.toHex()));
-    await this.adapter.delete(ids);
+    await this.adapter.deleteSyncObject(ids);
     // TODO: trigger subscription remove event!
   }
   // TODO: Trigger patch?

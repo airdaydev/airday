@@ -50,6 +50,9 @@ export class AirdayMemStorage implements StorageAdapter {
   async getOutboxOp(id: Uuidv4): Promise<any> {
     return this.outbox.get(id.toHex());
   }
+  async deleteOutboxOp(id: Uuidv4): Promise<any> {
+    this.outbox.delete(id.toHex());
+  }
 
   async getSyncObject(id: Uuidv4): Promise<any> {
     return this.syncObjects.get(id.toHex());
@@ -59,7 +62,7 @@ export class AirdayMemStorage implements StorageAdapter {
     throw new Error("Not yet implemented");
   }
 
-  async delete(hexIds: Uuidv4[]): Promise<void> {
+  async deleteSyncObject(hexIds: Uuidv4[]): Promise<void> {
     for (const id of hexIds) {
       const key = id.toHex();
       const obj = this.syncObjects.get(key);

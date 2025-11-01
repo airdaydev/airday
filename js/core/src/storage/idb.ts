@@ -85,7 +85,13 @@ export class AirdayIDBStorage implements StorageAdapter {
   updateObject(object: SyncObject): Promise<void> {
     throw new Error("Not yet implemented");
   }
-  delete = async (hexIds: Uuidv4[]) => {
+  deleteOutboxOp = async (id: Uuidv4): Promise<void> => {
+    const tx = this.handle!.transaction(OUTBOX_STORE_NAME, "readwrite");
+    const outboxStore = tx.objectStore(OUTBOX_STORE_NAME);
+    await outboxStore.delete(id);
+    await tx.done;
+  };
+  deleteSyncObject = async (hexIds: Uuidv4[]) => {
     // await this.db!.handle?.delete(SYNC_STORE_NAME, id);
     const tx = this.handle!.transaction(SYNC_STORE_NAME, "readwrite");
     const store = tx.objectStore(SYNC_STORE_NAME);
