@@ -249,8 +249,8 @@ export class WebsocketManager {
           const obj = await this.core.storage.getObj(op.objId);
           // Phase 2 commit: commit & persist seq
           obj.seq = seq; // TODO: Optional reactivity?
-          // object.committed
-          // TOOD: Second-phase commit op, then delete pending op
+          obj.commitPatch(op);
+          await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
           // TODO: delete pending op!
           // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
           await this.core.storage.adapter.updateObject(obj);

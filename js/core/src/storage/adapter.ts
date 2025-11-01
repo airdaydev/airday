@@ -10,6 +10,7 @@ export abstract class StorageAdapter {
   abstract getByLibrary(libraryId: Uuidv4): Promise<any[]>;
   abstract getOutboxOp(id: Uuidv4): Promise<SyncOp>;
   abstract getSyncObject(id: Uuidv4): Promise<SyncObject>;
+  abstract deleteOutboxOp(id: Uuidv4): Promise<void>;
   abstract delete(hexIds: Uuidv4[]): Promise<void>;
   abstract clear(): Promise<void>;
 }

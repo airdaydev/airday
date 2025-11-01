@@ -87,9 +87,10 @@ export class SyncObject {
 
   applyPatchLocal(op: SyncOp) {
     // Affect this.state immediately
-    if (op.opKind !== OpKind.PATCH) {
+    if (op.opKind !== OpKind.PATCH || !op.patch) {
       throw new Error("this API for patch only currently");
     }
+    this.merge(this.state, op.patch);
   }
 
   commitPatch(op: SyncOp) {
@@ -97,6 +98,7 @@ export class SyncObject {
     if (op.opKind !== OpKind.PATCH || !op.patch) {
       throw new Error("this API for patch only currently");
     }
+    // TODO: Header should be saved on object itself + sha_256 calculated
     this.merge(this.committed, op.patch);
   }
 
@@ -111,24 +113,6 @@ export class SyncObject {
         target[key] = result.register;
         // TODO: This should be targeted - not required on commit
         this.markChanged(key, result.register); // UI reaction
-      }
-    }
-  }
-
-  mergePatch(map: NumericAttrMap, local: boolean) {
-    for (const key of Object.keys(map)) {
-      const curVal = this.state[key];
-      if (!curVal) {
-        this.state[key] = curVal;
-      } else {
-        const otherVal = map[key];
-        if (!otherVal) throw new Error("val is set but not populated");
-        const result = curVal.merge(otherVal as any); // TODO: do we want to validate type on every merge/extraction?
-        if (result.source === "right" && local === false) {
-          this.dirty.delete(key);
-        }
-        this.state[key] = result.register;
-        this.markChanged(key, result.register);
       }
     }
   }
