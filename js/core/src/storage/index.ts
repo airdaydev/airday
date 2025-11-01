@@ -1,8 +1,14 @@
 // Memory storage for items (or all resources?)
 import { EventEmitter } from "../common/events";
-import { LibraryHexUuid, SyncObjectHexUuid, Uuidv4 } from "../common/uuid";
+import {
+  HexUuid,
+  LibraryHexUuid,
+  SyncObjectHexUuid,
+  Uuidv4,
+} from "../common/uuid";
 import { AirdayCore } from "../core";
 import { SyncObject } from "../sync/sync-object";
+import { SyncOp } from "../sync/sync-op";
 import { StorageAdapter } from "./adapter";
 import { AirdayIDBStorage } from "./idb";
 
@@ -17,6 +23,7 @@ export class AirdayStorage {
   // Cache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
   libMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
+  outbox: Map<HexUuid, SyncOp> = new Map();
   // Reactivity
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
@@ -25,6 +32,13 @@ export class AirdayStorage {
   }
   coldBoot() {
     // TODO: cold boot i.e. load libraries
+  }
+  async getOp(id: Uuidv4): Promise<SyncOp> {
+    let op = this.outbox.get(id.toHex());
+    if (op) return op;
+    const persisted = await this.adapter.getOutboxOp(id);
+    if (!persisted) throw new Error(`op not found ${id}`);
+    return persisted;
   }
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.stateCache.delete(id.toHex()));
@@ -44,7 +58,7 @@ export class AirdayStorage {
     const mem = this.stateCache.get(id.toHex());
     if (mem) return mem;
     const persisted = await this.adapter.getSyncObject(id);
-    if (!persisted) throw new Error("object not found");
+    if (!persisted) throw new Error(`object not found ${id}`);
     return persisted;
   }
   // TODO: Remove from cache etc

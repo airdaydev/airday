@@ -227,29 +227,32 @@ export class WebsocketManager {
   // Confirmation message
   private processBatchResponseMessage(span: ULSpan, msg: BatchResponseProto) {
     for (let i = 0; i < msg.batchLength(); i++) {
-      const op = msg.batch(i);
-      if (!op) continue;
-      const opId = Uuidv4.fromFBProto(op.opId());
+      const res = msg.batch(i);
+      if (!res) continue;
+      const opId = Uuidv4.fromFBProto(res.opId());
       tracer.addTag(span, "msg_type", "ResponseProto");
-      const seq = op.seq();
+      const seq = res.seq();
       // TODO: IMPORTANT Prevent if !success
       this.events.emit("batch-response", {
         opId,
-        success: op.success(),
+        success: res.success(),
         seq,
       });
       // TODO: Ensure:
-      // - Optimistic in-memory (already done)
-      // - Optimistic persisted (already done (in a tx with op outbox))
+      // - Optimistic in-memory
+      // - Optimistic persisted (in a tx with op outbox)
       // TODO: Consider putting in queue
-      const syncObject = this.core.storage
-        .getObj(opId)
-        .then(async (object) => {
+      this.core.storage.adapter
+        .getOutboxOp(opId)
+        .then(async (op) => {
+          const obj = await this.core.storage.getObj(op.objId);
           // Phase 2 commit: commit & persist seq
-          object.seq = op.seq(); // TODO: Optional reactivity?
+          obj.seq = seq; // TODO: Optional reactivity?
           // object.committed
-          // TODO: Retrieve the full op to merge to committed!
-          this.core.storage.adapter.updateObject(object);
+          // TODO: Retrieve the full op to merge to committed, and delete pending op!
+          // TODO: This update may be best done in a tx - unless it doesn't really matter
+          await this.core.storage.adapter.updateObject(obj);
+          // TODO: The case for saving op headers on the object: we may need them to ensure idempotency
         })
         .catch((err) => {
           console.error(`Error retrieving opId`, opId);
@@ -269,7 +272,7 @@ export class WebsocketManager {
       //
       //
       // TODO: We need to update in-memory version & db version (reactivity + persistence)
-      console.log("sync res received", op.seq());
+      console.log("sync res received", seq);
       tracer.endSpan(span);
     }
   }

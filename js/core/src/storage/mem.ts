@@ -13,6 +13,7 @@ export class AirdayMemStorage implements StorageAdapter {
   private syncObjects: Map<SyncObjectHexUuid, DBSyncObject> = new Map();
   private libraryIndex: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map(); // TODO: id or outbox id?
   private outbox: Map<HexUuid, SerialisedSyncOp> = new Map();
+  // TODO: op storage?
 
   async connect() {
     console.warn("initialised mem storage adapter, no persistence enabled");
