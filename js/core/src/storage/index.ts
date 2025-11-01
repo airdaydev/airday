@@ -1,6 +1,6 @@
 // Memory storage for items (or all resources?)
 import { EventEmitter } from "../common/events";
-import { Uuidv4 } from "../common/uuid";
+import { LibraryHexUuid, SyncObjectHexUuid, Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
 import { SyncObject } from "../sync/sync-object";
 import { StorageAdapter } from "./adapter";
@@ -11,19 +11,20 @@ interface StorageEventMap {
   delete: { ids: string[] };
 }
 
-// Fulfill example: Remote application of moving from one list to another
-// Goal: Ensure the item is removed from one list & moved into another!
-// Is this possible without going through every single list!?
-
-// TODO: Boot cold items
 export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
-  stateCache: Map<string, SyncObject> = new Map(); // hex-id-backed index
+  // Cache
+  stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
+  libMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
+  // Reactivity
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
+  }
+  coldBoot() {
+    // TODO: cold boot i.e. load libraries
   }
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.stateCache.delete(id.toHex()));
@@ -35,10 +36,16 @@ export class AirdayStorage {
     // Ensure this happens in batches
   }
   setStateCache(obj: SyncObject) {
-    this.stateCache.set(obj.id.toHex(), obj);
-    // TODO: Indexes
+    const hexId = obj.id.toHex();
+    this.stateCache.set(hexId, obj);
+    this.libMap.set(obj.libraryId.toHex(), hexId);
   }
-  getStateCache(id: Uuidv4) {
-    return this.stateCache.get(id.toHex());
+  async getObj(id: Uuidv4): Promise<SyncObject> {
+    const mem = this.stateCache.get(id.toHex());
+    if (mem) return mem;
+    const persisted = await this.adapter.getSyncObject(id);
+    if (!persisted) throw new Error("object not found");
+    return persisted;
   }
+  // TODO: Remove from cache etc
 }

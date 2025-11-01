@@ -1,13 +1,18 @@
-import { Uuidv4 } from "../common/uuid";
-import { SyncObject } from "../sync/sync-object";
+import {
+  HexUuid,
+  LibraryHexUuid,
+  SyncObjectHexUuid,
+  Uuidv4,
+} from "../common/uuid";
+import { DBSyncObject, SyncObject } from "../sync/sync-object";
 import { SerialisedSyncOp, SyncOp } from "../sync/sync-op";
 import { StorageAdapter } from "./adapter";
 
 // In-memory storage adapter for headless testing environments
 export class AirdayMemStorage implements StorageAdapter {
-  private syncObjects: Map<string, any> = new Map();
-  private outbox: Map<string, SerialisedSyncOp> = new Map();
-  private libraryIndex: Map<string, Set<string>> = new Map(); // TODO: id or outbox id?
+  private syncObjects: Map<SyncObjectHexUuid, DBSyncObject> = new Map();
+  private libraryIndex: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map(); // TODO: id or outbox id?
+  private outbox: Map<HexUuid, SerialisedSyncOp> = new Map();
 
   async connect() {
     console.warn("initialised mem storage adapter, no persistence enabled");
@@ -47,6 +52,10 @@ export class AirdayMemStorage implements StorageAdapter {
 
   async getSyncObject(id: Uuidv4): Promise<any> {
     return this.syncObjects.get(id.toHex());
+  }
+
+  updateObject(object: SyncObject): Promise<void> {
+    throw new Error("Not yet implemented");
   }
 
   async delete(hexIds: Uuidv4[]): Promise<void> {

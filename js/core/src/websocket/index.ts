@@ -231,17 +231,29 @@ export class WebsocketManager {
       if (!op) continue;
       const opId = Uuidv4.fromFBProto(op.opId());
       tracer.addTag(span, "msg_type", "ResponseProto");
+      const seq = op.seq();
+      // TODO: IMPORTANT Prevent if !success
       this.events.emit("batch-response", {
         opId,
         success: op.success(),
-        seq: op.seq(),
+        seq,
       });
-
-      // this.core.storage.adapter.getSyncObject()
+      // TODO: Ensure:
       // - Optimistic in-memory (already done)
       // - Optimistic persisted (already done (in a tx with op outbox))
-      // - Committed in-memory (tbd on receive seq - we must have access to op patch here to combine)
-      // - Commmitted persisted (at the same time)
+      // TODO: Consider putting in queue
+      const syncObject = this.core.storage
+        .getObj(opId)
+        .then(async (object) => {
+          // Phase 2 commit: commit & persist seq
+          object.seq = op.seq(); // TODO: Optional reactivity?
+          // object.committed
+          // TODO: Retrieve the full op to merge to committed!
+          this.core.storage.adapter.updateObject(object);
+        })
+        .catch((err) => {
+          console.error(`Error retrieving opId`, opId);
+        });
 
       // op persisted locally, state computed & persisted for fast access
       // op persisted to server, returning seq
