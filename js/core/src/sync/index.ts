@@ -92,33 +92,43 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
-  // TODO: Do we need ack + pending? vs retaining state on object itself?
-  // Probably yes but just keep this todo here for a bit
   handleBatchResponse = (res: BatchResponseEvent) => {
-    const op = this.outbox.get(res.opId.toHex());
+    // TODO: Ensure:
+    // - Optimistic in-memory
+    // - Optimistic persisted (in a tx with op outbox)
+    // TODO: Consider putting in queue
+    this.core.storage.adapter
+      .getOutboxOp(res.opId)
+      .then(async (op) => {
+        console.log(op.opKind); // TODO: Consider deletes/snapshots!
+        const obj = await this.core.storage.getObj(op.objId);
+        // Phase 2 commit: commit & persist seq
+        obj.seq = res.seq!; // ! TODO: Optional reactivity?
+        obj.commitPatch(op);
+        await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
+        // TODO: delete pending op!
+        // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
+        await this.core.storage.adapter.updateObject(obj);
+        // TODO: The case for saving op headers on the object: idempotency on hashes
+      })
+      .catch((err) => {
+        console.error(`Error retrieving opId`, opId);
+      });
 
-    if (op instanceof SyncOp) {
-      if (res.success) {
-        // TODO: Return seq
-        if (typeof res.seq === "bigint") {
-          const syncObject = this.core.storage.getStateCache(op.objId);
-          // TODO: Update seq
-          console.log(`TODO: ${syncObject?.seq}`);
-        }
-        // TODO: persist .seq!
-        // this.core.storage.idb?.upsert([action.syncObject]).catch((err) => {
-        //   console.log(err);
-        // });
-        this.outbox.delete(res.opId.toHex());
-        if (this.outbox.size === 0) {
-          this.events.emit("flushed", {});
-        }
-      }
-    } else {
-      console.error("Failed to sync item", res.error);
-      // Failure!
-      // TODO: Retries!
-    }
-    // TODO: Other resource types
+    // op persisted locally, state computed & persisted for fast access
+    // op persisted to server, returning seq
+    // seq stored against persisted version (so this is really last_seq)
+    // seq is fairly reliable, and if a seq is missed, it can be picked up by a merkle-tree based on the latest hash (computed only on ops with seqs)
+    // SO: Keep current-snapshot op headers on client
+    // OR if user wants to keep history - they can if there is room (but this is an optional/advanced option)
+    // hash is calculated on ops with seq only
+    //
+    // problem: ops contributing to fast access state, that did not have a seq, then being lost would then show a valid hash while the object would be invalid!
+    // solution = 2-phase state
+    // commmitted + optimistic separately
+    //
+    //
+    // TODO: We need to update in-memory version & db version (reactivity + persistence)
+    console.log("sync res received", seq);
   };
 }

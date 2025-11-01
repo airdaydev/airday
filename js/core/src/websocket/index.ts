@@ -238,43 +238,6 @@ export class WebsocketManager {
         success: res.success(), // TODO: We need an already commmitted case!
         seq,
       });
-      // TODO: Ensure:
-      // - Optimistic in-memory
-      // - Optimistic persisted (in a tx with op outbox)
-      // TODO: Consider putting in queue
-      this.core.storage.adapter
-        .getOutboxOp(opId)
-        .then(async (op) => {
-          console.log(op.opKind); // TODO: Consider deletes/snapshots!
-          const obj = await this.core.storage.getObj(op.objId);
-          // Phase 2 commit: commit & persist seq
-          obj.seq = seq; // TODO: Optional reactivity?
-          obj.commitPatch(op);
-          await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
-          // TODO: delete pending op!
-          // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
-          await this.core.storage.adapter.updateObject(obj);
-          // TODO: The case for saving op headers on the object: idempotency on hashes
-        })
-        .catch((err) => {
-          console.error(`Error retrieving opId`, opId);
-        });
-
-      // op persisted locally, state computed & persisted for fast access
-      // op persisted to server, returning seq
-      // seq stored against persisted version (so this is really last_seq)
-      // seq is fairly reliable, and if a seq is missed, it can be picked up by a merkle-tree based on the latest hash (computed only on ops with seqs)
-      // SO: Keep current-snapshot op headers on client
-      // OR if user wants to keep history - they can if there is room (but this is an optional/advanced option)
-      // hash is calculated on ops with seq only
-      //
-      // problem: ops contributing to fast access state, that did not have a seq, then being lost would then show a valid hash while the object would be invalid!
-      // solution = 2-phase state
-      // commmitted + optimistic separately
-      //
-      //
-      // TODO: We need to update in-memory version & db version (reactivity + persistence)
-      console.log("sync res received", seq);
       tracer.endSpan(span);
     }
   }
