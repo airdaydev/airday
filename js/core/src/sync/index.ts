@@ -92,6 +92,7 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
+  // Handler for a reply to an op originating from this client
   handleOpResponse = (res: OpResponseEvent) => {
     // TODO: Ensure:
     // - Optimistic in-memory
@@ -129,6 +130,6 @@ export class AirdaySync {
     //
     //
     // TODO: We need to update in-memory version & db version (reactivity + persistence)
-    console.log("sync res received", seq);
+    console.log("sync res received", res.seq);
   };
 }

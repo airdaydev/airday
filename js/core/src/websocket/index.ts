@@ -6,6 +6,7 @@ import {
   MessageProto,
   BatchResponseProto,
   BatchSyncOpProto,
+  OpKind,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction } from "../sync/fb";
@@ -259,6 +260,14 @@ export class WebsocketManager {
         // payload
       };
       const syncOp = new SyncOp(syncOpParams);
+      switch (syncOp.opKind) {
+        case OpKind.PATCH:
+          break;
+        case OpKind.SNAPSHOT:
+          break;
+        case OpKind.DELETE:
+          break;
+      }
       // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
       tracer.endSpan(span);
