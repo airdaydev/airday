@@ -104,7 +104,7 @@ test.only("Sync generic object", async () => {
   expect(syncObject, "recent sync object is in hot storage").toBeTruthy();
   // test sync completion
   await new Promise((resolve) => {
-    core.ws.events.once("batch-response", (data) => {
+    core.ws.events.once("op-response", (data) => {
       resolve(null);
     });
   });

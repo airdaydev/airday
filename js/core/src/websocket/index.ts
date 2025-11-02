@@ -14,8 +14,9 @@ import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
+import { SyncOp } from "../sync/sync-op";
 
-export interface BatchResponseEvent {
+export interface OpResponseEvent {
   opId: Uuidv4;
   success: boolean;
   seq?: bigint; // TODO
@@ -24,7 +25,7 @@ export interface BatchResponseEvent {
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ["batch-response"]: BatchResponseEvent;
+  ["op-response"]: OpResponseEvent;
   flushed: {};
 }
 
@@ -224,7 +225,7 @@ export class WebsocketManager {
       }
     }
   }
-  // Confirmation message
+  // Confirmation message of locally generated sync, necessary in the case of a failure
   private processBatchResponseMessage(span: ULSpan, msg: BatchResponseProto) {
     for (let i = 0; i < msg.batchLength(); i++) {
       const res = msg.batch(i);
@@ -233,7 +234,7 @@ export class WebsocketManager {
       tracer.addTag(span, "msg_type", "ResponseProto");
       const seq = res.seq();
       // TODO: IMPORTANT Prevent if !success
-      this.events.emit("batch-response", {
+      this.events.emit("op-response", {
         opId,
         success: res.success(), // TODO: We need an already commmitted case!
         seq,
@@ -247,12 +248,19 @@ export class WebsocketManager {
     for (let i = 0; i < msg.batchLength(); i++) {
       const op = msg.batch(i);
       if (!op) continue;
-      const opId = Uuidv4.fromFBProto(op.opId());
+      // TODO: Decrypt payload
+      // const payload = op.payload();
+      const syncOpParams = {
+        id: Uuidv4.fromFBProto(op.opId()),
+        opKind: op.opKind(),
+        libraryId: Uuidv4.fromFBProto(op.libraryId()),
+        objId: Uuidv4.fromFBProto(op.objId()),
+        objKind: op.objKind(),
+        // payload
+      };
+      const syncOp = new SyncOp(syncOpParams);
+      // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
-      // TODO: Do something with this
-      // op.action(objectResponse);
-      // TODO: Validate and add object to storage
-      console.log("sync op received", op);
       tracer.endSpan(span);
     }
   }

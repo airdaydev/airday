@@ -2,7 +2,7 @@ import { EventEmitter } from "../common/events";
 import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { BatchResponseEvent } from "../websocket";
+import { OpResponseEvent } from "../websocket";
 import { BatchSyncMessage } from "./fb";
 import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
@@ -25,7 +25,7 @@ export class AirdaySync {
   streams = new Map<string, SyncStream>();
   constructor(core: AirdayCore) {
     this.core = core;
-    this.core.ws.events.on("batch-response", this.handleBatchResponse);
+    this.core.ws.events.on("op-response", this.handleOpResponse);
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
@@ -92,7 +92,7 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
-  handleBatchResponse = (res: BatchResponseEvent) => {
+  handleOpResponse = (res: OpResponseEvent) => {
     // TODO: Ensure:
     // - Optimistic in-memory
     // - Optimistic persisted (in a tx with op outbox)
@@ -112,7 +112,7 @@ export class AirdaySync {
         // TODO: The case for saving op headers on the object: idempotency on hashes
       })
       .catch((err) => {
-        console.error(`Error retrieving opId`, opId);
+        console.error(`Error retrieving opId`, res.opId);
       });
 
     // op persisted locally, state computed & persisted for fast access
