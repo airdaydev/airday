@@ -37,28 +37,12 @@ export class SyncObject {
   private scheduled = false;
 
   constructor(op: SyncOp) {
+    // TODO: Guards for objects without objKind/id/libId
     this.objKind = op.objKind;
     this.id = op.id;
     this.libraryId = op.libraryId;
-    if (op.patch) {
-      this.merge(this.state, op.patch);
-    }
+    this.applyLocal(op);
     return this;
-  }
-
-  static new(objKind: number, libraryId: Uuidv4, patch?: NumericAttrMap) {
-    const op = new SyncOp({
-      opKind: OpKind.PATCH,
-      objKind,
-      objId: new Uuidv4(),
-      libraryId,
-      patch,
-    });
-    const obj = new SyncObject(op);
-    if (op.patch) {
-      obj.merge(obj.state, op.patch);
-    }
-    return op;
   }
 
   subscribe(cb: Listener): () => void {
@@ -102,10 +86,14 @@ export class SyncObject {
 
   applyLocal(op: SyncOp) {
     // Affect this.state immediately
-    if (op.opKind !== OpKind.PATCH || !op.patch) {
-      throw new Error("this API for patch only currently");
+    // TODO: Test types/library match?
+    // TODO: Wipe ops with lower seqs for snapshots
+    if (op.opKind === OpKind.DELETE) {
+      throw new Error("this API for patch/snapshot only currently");
     }
-    this.merge(this.state, op.patch);
+    if (op.patch) {
+      this.merge(this.state, op.patch);
+    }
     this.pendingOps.set(op.id.toHex(), op.header());
   }
 

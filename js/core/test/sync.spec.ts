@@ -4,23 +4,31 @@ import { Uuidv4 } from "../src/common/uuid";
 import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { LWWRegister } from "../src/crdt/lww";
 import { createAuthenticatedCore } from "./utils";
-import { SyncOp } from "../src/sync/sync-op";
+import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
+import { OpKind } from "../src/proto";
+import { Builder } from "flatbuffers";
 
 // TODO: Null state to clear? or explicit clear field?
 test.only("create, encode & decode patch SyncOp", async () => {
   const libraryId = new Uuidv4();
-  // Create a patch + sync object
-  const op = SyncObject.new(0, libraryId, {
-    1: new LWWRegister({
-      data: "test",
-    }),
+  const snapshot = new InitialSnapshotOp({
+    libraryId,
+    objKind: 0,
+    patch: {
+      1: new LWWRegister({
+        data: "test",
+      }),
+    },
   });
-  expect(op.serialiseAttrs().length).toBe(88);
+  // Create a patch + sync object
+  const obj = new SyncObject(snapshot);
+  expect(snapshot.serialiseAttrs().length).toBe(88);
+  expect(obj.pendingOps.size).toBe(1);
+
+  const builder = new Builder();
+  snapshot.addToFlatBuffer(builder);
+  builder.asUint8Array();
   // Parse
-  // const syncObjB = new SyncObject({
-  //   objKind: 0,
-  //   libraryId,
-  // });
   // syncObjB.parseAttrSet(buffer);
   // expect(syncObjB.state[0].data).toBe("hello");
   // expect(syncObjB.state[1].data).toBe(32);
@@ -53,6 +61,21 @@ test("Merge SyncObject", async () => {
   syncObj.state[1] = new LWWRegister({
     data: 64,
   });
+
+  // const syncObjB = new SyncOp({
+  //   opKind: OpKind.PATCH,
+  //   objId: obj.id,
+  //   objKind: snapshot.objKind,
+  //   libraryId,
+  //   patch: {
+  //     1: new LWWRegister({
+  //       data: "updated",
+  //     }),
+  //     2: new LWWRegister({
+  //       data: "added",
+  //     }),
+  //   },
+  // });
 
   syncObj.mergePatch(patch, true);
   expect(syncObj.state[0].data).toBe("hello again");

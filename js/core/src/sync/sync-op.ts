@@ -146,7 +146,7 @@ export class SyncOp {
   addToFlatBuffer(builder: Builder) {
     let vectorOffset;
     if (this.patch) {
-      const bytes = this.serialisePatch();
+      const bytes = this.serialiseAttrs();
       vectorOffset = builder.createByteVector(bytes);
     }
     SyncOpProto.startSyncOpProto(builder);
@@ -171,5 +171,23 @@ export class SyncOp {
     }
     const offset = SyncOpProto.endSyncOpProto(builder);
     return offset;
+  }
+}
+
+export interface InitialSnapshotOpParams {
+  libraryId: Uuidv4;
+  objKind: number;
+  patch?: NumericAttrMap;
+}
+
+export class InitialSnapshotOp extends SyncOp {
+  constructor(props: InitialSnapshotOpParams) {
+    super(
+      Object.assign(props, {
+        objId: new Uuidv4(),
+        opKind: OpKind.SNAPSHOT,
+        baseSeq: 0,
+      }),
+    );
   }
 }
