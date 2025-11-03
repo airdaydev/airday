@@ -28,16 +28,34 @@ export class SyncObject {
   // TODO: Track pending ops
   // TODO: Last access number to determine whether to trim full obj from mem storage
   hash?: Uint8Array; // committed hash
-  dirty: Set<string> = new Set(); // Updated locally, but not accepted (str rep of identifier)
   // Reactivity
   private subs = new Set<Listener>();
   private pending = new Map<string, LWWRegister<any> | undefined>();
   private scheduled = false;
 
-  constructor(params: SyncObjectParams) {
-    this.objKind = params.objKind;
-    this.id = params.id || new Uuidv4();
-    this.libraryId = params.libraryId;
+  constructor(op: SyncOp) {
+    this.objKind = op.objKind;
+    this.id = op.id;
+    this.libraryId = op.libraryId;
+    if (op.patch) {
+      this.merge(this.state, op.patch);
+    }
+    return this;
+  }
+
+  static new(objKind: number, libraryId: Uuidv4, patch?: NumericAttrMap) {
+    const op = new SyncOp({
+      opKind: OpKind.PATCH,
+      objKind,
+      objId: new Uuidv4(),
+      libraryId,
+      patch,
+    });
+    const obj = new SyncObject(op);
+    if (op.patch) {
+      obj.merge(obj.state, op.patch);
+    }
+    return op;
   }
 
   subscribe(cb: Listener): () => void {
@@ -138,11 +156,3 @@ export function parseGenericSyncObject(record: any) {
 const ensureDBSyncObject = compile(DBSyncObjectSchema, {
   ensure: true,
 });
-
-export interface SyncObjectParams {
-  id?: Uuidv4;
-  libraryId: Uuidv4;
-  lastModified?: bigint;
-  lastSync?: bigint;
-  objKind: number;
-}

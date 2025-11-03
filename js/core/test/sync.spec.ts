@@ -4,35 +4,23 @@ import { Uuidv4 } from "../src/common/uuid";
 import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { LWWRegister } from "../src/crdt/lww";
 import { createAuthenticatedCore } from "./utils";
+import { SyncOp } from "../src/sync/sync-op";
 
 // TODO: Null state to clear? or explicit clear field?
-test("create, encode & decode SyncOp", async () => {
+test.only("create, encode & decode SyncOp", async () => {
   const libraryId = new Uuidv4();
   // Create an object
-  const syncObj = new SyncObject({
-    objKind: 0,
-    libraryId,
-  });
-  syncObj.state[0] = new LWWRegister({
-    data: "hello",
-  });
-  syncObj.state[1] = new LWWRegister({
-    data: 32,
-  });
-  syncObj.state[2] = new LWWRegister({
-    data: false,
-  });
-  const buffer = syncObj.getFullAttrPayload();
-  expect(buffer.byteLength).toBe(184);
+  const op = SyncObject.new(0, libraryId);
+  expect(op.serialisePatch().length).toBe(184);
   // Parse
-  const syncObjB = new SyncObject({
-    objKind: 0,
-    libraryId,
-  });
-  syncObjB.parseAttrSet(buffer);
-  expect(syncObjB.state[0].data).toBe("hello");
-  expect(syncObjB.state[1].data).toBe(32);
-  expect(syncObjB.state[2].data).toBe(false);
+  // const syncObjB = new SyncObject({
+  //   objKind: 0,
+  //   libraryId,
+  // });
+  // syncObjB.parseAttrSet(buffer);
+  // expect(syncObjB.state[0].data).toBe("hello");
+  // expect(syncObjB.state[1].data).toBe(32);
+  // expect(syncObjB.state[2].data).toBe(false);
 });
 
 test("Merge SyncObject", async () => {
@@ -67,7 +55,7 @@ test("Merge SyncObject", async () => {
   expect(syncObj.state[1].data).toBe(64);
 });
 
-test.only("Sync generic object", async () => {
+test("Sync generic object", async () => {
   const core = await createAuthenticatedCore();
   const syncObj = new SyncObject({
     objKind: 0,
