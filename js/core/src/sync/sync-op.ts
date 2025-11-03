@@ -5,6 +5,12 @@ import { NumericAttrMap, SyncObject } from "./sync-object";
 import { v, compile } from "suretype";
 import { serialiseAttr } from "./fb";
 
+export interface OpHeader {
+  id: Uuidv4;
+  hash: Uint8Array;
+  seq?: number;
+}
+
 export interface SerialisedSyncOp {
   id: Uuidv4;
   opKind: OpKind;
@@ -22,6 +28,7 @@ export interface SyncOpParams {
   libraryId: Uuidv4;
   objId: Uuidv4;
   objKind: number;
+  seq?: number;
 }
 
 const serialisedSyncOpSchema = v.object({
@@ -58,6 +65,7 @@ export class SyncOp {
   objKind: number;
   patch?: NumericAttrMap;
   payload?: Uint8Array;
+  seq?: number;
   constructor(params: SyncOpParams) {
     this.id = new Uuidv4();
     this.opKind = params.opKind;
@@ -66,6 +74,18 @@ export class SyncOp {
     this.objKind = params.objKind;
     this.payload = params.payload;
     this.patch = params.patch;
+    this.seq = params.seq;
+  }
+  header(): OpHeader {
+    return {
+      id: this.id,
+      hash: this.hash(),
+      seq: this.seq,
+    };
+  }
+  hash(): Uint8Array {
+    // TODO: cache and hash
+    return new Uint8Array();
   }
   toIdb(): SerialisedSyncOp {
     return {
@@ -100,12 +120,9 @@ export class SyncOp {
       payload: validated.payload,
     });
   }
-  serialisePatch() {
-    if (!this.patch || !this.patch.size) {
-      throw new Error("No patch found on op");
-    }
-    if (!this.patch.size) {
-      throw new Error("building payload with size = 0");
+  serialiseAttrs() {
+    if (!this.patch) {
+      return new Uint8Array();
     }
     const builder = new Builder();
     const attributes: number[] = [];
@@ -128,8 +145,9 @@ export class SyncOp {
   }
   addToFlatBuffer(builder: Builder) {
     let vectorOffset;
-    if (this.payload) {
-      vectorOffset = builder.createByteVector(this.payload);
+    if (this.patch) {
+      const bytes = this.serialisePatch();
+      vectorOffset = builder.createByteVector(bytes);
     }
     SyncOpProto.startSyncOpProto(builder);
     SyncOpProto.addProtoVersion(builder, 1);

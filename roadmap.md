@@ -5,7 +5,7 @@
 - [] per lib seq
 - [] catch up stream api + limits via mpsc + select! + registers
 - [] delete items (tombstones, same api)
-- [] snapshot api
+- [] snapshot api (spicy)
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] ensure sync works well

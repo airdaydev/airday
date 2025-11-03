@@ -1,8 +1,8 @@
 import { LWWRegister } from "../crdt/lww";
-import { Uuidv4 } from "../common/uuid";
+import { HexUuid, Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
 import { OpKind } from "../proto";
-import { SyncOp } from "./sync-op";
+import { OpHeader, SyncOp } from "./sync-op";
 
 export type KeyMap = { readonly [k: string]: number };
 export type RegisterMap<K extends KeyMap> = {
@@ -25,6 +25,9 @@ export class SyncObject {
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   state: NumericAttrMap = {}; // optimistic client state
   committed: NumericAttrMap = {}; // We don't necessarily need this in memory...
+  // TODO: ops tracking (are we sure?)
+  pendingOps = new Map<HexUuid, OpHeader>();
+  committedOps = new Map<HexUuid, OpHeader>();
   // TODO: Track pending ops
   // TODO: Last access number to determine whether to trim full obj from mem storage
   hash?: Uint8Array; // committed hash
@@ -97,12 +100,13 @@ export class SyncObject {
     };
   }
 
-  applyPatchLocal(op: SyncOp) {
+  applyLocal(op: SyncOp) {
     // Affect this.state immediately
     if (op.opKind !== OpKind.PATCH || !op.patch) {
       throw new Error("this API for patch only currently");
     }
     this.merge(this.state, op.patch);
+    this.pendingOps.set(op.id.toHex(), op.header());
   }
 
   commitPatch(op: SyncOp) {
@@ -112,9 +116,14 @@ export class SyncObject {
     }
     // TODO: Header should be saved on object itself + sha_256 calculated
     this.merge(this.committed, op.patch);
+    const hexId = op.id.toHex();
+    this.pendingOps.delete(hexId);
+    this.committedOps.set(hexId, op.header());
+    // TODO: For snapshots, clear all committed ops before snapshot
+    // TODO: should server reject snapshots where seq > base_seq (yes if there is a snapshot with higher or same base_seq, no if op seq is higher (possible if same compaction rules and both online and both update))
   }
 
-  merge(target: NumericAttrMap, patch: NumericAttrMap) {
+  private merge(target: NumericAttrMap, patch: NumericAttrMap) {
     for (const key of Object.keys(patch)) {
       const existingVal = target[key];
       const patchVal = patch[key];

@@ -7,11 +7,15 @@ import { createAuthenticatedCore } from "./utils";
 import { SyncOp } from "../src/sync/sync-op";
 
 // TODO: Null state to clear? or explicit clear field?
-test.only("create, encode & decode SyncOp", async () => {
+test.only("create, encode & decode patch SyncOp", async () => {
   const libraryId = new Uuidv4();
-  // Create an object
-  const op = SyncObject.new(0, libraryId);
-  expect(op.serialisePatch().length).toBe(184);
+  // Create a patch + sync object
+  const op = SyncObject.new(0, libraryId, {
+    1: new LWWRegister({
+      data: "test",
+    }),
+  });
+  expect(op.serialiseAttrs().length).toBe(88);
   // Parse
   // const syncObjB = new SyncObject({
   //   objKind: 0,
