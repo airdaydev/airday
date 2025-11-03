@@ -1,4 +1,4 @@
-import { Builder, type Offset } from "flatbuffers";
+import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
   AuthenticateActionProto,
   SpanContextProto,
@@ -9,6 +9,7 @@ import {
   BatchSyncOpProto,
   AttrTypeProto,
   AttributeProto,
+  AttributeSetProto,
 } from "../proto";
 import { tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
@@ -211,14 +212,16 @@ export function deserialiseAttr(attr: AttributeProto) {
   });
 }
 
-// parseAttrSet(buffer: Uint8Array) {
-//   const bb = new ByteBuffer(buffer);
-//   const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
-//   for (let i = 0; i < attrSet.attributesLength(); i++) {
-//     const attr = attrSet.attributes(i);
-//     if (attr) {
-//       const lww = this.deserialiseAttr(attr);
-//       this.state[attr.fieldId()] = lww;
-//     }
-//   }
-// }
+export function parseAttrSet(buffer: Uint8Array) {
+  const state: NumericAttrMap = {};
+  const bb = new ByteBuffer(buffer);
+  const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
+  for (let i = 0; i < attrSet.attributesLength(); i++) {
+    const attr = attrSet.attributes(i);
+    if (attr) {
+      const lww = deserialiseAttr(attr);
+      state[attr.fieldId()] = lww;
+    }
+  }
+  return state;
+}

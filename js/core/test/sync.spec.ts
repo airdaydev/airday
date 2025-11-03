@@ -5,8 +5,8 @@ import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { LWWRegister } from "../src/crdt/lww";
 import { createAuthenticatedCore } from "./utils";
 import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
-import { OpKind } from "../src/proto";
-import { Builder } from "flatbuffers";
+import { OpKind, SyncOpProto } from "../src/proto";
+import { Builder, ByteBuffer } from "flatbuffers";
 
 // TODO: Null state to clear? or explicit clear field?
 test.only("create, encode & decode patch SyncOp", async () => {
@@ -26,13 +26,22 @@ test.only("create, encode & decode patch SyncOp", async () => {
   expect(obj.pendingOps.size).toBe(1);
 
   const builder = new Builder();
-  snapshot.addToFlatBuffer(builder);
-  builder.asUint8Array();
+  const offset = snapshot.addToFlatBuffer(builder);
+  builder.finish(offset);
+  const serialised = builder.asUint8Array();
   // Parse
-  // syncObjB.parseAttrSet(buffer);
-  // expect(syncObjB.state[0].data).toBe("hello");
-  // expect(syncObjB.state[1].data).toBe(32);
-  // expect(syncObjB.state[2].data).toBe(false);
+  const bb = new ByteBuffer(serialised);
+  const proto = SyncOpProto.getRootAsSyncOpProto(bb);
+  const op = SyncOp.fromSyncOpProto(proto);
+  expect(op.opKind).toBe(OpKind.SNAPSHOT);
+  expect(op.objKind).toBe(snapshot.objKind);
+  // TODO: Wtf
+  expect(op.objId.equals(snapshot.objId), "objId matches").toBeTrue();
+  expect(
+    op.libraryId.equals(snapshot.libraryId),
+    "libraryId matches",
+  ).toBeTrue();
+  expect(op.patch[1].data).toBe("test");
 });
 
 test("Merge SyncObject", async () => {

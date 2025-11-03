@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import { AttributeSetProto, OpKind, SyncOpProto, UuidProto } from "../proto";
 import { NumericAttrMap, SyncObject } from "./sync-object";
 import { v, compile } from "suretype";
-import { serialiseAttr } from "./fb";
+import { serialiseAttr, parseAttrSet } from "./fb";
 
 export interface OpHeader {
   id: Uuidv4;
@@ -118,6 +118,28 @@ export class SyncOp {
           : new Uuidv4(validated.objId),
       objKind: validated.objKind,
       payload: validated.payload,
+    });
+  }
+  static fromSyncOpProto(proto: SyncOpProto): SyncOp {
+    const id = Uuidv4.fromFBProto(proto.opId());
+    const libraryId = Uuidv4.fromFBProto(proto.libraryId());
+    const objId = Uuidv4.fromFBProto(proto.objId());
+    const payload = proto.payloadArray();
+
+    // Parse the payload into a patch if it exists
+    let patch: NumericAttrMap | undefined;
+    if (payload && payload.length > 0) {
+      patch = parseAttrSet(payload);
+    }
+
+    return new SyncOp({
+      id,
+      opKind: proto.opKind(),
+      libraryId,
+      objId,
+      objKind: proto.objKind(),
+      payload: payload ?? undefined,
+      patch,
     });
   }
   serialiseAttrs() {
