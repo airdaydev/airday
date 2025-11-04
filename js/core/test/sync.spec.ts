@@ -131,7 +131,7 @@ test.only("Phase 2 commit", async () => {
 test.skip("fan out to connection on same library", () => {});
 
 // TODO: This particular case kind of sucks requiring pushing both the obj & the syncop
-test.skip("Catch up stream", async (ctx) => {
+test.skip("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create 50 items
   const libraryId = new Uuidv4();
@@ -163,11 +163,11 @@ test.skip("Catch up stream", async (ctx) => {
   core.ws.close();
 });
 
-test.skip("Delete attribute patches", async (assert) => {});
-test.skip("Delete object patches", async (assert) => {});
-test.skip("Snapshots", async (assert) => {});
-test.skip("Merkle tree backed sync discrepency resolution", async (assert) => {});
-test.skip("Double OP ids w different sha256s?", async (assert) => {});
+test.skip("Delete attribute patches", async () => {});
+test.skip("Delete object patches", async () => {});
+test.skip("Snapshots", async () => {});
+test.skip("Merkle tree backed sync discrepency resolution", async () => {});
+test.skip("Double OP ids w different sha256s?", async () => {});
 
 test.skip("mem adapter", () => {
   // // Examples for the solid adapter within the web app:
@@ -181,7 +181,7 @@ test.skip("mem adapter", () => {
   // const solidAdapter = new SolidAdapterExample();
 });
 
-test.skip("Get all libraries", async (assert) => {});
-test.skip("Create library", async (assert) => {});
-test.skip("Delete library", async (assert) => {});
-test.skip("Sync local pending changes from idb", async (assert) => {});
+test.skip("Get all libraries", async () => {});
+test.skip("Create library", async () => {});
+test.skip("Delete library", async () => {});
+test.skip("Sync local pending changes from idb", async () => {});
