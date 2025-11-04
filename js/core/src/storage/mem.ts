@@ -62,8 +62,8 @@ export class AirdayMemStorage implements StorageAdapter {
     return obj;
   }
 
-  updateObject(object: SyncObject): Promise<void> {
-    throw new Error("Not yet implemented");
+  async updateObject(obj: SyncObject): Promise<void> {
+    this.syncObjects.set(obj.id.toHex(), obj);
   }
 
   async deleteSyncObject(hexIds: Uuidv4[]): Promise<void> {

@@ -97,10 +97,8 @@ test.only("Phase 2 commit", async () => {
     outboxOpIdb.id.equals(outboxOp.id),
     "serialised version stored in idb",
   ).toBe(true);
-  console.log("the id is", obj.id);
   await new Promise((resolve) => {
     core.ws.events.once("op-response", (data) => {
-      console.log("resolved huh", data);
       resolve(null);
     });
   });

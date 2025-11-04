@@ -20,14 +20,14 @@ export class SyncObject {
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
-  seq: bigint | null = null; // server id i.e. last_seq (last seen seq)
+  seq: bigint | null = null; // server id i.e. last_seq (last seen seq) should we have base_seq locally too?
   // Attributes
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   state: NumericAttrMap = {}; // optimistic client state
   committed: NumericAttrMap = {}; // We don't necessarily need this in memory...
   // TODO: ops tracking (are we sure?)
   pendingOps = new Map<HexUuid, OpHeader>();
-  committedOps = new Map<HexUuid, OpHeader>();
+  committedOps = new Map<HexUuid, OpHeader>(); // necessary to ensure idempotency on hashes!
   // TODO: Track pending ops
   // TODO: Last access number to determine whether to trim full obj from mem storage
   hash?: Uint8Array; // committed hash

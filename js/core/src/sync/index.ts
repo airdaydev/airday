@@ -102,17 +102,14 @@ export class AirdaySync {
     this.core.storage.adapter
       .getOutboxOp(res.opId)
       .then(async (op) => {
-        console.log("op incoming", op);
-        console.log(op.opKind); // TODO: Consider deletes/snapshots!
         const obj = await this.core.storage.getObj(op.objId);
         // Phase 2 commit: commit & persist seq
-        obj.seq = res.seq!; // ! TODO: Optional reactivity?
+        obj.seq = res.seq!; // ! TODO: Optional reactivity on seq itself or other metadata?
         obj.commitPatch(op);
         await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
-        // TODO: delete pending op!
+        // TODO: delete pending op ON the thingy!!
         // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
-        await this.core.storage.adapter.updateObject(obj);
-        // TODO: The case for saving op headers on the object: idempotency on hashes
+        await this.core.storage.adapter.updateObject(obj); // PERSIST CHANGE!
       })
       .catch((err) => {
         console.error(err, `Error retrieving opId`, res.opId);
