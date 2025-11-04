@@ -113,7 +113,7 @@ export class AirdaySync {
         // TODO: The case for saving op headers on the object: idempotency on hashes
       })
       .catch((err) => {
-        console.error(`Error retrieving opId`, res.opId);
+        console.error(err, `Error retrieving opId`, res.opId);
       });
 
     // op persisted locally, state computed & persisted for fast access

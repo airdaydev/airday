@@ -111,6 +111,16 @@ export class SyncObject {
     // TODO: should server reject snapshots where seq > base_seq (yes if there is a snapshot with higher or same base_seq, no if op seq is higher (possible if same compaction rules and both online and both update))
   }
 
+  buildPatch(patch: NumericAttrMap): SyncOp {
+    return new SyncOp({
+      libraryId: this.libraryId,
+      objId: this.id,
+      objKind: this.objKind,
+      opKind: OpKind.PATCH,
+      patch,
+    });
+  }
+
   private merge(target: NumericAttrMap, patch: NumericAttrMap) {
     for (const key of Object.keys(patch)) {
       const existingVal = target[key];

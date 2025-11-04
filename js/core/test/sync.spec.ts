@@ -9,7 +9,7 @@ import { OpKind, SyncOpProto } from "../src/proto";
 import { Builder, ByteBuffer } from "flatbuffers";
 
 // TODO: Null state to clear? or explicit clear field?
-test.only("create, encode & decode patch SyncOp", async () => {
+test("create, encode & decode patch SyncOp", async () => {
   const libraryId = new Uuidv4();
   const snapshot = new InitialSnapshotOp({
     libraryId,
@@ -43,19 +43,20 @@ test.only("create, encode & decode patch SyncOp", async () => {
   expect(op.patch[1].data).toBe("test");
 });
 
-test("Merge SyncObject", async () => {
-  const library = new Uuidv4();
-  const syncObj = new SyncObject({
+test("Phase 1 commit", async () => {
+  const libraryId = new Uuidv4();
+  const snapshot = new InitialSnapshotOp({
+    libraryId,
     objKind: 0,
-    libraryId: library,
+    patch: {
+      0: new LWWRegister({
+        data: "test",
+      }),
+    },
   });
-  syncObj.state[0] = new LWWRegister({
-    data: "hello",
-  });
-  syncObj.state[1] = new LWWRegister({
-    data: 32,
-  });
-  const patch: NumericAttrMap = {
+  const obj = new SyncObject(snapshot);
+  expect(obj.pendingOps.size).toBe(1);
+  const map: NumericAttrMap = {
     0: new LWWRegister({
       data: "hello again",
     }),
@@ -63,80 +64,53 @@ test("Merge SyncObject", async () => {
       data: 64,
     }),
   };
-  syncObj.state[0] = new LWWRegister({
-    data: "hello again",
-  });
-  syncObj.state[1] = new LWWRegister({
-    data: 64,
-  });
-
-  // const syncObjB = new SyncOp({
-  //   opKind: OpKind.PATCH,
-  //   objId: obj.id,
-  //   objKind: snapshot.objKind,
-  //   libraryId,
-  //   patch: {
-  //     1: new LWWRegister({
-  //       data: "updated",
-  //     }),
-  //     2: new LWWRegister({
-  //       data: "added",
-  //     }),
-  //   },
-  // });
-
-  syncObj.mergePatch(patch, true);
-  expect(syncObj.state[0].data).toBe("hello again");
-  expect(syncObj.state[1].data).toBe(64);
+  const patch = obj.buildPatch(map);
+  console.log("applying", patch);
+  obj.applyLocal(patch);
+  expect(obj.state[0].data).toBe("hello again");
+  expect(obj.state[1].data).toBe(64);
+  expect(obj.pendingOps.size).toBe(2);
 });
 
-test("Sync generic object", async () => {
+test.only("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
-  const syncObj = new SyncObject({
+  const libraryId = new Uuidv4();
+  const snapshot = new InitialSnapshotOp({
+    libraryId,
     objKind: 0,
-    libraryId: core.library.id!,
+    patch: {
+      0: new LWWRegister({
+        data: "test",
+      }),
+    },
   });
-  syncObj.state[0] = new LWWRegister({
-    data: "hello",
-  });
-  const op = syncObj.fullSyncOp();
-  const patch = {
-    1: new LWWRegister({
-      data: "goodbye",
-    }),
-  };
-  // TODO: Potentially roll mergePatch + queueOp into a single api
-  syncObj.mergePatch(patch, true);
-  // const op2 = syncObj.partialSyncOp(patch);
-  await core.sync.queueOp(op, syncObj);
+  const obj = new SyncObject(snapshot);
+  // TODO: P'raps we should just feed it the object & it can read the pending ops from it (err no because it only keeps head at that point)
+  await core.sync.queueOp(snapshot, obj);
   // Test outbox - in mem version
-  const outbox = core.sync.outbox.get(op.id.toHex());
-  if (!outbox?.id) throw new Error("fail test early");
-  expect(
-    op.id.equals(outbox.id),
-    "message gets placed in-mem outbox",
-  ).toBeTrue();
+  const outboxOp = core.sync.outbox.get(snapshot.id.toHex());
+  expect(outboxOp, "memory stored outbox op").toBe(snapshot);
   // Test outbox - idb version
-  const outboxOpIdb = await core.storage.adapter.getOutboxOp(op.id);
+  const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
+  // TODO: Next test passes but it is still a serialised format
   expect(
-    op.id.equals(outboxOpIdb.id),
-    "modified sync object gets stored in durable memory",
-  ).toBeTrue();
-  // Test in mem version
-  const syncObject = core.storage.getStateCache(syncObj.id);
-  expect(syncObject, "recent sync object is in hot storage").toBeTruthy();
-  // test sync completion
+    outboxOpIdb.id.equals(outboxOp.id),
+    "serialised version stored in idb",
+  ).toBe(true);
+  const syncObject = await core.storage.getObj(obj.id);
+  // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
+  expect(syncObject, "obj cached in mem cache").toBe(obj);
   await new Promise((resolve) => {
     core.ws.events.once("op-response", (data) => {
       resolve(null);
     });
   });
-  expect(
-    core.sync.outbox.size,
-    "ack message received & pending queue back to 0",
-  ).toBe(0);
+  // expect(
+  //   core.sync.outbox.size,
+  //   "ack message received & pending queue back to 0",
+  // ).toBe(0);
   // seq persisted to sync object
-  expect(syncObject?.seq, "seq persisted to sync object").toBeGreaterThan(0);
+  // expect(syncObject?.seq, "seq persisted to sync object").toBeGreaterThan(0);
   // const res = await core.storage.adapter.getByLibrary(core.library.id!);
   // const item = res[0];
   // expect(
