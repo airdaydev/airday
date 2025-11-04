@@ -127,3 +127,61 @@ test.only("Phase 2 commit", async () => {
   // });
   core.ws.close();
 });
+
+test.skip("fan out to connection on same library", () => {});
+
+// TODO: This particular case kind of sucks requiring pushing both the obj & the syncop
+test.skip("Catch up stream", async (ctx) => {
+  const core = await createAuthenticatedCore();
+  // create 50 items
+  const libraryId = new Uuidv4();
+  let objs = [];
+  for (let i = 0; i < 100; i++) {
+    const snapshot = new InitialSnapshotOp({
+      libraryId,
+      objKind: 0,
+      patch: {
+        0: new LWWRegister({
+          data: "test",
+        }),
+      },
+    });
+    const obj = new SyncObject(snapshot);
+    objs.push(obj);
+  }
+  // objs.map((obj) => core.sync.queueOp(obj, obj));
+  // await core.sync.flush();
+  // Clear database (TODO: Direct access??)
+  // await core.storage.adapter.clear();
+  // const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
+  // ctx.assertEq(emptyRes.length, 0, "idb has been emptied");
+  // Retrieve all items
+  // core.sync.getItemSince(core.library.id!, null);
+  // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
+  // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+  // console.log("items returned", res.length);
+  core.ws.close();
+});
+
+test.skip("Delete attribute patches", async (assert) => {});
+test.skip("Delete object patches", async (assert) => {});
+test.skip("Snapshots", async (assert) => {});
+test.skip("Merkle tree backed sync discrepency resolution", async (assert) => {});
+test.skip("Double OP ids w different sha256s?", async (assert) => {});
+
+test.skip("mem adapter", () => {
+  // // Examples for the solid adapter within the web app:
+  // class AirdayUIItem {}
+  // class AirdayUIContainer {}
+  // class SolidAdapterExample {
+  //   items: Map<string, AirdayUIItem> = new Map(); // reactive
+  //   containers: Map<string, AirdayUIContainer> = new Map(); // reactive
+  //   constructor() {}
+  // }
+  // const solidAdapter = new SolidAdapterExample();
+});
+
+test.skip("Get all libraries", async (assert) => {});
+test.skip("Create library", async (assert) => {});
+test.skip("Delete library", async (assert) => {});
+test.skip("Sync local pending changes from idb", async (assert) => {});

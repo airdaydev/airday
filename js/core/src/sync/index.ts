@@ -24,6 +24,7 @@ export class AirdaySync {
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;
   streams = new Map<string, SyncStream>();
+  snapshotLimit = 16; // Amount of ops to keep before we compact via snapshot
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("op-response", this.handleOpResponse);
