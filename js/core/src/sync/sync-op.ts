@@ -92,7 +92,7 @@ export class SyncOp {
       id: this.id,
       opKind: this.opKind,
       libraryId: this.libraryId,
-      objId: this.id,
+      objId: this.objId,
       objKind: this.objKind,
       payload: this.payload,
     };
