@@ -14,10 +14,11 @@ export interface OpHeader {
 export interface SerialisedSyncOp {
   id: Uuidv4;
   opKind: OpKind;
-  payload?: Uint8Array;
   libraryId: Uuidv4;
   objId: Uuidv4;
   objKind: number;
+  patch?: NumericAttrMap; // TODO: Temporary; remove in favour of payload or encrypted_patch or whatever
+  payload?: Uint8Array; // TODO: Encrypt
 }
 
 export interface SyncOpParams {
@@ -94,7 +95,7 @@ export class SyncOp {
       libraryId: this.libraryId,
       objId: this.objId,
       objKind: this.objKind,
-      payload: this.payload,
+      patch: this.patch,
     };
   }
   static fromIdb(raw: any): SyncOp {

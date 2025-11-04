@@ -39,7 +39,7 @@ export class SyncObject {
   constructor(op: SyncOp) {
     // TODO: Guards for objects without objKind/id/libId
     this.objKind = op.objKind;
-    this.id = op.id;
+    this.id = op.objId;
     this.libraryId = op.libraryId;
     this.applyLocal(op);
     return this;
@@ -99,11 +99,13 @@ export class SyncObject {
 
   commitPatch(op: SyncOp) {
     // Affect this.snapshot
-    if (op.opKind !== OpKind.PATCH || !op.patch) {
-      throw new Error("this API for patch only currently");
+    if (op.opKind === OpKind.DELETE) {
+      throw new Error("this API for patch/snapshot only currently");
     }
     // TODO: Header should be saved on object itself + sha_256 calculated
-    this.merge(this.committed, op.patch);
+    if (op.patch) {
+      this.merge(this.committed, op.patch);
+    }
     const hexId = op.id.toHex();
     this.pendingOps.delete(hexId);
     this.committedOps.set(hexId, op.header());

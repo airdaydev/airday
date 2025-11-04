@@ -8,6 +8,7 @@ import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
 import { SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
+import { instanceOfAny } from "idb/build/util.js";
 
 interface SyncEventMap {
   flushed: {};
@@ -101,6 +102,7 @@ export class AirdaySync {
     this.core.storage.adapter
       .getOutboxOp(res.opId)
       .then(async (op) => {
+        console.log("op incoming", op);
         console.log(op.opKind); // TODO: Consider deletes/snapshots!
         const obj = await this.core.storage.getObj(op.objId);
         // Phase 2 commit: commit & persist seq

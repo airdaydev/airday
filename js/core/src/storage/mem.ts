@@ -10,9 +10,9 @@ import { StorageAdapter } from "./adapter";
 
 // In-memory storage adapter for headless testing environments
 export class AirdayMemStorage implements StorageAdapter {
-  private syncObjects: Map<SyncObjectHexUuid, DBSyncObject> = new Map();
+  private syncObjects: Map<SyncObjectHexUuid, SyncObject> = new Map(); // TODO: Serialised version?
   private libraryIndex: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map(); // TODO: id or outbox id?
-  private outbox: Map<HexUuid, SerialisedSyncOp> = new Map();
+  private outbox: Map<HexUuid, SyncOp> = new Map(); // TODO: Serialised version?
   // TODO: op storage?
 
   async connect() {
@@ -20,11 +20,11 @@ export class AirdayMemStorage implements StorageAdapter {
   }
 
   async addOp(op: SyncOp, object: SyncObject) {
-    const outboxItem = op.toIdb();
+    // const outboxItem = op.toIdb(); TODO: serialise properly
     const opIdKey = op.id.toHex();
     const libraryKey = op.libraryId.toHex();
-    this.syncObjects.set(object.id.toHex(), object.toIdb());
-    this.outbox.set(opIdKey, outboxItem);
+    this.syncObjects.set(object.id.toHex(), object);
+    this.outbox.set(opIdKey, op);
     if (!this.libraryIndex.has(libraryKey)) {
       this.libraryIndex.set(libraryKey, new Set());
     }
@@ -47,15 +47,19 @@ export class AirdayMemStorage implements StorageAdapter {
     return results;
   }
 
-  async getOutboxOp(id: Uuidv4): Promise<any> {
-    return this.outbox.get(id.toHex());
+  async getOutboxOp(id: Uuidv4): Promise<SyncOp> {
+    const op = this.outbox.get(id.toHex());
+    if (!op) throw new Error(`could not find outbox op ${id}`);
+    return op;
   }
   async deleteOutboxOp(id: Uuidv4): Promise<any> {
     this.outbox.delete(id.toHex());
   }
 
-  async getSyncObject(id: Uuidv4): Promise<any> {
-    return this.syncObjects.get(id.toHex());
+  async getSyncObject(id: Uuidv4): Promise<SyncObject> {
+    const obj = this.syncObjects.get(id.toHex());
+    if (!obj) throw new Error(`could not find syncObject ${id}`);
+    return obj;
   }
 
   updateObject(object: SyncObject): Promise<void> {
