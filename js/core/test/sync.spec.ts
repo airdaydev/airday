@@ -35,7 +35,6 @@ test.only("create, encode & decode patch SyncOp", async () => {
   const op = SyncOp.fromSyncOpProto(proto);
   expect(op.opKind).toBe(OpKind.SNAPSHOT);
   expect(op.objKind).toBe(snapshot.objKind);
-  // TODO: Wtf
   expect(op.objId.equals(snapshot.objId), "objId matches").toBeTrue();
   expect(
     op.libraryId.equals(snapshot.libraryId),

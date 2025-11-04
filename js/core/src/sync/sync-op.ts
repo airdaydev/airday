@@ -181,7 +181,7 @@ export class SyncOp {
     SyncOpProto.addObjKind(builder, this.objKind);
     SyncOpProto.addObjId(
       builder,
-      UuidProto.createUuidProto(builder, this.id.toUUIDProto()),
+      UuidProto.createUuidProto(builder, this.objId.toUUIDProto()),
     );
     SyncOpProto.addLibraryId(
       builder,
