@@ -153,8 +153,9 @@ test.only("Catch up streams", async () => {
   expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
   const stream = core.sync.catchup(core.library.id!, 0);
+  await stream.done();
   // TODO: API to determine when stream is finished
-  // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
+  // const res = await core.storage.(core.library.id!.toHex());
   // console.log("items returned", res.length);
   core.ws.close();
 });

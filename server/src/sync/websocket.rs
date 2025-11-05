@@ -295,7 +295,9 @@ async fn read(
                                 )));
                             };
                             let library_id = proto_uuid_to_uuid(msg.library_id());
+                            let stream_id = proto_uuid_to_uuid(msg.stream_id());
                             let stream_request = StreamRequest {
+                                stream_id,
                                 library_id,
                                 user_id,
                                 socket_id,

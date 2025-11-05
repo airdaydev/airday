@@ -83,6 +83,7 @@ table ResponseProto {
 }
 
 table SyncStreamReqProto {
+  stream_id: UuidProto (required);
   library_id: UuidProto (required);
   seq: long;
 }

@@ -12,7 +12,7 @@ use crate::{
     common::error::AppError,
     sync::{
         fb::{build_batch_sync_op_msg, wrap_message},
-        proto_generated::proto::MessageProto,
+        proto_generated::proto::{MessageProto, StreamContextProto, StreamEventProto, UuidProto},
         websocket::send_to_client,
     },
 };
@@ -25,6 +25,7 @@ pub const PER_USER_STREAM_LIMIT: usize = 5;
 
 pub struct StreamRequest {
     pub socket_id: Uuid,
+    pub stream_id: Uuid,
     pub user_id: Uuid,
     pub library_id: Uuid,
     pub from_seq: i64,
@@ -60,14 +61,21 @@ pub async fn start_catchup_stream(
             .sync_op
             .seq_range(&req.library_id, cur, head, 50)
             .await?;
+        let mut stream_event = StreamEventProto::Data;
         if range.len() < 50 {
-            // TODO: DONE!
+            stream_event = StreamEventProto::End;
         }
         let mut fbb = FlatBufferBuilder::new();
-        let message_offset = build_batch_sync_op_msg(&mut fbb, &range);
+        let stream_context = Some(&StreamContextProto::new(
+            &UuidProto::new(req.stream_id.as_bytes()),
+            stream_event,
+        ));
+        let message_offset = build_batch_sync_op_msg(&mut fbb, &range, stream_context);
         let message = wrap_message(&mut fbb, MessageProto::BatchSyncOpProto, message_offset);
         send_to_client(&app_state.ws, &req.socket_id, message).await;
-        println!("WE GOING NOW\n");
+        if range.len() == 0 {
+            break;
+        }
         cur = range[range.len()].seq;
     }
     Ok(())

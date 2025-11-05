@@ -61,16 +61,22 @@ export class AirdayMessage implements MQMessage {
 
 export class SyncStreamReqMessage extends AirdayMessage {
   id = new Uuidv4();
+  streamId = new Uuidv4();
   libraryId: Uuidv4;
   seq: bigint | null = null;
   type = MessageProto.SyncStreamReqProto;
-  constructor(libraryId: Uuidv4, seq: bigint | null = null) {
+  constructor(streamId: Uuidv4, libraryId: Uuidv4, seq: bigint | null = null) {
     super();
+    this.streamId = streamId;
     this.libraryId = libraryId;
     this.seq = seq;
   }
   addToFlatBuffer(builder: Builder): Offset {
     SyncStreamReqProto.startSyncStreamReqProto(builder);
+    SyncStreamReqProto.addStreamId(
+      builder,
+      UuidProto.createUuidProto(builder, this.streamId.toUUIDProto()),
+    );
     SyncStreamReqProto.addLibraryId(
       builder,
       UuidProto.createUuidProto(builder, this.libraryId.toUUIDProto()),

@@ -1,6 +1,17 @@
+import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
+import { StreamEventProto } from "../proto";
 import { SyncStreamReqMessage } from "./fb";
+
+export interface StreamContext {
+  id: Uuidv4;
+  event: StreamEventProto;
+}
+
+interface StreamEventMap {
+  end: {};
+}
 
 // Subprotocols for AirdayCore streams
 // Activated on connect/reconnect
@@ -9,6 +20,8 @@ export class SyncStream {
   id = new Uuidv4();
   libraryId: Uuidv4;
   syncing = false;
+  events = new EventEmitter<StreamEventMap>();
+  finished = false;
   constructor(core: AirdayCore, libraryId: Uuidv4) {
     this.core = core;
     this.libraryId = libraryId;
@@ -18,17 +31,34 @@ export class SyncStream {
   }
   start(serverSeq: bigint | null) {
     this.syncing = true;
-    const message = new SyncStreamReqMessage(this.libraryId, serverSeq);
+    const message = new SyncStreamReqMessage(
+      this.id,
+      this.libraryId,
+      serverSeq,
+    );
     this.core.ws.enqueueAirdayMessage(message);
   }
   async end() {
-    // TODO: Triggers when stream ends
+    // Called from outside
+    this.finished = true;
+    this.events.emit("end", {});
+  }
+  done() {
+    return new Promise((resolve) => {
+      // TODO: This should also test ws outbound messages
+      if (this.finished) resolve(null);
+      this.events.once("end", resolve);
+    });
   }
   // listen: on data
   // listen: on end
   // listen: on error (?!)
   getSince(serverSeq: bigint | null) {
-    const message = new SyncStreamReqMessage(this.libraryId, serverSeq);
+    const message = new SyncStreamReqMessage(
+      this.id,
+      this.libraryId,
+      serverSeq,
+    );
     this.core.ws.enqueueAirdayMessage(message);
   }
 }

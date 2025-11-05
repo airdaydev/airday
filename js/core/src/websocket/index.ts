@@ -16,8 +16,9 @@ import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { SyncOp } from "../sync/sync-op";
+import { StreamContext } from "../sync/stream";
 
-export interface OpResponseEvent {
+export interface OpResponse {
   opId: Uuidv4;
   success: boolean;
   seq?: bigint; // TODO
@@ -26,7 +27,9 @@ export interface OpResponseEvent {
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ["op-response"]: OpResponseEvent;
+  ["op-response"]: OpResponse;
+  ["sync-op"]: SyncOp;
+  ["stream-event"]: StreamContext;
   flushed: {};
 }
 
@@ -258,7 +261,17 @@ export class WebsocketManager {
   }
   // Incoming sync update
   private processBatchSyncOpMessage(span: ULSpan, msg: BatchSyncOpProto) {
-    // TODO: Check stream info
+    const streamContextProto = msg.streamContext();
+    let streamContext: StreamContext | null = null;
+    if (streamContextProto) {
+      let streamId = streamContextProto.id();
+      if (streamId) {
+        streamContext = {
+          id: Uuidv4.fromFBProto(streamId),
+          event: streamContextProto.event(),
+        };
+      }
+    }
     for (let i = 0; i < msg.batchLength(); i++) {
       const op = msg.batch(i);
       if (!op) continue;
@@ -273,17 +286,13 @@ export class WebsocketManager {
         // payload
       };
       const syncOp = new SyncOp(syncOpParams);
-      switch (syncOp.opKind) {
-        case OpKind.PATCH:
-          break;
-        case OpKind.SNAPSHOT:
-          break;
-        case OpKind.DELETE:
-          break;
-      }
+      this.events.emit("sync-op", syncOp);
       // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
       tracer.endSpan(span);
+    }
+    if (streamContext) {
+      this.events.emit("stream-event", streamContext);
     }
   }
 }

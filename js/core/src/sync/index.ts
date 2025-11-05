@@ -2,13 +2,11 @@ import { EventEmitter } from "../common/events";
 import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { OpResponseEvent } from "../websocket";
-import { BatchSyncMessage } from "./fb";
+import { OpResponse } from "../websocket";
 import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
-import { SyncStream } from "./stream";
+import { StreamContext, SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
-import { instanceOfAny } from "idb/build/util.js";
 
 interface SyncEventMap {
   flushed: {};
@@ -29,6 +27,7 @@ export class AirdaySync {
   constructor(core: AirdayCore) {
     this.core = core;
     this.core.ws.events.on("op-response", this.handleOpResponse);
+    this.core.ws.events.on("stream-event", this.handleStreamEvent);
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
@@ -74,9 +73,10 @@ export class AirdaySync {
     const existingStream = this.streams.get(itemStream.key);
     if (existingStream && existingStream.syncing) {
       console.warn(`Existing stream [key=${itemStream.key}] already running`);
-      return;
+      return existingStream; // TODO: this is not it
     }
-    this.streams.set(itemStream.key, itemStream);
+    this.streams.set(itemStream.key, itemStream); // TODO: differentiate index
+    this.streams.set(itemStream.id.toHex(), itemStream);
     itemStream.start(null);
     return itemStream;
   }
@@ -94,8 +94,15 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
+  handleStreamEvent = (streamContext: StreamContext) => {
+    const stream = this.streams.get(streamContext.id.toHex());
+    console.log("our stream", stream);
+    if (stream) {
+      stream.end();
+    }
+  };
   // Handler for a reply to an op originating from this client
-  handleOpResponse = async (res: OpResponseEvent) => {
+  handleOpResponse = async (res: OpResponse) => {
     // TODO: Ensure:
     // - Optimistic in-memory
     // - Optimistic persisted (in a tx with op outbox)
