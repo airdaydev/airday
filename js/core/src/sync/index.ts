@@ -95,26 +95,27 @@ export class AirdaySync {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
   // Handler for a reply to an op originating from this client
-  handleOpResponse = (res: OpResponseEvent) => {
+  handleOpResponse = async (res: OpResponseEvent) => {
     // TODO: Ensure:
     // - Optimistic in-memory
     // - Optimistic persisted (in a tx with op outbox)
     // TODO: Consider batching at this point (otherwise batch on storage...?)
-    this.core.storage.adapter
-      .getOutboxOp(res.opId)
-      .then(async (op) => {
-        const obj = await this.core.storage.getObj(op.objId);
-        // Phase 2 commit: commit & persist seq
-        obj.seq = res.seq!; // ! TODO: Optional reactivity on seq itself or other metadata?
-        obj.commitPatch(op);
-        await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
-        // TODO: delete pending op ON the thingy!!
-        // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
-        await this.core.storage.adapter.updateObject(obj); // PERSIST CHANGE!
-      })
-      .catch((err) => {
-        console.error(err, `Error retrieving opId`, res.opId);
-      });)
+    try {
+      const op = await this.core.storage.adapter.getOutboxOp(res.opId);
+      const obj = await this.core.storage.getObj(op.objId);
+      // Phase 2 commit: commit & persist seq
+      obj.seq = res.seq!; // ! TODO: Optional reactivity on seq itself or other metadata?
+      obj.commitPatch(op);
+      await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
+      this.pendingOps.delete(op.id.toHex());
+      // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
+      await this.core.storage.adapter.updateObject(obj); // PERSIST CHANGE!
+    } catch (err) {
+      console.error(err, `Error retrieving opId`, res.opId);
+    }
+    if (!this.pendingOps.size) {
+      this.events.emit("flushed", {});
+    }
 
     // op persisted locally, state computed & persisted for fast access
     // op persisted to server, returning seq

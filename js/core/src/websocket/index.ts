@@ -143,7 +143,6 @@ export class WebsocketManager {
       batch.push(item);
     }
     const remaining = this.maxBatch - batch.length;
-    console.log("remaining", remaining);
     if (remaining > 0) {
       const ops = this.core.sync.takeOps(remaining);
       const message = new BatchSyncMessage(ops);
@@ -155,7 +154,6 @@ export class WebsocketManager {
     }
     this.wsSend(batch);
     if (!this.outboundMessages()) {
-      console.log("ready to flush!", !this.outboundMessages());
       this.events.emit("flushed", {});
       this.stop(); // stop until we start again
     }
@@ -235,7 +233,6 @@ export class WebsocketManager {
         this.processBatchSyncOpMessage(span, msg);
       }
       case MessageProto.BatchResponseProto: {
-        console.log("received batch response proto");
         const msg = new BatchResponseProto();
         wrapper.message(msg);
         this.processBatchResponseMessage(span, msg);

@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Hint when stream ends
 - [] catch up stream api + limits via mpsc + select! + registers
 - [] server metric endpoint
 - [] per lib seq

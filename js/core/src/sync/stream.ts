@@ -21,6 +21,9 @@ export class SyncStream {
     const message = new SyncStreamReqMessage(this.libraryId, serverSeq);
     this.core.ws.enqueueAirdayMessage(message);
   }
+  async end() {
+    // TODO: Triggers when stream ends
+  }
   // listen: on data
   // listen: on end
   // listen: on error (?!)
