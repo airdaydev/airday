@@ -1,14 +1,12 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] deserialize sync op
-- [] two-phase commit
+- [] server metric endpoint
 - [] per lib seq
 - [] catch up stream api + limits via mpsc + select! + registers
 - [] delete items (tombstones, same api)
 - [] snapshot api (spicy)
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
-- [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] ensure sync works well
 - [] add subscription to in-memory list to core
 - [] fan out live updates - maintain local library subscription map for sqlite version
@@ -28,13 +26,12 @@
 - [] Item List UI - build & respect fractional indexing system
 - [] Nav List UI - build & respect fractional indexing system
 - [] @airday/core - tracing fixes
-- [] Put up website
 - [] get all libraries
 - [] handling browser tabs?!
 - [] cors review
 - [] Postgresql adapter with personal library setup on account creation
 - [] consider migrating to change seq version # now - for postgresql adapter...? - investigate can current version interop with postgresql version?
-- [] Text encryption
+- [] payload encryption
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
@@ -48,6 +45,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)?
 
 # Sync verification plan
+- [] Reconsider how to index merkle tree
 - [] Node index should be based on id or created time (what timestamp?)
 - [] tree saved in a hashmap & serialised (maybe not necessary in JS if it's fast enough to booststrap - big if) - good idea in sqlite?
 - [] hot path = server time-1hr?
@@ -64,6 +62,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 
 ## Protocol improvements (l8a)
 - [] create versioning plan
+- [] get js client sync together, then swap out to rust-wasm version after learning wasm
 
 ## Done board
 - [] Done board show which list item was from
