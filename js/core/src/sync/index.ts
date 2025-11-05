@@ -85,7 +85,7 @@ export class AirdaySync {
     this.core.storage.setStateCache(obj);
     this.outbox.push(op);
     this.pendingOps.set(op.id.toHex(), op);
-    this.core.ws.start();
+    this.core.ws.start(); // TODO: I don't love this here feels fragile
   }
   initOutbox() {
     // Collects pending items from database to sync on boot
