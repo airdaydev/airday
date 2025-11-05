@@ -34,7 +34,8 @@ export class AirdaySync {
   // TODO: Timeout!
   flush() {
     return new Promise((resolve) => {
-      if (this.outbox.length === 0) resolve(null);
+      // TODO: This should also test ws outbound messages
+      if (this.pendingOps.size === 0) resolve(null);
       this.events.once("flushed", resolve);
     });
   }
@@ -98,7 +99,7 @@ export class AirdaySync {
     // TODO: Ensure:
     // - Optimistic in-memory
     // - Optimistic persisted (in a tx with op outbox)
-    // TODO: Consider putting in queue
+    // TODO: Consider batching at this point (otherwise batch on storage...?)
     this.core.storage.adapter
       .getOutboxOp(res.opId)
       .then(async (op) => {
@@ -113,7 +114,7 @@ export class AirdaySync {
       })
       .catch((err) => {
         console.error(err, `Error retrieving opId`, res.opId);
-      });
+      });)
 
     // op persisted locally, state computed & persisted for fast access
     // op persisted to server, returning seq

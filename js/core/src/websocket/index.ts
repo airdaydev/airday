@@ -155,6 +155,7 @@ export class WebsocketManager {
     }
     this.wsSend(batch);
     if (!this.outboundMessages()) {
+      console.log("ready to flush!", !this.outboundMessages());
       this.events.emit("flushed", {});
       this.stop(); // stop until we start again
     }
