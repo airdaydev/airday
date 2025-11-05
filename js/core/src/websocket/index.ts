@@ -9,7 +9,7 @@ import {
   OpKind,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
-import { AuthenticateAction } from "../sync/fb";
+import { AuthenticateAction, BatchSyncMessage } from "../sync/fb";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
@@ -124,12 +124,15 @@ export class WebsocketManager {
     };
     this.enqueue(queuedMessage);
   }
+  outboundMessages() {
+    return this.outgoing.length > 0 || this.core.sync.outbox.length > 0;
+  }
   get overflowed() {
     if (!this.ws) return true;
     return this.ws.bufferedAmount > this.maxBufferedAmount;
   }
   next() {
-    if (!this.authorised || this.outgoing.length === 0 || this.overflowed) {
+    if (!this.authorised || !this.outboundMessages() || this.overflowed) {
       return;
     }
     // 2. Form batch
@@ -139,8 +142,19 @@ export class WebsocketManager {
       this.outgoing.shift();
       batch.push(item);
     }
+    const remaining = this.maxBatch - batch.length;
+    console.log("remaining", remaining);
+    if (remaining > 0) {
+      const ops = this.core.sync.takeOps(remaining);
+      const message = new BatchSyncMessage(ops);
+      // TODO: Is The QueuedMessage vs MQMessages still needed?
+      const queuedMessage: QueuedMessage = {
+        message,
+      };
+      batch.push(queuedMessage);
+    }
     this.wsSend(batch);
-    if (this.outgoing.length === 0) {
+    if (!this.outboundMessages()) {
       this.events.emit("flushed", {});
       this.stop(); // stop until we start again
     }
@@ -163,7 +177,7 @@ export class WebsocketManager {
   }
   flush() {
     return new Promise((resolve) => {
-      if (this.outgoing.length === 0) resolve(null);
+      if (!this.outboundMessages()) resolve(null);
       this.events.once("flushed", resolve);
     });
   }
@@ -214,11 +228,13 @@ export class WebsocketManager {
         break;
       }
       case MessageProto.BatchSyncOpProto: {
+        console.log("received batch sync op proto");
         const msg = new BatchSyncOpProto();
         wrapper.message(msg);
         this.processBatchSyncOpMessage(span, msg);
       }
       case MessageProto.BatchResponseProto: {
+        console.log("received batch response proto");
         const msg = new BatchResponseProto();
         wrapper.message(msg);
         this.processBatchResponseMessage(span, msg);

@@ -1,9 +1,9 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] catch up stream api + limits via mpsc + select! + registers
 - [] server metric endpoint
 - [] per lib seq
-- [] catch up stream api + limits via mpsc + select! + registers
 - [] delete items (tombstones, same api)
 - [] snapshot api (spicy)
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated

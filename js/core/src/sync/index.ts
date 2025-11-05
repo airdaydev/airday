@@ -19,7 +19,8 @@ interface SyncEventMap {
 // TODO: Failure thresholds + offline!!!
 export class AirdaySync {
   core: AirdayCore;
-  outbox = new Map<HexUuid, SyncOp>(); // Queued, in-flight or failed messages
+  outbox: SyncOp[] = []; // Ops ready to be pulled by ws
+  pendingOps = new Map<HexUuid, SyncOp>(); // Ops handed off to websocket message already
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;
@@ -33,12 +34,15 @@ export class AirdaySync {
   // TODO: Timeout!
   flush() {
     return new Promise((resolve) => {
-      if (this.outbox.size === 0) resolve(null);
+      if (this.outbox.length === 0) resolve(null);
       this.events.once("flushed", resolve);
     });
   }
   timestamp() {
     return globalTSProducer.timestamp();
+  }
+  takeOps(count: number) {
+    return this.core.sync.outbox.splice(0, count);
   }
   // To be run after login
   initialSync() {
@@ -79,10 +83,9 @@ export class AirdaySync {
   async queueOp(op: SyncOp, obj: SyncObject) {
     await this.core.storage.adapter.addOp(op, obj);
     this.core.storage.setStateCache(obj);
-    this.outbox.set(op.id.toHex(), op);
-    // TODO: Not really batching huh...
-    const message = new BatchSyncMessage([op]);
-    this.core.ws.enqueueAirdayMessage(message);
+    this.outbox.push(op);
+    this.pendingOps.set(op.id.toHex(), op);
+    this.core.ws.start();
   }
   initOutbox() {
     // Collects pending items from database to sync on boot

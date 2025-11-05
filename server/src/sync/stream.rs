@@ -11,12 +11,8 @@ use crate::{
     AppState,
     common::error::AppError,
     sync::{
-        batch_response::BatchResponse,
-        fb::{
-            build_batch_response_msg, build_batch_sync_op_msg, build_error_response_message,
-            wrap_message,
-        },
-        proto_generated::proto::{BatchSyncOpProto, MessageProto},
+        fb::{build_batch_sync_op_msg, wrap_message},
+        proto_generated::proto::MessageProto,
         websocket::send_to_client,
     },
 };
@@ -70,7 +66,8 @@ pub async fn start_catchup_stream(
         let mut fbb = FlatBufferBuilder::new();
         let message_offset = build_batch_sync_op_msg(&mut fbb, &range);
         let message = wrap_message(&mut fbb, MessageProto::BatchSyncOpProto, message_offset);
-        send_to_client(&app_state.ws, &req.socket_id, message);
+        send_to_client(&app_state.ws, &req.socket_id, message).await;
+        println!("WE GOING NOW\n");
         cur = range[range.len()].seq;
     }
     Ok(())
