@@ -84,7 +84,6 @@ export class WebsocketManager {
       return;
     }
     const msg = new AuthenticateAction(this.core.session.token);
-    console.debug("WS: Sending", msg, "action");
     this.ws.send(msg.serialise());
     msg.complete();
   }

@@ -72,7 +72,7 @@ test("Phase 1 commit", async () => {
   expect(obj.pendingOps.size).toBe(2);
 });
 
-test.only("Phase 2 commit", async () => {
+test("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
   const libraryId = new Uuidv4();
   const snapshot = new InitialSnapshotOp({
@@ -131,11 +131,11 @@ test.only("Phase 2 commit", async () => {
 test.skip("fan out to connection on same library", () => {});
 
 // TODO: This particular case kind of sucks requiring pushing both the obj & the syncop
-test.skip("Catch up streams", async () => {
+test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create 50 items
   const libraryId = new Uuidv4();
-  let objs = [];
+  // TODO: We need to improve db performance here with a tx
   for (let i = 0; i < 100; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
@@ -147,17 +147,17 @@ test.skip("Catch up streams", async () => {
       },
     });
     const obj = new SyncObject(snapshot);
-    objs.push(obj);
+    core.sync.queueOp(snapshot, obj);
   }
-  // objs.map((obj) => core.sync.queueOp(obj, obj));
-  // await core.sync.flush();
+  await core.sync.flush();
   // Clear database (TODO: Direct access??)
-  // await core.storage.adapter.clear();
-  // const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
-  // ctx.assertEq(emptyRes.length, 0, "idb has been emptied");
+  await core.storage.adapter.clear();
+  const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
+  expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
-  // core.sync.getItemSince(core.library.id!, null);
-  // await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
+  const stream = core.sync.catchup(core.library.id!, 0);
+  // TODO: API to determine when stream is finished
+  await core.sync.flush(); // TODO: This won't function without an ack (perhaps wait until db is synced!)
   // const res = await core.db.item.getItemsByLibrary(core.library.id!.toHex());
   // console.log("items returned", res.length);
   core.ws.close();
