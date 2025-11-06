@@ -79,7 +79,6 @@ export class AirdayIDBStorage implements StorageAdapter {
     return SyncOp.fromIdb(rawItem);
   };
   getSyncObject = (id: Uuidv4): Promise<SyncObject> => {
-    console.log("calling getsyncobj with", id);
     return this.handle!.get(SYNC_STORE_NAME, id);
   };
   updateObject(object: SyncObject): Promise<void> {

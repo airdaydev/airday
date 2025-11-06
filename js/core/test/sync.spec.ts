@@ -65,14 +65,13 @@ test("Phase 1 commit", async () => {
     }),
   };
   const patch = obj.buildPatch(map);
-  console.log("applying", patch);
   obj.applyLocal(patch);
   expect(obj.state[0].data).toBe("hello again");
   expect(obj.state[1].data).toBe(64);
   expect(obj.pendingOps.size).toBe(2);
 });
 
-test("Phase 2 commit", async () => {
+test.only("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
   const libraryId = new Uuidv4();
   const snapshot = new InitialSnapshotOp({
@@ -84,11 +83,20 @@ test("Phase 2 commit", async () => {
       }),
     },
   });
+  const snapshot2 = new InitialSnapshotOp({
+    libraryId,
+    objKind: 0,
+    patch: {
+      0: new LWWRegister({
+        data: "test2",
+      }),
+    },
+  });
   const obj = new SyncObject(snapshot);
   // TODO: P'raps we should just feed it the object & it can read the pending ops from it (err no because it only keeps head at that point)
   await core.sync.queueOp(snapshot, obj);
   // Test outbox - in mem version
-  const outboxOp = core.sync.outbox.get(snapshot.id.toHex());
+  const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
   expect(outboxOp, "memory stored outbox op").toBe(snapshot);
   // Test outbox - idb version
   const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
@@ -97,22 +105,22 @@ test("Phase 2 commit", async () => {
     outboxOpIdb.id.equals(outboxOp.id),
     "serialised version stored in idb",
   ).toBe(true);
-  await new Promise((resolve) => {
-    core.ws.events.once("op-response", (data) => {
-      resolve(null);
-    });
-  });
+  await core.sync.flush();
   // We are only doing this after to ensure op-response fires
-  // const syncObject = await core.storage.getObj(obj.id);
+  const syncObject = await core.storage.getObj(obj.id);
   // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
-  // expect(syncObject, "obj cached in mem cache").toBe(obj);
+  expect(syncObject, "obj cached in mem cache").toBe(obj);
 
-  // expect(
-  //   core.sync.outbox.size,
-  //   "ack message received & pending queue back to 0",
-  // ).toBe(0);
+  expect(
+    core.sync.outbox.length,
+    "ack message received & outbox message deleted",
+  ).toBe(0);
+  expect(
+    core.sync.pendingOps.size,
+    "ack message received & pending message index removed",
+  ).toBe(0);
   // seq persisted to sync object
-  // expect(syncObject?.seq, "seq persisted to sync object").toBeGreaterThan(0);
+  expect(syncObject?.seq, "seq persisted to sync object").toBeGreaterThan(0);
   // const res = await core.storage.adapter.getByLibrary(core.library.id!);
   // const item = res[0];
   // expect(
@@ -130,7 +138,7 @@ test("Phase 2 commit", async () => {
 
 test.skip("fan out to connection on same library", () => {});
 
-test.only("Catch up streams", async () => {
+test("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create 50 items
   const libraryId = new Uuidv4();
@@ -156,7 +164,6 @@ test.only("Catch up streams", async () => {
   await stream.done();
   // TODO: API to determine when stream is finished
   // const res = await core.storage.(core.library.id!.toHex());
-  // console.log("items returned", res.length);
   core.ws.close();
 });
 

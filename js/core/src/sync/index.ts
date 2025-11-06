@@ -96,7 +96,6 @@ export class AirdaySync {
   }
   handleStreamEvent = (streamContext: StreamContext) => {
     const stream = this.streams.get(streamContext.id.toHex());
-    console.log("our stream", stream);
     if (stream) {
       stream.end();
     }
@@ -138,6 +137,5 @@ export class AirdaySync {
     //
     //
     // TODO: We need to update in-memory version & db version (reactivity + persistence)
-    console.log("sync res received", res.seq);
   };
 }

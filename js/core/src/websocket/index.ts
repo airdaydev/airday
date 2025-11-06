@@ -225,12 +225,10 @@ export class WebsocketManager {
             name,
             local: true,
           });
-          console.log(this.core.library);
         }
         break;
       }
       case MessageProto.BatchSyncOpProto: {
-        console.log("received batch sync op proto");
         const msg = new BatchSyncOpProto();
         wrapper.message(msg);
         this.processBatchSyncOpMessage(span, msg);
