@@ -18,12 +18,15 @@ CREATE TABLE IF NOT EXISTS session (
   FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
+-- seq can be incremented in blocks - allocating a range for transaction size of sync ops
 CREATE TABLE IF NOT EXISTS library (
   id UUID NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
-  primary_library BOOLEAN NOT NULL DEFAULT FALSE
+  primary_library BOOLEAN NOT NULL DEFAULT FALSE,
+  seq INTEGER NOT NULL DEFAULT 0
 );
 
+-- Relationship between users and libraries
 CREATE TABLE IF NOT EXISTS user_library (
   user_id UUID NOT NULL,
   library_id UUID NOT NULL,
@@ -60,3 +63,5 @@ CREATE INDEX ops_library_seq ON sync_op(library_id, seq);
 -- idemopotency guard
 CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_op_lib_opid
   ON sync_op(library_id, op_id);
+-- Protects against reusing seq
+CREATE UNIQUE INDEX IF NOT EXISTS library_id_seq ON sync_op(library_id, seq);

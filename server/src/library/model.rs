@@ -9,6 +9,7 @@ use crate::common::error::AppError;
 pub struct Library {
     pub id: Uuid,
     pub name: String,
+    pub seq: i64,
 }
 
 #[async_trait]

@@ -11,6 +11,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
+use tokio::task;
 
 // Provides direct pool access in case we need behaviour conditionally, specific to a db
 // #[derive(Clone)]
@@ -64,15 +65,15 @@ pub async fn connect_sqlite(config: &AirdayConfig) -> Db {
             err
         ),
     };
-    seed_sqlite_clock_from_db(&pool).await;
+    task::spawn(seed_sqlite_clock_from_db(pool.clone()));
     Db::from_sqlite_pool(pool)
 }
 
-// This ensures we never go backwards, even on restarts
-async fn seed_sqlite_clock_from_db(pool: &Pool<Sqlite>) {
+// This ensures local wall clock for crdt never go backwards due to clock drift etc
+async fn seed_sqlite_clock_from_db(pool: Pool<Sqlite>) {
     let db_max =
         sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(server_seq), 0) as db_max FROM item")
-            .fetch_one(pool)
+            .fetch_one(&pool)
             .await
             .unwrap_or(0);
     let utc_now = now_micros();

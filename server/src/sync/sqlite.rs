@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use crdt::timestamp::now_micros;
-use sqlx::{Pool, Sqlite, SqlitePool};
+use sqlx::{Pool, Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 pub struct SyncOpModelSqlite {
@@ -21,19 +21,31 @@ impl SyncOpModelSqlite {
 }
 
 async fn insert<'a>(
-    // tx: &mut Transaction<'a, Sqlite>,
-    pool: &Pool<Sqlite>,
+    tx: &mut Transaction<'a, Sqlite>,
+    // pool: &Pool<Sqlite>,
     op: &IncomingSyncOp,
 ) -> Result<i64, AppError> {
+    // TODO: start seq block with tx
+    let seq: i64 = sqlx::query_scalar(
+        "INSERT INTO library (library_id, seq)
+        VALUES (?1, 1)
+        ON CONFLICT(library_id) DO UPDATE
+          SET seq = library.seq + 1
+        RETURNING seq;",
+    )
+    .fetch_one(tx.as_mut())
+    .await?;
+    // TODO: End seq block
     let now = now_micros();
     let payload = op.payload.as_ref();
     let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
     let result = sqlx::query!(
         r#"INSERT INTO sync_op (
-            base_seq, op_id, op_kind,
+            seq, base_seq, op_id, op_kind,
             library_id, obj_id, path, obj_kind,
             payload, payload_sha256, created_utc, client_id, archived
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+        seq,
         op.base_seq,
         op.op_id,
         op.op_kind,
@@ -47,8 +59,8 @@ async fn insert<'a>(
         None::<Uuid>, // TODO: Get client_id from somewhere
         false,        // archived = false for new operations
     )
-    .execute(pool)
-    // .execute(tx.as_mut())
+    // .execute(pool)
+    .execute(tx.as_mut())
     .await?;
     Ok(result.last_insert_rowid())
 }

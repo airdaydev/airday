@@ -89,6 +89,7 @@ async fn process_batch_ops(
     while let Some(batch) = rx.recv().await {
         let mut responses: Vec<BatchResponse> = Vec::new();
         // TODO: Optimisation: Local cache for batch.user_id?
+        // TODO: TX this from the outside!
         for op in batch.ops {
             if auth_cache.check(&db, &batch.user_id, &op.library_id).await == false {
                 responses.push(BatchResponse::Error {

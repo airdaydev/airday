@@ -23,7 +23,7 @@ impl LibraryModelSqlite {
         let library = sqlx::query_as!(
             Library,
             r#"
-  INSERT INTO library (id, name) VALUES (?, ?) RETURNING id as "id: Uuid", name
+  INSERT INTO library (id, name) VALUES (?, ?) RETURNING id as "id: Uuid", name, seq
   "#,
             library_sqlx_uuid,
             name
