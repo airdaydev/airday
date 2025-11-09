@@ -2,10 +2,10 @@
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
 - [] per lib seq, tx on batch op updates (engine.rs) + pluralise insert, seq blocks
-- [] catch up stream api + limits via mpsc + select! + registers
+- [] analyse catch up stream api (limits via mpsc + select! + registers)
 - [] server metric endpoint
 - [] delete items (tombstones, same api)
-- [] snapshot api (spicy)
+- [] snapshot api
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
 - [] ensure sync works well
 - [] airday type materialisation with reactivity
