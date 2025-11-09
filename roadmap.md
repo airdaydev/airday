@@ -54,6 +54,7 @@ SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DE
 - [] Calculate hashes within sqlite statement? or in application?
 - [] On front-end, keep live hash structure that persists on update... probably need same for server-side.
 - [] Sync client gets pushed year hashes on every connect + changes since last server timestamp (oh-oh but these are not monotonic across servers - minus drift buffer hack?)
+- [] What happens client-side when an update is unauthorised..?
 
 # Span issues!
 - [] send back span from server

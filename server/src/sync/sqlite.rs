@@ -1,11 +1,13 @@
 use crate::{
     common::error::AppError,
     sync::{
-        engine::{IncomingSyncOp, Seq, SyncOpModel, SyncOpSql},
+        batch_response::BatchResponse,
+        engine::{IncomingSyncOp, OpLibMap, Seq, SyncOpModel, SyncOpSql},
         proto_generated::proto::OpKind,
     },
 };
 use async_trait::async_trait;
+use axum::response::Response;
 use crdt::timestamp::now_micros;
 use sqlx::{Pool, Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
@@ -22,19 +24,10 @@ impl SyncOpModelSqlite {
 
 async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
-    // pool: &Pool<Sqlite>,
     op: &IncomingSyncOp,
+    seq: i64,
 ) -> Result<i64, AppError> {
     // TODO: start seq block with tx
-    let seq: i64 = sqlx::query_scalar(
-        "INSERT INTO library (library_id, seq)
-        VALUES (?1, 1)
-        ON CONFLICT(library_id) DO UPDATE
-          SET seq = library.seq + 1
-        RETURNING seq;",
-    )
-    .fetch_one(tx.as_mut())
-    .await?;
     // TODO: End seq block
     let now = now_micros();
     let payload = op.payload.as_ref();
@@ -65,6 +58,25 @@ async fn insert<'a>(
     Ok(result.last_insert_rowid())
 }
 
+async fn allocate_block<'a>(
+    tx: &mut Transaction<'a, Sqlite>,
+    library_id: &Uuid,
+    block_len: usize,
+) -> Result<i64, AppError> {
+    let seq: i64 = sqlx::query_scalar(
+        "INSERT INTO library (library_id, se/aq)
+VALUES (?1, ?2)
+ON CONFLICT(library_id) DO UPDATE
+SET seq = library.seq + excluded.seq
+RETURNING seq",
+    )
+    .bind(library_id)
+    .bind(block_len as i64)
+    .fetch_one(tx.as_mut())
+    .await?;
+    Ok(seq - block_len as i64)
+}
+
 #[async_trait]
 impl SyncOpModel for SyncOpModelSqlite {
     async fn get_by_seq(&self, library_id: &Uuid, seq: i64) -> Result<Option<SyncOpSql>, AppError> {
@@ -82,21 +94,55 @@ impl SyncOpModel for SyncOpModelSqlite {
         .await?;
         Ok(result)
     }
+    // // Baseline approach, measure and upgrade to multi-insert
+    // async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError> {
+    //     // let mut tx = self.pool.begin().await?;
+
+    //     if op.op_kind == OpKind::PATCH.0 {
+    //         // Insert a new patch operation
+    //         let seq = insert(&self.pool, op).await?;
+
+    //         // Return the seq (rowid) of the inserted operation
+    //         Ok(seq)
+    //     } else {
+    //         // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
+    //         // Snapshot = archive all (library_id, obj_id), add snapshot op
+    //         panic!("Currently only OpKind::Patch supported");
+    //     }
+    // }
+
     // Baseline approach, measure and upgrade to multi-insert
-    async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError> {
-        // let mut tx = self.pool.begin().await?;
+    async fn apply_block(&self, op_lib_map: &OpLibMap) -> Result<Vec<BatchResponse>, AppError> {
+        let mut responses = vec![];
+        let mut tx = self.pool.begin().await?;
 
-        if op.op_kind == OpKind::PATCH.0 {
-            // Insert a new patch operation
-            let seq = insert(&self.pool, op).await?;
+        let libs: Vec<Uuid> = op_lib_map.keys().cloned().collect();
 
-            // Return the seq (rowid) of the inserted operation
-            Ok(seq)
-        } else {
-            // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
-            // Snapshot = archive all (library_id, obj_id), add snapshot op
-            panic!("Currently only OpKind::Patch supported");
+        for library_id in libs {
+            let Some(op_vec) = op_lib_map.get(&library_id) else {
+                continue;
+            };
+            let block_len = op_vec.len();
+            let mut cur_seq = allocate_block(&mut tx, &library_id, block_len).await?;
+            for op in op_vec {
+                // Update each with manual seq from allocated block
+                if op.op_kind == OpKind::PATCH.0 {
+                    // Insert a new patch operation
+                    insert(&mut tx, op, cur_seq).await?;
+                    responses.push(BatchResponse::Applied {
+                        op_id: op.op_id,
+                        seq: cur_seq,
+                    });
+                    cur_seq = cur_seq + 1;
+                } else {
+                    // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
+                    // Snapshot = archive all (library_id, obj_id), add snapshot op
+                    panic!("Currently only OpKind::Patch supported");
+                }
+            }
         }
+        tx.commit().await?;
+        Ok(responses)
     }
 
     async fn get_stream_head(&self, library_id: &Uuid) -> Result<i64, AppError> {
@@ -166,6 +212,7 @@ mod tests {
         // let mut items = vec![];
         for _ in 0..qty {
             let op = mock_incoming_op(library_id, None);
+            // TODO: Update for apply_block
             db.sync_op.apply(&op).await.unwrap();
         }
         let head = db.sync_op.get_stream_head(&library_id).await.unwrap();

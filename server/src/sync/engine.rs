@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     auth::cache::AuthCache,
     common::{error::AppError, sql::Db},
@@ -79,6 +81,8 @@ impl OpBatchProcessor {
     }
 }
 
+pub type OpLibMap = HashMap<Uuid, Vec<IncomingSyncOp>>;
+
 // Optimisation: Transactions
 async fn process_batch_ops(
     mut rx: mpsc::Receiver<IncomingSyncOpBatch>,
@@ -88,32 +92,65 @@ async fn process_batch_ops(
 ) {
     while let Some(batch) = rx.recv().await {
         let mut responses: Vec<BatchResponse> = Vec::new();
+        let mut op_lib_map: OpLibMap = HashMap::new();
         // TODO: Optimisation: Local cache for batch.user_id?
         // TODO: TX this from the outside!
+
+        // Grouping into libs
         for op in batch.ops {
-            if auth_cache.check(&db, &batch.user_id, &op.library_id).await == false {
-                responses.push(BatchResponse::Error {
-                    op_id: Some(op.op_id),
-                    message: String::from("unauthorised"),
-                });
+            match op_lib_map.get_mut(&op.library_id) {
+                Some(v) => {
+                    v.push(op);
+                }
+                None => {
+                    let key = op.library_id.clone();
+                    let new_vec = vec![op];
+                    op_lib_map.insert(key, new_vec);
+                }
+            }
+        }
+
+        // Checking permissions for each lib, filtering out bad permissions
+        let libs: Vec<Uuid> = op_lib_map.keys().cloned().collect();
+        for library_id in libs {
+            if auth_cache.check(&db, &batch.user_id, &library_id).await == false {
+                // loop through then delete
+                if let Some(bad_ops) = op_lib_map.get(&library_id) {
+                    for op in bad_ops {
+                        responses.push(BatchResponse::Error {
+                            op_id: Some(op.op_id),
+                            message: String::from("unauthorised"),
+                        });
+                    }
+                };
+                op_lib_map.remove(&library_id);
                 continue;
             }
-            // TODO: 1x transaction for all?!
-            match db.sync_op.apply(&op).await {
-                Ok(seq) => responses.push(BatchResponse::Applied {
-                    op_id: op.op_id,
-                    seq: seq,
-                }),
-                Err(err) => {
-                    println!("{err:?}"); // TODO: Telemetry
-                    responses.push(BatchResponse::Error {
-                        op_id: Some(op.op_id), // TODO: distinguish op vs action id?!
-                        message: String::from("apply_error"),
-                    });
-                    continue;
-                }
-            };
         }
+
+        // TODO: Don't continue if map is now empty!
+
+        let seq_map = db.sync_op.apply_block(&op_lib_map).await;
+
+        // for op in batch.ops {
+
+        //     // TODO: 1x transaction for all?!
+        //     match db.sync_op.apply(&op).await {
+        //         Ok(seq) => responses.push(BatchResponse::Applied {
+        //             op_id: op.op_id,
+        //             seq: seq,
+        //         }),
+        //         Err(err) => {
+        //             println!("{err:?}"); // TODO: Telemetry
+        //             responses.push(BatchResponse::Error {
+        //                 op_id: Some(op.op_id), // TODO: distinguish op vs action id?!
+        //                 message: String::from("apply_error"),
+        //             });
+        //             continue;
+        //         }
+        //     };
+        // }
+
         let mut fbb = FlatBufferBuilder::new();
         let message_offset = build_batch_response_msg(&mut fbb, responses);
         let message = wrap_message(&mut fbb, MessageProto::BatchResponseProto, message_offset);
@@ -133,6 +170,7 @@ pub trait SyncOpModel: Send + Sync {
         chunk_size: i64,
     ) -> Result<Vec<SyncOpSql>, sqlx::Error>;
     async fn get_stream_head(&self, library_id: &Uuid) -> Result<i64, AppError>;
-    async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError>;
+    // async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError>;
+    async fn apply_block(&self, op: &OpLibMap) -> Result<Seq, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }
