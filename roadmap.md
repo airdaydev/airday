@@ -8,14 +8,14 @@
 - [] snapshot api (spicy)
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
 - [] ensure sync works well
-- [] add subscription to in-memory list to core
-- [] fan out live updates - maintain local library subscription map for sqlite version
-- [] inbox = default = virtual list! (where orphans go too!)
+- [] airday type materialisation with reactivity
+- [] fan out sync ops to all subscribers per library
+- [] ensure inbox is the default, immutable list
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
 - [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)
-- [] GLUE CORE TO APP!!
+- [] Glue core to app
 - [] UI - Create items
 - [] UI - Update items
 - [] UI - Delete items
@@ -37,12 +37,6 @@
 - [] TODO: more cohesive error messaging system for websockets
 - [] protection against future dates being encoded in LWWRegisters
 - [] enforce batch size limits
-- [] Indexing for server_seq
-```sql
-CREATE INDEX IF NOT EXISTS item_lib_updated ON item(library_id, server_seq DESC);
-SELECT server_seq FROM item WHERE library_id = ? ORDER BY server_seq DESC, id DESC LIMIT 1;
-```
-- [] Merge attribute macro and/or hashmap on server side! (Start with list attribute)?
 
 # Sync verification plan
 - [] Reconsider how to index merkle tree

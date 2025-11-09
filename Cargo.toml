@@ -1,3 +1,3 @@
 [workspace]
-members = ["server", "rust/crdt", "rust/core"]
+members = ["server"]
 resolver = "3"
