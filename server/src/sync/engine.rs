@@ -129,27 +129,8 @@ async fn process_batch_ops(
         }
 
         // TODO: Don't continue if map is now empty!
-
-        let seq_map = db.sync_op.apply_block(&op_lib_map).await;
-
-        // for op in batch.ops {
-
-        //     // TODO: 1x transaction for all?!
-        //     match db.sync_op.apply(&op).await {
-        //         Ok(seq) => responses.push(BatchResponse::Applied {
-        //             op_id: op.op_id,
-        //             seq: seq,
-        //         }),
-        //         Err(err) => {
-        //             println!("{err:?}"); // TODO: Telemetry
-        //             responses.push(BatchResponse::Error {
-        //                 op_id: Some(op.op_id), // TODO: distinguish op vs action id?!
-        //                 message: String::from("apply_error"),
-        //             });
-        //             continue;
-        //         }
-        //     };
-        // }
+        db.sync_op.apply_block(&op_lib_map).await;
+        // TODO: Responses should return from above, append to responses vec
 
         let mut fbb = FlatBufferBuilder::new();
         let message_offset = build_batch_response_msg(&mut fbb, responses);
@@ -171,6 +152,6 @@ pub trait SyncOpModel: Send + Sync {
     ) -> Result<Vec<SyncOpSql>, sqlx::Error>;
     async fn get_stream_head(&self, library_id: &Uuid) -> Result<i64, AppError>;
     // async fn apply(&self, op: &IncomingSyncOp) -> Result<Seq, AppError>;
-    async fn apply_block(&self, op: &OpLibMap) -> Result<Seq, AppError>;
+    async fn apply_block(&self, op: &OpLibMap) -> Result<Vec<BatchResponse>, AppError>;
     // async fn get_by_id(&self, id: &Uuid) -> Result<Option<Item>, AppError>;
 }

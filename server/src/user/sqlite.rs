@@ -97,6 +97,7 @@ impl UserModel for UserModelSqlite {
                     primary_library: Some(Library {
                         id: primary_library.id,
                         name: primary_library.name,
+                        seq: None,
                     }),
                 };
                 tx.commit().await?;
@@ -158,6 +159,7 @@ impl UserModelSqlite {
         let library = library_id.map(|id| Library {
             id,
             name: library_name.unwrap_or_default(),
+            seq: None,
         });
 
         User {

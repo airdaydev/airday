@@ -2,14 +2,13 @@ use crate::{
     common::error::AppError,
     sync::{
         batch_response::BatchResponse,
-        engine::{IncomingSyncOp, OpLibMap, Seq, SyncOpModel, SyncOpSql},
+        engine::{IncomingSyncOp, OpLibMap, SyncOpModel, SyncOpSql},
         proto_generated::proto::OpKind,
     },
 };
 use async_trait::async_trait;
-use axum::response::Response;
 use crdt::timestamp::now_micros;
-use sqlx::{Pool, Sqlite, SqlitePool, Transaction};
+use sqlx::{Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 pub struct SyncOpModelSqlite {
