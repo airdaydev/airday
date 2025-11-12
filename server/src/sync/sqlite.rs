@@ -181,7 +181,10 @@ impl SyncOpModel for SyncOpModelSqlite {
 mod tests {
     use std::panic;
 
-    use crate::test_util::{self, mock_incoming_op};
+    use crate::{
+        sync::{batch_response::BatchResponse, engine::create_op_lib_map},
+        test_util::{self, mock_incoming_op},
+    };
     // use crdt::LWWRegister;
 
     #[tokio::test]
@@ -190,7 +193,11 @@ mod tests {
         let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
         let library_id = user.primary_library.unwrap().id;
         let op = mock_incoming_op(library_id, None);
-        let seq = db.sync_op.apply(&op).await.unwrap();
+        let map = create_op_lib_map(vec![op]);
+        let res = db.sync_op.apply_block(&map).await.unwrap();
+        let BatchResponse::Applied { op_id: _, seq } = res[0] else {
+            panic!("First res did not pass");
+        };
         assert!(seq >= 0);
         let Ok(Some(sql_op)) = db.sync_op.get_by_seq(&library_id, seq).await else {
             panic!("Failed to retrieve op after apply");
@@ -208,12 +215,13 @@ mod tests {
         let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
         let library_id = user.primary_library.unwrap().id;
         let qty = 100;
-        // let mut items = vec![];
+        let mut ops = vec![];
         for _ in 0..qty {
-            let op = mock_incoming_op(library_id, None);
+            ops.push(mock_incoming_op(library_id, None));
             // TODO: Update for apply_block
-            db.sync_op.apply(&op).await.unwrap();
         }
+        let map = create_op_lib_map(ops);
+        db.sync_op.apply_block(&map).await.unwrap();
         let head = db.sync_op.get_stream_head(&library_id).await.unwrap();
         let chunk_size = 5;
         let next = db

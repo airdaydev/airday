@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops};
 
 use crate::{
     auth::cache::AuthCache,
@@ -81,7 +81,25 @@ impl OpBatchProcessor {
     }
 }
 
+// helper data structure to efficiently check permissions & run batches per library
 pub type OpLibMap = HashMap<Uuid, Vec<IncomingSyncOp>>;
+
+pub fn create_op_lib_map(ops: Vec<IncomingSyncOp>) -> OpLibMap {
+    let mut op_lib_map: OpLibMap = HashMap::new();
+    for op in ops {
+        match op_lib_map.get_mut(&op.library_id) {
+            Some(v) => {
+                v.push(op);
+            }
+            None => {
+                let key = op.library_id.clone();
+                let new_vec = vec![op];
+                op_lib_map.insert(key, new_vec);
+            }
+        }
+    }
+    op_lib_map
+}
 
 // Optimisation: Transactions
 async fn process_batch_ops(
@@ -92,24 +110,10 @@ async fn process_batch_ops(
 ) {
     while let Some(batch) = rx.recv().await {
         let mut responses: Vec<BatchResponse> = Vec::new();
-        let mut op_lib_map: OpLibMap = HashMap::new();
+        let ops = batch.ops;
+        let mut op_lib_map = create_op_lib_map(ops);
         // TODO: Optimisation: Local cache for batch.user_id?
         // TODO: TX this from the outside!
-
-        // Grouping into libs
-        for op in batch.ops {
-            match op_lib_map.get_mut(&op.library_id) {
-                Some(v) => {
-                    v.push(op);
-                }
-                None => {
-                    let key = op.library_id.clone();
-                    let new_vec = vec![op];
-                    op_lib_map.insert(key, new_vec);
-                }
-            }
-        }
-
         // Checking permissions for each lib, filtering out bad permissions
         let libs: Vec<Uuid> = op_lib_map.keys().cloned().collect();
         for library_id in libs {
