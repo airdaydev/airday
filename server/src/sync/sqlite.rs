@@ -51,7 +51,6 @@ async fn insert<'a>(
         None::<Uuid>, // TODO: Get client_id from somewhere
         false,        // archived = false for new operations
     )
-    // .execute(pool)
     .execute(tx.as_mut())
     .await?;
     Ok(result.last_insert_rowid())
@@ -63,14 +62,13 @@ async fn allocate_block<'a>(
     block_len: usize,
 ) -> Result<i64, AppError> {
     let seq: i64 = sqlx::query_scalar(
-        "INSERT INTO library (library_id, se/aq)
-VALUES (?1, ?2)
-ON CONFLICT(library_id) DO UPDATE
-SET seq = library.seq + excluded.seq
-RETURNING seq",
+        "UPDATE library
+        SET seq = seq + ?
+        WHERE id = ?
+        RETURNING seq",
     )
-    .bind(library_id)
     .bind(block_len as i64)
+    .bind(library_id)
     .fetch_one(tx.as_mut())
     .await?;
     Ok(seq - block_len as i64)
@@ -162,7 +160,9 @@ impl SyncOpModel for SyncOpModelSqlite {
         chunk_size: i64,
     ) -> Result<Vec<SyncOpSql>, sqlx::Error> {
         sqlx::query_as::<_, SyncOpSql>(
-            r#"SELECT seq, base_seq, op_kind, library_id, obj_id, path, obj_kind, archived,
+            r#"SELECT op_id, seq, base_seq,
+            op_kind, library_id,
+            obj_id, path, obj_kind, archived,
             payload, payload_sha256, created_utc, client_id
             FROM sync_op
             WHERE library_id = ? AND seq >= ? AND seq <= ?
@@ -218,20 +218,24 @@ mod tests {
         let mut ops = vec![];
         for _ in 0..qty {
             ops.push(mock_incoming_op(library_id, None));
-            // TODO: Update for apply_block
         }
         let map = create_op_lib_map(ops);
         db.sync_op.apply_block(&map).await.unwrap();
         let head = db.sync_op.get_stream_head(&library_id).await.unwrap();
         let chunk_size = 5;
-        let next = db
-            .sync_op
-            .seq_range(&library_id, 0, head, chunk_size)
-            .await
-            .unwrap();
+        let next = match db.sync_op.seq_range(&library_id, 0, head, chunk_size).await {
+            Ok(next) => next,
+            Err(err) => {
+                panic!("Error calling seq_range - {:?}", err);
+            }
+        };
         assert_eq!(next.len() as i64, chunk_size, "chunk length matches");
         let last_seq = next[next.len() - 1].seq;
-        assert_eq!(last_seq, chunk_size);
+        assert_eq!(
+            last_seq,
+            chunk_size - 1,
+            "last seq matches chunk size after 0 seq for lib"
+        );
         let next_2 = db
             .sync_op
             .seq_range(&library_id, last_seq + 1, head, chunk_size)

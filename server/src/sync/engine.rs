@@ -133,7 +133,11 @@ async fn process_batch_ops(
         }
 
         // TODO: Don't continue if map is now empty!
-        db.sync_op.apply_block(&op_lib_map).await;
+        if let Err(err) = db.sync_op.apply_block(&op_lib_map).await {
+            println!("error in apply_block {:?}", err);
+            // TODO: We should be sending the error to client
+            return;
+        }
         // TODO: Responses should return from above, append to responses vec
 
         let mut fbb = FlatBufferBuilder::new();
