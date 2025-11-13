@@ -1,7 +1,6 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] per lib seq, tx on batch op updates (engine.rs) + pluralise insert, seq blocks
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
 - [] server metric endpoint
 - [] delete items (tombstones, same api)
@@ -58,6 +57,7 @@
 ## Protocol improvements (l8a)
 - [] create versioning plan
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
+- [] consider smarter batch sizing with size limits
 
 ## Done board
 - [] Done board show which list item was from
