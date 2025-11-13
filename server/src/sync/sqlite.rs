@@ -123,7 +123,7 @@ impl SyncOpModel for SyncOpModelSqlite {
             let mut cur_seq = allocate_block(&mut tx, &library_id, block_len).await?;
             for op in op_vec {
                 // Update each with manual seq from allocated block
-                if op.op_kind == OpKind::PATCH.0 {
+                if op.op_kind == OpKind::PATCH.0 || op.op_kind == OpKind::SNAPSHOT.0 {
                     // Insert a new patch operation
                     insert(&mut tx, op, cur_seq).await?;
                     responses.push(BatchResponse::Applied {
@@ -134,7 +134,7 @@ impl SyncOpModel for SyncOpModelSqlite {
                 } else {
                     // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
                     // Snapshot = archive all (library_id, obj_id), add snapshot op
-                    panic!("Currently only OpKind::Patch supported");
+                    panic!("Currently only OpKind::Patch/Snapshot supported");
                 }
             }
         }

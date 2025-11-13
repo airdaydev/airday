@@ -20,7 +20,7 @@ export class SyncObject {
   id: Uuidv4;
   libraryId: Uuidv4;
   // Sync state concerns
-  seq: bigint | null = null; // server id i.e. last_seq (last seen seq) should we have base_seq locally too?
+  maxSeq: bigint | null = null; // server id i.e. last_seq (last seen seq) should we have base_seq locally too?
   // Attributes
   raw: Uint8Array = new Uint8Array(); // TODO: store or naaaah...?
   state: NumericAttrMap = {}; // optimistic client state
@@ -43,6 +43,12 @@ export class SyncObject {
     this.libraryId = op.libraryId;
     this.applyLocal(op);
     return this;
+  }
+
+  setMaxSeq(seq: bigint) {
+    if (typeof this.maxSeq === "bigint" && seq > this.maxSeq) {
+      this.maxSeq = seq;
+    }
   }
 
   subscribe(cb: Listener): () => void {
@@ -79,7 +85,7 @@ export class SyncObject {
       id: this.id,
       objKind: this.objKind,
       libraryId: this.libraryId,
-      seq: this.seq,
+      maxSeq: this.maxSeq,
       // TODO: commit & optimistic & op headers & pending
     };
   }
@@ -107,6 +113,9 @@ export class SyncObject {
       this.merge(this.committed, op.patch);
     }
     const hexId = op.id.toHex();
+    if (op.seq) {
+      this.setMaxSeq(op.seq);
+    }
     this.pendingOps.delete(hexId);
     this.committedOps.set(hexId, op.header());
     // TODO: For snapshots, clear all committed ops before snapshot
@@ -144,7 +153,7 @@ const DBSyncObjectSchema = v.object({
   id: v.any().required(),
   objKind: v.number().required(),
   libraryId: v.any(),
-  seq: v.anyOf([v.unknown(), v.null()]),
+  maxSeq: v.anyOf([v.unknown(), v.null()]),
   attributes: v.any(), // TODO: Blob?
 });
 

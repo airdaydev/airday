@@ -2,6 +2,7 @@ use crate::sync::proto_generated::proto::{ResponseProto, ResponseProtoArgs, Uuid
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
+#[derive(Debug)]
 pub enum BatchResponse {
     Applied {
         op_id: Uuid,
@@ -13,6 +14,7 @@ pub enum BatchResponse {
     },
 }
 
+// Used in build_batch_response_msg
 impl BatchResponse {
     pub fn build_flatbuffer<'a>(
         &self,
@@ -45,7 +47,7 @@ impl BatchResponse {
                     fbb,
                     &ResponseProtoArgs {
                         op_id,
-                        success: true,
+                        success: false,
                         error: Some(err_message),
                         seq: 0,
                     },

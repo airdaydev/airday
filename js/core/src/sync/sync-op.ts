@@ -8,7 +8,7 @@ import { serialiseAttr, parseAttrSet } from "./fb";
 export interface OpHeader {
   id: Uuidv4;
   hash: Uint8Array;
-  seq?: number;
+  seq?: bigint;
 }
 
 export interface SerialisedSyncOp {
@@ -29,7 +29,7 @@ export interface SyncOpParams {
   libraryId: Uuidv4;
   objId: Uuidv4;
   objKind: number;
-  seq?: number;
+  seq?: bigint;
 }
 
 const serialisedSyncOpSchema = v.object({
@@ -66,7 +66,7 @@ export class SyncOp {
   objKind: number;
   patch?: NumericAttrMap;
   payload?: Uint8Array;
-  seq?: number;
+  seq?: bigint;
   constructor(params: SyncOpParams) {
     this.id = new Uuidv4();
     this.opKind = params.opKind;

@@ -59,8 +59,8 @@ pub fn build_batch_response_msg<'a>(
     responses: Vec<BatchResponse>,
 ) -> WIPOffset<UnionWIPOffset> {
     let mut comps: Vec<WIPOffset<ResponseProto>> = Vec::with_capacity(responses.len());
-    for action in responses {
-        comps.push(action.build_flatbuffer(fbb));
+    for response in responses {
+        comps.push(response.build_flatbuffer(fbb));
     }
 
     let batch_vector = fbb.create_vector(&comps);
