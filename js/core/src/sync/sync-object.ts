@@ -46,7 +46,7 @@ export class SyncObject {
   }
 
   setMaxSeq(seq: bigint) {
-    if (typeof this.maxSeq === "bigint" && seq > this.maxSeq) {
+    if (!this.maxSeq || seq > this.maxSeq) {
       this.maxSeq = seq;
     }
   }

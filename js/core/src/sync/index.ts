@@ -111,7 +111,9 @@ export class AirdaySync {
       const obj = await this.core.storage.getObj(op.objId);
       console.log("handing op response", res.seq, obj.id);
       // Phase 2 commit: commit & persist seq
-      if (res.seq) obj.setMaxSeq(res.seq); // ! TODO: Optional reactivity on seq itself or other metadata?
+      if (typeof res.seq == "bigint") {
+        obj.setMaxSeq(res.seq); // ! TODO: Optional reactivity on seq itself or other metadata?
+      }
       obj.commitPatch(op);
       await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
       this.pendingOps.delete(op.id.toHex());
