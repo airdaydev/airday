@@ -51,7 +51,7 @@ export class WebsocketManager {
   authorised = false;
   // Queue
   intervalId: ReturnType<typeof setTimeout> | null = null;
-  maxBatch = 50; // Messages to send at once
+  maxBatch = 500; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
   constructor(core: AirdayCore) {
@@ -155,6 +155,7 @@ export class WebsocketManager {
       };
       batch.push(queuedMessage);
     }
+    console.log("sending batch");
     this.wsSend(batch);
     if (!this.outboundMessages()) {
       this.events.emit("flushed", {});
@@ -175,7 +176,7 @@ export class WebsocketManager {
   start() {
     // TODO: Start at 150ms and tune
     if (this.intervalId) return; // Do nothing if interval is already going
-    this.intervalId = setInterval(() => this.next(), 150);
+    this.intervalId = setInterval(() => this.next(), 1);
   }
   flush() {
     return new Promise((resolve) => {

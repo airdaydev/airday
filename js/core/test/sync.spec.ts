@@ -73,7 +73,7 @@ test("Phase 1 commit", async () => {
 
 // TODO: Test unauthenticated
 
-test.only("Phase 2 commit", async () => {
+test("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
   const libraryId = core.library.id!;
   const snapshot = new InitialSnapshotOp({
@@ -119,9 +119,7 @@ test.only("Phase 2 commit", async () => {
     core.sync.pendingOps.size,
     "ack message received & pending message index removed",
   ).toBe(0);
-  // seq persisted to sync object
-  console.log("syncObject.maxSeq", syncObject.maxSeq);
-  // expect(syncObject?.maxSeq, "seq persisted to sync object").toBeGreaterThan(0);
+  expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
   // const res = await core.storage.adapter.getByLibrary(core.library.id!);
   // const item = res[0];
   // expect(
@@ -139,11 +137,11 @@ test.only("Phase 2 commit", async () => {
 
 test.skip("fan out to connection on same library", () => {});
 
-test("Catch up streams", async () => {
+test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create 50 items
   const libraryId = new Uuidv4();
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 30000; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
       objKind: 0,

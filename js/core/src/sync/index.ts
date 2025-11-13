@@ -109,7 +109,7 @@ export class AirdaySync {
     try {
       const op = await this.core.storage.adapter.getOutboxOp(res.opId);
       const obj = await this.core.storage.getObj(op.objId);
-      console.log("handing op response", res.seq, obj.id);
+      // console.log("handling op response", res.seq, obj.id);
       // Phase 2 commit: commit & persist seq
       if (typeof res.seq == "bigint") {
         obj.setMaxSeq(res.seq); // ! TODO: Optional reactivity on seq itself or other metadata?
