@@ -6,7 +6,6 @@
 - [] delete items (tombstones, same api)
 - [] snapshot api
 - [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
-- [] ensure sync works well
 - [] airday type materialisation with reactivity
 - [] fan out sync ops to all subscribers per library
 - [] ensure inbox is the default, immutable list
