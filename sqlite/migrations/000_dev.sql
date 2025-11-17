@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_library (
 );
 
 CREATE TABLE IF NOT EXISTS sync_op (
-  op_id UUID PRIMARY KEY NOT NULL,
+  op_id UUID UNIQUE NOT NULL,
   -- sync concerns
   seq INTEGER NOT NULL, -- server_seq number
   base_seq INTEGER, -- snapshot seq base (renders lower seqs as void)
@@ -53,13 +53,15 @@ CREATE TABLE IF NOT EXISTS sync_op (
   payload_sha256 BLOB NOT NULL,
   -- Metadata & tombstone
   created_utc INTEGER NOT NULL,
-  client_id UUID NULL
-  -- TODO: Consider switch to per library seq (good bc spans acros all tables even in sqlite, )
-  -- PRIMARY KEY (library_id, seq)
-);
+  client_id UUID NULL,
+  -- TODO: Reconsider indexes etc
+  PRIMARY KEY (library_id, seq)
+) WITHOUT ROWID;
 
+-- CREATE INDEX library_id_seq ON sync_op(library_id, seq);
+-- CREATE UNIQUE INDEX ux_sync_op_lib_opid ON sync_op(op_id);
 -- idemopotency guard
-CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_op_lib_opid
-  ON sync_op(library_id, op_id);
--- Speed up catch ups (reusing seq accidentally not really a problem if we anticipated it)
-CREATE INDEX IF NOT EXISTS library_id_seq ON sync_op(library_id, seq);
+-- CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_op_lib_opid
+--   ON sync_op(library_id, op_id);
+-- -- Speed up catch ups (reusing seq accidentally not really a problem if we anticipated it)
+-- CREATE INDEX IF NOT EXISTS library_id_seq ON sync_op(library_id, seq);

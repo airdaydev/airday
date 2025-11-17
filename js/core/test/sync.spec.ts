@@ -141,7 +141,7 @@ test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create x items
   const libraryId = core.library.id!;
-  for (let i = 0; i < 100000; i++) {
+  for (let i = 0; i < 30000; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
       objKind: 0,

@@ -52,7 +52,7 @@ export class WebsocketManager {
   // Queue
   intervalId: ReturnType<typeof setTimeout> | null = null;
   maxWSBatch = 10; // max ws messages
-  maxOpBatch = 500; // Messages to send at once
+  maxOpBatch = 1000; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
   constructor(core: AirdayCore) {
