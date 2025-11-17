@@ -270,6 +270,7 @@ async fn read(
                                 socket_id: socket_id,
                                 ops: op_vec,
                             };
+                            println!("capacity: {}", state.op_batch_processor.tx.capacity());
                             if let Err(err) = state.op_batch_processor.tx.send(batch).await {
                                 println!("Error sending to batch processor: {}", err);
                                 return Err(AppError::ServerError(String::from(

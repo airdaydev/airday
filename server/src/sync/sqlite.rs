@@ -21,6 +21,11 @@ impl SyncOpModelSqlite {
     }
 }
 
+// Sqlite has 999 binds available per statement
+const SQLITE_MAX_PARAMS: usize = 999;
+const FIELDS_PER_ROW: usize = 13; // confirm with fn insert()
+pub const OPTIMAL_ROWS_PER_INSERT: usize = SQLITE_MAX_PARAMS / FIELDS_PER_ROW;
+
 async fn insert<'a>(
     tx: &mut Transaction<'a, Sqlite>,
     op: &IncomingSyncOp,
@@ -54,6 +59,65 @@ async fn insert<'a>(
     .execute(tx.as_mut())
     .await?;
     Ok(result.last_insert_rowid())
+}
+
+async fn insert_multi<'a>(
+    tx: &mut Transaction<'a, Sqlite>,
+    op_vec: &[IncomingSyncOp],
+    start_seq: i64,
+) -> Result<(), AppError> {
+    if op_vec.is_empty() {
+        return Ok(());
+    }
+
+    let now = now_micros();
+    let payload_sha256 = vec![0u8; 32]; // TODO: Calculate actual SHA256 of payload
+
+    // Process in chunks of OPTIMAL_ROWS_PER_INSERT to stay within SQLite's parameter limit
+    for (chunk_idx, chunk) in op_vec.chunks(OPTIMAL_ROWS_PER_INSERT).enumerate() {
+        // println!("CHUNK bruh {}", chunk_idx);
+        let chunk_start_seq = start_seq + (chunk_idx * OPTIMAL_ROWS_PER_INSERT) as i64;
+
+        // Build the SQL with multiple VALUE clauses
+        let mut sql = String::from(
+            "INSERT INTO sync_op (
+                seq, base_seq, op_id, op_kind,
+                library_id, obj_id, path, obj_kind,
+                payload, payload_sha256, created_utc, client_id, archived
+            ) VALUES ",
+        );
+
+        let placeholders = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        let values_clauses: Vec<_> = (0..chunk.len()).map(|_| placeholders).collect();
+        sql.push_str(&values_clauses.join(", "));
+
+        let mut query = sqlx::query(&sql);
+
+        // Bind all parameters for this chunk
+        for (i, op) in chunk.iter().enumerate() {
+            let seq = chunk_start_seq + i as i64;
+            let payload = op.payload.as_ref();
+
+            query = query
+                .bind(seq)
+                .bind(op.base_seq)
+                .bind(op.op_id)
+                .bind(op.op_kind)
+                .bind(op.library_id)
+                .bind(op.obj_id)
+                .bind(&op.path)
+                .bind(op.obj_kind)
+                .bind(payload)
+                .bind(&payload_sha256)
+                .bind(now)
+                .bind(None::<Uuid>) // TODO: Get client_id from somewhere
+                .bind(false); // archived = false for new operations
+        }
+
+        query.execute(tx.as_mut()).await?;
+    }
+
+    Ok(())
 }
 
 async fn allocate_block<'a>(
@@ -108,7 +172,6 @@ impl SyncOpModel for SyncOpModelSqlite {
     //     }
     // }
 
-    // Baseline approach, measure and upgrade to multi-insert
     async fn apply_block(&self, op_lib_map: &OpLibMap) -> Result<Vec<BatchResponse>, AppError> {
         let mut responses = vec![];
         let mut tx = self.pool.begin().await?;
@@ -120,22 +183,24 @@ impl SyncOpModel for SyncOpModelSqlite {
                 continue;
             };
             let block_len = op_vec.len();
-            let mut cur_seq = allocate_block(&mut tx, &library_id, block_len).await?;
-            for op in op_vec {
-                // Update each with manual seq from allocated block
-                if op.op_kind == OpKind::PATCH.0 || op.op_kind == OpKind::SNAPSHOT.0 {
-                    // Insert a new patch operation
-                    insert(&mut tx, op, cur_seq).await?;
-                    responses.push(BatchResponse::Applied {
-                        op_id: op.op_id,
-                        seq: cur_seq,
-                    });
-                    cur_seq = cur_seq + 1;
-                } else {
-                    // Delete = archive all (library_id, obj_id), add tombstone op (NO PAYLOAD?)
-                    // Snapshot = archive all (library_id, obj_id), add snapshot op
+            let start_seq = allocate_block(&mut tx, &library_id, block_len).await?;
+
+            // Validate all ops are supported types before inserting
+            for op in op_vec.iter() {
+                if op.op_kind != OpKind::PATCH.0 && op.op_kind != OpKind::SNAPSHOT.0 {
                     panic!("Currently only OpKind::Patch/Snapshot supported");
                 }
+            }
+
+            // Batch insert all operations for this library
+            insert_multi(&mut tx, op_vec, start_seq).await?;
+
+            // Build responses for each inserted operation
+            for (i, op) in op_vec.iter().enumerate() {
+                responses.push(BatchResponse::Applied {
+                    op_id: op.op_id,
+                    seq: start_seq + i as i64,
+                });
             }
         }
         tx.commit().await?;

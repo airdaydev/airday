@@ -58,10 +58,8 @@ CREATE TABLE IF NOT EXISTS sync_op (
   -- PRIMARY KEY (library_id, seq)
 );
 
--- speed up catchups
-CREATE INDEX ops_library_seq ON sync_op(library_id, seq);
 -- idemopotency guard
 CREATE UNIQUE INDEX IF NOT EXISTS ux_sync_op_lib_opid
   ON sync_op(library_id, op_id);
--- Protects against reusing seq
-CREATE UNIQUE INDEX IF NOT EXISTS library_id_seq ON sync_op(library_id, seq);
+-- Speed up catch ups (reusing seq accidentally not really a problem if we anticipated it)
+CREATE INDEX IF NOT EXISTS library_id_seq ON sync_op(library_id, seq);

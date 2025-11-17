@@ -69,7 +69,7 @@ pub struct OpBatchProcessor {
 
 impl OpBatchProcessor {
     pub async fn start(ws: &WebsocketState, auth_cache: &AuthCache, db: &Db) -> Self {
-        let (tx, rx) = mpsc::channel::<IncomingSyncOpBatch>(1);
+        let (tx, rx) = mpsc::channel::<IncomingSyncOpBatch>(100);
         // rx to hook up to batch_processor
         tokio::spawn(process_batch_ops(
             rx,
@@ -141,6 +141,7 @@ async fn process_batch_ops(
             }
             Ok(res) => res,
         };
+        // println!("Applied full block");
         responses.extend(res);
         // TODO: Responses should return from above, append to responses vec
 
@@ -148,6 +149,7 @@ async fn process_batch_ops(
         let message_offset = build_batch_response_msg(&mut fbb, responses);
         let message = wrap_message(&mut fbb, MessageProto::BatchResponseProto, message_offset);
         send_to_client(&ws, &batch.socket_id, message).await;
+        // println!("Send block to client");
     }
 }
 
