@@ -118,9 +118,11 @@ table ErrorResponseProto {
 // TODO: LibrarySync
 // TODO: Merkle check proto of objects (e.g. ObjectDiffReqProto)
 union MessageProto {
+  // Upstream messages
   AuthenticateActionProto, // Websocket authentication request
   SyncStreamReqProto, // Requests a stream from server
   BatchSyncOpProto, // Bidirectional data sync batches
+  // Downstream messages
   BatchResponseProto, // Downstream batch responses for server acks
   AuthenticateResponseProto, // Server response for succesful authentication
   LibrarySyncResponseProto, // TODO: make edit library SyncLibraryActionProto, enforce library limits fe & server
