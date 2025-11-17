@@ -31,6 +31,8 @@ pub struct StreamRequest {
     pub from_seq: i64,
 }
 
+const STREAM_BATCH_LEN: usize = 1000;
+
 pub async fn start_catchup_stream(
     app_state: AppState,
     cancel: CancellationToken,
@@ -59,10 +61,10 @@ pub async fn start_catchup_stream(
         let range = app_state
             .db
             .sync_op
-            .seq_range(&req.library_id, cur, head, 50)
+            .seq_range(&req.library_id, cur, head, STREAM_BATCH_LEN as i64)
             .await?;
         let mut stream_event = StreamEventProto::Data;
-        if range.len() < 50 {
+        if range.len() < STREAM_BATCH_LEN {
             stream_event = StreamEventProto::End;
         }
         let mut fbb = FlatBufferBuilder::new();
@@ -76,7 +78,7 @@ pub async fn start_catchup_stream(
         if range.len() == 0 {
             break;
         }
-        cur = range[range.len()].seq;
+        cur = range[range.len() - 1].seq;
     }
     Ok(())
 }

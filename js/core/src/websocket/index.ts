@@ -51,7 +51,8 @@ export class WebsocketManager {
   authorised = false;
   // Queue
   intervalId: ReturnType<typeof setTimeout> | null = null;
-  maxBatch = 500; // Messages to send at once
+  maxWSBatch = 10; // max ws messages
+  maxOpBatch = 500; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
   constructor(core: AirdayCore) {
@@ -134,20 +135,21 @@ export class WebsocketManager {
     if (!this.ws) return true;
     return this.ws.bufferedAmount > this.maxBufferedAmount;
   }
+  // TODO: This forms a batch of queued messages, then deals with ops
+  // TBH we probably don't need to batch any other kind of message and can fuck half of this off
   next() {
     if (!this.authorised || !this.outboundMessages() || this.overflowed) {
       return;
     }
     // 2. Form batch
     const batch: QueuedMessage[] = [];
-    while (this.outgoing.length > 0 && batch.length < this.maxBatch) {
+    while (this.outgoing.length > 0 && batch.length < this.maxWSBatch) {
       const item = this.outgoing[0];
       this.outgoing.shift();
       batch.push(item);
     }
-    const remaining = this.maxBatch - batch.length;
-    if (remaining > 0) {
-      const ops = this.core.sync.takeOps(remaining);
+    if (this.maxOpBatch > 0) {
+      const ops = this.core.sync.takeOps(this.maxOpBatch);
       const message = new BatchSyncMessage(ops);
       // TODO: Is The QueuedMessage vs MQMessages still needed?
       const queuedMessage: QueuedMessage = {
@@ -155,17 +157,14 @@ export class WebsocketManager {
       };
       batch.push(queuedMessage);
     }
-    console.log("sending batch");
-    this.wsSend(batch);
+    console.log("sending batch", batch.length);
+    batch.map((item) => {
+      this.send(item.message.serialise());
+    });
     if (!this.outboundMessages()) {
       this.events.emit("flushed", {});
       this.stop(); // stop until we start again
     }
-  }
-  async wsSend(batch: Array<QueuedMessage>) {
-    batch.map((item) => {
-      this.send(item.message.serialise());
-    });
   }
   stop() {
     if (this.intervalId) {

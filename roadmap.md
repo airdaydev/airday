@@ -1,6 +1,9 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] no valid ops found in batch (rust side) send test from js (off-by-1)
+- [] backpressure on batch insertion
+- [] explicit test to catch off-by-one for streams etc
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
 - [] server metric endpoint
 - [] delete items (tombstones, same api)

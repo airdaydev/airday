@@ -79,8 +79,8 @@ impl SyncOpModel for SyncOpModelSqlite {
     async fn get_by_seq(&self, library_id: &Uuid, seq: i64) -> Result<Option<SyncOpSql>, AppError> {
         let result = sqlx::query_as!(
             SyncOpSql,
-            r#"SELECT seq, base_seq, archived, op_kind, op_id as "op_id: Uuid",
-            library_id as "library_id: Uuid",
+            r#"SELECT op_id as "op_id: Uuid", library_id as "library_id: Uuid",
+            seq, base_seq, archived, op_kind,
             obj_id as "obj_id: Uuid", path, obj_kind,
             payload, payload_sha256, created_utc, client_id as "client_id: Uuid"
             FROM sync_op WHERE library_id = ? AND seq = ? LIMIT 1"#,

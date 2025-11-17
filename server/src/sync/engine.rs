@@ -69,7 +69,7 @@ pub struct OpBatchProcessor {
 
 impl OpBatchProcessor {
     pub async fn start(ws: &WebsocketState, auth_cache: &AuthCache, db: &Db) -> Self {
-        let (tx, rx) = mpsc::channel::<IncomingSyncOpBatch>(100);
+        let (tx, rx) = mpsc::channel::<IncomingSyncOpBatch>(1);
         // rx to hook up to batch_processor
         tokio::spawn(process_batch_ops(
             rx,

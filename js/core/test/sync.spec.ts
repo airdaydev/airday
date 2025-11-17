@@ -139,9 +139,9 @@ test.skip("fan out to connection on same library", () => {});
 
 test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
-  // create 50 items
-  const libraryId = new Uuidv4();
-  for (let i = 0; i < 30000; i++) {
+  // create x items
+  const libraryId = core.library.id!;
+  for (let i = 0; i < 10000; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
       objKind: 0,
@@ -161,12 +161,14 @@ test.only("Catch up streams", async () => {
   // Retrieve all items
   const stream = core.sync.catchup(core.library.id!, 0);
   await stream.done();
-  // TODO: API to determine when stream is finished
   // const res = await core.storage.(core.library.id!.toHex());
   core.ws.close();
 });
 
-test.skip("Delete attribute patches", async () => {});
+test.skip("Delete attribute patches", async () => {
+  const core = await createAuthenticatedCore();
+});
+
 test.skip("Delete object patches", async () => {});
 test.skip("Snapshots", async () => {});
 test.skip("Merkle tree backed sync discrepency resolution", async () => {});

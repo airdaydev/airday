@@ -36,11 +36,11 @@ CREATE TABLE IF NOT EXISTS user_library (
 );
 
 CREATE TABLE IF NOT EXISTS sync_op (
+  op_id UUID PRIMARY KEY NOT NULL,
   -- sync concerns
   seq INTEGER NOT NULL, -- server_seq number
   base_seq INTEGER, -- snapshot seq base (renders lower seqs as void)
   -- crdt concerns
-  op_id UUID PRIMARY KEY,
   op_kind INTEGER NOT NULL, -- 0=patch, 1=delete, 2=snapshot (potentially extend for text ops)
   archived BOOLEAN NOT NULL DEFAULT TRUE, -- to be deleted, depending on server compaction policy
   -- static, immutable, identifiers
