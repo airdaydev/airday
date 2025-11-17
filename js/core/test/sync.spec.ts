@@ -159,8 +159,13 @@ test.only("Catch up streams", async () => {
   const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
   expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
+  console.log("starting catchup stream");
   const stream = core.sync.catchup(core.library.id!, 0);
   await stream.done();
+  console.log(
+    "huh",
+    (await core.storage.adapter.getByLibrary(libraryId)).length,
+  );
   // const res = await core.storage.(core.library.id!.toHex());
   core.ws.close();
 });

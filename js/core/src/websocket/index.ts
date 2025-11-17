@@ -231,6 +231,7 @@ export class WebsocketManager {
       case MessageProto.BatchSyncOpProto: {
         const msg = new BatchSyncOpProto();
         wrapper.message(msg);
+        console.log("coming in hot", msg.batchLength());
         this.processBatchSyncOpMessage(span, msg);
       }
       case MessageProto.BatchResponseProto: {
@@ -290,6 +291,7 @@ export class WebsocketManager {
       tracer.endSpan(span);
     }
     if (streamContext) {
+      // TODO: This should include stats
       this.events.emit("stream-event", streamContext);
     }
   }
