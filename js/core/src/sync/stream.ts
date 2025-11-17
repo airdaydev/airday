@@ -53,12 +53,4 @@ export class SyncStream {
   // listen: on data
   // listen: on end
   // listen: on error (?!)
-  getSince(serverSeq: bigint | null) {
-    const message = new SyncStreamReqMessage(
-      this.id,
-      this.libraryId,
-      serverSeq,
-    );
-    this.core.ws.enqueueAirdayMessage(message);
-  }
 }
