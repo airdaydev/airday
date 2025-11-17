@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] ensure incoming sync ops construct new objects (or maybe snapshots are required hm?!) and persist (see websocket/index.ts)
+- [] ensure incoming sync ops construct new objects (or maybe snapshots are required hm?!) and persist (see websocket/index.ts) - in batches (easier to use batch from server initially)
 - [] no valid ops found in batch (rust side) send test from js (off-by-1)
 - [] explicit test to catch off-by-one for streams etc
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
