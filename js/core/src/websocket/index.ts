@@ -41,14 +41,20 @@ export interface QueuedMessage {
   message: MQMessage;
 }
 
+enum WSState {
+  Disconnected,
+  Connecting,
+  Connected,
+  Authorised,
+}
+
 // TODO: Offline considerations
 export class WebsocketManager {
   core: AirdayCore;
   ws: WebSocket | null = null;
   address: URL;
   events = new EventEmitter<WSEventMap>();
-  connected = false;
-  authorised = false;
+  state: WSState = WSState.Disconnected;
   // Queue
   intervalId: ReturnType<typeof setTimeout> | null = null;
   maxWSBatch = 10; // max ws messages
@@ -70,11 +76,11 @@ export class WebsocketManager {
       console.error("error");
     });
     this.ws.addEventListener("close", (event) => {
-      this.connected = false;
+      this.state = WSState.Disconnected;
       console.error("closed");
     });
     this.ws.addEventListener("open", (event) => {
-      this.connected = true;
+      this.state = WSState.Connected;
       if (this.core.authMode === AuthMode.BearerToken) {
         this.bearerAuth();
       }
@@ -138,7 +144,11 @@ export class WebsocketManager {
   // TODO: This forms a batch of queued messages, then deals with ops
   // TBH we probably don't need to batch any other kind of message and can fuck half of this off
   next() {
-    if (!this.authorised || !this.outboundMessages() || this.overflowed) {
+    if (
+      this.state !== WSState.Authorised ||
+      !this.outboundMessages() ||
+      this.overflowed
+    ) {
       return;
     }
     // 2. Form batch
@@ -197,9 +207,10 @@ export class WebsocketManager {
         const libraryId = Uuidv4.fromFBProto(authResponse.libraryId());
         // Confirm things make sense and authorise
         // TODO: Confirm library id valid
-        this.authorised = this.core.session?.userId === stringify(userId);
+        const authorised = this.core.session?.userId === stringify(userId);
+        this.state === WSState.Authorised;
         this.core.library.id = libraryId; // TODO: Handle previous library/store?
-        if (!this.authorised) {
+        if (!authorised) {
           console.warn(this.core.session?.userId, stringify(userId), "huh");
         } else {
           this.events.emit("authenticated", {
@@ -231,7 +242,6 @@ export class WebsocketManager {
       case MessageProto.BatchSyncOpProto: {
         const msg = new BatchSyncOpProto();
         wrapper.message(msg);
-        console.log("coming in hot", msg.batchLength());
         this.processBatchSyncOpMessage(span, msg);
       }
       case MessageProto.BatchResponseProto: {
@@ -271,6 +281,7 @@ export class WebsocketManager {
         };
       }
     }
+    const incomingOps: SyncOp[] = [];
     for (let i = 0; i < msg.batchLength(); i++) {
       const op = msg.batch(i);
       if (!op) continue;
@@ -285,11 +296,13 @@ export class WebsocketManager {
         // payload
       };
       const syncOp = new SyncOp(syncOpParams);
+      // TODO: Denormalise queues
       this.events.emit("sync-op", syncOp);
       // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
       tracer.endSpan(span);
     }
+
     if (streamContext) {
       // TODO: This should include stats
       this.events.emit("stream-event", streamContext);
