@@ -28,6 +28,7 @@ export class AirdaySync {
     this.core = core;
     this.core.ws.events.on("op-response", this.handleOpResponse);
     this.core.ws.events.on("stream-event", this.handleStreamEvent);
+    this.core.ws.events.on("sync-op-batch", this.handleStreamEvent);
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
@@ -99,6 +100,12 @@ export class AirdaySync {
     if (stream) {
       stream.end();
     }
+  };
+  handleOpBatch = (batch: SyncOp[]) => {
+    // 1. map to object ids
+    // 2. look up objects
+    // 3. merge or create objects
+    // 4. store op headers & objects
   };
   // Handler for a reply to an op originating from this client
   handleOpResponse = async (res: OpResponse) => {

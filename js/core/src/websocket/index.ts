@@ -6,7 +6,6 @@ import {
   MessageProto,
   BatchResponseProto,
   BatchSyncOpProto,
-  OpKind,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
 import { AuthenticateAction, BatchSyncMessage } from "../sync/fb";
@@ -21,14 +20,14 @@ import { StreamContext } from "../sync/stream";
 export interface OpResponse {
   opId: Uuidv4;
   success: boolean;
-  seq?: bigint; // TODO
+  seq?: bigint;
   error?: string;
 }
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
   ["op-response"]: OpResponse;
-  ["sync-op"]: SyncOp;
+  ["sync-op-batch"]: SyncOp[];
   ["stream-event"]: StreamContext;
   flushed: {};
 }
@@ -173,7 +172,7 @@ export class WebsocketManager {
     });
     if (!this.outboundMessages()) {
       this.events.emit("flushed", {});
-      this.stop(); // stop until we start again
+      this.stop(); // stop until we start again (this won't start again if there's no new ops coming in)
     }
   }
   stop() {
@@ -183,9 +182,8 @@ export class WebsocketManager {
     this.intervalId = null;
   }
   start() {
-    // TODO: Start at 150ms and tune
     if (this.intervalId) return; // Do nothing if interval is already going
-    this.intervalId = setInterval(() => this.next(), 1);
+    this.intervalId = setInterval(() => this.next(), 50);
   }
   flush() {
     return new Promise((resolve) => {
@@ -297,11 +295,11 @@ export class WebsocketManager {
       };
       const syncOp = new SyncOp(syncOpParams);
       // TODO: Denormalise queues
-      this.events.emit("sync-op", syncOp);
       // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
       tracer.endSpan(span);
     }
+    this.events.emit("sync-op-batch", incomingOps);
 
     if (streamContext) {
       // TODO: This should include stats
