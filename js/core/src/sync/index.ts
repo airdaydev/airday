@@ -28,7 +28,7 @@ export class AirdaySync {
     this.core = core;
     this.core.ws.events.on("op-response", this.handleOpResponse);
     this.core.ws.events.on("stream-event", this.handleStreamEvent);
-    this.core.ws.events.on("sync-op-batch", this.handleStreamEvent);
+    this.core.ws.events.on("sync-op-batch", this.handleOpBatch);
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
@@ -101,11 +101,46 @@ export class AirdaySync {
       stream.end();
     }
   };
-  handleOpBatch = (batch: SyncOp[]) => {
-    // 1. map to object ids
-    // 2. look up objects
-    // 3. merge or create objects
-    // 4. store op headers & objects
+  // TODO: This is obviously set up to persist in at least op id batches but clearly isn't here
+  // TODO: This is a bit of a mess
+  handleOpBatch = async (batch: SyncOp[]) => {
+    const objIdMap = new Map<string, SyncOp[]>();
+    batch.map((op) => {
+      const id = op.id.toHex();
+      const arr = objIdMap.get(id);
+      if (arr) {
+        arr.push(op);
+      } else {
+        objIdMap.set(id, [op]);
+      }
+    });
+    // commit patches in batches (TODO: ideally persisting to idb in batches!)
+    for (let key of objIdMap.keys()) {
+      let obj: SyncObject | undefined;
+      try {
+        obj = await this.core.storage.getObj(Uuidv4.fromHex(key));
+      } catch (err) {
+        // Nothing
+      }
+      const arr = objIdMap.get(key);
+      if (obj && arr) {
+        arr.map((op) => {
+          obj!.commitPatch(op);
+        });
+        // Persist objects (with op headers)
+        console.log("persisterised");
+        await this.core.storage.adapter.updateObject(obj);
+        console.log("persisted");
+      } else {
+        console.log("no obj found!");
+        const firstOp = arr!.shift();
+        if (firstOp) {
+          obj = new SyncObject(firstOp);
+          arr!.map((op) => obj?.commitPatch(op));
+          await this.core.storage.adapter.updateObject(obj);
+        }
+      }
+    }
   };
   // Handler for a reply to an op originating from this client
   handleOpResponse = async (res: OpResponse) => {

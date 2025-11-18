@@ -34,6 +34,7 @@ export class AirdayMemStorage implements StorageAdapter {
   async getByLibrary(libraryId: Uuidv4): Promise<any[]> {
     const libraryKey = libraryId.toHex();
     const objectIds = this.libraryIndex.get(libraryKey);
+    console.log("wtf");
     if (!objectIds) {
       return [];
     }

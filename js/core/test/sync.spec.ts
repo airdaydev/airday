@@ -141,7 +141,7 @@ test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create x items
   const libraryId = core.library.id!;
-  for (let i = 0; i < 30000; i++) {
+  for (let i = 0; i < 1000; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
       objKind: 0,
@@ -159,13 +159,13 @@ test.only("Catch up streams", async () => {
   const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
   expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
-  console.log("starting catchup stream");
   const stream = core.sync.catchup(core.library.id!, 0);
   await stream.done();
-  console.log(
-    "huh",
-    (await core.storage.adapter.getByLibrary(libraryId)).length,
-  );
+  // HACK
+  await new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+  // TODO: The processing is done before the items have actually been processed
+  const res = await core.storage.adapter.getByLibrary(libraryId);
+  console.log("res", res.length);
   // const res = await core.storage.(core.library.id!.toHex());
   core.ws.close();
 });

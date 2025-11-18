@@ -143,6 +143,7 @@ export class WebsocketManager {
   // TODO: This forms a batch of queued messages, then deals with ops
   // TBH we probably don't need to batch any other kind of message and can fuck half of this off
   next() {
+    console.log(this.state);
     if (
       this.state !== WSState.Authorised ||
       !this.outboundMessages() ||
@@ -206,7 +207,7 @@ export class WebsocketManager {
         // Confirm things make sense and authorise
         // TODO: Confirm library id valid
         const authorised = this.core.session?.userId === stringify(userId);
-        this.state === WSState.Authorised;
+        this.state = WSState.Authorised;
         this.core.library.id = libraryId; // TODO: Handle previous library/store?
         if (!authorised) {
           console.warn(this.core.session?.userId, stringify(userId), "huh");
@@ -294,6 +295,7 @@ export class WebsocketManager {
         // payload
       };
       const syncOp = new SyncOp(syncOpParams);
+      incomingOps.push(syncOp);
       // TODO: Denormalise queues
       // TODO: deal with op (patch/snapshot/delete)
       tracer.addTag(span, "msg_type", "SyncOpProto");
