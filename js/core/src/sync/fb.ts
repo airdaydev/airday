@@ -231,3 +231,22 @@ export function parseAttrSet(buffer: Uint8Array) {
   }
   return state;
 }
+
+interface Decoder {
+  decodeFrame(frame: MessageEvent): Message[];
+  decodeSyncBatch(payload: Uint8Array): DecodedSyncBatch;
+}
+
+function decodeFrame(messageEvent: MessageEvent) {
+  if (messageEvent.type === "message") {
+    // TODO: parse binary messages here, then provide response subscription system
+    const uint8Array = new Uint8Array(messageEvent.data);
+
+    const bb = new ByteBuffer(uint8Array);
+    const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
+    const span = spanFromFlatbuffer(msg.spanContext(), "ws:receive");
+    // TODO: Unwrap span dedicated function
+    // TODO: Validate batch/extract span
+    this.handleAirdayMessage(span, msg);
+  }
+}

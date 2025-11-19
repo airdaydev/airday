@@ -32,6 +32,8 @@ interface WSEventMap {
   flushed: {};
 }
 
+type RawFrame = ArrayBuffer;
+
 export interface MQMessage {
   serialise(): Uint8Array;
 }
@@ -109,17 +111,14 @@ export class WebsocketManager {
   }
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
-  listener = (messageEvent: MessageEvent) => {
+  decodeFrame = (frame: MessageEvent) => {
     // TODO: Unwrap span here!
-    if (messageEvent.type === "message") {
-      // TODO: parse binary messages here, then provide response subscription system
-      const uint8Array = new Uint8Array(messageEvent.data);
-
+    if (frame.type === "message") {
+      const uint8Array = new Uint8Array(frame.data);
       const bb = new ByteBuffer(uint8Array);
       const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
       const span = spanFromFlatbuffer(msg.spanContext(), "ws:receive");
-      // TODO: Unwrap span dedicated function
-      // TODO: Validate batch/extract span
+      return;
       this.handleAirdayMessage(span, msg);
     }
   };

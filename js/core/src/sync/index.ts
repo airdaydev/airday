@@ -15,6 +15,7 @@ interface SyncEventMap {
 // TODO: Streams should disappear on completion
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
+// orchestrates sync
 export class AirdaySync {
   core: AirdayCore;
   outbox: SyncOp[] = []; // Ops ready to be pulled by ws
