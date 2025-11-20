@@ -68,20 +68,15 @@ export class WebsocketManager {
     this.address = address;
   }
   // Message handler & producer
-  // TODO: Consider separating connect & producer so producer can be reused
-  frames(): AsyncIterable<MessageWrapperProto> {
+  frames(ac: AbortController): AsyncIterable<MessageWrapperProto> {
     if (this.ws) {
-      // TODO: Implications?
-      throw new Error("Preventing second websocket.connect()");
+      // TODO: Consider separating connect & producer so frames producer can be reused
+      throw new Error("Cannot call ws.frames() twice.");
     }
     console.debug(`WS connection attempt to ${this.address}`);
     const ws = new WebSocket(this.address);
     this.ws = ws;
     ws.binaryType = "arraybuffer";
-    ws.addEventListener("error", (error) => {
-      // TODO: Do something with this
-      console.error("ws:error", error);
-    });
     ws.addEventListener("open", (event) => {
       this.state = WSState.Connected;
       if (this.core.authMode === AuthMode.BearerToken) {
@@ -117,7 +112,9 @@ export class WebsocketManager {
         }
       }
     });
+    // Resilience:
     ws.addEventListener("close", () => {
+      // TODO: Respond to ac.signal.aborted
       done = true;
       self.onClose();
       if (pendingResolve) {
@@ -126,6 +123,7 @@ export class WebsocketManager {
       }
     });
     ws.addEventListener("error", (error) => {
+      // TODO: Respond to ac.signal.aborted
       done = true;
       self.onClose(error);
       if (pendingResolve) {
@@ -134,6 +132,7 @@ export class WebsocketManager {
       }
     });
 
+    // Iteration
     return {
       [Symbol.asyncIterator]() {
         return {

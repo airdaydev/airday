@@ -167,9 +167,13 @@ export class AirdayCore {
   }
   async startSync() {
     this.ac = new AbortController();
-    const frames = this.ws.frames();
-    for await (const frame of frames) {
-      console.log(frame);
+    try {
+      const frames = this.ws.frames(this.ac);
+      for await (const frame of frames) {
+        console.log(frame);
+      }
+    } catch (err) {
+      console.error("startSync failed", err);
     }
   }
   stopSync() {
