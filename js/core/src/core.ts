@@ -64,6 +64,7 @@ export class AirdayCore {
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
+  private ac: AbortController | null = null;
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
     this.root = new URL(opts.rootUrl);
@@ -163,5 +164,21 @@ export class AirdayCore {
       userId: res.data.userId,
     });
     return res;
+  }
+  async startSync() {
+    this.ac = new AbortController();
+    const frames = this.ws.frames();
+    for await (const frame of frames) {
+      console.log(frame);
+    }
+  }
+  stopSync() {
+    if (this.ac) {
+      this.ac.abort();
+    } else {
+      console.warn(
+        "No AbortController found while calling core.stopSync(). Sync not started or already stopped?",
+      );
+    }
   }
 }

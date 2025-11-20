@@ -1,4 +1,3 @@
-import { ByteBuffer } from "flatbuffers";
 import {
   MessageWrapperProto,
   AuthenticateResponseProto,
@@ -8,7 +7,7 @@ import {
   BatchSyncOpProto,
 } from "../proto";
 import { AuthMode, Library, type AirdayCore } from "../core";
-import { AuthenticateAction, BatchSyncMessage } from "../sync/fb";
+import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
@@ -52,7 +51,7 @@ enum WSState {
 // TODO: Offline considerations
 export class WebsocketManager {
   core: AirdayCore;
-  ws: WebSocket | null = null;
+  private ws: WebSocket | null = null;
   address: URL;
   events = new EventEmitter<WSEventMap>();
   state: WSState = WSState.Disconnected;
@@ -68,25 +67,100 @@ export class WebsocketManager {
     address.pathname = "ws";
     this.address = address;
   }
-  connect() {
+  // Message handler & producer
+  // TODO: Consider separating connect & producer so producer can be reused
+  frames(): AsyncIterable<MessageWrapperProto> {
+    if (this.ws) {
+      // TODO: Implications?
+      throw new Error("Preventing second websocket.connect()");
+    }
     console.debug(`WS connection attempt to ${this.address}`);
-    this.ws = new WebSocket(this.address);
-    this.ws.binaryType = "arraybuffer";
-    this.ws.addEventListener("message", this.listener);
-    this.ws.addEventListener("error", (error) => {
-      console.error("error");
+    const ws = new WebSocket(this.address);
+    this.ws = ws;
+    ws.binaryType = "arraybuffer";
+    ws.addEventListener("error", (error) => {
+      // TODO: Do something with this
+      console.error("ws:error", error);
     });
-    this.ws.addEventListener("close", (event) => {
-      this.state = WSState.Disconnected;
-      console.error("closed");
-    });
-    this.ws.addEventListener("open", (event) => {
+    ws.addEventListener("open", (event) => {
       this.state = WSState.Connected;
       if (this.core.authMode === AuthMode.BearerToken) {
         this.bearerAuth();
       }
       // TODO: Re. cookie auth... send same message on server to ensure core is authorised
     });
+    let self = this;
+
+    let buffer: MessageWrapperProto[] = [];
+    let pendingResolve:
+      | ((r: IteratorResult<MessageWrapperProto>) => void)
+      | null = null;
+    let done = false;
+    ws.addEventListener("message", (message: MessageEvent) => {
+      const msg = decodeFrame(message);
+      let span;
+      if (msg) {
+        // TODO: Do something with span, here?
+        span = spanFromFlatbuffer(msg.spanContext(), "ws:downstream");
+      }
+      if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {
+        const authResponse = new AuthenticateResponseProto();
+        msg.message(authResponse);
+        self.handleAuthResponse(span, authResponse);
+      } else if (msg) {
+        if (pendingResolve) {
+          const resolve = pendingResolve;
+          pendingResolve = null;
+          resolve({ value: msg, done: false });
+        } else {
+          buffer.push(msg);
+        }
+      }
+    });
+    ws.addEventListener("close", () => {
+      done = true;
+      self.onClose();
+      if (pendingResolve) {
+        pendingResolve({ value: undefined as any, done });
+        pendingResolve = null;
+      }
+    });
+    ws.addEventListener("error", (error) => {
+      done = true;
+      self.onClose(error);
+      if (pendingResolve) {
+        pendingResolve({ value: undefined as any, done });
+        pendingResolve = null;
+      }
+    });
+
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          next(): Promise<IteratorResult<MessageWrapperProto>> {
+            if (buffer.length > 0) {
+              const value = buffer.shift()!;
+              return Promise.resolve({ value: value, done: false });
+            }
+            if (done) {
+              return Promise.resolve({ value: undefined as any, done: true });
+            }
+            return new Promise<IteratorResult<MessageWrapperProto>>(
+              (resolve) => {
+                pendingResolve = resolve;
+              },
+            );
+          },
+        };
+      },
+    };
+  }
+  onClose(error?: Event) {
+    if (error) {
+      console.error("ws:error", error);
+    }
+    this.state = WSState.Disconnected;
+    this.ws = null;
   }
   private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");
@@ -109,19 +183,29 @@ export class WebsocketManager {
     if (!this.ws) throw new Error("Cannot close, WS is not enabled");
     return this.ws.close();
   }
+  handleAuthResponse(span: ULSpan | undefined, res: AuthenticateResponseProto) {
+    if (span) {
+      // TODO: Perhaps we should create an empty span
+      tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
+    }
+    const userId = Uuidv4.fromFBProto(res.userId());
+    const libraryId = Uuidv4.fromFBProto(res.libraryId());
+    // Confirm things make sense and authorise
+    // TODO: Confirm library id valid
+    const authorised = this.core.session?.userId === stringify(userId);
+    this.state = WSState.Authorised;
+    this.core.library.id = libraryId; // TODO: Handle previous library/store?
+    if (!authorised) {
+      console.warn(this.core.session?.userId, stringify(userId), "huh");
+    } else {
+      this.events.emit("authenticated", {
+        userId,
+        libraryId,
+      });
+    }
+  }
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
-  decodeFrame = (frame: MessageEvent) => {
-    // TODO: Unwrap span here!
-    if (frame.type === "message") {
-      const uint8Array = new Uint8Array(frame.data);
-      const bb = new ByteBuffer(uint8Array);
-      const msg = MessageWrapperProto.getRootAsMessageWrapperProto(bb);
-      const span = spanFromFlatbuffer(msg.spanContext(), "ws:receive");
-      return;
-      this.handleAirdayMessage(span, msg);
-    }
-  };
   enqueue(message: QueuedMessage) {
     this.outgoing.push(message);
     this.start();
@@ -198,24 +282,6 @@ export class WebsocketManager {
     const type = wrapper.messageType();
     switch (type) {
       case MessageProto.AuthenticateResponseProto: {
-        tracer.addTag(span, "msg_type", "AuthenticateResponseProto");
-        const authResponse = new AuthenticateResponseProto();
-        wrapper.message(authResponse);
-        const userId = Uuidv4.fromFBProto(authResponse.userId());
-        const libraryId = Uuidv4.fromFBProto(authResponse.libraryId());
-        // Confirm things make sense and authorise
-        // TODO: Confirm library id valid
-        const authorised = this.core.session?.userId === stringify(userId);
-        this.state = WSState.Authorised;
-        this.core.library.id = libraryId; // TODO: Handle previous library/store?
-        if (!authorised) {
-          console.warn(this.core.session?.userId, stringify(userId), "huh");
-        } else {
-          this.events.emit("authenticated", {
-            userId,
-            libraryId,
-          });
-        }
         // TODO: Consider "auth" notification using JS native events
         this.start();
         break;

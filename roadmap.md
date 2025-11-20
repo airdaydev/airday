@@ -1,8 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] ensure incoming sync ops construct new objects (or maybe snapshots are required hm?!) and persist (see websocket/index.ts) - in batches (easier to use batch from server initially) (started, unfuck this flow)
-- [] clean up flows in diff modules... fp-like?
+- [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
 - [] no valid ops found in batch (rust side) send test from js (off-by-1)
 - [] explicit test to catch off-by-one for streams etc
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
@@ -61,6 +60,7 @@
 - [] create versioning plan
 - [] get js client sync together, then swap out to rust-wasm version after learning wasm
 - [] consider smarter batch sizing with size limits
+- Flatbuffer in flatbuffer for predictable sync engine user types (instead of current "AttributeProto")?
 
 ## Done board
 - [] Done board show which list item was from
@@ -204,6 +204,3 @@
 ## Fractional indexing
 - https://observablehq.com/@dgreensp/implementing-fractional-indexing
 - www.figma.com/blog/realtime-editing-of-ordered-sequences/
-
-## Optimisations
-- Flatbuffer in flatbuffer for predictable sync engine user types (instead of current "AttributeProto")
