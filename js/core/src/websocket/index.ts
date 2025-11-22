@@ -41,7 +41,7 @@ export interface QueuedMessage {
   message: MQMessage;
 }
 
-enum WSState {
+export enum WSState {
   Disconnected,
   Connecting,
   Connected,
@@ -55,25 +55,27 @@ export class WebsocketManager {
   address: URL;
   events = new EventEmitter<WSEventMap>();
   state: WSState = WSState.Disconnected;
-  // Queue
+  // Outgoing queue
   intervalId: ReturnType<typeof setTimeout> | null = null;
   maxWSBatch = 10; // max ws messages
   maxOpBatch = 1000; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
+  // Incoming iterator
+  private pendingResolve:
+    | ((r: IteratorResult<MessageWrapperProto>) => void)
+    | null = null;
+  private buffer: MessageWrapperProto[] = [];
   constructor(core: AirdayCore) {
     this.core = core;
     const address = core.root;
     address.pathname = "ws";
     this.address = address;
   }
-  // Message handler & producer
-  frames(ac: AbortController): AsyncIterable<MessageWrapperProto> {
+  private connect() {
     if (this.ws) {
-      // TODO: Consider separating connect & producer so frames producer can be reused
-      throw new Error("Cannot call ws.frames() twice.");
+      throw new Error("attempting to open concurrent ws connections");
     }
-    console.debug(`WS connection attempt to ${this.address}`);
     const ws = new WebSocket(this.address);
     this.ws = ws;
     ws.binaryType = "arraybuffer";
@@ -84,13 +86,6 @@ export class WebsocketManager {
       }
       // TODO: Re. cookie auth... send same message on server to ensure core is authorised
     });
-    let self = this;
-
-    let buffer: MessageWrapperProto[] = [];
-    let pendingResolve:
-      | ((r: IteratorResult<MessageWrapperProto>) => void)
-      | null = null;
-    let done = false;
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);
       let span;
@@ -101,44 +96,59 @@ export class WebsocketManager {
       if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {
         const authResponse = new AuthenticateResponseProto();
         msg.message(authResponse);
-        self.handleAuthResponse(span, authResponse);
+        this.handleAuthResponse(span, authResponse);
       } else if (msg) {
-        if (pendingResolve) {
-          const resolve = pendingResolve;
-          pendingResolve = null;
+        if (this.pendingResolve) {
+          const resolve = this.pendingResolve;
+          this.pendingResolve = null;
           resolve({ value: msg, done: false });
         } else {
-          buffer.push(msg);
+          this.buffer.push(msg);
         }
       }
     });
-    // Resilience:
-    ws.addEventListener("close", () => {
-      // TODO: Respond to ac.signal.aborted
-      done = true;
-      self.onClose();
-      if (pendingResolve) {
-        pendingResolve({ value: undefined as any, done });
-        pendingResolve = null;
+    return ws;
+  }
+  // Message handler & producer
+  frames(ac: AbortController): AsyncIterable<MessageWrapperProto> {
+    if (this.ws) {
+      // TODO: Consider separating connect & producer so frames producer can be reused
+      throw new Error("Cannot call ws.frames() twice.");
+    }
+    console.debug(`WS connection attempt to ${this.address}`);
+    // State
+    const ws = this.connect();
+    const self = this;
+    let done = false;
+    // Resilience or closing
+    const close = (event: Event) => {
+      const aborted = ac.signal.aborted;
+      if (event.type === "error") {
+        // TODO: how to trigger an error?
+        console.error("ws:error", event.type);
       }
-    });
-    ws.addEventListener("error", (error) => {
-      // TODO: Respond to ac.signal.aborted
-      done = true;
-      self.onClose(error);
-      if (pendingResolve) {
-        pendingResolve({ value: undefined as any, done });
-        pendingResolve = null;
+      this.state = WSState.Disconnected;
+      this.ws = null;
+      if (aborted) {
+        done = true;
       }
-    });
-
+      if (this.pendingResolve && aborted) {
+        this.pendingResolve({ value: undefined as any, done });
+        this.pendingResolve = null;
+      }
+      if (!aborted && !this.ws) {
+        this.connect();
+      }
+    };
+    ws.addEventListener("close", close);
+    ws.addEventListener("error", (err) => close(err));
     // Iteration
     return {
       [Symbol.asyncIterator]() {
         return {
           next(): Promise<IteratorResult<MessageWrapperProto>> {
-            if (buffer.length > 0) {
-              const value = buffer.shift()!;
+            if (self.buffer.length > 0) {
+              const value = self.buffer.shift()!;
               return Promise.resolve({ value: value, done: false });
             }
             if (done) {
@@ -146,20 +156,13 @@ export class WebsocketManager {
             }
             return new Promise<IteratorResult<MessageWrapperProto>>(
               (resolve) => {
-                pendingResolve = resolve;
+                self.pendingResolve = resolve;
               },
             );
           },
         };
       },
     };
-  }
-  onClose(error?: Event) {
-    if (error) {
-      console.error("ws:error", error);
-    }
-    this.state = WSState.Disconnected;
-    this.ws = null;
   }
   private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");

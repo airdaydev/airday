@@ -7,6 +7,7 @@ import { createAuthenticatedCore } from "./utils";
 import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
 import { OpKind, SyncOpProto } from "../src/proto";
 import { Builder, ByteBuffer } from "flatbuffers";
+import { WSState } from "../src/websocket";
 
 // TODO: Null state to clear? or explicit clear field?
 test("create, encode & decode patch SyncOp", async () => {
@@ -69,6 +70,19 @@ test("Phase 1 commit", async () => {
   expect(obj.state[0].data).toBe("hello again");
   expect(obj.state[1].data).toBe(64);
   expect(obj.pendingOps.size).toBe(2);
+});
+
+test.only("websocket lifecycle tests", async () => {
+  const core = await createAuthenticatedCore();
+  expect(core.ws.state).toBe(WSState.Disconnected);
+  core.startSync();
+  await core.ws.events.onceAsync("authenticated");
+  expect(core.ws.state).toBe(WSState.Authorised);
+  // 1. self-heal ws connection
+  core.ws.close();
+  await core.ws.events.onceAsync("authenticated");
+  console.log("auto reauthentication");
+  // core.stopSync();
 });
 
 // TODO: Test unauthenticated
@@ -137,7 +151,7 @@ test("Phase 2 commit", async () => {
 
 test.skip("fan out to connection on same library", () => {});
 
-test.only("Catch up streams", async () => {
+test("Catch up streams", async () => {
   const core = await createAuthenticatedCore();
   // create x items
   const libraryId = core.library.id!;

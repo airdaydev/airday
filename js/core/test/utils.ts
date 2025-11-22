@@ -45,8 +45,6 @@ export async function createAuthenticatedCore() {
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
   await core.storage.adapter.connect();
-  core.ws.connect();
-  await core.ws.events.onceAsync("authenticated");
   return core;
 }
 
