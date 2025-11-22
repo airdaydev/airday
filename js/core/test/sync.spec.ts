@@ -78,7 +78,7 @@ test("websocket lifecycle & self-healing", async () => {
   core.startSync();
   await core.ws.events.onceAsync("authenticated");
   expect(core.ws.state).toBe(WSState.Authorised);
-  core.ws.close();
+  core.ws.disrupt();
   expect(core.ws.state, "Connection state tracking updated on WS close").toBe(
     WSState.Disconnected,
   );
@@ -194,7 +194,7 @@ test("Catch up streams", async () => {
   const res = await core.storage.adapter.getByLibrary(libraryId);
   console.log("res", res.length);
   // const res = await core.storage.(core.library.id!.toHex());
-  core.ws.close();
+  core.stopSync();
 });
 
 test.skip("Delete attribute patches", async () => {

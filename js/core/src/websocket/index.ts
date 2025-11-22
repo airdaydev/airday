@@ -75,6 +75,11 @@ export class WebsocketManager {
     address.pathname = "ws";
     this.address = address;
   }
+  disrupt() {
+    // Kills ws connection while allowing self-healing
+    // Currently only used in tests
+    this.ws?.close();
+  }
   stop() {
     if (this.ac) this.ac.abort();
   }
