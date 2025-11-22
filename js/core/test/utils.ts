@@ -44,7 +44,6 @@ export async function createAuthenticatedCore() {
     storageAdapter: new AirdayMemStorage(),
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
-  await core.storage.adapter.connect();
   return core;
 }
 

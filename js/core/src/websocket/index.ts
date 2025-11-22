@@ -51,7 +51,6 @@ export enum WSState {
 // TODO: Offline considerations
 export class WebsocketManager {
   core: AirdayCore;
-  private ws: WebSocket | null = null;
   address: URL;
   events = new EventEmitter<WSEventMap>();
   state: WSState = WSState.Disconnected;
@@ -61,25 +60,38 @@ export class WebsocketManager {
   maxOpBatch = 1000; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
   outgoing: Array<QueuedMessage> = [];
-  // Incoming iterator
+  // Conn & incoming msg iterator
+  private connectionAttempts = 0;
+  private ws: WebSocket | null = null;
   private pendingResolve:
     | ((r: IteratorResult<MessageWrapperProto>) => void)
     | null = null;
   private buffer: MessageWrapperProto[] = [];
+  private ac: AbortController | null = new AbortController();
+  // --
   constructor(core: AirdayCore) {
     this.core = core;
     const address = core.root;
     address.pathname = "ws";
     this.address = address;
   }
+  stop() {
+    if (this.ac) this.ac.abort();
+  }
+  // connect with retries
   private connect() {
     if (this.ws) {
       throw new Error("attempting to open concurrent ws connections");
     }
+    // TODO: Attempts + back off
+    // console.log("retrying", this.connectionAttempts);
+    this.connectionAttempts++;
+    this.ac = new AbortController();
     const ws = new WebSocket(this.address);
     this.ws = ws;
     ws.binaryType = "arraybuffer";
     ws.addEventListener("open", (event) => {
+      this.connectionAttempts = 0;
       this.state = WSState.Connected;
       if (this.core.authMode === AuthMode.BearerToken) {
         this.bearerAuth();
@@ -110,7 +122,7 @@ export class WebsocketManager {
     return ws;
   }
   // Message handler & producer
-  frames(ac: AbortController): AsyncIterable<MessageWrapperProto> {
+  frames(): AsyncIterable<MessageWrapperProto> {
     if (this.ws) {
       // TODO: Consider separating connect & producer so frames producer can be reused
       throw new Error("Cannot call ws.frames() twice.");
@@ -122,7 +134,9 @@ export class WebsocketManager {
     let done = false;
     // Resilience or closing
     const close = (event: Event) => {
-      const aborted = ac.signal.aborted;
+      // TODO: Reconsider abort controller negation here
+      // - if it doesn't exist it should have already aborted
+      const aborted = !this.ac || this.ac.signal.aborted;
       if (event.type === "error") {
         // TODO: how to trigger an error?
         console.error("ws:error", event.type);
@@ -135,6 +149,7 @@ export class WebsocketManager {
       if (this.pendingResolve && aborted) {
         this.pendingResolve({ value: undefined as any, done });
         this.pendingResolve = null;
+        this.ac = null;
       }
       if (!aborted && !this.ws) {
         this.connect();
@@ -210,7 +225,7 @@ export class WebsocketManager {
   reconnect() {}
   enqueue(message: QueuedMessage) {
     this.outgoing.push(message);
-    this.start();
+    this.startOutgoing();
   }
   enqueueAirdayMessage(message: MQMessage) {
     const queuedMessage: QueuedMessage = {
@@ -258,16 +273,16 @@ export class WebsocketManager {
     });
     if (!this.outboundMessages()) {
       this.events.emit("flushed", {});
-      this.stop(); // stop until we start again (this won't start again if there's no new ops coming in)
+      this.stopOutgoing(); // stop until we start again (this won't start again if there's no new ops coming in)
     }
   }
-  stop() {
+  private stopOutgoing() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
     this.intervalId = null;
   }
-  start() {
+  private startOutgoing() {
     if (this.intervalId) return; // Do nothing if interval is already going
     this.intervalId = setInterval(() => this.next(), 50);
   }
@@ -285,7 +300,7 @@ export class WebsocketManager {
     switch (type) {
       case MessageProto.AuthenticateResponseProto: {
         // TODO: Consider "auth" notification using JS native events
-        this.start();
+        this.startOutgoing();
         break;
       }
       case MessageProto.LibrarySyncResponseProto: {

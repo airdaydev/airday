@@ -72,21 +72,33 @@ test("Phase 1 commit", async () => {
   expect(obj.pendingOps.size).toBe(2);
 });
 
-test.only("websocket lifecycle tests", async () => {
+test("websocket lifecycle & self-healing", async () => {
   const core = await createAuthenticatedCore();
   expect(core.ws.state).toBe(WSState.Disconnected);
   core.startSync();
   await core.ws.events.onceAsync("authenticated");
   expect(core.ws.state).toBe(WSState.Authorised);
-  // 1. self-heal ws connection
   core.ws.close();
+  expect(core.ws.state, "Connection state tracking updated on WS close").toBe(
+    WSState.Disconnected,
+  );
   await core.ws.events.onceAsync("authenticated");
-  console.log("auto reauthentication");
-  // core.stopSync();
+  expect(core.ws.state, "Self-healing reauthentication").toBe(
+    WSState.Authorised,
+  );
+  core.stopSync();
 });
 
-// TODO: Test unauthenticated
+// TODO: Automatic refresh tokens too..
+// test("websocket authentication failure", async () => {
+//   const core = await createAuthenticatedCore();
+//   expect(core.ws.state).toBe(WSState.Disconnected);
+//   core.startSync();
+//   await core.ws.events.onceAsync("bad-credentials");
+//   core.stopSync();
+// });
 
+// TODO: Test unauthenticated
 test("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
   const libraryId = core.library.id!;

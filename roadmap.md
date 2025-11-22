@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] http auth resilience & feedback
 - [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
 - [] no valid ops found in batch (rust side) send test from js (off-by-1)
 - [] explicit test to catch off-by-one for streams etc
