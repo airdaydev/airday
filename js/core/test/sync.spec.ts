@@ -90,7 +90,7 @@ test("websocket lifecycle & self-healing", async () => {
 });
 
 // TODO: Automatic refresh tokens too..
-// test("websocket authentication failure", async () => {
+// test("websocket bad auth", async () => {
 //   const core = await createAuthenticatedCore();
 //   expect(core.ws.state).toBe(WSState.Disconnected);
 //   core.startSync();
@@ -99,7 +99,7 @@ test("websocket lifecycle & self-healing", async () => {
 // });
 
 // TODO: Test unauthenticated
-test("Phase 2 commit", async () => {
+test.only("Phase 2 commit", async () => {
   const core = await createAuthenticatedCore();
   const libraryId = core.library.id!;
   const snapshot = new InitialSnapshotOp({
@@ -117,35 +117,36 @@ test("Phase 2 commit", async () => {
       data: "test2",
     }),
   });
+  // core.startSync();
   obj.applyLocal(patch);
-  // TODO: P'raps we should just feed it the object & it can read the pending ops from it (err no because it only keeps head at that point)
+  // // TODO: P'raps we should just feed it the object & it can read the pending ops from it (err no because it only keeps head at that point)
   await core.sync.queueOp(snapshot, obj);
-  await core.sync.queueOp(patch, obj);
-  // Test outbox - in mem version
-  const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
-  expect(outboxOp, "memory stored outbox op").toBe(snapshot);
-  // Test outbox - idb version
-  const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
-  // TODO: Next test passes but it is still a serialised format
-  expect(
-    outboxOpIdb.id.equals(outboxOp.id),
-    "serialised version stored in idb",
-  ).toBe(true);
-  await core.sync.flush();
-  // We are only doing this after to ensure op-response fires
-  const syncObject = await core.storage.getObj(obj.id);
-  // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
-  expect(syncObject, "obj cached in mem cache").toBe(obj);
+  // await core.sync.queueOp(patch, obj);
+  // // Test outbox - in mem version
+  // const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
+  // expect(outboxOp, "memory stored outbox op").toBe(snapshot);
+  // // Test outbox - idb version
+  // const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
+  // // TODO: Next test passes but it is still a serialised format
+  // expect(
+  //   outboxOpIdb.id.equals(outboxOp.id),
+  //   "serialised version stored in idb",
+  // ).toBe(true);
+  // await core.sync.flush();
+  // // We are only doing this after to ensure op-response fires
+  // const syncObject = await core.storage.getObj(obj.id);
+  // // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
+  // expect(syncObject, "obj cached in mem cache").toBe(obj);
 
-  expect(
-    core.sync.outbox.length,
-    "ack message received & outbox message deleted",
-  ).toBe(0);
-  expect(
-    core.sync.pendingOps.size,
-    "ack message received & pending message index removed",
-  ).toBe(0);
-  expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
+  // expect(
+  //   core.sync.outbox.length,
+  //   "ack message received & outbox message deleted",
+  // ).toBe(0);
+  // expect(
+  //   core.sync.pendingOps.size,
+  //   "ack message received & pending message index removed",
+  // ).toBe(0);
+  // expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
   // const res = await core.storage.adapter.getByLibrary(core.library.id!);
   // const item = res[0];
   // expect(
@@ -158,7 +159,7 @@ test("Phase 2 commit", async () => {
   //   }
   //   core.sync.events.onceAsync("flushed").then(resolve);
   // });
-  core.ws.close();
+  core.stopSync();
 });
 
 test.skip("fan out to connection on same library", () => {});

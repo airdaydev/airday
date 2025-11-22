@@ -196,10 +196,6 @@ export class WebsocketManager {
     // }
     return this.ws.send(data);
   }
-  close() {
-    if (!this.ws) throw new Error("Cannot close, WS is not enabled");
-    return this.ws.close();
-  }
   handleAuthResponse(span: ULSpan | undefined, res: AuthenticateResponseProto) {
     if (span) {
       // TODO: Perhaps we should create an empty span
