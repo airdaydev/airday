@@ -21,7 +21,8 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
-  // Libraries
+  // Library storage
+  libraries: Map<LibraryHexUuid, Library>;
   // OpCache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
   opLibMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
@@ -33,7 +34,7 @@ export class AirdayStorage {
     this.adapter = adapter || new AirdayIDBStorage();
   }
   async initialise() {
-    // 1. Attempt to load storage BY USER
+    // 1. Attempt to load storage FOR CURRENT USER (retrieve by session key... - uh oh time to put some extra info in there?! and also have a purely offline user!)
     // 2. If user cache not present, leave in this state
     // 2. If no user present, start a new local library FRESH
   }

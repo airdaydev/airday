@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] offline user bootstrap! - start from AirdayStorage.initialise
 - [] purely offline library resync with proper library ids...
 - [] bring back library id after auth to continue through sync tests
 - [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
