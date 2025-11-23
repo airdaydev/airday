@@ -15,7 +15,6 @@ interface SyncEventMap {
 // TODO: Streams should disappear on completion
 // TODO: Ack timeouts...?
 // TODO: Failure thresholds + offline!!!
-// orchestrates sync
 export class AirdaySync {
   core: AirdayCore;
   outbox: SyncOp[] = []; // Ops ready to be pulled by ws
@@ -46,11 +45,10 @@ export class AirdaySync {
   takeOps(count: number) {
     return this.core.sync.outbox.splice(0, count);
   }
-  // To be run after login
   initialSync() {
     // TODO: Prevent if not authorised
-    this.catchup(this.core.library.id!, 0);
     this.getLibraries(); // TODO: currently a noop
+    this.catchup(this.core.library.id!, 0);
     // TODO: For each shared library, start list & item streams
     // TODO: Later, prioritise by active items, tombstoned items, completed items
 

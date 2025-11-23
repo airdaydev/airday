@@ -1,5 +1,6 @@
 // Memory storage for items (or all resources?)
 import { EventEmitter } from "../common/events";
+import { Library } from "../common/library";
 import {
   HexUuid,
   LibraryHexUuid,
@@ -20,9 +21,10 @@ interface StorageEventMap {
 export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
-  // Cache
+  // Libraries
+  // OpCache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
-  libMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
+  opLibMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
   outbox: Map<HexUuid, SyncOp> = new Map();
   // Reactivity
   events = new EventEmitter<StorageEventMap>();
@@ -30,8 +32,10 @@ export class AirdayStorage {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
   }
-  coldBoot() {
-    // TODO: cold boot i.e. load libraries
+  async initialise() {
+    // 1. Attempt to load storage BY USER
+    // 2. If user cache not present, leave in this state
+    // 2. If no user present, start a new local library FRESH
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
     let op = this.outbox.get(id.toHex());
@@ -52,7 +56,7 @@ export class AirdayStorage {
   setStateCache(obj: SyncObject) {
     const hexId = obj.id.toHex();
     this.stateCache.set(hexId, obj);
-    this.libMap.set(obj.libraryId.toHex(), hexId);
+    this.opLibMap.set(obj.libraryId.toHex(), hexId);
   }
   async getObj(id: Uuidv4): Promise<SyncObject> {
     const mem = this.stateCache.get(id.toHex());

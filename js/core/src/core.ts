@@ -8,9 +8,9 @@ import {
 import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import type { TypeOf } from "suretype";
-import type { Uuidv4 } from "./common/uuid";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
+import { Library } from "./common/library";
 
 export enum AuthMode {
   ImplicitCookie,
@@ -32,35 +32,11 @@ interface Session {
   userId: string;
 }
 
-interface LibraryConstructorOpts {
-  id?: Uuidv4;
-  name: string;
-  local: boolean;
-}
-
-export class Library {
-  id?: Uuidv4;
-  name: string = "Private";
-  local = true;
-  primary = false;
-  constructor(opts?: LibraryConstructorOpts) {
-    if (opts) {
-      this.id = opts.id;
-      this.name = opts.name;
-      this.local = opts.local;
-    }
-  }
-}
-
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   root: URL;
   authMode: AuthMode;
   session?: Session;
-  library: Library = new Library({
-    name: "private",
-    local: true,
-  });
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
