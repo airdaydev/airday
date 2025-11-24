@@ -36,6 +36,7 @@ mod sync {
 }
 mod root;
 use crate::auth::cache::AuthCache;
+use crate::auth::paseto::PasetoKeys;
 use crate::common::config::AirdayConfig;
 use crate::common::sql::Db;
 use crate::sync::engine::OpBatchProcessor;
@@ -90,6 +91,7 @@ async fn main() {
         cfg.log_level = log_level.to_lowercase();
     }
 
+    PasetoKeys::set_keys(&cfg).unwrap();
     telemetry::otlp::setup(&cfg);
 
     // Database

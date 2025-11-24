@@ -1,6 +1,8 @@
-use crate::auth::session::UserSession;
+use crate::auth::session::{AuthToken, UserSession};
+use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
 use core::convert::TryFrom;
 use pasetors::claims::{Claims, ClaimsValidationRules};
@@ -18,52 +20,43 @@ pub struct PasetoKeys {
 }
 
 impl PasetoKeys {
-    fn from_env() -> Result<Self, AppError> {
-        let secret_b64 = std::env::var("PASETO_SECRET_KEY").map_err(|_| {
-            AppError::ServerError(String::from(
-                "PASETO_SECRET_KEY environment variable not set",
-            ))
-        })?;
-        let public_b64 = std::env::var("PASETO_PUBLIC_KEY").map_err(|_| {
-            AppError::ServerError(String::from(
-                "PASETO_PUBLIC_KEY environment variable not set",
-            ))
-        })?;
-
-        let secret_bytes = BASE64.decode(&secret_b64).map_err(|e| {
-            AppError::ServerError(format!("Failed to decode PASETO_SECRET_KEY: {}", e))
-        })?;
-        let public_bytes = BASE64.decode(&public_b64).map_err(|e| {
-            AppError::ServerError(format!("Failed to decode PASETO_PUBLIC_KEY: {}", e))
-        })?;
-
-        let secret = AsymmetricSecretKey::<V4>::from(&secret_bytes)
-            .map_err(|e| AppError::ServerError(format!("Failed to parse secret key: {}", e)))?;
-        let public = AsymmetricPublicKey::<V4>::from(&public_bytes)
-            .map_err(|e| AppError::ServerError(format!("Failed to parse public key: {}", e)))?;
-
-        Ok(Self { secret, public })
+    fn get() -> Result<&'static PasetoKeys, AppError> {
+        PASETO_KEYS.get().ok_or(AppError::ServerError(format!(
+            "Error retrieving PASETO keys"
+        )))
     }
-
-    pub fn get() -> Result<&'static PasetoKeys, AppError> {
-        PASETO_KEYS.get_or_try_init(|| Self::from_env())
+    pub fn set_keys(cfg: &AirdayConfig) -> Result<(), AppError> {
+        let public_raw = BASE64
+            .decode(&cfg.paseto_pk_b64)
+            .map_err(|e| AppError::ServerError(format!("Error decoding paseto_pk_b64: {}", e)))?;
+        let public = AsymmetricPublicKey::<V4>::from(&public_raw)
+            .map_err(|e| AppError::ServerError(format!("Failed to decode paseto_pk_b64: {}", e)))?;
+        let secret_raw = BASE64
+            .decode(&cfg.paseto_sk_b64)
+            .map_err(|e| AppError::ServerError(format!("Error decoding paseto_sk_b64: {}", e)))?;
+        let secret = AsymmetricSecretKey::<V4>::from(&secret_raw)
+            .map_err(|e| AppError::ServerError(format!("Failed to decode paseto_sk_64: {}", e)))?;
+        PASETO_KEYS.set(PasetoKeys { public, secret });
+        Ok(())
     }
 }
 
 /// Serialize a UserSession into a signed PASETO token
-pub fn serialize_session(session: &UserSession) -> Result<String, AppError> {
+pub fn serialize_token(token: &AuthToken) -> Result<String, AppError> {
     let keys = PasetoKeys::get()?;
-    let mut claims = Claims::new()?;
-
-    // Add all UserSession fields as claims
-    claims.add_additional("id", session.id.to_string())?;
-    claims.add_additional("token", &session.token)?;
-    claims.add_additional("expires", session.expires.to_rfc3339())?;
-    claims.add_additional("refresh_token", &session.refresh_token)?;
-    claims.add_additional("refresh_expires", session.refresh_expires.to_rfc3339())?;
-    claims.add_additional("user_id", session.user_id.to_string())?;
-
-    let paseto_token = public::sign(&keys.secret, &claims, None, None)?;
+    let mut claims = Claims::new().map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    claims
+        .add_additional("session_id", token.session_id.to_string())
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    // claims.add_additional("expires", session.expires.to_rfc3339())?;
+    claims
+        .add_additional("kind", &session.kind)
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    claims
+        .add_additional("user_id", session.user_id.to_string())
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    let paseto_token = public::sign(&keys.secret, &claims, None, None)
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     Ok(paseto_token)
 }
 
@@ -161,7 +154,8 @@ mod tests {
         assert!(paseto_token.starts_with("v4.public."));
 
         // Deserialize back
-        let deserialized = deserialize_session(&paseto_token).expect("Failed to deserialize session");
+        let deserialized =
+            deserialize_session(&paseto_token).expect("Failed to deserialize session");
 
         // Verify all fields match
         assert_eq!(session.id, deserialized.id);
@@ -171,10 +165,17 @@ mod tests {
 
         // DateTime comparison (allowing small precision differences)
         let expires_diff = (session.expires.timestamp() - deserialized.expires.timestamp()).abs();
-        assert!(expires_diff < 2, "Expires timestamps should be nearly equal");
+        assert!(
+            expires_diff < 2,
+            "Expires timestamps should be nearly equal"
+        );
 
-        let refresh_expires_diff = (session.refresh_expires.timestamp() - deserialized.refresh_expires.timestamp()).abs();
-        assert!(refresh_expires_diff < 2, "Refresh expires timestamps should be nearly equal");
+        let refresh_expires_diff =
+            (session.refresh_expires.timestamp() - deserialized.refresh_expires.timestamp()).abs();
+        assert!(
+            refresh_expires_diff < 2,
+            "Refresh expires timestamps should be nearly equal"
+        );
     }
 
     #[test]

@@ -2,7 +2,6 @@ use crate::AppState;
 use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::auth::meta::ClientMeta;
 use crate::auth::paseto::{SessionClaims, create_session_token, verify_session_token};
-use crate::common::datetime::serialize_datetime_iso;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::hash_password;
@@ -20,7 +19,7 @@ use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
-use uuid::{Bytes, Uuid};
+use uuid::Uuid;
 
 type HighEntropyBytes = [u8; 20];
 
@@ -109,25 +108,12 @@ pub struct InsertSessionParams {
     pub id: Uuid,
     pub user_id: SqlxUuid,
     pub client_meta: ClientMeta,
-    pub session_token: AuthToken,
-    pub refresh_token: AuthToken,
 }
 
 #[async_trait]
 pub trait SessionModel: Send + Sync {
-    // TODO: Consider encapsulating these in struct
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
-    async fn get_token(
-        &self,
-        session_id: Uuid,
-        kind: AuthTokenKind,
-    ) -> Result<Option<HashedAuthToken>, AppError>;
-    async fn update_tokens(
-        &self,
-        session_token: &AuthToken,
-        refresh_token: &AuthToken,
-    ) -> Result<(), AppError>;
 }
 
 impl UserSession {
@@ -143,8 +129,6 @@ impl UserSession {
             .insert_session(InsertSessionParams {
                 id: session_id,
                 user_id: sqlx_user_id,
-                session_token,
-                refresh_token,
                 client_meta: client_meta.clone(),
             })
             .await?;
@@ -173,8 +157,6 @@ impl UserSession {
             refresh_token_hash,
             refresh_expires,
         };
-        // Update existing session with new tokens
-        db.session.update_token(session.id, &refresh).await?;
 
         Ok(UserSession {
             id: session.id,
@@ -313,10 +295,12 @@ where
                     "no auth token found",
                 )))?;
 
+            // TODO: deserialise paseto
+
             let session = app_state
                 .db
                 .session
-                .get_by_token(&token)
+                .get_token(&token)
                 .await
                 .map_err(|_| {
                     AppError::ServerError(String::from("Failed to retrieve user session db error"))

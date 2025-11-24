@@ -66,8 +66,6 @@ impl SessionModel for SessionModelSqlite {
         )
         .execute(tx.as_mut())
         .await?;
-        tx = upsert_token(tx, &params.session_token).await?;
-        tx = upsert_token(tx, &params.refresh_token).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -96,49 +94,5 @@ impl SessionModel for SessionModelSqlite {
             })
             .collect();
         Ok(sessions)
-    }
-    async fn get_token(
-        &self,
-        session_id: Uuid,
-        kind: AuthTokenKind,
-    ) -> Result<Option<HashedAuthToken>, AppError> {
-        let sql_kind = match kind {
-            AuthTokenKind::Refresh => "REFRESH",
-            AuthTokenKind::Session => "SESSION",
-        };
-        let result = sqlx::query!(
-            r#"
-            SELECT session_id as "session_id: Uuid",
-            hash as "hash: Vec<u8>",
-            expires, kind
-            FROM session_token
-            WHERE session_id = ? AND kind = ?
-            "#,
-            session_id,
-            sql_kind,
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match result {
-            Some(row) => Ok(Some(HashedAuthToken {
-                session_id: row.session_id,
-                hash: row.hash,
-                exp: row.expires,
-                kind: crate::auth::session::AuthTokenKind::Refresh,
-            })),
-            None => Ok(None),
-        }
-    }
-    async fn update_tokens(
-        &self,
-        session_token: &AuthToken,
-        refresh_token: &AuthToken,
-    ) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await?;
-        tx = upsert_token(tx, session_token).await?;
-        tx = upsert_token(tx, refresh_token).await?;
-        tx.commit().await;
-        Ok(())
     }
 }
