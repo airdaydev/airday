@@ -19,7 +19,9 @@ mod telemetry {
 mod auth {
     pub mod auth;
     pub mod cache;
+    pub mod paseto;
     pub mod session;
+    pub mod sqlite;
 }
 mod sync {
     pub mod batch_response;

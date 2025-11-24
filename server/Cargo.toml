@@ -37,3 +37,4 @@ opentelemetry = "0.30.0"
 opentelemetry-stdout = "0.30.0"
 crdt = { path = "../rust/crdt" }
 tokio-util = "0.7.16"
+pasetors = "0.7.7"

@@ -4,6 +4,7 @@
   "description": "",
   "scripts": {
     "start": "pnpm --dir ./web start",
+    "gen_keys": "cargo run --bin gen_paseto_keys",
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
     "db": "sqlx database reset -y --source sqlite/migrations",
     "fb": "./flatbuffers/compile.sh",

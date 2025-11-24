@@ -1,10 +1,13 @@
 use crate::AppState;
 use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
+use crate::auth::paseto::{SessionClaims, create_session_token, verify_session_token};
 use crate::common::datetime::serialize_datetime_iso;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::hash_password;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::password_hash::SaltString;
+use argon2::password_hash::rand_core::OsRng as ArgonRng;
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use async_trait::async_trait;
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
@@ -14,32 +17,54 @@ use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
 use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct UserSession {
-    pub id: Uuid,
-    pub token: String,
-    #[serde(serialize_with = "serialize_datetime_iso")]
-    pub expires: DateTime<Utc>,
-    pub refresh_token: String,
-    #[serde(serialize_with = "serialize_datetime_iso")]
-    pub refresh_expires: DateTime<Utc>,
-    pub user_id: Uuid,
-}
+type HighEntropyBytes = [u8; 20];
 
-pub fn gen_token() -> String {
+fn gen_high_entropy_bytes() -> HighEntropyBytes {
     let mut rng = OsRng; // CSPRNG
     let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
     rng.try_fill_bytes(&mut bytes).unwrap();
+    bytes
+}
+
+fn to_b64(bytes: HighEntropyBytes) -> String {
     general_purpose::URL_SAFE_NO_PAD.encode(&bytes) // Base64 encoded
 }
 
-fn get_current_timestamp() -> i64 {
+pub fn hash_token(bytes: &HighEntropyBytes) -> Result<String, AppError> {
+    let salt = SaltString::generate(&mut ArgonRng);
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+    let password_hash = argon2
+        .hash_password(bytes, &salt)
+        .map_err(|e| AppError::ServerError(format!("Token hash failed: {}", e)))?;
+    Ok(password_hash.to_string())
+}
+
+#[derive(Clone, Debug)]
+pub struct AuthToken {
+    pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
+    pub user_id: Uuid,
+    pub key: HighEntropyBytes,
+    pub exp: DateTime<Utc>,
+}
+
+pub struct TokenPair {
+    pub session: AuthToken,
+    pub refresh: AuthToken,
+}
+
+pub struct UserSession {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub ip: String,
+    pub user_agent: String,
+}
+
+pub fn get_current_timestamp() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -71,13 +96,13 @@ pub struct TokenRefresh {
 }
 
 pub struct InsertSessionParams {
-    id: Uuid,
-    token: String,
-    expires: i64,
-    refresh_token_hash: String,
-    refresh_expires: i64,
-    sqlx_user_id: SqlxUuid,
-    client_meta: ClientMeta,
+    pub id: Uuid,
+    pub token: String,
+    pub expires: i64,
+    pub refresh_token_hash: String,
+    pub refresh_expires: i64,
+    pub sqlx_user_id: SqlxUuid,
+    pub client_meta: ClientMeta,
 }
 
 #[async_trait]
@@ -85,154 +110,13 @@ pub trait SessionModel: Send + Sync {
     // TODO: Consider encapsulating these in struct
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
-    async fn get_by_id(&self, id: Uuid) -> Result<Option<UserSession>, AppError>;
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<TokenPair>, AppError>;
     async fn update_token(
         &self,
         session_id: Uuid,
         token_refresh: &TokenRefresh,
     ) -> Result<(), AppError>;
-    async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError>;
-}
-
-pub struct SessionModelSqlite {
-    pool: SqlitePool,
-}
-
-impl SessionModelSqlite {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-}
-
-#[async_trait]
-impl SessionModel for SessionModelSqlite {
-    async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError> {
-        sqlx::query!(
-          r#"
-          INSERT INTO session (id, token, expires, refresh_token, refresh_expires, user_id, user_agent, ip)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          "#,
-          params.id,
-          params.token,
-          params.expires,
-          params.refresh_token_hash,
-          params.refresh_expires,
-          params.sqlx_user_id,
-          params.client_meta.user_agent,
-          params.client_meta.ip
-      )
-      .execute(&self.pool)
-      .await?;
-        Ok(())
-    }
-    async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let results = sqlx::query!(
-            r#"
-        SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-        refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
-        FROM session
-        WHERE user_id = ? AND expires > ?
-        "#,
-            user_id,
-            now
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let sessions: Vec<UserSession> = results
-            .into_iter()
-            .map(|row| UserSession {
-                id: row.id,
-                token: row.token,
-                expires: row.expires,
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })
-            .collect();
-
-        Ok(sessions)
-    }
-    async fn get_by_id(&self, id: Uuid) -> Result<Option<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let result = sqlx::query!(
-            r#"
-            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>", user_id as 'user_id: Uuid'
-            FROM session
-            WHERE id = ? AND refresh_expires > ?
-            "#,
-            id,
-            now
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match result {
-            Some(row) => Ok(Some(UserSession {
-                id: row.id,
-                token: row.token,
-                expires: row.expires,
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })),
-            None => Ok(None),
-        }
-    }
-    async fn update_token(
-        &self,
-        session_id: Uuid,
-        token_refresh: &TokenRefresh,
-    ) -> Result<(), AppError> {
-        sqlx::query!(
-            r#"
-          UPDATE session
-          SET token = ?, expires = ?, refresh_token = ?, refresh_expires = ?
-          WHERE id = ?
-          "#,
-            token_refresh.token,
-            token_refresh.expires,
-            token_refresh.refresh_token_hash,
-            token_refresh.refresh_expires,
-            session_id,
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-    async fn get_by_token(&self, token: &str) -> Result<Option<UserSession>, AppError> {
-        let now = get_current_timestamp();
-
-        let result = sqlx::query!(
-            r#"
-            SELECT id as "id: Uuid", token, expires as "expires: DateTime<Utc>",
-            refresh_token, refresh_expires as "refresh_expires: DateTime<Utc>",
-            user_id as 'user_id: Uuid'
-            FROM session
-            WHERE token = ? AND expires > ?
-            "#,
-            token,
-            now
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match result {
-            Some(row) => Ok(Some(UserSession {
-                id: row.id,
-                expires: row.expires,
-                token: row.id.to_string(),
-                refresh_token: row.refresh_token,
-                refresh_expires: row.refresh_expires,
-                user_id: row.user_id,
-            })),
-            None => Ok(None),
-        }
-    }
+    async fn get_by_token(&self, token: &str) -> Result<Option<TokenPair>, AppError>;
 }
 
 pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
@@ -252,9 +136,13 @@ pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
 }
 
 impl UserSession {
-    pub async fn new(db: &Db, user_id: Uuid, client_meta: ClientMeta) -> Result<Self, AppError> {
-        let token = gen_token();
-        let refresh_token = gen_token();
+    pub async fn new_pair(
+        db: &Db,
+        user_id: Uuid,
+        client_meta: ClientMeta,
+    ) -> Result<Self, AppError> {
+        let token = gen_high_entropy_bytes();
+        let refresh_token = gen_high_entropy_bytes();
         let refresh_token_hash = hash_password(&refresh_token)?;
 
         // Calculate expiration times (24 hours for session, 30 days for refresh token)

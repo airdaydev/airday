@@ -8,14 +8,18 @@ CREATE TABLE IF NOT EXISTS user (
 
 CREATE TABLE IF NOT EXISTS session (
   id UUID NOT NULL PRIMARY KEY,
-  token TEXT UNIQUE NOT NULL,
-  expires INTEGER NOT NULL,
-  refresh_token TEXT NOT NULL,
-  refresh_expires INTEGER NOT NULL,
   user_id UUID NOT NULL,
   user_agent TEXT NOT NULL,
   ip TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES user (id)
+);
+
+CREATE TABLE IF NOT EXISTS session_keys (
+  session_id UUID NOT NULL PRIMARY KEY,
+  token TEXT UNIQUE NOT NULL,
+  expires INTEGER NOT NULL,
+  refresh BOOLEAN NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES session (id)
 );
 
 -- seq can be incremented in blocks - allocating a range for transaction size of sync ops
