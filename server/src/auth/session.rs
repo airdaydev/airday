@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
+use crate::auth::meta::ClientMeta;
 use crate::auth::paseto::{SessionClaims, create_session_token, verify_session_token};
 use crate::common::datetime::serialize_datetime_iso;
 use crate::common::error::AppError;
@@ -23,33 +24,69 @@ use uuid::Uuid;
 
 type HighEntropyBytes = [u8; 20];
 
-fn gen_high_entropy_bytes() -> HighEntropyBytes {
-    let mut rng = OsRng; // CSPRNG
-    let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
-    rng.try_fill_bytes(&mut bytes).unwrap();
-    bytes
+#[derive(Clone, Debug, PartialEq)]
+pub enum AuthTokenKind {
+    Session,
+    Refresh,
 }
 
-fn to_b64(bytes: HighEntropyBytes) -> String {
-    general_purpose::URL_SAFE_NO_PAD.encode(&bytes) // Base64 encoded
-}
-
-pub fn hash_token(bytes: &HighEntropyBytes) -> Result<String, AppError> {
-    let salt = SaltString::generate(&mut ArgonRng);
-    // Argon2 with default params (Argon2id v19)
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(bytes, &salt)
-        .map_err(|e| AppError::ServerError(format!("Token hash failed: {}", e)))?;
-    Ok(password_hash.to_string())
+#[derive(Clone, Debug)]
+pub struct HashedAuthToken {
+    pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
+    pub hash: HighEntropyBytes,
+    pub exp: i64,
+    pub kind: AuthTokenKind,
 }
 
 #[derive(Clone, Debug)]
 pub struct AuthToken {
     pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
-    pub user_id: Uuid,
-    pub key: HighEntropyBytes,
-    pub exp: DateTime<Utc>,
+    pub token: HighEntropyBytes,
+    pub exp: i64,
+    pub kind: AuthTokenKind,
+}
+
+impl AuthToken {
+    fn new_session_token(session_id: Uuid) -> Self {
+        Self {
+            kind: AuthTokenKind::Session,
+            session_id,
+            token: Self::gen_high_entropy_bytes(),
+            exp: Self::get_current_timestamp() + (24 * 60 * 60), // 24 hours
+        }
+    }
+    fn new_refresh_token(session_id: Uuid) -> Self {
+        Self {
+            kind: AuthTokenKind::Refresh,
+            session_id,
+            token: Self::gen_high_entropy_bytes(),
+            exp: Self::get_current_timestamp() + (30 * 24 * 60 * 60), // 30 days
+        }
+    }
+    fn gen_high_entropy_bytes() -> HighEntropyBytes {
+        let mut rng = OsRng; // CSPRNG
+        let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
+        rng.try_fill_bytes(&mut bytes).unwrap();
+        bytes
+    }
+    fn get_current_timestamp() -> i64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64
+    }
+    pub fn hash_token(self: &Self) -> Result<String, AppError> {
+        let salt = SaltString::generate(&mut ArgonRng);
+        // Argon2 with default params (Argon2id v19)
+        let argon2 = Argon2::default();
+        let password_hash = argon2
+            .hash_password(&self.token, &salt)
+            .map_err(|e| AppError::ServerError(format!("Token hash failed: {}", e)))?;
+        Ok(password_hash.to_string())
+    }
+    fn b64_hash(self: &Self) -> String {
+        general_purpose::URL_SAFE_NO_PAD.encode(&self.token) // Base64 encoded
+    }
 }
 
 pub struct TokenPair {
@@ -57,52 +94,23 @@ pub struct TokenPair {
     pub refresh: AuthToken,
 }
 
+#[derive(Clone)]
 pub struct UserSession {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub ip: String,
-    pub user_agent: String,
-}
-
-pub fn get_current_timestamp() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64
-}
-
-fn calculate_session_expiry(now: i64) -> i64 {
-    now + (24 * 60 * 60) // 24 hours
-}
-
-fn calculate_refresh_expiry(now: i64) -> i64 {
-    now + (30 * 24 * 60 * 60) // 30 days
+    pub client_meta: ClientMeta,
 }
 
 fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
     DateTime::from_timestamp(timestamp, 0).unwrap()
 }
 
-pub struct ClientMeta {
-    pub ip: String,
-    pub user_agent: String,
-}
-
-pub struct TokenRefresh {
-    token: String,
-    expires: i64,
-    refresh_token_hash: String,
-    refresh_expires: i64,
-}
-
 pub struct InsertSessionParams {
     pub id: Uuid,
-    pub token: String,
-    pub expires: i64,
-    pub refresh_token_hash: String,
-    pub refresh_expires: i64,
-    pub sqlx_user_id: SqlxUuid,
+    pub user_id: SqlxUuid,
     pub client_meta: ClientMeta,
+    pub session_token: AuthToken,
+    pub refresh_token: AuthToken,
 }
 
 #[async_trait]
@@ -110,72 +118,38 @@ pub trait SessionModel: Send + Sync {
     // TODO: Consider encapsulating these in struct
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
-    async fn get_by_id(&self, id: Uuid) -> Result<Option<TokenPair>, AppError>;
-    async fn update_token(
+    async fn get_refresh_token(&self, session_id: Uuid) -> Result<Option<TokenPair>, AppError>;
+    async fn update_tokens(
         &self,
-        session_id: Uuid,
-        token_refresh: &TokenRefresh,
+        session_token: &AuthToken,
+        refresh_token: &AuthToken,
     ) -> Result<(), AppError>;
     async fn get_by_token(&self, token: &str) -> Result<Option<TokenPair>, AppError>;
 }
 
-pub fn get_client_meta(headers: &axum::http::HeaderMap) -> ClientMeta {
-    let user_agent = headers
-        .get("user-agent")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("Unknown")
-        .to_string();
-
-    let ip = headers
-        .get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("Unknown")
-        .to_string();
-    return ClientMeta { user_agent, ip };
-}
-
 impl UserSession {
-    pub async fn new_pair(
-        db: &Db,
-        user_id: Uuid,
-        client_meta: ClientMeta,
-    ) -> Result<Self, AppError> {
-        let token = gen_high_entropy_bytes();
-        let refresh_token = gen_high_entropy_bytes();
-        let refresh_token_hash = hash_password(&refresh_token)?;
-
-        // Calculate expiration times (24 hours for session, 30 days for refresh token)
-        let now = get_current_timestamp();
-        let expires = calculate_session_expiry(now);
-        let expires_datetime = timestamp_to_datetime(expires);
-        let refresh_expires = calculate_refresh_expiry(now);
-        let refresh_expires_datetime = timestamp_to_datetime(refresh_expires);
-
+    pub async fn new(db: &Db, user_id: Uuid, client_meta: ClientMeta) -> Result<Self, AppError> {
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
         let uuid = Uuid::new_v4();
-        let id = SqlxUuid::from_bytes(uuid.into_bytes());
+        let session_id = SqlxUuid::from_bytes(uuid.into_bytes());
+        let session_token = AuthToken::new_session_token(session_id);
+        let refresh_token = AuthToken::new_refresh_token(session_id);
 
         db.session
             .insert_session(InsertSessionParams {
-                id: id,
-                token: token.clone(),
-                expires: expires,
-                refresh_token_hash: refresh_token_hash,
-                refresh_expires: refresh_expires,
-                sqlx_user_id: sqlx_user_id,
-                client_meta: client_meta,
+                id: session_id,
+                user_id: sqlx_user_id,
+                session_token,
+                refresh_token,
+                client_meta: client_meta.clone(),
             })
             .await?;
 
         Ok(UserSession {
-            id,
-            token,
-            expires: expires_datetime,
-            refresh_token,
-            refresh_expires: refresh_expires_datetime,
+            id: session_id,
             user_id,
+            client_meta,
         })
     }
 
