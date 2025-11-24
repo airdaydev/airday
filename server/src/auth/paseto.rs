@@ -2,7 +2,6 @@ use crate::auth::session::{AuthToken, UserSession};
 use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
 use core::convert::TryFrom;
 use pasetors::claims::{Claims, ClaimsValidationRules};
@@ -50,10 +49,10 @@ pub fn serialize_token(token: &AuthToken) -> Result<String, AppError> {
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     // claims.add_additional("expires", session.expires.to_rfc3339())?;
     claims
-        .add_additional("kind", &session.kind)
+        .add_additional("kind", token.kind.to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
-        .add_additional("user_id", session.user_id.to_string())
+        .add_additional("user_id", token.user_id.to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     let paseto_token = public::sign(&keys.secret, &claims, None, None)
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
@@ -61,7 +60,7 @@ pub fn serialize_token(token: &AuthToken) -> Result<String, AppError> {
 }
 
 /// Deserialize a PASETO token back into a UserSession
-pub fn deserialize_session(token: &str) -> Result<UserSession, AppError> {
+pub fn deserialize_token(token: &str) -> Result<UserSession, AppError> {
     let keys = PasetoKeys::get()?;
 
     let validation_rules = ClaimsValidationRules::new();

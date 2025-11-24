@@ -29,6 +29,15 @@ pub enum AuthTokenKind {
     Refresh,
 }
 
+impl AuthTokenKind {
+    pub fn to_string(&self) -> &str {
+        match &self {
+            AuthTokenKind::Session => "SESSION",
+            AuthTokenKind::Refresh => "REFRESH",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct HashedAuthToken {
     pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
@@ -40,6 +49,7 @@ pub struct HashedAuthToken {
 #[derive(Clone, Debug)]
 pub struct AuthToken {
     pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
+    pub user_id: Uuid,
     pub token: HighEntropyBytes,
     pub exp: i64,
     pub kind: AuthTokenKind,
