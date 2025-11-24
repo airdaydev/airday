@@ -5,10 +5,7 @@ use uuid::Uuid;
 use crate::{
     auth::{
         meta::ClientMeta,
-        session::{
-            AuthToken, AuthTokenKind, HashedAuthToken, InsertSessionParams, SessionModel,
-            UserSession,
-        },
+        session::{InsertSessionParams, SessionModel, UserSession},
     },
     common::error::AppError,
 };
@@ -21,33 +18,6 @@ impl SessionModelSqlite {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-}
-
-async fn upsert_token<'a>(
-    mut tx: Transaction<'a, Sqlite>,
-    token: &'a AuthToken,
-) -> Result<Transaction<'a, Sqlite>, AppError> {
-    let hash = token.hash_token()?;
-    let is_refresh = token.kind == crate::auth::session::AuthTokenKind::Refresh;
-
-    sqlx::query!(
-        r#"
-        INSERT INTO session_token (session_id, hash, expires, kind)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(session_id, kind) DO UPDATE SET
-            hash = excluded.hash,
-            expires = excluded.expires,
-            refresh = excluded.kind
-        "#,
-        token.session_id,
-        hash,
-        token.exp,
-        is_refresh
-    )
-    .execute(tx.as_mut())
-    .await?;
-
-    Ok(tx)
 }
 
 #[async_trait]

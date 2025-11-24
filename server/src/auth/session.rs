@@ -1,10 +1,7 @@
 use crate::AppState;
-use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::auth::meta::ClientMeta;
-use crate::auth::paseto::{SessionClaims, create_session_token, verify_session_token};
 use crate::common::error::AppError;
 use crate::common::sql::Db;
-use crate::user::model::hash_password;
 use argon2::password_hash::SaltString;
 use argon2::password_hash::rand_core::OsRng as ArgonRng;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -47,54 +44,93 @@ pub struct HashedAuthToken {
 }
 
 #[derive(Clone, Debug)]
-pub struct AuthToken {
-    pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
+pub struct TokenData {
+    pub session_id: Uuid,
     pub user_id: Uuid,
+    pub primary_library_id: Uuid,
     pub token: HighEntropyBytes,
     pub exp: i64,
-    pub kind: AuthTokenKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum AuthToken {
+    SessionToken(TokenData),
+    RefreshToken(TokenData),
 }
 
 impl AuthToken {
-    fn new_session_token(session_id: Uuid) -> Self {
-        Self {
-            kind: AuthTokenKind::Session,
-            session_id,
+    pub fn new_session_token(session: UserSession) -> Self {
+        AuthToken::SessionToken(TokenData {
+            session_id: session.id,
+            user_id: session.user_id,
+            primary_library_id: session.primary_library,
             token: Self::gen_high_entropy_bytes(),
             exp: Self::get_current_timestamp() + (24 * 60 * 60), // 24 hours
-        }
+        })
     }
-    fn new_refresh_token(session_id: Uuid) -> Self {
-        Self {
-            kind: AuthTokenKind::Refresh,
-            session_id,
+
+    pub fn new_refresh_token(session: UserSession) -> Self {
+        AuthToken::RefreshToken(TokenData {
+            session_id: session.id,
+            user_id: session.user_id,
+            primary_library_id: session.primary_library,
             token: Self::gen_high_entropy_bytes(),
             exp: Self::get_current_timestamp() + (30 * 24 * 60 * 60), // 30 days
-        }
+        })
     }
+
     fn gen_high_entropy_bytes() -> HighEntropyBytes {
         let mut rng = OsRng; // CSPRNG
         let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
         rng.try_fill_bytes(&mut bytes).unwrap();
         bytes
     }
+
     fn get_current_timestamp() -> i64 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64
     }
-    pub fn hash_token(self: &Self) -> Result<String, AppError> {
+
+    pub fn hash_token(&self) -> Result<String, AppError> {
         let salt = SaltString::generate(&mut ArgonRng);
-        // Argon2 with default params (Argon2id v19)
         let argon2 = Argon2::default();
+        let token_bytes = self.data().token;
         let password_hash = argon2
-            .hash_password(&self.token, &salt)
+            .hash_password(&token_bytes, &salt)
             .map_err(|e| AppError::ServerError(format!("Token hash failed: {}", e)))?;
         Ok(password_hash.to_string())
     }
-    fn b64_hash(self: &Self) -> String {
-        general_purpose::URL_SAFE_NO_PAD.encode(&self.token) // Base64 encoded
+
+    fn b64_hash(&self) -> String {
+        general_purpose::URL_SAFE_NO_PAD.encode(&self.data().token)
+    }
+
+    pub fn data(&self) -> &TokenData {
+        match self {
+            AuthToken::SessionToken(data) => data,
+            AuthToken::RefreshToken(data) => data,
+        }
+    }
+
+    pub fn kind(&self) -> AuthTokenKind {
+        match self {
+            AuthToken::SessionToken(_) => AuthTokenKind::Session,
+            AuthToken::RefreshToken(_) => AuthTokenKind::Refresh,
+        }
+    }
+
+    pub fn session_id(&self) -> Uuid {
+        self.data().session_id
+    }
+
+    pub fn user_id(&self) -> Uuid {
+        self.data().user_id
+    }
+
+    pub fn exp(&self) -> i64 {
+        self.data().exp
     }
 }
 
@@ -107,6 +143,7 @@ pub struct TokenPair {
 pub struct UserSession {
     pub id: Uuid,
     pub user_id: Uuid,
+    pub primary_library: Uuid,
     pub client_meta: ClientMeta,
 }
 
@@ -127,13 +164,16 @@ pub trait SessionModel: Send + Sync {
 }
 
 impl UserSession {
-    pub async fn new(db: &Db, user_id: Uuid, client_meta: ClientMeta) -> Result<Self, AppError> {
+    pub async fn new(
+        db: &Db,
+        user_id: Uuid,
+        primary_library_id: Uuid,
+        client_meta: ClientMeta,
+    ) -> Result<Self, AppError> {
         let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
 
         let uuid = Uuid::new_v4();
         let session_id = SqlxUuid::from_bytes(uuid.into_bytes());
-        let session_token = AuthToken::new_session_token(session_id);
-        let refresh_token = AuthToken::new_refresh_token(session_id);
 
         db.session
             .insert_session(InsertSessionParams {
@@ -146,6 +186,7 @@ impl UserSession {
         Ok(UserSession {
             id: session_id,
             user_id,
+            primary_library: primary_library_id,
             client_meta,
         })
     }

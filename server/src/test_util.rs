@@ -25,9 +25,12 @@ pub async fn mock_user(db: &Db, email: String) -> User {
 }
 
 pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
+    let user = db.user.get_by_id(user_id).await.unwrap().unwrap();
+    let primary_library_id = user.primary_library.as_ref().unwrap().id;
     UserSession::new(
         &db,
         user_id,
+        primary_library_id,
         ClientMeta {
             ip: String::from(""),
             user_agent: String::from(""),
