@@ -60,7 +60,7 @@ pub fn serialize_token(token: &AuthToken) -> Result<String, AppError> {
 }
 
 /// Deserialize a PASETO token back into a UserSession
-pub fn deserialize_token(token: &str) -> Result<UserSession, AppError> {
+pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
     let keys = PasetoKeys::get()?;
 
     let validation_rules = ClaimsValidationRules::new();
@@ -84,11 +84,9 @@ pub fn deserialize_token(token: &str) -> Result<UserSession, AppError> {
 
     // Extract all fields
     let id = extract_uuid(&claims, "id")?;
-    let token = extract_string(&claims, "token")?;
     let expires = extract_datetime(&claims, "expires")?;
-    let refresh_token = extract_string(&claims, "refresh_token")?;
-    let refresh_expires = extract_datetime(&claims, "refresh_expires")?;
     let user_id = extract_uuid(&claims, "user_id")?;
+    // TODO: Refresh or Session?
 
     Ok(UserSession {
         id,
