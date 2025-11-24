@@ -45,13 +45,18 @@ export class AirdaySync {
   takeOps(count: number) {
     return this.core.sync.outbox.splice(0, count);
   }
+  async initialise() {
+    // 1. Attempt to load storage FOR CURRENT USER
+    // // (retrieve by session key... - uh oh time to put some extra info in there?! and also have a purely offline user!)
+    // 2. If user cache not present, leave in this state
+    // 2. If no user present, start a new local library FRESH
+  }
   initialSync() {
     // TODO: Prevent if not authorised
     this.getLibraries(); // TODO: currently a noop
     this.catchup(this.core.library.id!, 0);
     // TODO: For each shared library, start list & item streams
     // TODO: Later, prioritise by active items, tombstoned items, completed items
-
     // TODO: Collect pending items, containers, libraries for pushing
   }
   applyLocal(patches: SyncObject[]) {

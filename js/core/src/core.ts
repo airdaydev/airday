@@ -53,6 +53,7 @@ export class AirdayCore {
     url.pathname = pathName;
     return url;
   }
+  // TODO: differentiate between cookie & bearer
   setSession(session: Session) {
     this.session = session;
   }

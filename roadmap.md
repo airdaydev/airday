@@ -1,6 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] paseto cookie single source of truth
+- [] differentiate cookie vs bearer auth
 - [] offline user bootstrap! - start from AirdayStorage.initialise
 - [] purely offline library resync with proper library ids...
 - [] bring back library id after auth to continue through sync tests

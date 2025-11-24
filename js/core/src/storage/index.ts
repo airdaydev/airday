@@ -22,7 +22,7 @@ export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
   // Library storage
-  libraries: Map<LibraryHexUuid, Library>;
+  libraries: Map<LibraryHexUuid, Library> = new Map();
   // OpCache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
   opLibMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
@@ -32,11 +32,6 @@ export class AirdayStorage {
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
-  }
-  async initialise() {
-    // 1. Attempt to load storage FOR CURRENT USER (retrieve by session key... - uh oh time to put some extra info in there?! and also have a purely offline user!)
-    // 2. If user cache not present, leave in this state
-    // 2. If no user present, start a new local library FRESH
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
     let op = this.outbox.get(id.toHex());
