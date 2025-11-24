@@ -20,7 +20,7 @@ use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
-use uuid::Uuid;
+use uuid::{Bytes, Uuid};
 
 type HighEntropyBytes = [u8; 20];
 
@@ -33,7 +33,7 @@ pub enum AuthTokenKind {
 #[derive(Clone, Debug)]
 pub struct HashedAuthToken {
     pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
-    pub hash: HighEntropyBytes,
+    pub hash: Vec<u8>,
     pub exp: i64,
     pub kind: AuthTokenKind,
 }
@@ -118,13 +118,16 @@ pub trait SessionModel: Send + Sync {
     // TODO: Consider encapsulating these in struct
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
-    async fn get_refresh_token(&self, session_id: Uuid) -> Result<Option<TokenPair>, AppError>;
+    async fn get_token(
+        &self,
+        session_id: Uuid,
+        kind: AuthTokenKind,
+    ) -> Result<Option<HashedAuthToken>, AppError>;
     async fn update_tokens(
         &self,
         session_token: &AuthToken,
         refresh_token: &AuthToken,
     ) -> Result<(), AppError>;
-    async fn get_by_token(&self, token: &str) -> Result<Option<TokenPair>, AppError>;
 }
 
 impl UserSession {

@@ -5,7 +5,10 @@ use uuid::Uuid;
 use crate::{
     auth::{
         meta::ClientMeta,
-        session::{AuthToken, HashedAuthToken, InsertSessionParams, SessionModel, UserSession},
+        session::{
+            AuthToken, AuthTokenKind, HashedAuthToken, InsertSessionParams, SessionModel,
+            UserSession,
+        },
     },
     common::error::AppError,
 };
@@ -29,12 +32,12 @@ async fn upsert_token<'a>(
 
     sqlx::query!(
         r#"
-        INSERT INTO session_token (session_id, hash, expires, refresh)
+        INSERT INTO session_token (session_id, hash, expires, kind)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(session_id, refresh) DO UPDATE SET
+        ON CONFLICT(session_id, kind) DO UPDATE SET
             hash = excluded.hash,
             expires = excluded.expires,
-            refresh = excluded.refresh
+            refresh = excluded.kind
         "#,
         token.session_id,
         hash,
@@ -94,18 +97,25 @@ impl SessionModel for SessionModelSqlite {
             .collect();
         Ok(sessions)
     }
-    async fn get_refresh_token(
+    async fn get_token(
         &self,
         session_id: Uuid,
+        kind: AuthTokenKind,
     ) -> Result<Option<HashedAuthToken>, AppError> {
+        let sql_kind = match kind {
+            AuthTokenKind::Refresh => "REFRESH",
+            AuthTokenKind::Session => "SESSION",
+        };
         let result = sqlx::query!(
             r#"
-            SELECT session_id as "session_id: Uuid", hash,
-            expires, refresh
+            SELECT session_id as "session_id: Uuid",
+            hash as "hash: Vec<u8>",
+            expires, kind
             FROM session_token
-            WHERE session_id = ? AND refresh = TRUE
+            WHERE session_id = ? AND kind = ?
             "#,
             session_id,
+            sql_kind,
         )
         .fetch_optional(&self.pool)
         .await?;

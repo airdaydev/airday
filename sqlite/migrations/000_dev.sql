@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS session_token (
   session_id UUID NOT NULL,
   hash BYTES UNIQUE NOT NULL,
   expires INTEGER NOT NULL,
-  refresh BOOLEAN NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('SESSION', 'REFRESH')),
   FOREIGN KEY (session_id) REFERENCES session (id)
-  PRIMARY KEY (session_id, refresh)
+  PRIMARY KEY (session_id, kind)
 );
 
 -- seq can be incremented in blocks - allocating a range for transaction size of sync ops
