@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::{
@@ -43,9 +43,10 @@ impl SessionModel for SessionModelSqlite {
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError> {
         let results = sqlx::query!(
             r#"
-        SELECT id as "id: Uuid", user_id as 'user_id: Uuid', ip, user_agent
-        FROM session
-        WHERE user_id = ?
+        SELECT s.id as "id: Uuid", s.user_id as 'user_id: Uuid', s.ip, s.user_agent, u.primary_library_id as "primary_library_id: Uuid"
+        FROM session s
+        JOIN user u ON s.user_id = u.id
+        WHERE s.user_id = ?
         "#,
             user_id
         )
@@ -57,6 +58,7 @@ impl SessionModel for SessionModelSqlite {
             .map(|row| UserSession {
                 id: row.id,
                 user_id: row.user_id,
+                primary_library: row.primary_library_id,
                 client_meta: ClientMeta {
                     user_agent: row.user_agent,
                     ip: row.ip,
@@ -64,5 +66,29 @@ impl SessionModel for SessionModelSqlite {
             })
             .collect();
         Ok(sessions)
+    }
+
+    async fn get_by_id(&self, session_id: Uuid) -> Result<Option<UserSession>, AppError> {
+        let result = sqlx::query!(
+            r#"
+        SELECT s.id as "id: Uuid", s.user_id as 'user_id: Uuid', s.ip, s.user_agent, u.primary_library_id as "primary_library_id: Uuid"
+        FROM session s
+        JOIN user u ON s.user_id = u.id
+        WHERE s.id = ?
+        "#,
+            session_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|row| UserSession {
+            id: row.id,
+            user_id: row.user_id,
+            primary_library: row.primary_library_id,
+            client_meta: ClientMeta {
+                user_agent: row.user_agent,
+                ip: row.ip,
+            },
+        }))
     }
 }

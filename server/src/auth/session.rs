@@ -111,6 +111,7 @@ pub struct InsertSessionParams {
 pub trait SessionModel: Send + Sync {
     async fn insert_session(&self, params: InsertSessionParams) -> Result<(), AppError>;
     async fn get_by_user(&self, user_id: Uuid) -> Result<Vec<UserSession>, AppError>;
+    async fn get_by_id(&self, session_id: Uuid) -> Result<Option<UserSession>, AppError>;
 }
 
 impl UserSession {

@@ -1,5 +1,5 @@
 use crate::{
-    auth::session::{SessionModel, SessionModelSqlite},
+    auth::{session::SessionModel, sqlite::SessionModelSqlite},
     common::config::AirdayConfig,
     library::{model::LibraryModel, sqlite::LibraryModelSqlite},
     sync::{engine::SyncOpModel, sqlite::SyncOpModelSqlite},

@@ -2,7 +2,7 @@ use crate::{
     AppState,
     auth::{
         meta::get_client_meta,
-        paseto::to_paseto,
+        paseto::{deserialize_token, to_paseto},
         session::{AuthToken, UserSession},
     },
     common::{config::AirdayConfig, error::AppError, sql::Db},
@@ -120,8 +120,8 @@ pub async fn auth_websocket(
     session_token: &str,
     socket_id: &Uuid,
 ) -> Result<UserSession, AppError> {
-    let user_session = state.db.session.get_by_token(&session_token).await?;
-    // TODO: SECURITY! VALIDATE THE SESSION!!
+    let paseto = deserialize_token(session_token)?; // TODO: Does this always validate?
+    let user_session = state.db.session.get_by_id(paseto.session_id()).await?;
     if let Some(sesh) = user_session {
         let set_conn_user_id: bool = {
             // Mutex scope

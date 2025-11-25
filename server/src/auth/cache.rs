@@ -1,9 +1,7 @@
-use std::time::Duration;
-
-use mini_moka::sync::Cache;
-use uuid::Uuid;
-
 use crate::common::sql::Db;
+use mini_moka::sync::Cache;
+use std::time::Duration;
+use uuid::Uuid;
 
 type AuthCacheKey = (Uuid, Uuid);
 
@@ -30,11 +28,9 @@ impl AuthCache {
         }
         // Fall through
         if let Some(user) = db.user.get_by_id(&user_id).await.unwrap() {
-            if let Some(primary_library) = user.primary_library {
-                if primary_library.id == *library_id {
-                    self.cache.insert(key, true);
-                    return true;
-                }
+            if user.primary_library.id == *library_id {
+                self.cache.insert(key, true);
+                return true;
             }
         };
         self.cache.insert(key, false);
