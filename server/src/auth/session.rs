@@ -14,8 +14,25 @@ use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
 use uuid::Uuid;
 
-const SESSION_CONST: &'static str = "session";
-const REFRESH_CONST: &'static str = "refresh";
+pub enum AuthTokenKind {
+    SESSION,
+    REFRESH,
+}
+
+pub const SESSION_CONST: &'static str = "session";
+pub const REFRESH_CONST: &'static str = "refresh";
+
+pub fn match_token_kind(str: &str) -> Result<AuthTokenKind, AppError> {
+    if str == SESSION_CONST {
+        return Ok(AuthTokenKind::SESSION);
+    }
+    if str == REFRESH_CONST {
+        return Ok(AuthTokenKind::REFRESH);
+    }
+    Err(AppError::ValidationError(String::from(
+        "Invalid token kind",
+    )))
+}
 
 #[derive(Clone, Debug)]
 pub struct TokenData {
@@ -73,6 +90,10 @@ impl AuthToken {
 
     pub fn session_id(&self) -> Uuid {
         self.data().session_id
+    }
+
+    pub fn primary_library_id(&self) -> Uuid {
+        self.data().primary_library_id
     }
 
     pub fn user_id(&self) -> Uuid {

@@ -1,4 +1,4 @@
-use crate::auth::session::{AuthToken, UserSession};
+use crate::auth::session::{AuthToken, AuthTokenKind, TokenData, match_token_kind};
 use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -40,26 +40,27 @@ impl PasetoKeys {
     }
 }
 
-/// Serialize a UserSession into a signed PASETO token
 pub fn to_paseto(token: &AuthToken) -> Result<String, AppError> {
     let keys = PasetoKeys::get()?;
     let mut claims = Claims::new().map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
-        .add_additional("session_id", token.session_id().to_string())
-        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
-    // claims.add_additional("expires", token.exp().to_rfc3339())?;
-    claims
-        .add_additional("kind", token.kind_str())
+        .add_additional("s_id", token.session_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
-        .add_additional("user_id", token.user_id().to_string())
+        .add_additional("p_id", token.primary_library_id().to_string())
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    // claims.add_additional("exp", token.exp().to_rfc3339())?;
+    claims
+        .add_additional("k", token.kind_str())
+        .map_err(|e| AppError::ServerError(format!("{}", e)))?;
+    claims
+        .add_additional("u_id", token.user_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     let paseto_token = public::sign(&keys.secret, &claims, None, None)
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     Ok(paseto_token)
 }
 
-/// Deserialize a PASETO token back into a UserSession
 pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
     let keys = PasetoKeys::get()?;
 
@@ -82,20 +83,23 @@ pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
             "No claims in token",
         )))?;
 
-    // Extract all fields
-    let id = extract_uuid(&claims, "id")?;
-    let expires = extract_datetime(&claims, "expires")?;
-    let user_id = extract_uuid(&claims, "user_id")?;
-    // TODO: Refresh or Session?
+    let session_id = extract_uuid(&claims, "s_id")?;
+    let exp = extract_datetime(&claims, "exp")?;
+    let user_id = extract_uuid(&claims, "u_id")?;
+    let primary_library_id = extract_uuid(&claims, "p_id")?;
+    let kind = extract_kind(&claims, "k")?;
 
-    Ok(UserSession {
-        id,
-        token,
-        expires,
-        refresh_token,
-        refresh_expires,
-        user_id,
-    })
+    let token = match kind {
+        AuthTokenKind::REFRESH => AuthToken::SessionToken(TokenData {
+            session_id,
+            user_id,
+            primary_library_id,
+            exp,
+        }),
+        AuthTokenKind::SESSION => AuthToken::new_session_token(session),
+    };
+
+    Ok(token)
 }
 
 // Helper functions to extract typed values from claims
@@ -118,6 +122,11 @@ fn extract_uuid(claims: &Claims, key: &str) -> Result<Uuid, AppError> {
     let uuid_str = extract_string(claims, key)?;
     Uuid::parse_str(&uuid_str)
         .map_err(|_| AppError::AuthorisationError(format!("Invalid {} UUID", key)))
+}
+
+fn extract_kind(claims: &Claims, key: &str) -> Result<AuthTokenKind, AppError> {
+    let kind_str = extract_string(claims, key)?;
+    match_token_kind(&kind_str)
 }
 
 fn extract_datetime(claims: &Claims, key: &str) -> Result<DateTime<Utc>, AppError> {
