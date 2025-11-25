@@ -2,8 +2,8 @@ CREATE TABLE IF NOT EXISTS user (
   id UUID NOT NULL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  primary_library_id UUID NULL,
-  FOREIGN KEY (primary_library_id) REFERENCES library (id) ON DELETE SET NULL
+  primary_library_id UUID NOT NULL,
+  FOREIGN KEY (primary_library_id) REFERENCES library (id)
 );
 
 CREATE TABLE IF NOT EXISTS session (

@@ -34,7 +34,7 @@ impl UserModel for UserModelSqlite {
                 row.password_hash,
                 row.library_id,
                 row.library_name,
-            );
+            )?;
             return Ok(Some(user));
         }
         Ok(None)
@@ -62,7 +62,7 @@ impl UserModel for UserModelSqlite {
                 row.password_hash,
                 row.library_id,
                 row.library_name,
-            );
+            )?;
             return Ok(Some(user));
         }
         Ok(None)
@@ -94,11 +94,7 @@ impl UserModel for UserModelSqlite {
                     id: row.id,
                     email: row.email,
                     password_hash: row.password_hash,
-                    primary_library: Some(Library {
-                        id: primary_library.id,
-                        name: primary_library.name,
-                        seq: None,
-                    }),
+                    primary_library,
                 };
                 tx.commit().await?;
                 Ok(user)
@@ -155,19 +151,24 @@ impl UserModelSqlite {
         password_hash: String,
         library_id: Option<Uuid>,
         library_name: Option<String>,
-    ) -> User {
-        let library = library_id.map(|id| Library {
-            id,
-            name: library_name.unwrap_or_default(),
+    ) -> Result<User, AppError> {
+        let Some(library_id) = library_id else {
+            return Err(AppError::DatabaseError(String::from(
+                "User has no primary_library",
+            )));
+        };
+        let primary_library = Library {
+            id: library_id,
+            name: library_name.unwrap_or(String::from("")),
             seq: None,
-        });
+        };
 
-        User {
+        Ok(User {
             id,
             email,
             password_hash,
-            primary_library: library,
-        }
+            primary_library,
+        })
     }
 }
 

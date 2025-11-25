@@ -2,6 +2,7 @@ use crate::AppState;
 use crate::auth::meta::ClientMeta;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
+use crate::user::model::User;
 use argon2::password_hash::SaltString;
 use argon2::password_hash::rand_core::OsRng as ArgonRng;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -164,13 +165,8 @@ pub trait SessionModel: Send + Sync {
 }
 
 impl UserSession {
-    pub async fn new(
-        db: &Db,
-        user_id: Uuid,
-        primary_library_id: Uuid,
-        client_meta: ClientMeta,
-    ) -> Result<Self, AppError> {
-        let sqlx_user_id = SqlxUuid::from_bytes(user_id.into_bytes());
+    pub async fn new(db: &Db, user: User, client_meta: ClientMeta) -> Result<Self, AppError> {
+        let sqlx_user_id = SqlxUuid::from_bytes(user.id.into_bytes());
 
         let uuid = Uuid::new_v4();
         let session_id = SqlxUuid::from_bytes(uuid.into_bytes());

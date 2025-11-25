@@ -41,14 +41,14 @@ pub struct User {
     pub id: SqlxUuid,
     pub email: String,
     pub password_hash: String,
-    pub primary_library: Option<Library>,
+    pub primary_library: Library,
 }
 
 #[derive(Serialize, Debug)]
 pub struct PublicUser {
     pub id: String,
     pub email: String,
-    pub primary_library: Option<Library>,
+    pub primary_library: Library,
 }
 
 impl From<User> for PublicUser {

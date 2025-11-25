@@ -42,16 +42,8 @@ pub async fn password_authorisation(
     payload: PasswordAuthorisationReq,
 ) -> Result<UserSession, AppError> {
     let user = verify_login(&db, &payload.email, &payload.password).await?;
-    let user_uuid = Uuid::from_bytes(user.id.into_bytes());
-    let primary_library_id = user
-        .primary_library
-        .as_ref()
-        .ok_or(AppError::ServerError(String::from(
-            "User has no primary library",
-        )))?
-        .id;
     let client_meta = get_client_meta(&headers);
-    let session = UserSession::new(db, user_uuid, primary_library_id, client_meta).await?;
+    let session = UserSession::new(db, user, client_meta).await?;
     Ok(session)
 }
 
