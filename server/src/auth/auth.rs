@@ -1,7 +1,10 @@
 use crate::{
     AppState,
-    auth::meta::get_client_meta,
-    auth::session::UserSession,
+    auth::{
+        meta::get_client_meta,
+        paseto::to_paseto,
+        session::{AuthToken, UserSession},
+    },
     common::{config::AirdayConfig, error::AppError, sql::Db},
     user::model::{PublicUser, verify_login},
 };
@@ -16,24 +19,34 @@ pub struct PasswordAuthorisationReq {
     pub password: String,
 }
 
-pub fn build_session_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
-    Cookie::build(("session_token", String::from(token)))
+pub fn build_session_cookie(
+    config: AirdayConfig,
+    session: &UserSession,
+) -> Result<Cookie<'static>, AppError> {
+    let token = AuthToken::new_session_token(session);
+    let paseto = to_paseto(&token)?;
+    Ok(Cookie::build(("session_token", paseto))
         .http_only(true)
         .secure(config.secure_cookies.clone())
         .same_site(tower_cookies::cookie::SameSite::Strict)
         .path("/")
         .max_age(tower_cookies::cookie::time::Duration::hours(24))
-        .build()
+        .build())
 }
 
-pub fn build_refresh_cookie(config: AirdayConfig, token: &str) -> Cookie<'static> {
-    Cookie::build(("refresh_token", String::from(token)))
+pub fn build_refresh_cookie(
+    config: AirdayConfig,
+    session: &UserSession,
+) -> Result<Cookie<'static>, AppError> {
+    let token = AuthToken::new_refresh_token(session);
+    let paseto = to_paseto(&token)?;
+    Ok(Cookie::build(("refresh_token", paseto))
         .http_only(true)
         .secure(config.secure_cookies.clone())
         .same_site(tower_cookies::cookie::SameSite::Strict)
         .path("/")
         .max_age(tower_cookies::cookie::time::Duration::days(120))
-        .build()
+        .build())
 }
 
 pub async fn password_authorisation(
@@ -54,18 +67,10 @@ pub async fn password_authorisation_cookie(
     Json(payload): Json<PasswordAuthorisationReq>,
 ) -> Result<Json<UserSession>, AppError> {
     let session = password_authorisation(&state.db, headers, payload).await?;
-    let session_cookie = build_session_cookie(state.config.clone(), &session.token);
+    let session_cookie = build_session_cookie(state.config.clone(), &session)?;
     cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session)?;
     cookies.add(refresh_cookie);
-    // TODO: Remove tokens from cookie sessions
-    // TODO: Improve with default library
-    // let user = state
-    //     .db
-    //     .user
-    //     .get_by_id(&session.user_id)
-    //     .await?
-    //     .ok_or(AppError::ServerError(String::from("User retrieval failed")))?;
     Ok(Json(session))
 }
 

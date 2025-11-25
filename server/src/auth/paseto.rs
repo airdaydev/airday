@@ -41,15 +41,15 @@ impl PasetoKeys {
 }
 
 /// Serialize a UserSession into a signed PASETO token
-pub fn serialize_token(token: &AuthToken) -> Result<String, AppError> {
+pub fn to_paseto(token: &AuthToken) -> Result<String, AppError> {
     let keys = PasetoKeys::get()?;
     let mut claims = Claims::new().map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
         .add_additional("session_id", token.session_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
-    // claims.add_additional("expires", session.expires.to_rfc3339())?;
+    // claims.add_additional("expires", token.exp().to_rfc3339())?;
     claims
-        .add_additional("kind", token.kind().to_string())
+        .add_additional("kind", token.kind_str())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
         .add_additional("user_id", token.user_id().to_string())

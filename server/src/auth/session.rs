@@ -3,53 +3,25 @@ use crate::auth::meta::ClientMeta;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::User;
-use argon2::password_hash::SaltString;
-use argon2::password_hash::rand_core::OsRng as ArgonRng;
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use async_trait::async_trait;
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::HeaderMap;
 use axum::http::request::Parts;
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
-use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
 use tower_cookies::Cookies;
 use uuid::Uuid;
 
-type HighEntropyBytes = [u8; 20];
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum AuthTokenKind {
-    Session,
-    Refresh,
-}
-
-impl AuthTokenKind {
-    pub fn to_string(&self) -> &str {
-        match &self {
-            AuthTokenKind::Session => "SESSION",
-            AuthTokenKind::Refresh => "REFRESH",
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct HashedAuthToken {
-    pub session_id: Uuid, // Used to differentiate sessions when enumerating on client
-    pub hash: Vec<u8>,
-    pub exp: i64,
-    pub kind: AuthTokenKind,
-}
+const SESSION_CONST: &'static str = "session";
+const REFRESH_CONST: &'static str = "refresh";
 
 #[derive(Clone, Debug)]
 pub struct TokenData {
     pub session_id: Uuid,
     pub user_id: Uuid,
     pub primary_library_id: Uuid,
-    pub token: HighEntropyBytes,
     pub exp: i64,
 }
 
@@ -60,31 +32,22 @@ pub enum AuthToken {
 }
 
 impl AuthToken {
-    pub fn new_session_token(session: UserSession) -> Self {
+    pub fn new_session_token(session: &UserSession) -> Self {
         AuthToken::SessionToken(TokenData {
             session_id: session.id,
             user_id: session.user_id,
             primary_library_id: session.primary_library,
-            token: Self::gen_high_entropy_bytes(),
             exp: Self::get_current_timestamp() + (24 * 60 * 60), // 24 hours
         })
     }
 
-    pub fn new_refresh_token(session: UserSession) -> Self {
+    pub fn new_refresh_token(session: &UserSession) -> Self {
         AuthToken::RefreshToken(TokenData {
             session_id: session.id,
             user_id: session.user_id,
             primary_library_id: session.primary_library,
-            token: Self::gen_high_entropy_bytes(),
             exp: Self::get_current_timestamp() + (30 * 24 * 60 * 60), // 30 days
         })
-    }
-
-    fn gen_high_entropy_bytes() -> HighEntropyBytes {
-        let mut rng = OsRng; // CSPRNG
-        let mut bytes = [0u8; 20]; // 160 bits of entropy (OAuth 2 recommendation)
-        rng.try_fill_bytes(&mut bytes).unwrap();
-        bytes
     }
 
     fn get_current_timestamp() -> i64 {
@@ -94,20 +57,6 @@ impl AuthToken {
             .as_secs() as i64
     }
 
-    pub fn hash_token(&self) -> Result<String, AppError> {
-        let salt = SaltString::generate(&mut ArgonRng);
-        let argon2 = Argon2::default();
-        let token_bytes = self.data().token;
-        let password_hash = argon2
-            .hash_password(&token_bytes, &salt)
-            .map_err(|e| AppError::ServerError(format!("Token hash failed: {}", e)))?;
-        Ok(password_hash.to_string())
-    }
-
-    fn b64_hash(&self) -> String {
-        general_purpose::URL_SAFE_NO_PAD.encode(&self.data().token)
-    }
-
     pub fn data(&self) -> &TokenData {
         match self {
             AuthToken::SessionToken(data) => data,
@@ -115,10 +64,10 @@ impl AuthToken {
         }
     }
 
-    pub fn kind(&self) -> AuthTokenKind {
+    pub fn kind_str(&self) -> &'static str {
         match self {
-            AuthToken::SessionToken(_) => AuthTokenKind::Session,
-            AuthToken::RefreshToken(_) => AuthTokenKind::Refresh,
+            AuthToken::SessionToken(_) => SESSION_CONST,
+            AuthToken::RefreshToken(_) => REFRESH_CONST,
         }
     }
 
@@ -285,9 +234,9 @@ pub async fn refresh_session_cookie(
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
         .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
-    let session_cookie = build_session_cookie(state.config.clone(), &session.token);
+    let session_cookie = build_session_cookie(state.config.clone(), &session);
     cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session.refresh_token);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session);
     cookies.add(refresh_cookie);
     // TODO: Omit tokens
     Ok(Json(session))
