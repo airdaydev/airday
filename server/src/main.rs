@@ -102,11 +102,11 @@ async fn main() {
     let private = Router::new()
         .route(
             "/auth/refresh/cookie",
-            post(auth::session::refresh_session_cookie),
+            post(auth::auth::refresh_session_cookie),
         )
         .route(
             "/auth/refresh/bearer",
-            post(auth::session::refresh_session_bearer),
+            post(auth::auth::refresh_session_bearer),
         )
         .route("/user", put(user::model::update_user_handler))
         .route("/auth/sessions", post(auth::session::get_user_sessions))

@@ -62,6 +62,7 @@ pub async fn password_authorisation(
     Ok(session)
 }
 
+#[axum::debug_handler]
 pub async fn password_authorisation_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
@@ -76,10 +77,11 @@ pub async fn password_authorisation_cookie(
     Ok(Json(session))
 }
 
-struct PasswordAuthorisationBearerRes {
-    session: UserSession,
-    session_token: String,
-    refresh_token: String,
+#[derive(serde::Serialize)]
+pub struct PasswordAuthorisationBearerRes {
+    pub session: UserSession,
+    pub session_token: String,
+    pub refresh_token: String,
 }
 
 pub async fn password_authorisation_bearer(
@@ -156,10 +158,11 @@ pub struct RefreshSessionReq {
     pub id: String,
 }
 
-struct RefreshSessionBearerRes {
-    session: UserSession,
-    session_token: String,
-    refresh_token: String,
+#[derive(serde::Serialize)]
+pub struct RefreshSessionBearerRes {
+    pub session: UserSession,
+    pub session_token: String,
+    pub refresh_token: String,
 }
 
 pub async fn refresh_session_bearer(
@@ -261,12 +264,11 @@ where
                     "no auth token found",
                 )))?;
 
-            // TODO: deserialise paseto
-
+            let paseto = deserialize_token(&token)?;
             let session = app_state
                 .db
                 .session
-                .get_token(&token)
+                .get_by_id(paseto.session_id())
                 .await
                 .map_err(|_| {
                     AppError::ServerError(String::from("Failed to retrieve user session db error"))

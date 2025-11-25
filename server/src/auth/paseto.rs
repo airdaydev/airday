@@ -1,4 +1,4 @@
-use crate::auth::session::{AuthToken, AuthTokenKind, TokenData, match_token_kind};
+use crate::auth::token::{AuthToken, AuthTokenKind, TokenData, match_token_kind};
 use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
