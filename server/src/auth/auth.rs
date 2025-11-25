@@ -1,16 +1,18 @@
+use crate::auth::paseto::{deserialize_token, to_paseto};
+use crate::auth::token::AuthToken;
 use crate::{
     AppState,
-    auth::{
-        meta::get_client_meta,
-        paseto::{deserialize_token, to_paseto},
-        session::{AuthToken, UserSession},
-    },
+    auth::{meta::get_client_meta, session::UserSession},
     common::{config::AirdayConfig, error::AppError, sql::Db},
     user::model::{PublicUser, verify_login},
 };
-use axum::{extract::State, response::Json};
+use axum::extract::{FromRef, FromRequestParts, State};
+use axum::http::HeaderMap;
+use axum::http::request::Parts;
+use axum::response::Json;
 use serde::Deserialize;
-use tower_cookies::{Cookie, Cookies};
+use tower_cookies::Cookie;
+use tower_cookies::Cookies;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -147,4 +149,133 @@ pub async fn auth_websocket(
     Err(AppError::ValidationError(String::from(
         "Authorisation error",
     )))
+}
+
+#[derive(Deserialize)]
+pub struct RefreshSessionReq {
+    pub id: String,
+}
+
+struct RefreshSessionBearerRes {
+    session: UserSession,
+    session_token: String,
+    refresh_token: String,
+}
+
+pub async fn refresh_session_bearer(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(_): Json<RefreshSessionReq>,
+) -> Result<Json<RefreshSessionBearerRes>, AppError> {
+    let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
+        String::from("No refresh token"),
+    ))?;
+    // TODO: does this accept expired or otherwise bad tokens?
+    let token = deserialize_token(&refresh_token)?;
+    let session = state
+        .db
+        .session
+        .get_by_id(token.session_id())
+        .await?
+        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
+    let session_token = AuthToken::new_session_token(&session);
+    let session_paseto = to_paseto(&session_token)?;
+    let refresh_token = AuthToken::new_refresh_token(&session);
+    let refresh_paseto = to_paseto(&refresh_token)?;
+    Ok(Json(RefreshSessionBearerRes {
+        session,
+        session_token: session_paseto,
+        refresh_token: refresh_paseto,
+    }))
+}
+
+pub async fn refresh_session_cookie(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    Json(_): Json<RefreshSessionReq>,
+) -> Result<Json<UserSession>, AppError> {
+    let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
+        AppError::AuthorisationError(String::from("No refresh token")),
+    )?;
+    // TODO: does this accept expired or otherwise bad tokens?
+    let token = deserialize_token(&refresh_token)?;
+    let session = state
+        .db
+        .session
+        .get_by_id(token.session_id())
+        .await?
+        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
+    let session_cookie = build_session_cookie(state.config.clone(), &session)?;
+    cookies.add(session_cookie);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session)?;
+    cookies.add(refresh_cookie);
+    Ok(Json(session))
+}
+
+fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("Authorization")
+        .and_then(|value| value.to_str().ok())
+        .filter(|auth| auth.starts_with("Bearer"))
+        .map(|auth| auth.trim_start_matches("Bearer ").trim().to_string())
+}
+
+fn extract_cookie(cookies: &tower_cookies::Cookies, name: String) -> Option<String> {
+    cookies.get(&name).map(|cookie| cookie.value().to_string())
+}
+
+async fn extract_token<S>(parts: &mut Parts, state: &S) -> Option<String>
+where
+    S: Send + Sync,
+{
+    if let Some(token) = extract_bearer_token(&parts.headers) {
+        return Some(token);
+    }
+
+    let cookies_result = tower_cookies::Cookies::from_request_parts(parts, state).await;
+    if let Ok(cookies) = cookies_result {
+        if let Some(token) = extract_cookie(&cookies, String::from("session_token")) {
+            return Some(token);
+        }
+    }
+
+    None
+}
+
+impl<S> FromRequestParts<S> for UserSession
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = AppError;
+
+    fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        async move {
+            let app_state = AppState::from_ref(state);
+            let token = extract_token(parts, state)
+                .await
+                .ok_or(AppError::AuthorisationError(String::from(
+                    "no auth token found",
+                )))?;
+
+            // TODO: deserialise paseto
+
+            let session = app_state
+                .db
+                .session
+                .get_token(&token)
+                .await
+                .map_err(|_| {
+                    AppError::ServerError(String::from("Failed to retrieve user session db error"))
+                })?
+                .ok_or(AppError::AuthorisationError(String::from(
+                    "no user session found",
+                )))?;
+
+            Ok(session)
+        }
+    }
 }

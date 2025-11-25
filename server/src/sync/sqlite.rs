@@ -256,7 +256,7 @@ mod tests {
     async fn sqlite_sync_op_apply() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("sync_op_merge@air.day")).await;
-        let library_id = user.primary_library.unwrap().id;
+        let library_id = user.primary_library.id;
         let op = mock_incoming_op(library_id, None);
         let map = create_op_lib_map(vec![op]);
         let res = db.sync_op.apply_block(&map).await.unwrap();
@@ -278,7 +278,7 @@ mod tests {
     async fn sqlite_stream_from_seq() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("lib_stream_merge@air.day")).await;
-        let library_id = user.primary_library.unwrap().id;
+        let library_id = user.primary_library.id;
         let qty = 100;
         let mut ops = vec![];
         for _ in 0..qty {

@@ -182,12 +182,11 @@ pub fn create_auth_response<'a>(
     fbb: &mut FlatBufferBuilder<'a>,
     user: &User,
 ) -> WIPOffset<UnionWIPOffset> {
-    let primary_library = user.primary_library.as_ref().unwrap();
     let action_offset = AuthenticateResponseProto::create(
         fbb,
         &AuthenticateResponseProtoArgs {
             user_id: Some(&UuidProto::new(user.id.as_bytes())),
-            library_id: Some(&UuidProto::new(primary_library.id.as_bytes())),
+            library_id: Some(&UuidProto::new(user.primary_library.id.as_bytes())),
         },
     )
     .as_union_value();

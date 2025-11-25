@@ -1,121 +1,22 @@
 use crate::AppState;
-use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::auth::meta::ClientMeta;
-use crate::auth::paseto::{deserialize_token, to_paseto};
+use crate::auth::token::AuthToken;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::User;
 use async_trait::async_trait;
 use axum::Json;
-use axum::extract::{FromRef, FromRequestParts, State};
-use axum::http::HeaderMap;
-use axum::http::request::Parts;
-use chrono::{DateTime, Utc};
+use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
-use std::time::Duration;
-use tower_cookies::Cookies;
 use uuid::Uuid;
 
-pub enum AuthTokenKind {
-    SESSION,
-    REFRESH,
-}
-
-pub const SESSION_CONST: &'static str = "session";
-pub const REFRESH_CONST: &'static str = "refresh";
-
-pub fn match_token_kind(str: &str) -> Result<AuthTokenKind, AppError> {
-    if str == SESSION_CONST {
-        return Ok(AuthTokenKind::SESSION);
-    }
-    if str == REFRESH_CONST {
-        return Ok(AuthTokenKind::REFRESH);
-    }
-    Err(AppError::ValidationError(String::from(
-        "Invalid token kind",
-    )))
-}
-
-#[derive(Clone, Debug)]
-pub struct TokenData {
-    pub session_id: Uuid,
-    pub user_id: Uuid,
-    pub primary_library_id: Uuid,
-}
-
-#[derive(Clone, Debug)]
-pub enum AuthToken {
-    SessionToken(TokenData),
-    RefreshToken(TokenData),
-}
-
-impl AuthToken {
-    pub fn new_session_token(session: &UserSession) -> Self {
-        AuthToken::SessionToken(TokenData {
-            session_id: session.id,
-            user_id: session.user_id,
-            primary_library_id: session.primary_library,
-        })
-    }
-
-    pub fn new_refresh_token(session: &UserSession) -> Self {
-        AuthToken::RefreshToken(TokenData {
-            session_id: session.id,
-            user_id: session.user_id,
-            primary_library_id: session.primary_library,
-        })
-    }
-
-    pub fn data(&self) -> &TokenData {
-        match self {
-            AuthToken::SessionToken(data) => data,
-            AuthToken::RefreshToken(data) => data,
-        }
-    }
-
-    pub fn kind_str(&self) -> &'static str {
-        match self {
-            AuthToken::SessionToken(_) => SESSION_CONST,
-            AuthToken::RefreshToken(_) => REFRESH_CONST,
-        }
-    }
-
-    pub fn session_id(&self) -> Uuid {
-        self.data().session_id
-    }
-
-    pub fn primary_library_id(&self) -> Uuid {
-        self.data().primary_library_id
-    }
-
-    pub fn user_id(&self) -> Uuid {
-        self.data().user_id
-    }
-
-    pub fn expires_in(&self) -> Duration {
-        match self {
-            AuthToken::SessionToken(_) => Duration::from_secs(24 * 60 * 60), // 24 hours
-            AuthToken::RefreshToken(_) => Duration::from_secs(30 * 24 * 60 * 60), // 30 days
-        }
-    }
-}
-
-pub struct TokenPair {
-    pub session: AuthToken,
-    pub refresh: AuthToken,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct UserSession {
     pub id: Uuid,
     pub user_id: Uuid,
     pub primary_library: Uuid,
     pub client_meta: ClientMeta,
-}
-
-fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
-    DateTime::from_timestamp(timestamp, 0).unwrap()
 }
 
 pub struct InsertSessionParams {
@@ -166,135 +67,6 @@ pub async fn get_user_sessions(
 ) -> Result<Json<GetUserSessionsResponse>, AppError> {
     let sessions = state.db.session.get_by_user(session.id).await?;
     Ok(Json(GetUserSessionsResponse { data: sessions }))
-}
-
-#[derive(Deserialize)]
-pub struct RefreshSessionReq {
-    pub id: String,
-}
-
-struct RefreshSessionBearerRes {
-    session: UserSession,
-    session_token: String,
-    refresh_token: String,
-}
-
-pub async fn refresh_session_bearer(
-    State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
-    Json(_): Json<RefreshSessionReq>,
-) -> Result<Json<RefreshSessionBearerRes>, AppError> {
-    let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
-        String::from("No refresh token"),
-    ))?;
-    // TODO: does this accept expired or otherwise bad tokens?
-    let token = deserialize_token(&refresh_token)?;
-    let session = state
-        .db
-        .session
-        .get_by_id(token.session_id())
-        .await?
-        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
-    let session_token = AuthToken::new_session_token(&session);
-    let session_paseto = to_paseto(&session_token)?;
-    let refresh_token = AuthToken::new_refresh_token(&session);
-    let refresh_paseto = to_paseto(&refresh_token)?;
-    Ok(Json(RefreshSessionBearerRes {
-        session,
-        session_token: session_paseto,
-        refresh_token: refresh_paseto,
-    }))
-}
-
-pub async fn refresh_session_cookie(
-    State(state): State<AppState>,
-    cookies: Cookies,
-    Json(_): Json<RefreshSessionReq>,
-) -> Result<Json<UserSession>, AppError> {
-    let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
-        AppError::AuthorisationError(String::from("No refresh token")),
-    )?;
-    // TODO: does this accept expired or otherwise bad tokens?
-    let token = deserialize_token(&refresh_token)?;
-    let session = state
-        .db
-        .session
-        .get_by_id(token.session_id())
-        .await?
-        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
-    let session_cookie = build_session_cookie(state.config.clone(), &session)?;
-    cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session)?;
-    cookies.add(refresh_cookie);
-    Ok(Json(session))
-}
-
-fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .filter(|auth| auth.starts_with("Bearer"))
-        .map(|auth| auth.trim_start_matches("Bearer ").trim().to_string())
-}
-
-fn extract_cookie(cookies: &tower_cookies::Cookies, name: String) -> Option<String> {
-    cookies.get(&name).map(|cookie| cookie.value().to_string())
-}
-
-async fn extract_token<S>(parts: &mut Parts, state: &S) -> Option<String>
-where
-    S: Send + Sync,
-{
-    if let Some(token) = extract_bearer_token(&parts.headers) {
-        return Some(token);
-    }
-
-    let cookies_result = tower_cookies::Cookies::from_request_parts(parts, state).await;
-    if let Ok(cookies) = cookies_result {
-        if let Some(token) = extract_cookie(&cookies, String::from("session_token")) {
-            return Some(token);
-        }
-    }
-
-    None
-}
-
-impl<S> FromRequestParts<S> for UserSession
-where
-    S: Send + Sync,
-    AppState: FromRef<S>,
-{
-    type Rejection = AppError;
-
-    fn from_request_parts(
-        parts: &mut Parts,
-        state: &S,
-    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-        async move {
-            let app_state = AppState::from_ref(state);
-            let token = extract_token(parts, state)
-                .await
-                .ok_or(AppError::AuthorisationError(String::from(
-                    "no auth token found",
-                )))?;
-
-            // TODO: deserialise paseto
-
-            let session = app_state
-                .db
-                .session
-                .get_token(&token)
-                .await
-                .map_err(|_| {
-                    AppError::ServerError(String::from("Failed to retrieve user session db error"))
-                })?
-                .ok_or(AppError::AuthorisationError(String::from(
-                    "no user session found",
-                )))?;
-
-            Ok(session)
-        }
-    }
 }
 
 #[cfg(test)]

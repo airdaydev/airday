@@ -1,4 +1,6 @@
-#[derive(Clone)]
+use serde::Serialize;
+
+#[derive(Clone, Serialize)]
 pub struct ClientMeta {
     pub ip: String,
     pub user_agent: String,
