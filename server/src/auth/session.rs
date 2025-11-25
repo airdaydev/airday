@@ -1,6 +1,7 @@
 use crate::AppState;
 use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::auth::meta::ClientMeta;
+use crate::auth::paseto::{deserialize_token, to_paseto};
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::User;
@@ -152,34 +153,6 @@ impl UserSession {
             client_meta,
         })
     }
-
-    pub async fn refresh(db: &Db, session: UserSession) -> Result<Self, AppError> {
-        // Generate new tokens
-        let token = gen_token();
-        let new_refresh_token = gen_token();
-        let refresh_token_hash = hash_password(&new_refresh_token)?;
-
-        // Calculate expiration times (24 hours for session, 30 days for refresh token)
-        let now = get_current_timestamp();
-        let expires = calculate_session_expiry(now);
-        let refresh_expires = calculate_refresh_expiry(now);
-
-        let refresh = TokenRefresh {
-            token,
-            expires,
-            refresh_token_hash,
-            refresh_expires,
-        };
-
-        Ok(UserSession {
-            id: session.id,
-            token: refresh.token.clone(),
-            expires: timestamp_to_datetime(expires),
-            refresh_token: new_refresh_token,
-            refresh_expires: timestamp_to_datetime(refresh_expires),
-            user_id: session.user_id,
-        })
-    }
 }
 
 #[derive(Serialize)]
@@ -200,49 +173,55 @@ pub struct RefreshSessionReq {
     pub id: String,
 }
 
-async fn refresh_tokens(
-    db: &Db,
-    user_id: Uuid,
-    old_refresh_token: &str,
-) -> Result<UserSession, AppError> {
-    // TODO: unfuck this
-    let old_session = match db.session.get_by_id(user_id).await? {
-        Some(session) => session,
-        None => {
-            return Err(AppError::AuthorisationError(String::from(
-                "Invalid session id errr",
-            )));
-        }
-    };
-    let session = UserSession::refresh(db, old_session).await?;
-    Ok(session)
+struct RefreshSessionBearerRes {
+    session: UserSession,
+    session_token: String,
+    refresh_token: String,
 }
 
 pub async fn refresh_session_bearer(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(payload): Json<RefreshSessionReq>,
-) -> Result<Json<UserSession>, AppError> {
+    Json(_): Json<RefreshSessionReq>,
+) -> Result<Json<RefreshSessionBearerRes>, AppError> {
     let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
         String::from("No refresh token"),
     ))?;
-    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
-    let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
-    Ok(Json(session))
+    // TODO: does this accept expired or otherwise bad tokens?
+    let token = deserialize_token(&refresh_token)?;
+    let session = state
+        .db
+        .session
+        .get_by_id(token.session_id())
+        .await?
+        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
+    let session_token = AuthToken::new_session_token(&session);
+    let session_paseto = to_paseto(&session_token)?;
+    let refresh_token = AuthToken::new_refresh_token(&session);
+    let refresh_paseto = to_paseto(&refresh_token)?;
+    Ok(Json(RefreshSessionBearerRes {
+        session,
+        session_token: session_paseto,
+        refresh_token: refresh_paseto,
+    }))
 }
 
 pub async fn refresh_session_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
-    Json(payload): Json<RefreshSessionReq>,
+    Json(_): Json<RefreshSessionReq>,
 ) -> Result<Json<UserSession>, AppError> {
     let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
         AppError::AuthorisationError(String::from("No refresh token")),
     )?;
-    let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
-        .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
-    let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
+    // TODO: does this accept expired or otherwise bad tokens?
+    let token = deserialize_token(&refresh_token)?;
+    let session = state
+        .db
+        .session
+        .get_by_id(token.session_id())
+        .await?
+        .ok_or(AppError::ValidationError(String::from("Session not found")))?;
     let session_cookie = build_session_cookie(state.config.clone(), &session)?;
     cookies.add(session_cookie);
     let refresh_cookie = build_refresh_cookie(state.config.clone(), &session)?;
