@@ -74,13 +74,27 @@ pub async fn password_authorisation_cookie(
     Ok(Json(session))
 }
 
+struct PasswordAuthorisationBearerRes {
+    session: UserSession,
+    session_token: String,
+    refresh_token: String,
+}
+
 pub async fn password_authorisation_bearer(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     Json(payload): Json<PasswordAuthorisationReq>,
-) -> Result<Json<UserSession>, AppError> {
+) -> Result<Json<PasswordAuthorisationBearerRes>, AppError> {
     let session = password_authorisation(&state.db, headers, payload).await?;
-    Ok(Json(session))
+    let session_token = AuthToken::new_session_token(&session);
+    let session_paseto = to_paseto(&session_token)?;
+    let refresh_token = AuthToken::new_refresh_token(&session);
+    let refresh_paseto = to_paseto(&refresh_token)?;
+    Ok(Json(PasswordAuthorisationBearerRes {
+        session,
+        session_token: session_paseto,
+        refresh_token: refresh_paseto,
+    }))
 }
 
 #[derive(Deserialize)]
