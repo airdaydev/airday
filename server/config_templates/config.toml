@@ -4,8 +4,8 @@ port = 3000
 secure_cookies = false
 
 # ░▒█ Dummy keys (replace w gen_paseto_keys output)
-paseto_pk_b64 = zzBHKWbOVoE7HTijocAzekDfPM2JTvIFmFyZ4kYtVLs=
-paseto_sk_b64 = mpHLwtGPobLDlvSJuLpxf4L1vX78vMWleF/0pVs+pkTPMEcpZs5WgTsdOKOhwDN6QN88zYlO8gWYXJniRi1Uuw==
+paseto_pk_b64 = "zzBHKWbOVoE7HTijocAzekDfPM2JTvIFmFyZ4kYtVLs="
+paseto_sk_b64 = "mpHLwtGPobLDlvSJuLpxf4L1vX78vMWleF/0pVs+pkTPMEcpZs5WgTsdOKOhwDN6QN88zYlO8gWYXJniRi1Uuw=="
 
 # ░▒█ Database settings
 sqlx_host = "sqlite:$HOME/.config/airday/airday.db"

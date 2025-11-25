@@ -6,8 +6,8 @@ fn generate_keys() -> Result<(), Box<dyn std::error::Error>> {
     let kp = AsymmetricKeyPair::<V4>::generate()?;
     let secret_base64 = BASE64.encode(kp.secret.as_bytes());
     let public_base64 = BASE64.encode(kp.public.as_bytes());
-    println!("paseto_pk = {}", public_base64);
-    println!("paseto_sk = {}", secret_base64);
+    println!("paseto_pk = \"{}\"", public_base64);
+    println!("paseto_sk = \"{}\"", secret_base64);
     Ok(())
 }
 
