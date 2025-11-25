@@ -16,7 +16,7 @@ export async function passwordAuthCookie(
   core: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
-  const res = await fetch(core.endpoint("/auth/password"), {
+  const res = await fetch(core.endpoint("/auth/password/cookie"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -73,7 +73,7 @@ export async function refreshCookie(core: AirdayCore) {
     "Content-Type": "application/json",
     "Accept-Content": "application/json",
   };
-  const res = await fetch(core.endpoint("/auth/refresh"), {
+  const res = await fetch(core.endpoint("/auth/refresh/cookie"), {
     method: "POST",
     headers,
     credentials: "include",

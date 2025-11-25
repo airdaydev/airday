@@ -118,7 +118,7 @@ async fn main() {
     let public = Router::new()
         .route("/", get(root::root_handler))
         .route(
-            "/auth/password",
+            "/auth/password/cookie",
             post(auth::auth::password_authorisation_cookie),
         )
         .route(
@@ -127,7 +127,10 @@ async fn main() {
         )
         .route("/user", post(auth::auth::create_user));
     let private = Router::new()
-        .route("/auth/refresh", post(auth::session::refresh_session_cookie))
+        .route(
+            "/auth/refresh/cookie",
+            post(auth::session::refresh_session_cookie),
+        )
         .route(
             "/auth/refresh/bearer",
             post(auth::session::refresh_session_bearer),

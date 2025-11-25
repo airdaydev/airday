@@ -181,8 +181,8 @@ impl UserSession {
 
         Ok(UserSession {
             id: session_id,
-            user_id,
-            primary_library: primary_library_id,
+            user_id: user.id,
+            primary_library: user.primary_library.id,
             client_meta,
         })
     }
