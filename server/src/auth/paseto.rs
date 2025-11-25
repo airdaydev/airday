@@ -2,7 +2,6 @@ use crate::auth::session::{AuthToken, AuthTokenKind, TokenData, match_token_kind
 use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use chrono::{DateTime, Utc};
 use core::convert::TryFrom;
 use pasetors::claims::{Claims, ClaimsValidationRules};
 use pasetors::keys::{AsymmetricPublicKey, AsymmetricSecretKey};
@@ -44,12 +43,14 @@ pub fn to_paseto(token: &AuthToken) -> Result<String, AppError> {
     let keys = PasetoKeys::get()?;
     let mut claims = Claims::new().map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
+        .set_expires_in(&token.expires_in())
+        .map_err(|e| AppError::ServerError(format!("Failed to set expiry: {}", e)))?;
+    claims
         .add_additional("s_id", token.session_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
         .add_additional("p_id", token.primary_library_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
-    // claims.add_additional("exp", token.exp().to_rfc3339())?;
     claims
         .add_additional("k", token.kind_str())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
@@ -84,19 +85,19 @@ pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
         )))?;
 
     let session_id = extract_uuid(&claims, "s_id")?;
-    let exp = extract_datetime(&claims, "exp")?;
     let user_id = extract_uuid(&claims, "u_id")?;
     let primary_library_id = extract_uuid(&claims, "p_id")?;
     let kind = extract_kind(&claims, "k")?;
 
+    let data = TokenData {
+        session_id,
+        user_id,
+        primary_library_id,
+    };
+
     let token = match kind {
-        AuthTokenKind::REFRESH => AuthToken::SessionToken(TokenData {
-            session_id,
-            user_id,
-            primary_library_id,
-            exp,
-        }),
-        AuthTokenKind::SESSION => AuthToken::new_session_token(session),
+        AuthTokenKind::SESSION => AuthToken::SessionToken(data),
+        AuthTokenKind::REFRESH => AuthToken::RefreshToken(data),
     };
 
     Ok(token)
@@ -127,11 +128,4 @@ fn extract_uuid(claims: &Claims, key: &str) -> Result<Uuid, AppError> {
 fn extract_kind(claims: &Claims, key: &str) -> Result<AuthTokenKind, AppError> {
     let kind_str = extract_string(claims, key)?;
     match_token_kind(&kind_str)
-}
-
-fn extract_datetime(claims: &Claims, key: &str) -> Result<DateTime<Utc>, AppError> {
-    let datetime_str = extract_string(claims, key)?;
-    DateTime::parse_from_rfc3339(&datetime_str)
-        .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|_| AppError::AuthorisationError(format!("Invalid {} datetime", key)))
 }

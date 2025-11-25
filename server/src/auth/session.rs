@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::auth::auth::{build_refresh_cookie, build_session_cookie};
 use crate::auth::meta::ClientMeta;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
@@ -11,6 +12,7 @@ use axum::http::request::Parts;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid as SqlxUuid;
+use std::time::Duration;
 use tower_cookies::Cookies;
 use uuid::Uuid;
 
@@ -39,7 +41,6 @@ pub struct TokenData {
     pub session_id: Uuid,
     pub user_id: Uuid,
     pub primary_library_id: Uuid,
-    pub exp: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +55,6 @@ impl AuthToken {
             session_id: session.id,
             user_id: session.user_id,
             primary_library_id: session.primary_library,
-            exp: Self::get_current_timestamp() + (24 * 60 * 60), // 24 hours
         })
     }
 
@@ -63,15 +63,7 @@ impl AuthToken {
             session_id: session.id,
             user_id: session.user_id,
             primary_library_id: session.primary_library,
-            exp: Self::get_current_timestamp() + (30 * 24 * 60 * 60), // 30 days
         })
-    }
-
-    fn get_current_timestamp() -> i64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64
     }
 
     pub fn data(&self) -> &TokenData {
@@ -100,8 +92,11 @@ impl AuthToken {
         self.data().user_id
     }
 
-    pub fn exp(&self) -> i64 {
-        self.data().exp
+    pub fn expires_in(&self) -> Duration {
+        match self {
+            AuthToken::SessionToken(_) => Duration::from_secs(24 * 60 * 60), // 24 hours
+            AuthToken::RefreshToken(_) => Duration::from_secs(30 * 24 * 60 * 60), // 30 days
+        }
     }
 }
 
@@ -205,12 +200,12 @@ pub struct RefreshSessionReq {
     pub id: String,
 }
 
-async fn refresh_if_valid(
+async fn refresh_tokens(
     db: &Db,
     user_id: Uuid,
-    refresh_token: &str,
+    old_refresh_token: &str,
 ) -> Result<UserSession, AppError> {
-    let refresh_token: &[u8] = refresh_token.as_bytes();
+    // TODO: unfuck this
     let old_session = match db.session.get_by_id(user_id).await? {
         Some(session) => session,
         None => {
@@ -219,14 +214,6 @@ async fn refresh_if_valid(
             )));
         }
     };
-    let parsed_hash = PasswordHash::new(&old_session.refresh_token)
-        .map_err(|_| AppError::ServerError(String::from("Password hash could not be parsed.")))?;
-    let ok = Argon2::default()
-        .verify_password(refresh_token, &parsed_hash)
-        .is_ok();
-    if !ok {
-        return Err(AppError::ValidationError(String::from("Invalid token")));
-    }
     let session = UserSession::refresh(db, old_session).await?;
     Ok(session)
 }
@@ -256,11 +243,10 @@ pub async fn refresh_session_cookie(
     let sqlx_user_id = SqlxUuid::parse_str(&payload.id)
         .map_err(|_| AppError::ValidationError(String::from("Invalid user ID format")))?;
     let session = refresh_if_valid(&state.db, sqlx_user_id, &refresh_token).await?;
-    let session_cookie = build_session_cookie(state.config.clone(), &session);
+    let session_cookie = build_session_cookie(state.config.clone(), &session)?;
     cookies.add(session_cookie);
-    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session);
+    let refresh_cookie = build_refresh_cookie(state.config.clone(), &session)?;
     cookies.add(refresh_cookie);
-    // TODO: Omit tokens
     Ok(Json(session))
 }
 
