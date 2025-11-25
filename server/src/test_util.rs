@@ -24,8 +24,7 @@ pub async fn mock_user(db: &Db, email: String) -> User {
     db.user.create(&email, "test").await.unwrap()
 }
 
-pub async fn mock_session(db: &Db, user_id: Uuid) -> UserSession {
-    let user = db.user.get_by_id(&user_id).await.unwrap().unwrap();
+pub async fn mock_session(db: &Db, user: User) -> UserSession {
     UserSession::new(
         &db,
         user,

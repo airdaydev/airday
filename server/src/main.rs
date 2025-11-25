@@ -98,6 +98,7 @@ async fn main() {
             post(auth::auth::password_authorisation_bearer),
         )
         .route("/user", post(auth::auth::create_user));
+
     let private = Router::new()
         .route(
             "/auth/refresh/cookie",

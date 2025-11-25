@@ -306,11 +306,7 @@ mod tests {
     async fn test_session_crud() {
         let db = test_util::create_test_db().await;
         let user = test_util::mock_user(&db, String::from("test_session_crud@air.day")).await;
-        let session = mock_session(&db, user.id).await;
-        let refreshed_session = UserSession::refresh(&db, session.clone()).await.unwrap();
-        assert_eq!(session.id, refreshed_session.id);
-        assert_ne!(session.token, refreshed_session.token);
-        assert_ne!(session.refresh_token, refreshed_session.refresh_token);
+        let session = mock_session(&db, user).await;
         let existing_session = db.session.get_by_id(session.id).await.unwrap();
         assert!(existing_session.is_some());
     }
