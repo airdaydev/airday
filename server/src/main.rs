@@ -1,40 +1,12 @@
-mod common {
-    pub mod config;
-    pub mod datetime;
-    pub mod error;
-    pub mod sql;
-    pub mod utils;
-}
-mod user {
-    pub mod model;
-    pub mod sqlite;
-}
-mod library {
-    pub mod model;
-    pub mod sqlite;
-}
-mod telemetry {
-    pub mod otlp;
-}
-mod auth {
-    pub mod auth;
-    pub mod cache;
-    pub mod meta;
-    pub mod paseto;
-    pub mod session;
-    pub mod sqlite;
-}
-mod sync {
-    pub mod batch_response;
-    pub mod engine;
-    pub mod fb;
-    #[allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
-    pub mod proto_generated;
-    pub mod sqlite;
-    pub mod stream;
-    pub mod websocket;
-}
-mod root;
+// Mods
+mod auth;
+mod common;
+mod http_root;
+mod library;
+mod sync;
+mod telemetry;
+mod user;
+// Imports
 use crate::auth::cache::AuthCache;
 use crate::auth::paseto::PasetoKeys;
 use crate::common::config::AirdayConfig;
@@ -116,7 +88,7 @@ async fn main() {
         .allow_origin(Any);
 
     let public = Router::new()
-        .route("/", get(root::root_handler))
+        .route("/", get(http_root::root_handler))
         .route(
             "/auth/password/cookie",
             post(auth::auth::password_authorisation_cookie),
