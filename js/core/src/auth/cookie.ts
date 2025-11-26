@@ -1,11 +1,24 @@
 import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter } from "./adapters";
-import { passwordAuthCookie } from "../http/auth";
+import { passwordAuthCookie, refreshCookie } from "../http/auth";
+import { AirdayCore } from "../core";
+import { Uuidv4 } from "../common/uuid";
+
+interface CookieSessionData {
+  userId: Uuidv4;
+  primaryLibraryId: Uuidv4;
+  sessionExp: Date;
+  refreshExp: Date;
+}
 
 export class CookieAuth implements AuthAdapter {
+  core: AirdayCore;
   credentials: RequestCredentials = "include";
-  constructor() {}
+  sessionData?: CookieSessionData;
+  constructor(core: AirdayCore) {
+    this.core = core;
+  }
   headers(json: boolean = true) {
     const headers: Record<string, string> = {};
     if (json) {
@@ -15,18 +28,17 @@ export class CookieAuth implements AuthAdapter {
   initOpts(init: RequestInit) {
     init.credentials = "include";
   }
-  authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthCookie(this, opts);
-    this.setSession({
-      id: res.data.id,
-      expires: new Date(res.data.expires),
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
+  async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
+    const res = await passwordAuthCookie(this.core, opts);
+    // this.sessionData = {
+    //   id: res.data.id,
+    //   expires: new Date(res.data.expires),
+    //   refreshExpires: new Date(res.data.refreshExpires),
+    //   userId: res.data.userId,
+    // };
   }
-  // TODO: Confirm success
-  // or logout, or retry/back-off
+  signout() {}
   async refresh() {
-    const res = await refreshCookie(this);
+    const res = await refreshCookie(this.core);
   }
 }

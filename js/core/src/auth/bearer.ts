@@ -1,9 +1,25 @@
+import { TypeOf } from "suretype";
+import { Uuidv4 } from "../common/uuid";
+import { AirdayCore } from "../core";
+import { passwordAuthBearer, refreshBearer } from "../http/auth";
+import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter } from "./adapters";
 
+interface BearerSessionData {
+  userId: Uuidv4;
+  primaryLibraryId: Uuidv4;
+  sessionExp: Date;
+  refreshExp: Date;
+}
+
 export class BearerAuth implements AuthAdapter {
+  core: AirdayCore;
   sessionToken: string = "zzz";
   credentials: RequestCredentials = "omit";
-  constructor() {}
+  sessionData?: BearerSessionData;
+  constructor(core: AirdayCore) {
+    this.core = core;
+  }
   headers(json: boolean = true) {
     if (!this.sessionToken) throw new Error("User is not authenticated");
     const headers: Record<string, string> = {
@@ -19,19 +35,15 @@ export class BearerAuth implements AuthAdapter {
     }
   }
   authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthBearer(this, opts);
-    this.setSession({
-      id: res.data.id,
-      token: res.data.token,
-      expires: new Date(res.data.expires),
+    const res = await passwordAuthBearer(this.core, opts);
+    this.sessionData = {
+      sessionToken: res.data.sessionToken,
       refreshToken: res.data.refreshToken,
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
+    };
     return res;
   }
   async refreshBearer() {
-    const res = await refreshBearer(this);
+    const res = await refreshBearer(this.core);
     return res;
   }
 }

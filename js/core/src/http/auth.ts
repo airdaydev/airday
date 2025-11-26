@@ -3,6 +3,10 @@ import { type TypeOf, v } from "suretype";
 import { v_session_bearer, v_session_cookie } from "./types";
 import type { AirdayCore } from "../core";
 
+const jsonHeaders = {
+  "Content-Type": "application/json",
+};
+
 export async function passwordAuthCookie(
   core: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
@@ -10,9 +14,7 @@ export async function passwordAuthCookie(
   const res = await fetch(core.endpoint("/auth/password/cookie"), {
     method: "POST",
     body: JSON.stringify(opts),
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: jsonHeaders,
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, passwordAuthCookieRes.ensureFunc);
@@ -27,9 +29,7 @@ export async function passwordAuthBearer(
   const res = await fetch(core.endpoint("/auth/password/bearer"), {
     method: "POST",
     body: JSON.stringify(opts),
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: jsonHeaders,
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, passwordAuthBearerRes.ensureFunc);
