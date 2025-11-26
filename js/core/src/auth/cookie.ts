@@ -1,6 +1,6 @@
 import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter } from "./adapters";
+import { AuthAdapter, AuthState } from "./adapters";
 import { passwordAuthCookie, refreshCookie } from "../http/auth";
 import { AirdayCore } from "../core";
 import { Uuidv4 } from "../common/uuid";
@@ -15,6 +15,7 @@ interface CookieSessionData {
 export class CookieAuth implements AuthAdapter {
   core: AirdayCore;
   credentials: RequestCredentials = "include";
+  state: AuthState = AuthState.Uninitialised;
   sessionData?: CookieSessionData;
   constructor(core: AirdayCore) {
     this.core = core;

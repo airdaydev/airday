@@ -3,7 +3,7 @@ import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter } from "./adapters";
+import { AuthAdapter, AuthState } from "./adapters";
 import { verifyToken } from "./token";
 
 interface BearerSessionData {
@@ -25,6 +25,7 @@ export class BearerAuth implements AuthAdapter {
   sessionExpiry?: number;
   publicKey: string = "k4.public.dummy-key-replace-me";
   credentials: RequestCredentials = "omit";
+  state: AuthState = AuthState.Uninitialised;
   userData?: UserData;
   constructor(core: AirdayCore) {
     this.core = core;
@@ -39,6 +40,7 @@ export class BearerAuth implements AuthAdapter {
       SESSION_STORAGE_KEY,
       JSON.stringify({ sessionToken, refreshToken }),
     );
+    this.state = AuthState.Online;
   }
   async initSession(): Promise<boolean> {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
