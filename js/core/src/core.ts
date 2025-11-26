@@ -1,26 +1,18 @@
-import {
-  passwordAuthBearer,
-  passwordAuthCookie,
-  passwordAuthSchema,
-  refreshBearer,
-  refreshCookie,
-} from "./http/auth";
 import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
-import type { TypeOf } from "suretype";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { Library } from "./common/library";
+import { AuthAdapter } from "./auth/adapters";
 
 export enum AuthMode {
-  ImplicitCookie,
+  Cookie,
   BearerToken,
 }
 
 interface AirdayCoreOpts {
   rootUrl: string;
   paseto_pk: string;
-  authMode?: AuthMode;
+  authAdapter: AuthAdapter;
   storageAdapter?: StorageAdapter;
 }
 
@@ -36,113 +28,26 @@ interface Session {
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   root: URL;
-  authMode: AuthMode;
-  paseto_pk: string;
   session?: Session;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
+  auth: AuthAdapter;
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
-    this.paseto_pk = opts.paseto_pk;
     this.root = new URL(opts.rootUrl);
-    this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
     this.sync = new AirdaySync(this);
     this.storage = new AirdayStorage(this, opts.storageAdapter);
+    if (!opts.authAdapter) {
+      throw new Error("AuthAdapter required in AirdayCore constructor");
+    }
+    this.auth = opts.authAdapter;
   }
   endpoint(pathName: string) {
     const url = new URL(this.root);
     url.pathname = pathName;
     return url;
-  }
-  // TODO: differentiate between cookie & bearer
-  setSession(session: Session) {
-    this.session = session;
-  }
-  headers(json: boolean = true) {
-    if (!this.session) throw new Error("User is not authenticated");
-    const headers: Record<string, string> = {};
-    if (this.authMode === AuthMode.BearerToken) {
-      headers["Authorization"] = `Bearer ${this.session.token}`;
-    }
-    if (json) {
-      headers["Accept-Content"] = "application/json";
-    }
-    return headers;
-  }
-  credentials(): RequestCredentials {
-    if (this.authMode === AuthMode.BearerToken) {
-      return "omit";
-    }
-    return "include";
-  }
-  getInitOpts(init: RequestInit) {
-    if (this.authMode === AuthMode.BearerToken) {
-      if (!init.headers) {
-        init.headers = {};
-      }
-    }
-    if (this.authMode == AuthMode.ImplicitCookie) {
-      init.credentials = "include";
-    }
-  }
-  async refresh() {
-    if (this.authMode === AuthMode.BearerToken) {
-      return this.refreshBearer();
-    }
-    return this.refreshCookie();
-  }
-  // TODO: Confirm success
-  // or logout, or retry/back-off
-  async refreshCookie() {
-    const res = await refreshCookie(this);
-    this.setSession({
-      id: res.data.id,
-      expires: new Date(res.data.expires),
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
-    return res;
-  }
-  async refreshBearer() {
-    const res = await refreshBearer(this);
-    this.setSession({
-      id: res.data.id,
-      token: res.data.token,
-      expires: new Date(res.data.expires),
-      refreshToken: res.data.refreshToken,
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
-    return res;
-  }
-  async loginWithPasswordCookie(
-    opts: TypeOf<typeof passwordAuthSchema.schema>,
-  ) {
-    this.authMode = AuthMode.ImplicitCookie;
-    const res = await passwordAuthCookie(this, opts);
-    this.setSession({
-      id: res.data.id,
-      expires: new Date(res.data.expires),
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
-  }
-  async loginWithPasswordBearer(
-    opts: TypeOf<typeof passwordAuthSchema.schema>,
-  ) {
-    this.authMode = AuthMode.BearerToken;
-    const res = await passwordAuthBearer(this, opts);
-    this.setSession({
-      id: res.data.id,
-      token: res.data.token,
-      expires: new Date(res.data.expires),
-      refreshToken: res.data.refreshToken,
-      refreshExpires: new Date(res.data.refreshExpires),
-      userId: res.data.userId,
-    });
-    return res;
   }
   async startSync() {
     try {
