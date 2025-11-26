@@ -31,7 +31,8 @@ export function parseCookieValue(
 }
 
 const schema = {
-  API_URL: { type: "string" },
+  api_url: { type: "string" },
+  paseto_pk: { type: "string" },
 } as const;
 
 const rawConfig = loadToml(import.meta.url, "../config.toml");
@@ -39,8 +40,9 @@ export const config = validateConfig(schema, rawConfig);
 
 export async function createAuthenticatedCore() {
   const core = new AirdayCore({
-    rootUrl: "http://localhost:3000",
+    rootUrl: config.api_url,
     authMode: AuthMode.BearerToken,
+    paseto_pk: config.paseto_pk,
     storageAdapter: new AirdayMemStorage(),
   });
   await authenticate(core, `${Math.random()}@airday.com}`);

@@ -6,7 +6,7 @@ import {
   BatchResponseProto,
   BatchSyncOpProto,
 } from "../proto";
-import { AuthMode, Library, type AirdayCore } from "../core";
+import { AuthMode, type AirdayCore } from "../core";
 import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";

@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] bearer token backed to local storage (single source of truth)
 - [] paseto cookie single source of truth (client)
 - [] differentiate cookie vs bearer auth (client)
 - [] offline user bootstrap! - start from AirdayStorage.initialise

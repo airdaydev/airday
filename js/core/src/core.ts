@@ -19,6 +19,7 @@ export enum AuthMode {
 
 interface AirdayCoreOpts {
   rootUrl: string;
+  paseto_pk: string;
   authMode?: AuthMode;
   storageAdapter?: StorageAdapter;
 }
@@ -36,12 +37,14 @@ interface Session {
 export class AirdayCore {
   root: URL;
   authMode: AuthMode;
+  paseto_pk: string;
   session?: Session;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
+    this.paseto_pk = opts.paseto_pk;
     this.root = new URL(opts.rootUrl);
     this.authMode = opts.authMode ?? AuthMode.ImplicitCookie;
     this.ws = new WebsocketManager(this);
