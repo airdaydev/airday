@@ -3,15 +3,6 @@ import { type TypeOf, v } from "suretype";
 import { v_session_bearer, v_session_cookie } from "./types";
 import type { AirdayCore } from "../core";
 
-export const passwordAuthSchema = APISchema(
-  v.object({
-    email: v.string().required(),
-    password: v.string().required(),
-  }),
-);
-
-const passwordAuthCookieRes = APISchema(v_session_cookie);
-
 export async function passwordAuthCookie(
   core: AirdayCore,
   opts: TypeOf<typeof passwordAuthSchema.schema>,

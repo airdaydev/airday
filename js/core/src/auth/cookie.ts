@@ -1,4 +1,7 @@
+import { TypeOf } from "suretype";
+import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter } from "./adapters";
+import { passwordAuthCookie } from "../http/auth";
 
 export class CookieAuth implements AuthAdapter {
   credentials: RequestCredentials = "include";
