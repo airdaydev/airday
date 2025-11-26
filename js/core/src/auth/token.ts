@@ -7,7 +7,7 @@ interface TokenData {
   primary_library_id: Uuidv4;
 }
 
-async function decryptToken(key: string, token: string) {
+export async function verifyToken(key: string, token: string) {
   const { payload, footer } = verify<TokenData>(key, token, {
     // assertion,
     maxDepth: 1,

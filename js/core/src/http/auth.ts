@@ -1,6 +1,11 @@
 import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
 import { type TypeOf, v } from "suretype";
-import { v_session_bearer, v_session_cookie } from "./types";
+import {
+  passwordAuthCookieRes,
+  passwordAuthSchema,
+  v_session_bearer,
+  v_session_cookie,
+} from "./types";
 import type { AirdayCore } from "../core";
 
 const jsonHeaders = {
@@ -48,8 +53,8 @@ const sessionsRes = APISchema(
 export async function getUserSessions(core: AirdayCore) {
   const res = await fetch(core.endpoint("/auth/sessions"), {
     method: "GET",
-    credentials: core.credentials(),
-    headers: core.headers(),
+    credentials: core.auth.credentials,
+    headers: core.auth.headers(),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, sessionsRes.ensureFunc);
@@ -85,7 +90,6 @@ export async function refreshBearer(core: AirdayCore) {
   const res = await fetch(core.endpoint("/auth/refresh/bearer"), {
     method: "POST",
     headers,
-    credentials: "include",
     body: JSON.stringify({ id: core.session.id }),
   });
   const untyped = await parseJSONResponse(res);

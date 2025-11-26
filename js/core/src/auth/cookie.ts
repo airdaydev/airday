@@ -19,11 +19,12 @@ export class CookieAuth implements AuthAdapter {
   constructor(core: AirdayCore) {
     this.core = core;
   }
-  headers(json: boolean = true) {
+  headers(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};
     if (json) {
       headers["Accept-Content"] = "application/json";
     }
+    return headers;
   }
   initOpts(init: RequestInit) {
     init.credentials = "include";
