@@ -1,5 +1,4 @@
 import { APISchema, endpoint, parseJSONResponse, valJSONRes } from "./utils";
-import { AirdayCore } from "../core";
 import { v } from "suretype";
 
 const getRootResSchema = APISchema(

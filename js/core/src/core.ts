@@ -21,7 +21,7 @@ interface Session {
 
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
-  apiUrl: URL;
+  readonly apiUrl: URL;
   session?: Session;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer

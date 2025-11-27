@@ -1,6 +1,5 @@
 import { TypeOf } from "suretype";
 import { Uuidv4 } from "../common/uuid";
-import { AirdayCore } from "../core";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState } from "./adapters";
@@ -19,15 +18,18 @@ interface UserData {
 }
 
 export class BearerAuth implements AuthAdapter {
-  core: AirdayCore;
+  readonly rootUrl: URL;
+  readonly publicKey: string;
   sessionToken?: string;
   refreshToken?: string;
   sessionExpiry?: number;
-  publicKey: string = "k4.public.dummy-key-replace-me";
   credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
   userData?: UserData;
-  constructor(rootUrl: URL, publicKey: string) {}
+  constructor(rootUrl: URL, publicKey: string) {
+    this.rootUrl = rootUrl;
+    this.publicKey = publicKey;
+  }
   async setTokens(sessionToken: string, refreshToken: string) {
     this.sessionToken = sessionToken;
     this.refreshToken = refreshToken;
@@ -70,11 +72,15 @@ export class BearerAuth implements AuthAdapter {
     }
   }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthBearer(this.core, opts);
+    const res = await passwordAuthBearer(this.rootUrl, opts);
     return res;
   }
   async refreshBearer() {
-    const res = await refreshBearer(this.core, this.refreshToken);
+    if (!this.refreshToken) {
+      // TODO: Drop the error
+      throw new Error("can't refresh without token");
+    }
+    const res = await refreshBearer(this.rootUrl, this.refreshToken);
     return res;
   }
 }
