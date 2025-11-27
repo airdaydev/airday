@@ -2,7 +2,7 @@ import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { AuthAdapter } from "./auth/adapters";
+import { AuthAdapter } from "./auth/adapter";
 
 interface AirdayCoreOpts {
   apiUrl: URL;

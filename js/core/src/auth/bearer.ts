@@ -2,7 +2,7 @@ import { TypeOf } from "suretype";
 import { Uuidv4 } from "../common/uuid";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter, AuthState } from "./adapters";
+import { AuthAdapter, AuthState } from "./adapter";
 import { verifyToken } from "./token";
 
 interface BearerSessionData {

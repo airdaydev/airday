@@ -1,5 +1,3 @@
-import { AirdayCore } from "../core";
-
 export enum AuthState {
   Uninitialised = "uninitialised",
   Local = "local",
