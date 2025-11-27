@@ -100,7 +100,6 @@ pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
     Ok(token)
 }
 
-// Helper functions to extract typed values from claims
 fn extract_string(claims: &Claims, key: &str) -> Result<String, AppError> {
     claims
         .get_claim(key)
@@ -125,4 +124,62 @@ fn extract_uuid(claims: &Claims, key: &str) -> Result<Uuid, AppError> {
 fn extract_kind(claims: &Claims, key: &str) -> Result<AuthTokenKind, AppError> {
     let kind_str = extract_string(claims, key)?;
     match_token_kind(&kind_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::{create_test_db, mock_session, mock_user};
+    use pasetors::keys::{AsymmetricKeyPair, Generate};
+    use pasetors::paserk::FormatAsPaserk;
+
+    fn setup_test_keys() {
+        let kp = AsymmetricKeyPair::<V4>::generate().unwrap();
+        let mut secret_paserk = String::new();
+        kp.secret.fmt(&mut secret_paserk).unwrap();
+        let mut public_paserk = String::new();
+        kp.public.fmt(&mut public_paserk).unwrap();
+
+        let cfg = AirdayConfig {
+            paseto_pk: public_paserk,
+            paseto_sk: secret_paserk,
+            ..Default::default()
+        };
+        let _ = PasetoKeys::set_keys(&cfg);
+    }
+
+    #[tokio::test]
+    async fn test_session_token_roundtrip() {
+        setup_test_keys();
+        let db = create_test_db().await;
+        let user = mock_user(&db, String::from("test_session_roundtrip@air.day")).await;
+        let session = mock_session(&db, user).await;
+
+        let token = AuthToken::new_session_token(&session);
+        let paseto_str = to_paseto(&token).expect("Failed to serialize to PASETO");
+        println!("paseto_str: {}", paseto_str);
+        let deserialized = deserialize_token(&paseto_str).expect("Failed to deserialize PASETO");
+
+        assert_eq!(deserialized.session_id(), session.id);
+        assert_eq!(deserialized.user_id(), session.user_id);
+        assert_eq!(deserialized.primary_library_id(), session.primary_library);
+        assert_eq!(deserialized.kind_str(), "session");
+    }
+
+    #[tokio::test]
+    async fn test_refresh_token_roundtrip() {
+        setup_test_keys();
+        let db = create_test_db().await;
+        let user = mock_user(&db, String::from("test_refresh_roundtrip@air.day")).await;
+        let session = mock_session(&db, user).await;
+
+        let token = AuthToken::new_refresh_token(&session);
+        let paseto_str = to_paseto(&token).expect("Failed to serialize to PASETO");
+        let deserialized = deserialize_token(&paseto_str).expect("Failed to deserialize PASETO");
+
+        assert_eq!(deserialized.session_id(), session.id);
+        assert_eq!(deserialized.user_id(), session.user_id);
+        assert_eq!(deserialized.primary_library_id(), session.primary_library);
+        assert_eq!(deserialized.kind_str(), "refresh");
+    }
 }
