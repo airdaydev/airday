@@ -5,7 +5,8 @@ import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState } from "./adapter";
 import { verifyToken } from "./token";
 
-interface BearerSessionData {
+// Stored & retrieved in local_storage
+interface BearerLocalStorageData {
   sessionToken: string;
   refreshToken: string;
 }
@@ -40,19 +41,24 @@ export class BearerAuth implements AuthAdapter {
       SESSION_STORAGE_KEY,
       JSON.stringify({ sessionToken, refreshToken }),
     );
-    this.state = AuthState.Online;
+    this.state = AuthState.Loaded;
   }
-  async initSession(): Promise<boolean> {
+  async loadAuthState(): Promise<boolean> {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!stored) return false;
+    if (!stored) {
+      this.state = AuthState.Anon;
+      return false;
+    }
     try {
       const { sessionToken, refreshToken } = JSON.parse(
         stored,
-      ) as BearerSessionData;
+      ) as BearerLocalStorageData;
       await this.setTokens(sessionToken, refreshToken);
+      this.state = AuthState.Loaded;
       return true;
     } catch {
       localStorage.removeItem(SESSION_STORAGE_KEY);
+      this.state = AuthState.Anon;
       return false;
     }
   }
@@ -83,4 +89,5 @@ export class BearerAuth implements AuthAdapter {
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
     return res;
   }
+  signout() {}
 }

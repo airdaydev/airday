@@ -1,6 +1,6 @@
 import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter, AuthState } from "./adapters";
+import { AuthAdapter, AuthState } from "./adapter";
 import { passwordAuthCookie, refreshCookie } from "../http/auth";
 import { Uuidv4 } from "../common/uuid";
 
@@ -29,6 +29,7 @@ export class CookieAuth implements AuthAdapter {
   initOpts(init: RequestInit) {
     init.credentials = "include";
   }
+  loadAuthState() {}
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthCookie(this.apiUrl, opts);
     // this.sessionData = {

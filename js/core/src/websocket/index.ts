@@ -99,10 +99,9 @@ export class WebsocketManager {
     ws.addEventListener("open", (event) => {
       this.connectionAttempts = 0;
       this.state = WSState.Connected;
-      if (this.core.authMode === AuthMode.BearerToken) {
-        this.bearerAuth();
-      }
-      // TODO: Re. cookie auth... send same message on server to ensure core is authorised
+      // if (this.core.auth === AuthMode.BearerToken) {
+      //   this.bearerAuth();
+      // }
     });
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);

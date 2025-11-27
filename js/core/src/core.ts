@@ -2,7 +2,7 @@ import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { AuthAdapter } from "./auth/adapter";
+import { AuthAdapter, AuthState } from "./auth/adapter";
 
 interface AirdayCoreOpts {
   apiUrl: URL;
@@ -10,14 +10,13 @@ interface AirdayCoreOpts {
   storageAdapter?: StorageAdapter;
 }
 
-// TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   readonly apiUrl: URL;
+  online = false;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
   auth: AuthAdapter;
-  // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
     this.apiUrl = opts.apiUrl;
     this.ws = new WebsocketManager(this);
@@ -27,8 +26,20 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
+    // this.auth.on("authenticated", () => {
+    //   // If stopped!
+    //   this.startSync();
+    // });
+    // this.auth.on("deauthenticated", () => {
+    //   this.stopSync();
+    // });
   }
   async startSync() {
+    if (this.auth.state !== AuthState.Loaded) {
+      console.warn("attempted to startSync without credentials loaded");
+      return;
+    }
+    this.online = true;
     try {
       const frames = this.ws.frames();
       for await (const frame of frames) {
@@ -37,6 +48,7 @@ export class AirdayCore {
     } catch (err) {
       console.error("startSync failed", err);
     }
+    this.online = false;
   }
   stopSync() {
     this.ws.stop();
