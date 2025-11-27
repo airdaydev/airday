@@ -80,3 +80,9 @@ export function APISchema<T extends ObjectValidator<any>>(
     ensureFunc: compile(schema, { ensure: true }),
   };
 }
+
+export function endpoint(rootUrl: URL, pathName: string) {
+  const url = new URL(rootUrl);
+  url.pathname = pathName;
+  return url;
+}

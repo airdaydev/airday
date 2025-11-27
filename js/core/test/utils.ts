@@ -1,7 +1,8 @@
 import { loadToml, validateConfig } from "toml-config";
-import { AirdayCore, AuthMode } from "../src/index";
+import { AirdayCore } from "../src/index";
 import { createUser } from "../src/index";
 import { AirdayMemStorage } from "../src/storage/mem";
+import { BearerAuth } from "../src/auth/bearer";
 
 export function extractCookie(
   headers: Headers,
@@ -39,11 +40,12 @@ const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
 export async function createAuthenticatedCore() {
+  const apiUrl = new URL(config.api_url);
+  const bearer = new BearerAuth(apiUrl, config.paseto_pk);
   const core = new AirdayCore({
-    rootUrl: config.api_url,
-    authMode: AuthMode.BearerToken,
-    paseto_pk: config.paseto_pk,
+    apiUrl: apiUrl,
     storageAdapter: new AirdayMemStorage(),
+    authAdapter: bearer,
   });
   await authenticate(core, `${Math.random()}@airday.com}`);
   return core;
@@ -51,10 +53,10 @@ export async function createAuthenticatedCore() {
 
 export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
-  await createUser(core, {
+  await createUser(core.apiUrl, {
     email,
     password,
   });
-  await core.loginWithPasswordBearer({ email, password });
+  // await core.loginWithPasswordBearer({ email, password });
   return core;
 }

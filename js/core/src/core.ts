@@ -4,14 +4,8 @@ import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
 import { AuthAdapter } from "./auth/adapters";
 
-export enum AuthMode {
-  Cookie,
-  BearerToken,
-}
-
 interface AirdayCoreOpts {
-  rootUrl: string;
-  paseto_pk: string;
+  apiUrl: URL;
   authAdapter: AuthAdapter;
   storageAdapter?: StorageAdapter;
 }
@@ -27,7 +21,7 @@ interface Session {
 
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
-  root: URL;
+  apiUrl: URL;
   session?: Session;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
@@ -35,7 +29,7 @@ export class AirdayCore {
   auth: AuthAdapter;
   // TODO: Refresh token management
   constructor(opts: AirdayCoreOpts) {
-    this.root = new URL(opts.rootUrl);
+    this.apiUrl = opts.apiUrl;
     this.ws = new WebsocketManager(this);
     this.sync = new AirdaySync(this);
     this.storage = new AirdayStorage(this, opts.storageAdapter);
@@ -43,11 +37,6 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
-  }
-  endpoint(pathName: string) {
-    const url = new URL(this.root);
-    url.pathname = pathName;
-    return url;
   }
   async startSync() {
     try {

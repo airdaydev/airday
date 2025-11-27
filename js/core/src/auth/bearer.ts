@@ -27,9 +27,7 @@ export class BearerAuth implements AuthAdapter {
   credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
   userData?: UserData;
-  constructor(core: AirdayCore) {
-    this.core = core;
-  }
+  constructor(rootUrl: URL, publicKey: string) {}
   async setTokens(sessionToken: string, refreshToken: string) {
     this.sessionToken = sessionToken;
     this.refreshToken = refreshToken;
@@ -76,7 +74,7 @@ export class BearerAuth implements AuthAdapter {
     return res;
   }
   async refreshBearer() {
-    const res = await refreshBearer(this.core);
+    const res = await refreshBearer(this.core, this.refreshToken);
     return res;
   }
 }

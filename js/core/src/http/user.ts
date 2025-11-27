@@ -1,6 +1,5 @@
-import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
+import { APISchema, endpoint, parseJSONResponse, valJSONRes } from "./utils";
 import { type TypeOf, v } from "suretype";
-import type { AirdayCore } from "../core";
 
 const createUserOpts = APISchema(
   v.object({
@@ -22,11 +21,11 @@ const createUserRes = APISchema(
 );
 
 export async function createUser(
-  core: AirdayCore,
+  rootUrl: URL,
   opts: TypeOf<typeof createUserOpts.schema>,
 ) {
   createUserOpts.ensureFunc(opts);
-  const res = await fetch(core.endpoint("/user"), {
+  const res = await fetch(endpoint(rootUrl, "/user"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -44,11 +43,11 @@ const updateUserOpts = APISchema(
 );
 
 export async function updateUser(
-  core: AirdayCore,
+  rootUrl: URL,
   opts: TypeOf<typeof updateUserOpts.schema>,
 ) {
   createUserOpts.ensureFunc(opts);
-  const res = await fetch(core.endpoint("/user"), {
+  const res = await fetch(endpoint(rootUrl, "/user"), {
     method: "PUT",
     body: JSON.stringify(opts),
     headers: {

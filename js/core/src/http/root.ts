@@ -1,4 +1,4 @@
-import { APISchema, parseJSONResponse, valJSONRes } from "./utils";
+import { APISchema, endpoint, parseJSONResponse, valJSONRes } from "./utils";
 import { AirdayCore } from "../core";
 import { v } from "suretype";
 
@@ -8,8 +8,8 @@ const getRootResSchema = APISchema(
   }),
 );
 
-export async function getRoot(core: AirdayCore) {
-  const res = await fetch(core.endpoint("/"), {
+export async function getRoot(rootUrl: URL) {
+  const res = await fetch(endpoint(rootUrl, "/"), {
     method: "GET",
   });
   const untyped = await parseJSONResponse(res);
