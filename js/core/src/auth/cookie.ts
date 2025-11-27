@@ -2,7 +2,6 @@ import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState } from "./adapters";
 import { passwordAuthCookie, refreshCookie } from "../http/auth";
-import { AirdayCore } from "../core";
 import { Uuidv4 } from "../common/uuid";
 
 interface CookieSessionData {
@@ -13,12 +12,12 @@ interface CookieSessionData {
 }
 
 export class CookieAuth implements AuthAdapter {
-  core: AirdayCore;
+  readonly rootUrl: URL;
   credentials: RequestCredentials = "include";
   state: AuthState = AuthState.Uninitialised;
   sessionData?: CookieSessionData;
-  constructor(core: AirdayCore) {
-    this.core = core;
+  constructor(rootUrl: URL) {
+    this.rootUrl = rootUrl;
   }
   headers(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -31,7 +30,7 @@ export class CookieAuth implements AuthAdapter {
     init.credentials = "include";
   }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthCookie(this.core, opts);
+    const res = await passwordAuthCookie(this.rootUrl, opts);
     // this.sessionData = {
     //   id: res.data.id,
     //   expires: new Date(res.data.expires),
@@ -41,6 +40,6 @@ export class CookieAuth implements AuthAdapter {
   }
   signout() {}
   async refresh() {
-    const res = await refreshCookie(this.core);
+    const res = await refreshCookie(this.rootUrl);
   }
 }

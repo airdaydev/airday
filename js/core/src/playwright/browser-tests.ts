@@ -1,6 +1,6 @@
 // Browser integration tests with indexeddb
 import { BrowserRunner, log } from "./runner";
-import { AirdayCore, AuthMode, createUser } from "../index";
+import { AirdayCore, createUser } from "../index";
 import { tracer } from "../tracer";
 import { LWWRegister } from "../crdt/lww";
 import { Uuidv4 } from "../common/uuid";

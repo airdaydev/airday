@@ -10,19 +10,9 @@ interface AirdayCoreOpts {
   storageAdapter?: StorageAdapter;
 }
 
-interface Session {
-  id: string;
-  token?: string;
-  expires: Date;
-  refreshToken?: string;
-  refreshExpires: Date;
-  userId: string;
-}
-
 // TODO: Consider making a separate HTTP (and/or auth) class
 export class AirdayCore {
   readonly apiUrl: URL;
-  session?: Session;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer

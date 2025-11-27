@@ -6,7 +6,7 @@ import {
   BatchResponseProto,
   BatchSyncOpProto,
 } from "../proto";
-import { AuthMode, type AirdayCore } from "../core";
+import { type AirdayCore } from "../core";
 import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
 import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
@@ -15,6 +15,7 @@ import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { SyncOp } from "../sync/sync-op";
 import { StreamContext } from "../sync/stream";
+import { Library } from "../common/library";
 
 export interface OpResponse {
   opId: Uuidv4;
@@ -316,7 +317,8 @@ export class WebsocketManager {
           this.core.library = new Library({
             id,
             name,
-            local: true,
+            primary: true,
+            remote: true,
           });
         }
         break;
