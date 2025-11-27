@@ -145,6 +145,7 @@ mod tests {
             paseto_sk: secret_paserk,
             ..Default::default()
         };
+        // Ignore error if keys already set (from previous test)
         let _ = PasetoKeys::set_keys(&cfg);
     }
 
@@ -157,7 +158,6 @@ mod tests {
 
         let token = AuthToken::new_session_token(&session);
         let paseto_str = to_paseto(&token).expect("Failed to serialize to PASETO");
-        println!("paseto_str: {}", paseto_str);
         let deserialized = deserialize_token(&paseto_str).expect("Failed to deserialize PASETO");
 
         assert_eq!(deserialized.session_id(), session.id);
