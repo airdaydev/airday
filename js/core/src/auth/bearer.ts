@@ -18,7 +18,7 @@ interface UserData {
   primaryLibraryId: Uuidv4;
 }
 
-export class BearerAuth implements AuthAdapter {
+export class BearerAuth extends AuthAdapter {
   readonly apiUrl: URL;
   readonly publicKey: string;
   sessionToken?: string;
@@ -43,6 +43,10 @@ export class BearerAuth implements AuthAdapter {
     );
     this.state = AuthState.Loaded;
   }
+  async clearAuthState() {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    this.state = AuthState.Anon;
+  }
   async loadAuthState(): Promise<boolean> {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!stored) {
@@ -57,8 +61,7 @@ export class BearerAuth implements AuthAdapter {
       this.state = AuthState.Loaded;
       return true;
     } catch {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      this.state = AuthState.Anon;
+      this.clearAuthState();
       return false;
     }
   }

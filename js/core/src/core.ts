@@ -26,17 +26,35 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
-    // this.auth.on("authenticated", () => {
-    //   // If stopped!
-    //   this.startSync();
-    // });
-    // this.auth.on("deauthenticated", () => {
-    //   this.stopSync();
-    // });
+    this.auth.events.on("authenticated", () => {
+      // Load storage!
+      this.startSync();
+    });
+    this.auth.events.on("deauthenticated", () => {
+      // TODO: Does this always mean sign out here?
+      // What happens when you get kicked?
+      // Leave storage
+      this.stopSync();
+    });
+    this.init().catch((err) => {
+      console.warn(err);
+      this.reset();
+    });
+  }
+  async init() {
+    await this.auth.loadAuthState();
+  }
+  async reset() {
+    // TODO: Errors here are currently fatal
+    this.auth.clearAuthState();
   }
   async startSync() {
     if (this.auth.state !== AuthState.Loaded) {
       console.warn("attempted to startSync without credentials loaded");
+      return;
+    }
+    if (this.online) {
+      console.warn("attempted to startSync while already online");
       return;
     }
     this.online = true;

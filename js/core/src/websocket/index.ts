@@ -16,6 +16,7 @@ import { ULSpan } from "@airday/tracer";
 import { SyncOp } from "../sync/sync-op";
 import { StreamContext } from "../sync/stream";
 import { Library } from "../common/library";
+import { BearerAuth } from "../auth/bearer";
 
 export interface OpResponse {
   opId: Uuidv4;
@@ -99,9 +100,9 @@ export class WebsocketManager {
     ws.addEventListener("open", (event) => {
       this.connectionAttempts = 0;
       this.state = WSState.Connected;
-      // if (this.core.auth === AuthMode.BearerToken) {
-      //   this.bearerAuth();
-      // }
+      if (this.core.auth instanceof BearerAuth) {
+        this.bearerAuth();
+      }
     });
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);
@@ -186,13 +187,17 @@ export class WebsocketManager {
   }
   private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");
-    if (!this.core.session?.token) {
-      console.warn("Cannot websocket bearer auth, no bearer token");
+    const auth = this.core.auth;
+    if (auth instanceof BearerAuth && auth.sessionToken) {
+      // TODO: Check expiry etc
+      // Timeout for action completing?
+      const msg = new AuthenticateAction(auth.sessionToken);
+      this.ws.send(msg.serialise());
+      msg.complete();
       return;
     }
-    const msg = new AuthenticateAction(this.core.session.token);
-    this.ws.send(msg.serialise());
-    msg.complete();
+    console.warn("Cannot websocket bearer auth, no bearer token");
+    return;
   }
   send(data: any) {
     if (!this.ws) throw new Error("Cannot send, WS is not enabled");
