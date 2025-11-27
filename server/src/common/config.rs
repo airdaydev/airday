@@ -10,8 +10,8 @@ pub struct AirdayConfig {
     #[serde(deserialize_with = "deserialize_lowercase")]
     pub log_level: String,
     pub otlp_host: Option<String>,
-    pub paseto_pk_b64: String,
-    pub paseto_sk_b64: String,
+    pub paseto_pk: String,
+    pub paseto_sk: String,
 }
 
 fn deserialize_lowercase<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -31,8 +31,8 @@ impl Default for AirdayConfig {
             secure_cookies: true,
             otlp_host: None,
             log_level: String::from("info"),
-            paseto_pk_b64: String::from(""),
-            paseto_sk_b64: String::from(""),
+            paseto_pk: String::from(""),
+            paseto_sk: String::from(""),
         }
     }
 }

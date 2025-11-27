@@ -1,13 +1,12 @@
 use crate::AppState;
 use crate::auth::meta::ClientMeta;
-use crate::auth::token::AuthToken;
 use crate::common::error::AppError;
 use crate::common::sql::Db;
 use crate::user::model::User;
 use async_trait::async_trait;
 use axum::Json;
 use axum::extract::State;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlx::types::Uuid as SqlxUuid;
 use uuid::Uuid;
 

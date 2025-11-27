@@ -1,7 +1,6 @@
 use crate::auth::token::{AuthToken, AuthTokenKind, TokenData, match_token_kind};
 use crate::common::config::AirdayConfig;
 use crate::common::error::AppError;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use core::convert::TryFrom;
 use pasetors::claims::{Claims, ClaimsValidationRules};
 use pasetors::keys::{AsymmetricPublicKey, AsymmetricSecretKey};
@@ -24,17 +23,15 @@ impl PasetoKeys {
         )))
     }
     pub fn set_keys(cfg: &AirdayConfig) -> Result<(), AppError> {
-        let public_raw = BASE64
-            .decode(&cfg.paseto_pk_b64)
-            .map_err(|e| AppError::ServerError(format!("Error decoding paseto_pk_b64: {}", e)))?;
-        let public = AsymmetricPublicKey::<V4>::from(&public_raw)
-            .map_err(|e| AppError::ServerError(format!("Failed to decode paseto_pk_b64: {}", e)))?;
-        let secret_raw = BASE64
-            .decode(&cfg.paseto_sk_b64)
-            .map_err(|e| AppError::ServerError(format!("Error decoding paseto_sk_b64: {}", e)))?;
-        let secret = AsymmetricSecretKey::<V4>::from(&secret_raw)
-            .map_err(|e| AppError::ServerError(format!("Failed to decode paseto_sk_64: {}", e)))?;
-        PASETO_KEYS.set(PasetoKeys { public, secret });
+        let public = AsymmetricPublicKey::<V4>::try_from(cfg.paseto_pk.as_str())
+            .map_err(|e| AppError::ServerError(format!("Error parsing paseto_pk: {}", e)))?;
+        let secret = AsymmetricSecretKey::<V4>::try_from(cfg.paseto_sk.as_str())
+            .map_err(|e| AppError::ServerError(format!("Error parsing paseto_sk: {}", e)))?;
+        if let Err(_) = PASETO_KEYS.set(PasetoKeys { public, secret }) {
+            return Err(AppError::ServerError(String::from(
+                "Paseto keys in PASERK format not loading",
+            )));
+        }
         Ok(())
     }
 }
