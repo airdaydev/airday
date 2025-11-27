@@ -7,8 +7,8 @@ const getRootResSchema = APISchema(
   }),
 );
 
-export async function getRoot(rootUrl: URL) {
-  const res = await fetch(endpoint(rootUrl, "/"), {
+export async function getRoot(apiUrl: URL) {
+  const res = await fetch(endpoint(apiUrl, "/"), {
     method: "GET",
   });
   const untyped = await parseJSONResponse(res);

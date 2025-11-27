@@ -12,12 +12,12 @@ interface CookieSessionData {
 }
 
 export class CookieAuth implements AuthAdapter {
-  readonly rootUrl: URL;
+  readonly apiUrl: URL;
   credentials: RequestCredentials = "include";
   state: AuthState = AuthState.Uninitialised;
   sessionData?: CookieSessionData;
-  constructor(rootUrl: URL) {
-    this.rootUrl = rootUrl;
+  constructor(apiUrl: URL) {
+    this.apiUrl = apiUrl;
   }
   headers(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -30,7 +30,7 @@ export class CookieAuth implements AuthAdapter {
     init.credentials = "include";
   }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthCookie(this.rootUrl, opts);
+    const res = await passwordAuthCookie(this.apiUrl, opts);
     // this.sessionData = {
     //   id: res.data.id,
     //   expires: new Date(res.data.expires),
@@ -40,6 +40,6 @@ export class CookieAuth implements AuthAdapter {
   }
   signout() {}
   async refresh() {
-    const res = await refreshCookie(this.rootUrl);
+    const res = await refreshCookie(this.apiUrl);
   }
 }

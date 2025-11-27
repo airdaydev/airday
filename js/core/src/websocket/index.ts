@@ -51,8 +51,8 @@ export enum WSState {
 
 // TODO: Offline considerations
 export class WebsocketManager {
-  core: AirdayCore;
-  address: URL;
+  readonly core: AirdayCore;
+  readonly address: URL;
   events = new EventEmitter<WSEventMap>();
   state: WSState = WSState.Disconnected;
   // Outgoing queue
@@ -72,7 +72,7 @@ export class WebsocketManager {
   // --
   constructor(core: AirdayCore) {
     this.core = core;
-    const address = core.root;
+    const address = core.apiUrl;
     address.pathname = "ws";
     this.address = address;
   }

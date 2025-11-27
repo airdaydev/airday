@@ -21,11 +21,11 @@ const createUserRes = APISchema(
 );
 
 export async function createUser(
-  rootUrl: URL,
+  apiUrl: URL,
   opts: TypeOf<typeof createUserOpts.schema>,
 ) {
   createUserOpts.ensureFunc(opts);
-  const res = await fetch(endpoint(rootUrl, "/user"), {
+  const res = await fetch(endpoint(apiUrl, "/user"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: {
@@ -43,11 +43,11 @@ const updateUserOpts = APISchema(
 );
 
 export async function updateUser(
-  rootUrl: URL,
+  apiUrl: URL,
   opts: TypeOf<typeof updateUserOpts.schema>,
 ) {
   createUserOpts.ensureFunc(opts);
-  const res = await fetch(endpoint(rootUrl, "/user"), {
+  const res = await fetch(endpoint(apiUrl, "/user"), {
     method: "PUT",
     body: JSON.stringify(opts),
     headers: {

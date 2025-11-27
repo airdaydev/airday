@@ -20,8 +20,7 @@ export async function authenticate(core: AirdayCore, email: string) {
 
 export async function createTestCore() {
   const core = new AirdayCore({
-    rootUrl: "http://localhost:3000",
-    authMode: AuthMode.BearerToken,
+    apiUrl: new URL("http://localhost:3000"),
     storageAdapter: new AirdayMemStorage(),
   });
   await authenticate(core, `${Math.random()}@airday.com}`);

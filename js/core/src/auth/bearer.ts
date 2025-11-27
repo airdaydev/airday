@@ -18,7 +18,7 @@ interface UserData {
 }
 
 export class BearerAuth implements AuthAdapter {
-  readonly rootUrl: URL;
+  readonly apiUrl: URL;
   readonly publicKey: string;
   sessionToken?: string;
   refreshToken?: string;
@@ -26,8 +26,8 @@ export class BearerAuth implements AuthAdapter {
   credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
   userData?: UserData;
-  constructor(rootUrl: URL, publicKey: string) {
-    this.rootUrl = rootUrl;
+  constructor(apiUrl: URL, publicKey: string) {
+    this.apiUrl = apiUrl;
     this.publicKey = publicKey;
   }
   async setTokens(sessionToken: string, refreshToken: string) {
@@ -72,7 +72,7 @@ export class BearerAuth implements AuthAdapter {
     }
   }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthBearer(this.rootUrl, opts);
+    const res = await passwordAuthBearer(this.apiUrl, opts);
     return res;
   }
   async refreshBearer() {
@@ -80,7 +80,7 @@ export class BearerAuth implements AuthAdapter {
       // TODO: Drop the error
       throw new Error("can't refresh without token");
     }
-    const res = await refreshBearer(this.rootUrl, this.refreshToken);
+    const res = await refreshBearer(this.apiUrl, this.refreshToken);
     return res;
   }
 }

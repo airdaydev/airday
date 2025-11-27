@@ -13,10 +13,10 @@ const jsonHeaders = {
 };
 
 export async function passwordAuthCookie(
-  rootUrl: URL,
+  apiUrl: URL,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
-  const res = await fetch(endpoint(rootUrl, "/auth/password/cookie"), {
+  const res = await fetch(endpoint(apiUrl, "/auth/password/cookie"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: jsonHeaders,
@@ -28,10 +28,10 @@ export async function passwordAuthCookie(
 const passwordAuthBearerRes = APISchema(v_session_bearer);
 
 export async function passwordAuthBearer(
-  rootUrl: URL,
+  apiUrl: URL,
   opts: TypeOf<typeof passwordAuthSchema.schema>,
 ) {
-  const res = await fetch(endpoint(rootUrl, "/auth/password/bearer"), {
+  const res = await fetch(endpoint(apiUrl, "/auth/password/bearer"), {
     method: "POST",
     body: JSON.stringify(opts),
     headers: jsonHeaders,
@@ -50,8 +50,8 @@ const sessionsRes = APISchema(
   }),
 );
 
-export async function getUserSessions(rootUrl: URL, auth: AuthAdapter) {
-  const res = await fetch(endpoint(rootUrl, "/auth/sessions"), {
+export async function getUserSessions(apiUrl: URL, auth: AuthAdapter) {
+  const res = await fetch(endpoint(apiUrl, "/auth/sessions"), {
     method: "GET",
     credentials: auth.credentials,
     headers: auth.headers(),
@@ -63,12 +63,12 @@ export async function getUserSessions(rootUrl: URL, auth: AuthAdapter) {
 const refreshCookieRes = APISchema(v_session_cookie);
 const refreshBearerRes = APISchema(v_session_bearer);
 
-export async function refreshCookie(rootUrl: URL) {
+export async function refreshCookie(apiUrl: URL) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Accept-Content": "application/json",
   };
-  const res = await fetch(endpoint(rootUrl, "/auth/refresh/cookie"), {
+  const res = await fetch(endpoint(apiUrl, "/auth/refresh/cookie"), {
     method: "POST",
     headers,
     credentials: "include",
@@ -77,13 +77,13 @@ export async function refreshCookie(rootUrl: URL) {
   return valJSONRes(untyped, refreshCookieRes.ensureFunc);
 }
 
-export async function refreshBearer(rootUrl: URL, refreshToken: string) {
+export async function refreshBearer(apiUrl: URL, refreshToken: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Accept-Content": "application/json",
     Authorization: `Bearer ${refreshToken}`,
   };
-  const res = await fetch(endpoint(rootUrl, "/auth/refresh/bearer"), {
+  const res = await fetch(endpoint(apiUrl, "/auth/refresh/bearer"), {
     method: "POST",
     headers,
   });

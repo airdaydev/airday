@@ -81,8 +81,8 @@ export function APISchema<T extends ObjectValidator<any>>(
   };
 }
 
-export function endpoint(rootUrl: URL, pathName: string) {
-  const url = new URL(rootUrl);
+export function endpoint(apiUrl: URL, pathName: string) {
+  const url = new URL(apiUrl);
   url.pathname = pathName;
   return url;
 }
