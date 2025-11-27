@@ -13,6 +13,7 @@ App domain-specific objects are materialised on the client, the type determined 
 - `pnpm run db`: Resets the database
 - `pnpm run fb`: Compiles flatbuffers
 - `pnpm run test`: Runs ALL tests in the repo
+- `cargo test --manifest-path ./server/Cargo.toml <TEST NAME> -- --nocapture 2>&1`: Run a particular test within server
 - `pnpm run test-core`: Tests entire JS core, automatically resets DB & runs server with in-mem sqlite against it
 - `pnpm run serverd`: Runs server in background, resetting DB
 - `pnpm run jaeger`: Runs dev jaeger in background
