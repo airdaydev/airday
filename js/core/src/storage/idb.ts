@@ -1,7 +1,7 @@
 import { type DBSchema, type IDBPDatabase, openDB, type StoreNames } from "idb";
 import { SyncOp } from "../sync/sync-op";
 import { Uuidv4 } from "../common/uuid";
-import { StorageAdapter } from "./adapter";
+import { dbName, StorageAdapter } from "./adapter";
 import { SyncObject } from "../sync/sync-object";
 
 const SYNC_STORE_NAME = "sync_object"; // snapshot of merged ops i.e. entire object
@@ -36,8 +36,8 @@ export type AirdayStoreNames = StoreNames<AirdayDBSchema>;
 export class AirdayIDBStorage implements StorageAdapter {
   handle: AirdayIDBPDatabase | null = null;
   constructor() {}
-  connect = async () => {
-    this.handle = await openDB("test", 1, {
+  connect = async (userId: Uuidv4) => {
+    this.handle = await openDB(dbName(userId), 1, {
       upgrade(db) {
         const objects = db.createObjectStore(SYNC_STORE_NAME, {
           keyPath: "id",

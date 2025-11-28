@@ -46,7 +46,8 @@ export class AirdayCore {
   }
   async reset() {
     // TODO: Errors here are currently fatal
-    this.auth.clearAuthState();
+    await this.auth.clearAuthState();
+    // TODO: vs creating anonymous state?
   }
   async startSync() {
     if (this.auth.state !== AuthState.Loaded) {

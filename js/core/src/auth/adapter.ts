@@ -16,7 +16,8 @@ export abstract class AuthAdapter {
   events = new EventEmitter<WSEventMap>();
   abstract credentials: RequestCredentials;
   abstract state: AuthState;
-  abstract headers: (json?: boolean) => Record<string, string>;
-  abstract loadAuthState: () => Promise<boolean>;
-  abstract signout: () => void;
+  abstract headers(json?: boolean): Record<string, string>;
+  abstract loadAuthState(): Promise<boolean>;
+  abstract clearAuthState(): Promise<void>;
+  abstract signout(): void;
 }

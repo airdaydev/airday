@@ -22,6 +22,7 @@ export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
   // Library storage
+  primaryLibraryIndex?: LibraryHexUuid;
   libraries: Map<LibraryHexUuid, Library> = new Map();
   // OpCache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
@@ -32,6 +33,9 @@ export class AirdayStorage {
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
+  }
+  async initDb(userId: Uuidv4) {
+    await this.adapter.connect(userId);
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
     let op = this.outbox.get(id.toHex());

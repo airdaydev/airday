@@ -28,6 +28,7 @@ export class BearerAuth extends AuthAdapter {
   state: AuthState = AuthState.Uninitialised;
   userData?: UserData;
   constructor(apiUrl: URL, publicKey: string) {
+    super();
     this.apiUrl = apiUrl;
     this.publicKey = publicKey;
   }

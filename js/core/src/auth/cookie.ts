@@ -11,12 +11,13 @@ interface CookieSessionData {
   refreshExp: Date;
 }
 
-export class CookieAuth implements AuthAdapter {
+export class CookieAuth extends AuthAdapter {
   readonly apiUrl: URL;
   credentials: RequestCredentials = "include";
   state: AuthState = AuthState.Uninitialised;
   sessionData?: CookieSessionData;
   constructor(apiUrl: URL) {
+    super();
     this.apiUrl = apiUrl;
   }
   headers(json: boolean = true): Record<string, string> {
@@ -29,7 +30,9 @@ export class CookieAuth implements AuthAdapter {
   initOpts(init: RequestInit) {
     init.credentials = "include";
   }
-  loadAuthState() {}
+  async loadAuthState() {
+    return true;
+  }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthCookie(this.apiUrl, opts);
     // this.sessionData = {
@@ -39,6 +42,7 @@ export class CookieAuth implements AuthAdapter {
     //   userId: res.data.userId,
     // };
   }
+  async clearAuthState() {}
   signout() {}
   async refresh() {
     const res = await refreshCookie(this.apiUrl);
