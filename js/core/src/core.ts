@@ -42,7 +42,7 @@ export class AirdayCore {
     });
   }
   async init() {
-    await this.auth.loadAuthState();
+    await this.auth.initAuthState();
   }
   async reset() {
     // TODO: Errors here are currently fatal

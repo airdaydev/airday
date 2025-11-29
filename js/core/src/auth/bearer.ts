@@ -2,20 +2,14 @@ import { TypeOf } from "suretype";
 import { Uuidv4 } from "../common/uuid";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter, AuthState } from "./adapter";
+import { AuthAdapter, AuthState, SESSION_STORAGE_KEY } from "./adapter";
 import { verifyToken } from "./token";
 
-// Stored & retrieved in local_storage
 interface BearerLocalStorageData {
-  sessionToken: string;
-  refreshToken: string;
-}
-
-const SESSION_STORAGE_KEY = "airday_session";
-
-interface UserData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
+  sessionToken: string;
+  refreshToken: string;
 }
 
 export class BearerAuth extends AuthAdapter {
@@ -26,7 +20,7 @@ export class BearerAuth extends AuthAdapter {
   sessionExpiry?: number;
   credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
-  userData?: UserData;
+  localStorage?: BearerLocalStorageData;
   constructor(apiUrl: URL, publicKey: string) {
     super();
     this.apiUrl = apiUrl;
@@ -38,26 +32,29 @@ export class BearerAuth extends AuthAdapter {
     const payload = await verifyToken(this.publicKey, sessionToken);
     // TODO: Save sessionExpiry
     // this.sessionExpiry = payload.exp;
-    localStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ sessionToken, refreshToken }),
-    );
+    const storage: BearerLocalStorageData = {
+      sessionToken,
+      refreshToken,
+      userId: payload.u_id,
+      primaryLibraryId: payload.l_id,
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(storage));
     this.state = AuthState.Loaded;
   }
   async clearAuthState() {
     localStorage.removeItem(SESSION_STORAGE_KEY);
     this.state = AuthState.Anon;
   }
-  async loadAuthState(): Promise<boolean> {
+  async initAuthState(): Promise<boolean> {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!stored) {
       this.state = AuthState.Anon;
       return false;
     }
+    // TODO: Validate saved data!
     try {
-      const { sessionToken, refreshToken } = JSON.parse(
-        stored,
-      ) as BearerLocalStorageData;
+      const { sessionToken, refreshToken, userId, primaryLibraryId } =
+        JSON.parse(stored) as BearerLocalStorageData;
       await this.setTokens(sessionToken, refreshToken);
       this.state = AuthState.Loaded;
       return true;

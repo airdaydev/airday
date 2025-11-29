@@ -4,7 +4,7 @@ import { AuthAdapter, AuthState } from "./adapter";
 import { passwordAuthCookie, refreshCookie } from "../http/auth";
 import { Uuidv4 } from "../common/uuid";
 
-interface CookieSessionData {
+interface CookieLocalStorageData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
   sessionExp: Date;
@@ -15,7 +15,7 @@ export class CookieAuth extends AuthAdapter {
   readonly apiUrl: URL;
   credentials: RequestCredentials = "include";
   state: AuthState = AuthState.Uninitialised;
-  sessionData?: CookieSessionData;
+  sessionData?: CookieLocalStorageData;
   constructor(apiUrl: URL) {
     super();
     this.apiUrl = apiUrl;
@@ -30,7 +30,7 @@ export class CookieAuth extends AuthAdapter {
   initOpts(init: RequestInit) {
     init.credentials = "include";
   }
-  async loadAuthState() {
+  async initAuthState() {
     return true;
   }
   async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {

@@ -2,9 +2,9 @@ import { verify } from "paseto-ts/v4";
 import { Uuidv4 } from "../common/uuid";
 
 interface TokenData {
-  session_id: Uuidv4;
-  user_id: Uuidv4;
-  primary_library_id: Uuidv4;
+  s_id: Uuidv4;
+  u_id: Uuidv4;
+  l_id: Uuidv4;
 }
 
 export async function verifyToken(key: string, token: string) {

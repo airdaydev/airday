@@ -1,5 +1,7 @@
 import { EventEmitter } from "../common/events";
 
+export const SESSION_STORAGE_KEY = "airday_session";
+
 export enum AuthState {
   Uninitialised = "uninitialised",
   Loaded = "loaded",
@@ -17,7 +19,7 @@ export abstract class AuthAdapter {
   abstract credentials: RequestCredentials;
   abstract state: AuthState;
   abstract headers(json?: boolean): Record<string, string>;
-  abstract loadAuthState(): Promise<boolean>;
+  abstract initAuthState(): Promise<boolean>;
   abstract clearAuthState(): Promise<void>;
   abstract signout(): void;
 }
