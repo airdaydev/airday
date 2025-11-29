@@ -23,8 +23,10 @@
   },
   "dependencies": {
     "@airday/tracer": "workspace:^",
+    "bun": "1.3.3",
     "flatbuffers": "25.2.10",
     "idb": "^8.0.3",
+    "install": "0.13.0",
     "paseto-ts": "2.0.5",
     "suretype": "^3.3.1",
     "toml-config": "^1.1.4",

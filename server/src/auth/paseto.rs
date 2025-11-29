@@ -46,7 +46,7 @@ pub fn to_paseto(token: &AuthToken) -> Result<String, AppError> {
         .add_additional("s_id", token.session_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
-        .add_additional("p_id", token.primary_library_id().to_string())
+        .add_additional("l_id", token.primary_library_id().to_string())
         .map_err(|e| AppError::ServerError(format!("{}", e)))?;
     claims
         .add_additional("k", token.kind_str())
@@ -83,7 +83,7 @@ pub fn deserialize_token(token: &str) -> Result<AuthToken, AppError> {
 
     let session_id = extract_uuid(&claims, "s_id")?;
     let user_id = extract_uuid(&claims, "u_id")?;
-    let primary_library_id = extract_uuid(&claims, "p_id")?;
+    let primary_library_id = extract_uuid(&claims, "l_id")?;
     let kind = extract_kind(&claims, "k")?;
 
     let data = TokenData {

@@ -1,3 +1,4 @@
+import "./localstorage-polyfill";
 import { loadToml, validateConfig } from "toml-config";
 import { AirdayCore } from "../src/index";
 import { createUser } from "../src/index";
@@ -38,6 +39,17 @@ const schema = {
 
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
+
+export function createCore() {
+  const apiUrl = new URL(config.api_url);
+  const bearer = new BearerAuth(apiUrl, config.paseto_pk);
+  const core = new AirdayCore({
+    apiUrl: apiUrl,
+    storageAdapter: new AirdayMemStorage(),
+    authAdapter: bearer,
+  });
+  return core;
+}
 
 export async function createAuthenticatedCore() {
   const apiUrl = new URL(config.api_url);

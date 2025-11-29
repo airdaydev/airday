@@ -2,13 +2,14 @@ import { test, expect } from "bun:test";
 import { createUser, updateUser } from "../src/index";
 import { getRoot } from "../src/index";
 import {
+  createCore,
   createAuthenticatedCore,
   extractCookie,
   parseCookieValue,
 } from "./utils";
 
 test.only("API root url & version", async () => {
-  const core = await createAuthenticatedCore();
+  const core = createCore();
   const d = await getRoot(core.apiUrl);
   expect(typeof d.data.version).toBe("string");
 });
