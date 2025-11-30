@@ -80,6 +80,7 @@ export class BearerAuth extends AuthAdapter {
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthBearer(this.apiUrl, opts);
+    console.log(res);
     // TODO: Save sesion data
     return true;
   }

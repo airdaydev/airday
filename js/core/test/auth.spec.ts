@@ -84,11 +84,10 @@ test.only("Bearer authorisation & refreshing sessions with bearer tokens", async
     }),
     "Rejects bad passwords",
   ).rejects.toThrow();
-  const res = await core.auth.passwordAuth({
+  await core.auth.passwordAuth({
     email,
     password,
   });
-  console.log(res);
   // expect(core.session?.expires instanceof Date).toBe(true);
   // expect(core.session?.refreshExpires instanceof Date).toBe(true);
   // expect(typeof core.session?.token).toBe("string");

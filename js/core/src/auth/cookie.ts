@@ -40,6 +40,6 @@ export class CookieAuth extends AuthAdapter {
   async clearAuthState() {}
   signout() {}
   async refresh() {
-    const res = await refreshCookie(this.apiUrl);
+    await refreshCookie(this.apiUrl);
   }
 }

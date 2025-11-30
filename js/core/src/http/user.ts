@@ -38,7 +38,7 @@ export async function createUser(
 
 const updateUserOpts = APISchema(
   v.object({
-    primary_library_id: v.string(),
+    primaryLibraryId: v.string(),
   }),
 );
 
