@@ -17,7 +17,7 @@ export class BearerAuth extends AuthAdapter {
   readonly publicKey: string;
   sessionToken?: string;
   refreshToken?: string;
-  sessionExpiry?: number;
+  sessionExpiry?: Date;
   credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
   localStorage?: BearerLocalStorageData;
@@ -29,14 +29,14 @@ export class BearerAuth extends AuthAdapter {
   async setTokens(sessionToken: string, refreshToken: string) {
     this.sessionToken = sessionToken;
     this.refreshToken = refreshToken;
-    const payload = await verifyToken(this.publicKey, sessionToken);
+    const res = await verifyToken(this.publicKey, sessionToken);
     // TODO: Save sessionExpiry
-    // this.sessionExpiry = payload.exp;
+    this.sessionExpiry = res.expiry;
     const storage: BearerLocalStorageData = {
       sessionToken,
       refreshToken,
-      userId: payload.u_id,
-      primaryLibraryId: payload.l_id,
+      userId: res.userId,
+      primaryLibraryId: res.primaryLibraryId,
     };
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(storage));
     this.state = AuthState.Loaded;
@@ -80,8 +80,7 @@ export class BearerAuth extends AuthAdapter {
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthBearer(this.apiUrl, opts);
-    console.log(res);
-    // TODO: Save sesion data
+    this.setTokens(res.data.session_token, res.data.refresh_token);
     return true;
   }
   async refreshBearer() {
