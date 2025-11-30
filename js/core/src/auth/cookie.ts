@@ -33,14 +33,9 @@ export class CookieAuth extends AuthAdapter {
   async initAuthState() {
     return true;
   }
-  async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
-    const res = await passwordAuthCookie(this.apiUrl, opts);
-    // this.sessionData = {
-    //   id: res.data.id,
-    //   expires: new Date(res.data.expires),
-    //   refreshExpires: new Date(res.data.refreshExpires),
-    //   userId: res.data.userId,
-    // };
+  async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
+    await passwordAuthCookie(this.apiUrl, opts);
+    return true;
   }
   async clearAuthState() {}
   signout() {}

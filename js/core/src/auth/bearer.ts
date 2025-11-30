@@ -78,9 +78,10 @@ export class BearerAuth extends AuthAdapter {
       init.headers = {};
     }
   }
-  async authWithPassword(opts: TypeOf<typeof passwordAuthSchema.schema>) {
+  async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthBearer(this.apiUrl, opts);
-    return res;
+    // TODO: Save sesion data
+    return true;
   }
   async refreshBearer() {
     if (!this.refreshToken) {

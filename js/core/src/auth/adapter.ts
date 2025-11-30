@@ -1,4 +1,6 @@
+import { TypeOf } from "suretype";
 import { EventEmitter } from "../common/events";
+import { passwordAuthSchema } from "../http/types";
 
 export const SESSION_STORAGE_KEY = "airday_session";
 
@@ -21,5 +23,8 @@ export abstract class AuthAdapter {
   abstract headers(json?: boolean): Record<string, string>;
   abstract initAuthState(): Promise<boolean>;
   abstract clearAuthState(): Promise<void>;
+  abstract passwordAuth(
+    opts: TypeOf<typeof passwordAuthSchema.schema>,
+  ): Promise<boolean>;
   abstract signout(): void;
 }
