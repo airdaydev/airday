@@ -30,6 +30,7 @@ export class BearerAuth extends AuthAdapter {
     this.sessionToken = sessionToken;
     this.refreshToken = refreshToken;
     const res = await verifyToken(this.publicKey, sessionToken);
+    const refresh_res = await verifyToken(this.publicKey, refreshToken);
     // TODO: Save sessionExpiry
     this.sessionExpiry = res.expiry;
     const storage: BearerLocalStorageData = {

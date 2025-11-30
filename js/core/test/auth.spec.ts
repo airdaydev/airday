@@ -7,6 +7,7 @@ import {
   extractCookie,
   parseCookieValue,
 } from "./utils";
+import { BearerAuth } from "../src/auth/bearer";
 
 test("API root url & version", async () => {
   const core = createCore();
@@ -77,6 +78,7 @@ test.only("Bearer authorisation & refreshing sessions with bearer tokens", async
     email,
     password,
   });
+  // TODO: Put this in another test
   expect(
     core.auth.passwordAuth({
       email,
@@ -88,13 +90,15 @@ test.only("Bearer authorisation & refreshing sessions with bearer tokens", async
     email,
     password,
   });
-  // expect(core.session?.expires instanceof Date).toBe(true);
-  // expect(core.session?.refreshExpires instanceof Date).toBe(true);
-  // expect(typeof core.session?.token).toBe("string");
-  // expect(typeof core.session?.refreshToken).toBe("string");
-  // expect(typeof core.session?.userId).toBe("string");
-  // const firstToken = core.session?.token;
-  // const firstRefreshToken = core.session?.refreshToken;
+  const bearerAuth = core.auth as BearerAuth;
+  expect(bearerAuth.sessionExpiry instanceof Date).toBe(true);
+  expect(typeof bearerAuth.sessionToken).toBe("string");
+  expect(typeof bearerAuth.refreshToken).toBe("string");
+  expect(typeof bearerAuth.localStorage?.userId).toBe("string");
+  // TODO: Refresh
+  const ogToken = bearerAuth.sessionToken;
+  const ogRefreshToken = bearerAuth.refreshToken;
+  await bearerAuth.refreshBearer();
   // // TODO: Use another route
   // // const session = await getJMAPSession(core);
   // // expect(session.response.status).toBe(200);
