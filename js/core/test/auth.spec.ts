@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { createUser, updateUser } from "../src/index";
+import { createUser } from "../src/index";
 import { getRoot } from "../src/index";
 import {
   createCore,
@@ -10,7 +10,7 @@ import {
 import { BearerAuth } from "../src/auth/bearer";
 import { Uuidv4 } from "../src/common/uuid";
 
-test("API root url & version", async () => {
+test("Unauthorised API root url & version", async () => {
   const core = createCore();
   const d = await getRoot(core.apiUrl);
   expect(typeof d.data.version).toBe("string");
@@ -56,20 +56,6 @@ test("Creating a user & default library", async () => {
     }),
   ).rejects.toThrow();
 });
-
-// test.skip("Cookie authorisation", async () => {
-//   // const sessionSetCookie = extractCookie(res.response.headers, "session_token");
-//   // const sessionToken = parseCookieValue(sessionSetCookie, "session_token");
-//   // expect(sessionToken).toBeTypeOf("string");
-//   // expect(sessionToken, "Session id key correct").toBeTruthy();
-//   // expect(sessionToken.length, "Returns valid session id").toBe(27);
-//   // const refreshSetCookie = extractCookie(res.response.headers, "refresh_token");
-//   // const refreshToken = parseCookieValue(refreshSetCookie, "refresh_token");
-//   // expect(refreshToken).toBeTypeOf("string");
-//   // expect(refreshToken, "Refresh token correct").toBeTruthy();
-//   // expect(refreshToken.length, "Returns valid refresh token").toBe(27);
-//   // expect(refreshToken).not.toBe(sessionToken);
-// });
 
 test("Real account, bad password", async () => {
   const core = createCore();
@@ -120,3 +106,5 @@ test("Bearer refresh", async () => {
 });
 
 test.todo("Automatic bearer refresh", () => {});
+test.todo("Expired session token but valid refresh token", () => {});
+test.todo("Expired session & refresh tokens", () => {});

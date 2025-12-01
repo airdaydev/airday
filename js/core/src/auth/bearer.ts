@@ -47,6 +47,11 @@ export class BearerAuth extends AuthAdapter {
       const refreshRes = await verifyToken(this.publicKey, refreshToken);
       this.sessionExpiry = sessionRes.expiry;
       this.refreshExpiry = refreshRes.expiry;
+      if (refreshRes.expiry.getTime() <= new Date().getTime()) {
+        // TODO: Show user somehow!
+        // TODO: This shouldn't actually revert to anon state!!
+        throw new Error("Refresh token expired, reverting to anon");
+      }
       const sessionData: TokenPersistence = {
         sessionToken,
         refreshToken,
@@ -56,8 +61,13 @@ export class BearerAuth extends AuthAdapter {
         primaryLibraryId: sessionRes.primaryLibraryId,
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-      this.state = AuthState.Loaded;
-      this.events.emit("authenticated", {});
+      if (this.sessionExpiry.getTime() <= new Date().getTime()) {
+        this.state = AuthState.ExpiredSession;
+        this.refreshBearer();
+      } else {
+        this.state = AuthState.Loaded;
+        this.events.emit("authenticated", {});
+      }
     } catch (err) {
       this.clearAuthState();
     }
@@ -97,6 +107,7 @@ export class BearerAuth extends AuthAdapter {
     }
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
+    // Retries when offline
     const res = await passwordAuthBearer(this.apiUrl, opts);
     await this.setTokens(res.data.session_token, res.data.refresh_token);
     return true;
@@ -105,10 +116,9 @@ export class BearerAuth extends AuthAdapter {
     if (!this.refreshToken) {
       throw new Error("can't refresh without token");
     }
-    // TODO: Failed refreshes
+    // TODO: Failed refreshes, retries when offline
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
     await this.setTokens(res.data.session_token, res.data.refresh_token);
-    return true;
   }
   signout() {}
 }

@@ -14,6 +14,7 @@ export enum AuthState {
   Uninitialised = "uninitialised",
   Loaded = "loaded",
   Anon = "anon",
+  ExpiredSession = "expired_session",
 }
 
 export interface WSEventMap {
