@@ -1,5 +1,6 @@
 use crate::auth::paseto::{deserialize_token, to_paseto};
 use crate::auth::token::AuthToken;
+use crate::common::json::JsonBody;
 use crate::{
     AppState,
     auth::{meta::get_client_meta, session::UserSession},
@@ -67,7 +68,7 @@ pub async fn password_authorisation_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
     headers: axum::http::HeaderMap,
-    Json(payload): Json<PasswordAuthorisationReq>,
+    JsonBody(payload): JsonBody<PasswordAuthorisationReq>,
 ) -> Result<Json<UserSession>, AppError> {
     let session = password_authorisation(&state.db, headers, payload).await?;
     let session_cookie = build_session_cookie(state.config.clone(), &session)?;
@@ -87,7 +88,7 @@ pub struct PasswordAuthorisationBearerRes {
 pub async fn password_authorisation_bearer(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(payload): Json<PasswordAuthorisationReq>,
+    JsonBody(payload): JsonBody<PasswordAuthorisationReq>,
 ) -> Result<Json<PasswordAuthorisationBearerRes>, AppError> {
     let session = password_authorisation(&state.db, headers, payload).await?;
     let session_token = AuthToken::new_session_token(&session);
@@ -109,7 +110,7 @@ pub struct CreateUserRequest {
 
 pub async fn create_user(
     State(state): State<AppState>,
-    Json(payload): Json<CreateUserRequest>,
+    JsonBody(payload): JsonBody<CreateUserRequest>,
 ) -> Result<Json<PublicUser>, AppError> {
     let email = payload.email;
     let password = payload.password;
@@ -168,7 +169,7 @@ pub struct RefreshSessionBearerRes {
 pub async fn refresh_session_bearer(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(_): Json<RefreshSessionReq>,
+    JsonBody(_): JsonBody<RefreshSessionReq>,
 ) -> Result<Json<RefreshSessionBearerRes>, AppError> {
     let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
         String::from("No refresh token"),
@@ -195,7 +196,7 @@ pub async fn refresh_session_bearer(
 pub async fn refresh_session_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
-    Json(_): Json<RefreshSessionReq>,
+    JsonBody(_): JsonBody<RefreshSessionReq>,
 ) -> Result<Json<UserSession>, AppError> {
     let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
         AppError::AuthorisationError(String::from("No refresh token")),

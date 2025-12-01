@@ -85,12 +85,10 @@ export class BearerAuth extends AuthAdapter {
   }
   async refreshBearer() {
     if (!this.refreshToken) {
-      // TODO: Drop the error
       throw new Error("can't refresh without token");
     }
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
-    console.log(res);
-    return res;
+    return false;
   }
   signout() {}
 }

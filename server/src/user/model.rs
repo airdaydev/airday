@@ -102,7 +102,7 @@ pub fn verify_password(password_hash: &str, password: &str) -> Result<(), AppErr
 
 pub async fn update_user_handler(// State(state): State<AppState>,
     // session: UserSession,
-    // Json(payload): Json<UserAttributes>,
+    // JsonBody(payload): JsonBody<UserAttributes>,
 ) -> Result<StatusCode, AppError> {
     // state.db.user.update_user(&session.user_id, payload).await?;
     Ok(StatusCode::NOT_IMPLEMENTED)
