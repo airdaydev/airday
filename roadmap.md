@@ -1,9 +1,10 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] an explicit bad session auth should trigger a logout
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
-- [] purely offline library resync with proper library ids...
+- [] purely offline library sync with proper library ids...
 - [] bring back library id after auth to continue through sync tests
 - [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
 - [] websocket authentication bad path

@@ -73,7 +73,7 @@ test("Phase 1 commit", async () => {
 });
 
 test("websocket lifecycle & self-healing", async () => {
-  const core = await createAuthenticatedCore();
+  const core = await createAuthenticatedCore("websocket@air.day");
   expect(core.ws.state).toBe(WSState.Disconnected);
   core.startSync();
   await core.ws.events.onceAsync("authenticated");
@@ -89,19 +89,10 @@ test("websocket lifecycle & self-healing", async () => {
   core.stopSync();
 });
 
-// TODO: Automatic refresh tokens too..
-// test("websocket bad auth", async () => {
-//   const core = await createAuthenticatedCore();
-//   expect(core.ws.state).toBe(WSState.Disconnected);
-//   core.startSync();
-//   await core.ws.events.onceAsync("bad-credentials");
-//   core.stopSync();
-// });
-
 // TODO: Test unauthenticated
 test.only("Phase 2 commit", async () => {
-  const core = await createAuthenticatedCore();
-  const libraryId = core.library.id!;
+  const core = await createAuthenticatedCore("phase2@air.day");
+  const libraryId = core.auth.sessionData?.primaryLibraryId!;
   const snapshot = new InitialSnapshotOp({
     libraryId,
     objKind: 0,
@@ -117,23 +108,23 @@ test.only("Phase 2 commit", async () => {
       data: "test2",
     }),
   });
-  // core.startSync();
   obj.applyLocal(patch);
   // // TODO: P'raps we should just feed it the object & it can read the pending ops from it (err no because it only keeps head at that point)
   await core.sync.queueOp(snapshot, obj);
-  // await core.sync.queueOp(patch, obj);
-  // // Test outbox - in mem version
-  // const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
-  // expect(outboxOp, "memory stored outbox op").toBe(snapshot);
-  // // Test outbox - idb version
-  // const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
-  // // TODO: Next test passes but it is still a serialised format
-  // expect(
-  //   outboxOpIdb.id.equals(outboxOp.id),
-  //   "serialised version stored in idb",
-  // ).toBe(true);
-  // await core.sync.flush();
-  // // We are only doing this after to ensure op-response fires
+  await core.sync.queueOp(patch, obj);
+  // Test outbox - in mem version
+  const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
+  expect(outboxOp, "memory stored outbox op").toBe(snapshot);
+  // Test outbox - idb version
+  const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
+  // TODO: Next test passes but it is still a serialised format
+  expect(
+    outboxOpIdb.id.equals(outboxOp.id),
+    "serialised version stored in idb",
+  ).toBe(true);
+  // Flush is dead again! We could flush or we could track actual ops too
+  await core.sync.flush();
+  // We are only doing this after to ensure op-response fires
   // const syncObject = await core.storage.getObj(obj.id);
   // // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
   // expect(syncObject, "obj cached in mem cache").toBe(obj);
