@@ -53,7 +53,7 @@ export class AirdayCore {
     const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
   }
   async startSync() {
-    if (this.auth.state !== AuthState.Loaded) {
+    if (this.auth.state !== AuthState.Remote) {
       console.warn("attempted to startSync without credentials loaded");
       return;
     }
