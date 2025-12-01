@@ -53,7 +53,7 @@ const sessionsRes = APISchema(
 export async function getUserSessions(apiUrl: URL, auth: AuthAdapter) {
   const res = await fetch(endpoint(apiUrl, "/auth/sessions"), {
     method: "GET",
-    credentials: auth.credentials,
+    credentials: auth.requestCredentials,
     headers: auth.headers(),
   });
   const untyped = await parseJSONResponse(res);

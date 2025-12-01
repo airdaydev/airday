@@ -51,7 +51,7 @@ export function createCore() {
   return core;
 }
 
-export async function createAuthenticatedCore() {
+export async function createAuthenticatedCore(email: string) {
   const apiUrl = new URL(config.api_url);
   const bearer = new BearerAuth(apiUrl, config.paseto_pk);
   const core = new AirdayCore({
@@ -59,16 +59,11 @@ export async function createAuthenticatedCore() {
     storageAdapter: new AirdayMemStorage(),
     authAdapter: bearer,
   });
-  await authenticate(core, `${Math.random()}@airday.com}`);
-  return core;
-}
-
-export async function authenticate(core: AirdayCore, email: string) {
   const password = "fa09j20fiaj3fpaof";
   await createUser(core.apiUrl, {
     email,
     password,
   });
-  // await core.loginWithPasswordBearer({ email, password });
+  await core.auth.passwordAuth({ email, password });
   return core;
 }

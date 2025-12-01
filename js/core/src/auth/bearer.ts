@@ -5,7 +5,7 @@ import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState, SESSION_STORAGE_KEY } from "./adapter";
 import { verifyToken } from "./token";
 
-interface BearerLocalStorageData {
+interface BearerSessionData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
   sessionToken: string;
@@ -18,9 +18,8 @@ export class BearerAuth extends AuthAdapter {
   sessionToken?: string;
   refreshToken?: string;
   sessionExpiry?: Date;
-  credentials: RequestCredentials = "omit";
   state: AuthState = AuthState.Uninitialised;
-  localStorage?: BearerLocalStorageData;
+  sessionData?: BearerSessionData;
   constructor(apiUrl: URL, publicKey: string) {
     super();
     this.apiUrl = apiUrl;
@@ -30,16 +29,16 @@ export class BearerAuth extends AuthAdapter {
     this.sessionToken = sessionToken;
     this.refreshToken = refreshToken;
     const res = await verifyToken(this.publicKey, sessionToken);
-    const refresh_res = await verifyToken(this.publicKey, refreshToken);
-    // TODO: Save sessionExpiry
+    await verifyToken(this.publicKey, refreshToken);
     this.sessionExpiry = res.expiry;
-    const storage: BearerLocalStorageData = {
+    const sessionData: BearerSessionData = {
       sessionToken,
       refreshToken,
       userId: res.userId,
       primaryLibraryId: res.primaryLibraryId,
     };
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(storage));
+    this.sessionData = sessionData;
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
     this.state = AuthState.Loaded;
   }
   async clearAuthState() {
@@ -55,7 +54,7 @@ export class BearerAuth extends AuthAdapter {
     // TODO: Validate saved data!
     try {
       const { sessionToken, refreshToken, userId, primaryLibraryId } =
-        JSON.parse(stored) as BearerLocalStorageData;
+        JSON.parse(stored) as BearerSessionData;
       await this.setTokens(sessionToken, refreshToken);
       this.state = AuthState.Loaded;
       return true;
@@ -81,7 +80,7 @@ export class BearerAuth extends AuthAdapter {
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     const res = await passwordAuthBearer(this.apiUrl, opts);
-    this.setTokens(res.data.session_token, res.data.refresh_token);
+    await this.setTokens(res.data.session_token, res.data.refresh_token);
     return true;
   }
   async refreshBearer() {
@@ -90,6 +89,7 @@ export class BearerAuth extends AuthAdapter {
       throw new Error("can't refresh without token");
     }
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
+    console.log(res);
     return res;
   }
   signout() {}

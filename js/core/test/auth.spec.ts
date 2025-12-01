@@ -8,6 +8,7 @@ import {
   parseCookieValue,
 } from "./utils";
 import { BearerAuth } from "../src/auth/bearer";
+import { Uuidv4 } from "../src/common/uuid";
 
 test("API root url & version", async () => {
   const core = createCore();
@@ -29,7 +30,7 @@ test("non-existent username & password", async () => {
 });
 
 test("Creating a user & default library", async () => {
-  const core = await createAuthenticatedCore();
+  const core = await createAuthenticatedCore("defaultlib@air.day");
   const doubledEmail = "doubleup2@air.day";
   const res = await createUser(core.apiUrl, {
     email: doubledEmail,
@@ -70,15 +71,14 @@ test("Creating a user & default library", async () => {
 //   // expect(refreshToken).not.toBe(sessionToken);
 // });
 
-test.only("Bearer authorisation & refreshing sessions with bearer tokens", async () => {
+test("Real account, bad password", async () => {
   const core = createCore();
-  const email = "daniel-pw@air.day";
+  const email = "real-acc@air.day";
   const password = "fa09j20fiaj3fpaof";
   await createUser(core.apiUrl, {
     email,
     password,
   });
-  // TODO: Put this in another test
   expect(
     core.auth.passwordAuth({
       email,
@@ -86,6 +86,16 @@ test.only("Bearer authorisation & refreshing sessions with bearer tokens", async
     }),
     "Rejects bad passwords",
   ).rejects.toThrow();
+});
+
+test("Bearer authorisation", async () => {
+  const core = createCore();
+  const email = "daniel-pw@air.day";
+  const password = "fa09j20fiaj3fpaof";
+  await createUser(core.apiUrl, {
+    email,
+    password,
+  });
   await core.auth.passwordAuth({
     email,
     password,
@@ -94,28 +104,18 @@ test.only("Bearer authorisation & refreshing sessions with bearer tokens", async
   expect(bearerAuth.sessionExpiry instanceof Date).toBe(true);
   expect(typeof bearerAuth.sessionToken).toBe("string");
   expect(typeof bearerAuth.refreshToken).toBe("string");
-  expect(typeof bearerAuth.localStorage?.userId).toBe("string");
-  // TODO: Refresh
-  const ogToken = bearerAuth.sessionToken;
+  expect(bearerAuth.sessionData?.userId instanceof Uuidv4).toBeTrue();
+});
+
+// TODO: Automatic refresh?
+test.only("Bearer refresh", async () => {
+  const core = await createAuthenticatedCore("bearer-refresh@air.day");
+  const bearerAuth = core.auth as BearerAuth;
+  const ogToken = bearerAuth.sessionData?.sessionToken;
   const ogRefreshToken = bearerAuth.refreshToken;
   await bearerAuth.refreshBearer();
-  // // TODO: Use another route
-  // // const session = await getJMAPSession(core);
-  // // expect(session.response.status).toBe(200);
-  // expect(core.session?.token?.length, "Valid session token").toBe(27);
-  // expect(core.session?.refreshToken?.length, "Valid refresh token").toBe(27);
-  // const refresh = await core.refreshBearer();
-  // expect(refresh.response.status, "refresh api call succeeded").toBe(200);
-  // expect(refresh.data.token, "core set refresh token").toBe(
-  //   core.session?.token as string,
-  // );
-  // expect(core.session?.token, "core token has rotated after refresh").not.toBe(
-  //   firstToken as string,
-  // );
-  // expect(refresh.data.refreshToken, "refresh token has set from api call").toBe(
-  //   core.session?.refreshToken as string,
-  // );
-  // expect(core.session?.refreshToken, "refresh token has rotated").not.toBe(
-  //   firstRefreshToken as string,
-  // );
+  const newToken = bearerAuth?.sessionData?.sessionToken;
+  const newRefreshToken = bearerAuth.sessionData?.refreshToken;
+  expect(ogToken).not.toBe(newToken);
+  expect(ogRefreshToken).not.toBe(newRefreshToken);
 });

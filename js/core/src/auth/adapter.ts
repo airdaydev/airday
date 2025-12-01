@@ -18,7 +18,7 @@ interface WSEventMap {
 export abstract class AuthAdapter {
   constructor() {}
   events = new EventEmitter<WSEventMap>();
-  abstract credentials: RequestCredentials;
+  requestCredentials: RequestCredentials = "omit";
   abstract state: AuthState;
   abstract headers(json?: boolean): Record<string, string>;
   abstract initAuthState(): Promise<boolean>;
