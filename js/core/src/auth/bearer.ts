@@ -70,13 +70,15 @@ export function getInitialAuthState(): BearerSession | LocalSession {
   }
 }
 
-// TODO: Implement automatic refresh
+const REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+
 export class BearerAuth extends AuthAdapter {
   readonly apiUrl: URL;
   readonly publicKey: string;
   sessionToken?: string;
   refreshToken?: string;
   state: AuthState = AuthState.Uninitialised;
+  private refreshTimer?: ReturnType<typeof setTimeout>;
   constructor(apiUrl: URL, publicKey: string) {
     super();
     this.apiUrl = apiUrl;
@@ -87,6 +89,9 @@ export class BearerAuth extends AuthAdapter {
     this.events.emit("authenticated", {});
   }
   async bootSession(session: LocalSession | BearerSession) {
+    if (this.state === AuthState.Initialising) {
+      throw new Error("Attempted to boot concurrently. Stopping.");
+    }
     this.state = AuthState.Initialising;
     switch (session.type) {
       case "local": {
@@ -104,20 +109,26 @@ export class BearerAuth extends AuthAdapter {
           this.sessionToken = session.sessionToken;
           this.refreshToken = session.refreshToken;
           this.sessionExpiry = sessionTokenData.expiry;
-          this.refreshExpiry = sessionTokenData.expiry;
+          this.refreshExpiry = refreshTokenData.expiry;
           this.persistSession(session);
           this.state = AuthState.Remote;
-          // TODO: This is where we should init refresh clock (if within 48hrs)
-          // if (refreshRes.expiry.getTime() - 24hrs <= new Date().getTime()) { }
+          this.sessionData = {
+            type: "remote",
+            userId: sessionTokenData.userId,
+            primaryLibraryId: sessionTokenData.primaryLibraryId,
+          };
+          this.scheduleRefresh();
         } catch (err) {
           // Rules to implement:
           // 1. Session expiry doesn't matter if refreshToken is still there - we can still authenticated
           // 2. If both expire - maybe we should just log out! - although we could just revert to a local state but without credentials
+          console.warn(err);
+          console.warn("Creating a new session");
+          const newSession = newLocalSession();
+          this.persistSession(newSession);
+          this.state = AuthState.Local;
         }
         return;
-      }
-      default: {
-        this.persistSession(newLocalSession());
       }
     }
   }
@@ -155,4 +166,37 @@ export class BearerAuth extends AuthAdapter {
     await this.bootSession(session);
   }
   signout() {}
+
+  private scheduleRefresh() {
+    this.cancelScheduledRefresh();
+
+    if (!this.sessionExpiry) {
+      return;
+    }
+
+    const now = Date.now();
+    const expiryMs = this.sessionExpiry.getTime();
+    const delay = expiryMs - now - REFRESH_BUFFER_MS;
+
+    if (delay <= 0) {
+      // Already past refresh window, refresh immediately
+      this.refreshBearer().catch((err) => {
+        console.warn("Immediate refresh failed:", err);
+      });
+      return;
+    }
+
+    this.refreshTimer = setTimeout(() => {
+      this.refreshBearer().catch((err) => {
+        console.warn("Scheduled refresh failed:", err);
+      });
+    }, delay);
+  }
+
+  private cancelScheduledRefresh() {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+  }
 }
