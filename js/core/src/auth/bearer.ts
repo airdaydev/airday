@@ -25,6 +25,7 @@ function validateSerialisedBearerSessionData(
   };
 }
 
+// TODO: Clean this up! Implement automatic refreshes
 export class BearerAuth extends AuthAdapter {
   readonly apiUrl: URL;
   readonly publicKey: string;
@@ -41,6 +42,7 @@ export class BearerAuth extends AuthAdapter {
       this.sessionToken = sessionToken;
       this.refreshToken = refreshToken;
       const sessionRes = await verifyToken(this.publicKey, sessionToken);
+      // TODO: If the sessionRes is bad we still need to give the refreshToken a chance
       const refreshRes = await verifyToken(this.publicKey, refreshToken);
       this.sessionExpiry = sessionRes.expiry;
       this.refreshExpiry = refreshRes.expiry;
@@ -97,11 +99,6 @@ export class BearerAuth extends AuthAdapter {
       headers["Accept-Content"] = "application/json";
     }
     return headers;
-  }
-  initOpts(init: RequestInit) {
-    if (!init.headers) {
-      init.headers = {};
-    }
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     // Retries when offline

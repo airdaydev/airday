@@ -26,9 +26,6 @@ export class CookieAuth extends AuthAdapter {
     }
     return headers;
   }
-  initOpts(init: RequestInit) {
-    init.credentials = "include";
-  }
   async initAuthState() {
     return true;
   }
