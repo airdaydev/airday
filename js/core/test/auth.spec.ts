@@ -107,15 +107,16 @@ test("Bearer authorisation", async () => {
   expect(bearerAuth.sessionData?.userId instanceof Uuidv4).toBeTrue();
 });
 
-// TODO: Automatic refresh?
-test.only("Bearer refresh", async () => {
+test("Bearer refresh", async () => {
   const core = await createAuthenticatedCore("bearer-refresh@air.day");
   const bearerAuth = core.auth as BearerAuth;
   const ogToken = bearerAuth.sessionData?.sessionToken;
   const ogRefreshToken = bearerAuth.refreshToken;
   await bearerAuth.refreshBearer();
-  // const newToken = bearerAuth?.sessionData?.sessionToken;
-  // const newRefreshToken = bearerAuth.sessionData?.refreshToken;
-  // expect(ogToken).not.toBe(newToken);
-  // expect(ogRefreshToken).not.toBe(newRefreshToken);
+  const newToken = bearerAuth?.sessionData?.sessionToken;
+  const newRefreshToken = bearerAuth.sessionData?.refreshToken;
+  expect(ogToken).not.toBe(newToken);
+  expect(ogRefreshToken).not.toBe(newRefreshToken);
 });
+
+test.todo("Automatic bearer refresh", () => {});

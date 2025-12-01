@@ -154,11 +154,6 @@ pub async fn auth_websocket(
     )))
 }
 
-#[derive(Deserialize)]
-pub struct RefreshSessionReq {
-    pub id: String,
-}
-
 #[derive(serde::Serialize)]
 pub struct RefreshSessionBearerRes {
     pub session: UserSession,
@@ -169,7 +164,6 @@ pub struct RefreshSessionBearerRes {
 pub async fn refresh_session_bearer(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    JsonBody(_): JsonBody<RefreshSessionReq>,
 ) -> Result<Json<RefreshSessionBearerRes>, AppError> {
     let refresh_token = extract_bearer_token(&headers).ok_or(AppError::AuthorisationError(
         String::from("No refresh token"),
@@ -196,7 +190,6 @@ pub async fn refresh_session_bearer(
 pub async fn refresh_session_cookie(
     State(state): State<AppState>,
     cookies: Cookies,
-    JsonBody(_): JsonBody<RefreshSessionReq>,
 ) -> Result<Json<UserSession>, AppError> {
     let refresh_token = extract_cookie(&cookies, String::from("refresh_token")).ok_or(
         AppError::AuthorisationError(String::from("No refresh token")),

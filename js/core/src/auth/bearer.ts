@@ -1,4 +1,4 @@
-import { TypeOf } from "suretype";
+import { TypeOf, ensure, v } from "suretype";
 import { Uuidv4 } from "../common/uuid";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
@@ -10,6 +10,29 @@ interface BearerSessionData {
   primaryLibraryId: Uuidv4;
   sessionToken: string;
   refreshToken: string;
+}
+
+export const bearerSessionData = v.object({
+  sessionToken: v.string().required(),
+  refreshToken: v.string().required(),
+  userId: v.string().minLength(36).maxLength(36).required(),
+  primaryLibraryId: v.string().minLength(36).maxLength(36).required(),
+});
+
+function validateSerialisedBearerSessionData(
+  sessionData: string,
+): BearerSessionData {
+  const parsed = JSON.parse(sessionData);
+  const validated = ensure(bearerSessionData, parsed);
+  if (!validated) {
+    throw new Error("Invalid session data");
+  }
+  return {
+    sessionToken: validated.sessionToken,
+    refreshToken: validated.refreshToken,
+    userId: Uuidv4.fromString(validated.userId),
+    primaryLibraryId: Uuidv4.fromString(validated.primaryLibraryId),
+  };
 }
 
 export class BearerAuth extends AuthAdapter {
@@ -51,12 +74,10 @@ export class BearerAuth extends AuthAdapter {
       this.state = AuthState.Anon;
       return false;
     }
-    // TODO: Validate saved data!
     try {
-      const { sessionToken, refreshToken, userId, primaryLibraryId } =
-        JSON.parse(stored) as BearerSessionData;
+      const { sessionToken, refreshToken } =
+        validateSerialisedBearerSessionData(stored);
       await this.setTokens(sessionToken, refreshToken);
-      this.state = AuthState.Loaded;
       return true;
     } catch {
       this.clearAuthState();
@@ -87,7 +108,9 @@ export class BearerAuth extends AuthAdapter {
     if (!this.refreshToken) {
       throw new Error("can't refresh without token");
     }
+    // TODO: Failed refreshes
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
+    await this.setTokens(res.data.session_token, res.data.refresh_token);
     return false;
   }
   signout() {}
