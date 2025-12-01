@@ -8,13 +8,14 @@ export const SESSION_STORAGE_KEY = "airday_session";
 export interface SessionData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
-  type: "remote" | "local_only";
+  type: "remote" | "local";
 }
 
 export enum AuthState {
   Uninitialised = "uninitialised",
+  Initialising = "initialising",
   Remote = "remote",
-  LocalOnly = "local_only",
+  Local = "local",
   ExpiredSession = "expired_session",
 }
 
@@ -32,11 +33,9 @@ export abstract class AuthAdapter {
   refreshExpiry?: Date;
   abstract state: AuthState;
   abstract requestHeaders(json?: boolean): Record<string, string>;
-  abstract initAuthState(): Promise<void>;
-  abstract clearAuthState(): Promise<void>;
   abstract passwordAuth(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
-  ): Promise<boolean>;
+  ): Promise<void>;
   abstract signout(): void;
 }
 

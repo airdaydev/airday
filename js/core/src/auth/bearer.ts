@@ -5,6 +5,7 @@ import {
   AuthAdapter,
   AuthState,
   LocalSession,
+  newLocalSession,
   SESSION_STORAGE_KEY,
 } from "./adapter";
 import { verifyToken } from "./token";
@@ -54,7 +55,22 @@ function validateSerialisedBearerSessionData(
   throw new Error("bad session");
 }
 
-// TODO: Clean this up! Implement automatic refreshes
+export function getInitialAuthState(): BearerSession | LocalSession {
+  const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!stored) {
+    // No stored session found, create new offline user
+    return newLocalSession();
+  }
+  try {
+    const sessionData = validateSerialisedBearerSessionData(stored);
+    return sessionData;
+  } catch {
+    // Invalid session storage found, return new anon user
+    return newLocalSession();
+  }
+}
+
+// TODO: Implement automatic refresh
 export class BearerAuth extends AuthAdapter {
   readonly apiUrl: URL;
   readonly publicKey: string;
@@ -68,73 +84,41 @@ export class BearerAuth extends AuthAdapter {
   }
   persistSession(session: LocalSession | BearerSession) {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    this.events.emit("authenticated", {});
   }
-  async setTokens(sessionToken: string, refreshToken: string) {
-    try {
-      this.sessionToken = sessionToken;
-      this.refreshToken = refreshToken;
-      const sessionRes = await verifyToken(this.publicKey, sessionToken);
-      // TODO: If the sessionRes is bad we still need to give the refreshToken a chance
-      const refreshRes = await verifyToken(this.publicKey, refreshToken);
-      this.sessionExpiry = sessionRes.expiry;
-      this.refreshExpiry = refreshRes.expiry;
-      if (refreshRes.expiry.getTime() <= new Date().getTime()) {
-        // TODO: Show user somehow!
-        // TODO: This shouldn't actually revert to anon state!!
-        throw new Error("Refresh token expired, reverting to anon");
+  async bootSession(session: LocalSession | BearerSession) {
+    this.state = AuthState.Initialising;
+    switch (session.type) {
+      case "local": {
+        this.sessionData = session;
+        this.persistSession(session);
+        this.state = AuthState.Local;
+        return;
       }
-      const sessionData: TokenPersistence = {
-        sessionToken,
-        refreshToken,
-      };
-      this.sessionData = {
-        userId: sessionRes.userId,
-        primaryLibraryId: sessionRes.primaryLibraryId,
-        type: "remote",
-      };
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-      if (this.sessionExpiry.getTime() <= new Date().getTime()) {
-        this.state = AuthState.ExpiredSession;
-        this.refreshBearer();
-      } else {
-        this.state = AuthState.Remote;
-        this.events.emit("authenticated", {});
-      }
-    } catch (err) {
-      this.clearAuthState();
-    }
-  }
-  async clearAuthState() {
-    // TODO: Be specific about what this is
-    this.events.emit("deauthenticated", {});
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-    this.state = AuthState.LocalOnly;
-  }
-  async initAuthState() {
-    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!stored) {
-      this.clearAuthState();
-      return;
-    }
-    try {
-      const sessionData = validateSerialisedBearerSessionData(stored);
-      switch (sessionData.type) {
-        case "local": {
-          this.sessionData = sessionData;
+      case "remote": {
+        try {
+          const [sessionTokenData, refreshTokenData] = await Promise.all([
+            verifyToken(this.publicKey, session.sessionToken),
+            verifyToken(this.publicKey, session.refreshToken),
+          ]);
+          this.sessionToken = session.sessionToken;
+          this.refreshToken = session.refreshToken;
+          this.sessionExpiry = sessionTokenData.expiry;
+          this.refreshExpiry = sessionTokenData.expiry;
+          this.persistSession(session);
+          this.state = AuthState.Remote;
+          // TODO: This is where we should init refresh clock (if within 48hrs)
+          // if (refreshRes.expiry.getTime() - 24hrs <= new Date().getTime()) { }
+        } catch (err) {
+          // Rules to implement:
+          // 1. Session expiry doesn't matter if refreshToken is still there - we can still authenticated
+          // 2. If both expire - maybe we should just log out! - although we could just revert to a local state but without credentials
         }
-        case "remote": {
-          if (sessionData.sessionToken && sessionData.refreshToken) {
-            await this.setTokens(
-              sessionData.sessionToken,
-              sessionData.refreshToken,
-            );
-          } else {
-            this.clearAuthState();
-          }
-        }
+        return;
       }
-    } catch {
-      this.clearAuthState();
+      default: {
+        this.persistSession(newLocalSession());
+      }
     }
   }
   requestHeaders(json: boolean = true): Record<string, string> {
@@ -150,8 +134,12 @@ export class BearerAuth extends AuthAdapter {
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     // Retries when offline
     const res = await passwordAuthBearer(this.apiUrl, opts);
-    await this.setTokens(res.data.session_token, res.data.refresh_token);
-    return true;
+    const session: BearerSession = {
+      type: "remote",
+      refreshToken: res.data.refresh_token,
+      sessionToken: res.data.session_token,
+    };
+    await this.bootSession(session);
   }
   async refreshBearer() {
     if (!this.refreshToken) {
@@ -159,7 +147,12 @@ export class BearerAuth extends AuthAdapter {
     }
     // TODO: Failed refreshes, retries when offline
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
-    await this.setTokens(res.data.session_token, res.data.refresh_token);
+    const session: BearerSession = {
+      type: "remote",
+      refreshToken: res.data.refresh_token,
+      sessionToken: res.data.session_token,
+    };
+    await this.bootSession(session);
   }
   signout() {}
 }

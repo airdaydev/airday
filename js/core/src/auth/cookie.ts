@@ -14,7 +14,6 @@ export class CookieAuth extends AuthAdapter {
   readonly apiUrl: URL;
   requestCredentials: RequestCredentials = "include";
   state: AuthState = AuthState.Uninitialised;
-  sessionData?: CookieSessionData;
   constructor(apiUrl: URL) {
     super();
     this.apiUrl = apiUrl;
@@ -25,9 +24,6 @@ export class CookieAuth extends AuthAdapter {
       headers["Accept-Content"] = "application/json";
     }
     return headers;
-  }
-  async initAuthState() {
-    return true;
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     await passwordAuthCookie(this.apiUrl, opts);
