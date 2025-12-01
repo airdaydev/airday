@@ -55,7 +55,7 @@ function validateSerialisedBearerSessionData(
   throw new Error("bad session");
 }
 
-export function getInitialAuthState(): BearerSession | LocalSession {
+export function getInitialSession(): BearerSession | LocalSession {
   const stored = localStorage.getItem(SESSION_STORAGE_KEY);
   if (!stored) {
     // No stored session found, create new offline user
@@ -98,7 +98,7 @@ export class BearerAuth extends AuthAdapter {
         this.sessionData = session;
         this.persistSession(session);
         this.state = AuthState.Local;
-        return;
+        break;
       }
       case "remote": {
         try {
@@ -127,10 +127,12 @@ export class BearerAuth extends AuthAdapter {
           const newSession = newLocalSession();
           this.persistSession(newSession);
           this.state = AuthState.Local;
+          this.sessionData = newSession;
+          break;
         }
-        return;
       }
     }
+    return this.sessionData;
   }
   requestHeaders(json: boolean = true): Record<string, string> {
     if (!this.sessionToken) throw new Error("User is not authenticated");

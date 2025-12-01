@@ -2,7 +2,8 @@ import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { AuthAdapter, AuthState } from "./auth/adapter";
+import { AuthAdapter, AuthState, newLocalSession } from "./auth/adapter";
+import { BearerAuth, getInitialSession } from "./auth/bearer";
 
 interface AirdayCoreOpts {
   apiUrl: URL;
@@ -42,16 +43,14 @@ export class AirdayCore {
     });
   }
   async init() {
-    await this.auth.initAuthState();
-    const userId = this.auth.sessionData?.userId;
-    if (userId) {
-      // TODO: Anonymous?
-      await this.storage.initDb(userId);
-    }
+    const session = getInitialSession();
+    const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
+    await this.storage.initDb(sessionData.userId);
+    // TODO: Test for startSync?
   }
   async reset() {
-    // TODO: Errors here are currently fatal
-    await this.auth.clearAuthState();
+    const session = newLocalSession();
+    const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
   }
   async startSync() {
     if (this.auth.state !== AuthState.Loaded) {
