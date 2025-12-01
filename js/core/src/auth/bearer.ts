@@ -42,46 +42,52 @@ export class BearerAuth extends AuthAdapter {
   refreshToken?: string;
   sessionExpiry?: Date;
   state: AuthState = AuthState.Uninitialised;
-  sessionData?: BearerSessionData;
   constructor(apiUrl: URL, publicKey: string) {
     super();
     this.apiUrl = apiUrl;
     this.publicKey = publicKey;
   }
   async setTokens(sessionToken: string, refreshToken: string) {
-    this.sessionToken = sessionToken;
-    this.refreshToken = refreshToken;
-    const res = await verifyToken(this.publicKey, sessionToken);
-    await verifyToken(this.publicKey, refreshToken);
-    this.sessionExpiry = res.expiry;
-    const sessionData: BearerSessionData = {
-      sessionToken,
-      refreshToken,
-      userId: res.userId,
-      primaryLibraryId: res.primaryLibraryId,
-    };
-    this.sessionData = sessionData;
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-    this.state = AuthState.Loaded;
+    try {
+      this.sessionToken = sessionToken;
+      this.refreshToken = refreshToken;
+      const res = await verifyToken(this.publicKey, sessionToken);
+      await verifyToken(this.publicKey, refreshToken);
+      this.sessionExpiry = res.expiry;
+      const sessionData: BearerSessionData = {
+        sessionToken,
+        refreshToken,
+        userId: res.userId,
+        primaryLibraryId: res.primaryLibraryId,
+      };
+      this.sessionData = {
+        userId: res.userId,
+        primaryLibraryId: res.primaryLibraryId,
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+      this.state = AuthState.Loaded;
+      this.events.emit("authenticated", {});
+    } catch (err) {
+      this.clearAuthState();
+    }
   }
   async clearAuthState() {
+    this.events.emit("deauthenticated", {});
     localStorage.removeItem(SESSION_STORAGE_KEY);
     this.state = AuthState.Anon;
   }
-  async initAuthState(): Promise<boolean> {
+  async initAuthState() {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!stored) {
-      this.state = AuthState.Anon;
-      return false;
+      this.clearAuthState();
+      return;
     }
     try {
       const { sessionToken, refreshToken } =
         validateSerialisedBearerSessionData(stored);
       await this.setTokens(sessionToken, refreshToken);
-      return true;
     } catch {
       this.clearAuthState();
-      return false;
     }
   }
   headers(json: boolean = true): Record<string, string> {
@@ -111,7 +117,7 @@ export class BearerAuth extends AuthAdapter {
     // TODO: Failed refreshes
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
     await this.setTokens(res.data.session_token, res.data.refresh_token);
-    return false;
+    return true;
   }
   signout() {}
 }

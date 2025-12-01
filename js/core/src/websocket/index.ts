@@ -213,19 +213,18 @@ export class WebsocketManager {
     }
     const userId = Uuidv4.fromFBProto(res.userId());
     const libraryId = Uuidv4.fromFBProto(res.libraryId());
-    // Confirm things make sense and authorise
-    // TODO: Confirm library id valid
-    const authorised = this.core.session?.userId === stringify(userId);
-    this.state = WSState.Authorised;
-    this.core.library.id = libraryId; // TODO: Handle previous library/store?
-    if (!authorised) {
-      console.warn(this.core.session?.userId, stringify(userId), "huh");
-    } else {
-      this.events.emit("authenticated", {
-        userId,
-        libraryId,
-      });
+    const sameUserId = this.core.auth.sessionData!.userId.equals(userId);
+    const sameLibId =
+      this.core.auth.sessionData!.primaryLibraryId.equals(libraryId);
+    if (!sameUserId || !sameLibId) {
+      // TODO: Consider this error
+      throw new Error("Fatal error: user id / lib id swapped or non-existent");
     }
+    this.state = WSState.Authorised;
+    this.events.emit("authenticated", {
+      userId,
+      libraryId,
+    });
   }
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}

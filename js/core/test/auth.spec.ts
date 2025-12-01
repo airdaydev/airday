@@ -110,11 +110,11 @@ test("Bearer authorisation", async () => {
 test("Bearer refresh", async () => {
   const core = await createAuthenticatedCore("bearer-refresh@air.day");
   const bearerAuth = core.auth as BearerAuth;
-  const ogToken = bearerAuth.sessionData?.sessionToken;
+  const ogToken = bearerAuth.sessionToken;
   const ogRefreshToken = bearerAuth.refreshToken;
   await bearerAuth.refreshBearer();
-  const newToken = bearerAuth?.sessionData?.sessionToken;
-  const newRefreshToken = bearerAuth.sessionData?.refreshToken;
+  const newToken = bearerAuth?.sessionToken;
+  const newRefreshToken = bearerAuth.refreshToken;
   expect(ogToken).not.toBe(newToken);
   expect(ogRefreshToken).not.toBe(newRefreshToken);
 });

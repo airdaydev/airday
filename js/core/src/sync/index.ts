@@ -54,7 +54,7 @@ export class AirdaySync {
   initialSync() {
     // TODO: Prevent if not authorised
     this.getLibraries(); // TODO: currently a noop
-    this.catchup(this.core.library.id!, 0);
+    this.catchup(this.core.auth.sessionData!.primaryLibraryId, 0);
     // TODO: For each shared library, start list & item streams
     // TODO: Later, prioritise by active items, tombstoned items, completed items
     // TODO: Collect pending items, containers, libraries for pushing
