@@ -8,7 +8,6 @@ interface CookieSessionData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
   sessionExp: Date;
-  refreshExp: Date;
 }
 
 export class CookieAuth extends AuthAdapter {

@@ -2,10 +2,7 @@
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
 - [] cookie auth for websocket connection
-- [] bearer token backed to local storage (single source of truth)
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
-- [] differentiate cookie vs bearer auth (client)
-- [] offline user bootstrap! - start from AirdayStorage.initialise
 - [] purely offline library resync with proper library ids...
 - [] bring back library id after auth to continue through sync tests
 - [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
