@@ -1,5 +1,4 @@
 import { TypeOf, ensure, v } from "suretype";
-import { Uuidv4 } from "../common/uuid";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState, SESSION_STORAGE_KEY } from "./adapter";
@@ -31,8 +30,6 @@ export class BearerAuth extends AuthAdapter {
   readonly publicKey: string;
   sessionToken?: string;
   refreshToken?: string;
-  sessionExpiry?: Date;
-  refreshExpiry?: Date;
   state: AuthState = AuthState.Uninitialised;
   constructor(apiUrl: URL, publicKey: string) {
     super();
