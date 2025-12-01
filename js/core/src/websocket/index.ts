@@ -314,15 +314,7 @@ export class WebsocketManager {
         wrapper.message(libraryResponse);
         const primaryLibraryBuffer = libraryResponse.primaryLibrary();
         if (primaryLibraryBuffer) {
-          // TODO: Validate and add item to storage
-          let id = Uuidv4.fromFBProto(primaryLibraryBuffer.id());
-          let name = primaryLibraryBuffer.name() || "";
-          this.core.library = new Library({
-            id,
-            name,
-            primary: true,
-            remote: true,
-          });
+          // We do not need this anymore, simply load the libraries
         }
         break;
       }
