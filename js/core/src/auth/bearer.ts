@@ -5,23 +5,16 @@ import { passwordAuthSchema } from "../http/types";
 import { AuthAdapter, AuthState, SESSION_STORAGE_KEY } from "./adapter";
 import { verifyToken } from "./token";
 
-interface BearerSessionData {
-  userId: Uuidv4;
-  primaryLibraryId: Uuidv4;
-  sessionToken: string;
-  refreshToken: string;
-}
-
 export const bearerSessionData = v.object({
   sessionToken: v.string().required(),
   refreshToken: v.string().required(),
-  userId: v.string().minLength(36).maxLength(36).required(),
-  primaryLibraryId: v.string().minLength(36).maxLength(36).required(),
 });
+
+type TokenPersistence = TypeOf<typeof bearerSessionData>;
 
 function validateSerialisedBearerSessionData(
   sessionData: string,
-): BearerSessionData {
+): TokenPersistence {
   const parsed = JSON.parse(sessionData);
   const validated = ensure(bearerSessionData, parsed);
   if (!validated) {
@@ -30,8 +23,6 @@ function validateSerialisedBearerSessionData(
   return {
     sessionToken: validated.sessionToken,
     refreshToken: validated.refreshToken,
-    userId: Uuidv4.fromString(validated.userId),
-    primaryLibraryId: Uuidv4.fromString(validated.primaryLibraryId),
   };
 }
 
@@ -41,6 +32,7 @@ export class BearerAuth extends AuthAdapter {
   sessionToken?: string;
   refreshToken?: string;
   sessionExpiry?: Date;
+  refreshExpiry?: Date;
   state: AuthState = AuthState.Uninitialised;
   constructor(apiUrl: URL, publicKey: string) {
     super();
@@ -51,18 +43,17 @@ export class BearerAuth extends AuthAdapter {
     try {
       this.sessionToken = sessionToken;
       this.refreshToken = refreshToken;
-      const res = await verifyToken(this.publicKey, sessionToken);
-      await verifyToken(this.publicKey, refreshToken);
-      this.sessionExpiry = res.expiry;
-      const sessionData: BearerSessionData = {
+      const sessionRes = await verifyToken(this.publicKey, sessionToken);
+      const refreshRes = await verifyToken(this.publicKey, refreshToken);
+      this.sessionExpiry = sessionRes.expiry;
+      this.refreshExpiry = refreshRes.expiry;
+      const sessionData: TokenPersistence = {
         sessionToken,
         refreshToken,
-        userId: res.userId,
-        primaryLibraryId: res.primaryLibraryId,
       };
       this.sessionData = {
-        userId: res.userId,
-        primaryLibraryId: res.primaryLibraryId,
+        userId: sessionRes.userId,
+        primaryLibraryId: sessionRes.primaryLibraryId,
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
       this.state = AuthState.Loaded;
