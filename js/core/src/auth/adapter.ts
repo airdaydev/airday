@@ -20,7 +20,7 @@ export enum AuthState {
 }
 
 export interface WSEventMap {
-  authenticated: {};
+  authenticated: SessionData;
   deauthenticated: {};
 }
 

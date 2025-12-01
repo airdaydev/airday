@@ -8,7 +8,6 @@ import {
 } from "../proto";
 import { type AirdayCore } from "../core";
 import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
-import { stringify } from "uuid";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";

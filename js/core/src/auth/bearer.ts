@@ -86,7 +86,6 @@ export class BearerAuth extends AuthAdapter {
   }
   persistSession(session: LocalSession | BearerSession) {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-    this.events.emit("authenticated", {});
   }
   async bootSession(session: LocalSession | BearerSession) {
     if (this.state === AuthState.Initialising) {
@@ -97,6 +96,7 @@ export class BearerAuth extends AuthAdapter {
       case "local": {
         this.sessionData = session;
         this.persistSession(session);
+        this.events.emit("authenticated", session);
         this.state = AuthState.Local;
         break;
       }
@@ -117,6 +117,7 @@ export class BearerAuth extends AuthAdapter {
             userId: sessionTokenData.userId,
             primaryLibraryId: sessionTokenData.primaryLibraryId,
           };
+          this.events.emit("authenticated", this.sessionData);
           this.scheduleRefresh();
         } catch (err) {
           // Rules to implement:
@@ -128,6 +129,7 @@ export class BearerAuth extends AuthAdapter {
           this.persistSession(newSession);
           this.state = AuthState.Local;
           this.sessionData = newSession;
+          this.events.emit("authenticated", newSession);
           break;
         }
       }

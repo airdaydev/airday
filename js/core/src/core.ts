@@ -27,15 +27,11 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
-    this.auth.events.on("authenticated", () => {
-      // Load storage!
+    this.auth.events.on("authenticated", async (sessionData) => {
+      // TODO: Reset first
+      // this.stopSync();
+      await this.storage.initDb(sessionData.userId);
       this.startSync();
-    });
-    this.auth.events.on("deauthenticated", () => {
-      // TODO: Does this always mean sign out here?
-      // What happens when you get kicked?
-      // Leave storage
-      this.stopSync();
     });
     this.init().catch((err) => {
       console.warn(err);
@@ -45,12 +41,12 @@ export class AirdayCore {
   async init() {
     const session = getInitialSession();
     const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
-    await this.storage.initDb(sessionData.userId);
     // TODO: Test for startSync?
   }
   async reset() {
     const session = newLocalSession();
     const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
+    await this.storage.initDb(sessionData.userId);
   }
   async startSync() {
     if (this.auth.state !== AuthState.Remote) {
@@ -74,6 +70,7 @@ export class AirdayCore {
     this.online = false;
   }
   stopSync() {
+    // TODO: Provide a wait api
     this.ws.stop();
   }
 }
