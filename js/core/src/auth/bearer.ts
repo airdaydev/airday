@@ -1,28 +1,57 @@
 import { TypeOf, ensure, v } from "suretype";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
-import { AuthAdapter, AuthState, SESSION_STORAGE_KEY } from "./adapter";
+import {
+  AuthAdapter,
+  AuthState,
+  LocalSession,
+  SESSION_STORAGE_KEY,
+} from "./adapter";
 import { verifyToken } from "./token";
+import { Uuidv4 } from "../common/uuid";
 
-export const bearerSessionData = v.object({
-  sessionToken: v.string().required(),
-  refreshToken: v.string().required(),
-});
+export const bearerSessionData = v.anyOf([
+  v.object({
+    type: v.string().const("local"),
+    userId: v.string().required(),
+    primaryLibraryId: v.string().required(),
+  }),
+  v.object({
+    type: v.string().const("remote"),
+    sessionToken: v.string().required(),
+    refreshToken: v.string().required(),
+  }),
+]);
 
-type TokenPersistence = TypeOf<typeof bearerSessionData>;
+type BearerSession = {
+  type: "remote";
+  sessionToken: string;
+  refreshToken: string;
+};
 
 function validateSerialisedBearerSessionData(
-  sessionData: string,
-): TokenPersistence {
-  const parsed = JSON.parse(sessionData);
+  serialisedSessionData: string,
+): BearerSession | LocalSession {
+  const parsed = JSON.parse(serialisedSessionData);
   const validated = ensure(bearerSessionData, parsed);
   if (!validated) {
     throw new Error("Invalid session data");
   }
-  return {
-    sessionToken: validated.sessionToken,
-    refreshToken: validated.refreshToken,
-  };
+  if (validated.type === "remote") {
+    return {
+      type: "remote",
+      sessionToken: validated.sessionToken,
+      refreshToken: validated.refreshToken,
+    } satisfies BearerSession;
+  }
+  if (validated.type === "local") {
+    return {
+      type: "local",
+      primaryLibraryId: Uuidv4.fromString(validated.primaryLibraryId),
+      userId: Uuidv4.fromString(validated.userId),
+    } satisfies LocalSession;
+  }
+  throw new Error("bad session");
 }
 
 // TODO: Clean this up! Implement automatic refreshes
@@ -36,6 +65,9 @@ export class BearerAuth extends AuthAdapter {
     super();
     this.apiUrl = apiUrl;
     this.publicKey = publicKey;
+  }
+  persistSession(session: LocalSession | BearerSession) {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
   async setTokens(sessionToken: string, refreshToken: string) {
     try {
@@ -58,13 +90,14 @@ export class BearerAuth extends AuthAdapter {
       this.sessionData = {
         userId: sessionRes.userId,
         primaryLibraryId: sessionRes.primaryLibraryId,
+        type: "remote",
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
       if (this.sessionExpiry.getTime() <= new Date().getTime()) {
         this.state = AuthState.ExpiredSession;
         this.refreshBearer();
       } else {
-        this.state = AuthState.Loaded;
+        this.state = AuthState.Remote;
         this.events.emit("authenticated", {});
       }
     } catch (err) {
@@ -72,9 +105,10 @@ export class BearerAuth extends AuthAdapter {
     }
   }
   async clearAuthState() {
+    // TODO: Be specific about what this is
     this.events.emit("deauthenticated", {});
     localStorage.removeItem(SESSION_STORAGE_KEY);
-    this.state = AuthState.Anon;
+    this.state = AuthState.LocalOnly;
   }
   async initAuthState() {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -83,14 +117,27 @@ export class BearerAuth extends AuthAdapter {
       return;
     }
     try {
-      const { sessionToken, refreshToken } =
-        validateSerialisedBearerSessionData(stored);
-      await this.setTokens(sessionToken, refreshToken);
+      const sessionData = validateSerialisedBearerSessionData(stored);
+      switch (sessionData.type) {
+        case "local": {
+          this.sessionData = sessionData;
+        }
+        case "remote": {
+          if (sessionData.sessionToken && sessionData.refreshToken) {
+            await this.setTokens(
+              sessionData.sessionToken,
+              sessionData.refreshToken,
+            );
+          } else {
+            this.clearAuthState();
+          }
+        }
+      }
     } catch {
       this.clearAuthState();
     }
   }
-  headers(json: boolean = true): Record<string, string> {
+  requestHeaders(json: boolean = true): Record<string, string> {
     if (!this.sessionToken) throw new Error("User is not authenticated");
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.sessionToken}`,

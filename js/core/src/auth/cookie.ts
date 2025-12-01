@@ -19,7 +19,7 @@ export class CookieAuth extends AuthAdapter {
     super();
     this.apiUrl = apiUrl;
   }
-  headers(json: boolean = true): Record<string, string> {
+  requestHeaders(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};
     if (json) {
       headers["Accept-Content"] = "application/json";

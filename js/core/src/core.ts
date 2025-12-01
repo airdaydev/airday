@@ -43,17 +43,22 @@ export class AirdayCore {
   }
   async init() {
     await this.auth.initAuthState();
+    const userId = this.auth.sessionData?.userId;
+    if (userId) {
+      // TODO: Anonymous?
+      await this.storage.initDb(userId);
+    }
   }
   async reset() {
     // TODO: Errors here are currently fatal
     await this.auth.clearAuthState();
-    // TODO: vs creating anonymous state?
   }
   async startSync() {
     if (this.auth.state !== AuthState.Loaded) {
       console.warn("attempted to startSync without credentials loaded");
       return;
     }
+    // TODO: This should be embedded in sync state / ws state
     if (this.online) {
       console.warn("attempted to startSync while already online");
       return;

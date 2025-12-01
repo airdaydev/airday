@@ -54,7 +54,7 @@ export async function getUserSessions(apiUrl: URL, auth: AuthAdapter) {
   const res = await fetch(endpoint(apiUrl, "/auth/sessions"), {
     method: "GET",
     credentials: auth.requestCredentials,
-    headers: auth.headers(),
+    headers: auth.requestHeaders(),
   });
   const untyped = await parseJSONResponse(res);
   return valJSONRes(untyped, sessionsRes.ensureFunc);

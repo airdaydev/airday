@@ -35,6 +35,7 @@ export class AirdayStorage {
     this.adapter = adapter || new AirdayIDBStorage();
   }
   async initDb(userId: Uuidv4) {
+    // TODO: Check DB status, may be connected
     await this.adapter.connect(userId);
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
