@@ -3,7 +3,6 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { SyncOp } from "./sync-op";
-import { ChecksumStore } from "./checksum";
 import { parseStreamCtx, StreamContext, SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
 import {

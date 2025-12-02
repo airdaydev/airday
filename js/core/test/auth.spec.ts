@@ -108,3 +108,4 @@ test("Bearer refresh", async () => {
 test.todo("Automatic bearer refresh", () => {});
 test.todo("Expired session token but valid refresh token", () => {});
 test.todo("Expired session & refresh tokens", () => {});
+test.todo("Anon offline user", () => {});
