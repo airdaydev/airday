@@ -66,14 +66,8 @@ export class AirdayCore {
     try {
       const frames = this.ws.frames();
       const parsedFrames = parseFrames(frames);
-      // TODO: 3 types of messages so far
-      // TODO: Streams
-      // Library advertising (can happen all at once & block messages)
-      // Responses/Acks (seqs only - 2nd phase commit)
-      // SyncOps (full sync ops - a full commit)
-      // All 3 involve a database operation
       for await (const frame of parsedFrames) {
-        console.log("incoming frame", frame);
+        console.debug("incoming frame", frame);
       }
     } catch (err) {
       console.error("startSync failed", err);

@@ -5,7 +5,6 @@
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
 - [] purely offline library sync with proper library ids...
-- [] bring back library id after auth to continue through sync tests
 - [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
 - [] websocket authentication bad path
 - [] no valid ops found in batch (rust side) send test from js (off-by-1)

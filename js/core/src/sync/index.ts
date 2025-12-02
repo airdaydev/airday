@@ -35,9 +35,7 @@ export function parseResponseProto(proto: ResponseProto): OpAck {
   };
 }
 
-// TODO: Streams should disappear on completion
 // TODO: Ack timeouts...?
-// TODO: Failure thresholds + offline!!!
 export class AirdaySync {
   core: AirdayCore;
   outbox: SyncOp[] = []; // Ops ready to be pulled by ws
@@ -64,12 +62,6 @@ export class AirdaySync {
   }
   takeOps(count: number) {
     return this.core.sync.outbox.splice(0, count);
-  }
-  async initialise() {
-    // 1. Attempt to load storage FOR CURRENT USER
-    // // (retrieve by session key... - uh oh time to put some extra info in there?! and also have a purely offline user!)
-    // 2. If user cache not present, leave in this state
-    // 2. If no user present, start a new local library FRESH
   }
   initialSync() {
     // TODO: Prevent if not authorised
@@ -121,7 +113,7 @@ export class AirdaySync {
   processStreamMessage(streamContext: StreamContext) {
     const stream = this.streams.get(streamContext.id.toHex());
     if (!stream) return;
-    stream.
+    stream.processMessage(streamContext);
   }
   async *handleMessage(messages: AsyncIterable<IncomingMessage>) {
     // TODO: collect batches of each type or make new streams
@@ -254,11 +246,12 @@ export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
         break;
       }
       default: {
+        // log error
+        tracer.endSpan(span);
         throw new Error("Unknown message type");
       }
     }
     yield {
-      type,
       span,
       msg,
     };
