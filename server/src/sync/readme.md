@@ -38,3 +38,21 @@ Questions:
 
 Optimisations:
 - Specific transactions instead of Optimisations
+
+Just kepeing this more up to date dump here for l8a:
+client 2 phase commit
+
+    // op persisted locally, state computed & persisted for fast access
+    // op persisted to server, returning seq
+    // seq stored against persisted version (so this is really last_seq)
+    // seq is fairly reliable, and if a seq is missed, it can be picked up by a merkle-tree based on the latest hash (computed only on ops with seqs)
+    // SO: Keep current-snapshot op headers on client
+    // OR if user wants to keep history - they can if there is room (but this is an optional/advanced option)
+    // hash is calculated on ops with seq only
+    //
+    // problem: ops contributing to fast access state, that did not have a seq, then being lost would then show a valid hash while the object would be invalid!
+    // solution = 2-phase state
+    // commmitted + optimistic separately
+    //
+    //
+    // TODO: We need to update in-memory version & db version (reactivity + persistence)

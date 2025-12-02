@@ -105,12 +105,8 @@ export class WebsocketManager {
     });
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);
-      let span;
-      if (msg) {
-        // TODO: Do something with span, here?
-        span = spanFromFlatbuffer(msg.spanContext(), "ws:downstream");
-      }
       if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {
+        let span = spanFromFlatbuffer(msg.spanContext(), "ws:downstream");
         const authResponse = new AuthenticateResponseProto();
         msg.message(authResponse);
         this.handleAuthResponse(span, authResponse);
@@ -271,7 +267,6 @@ export class WebsocketManager {
       };
       batch.push(queuedMessage);
     }
-    console.log("sending batch", batch.length);
     batch.map((item) => {
       this.send(item.message.serialise());
     });
@@ -295,96 +290,5 @@ export class WebsocketManager {
       if (!this.outboundMessages()) resolve(null);
       this.events.once("flushed", resolve);
     });
-  }
-  // TODO Consider moving this into subhandler
-  private handleAirdayMessage(span: ULSpan, wrapper: MessageWrapperProto) {
-    if (!wrapper) return;
-
-    const type = wrapper.messageType();
-    switch (type) {
-      case MessageProto.AuthenticateResponseProto: {
-        // TODO: Consider "auth" notification using JS native events
-        this.startOutgoing();
-        break;
-      }
-      case MessageProto.LibrarySyncResponseProto: {
-        tracer.addTag(span, "msg_type", "LibrarySyncResponseProto");
-        const libraryResponse = new LibrarySyncResponseProto();
-        wrapper.message(libraryResponse);
-        const primaryLibraryBuffer = libraryResponse.primaryLibrary();
-        if (primaryLibraryBuffer) {
-          // We do not need this anymore, simply load the libraries
-        }
-        break;
-      }
-      case MessageProto.BatchSyncOpProto: {
-        const msg = new BatchSyncOpProto();
-        wrapper.message(msg);
-        this.processBatchSyncOpMessage(span, msg);
-      }
-      case MessageProto.BatchResponseProto: {
-        const msg = new BatchResponseProto();
-        wrapper.message(msg);
-        this.processBatchResponseMessage(span, msg);
-      }
-    }
-  }
-  // Confirmation message of locally generated sync, necessary in the case of a failure
-  private processBatchResponseMessage(span: ULSpan, msg: BatchResponseProto) {
-    for (let i = 0; i < msg.batchLength(); i++) {
-      const res = msg.batch(i);
-      if (!res) continue;
-      const opId = Uuidv4.fromFBProto(res.opId());
-      tracer.addTag(span, "msg_type", "ResponseProto");
-      const seq = res.seq();
-      // TODO: IMPORTANT Prevent if !success
-      this.events.emit("op-response", {
-        opId,
-        success: res.success(), // TODO: We need an already commmitted case!
-        seq,
-      });
-      tracer.endSpan(span);
-    }
-  }
-  // Incoming sync update
-  private processBatchSyncOpMessage(span: ULSpan, msg: BatchSyncOpProto) {
-    const streamContextProto = msg.streamContext();
-    let streamContext: StreamContext | null = null;
-    if (streamContextProto) {
-      let streamId = streamContextProto.id();
-      if (streamId) {
-        streamContext = {
-          id: Uuidv4.fromFBProto(streamId),
-          event: streamContextProto.event(),
-        };
-      }
-    }
-    const incomingOps: SyncOp[] = [];
-    for (let i = 0; i < msg.batchLength(); i++) {
-      const op = msg.batch(i);
-      if (!op) continue;
-      // TODO: Decrypt payload
-      // const payload = op.payload();
-      const syncOpParams = {
-        id: Uuidv4.fromFBProto(op.opId()),
-        opKind: op.opKind(),
-        libraryId: Uuidv4.fromFBProto(op.libraryId()),
-        objId: Uuidv4.fromFBProto(op.objId()),
-        objKind: op.objKind(),
-        // payload
-      };
-      const syncOp = new SyncOp(syncOpParams);
-      incomingOps.push(syncOp);
-      // TODO: Denormalise queues
-      // TODO: deal with op (patch/snapshot/delete)
-      tracer.addTag(span, "msg_type", "SyncOpProto");
-      tracer.endSpan(span);
-    }
-    this.events.emit("sync-op-batch", incomingOps);
-
-    if (streamContext) {
-      // TODO: This should include stats
-      this.events.emit("stream-event", streamContext);
-    }
   }
 }

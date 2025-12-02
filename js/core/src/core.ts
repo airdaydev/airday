@@ -1,5 +1,5 @@
 import { WebsocketManager } from "./websocket";
-import { AirdaySync } from "./sync";
+import { AirdaySync, parseFrames } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
 import { AuthAdapter, AuthState, newLocalSession } from "./auth/adapter";
@@ -11,9 +11,15 @@ interface AirdayCoreOpts {
   storageAdapter?: StorageAdapter;
 }
 
+const enum SyncState {
+  Stopped,
+  Started,
+  Stopping,
+}
+
 export class AirdayCore {
   readonly apiUrl: URL;
-  online = false;
+  syncState = SyncState.Stopped;
   ws: WebsocketManager; // websocket layer
   sync: AirdaySync; // airday item layer
   storage: AirdayStorage; // mem & idb storage layer
@@ -41,7 +47,6 @@ export class AirdayCore {
   async init() {
     const session = getInitialSession();
     const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
-    // TODO: Test for startSync?
   }
   async reset() {
     const session = newLocalSession();
@@ -54,23 +59,31 @@ export class AirdayCore {
       return;
     }
     // TODO: This should be embedded in sync state / ws state
-    if (this.online) {
-      console.warn("attempted to startSync while already online");
-      return;
+    if (this.syncState !== SyncState.Stopped) {
+      throw new Error("Sync already started");
     }
-    this.online = true;
+    this.syncState = SyncState.Started;
     try {
       const frames = this.ws.frames();
-      for await (const frame of frames) {
-        console.log(frame);
+      const parsedFrames = parseFrames(frames);
+      // TODO: 3 types of messages so far
+      // TODO: Streams
+      // Library advertising (can happen all at once & block messages)
+      // Responses/Acks (seqs only - 2nd phase commit)
+      // SyncOps (full sync ops - a full commit)
+      // All 3 involve a database operation
+      for await (const frame of parsedFrames) {
+        console.log("incoming frame", frame);
       }
     } catch (err) {
       console.error("startSync failed", err);
     }
-    this.online = false;
+    this.syncState = SyncState.Stopped;
   }
+  // Stop but keep ingesting queued frames
   stopSync() {
     // TODO: Provide a wait api
+    this.syncState = SyncState.Stopping;
     this.ws.stop();
   }
 }

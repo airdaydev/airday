@@ -5,8 +5,17 @@ import { globalTSProducer } from "../crdt/lww";
 import { OpResponse } from "../websocket";
 import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
-import { StreamContext, SyncStream } from "./stream";
+import { parseStreamCtx, StreamContext, SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
+import { ULSpan } from "@airday/tracer";
+import {
+  BatchResponseProto,
+  BatchSyncOpProto,
+  LibrarySyncResponseProto,
+  MessageProto,
+  MessageWrapperProto,
+} from "../proto";
+import { spanFromFlatbuffer, tracer } from "../tracer";
 
 interface SyncEventMap {
   flushed: {};
@@ -26,9 +35,6 @@ export class AirdaySync {
   snapshotLimit = 16; // Amount of ops to keep before we compact via snapshot
   constructor(core: AirdayCore) {
     this.core = core;
-    this.core.ws.events.on("op-response", this.handleOpResponse);
-    this.core.ws.events.on("stream-event", this.handleStreamEvent);
-    this.core.ws.events.on("sync-op-batch", this.handleOpBatch);
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
@@ -146,7 +152,7 @@ export class AirdaySync {
     }
   };
   // Handler for a reply to an op originating from this client
-  handleOpResponse = async (res: OpResponse) => {
+  private processOpResponse = async (res: OpResponse) => {
     // TODO: Ensure:
     // - Optimistic in-memory
     // - Optimistic persisted (in a tx with op outbox)
@@ -170,20 +176,89 @@ export class AirdaySync {
     if (!this.pendingOps.size) {
       this.events.emit("flushed", {});
     }
-
-    // op persisted locally, state computed & persisted for fast access
-    // op persisted to server, returning seq
-    // seq stored against persisted version (so this is really last_seq)
-    // seq is fairly reliable, and if a seq is missed, it can be picked up by a merkle-tree based on the latest hash (computed only on ops with seqs)
-    // SO: Keep current-snapshot op headers on client
-    // OR if user wants to keep history - they can if there is room (but this is an optional/advanced option)
-    // hash is calculated on ops with seq only
-    //
-    // problem: ops contributing to fast access state, that did not have a seq, then being lost would then show a valid hash while the object would be invalid!
-    // solution = 2-phase state
-    // commmitted + optimistic separately
-    //
-    //
-    // TODO: We need to update in-memory version & db version (reactivity + persistence)
   };
+  // Confirmation message of locally generated sync, necessary in the case of a failure
+  private processBatchResponse(span: ULSpan, msg: BatchResponseProto) {
+    for (let i = 0; i < msg.batchLength(); i++) {
+      const res = msg.batch(i);
+      if (!res) continue;
+      const opId = Uuidv4.fromFBProto(res.opId());
+      tracer.addTag(span, "msg_type", "ResponseProto");
+      const seq = res.seq();
+      // TODO: IMPORTANT Prevent if !success
+      // this.events.emit("op-response", {
+      //   opId,
+      //   success: res.success(), // TODO: We need an already commmitted case!
+      //   seq,
+      // });
+      tracer.endSpan(span);
+    }
+  }
+  // Incoming sync update
+  private processBatchSyncOp(span: ULSpan, msg: BatchSyncOpProto) {
+    const streamContext = parseStreamCtx(msg.streamContext());
+    const incomingOps: SyncOp[] = [];
+    for (let i = 0; i < msg.batchLength(); i++) {
+      const op = msg.batch(i);
+      if (!op) continue;
+      // TODO: Decrypt payload
+      // const payload = op.payload();
+      const syncOpParams = {
+        id: Uuidv4.fromFBProto(op.opId()),
+        opKind: op.opKind(),
+        libraryId: Uuidv4.fromFBProto(op.libraryId()),
+        objId: Uuidv4.fromFBProto(op.objId()),
+        objKind: op.objKind(),
+        // payload
+      };
+      const syncOp = new SyncOp(syncOpParams);
+      incomingOps.push(syncOp);
+      // TODO: Denormalise queues
+      // TODO: deal with op (patch/snapshot/delete)
+      tracer.addTag(span, "msg_type", "SyncOpProto");
+      tracer.endSpan(span);
+    }
+    // this.events.emit("sync-op-batch", incomingOps);
+
+    if (streamContext) {
+      // TODO: This should include stats
+      // this.events.emit("stream-event", streamContext);
+    }
+  }
+}
+
+export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
+  for await (const wrapper of frames) {
+    let span = spanFromFlatbuffer(wrapper.spanContext(), "ws:downstream");
+    const type = wrapper.messageType();
+    let msg: LibrarySyncResponseProto | BatchSyncOpProto | BatchResponseProto;
+    switch (type) {
+      case MessageProto.LibrarySyncResponseProto: {
+        msg = new LibrarySyncResponseProto();
+        tracer.addTag(span, "proto_type", "library_sync_response_proto");
+        wrapper.message(msg);
+        break;
+      }
+      case MessageProto.BatchSyncOpProto: {
+        msg = new BatchSyncOpProto();
+        tracer.addTag(span, "proto_type", "batch_sync_op_proto");
+        wrapper.message(msg);
+        break;
+      }
+      case MessageProto.BatchResponseProto: {
+        msg = new BatchResponseProto();
+        tracer.addTag(span, "proto_type", "batch_response_proto");
+        wrapper.message(msg);
+        break;
+      }
+      default: {
+        throw new Error("Unknown message type");
+      }
+    }
+    yield {
+      type,
+      span,
+      msg,
+    };
+  }
 }

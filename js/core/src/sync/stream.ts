@@ -1,7 +1,7 @@
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import { AirdayCore } from "../core";
-import { StreamEventProto } from "../proto";
+import { StreamContextProto, StreamEventProto } from "../proto";
 import { SyncStreamReqMessage } from "./fb";
 
 export interface StreamContext {
@@ -53,4 +53,18 @@ export class SyncStream {
   // listen: on data
   // listen: on end
   // listen: on error (?!)
+}
+
+export function parseStreamCtx(
+  streamContextProto: StreamContextProto | null,
+): StreamContext | null {
+  if (!streamContextProto) return null;
+  let streamId = streamContextProto.id();
+  if (streamId) {
+    return {
+      id: Uuidv4.fromFBProto(streamId),
+      event: streamContextProto.event(),
+    };
+  }
+  return null;
 }
