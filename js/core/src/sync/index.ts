@@ -105,6 +105,7 @@ export class AirdaySync {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
   async *handleMessage(messages: AsyncIterable<IncomingMessage>) {
+    // TODO: collect batches of each type or make new streams
     for await (const msg of messages) {
       switch (Object.getPrototypeOf(msg)) {
         case LibrarySyncResponseProto: {
@@ -128,46 +129,23 @@ export class AirdaySync {
       stream.end();
     }
   };
-  // TODO: This is obviously set up to persist in at least op id batches but clearly isn't here
-  // TODO: This is a bit of a mess
   handleOpBatch = async (batch: SyncOp[]) => {
-    const objIdMap = new Map<string, SyncOp[]>();
-    batch.map((op) => {
-      const id = op.id.toHex();
-      const arr = objIdMap.get(id);
-      if (arr) {
-        arr.push(op);
-      } else {
-        objIdMap.set(id, [op]);
+    // TODO: Update this for batching and transactions
+    const patches = [];
+    batch.map(async (syncOp) => {
+      try {
+        // Existing object found
+        const obj = await this.core.storage.getObj(syncOp.objId);
+        obj!.commitPatch(syncOp);
+        await this.core.storage.adapter.updateObject(obj);
+      } catch (err) {
+        // Object doesn't exist so we create a new object
+        // TODO: We need a local cache too for brand new objects!
+        const obj = new SyncObject(syncOp);
+        obj?.commitPatch(syncOp);
+        await this.core.storage.adapter.updateObject(obj);
       }
     });
-    // commit patches in batches (TODO: ideally persisting to idb in batches!)
-    for (let key of objIdMap.keys()) {
-      let obj: SyncObject | undefined;
-      try {
-        obj = await this.core.storage.getObj(Uuidv4.fromHex(key));
-      } catch (err) {
-        // Nothing
-      }
-      const arr = objIdMap.get(key);
-      if (obj && arr) {
-        arr.map((op) => {
-          obj!.commitPatch(op);
-        });
-        // Persist objects (with op headers)
-        console.log("persisterised");
-        await this.core.storage.adapter.updateObject(obj);
-        console.log("persisted");
-      } else {
-        console.log("no obj found!");
-        const firstOp = arr!.shift();
-        if (firstOp) {
-          obj = new SyncObject(firstOp);
-          arr!.map((op) => obj?.commitPatch(op));
-          await this.core.storage.adapter.updateObject(obj);
-        }
-      }
-    }
   };
   // Handler for a reply to an op originating from this client
   private processOpResponse = async (res: OpResponse) => {
@@ -284,4 +262,18 @@ export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
       msg,
     };
   }
+}
+
+function groupOpBatchByObject(batch: SyncOp[]) {
+  const objIdMap = new Map<string, SyncOp[]>();
+  batch.map((op) => {
+    const id = op.id.toHex();
+    const arr = objIdMap.get(id);
+    if (arr) {
+      arr.push(op);
+    } else {
+      objIdMap.set(id, [op]);
+    }
+  });
+  return objIdMap;
 }

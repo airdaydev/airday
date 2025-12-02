@@ -63,6 +63,7 @@ export class AirdayStorage {
     const mem = this.stateCache.get(id.toHex());
     if (mem) return mem;
     const persisted = await this.adapter.getSyncObject(id);
+    this.stateCache.set(id.toHex(), persisted);
     if (!persisted) throw new Error(`object not found ${id}`);
     return persisted;
   }
