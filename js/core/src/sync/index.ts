@@ -2,23 +2,37 @@ import { EventEmitter } from "../common/events";
 import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
-import { OpResponse } from "../websocket";
 import { SyncOp } from "./sync-op";
 import { ChecksumStore } from "./checksum";
 import { parseStreamCtx, StreamContext, SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
-import { ULSpan } from "@airday/tracer";
 import {
   BatchResponseProto,
   BatchSyncOpProto,
   LibrarySyncResponseProto,
   MessageProto,
   MessageWrapperProto,
+  ResponseProto,
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 
 interface SyncEventMap {
   flushed: {};
+}
+
+export interface OpAck {
+  opId: Uuidv4;
+  seq?: bigint;
+}
+
+export function parseResponseProto(proto: ResponseProto): OpAck {
+  if (!proto.success()) {
+    throw new Error(`Ack failed with error: ${proto.error()}`);
+  }
+  return {
+    opId: Uuidv4.fromFBProto(proto.opId()),
+    seq: proto.seq(),
+  };
 }
 
 // TODO: Streams should disappear on completion
@@ -113,11 +127,43 @@ export class AirdaySync {
           break;
         }
         case BatchSyncOpProto: {
-          await this.handleOpBatch(msg);
-          // TODO: Put db commit on separate queue?
+          const typed = msg as BatchSyncOpProto;
+          // TODO: Do something with streamContext
+          const streamContext = parseStreamCtx(typed.streamContext());
+          for (let i = 0; i < typed.batchLength(); i++) {
+            const rawOp = typed.batch(i);
+            if (!rawOp) {
+              console.warn("Encountered invalid raw op");
+              continue;
+            }
+            const syncOp = SyncOp.fromSyncOpProto(rawOp);
+            const obj = await this.applyRemote(syncOp);
+            // TODO: Persist obj to db in tx queue
+            // TODO: Spans?
+          }
           break;
         }
         case BatchResponseProto: {
+          const typed = msg as BatchResponseProto;
+          for (let i = 0; i < typed.batchLength(); i++) {
+            const ack = typed.batch(i);
+            if (!ack) {
+              console.warn("Encountered invalid raw ack");
+              continue;
+            }
+            if (!ack.success()) {
+              console.warn("Ack failure", ack.opId());
+            }
+            try {
+              const parsed = parseResponseProto(ack);
+            } catch (err) {
+              console.error("Ack failed with error", err);
+              continue;
+            }
+            // Commit this to corresponding obj &
+            // TODO: Persist second phase commit to db in tx queue
+            // TODO: Spans?
+          }
           break;
         }
       }
@@ -129,23 +175,23 @@ export class AirdaySync {
       stream.end();
     }
   };
-  handleOpBatch = async (batch: SyncOp[]) => {
-    // TODO: Update this for batching and transactions
-    const patches = [];
-    batch.map(async (syncOp) => {
-      try {
-        // Existing object found
-        const obj = await this.core.storage.getObj(syncOp.objId);
-        obj!.commitPatch(syncOp);
-        await this.core.storage.adapter.updateObject(obj);
-      } catch (err) {
-        // Object doesn't exist so we create a new object
-        // TODO: We need a local cache too for brand new objects!
-        const obj = new SyncObject(syncOp);
-        obj?.commitPatch(syncOp);
-        await this.core.storage.adapter.updateObject(obj);
-      }
-    });
+  // For incoming remote sync operations,
+  // we create or apply ops to the corresponding cached obj
+  // then return a set - marking them for persistence
+  // TODO Actually we gain nothing doing this in bulk
+  applyRemote = async (syncOp: SyncOp) => {
+    try {
+      // Existing object found
+      const obj = await this.core.storage.getObj(syncOp.objId);
+      obj!.commitPatch(syncOp);
+      return obj;
+    } catch (err) {
+      // New object, set immediately but do not persist
+      const obj = new SyncObject(syncOp);
+      this.core.storage.setStateCache(obj);
+      obj?.commitPatch(syncOp);
+      return obj;
+    }
   };
   // Handler for a reply to an op originating from this client
   private processOpResponse = async (res: OpResponse) => {
@@ -173,54 +219,6 @@ export class AirdaySync {
       this.events.emit("flushed", {});
     }
   };
-  // Confirmation message of locally generated sync, necessary in the case of a failure
-  private processBatchResponse(span: ULSpan, msg: BatchResponseProto) {
-    for (let i = 0; i < msg.batchLength(); i++) {
-      const res = msg.batch(i);
-      if (!res) continue;
-      const opId = Uuidv4.fromFBProto(res.opId());
-      tracer.addTag(span, "msg_type", "ResponseProto");
-      const seq = res.seq();
-      // TODO: IMPORTANT Prevent if !success
-      // this.events.emit("op-response", {
-      //   opId,
-      //   success: res.success(), // TODO: We need an already commmitted case!
-      //   seq,
-      // });
-      tracer.endSpan(span);
-    }
-  }
-  // Incoming sync update
-  private processBatchSyncOp(span: ULSpan, msg: BatchSyncOpProto) {
-    const streamContext = parseStreamCtx(msg.streamContext());
-    const incomingOps: SyncOp[] = [];
-    for (let i = 0; i < msg.batchLength(); i++) {
-      const op = msg.batch(i);
-      if (!op) continue;
-      // TODO: Decrypt payload
-      // const payload = op.payload();
-      const syncOpParams = {
-        id: Uuidv4.fromFBProto(op.opId()),
-        opKind: op.opKind(),
-        libraryId: Uuidv4.fromFBProto(op.libraryId()),
-        objId: Uuidv4.fromFBProto(op.objId()),
-        objKind: op.objKind(),
-        // payload
-      };
-      const syncOp = new SyncOp(syncOpParams);
-      incomingOps.push(syncOp);
-      // TODO: Denormalise queues
-      // TODO: deal with op (patch/snapshot/delete)
-      tracer.addTag(span, "msg_type", "SyncOpProto");
-      tracer.endSpan(span);
-    }
-    // this.events.emit("sync-op-batch", incomingOps);
-
-    if (streamContext) {
-      // TODO: This should include stats
-      // this.events.emit("stream-event", streamContext);
-    }
-  }
 }
 
 type IncomingMessage =
@@ -262,18 +260,4 @@ export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
       msg,
     };
   }
-}
-
-function groupOpBatchByObject(batch: SyncOp[]) {
-  const objIdMap = new Map<string, SyncOp[]>();
-  batch.map((op) => {
-    const id = op.id.toHex();
-    const arr = objIdMap.get(id);
-    if (arr) {
-      arr.push(op);
-    } else {
-      objIdMap.set(id, [op]);
-    }
-  });
-  return objIdMap;
 }

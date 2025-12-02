@@ -1,10 +1,7 @@
 import {
   MessageWrapperProto,
   AuthenticateResponseProto,
-  LibrarySyncResponseProto,
   MessageProto,
-  BatchResponseProto,
-  BatchSyncOpProto,
 } from "../proto";
 import { type AirdayCore } from "../core";
 import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
@@ -12,27 +9,12 @@ import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
-import { SyncOp } from "../sync/sync-op";
-import { StreamContext } from "../sync/stream";
-import { Library } from "../common/library";
 import { BearerAuth } from "../auth/bearer";
-
-export interface OpResponse {
-  opId: Uuidv4;
-  success: boolean;
-  seq?: bigint;
-  error?: string;
-}
 
 interface WSEventMap {
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
-  ["op-response"]: OpResponse;
-  ["sync-op-batch"]: SyncOp[];
-  ["stream-event"]: StreamContext;
   flushed: {};
 }
-
-type RawFrame = ArrayBuffer;
 
 export interface MQMessage {
   serialise(): Uint8Array;
