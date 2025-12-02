@@ -104,6 +104,24 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
+  async *handleMessage(messages: AsyncIterable<IncomingMessage>) {
+    for await (const msg of messages) {
+      switch (Object.getPrototypeOf(msg)) {
+        case LibrarySyncResponseProto: {
+          // this.handleOpBatch(message);
+          break;
+        }
+        case BatchSyncOpProto: {
+          await this.handleOpBatch(msg);
+          // TODO: Put db commit on separate queue?
+          break;
+        }
+        case BatchResponseProto: {
+          break;
+        }
+      }
+    }
+  }
   handleStreamEvent = (streamContext: StreamContext) => {
     const stream = this.streams.get(streamContext.id.toHex());
     if (stream) {
@@ -227,11 +245,16 @@ export class AirdaySync {
   }
 }
 
+type IncomingMessage =
+  | LibrarySyncResponseProto
+  | BatchSyncOpProto
+  | BatchResponseProto;
+
 export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
   for await (const wrapper of frames) {
     let span = spanFromFlatbuffer(wrapper.spanContext(), "ws:downstream");
     const type = wrapper.messageType();
-    let msg: LibrarySyncResponseProto | BatchSyncOpProto | BatchResponseProto;
+    let msg: IncomingMessage;
     switch (type) {
       case MessageProto.LibrarySyncResponseProto: {
         msg = new LibrarySyncResponseProto();
