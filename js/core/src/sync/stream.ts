@@ -10,7 +10,8 @@ export interface StreamContext {
 }
 
 interface StreamEventMap {
-  end: {};
+  data: {};
+  end: {}; // TODO: spit error here
 }
 
 // Subprotocols for AirdayCore streams
@@ -25,6 +26,22 @@ export class SyncStream {
   constructor(core: AirdayCore, libraryId: Uuidv4) {
     this.core = core;
     this.libraryId = libraryId;
+  }
+  processMessage(streamContext: StreamContext) {
+    switch (streamContext.event) {
+      case StreamEventProto.Data: {
+        this.events.emit("data", {});
+      }
+      case StreamEventProto.Error: {
+        console.error("Stream ended with an error!");
+        this.events.emit("end", {});
+        this.end();
+      }
+      case StreamEventProto.End: {
+        this.events.emit("end", {});
+        this.end();
+      }
+    }
   }
   get key() {
     return `${this.libraryId.toHex()}`;

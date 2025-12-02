@@ -118,6 +118,11 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
+  processStreamMessage(streamContext: StreamContext) {
+    const stream = this.streams.get(streamContext.id.toHex());
+    if (!stream) return;
+    stream.
+  }
   async *handleMessage(messages: AsyncIterable<IncomingMessage>) {
     // TODO: collect batches of each type or make new streams
     for await (const msg of messages) {
@@ -128,8 +133,9 @@ export class AirdaySync {
         }
         case BatchSyncOpProto: {
           const typed = msg as BatchSyncOpProto;
-          // TODO: Do something with streamContext
           const streamContext = parseStreamCtx(typed.streamContext());
+          if (streamContext) this.processStreamMessage(streamContext);
+          // TODO: Process stream message
           for (let i = 0; i < typed.batchLength(); i++) {
             const rawOp = typed.batch(i);
             if (!rawOp) {
@@ -194,11 +200,8 @@ export class AirdaySync {
     }
   };
   // Handler for a reply to an op originating from this client
-  private processOpResponse = async (res: OpResponse) => {
-    // TODO: Ensure:
-    // - Optimistic in-memory
-    // - Optimistic persisted (in a tx with op outbox)
-    // TODO: Consider batching at this point (otherwise batch on storage...?)
+  // TODO: Dial the DB side in
+  private processOpResponse = async (res: OpAck) => {
     try {
       const op = await this.core.storage.adapter.getOutboxOp(res.opId);
       const obj = await this.core.storage.getObj(op.objId);
