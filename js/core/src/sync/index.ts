@@ -149,6 +149,12 @@ export class AirdaySync {
           try {
             const ack = parseResponseProto(rawAck);
             const obj = await this.applyAck(ack);
+            if (!obj) {
+              console.warn(
+                `No obj found for corresponding ack for op id ${ack.opId}`,
+              );
+              continue;
+            }
             this.core.storage.objectDirty.add(obj.id);
             this.core.storage.outboxDirty.add(ack.opId);
           } catch (err) {
@@ -187,6 +193,7 @@ export class AirdaySync {
     if (obj) {
       obj.commitPatch(op);
       this.pendingOps.delete(op.id.toHex());
+      return obj;
     } else {
       console.error(`Error retrieving opId`, ack.opId);
     }
