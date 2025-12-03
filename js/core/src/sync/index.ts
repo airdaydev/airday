@@ -166,34 +166,29 @@ export class AirdaySync {
       stream.end();
     }
   };
-  // For incoming remote sync operations,
-  // we create or apply ops to the corresponding cached obj
-  // then return a set - marking them for persistence
-  // TODO Actually we gain nothing doing this in bulk
+  // Handler for incoming remote sync operations
   applyRemote = async (syncOp: SyncOp) => {
-    try {
+    const obj = await this.core.storage.getObj(syncOp.objId);
+    if (obj) {
       // Existing object found
-      const obj = await this.core.storage.getObj(syncOp.objId);
       obj!.commitPatch(syncOp);
       return obj;
-    } catch (err) {
-      // New object, set immediately but do not persist
-      const obj = new SyncObject(syncOp);
-      this.core.storage.setStateCache(obj);
-      obj?.commitPatch(syncOp);
-      return obj;
     }
+    // New obj
+    const newObj = new SyncObject(syncOp);
+    this.core.storage.setStateCache(newObj);
+    newObj?.commitPatch(syncOp);
+    return newObj;
   };
-  // Handler for a reply to an op originating from this client (2nd phase commit)
+  // Handler for a reply to an op originating from this client - 2nd phase commit
   private applyAck = async (ack: OpAck) => {
-    try {
-      const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
-      const obj = await this.core.storage.getObj(op.objId);
-      obj.setMaxSeq(ack.seq);
+    const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
+    const obj = await this.core.storage.getObj(op.objId);
+    if (obj) {
       obj.commitPatch(op);
       this.pendingOps.delete(op.id.toHex());
-    } catch (err) {
-      console.error(err, `Error retrieving opId`, res.opId);
+    } else {
+      console.error(`Error retrieving opId`, ack.opId);
     }
   };
 }

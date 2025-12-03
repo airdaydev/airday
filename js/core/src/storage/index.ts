@@ -56,12 +56,13 @@ export class AirdayStorage {
     const hexId = obj.id.toHex();
     this.stateCache.set(hexId, obj);
   }
-  async getObj(id: Uuidv4): Promise<SyncObject> {
+  async getObj(id: Uuidv4): Promise<SyncObject | undefined> {
     const mem = this.stateCache.get(id.toHex());
     if (mem) return mem;
     const persisted = await this.adapter.getSyncObject(id);
-    this.stateCache.set(id.toHex(), persisted);
-    if (!persisted) throw new Error(`object not found ${id}`);
+    if (persisted) {
+      this.stateCache.set(id.toHex(), persisted);
+    }
     return persisted;
   }
   async persistence() {

@@ -13,7 +13,7 @@ export abstract class StorageAdapter {
   abstract updateObject(object: SyncObject): Promise<void>;
   abstract getByLibrary(libraryId: Uuidv4): Promise<any[]>;
   abstract getOutboxOp(id: Uuidv4): Promise<SyncOp>;
-  abstract getSyncObject(id: Uuidv4): Promise<SyncObject>;
+  abstract getSyncObject(id: Uuidv4): Promise<SyncObject | undefined>;
   abstract deleteOutboxOp(id: Uuidv4): Promise<void>;
   abstract deleteSyncObject(hexIds: Uuidv4[]): Promise<void>;
   abstract clear(): Promise<void>;
