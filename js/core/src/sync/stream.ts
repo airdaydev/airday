@@ -17,15 +17,15 @@ interface StreamEventMap {
 // Subprotocols for AirdayCore streams
 // Activated on connect/reconnect
 export class SyncStream {
-  core: AirdayCore;
   id = new Uuidv4();
+  startSeq = 0n;
   libraryId: Uuidv4;
   syncing = false;
   events = new EventEmitter<StreamEventMap>();
   finished = false;
-  constructor(core: AirdayCore, libraryId: Uuidv4) {
-    this.core = core;
+  constructor(libraryId: Uuidv4, startSeq = 0n) {
     this.libraryId = libraryId;
+    this.startSeq = startSeq;
   }
   processMessage(streamContext: StreamContext) {
     switch (streamContext.event) {
@@ -46,14 +46,14 @@ export class SyncStream {
   get key() {
     return `${this.libraryId.toHex()}`;
   }
-  start(serverSeq: bigint | null) {
+  req() {
     this.syncing = true;
-    const message = new SyncStreamReqMessage(
+    const req = new SyncStreamReqMessage(
       this.id,
       this.libraryId,
-      serverSeq,
+      this.startSeq,
     );
-    this.core.ws.enqueueAirdayMessage(message);
+    return req;
   }
   async end() {
     // Called from outside

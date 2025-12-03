@@ -67,7 +67,7 @@ export class AirdaySync {
   initialSync() {
     // TODO: Prevent if not authorised
     this.getLibraries(); // TODO: currently a noop
-    this.catchup(this.core.auth.sessionData!.primaryLibraryId, 0);
+    this.catchup(this.core.auth.sessionData!.primaryLibraryId);
     // TODO: For each shared library, start list & item streams
     // TODO: Later, prioritise by active items, tombstoned items, completed items
     // TODO: Collect pending items, containers, libraries for pushing
@@ -77,16 +77,18 @@ export class AirdaySync {
     // TODO: Get all shared libraries (TODO: Offline mode? Sync? limits?)
     // TODO: Process for creating a shared library
   }
-  catchup(libraryId: Uuidv4, sinceSeq: number) {
-    const itemStream = new SyncStream(this.core, libraryId);
+  catchup(libraryId: Uuidv4, sinceSeq: bigint = 0n) {
+    const itemStream = new SyncStream(libraryId, sinceSeq);
     const existingStream = this.streams.get(itemStream.key);
     if (existingStream && existingStream.syncing) {
-      console.warn(`Existing stream [key=${itemStream.key}] already running`);
-      return existingStream; // TODO: this is not it
+      throw new Error(
+        `Existing stream [key=${itemStream.key}] already running`,
+      );
     }
     this.streams.set(itemStream.key, itemStream); // TODO: differentiate index
     this.streams.set(itemStream.id.toHex(), itemStream);
-    itemStream.start(null);
+    const req = itemStream.req();
+    this.core.ws.enqueueAirdayMessage(req);
     return itemStream;
   }
   createList(list: any) {}
