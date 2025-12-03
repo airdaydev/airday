@@ -3,6 +3,7 @@ import { HexUuid, Uuidv4 } from "../common/uuid";
 import type { AirdayCore } from "../core";
 import { globalTSProducer } from "../crdt/lww";
 import { SyncOp } from "./sync-op";
+import { ChecksumStore } from "./checksum";
 import { parseStreamCtx, StreamContext, SyncStream } from "./stream";
 import { SyncObject } from "./sync-object";
 import {
@@ -14,6 +15,7 @@ import {
   ResponseProto,
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
+import { ULSpan } from "@airday/tracer";
 
 interface SyncEventMap {
   flushed: {};
@@ -21,7 +23,7 @@ interface SyncEventMap {
 
 export interface OpAck {
   opId: Uuidv4;
-  seq?: bigint;
+  seq: bigint;
 }
 
 export function parseResponseProto(proto: ResponseProto): OpAck {
@@ -70,15 +72,6 @@ export class AirdaySync {
     // TODO: Later, prioritise by active items, tombstoned items, completed items
     // TODO: Collect pending items, containers, libraries for pushing
   }
-  applyLocal(patches: SyncObject[]) {
-    for (let patch of patches) {
-    }
-    // this.core.storage.getById
-    // 1. Find & merge object (checking cache first, then persistent layer), allowing UI to react
-    // 2. Transaction of
-    // -- persist merged object with hash
-    // -- persist patch in outbox
-  }
   getLibraries() {
     console.log("hit getLibraries noop");
     // TODO: Get all shared libraries (TODO: Offline mode? Sync? limits?)
@@ -109,60 +102,61 @@ export class AirdaySync {
   deleteItem(id: String) {
     // TODO: Use the upsertItem api with tombstone timestamp
   }
-  processStreamMessage(streamContext: StreamContext) {
+  processStreamContext(streamContext: StreamContext) {
     const stream = this.streams.get(streamContext.id.toHex());
     if (!stream) return;
     stream.processMessage(streamContext);
   }
-  async *handleMessage(messages: AsyncIterable<IncomingMessage>) {
+  async handleFrame(frame: ParsedFrame) {
+    // TODO: Do something with spans
+    const { msg, span } = frame;
     // TODO: collect batches of each type or make new streams
-    for await (const msg of messages) {
-      switch (Object.getPrototypeOf(msg)) {
-        case LibrarySyncResponseProto: {
-          // this.handleOpBatch(message);
-          break;
+    switch (Object.getPrototypeOf(msg)) {
+      case LibrarySyncResponseProto: {
+        // this.handleOpBatch(message);
+        break;
+      }
+      case BatchSyncOpProto: {
+        const typed = msg as BatchSyncOpProto;
+        const streamContext = parseStreamCtx(typed.streamContext());
+        if (streamContext) {
+          this.processStreamContext(streamContext);
         }
-        case BatchSyncOpProto: {
-          const typed = msg as BatchSyncOpProto;
-          const streamContext = parseStreamCtx(typed.streamContext());
-          if (streamContext) this.processStreamMessage(streamContext);
-          // TODO: Process stream message
-          for (let i = 0; i < typed.batchLength(); i++) {
-            const rawOp = typed.batch(i);
-            if (!rawOp) {
-              console.warn("Encountered invalid raw op");
-              continue;
-            }
-            const syncOp = SyncOp.fromSyncOpProto(rawOp);
-            const obj = await this.applyRemote(syncOp);
-            // TODO: Persist obj to db in tx queue
-            // TODO: Spans?
+        // TODO: Process stream message
+        for (let i = 0; i < typed.batchLength(); i++) {
+          const rawOp = typed.batch(i);
+          if (!rawOp) {
+            console.warn("Encountered invalid raw op");
+            continue;
           }
-          break;
+          const syncOp = SyncOp.fromSyncOpProto(rawOp);
+          const obj = await this.applyRemote(syncOp);
+          this.core.storage.objectDirty.add(obj.id);
         }
-        case BatchResponseProto: {
-          const typed = msg as BatchResponseProto;
-          for (let i = 0; i < typed.batchLength(); i++) {
-            const ack = typed.batch(i);
-            if (!ack) {
-              console.warn("Encountered invalid raw ack");
-              continue;
-            }
-            if (!ack.success()) {
-              console.warn("Ack failure", ack.opId());
-            }
-            try {
-              const parsed = parseResponseProto(ack);
-            } catch (err) {
-              console.error("Ack failed with error", err);
-              continue;
-            }
-            // Commit this to corresponding obj &
-            // TODO: Persist second phase commit to db in tx queue
-            // TODO: Spans?
+        break;
+      }
+      case BatchResponseProto: {
+        const typed = msg as BatchResponseProto;
+        for (let i = 0; i < typed.batchLength(); i++) {
+          const rawAck = typed.batch(i);
+          if (!rawAck) {
+            console.warn("Encountered invalid rawAck");
+            continue;
           }
-          break;
+          if (!rawAck.success()) {
+            console.warn("Ack failure", rawAck.opId());
+          }
+          try {
+            const ack = parseResponseProto(rawAck);
+            const obj = await this.applyAck(ack);
+            this.core.storage.objectDirty.add(obj.id);
+            this.core.storage.outboxDirty.add(ack.opId);
+          } catch (err) {
+            console.error("Ack failed with error", err);
+            continue;
+          }
         }
+        break;
       }
     }
   }
@@ -190,27 +184,16 @@ export class AirdaySync {
       return obj;
     }
   };
-  // Handler for a reply to an op originating from this client
-  // TODO: Dial the DB side in
-  private processOpResponse = async (res: OpAck) => {
+  // Handler for a reply to an op originating from this client (2nd phase commit)
+  private applyAck = async (ack: OpAck) => {
     try {
-      const op = await this.core.storage.adapter.getOutboxOp(res.opId);
+      const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
       const obj = await this.core.storage.getObj(op.objId);
-      // console.log("handling op response", res.seq, obj.id);
-      // Phase 2 commit: commit & persist seq
-      if (typeof res.seq == "bigint") {
-        obj.setMaxSeq(res.seq); // ! TODO: Optional reactivity on seq itself or other metadata?
-      }
+      obj.setMaxSeq(ack.seq);
       obj.commitPatch(op);
-      await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
       this.pendingOps.delete(op.id.toHex());
-      // TODO: This update may be best done in a tx - unless it doesn't really matter due to having all relevant op headers
-      await this.core.storage.adapter.updateObject(obj); // PERSIST CHANGE!
     } catch (err) {
       console.error(err, `Error retrieving opId`, res.opId);
-    }
-    if (!this.pendingOps.size) {
-      this.events.emit("flushed", {});
     }
   };
 }
@@ -219,6 +202,11 @@ type IncomingMessage =
   | LibrarySyncResponseProto
   | BatchSyncOpProto
   | BatchResponseProto;
+
+export type ParsedFrame = {
+  msg: IncomingMessage;
+  span: ULSpan;
+};
 
 export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
   for await (const wrapper of frames) {
@@ -253,6 +241,6 @@ export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
     yield {
       span,
       msg,
-    };
+    } satisfies ParsedFrame;
   }
 }

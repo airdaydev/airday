@@ -22,12 +22,14 @@ export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
   // Library storage
-  primaryLibraryIndex?: LibraryHexUuid;
+  primaryLibraryId?: Uuidv4;
   libraries: Map<LibraryHexUuid, Library> = new Map();
   // OpCache
   stateCache: Map<SyncObjectHexUuid, SyncObject> = new Map();
-  opLibMap: Map<LibraryHexUuid, SyncObjectHexUuid> = new Map();
   outbox: Map<HexUuid, SyncOp> = new Map();
+  // Pending DB updates
+  outboxDirty: Set<Uuidv4> = new Set();
+  objectDirty: Set<Uuidv4> = new Set();
   // Reactivity
   events = new EventEmitter<StorageEventMap>();
   constructor(core: AirdayCore, adapter?: StorageAdapter) {
@@ -37,6 +39,7 @@ export class AirdayStorage {
   async initDb(userId: Uuidv4) {
     // TODO: Check DB status, may be connected
     await this.adapter.connect(userId);
+    // Load up libs, outbox, then normal items
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
     let op = this.outbox.get(id.toHex());
@@ -48,16 +51,10 @@ export class AirdayStorage {
   async removeItems(ids: Uuidv4[]) {
     ids.forEach((id) => this.stateCache.delete(id.toHex()));
     await this.adapter.deleteSyncObject(ids);
-    // TODO: trigger subscription remove event!
-  }
-  // TODO: Trigger patch?
-  subscribe() {
-    // Ensure this happens in batches
   }
   setStateCache(obj: SyncObject) {
     const hexId = obj.id.toHex();
     this.stateCache.set(hexId, obj);
-    this.opLibMap.set(obj.libraryId.toHex(), hexId);
   }
   async getObj(id: Uuidv4): Promise<SyncObject> {
     const mem = this.stateCache.get(id.toHex());
@@ -67,5 +64,11 @@ export class AirdayStorage {
     if (!persisted) throw new Error(`object not found ${id}`);
     return persisted;
   }
-  // TODO: Remove from cache etc
+  async persistence() {
+    // TODO: When there are items in queue, run at least once every 16ms
+    // Taking up to 500 at a time
+    // TODO: as a transaction
+    // await this.core.storage.adapter.deleteOutboxOp(op.id); // Job is done
+    // await this.core.storage.adapter.updateObject(obj); // PERSIST CHANGE!
+  }
 }

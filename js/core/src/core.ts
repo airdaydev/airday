@@ -64,10 +64,11 @@ export class AirdayCore {
     }
     this.syncState = SyncState.Started;
     try {
-      const frames = this.ws.frames();
-      const parsedFrames = parseFrames(frames);
+      const protoFrames = this.ws.frames();
+      const parsedFrames = parseFrames(protoFrames);
       for await (const frame of parsedFrames) {
         console.debug("incoming frame", frame);
+        await this.sync.handleFrame(frame);
       }
     } catch (err) {
       console.error("startSync failed", err);
