@@ -156,9 +156,10 @@ test.only("Phase 2 commit", async () => {
 test.skip("fan out to connection on same library", () => {});
 
 test("Catch up streams", async () => {
-  const core = await createAuthenticatedCore();
+  const core = await createAuthenticatedCore("catch-up@air.day");
   // create x items
-  const libraryId = core.library.id!;
+  const libraryId = core.auth.sessionData?.primaryLibraryId!;
+  expect(libraryId).toBeDefined();
   for (let i = 0; i < 1000; i++) {
     const snapshot = new InitialSnapshotOp({
       libraryId,
@@ -174,10 +175,10 @@ test("Catch up streams", async () => {
   }
   await core.sync.flush();
   await core.storage.adapter.clear();
-  const emptyRes = await core.storage.adapter.getByLibrary(core.library.id!);
+  const emptyRes = await core.storage.adapter.getByLibrary(libraryId);
   expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
-  const stream = core.sync.catchup(core.library.id!, 0);
+  const stream = core.sync.catchup(libraryId, 0n);
   await stream.done();
   // HACK
   await new Promise((resolve) => setTimeout(() => resolve(null), 5000));
@@ -188,16 +189,14 @@ test("Catch up streams", async () => {
   core.stopSync();
 });
 
-test.skip("Delete attribute patches", async () => {
-  const core = await createAuthenticatedCore();
-});
+test.todo("Delete attribute patches", async () => {});
 
-test.skip("Delete object patches", async () => {});
-test.skip("Snapshots", async () => {});
-test.skip("Merkle tree backed sync discrepency resolution", async () => {});
-test.skip("Double OP ids w different sha256s?", async () => {});
+test.todo("Delete object patches", async () => {});
+test.todo("Snapshots", async () => {});
+test.todo("Merkle tree backed sync discrepency resolution", async () => {});
+test.todo("Double OP ids w different sha256s?", async () => {});
 
-test.skip("mem adapter", () => {
+test.todo("mem adapter", () => {
   // // Examples for the solid adapter within the web app:
   // class AirdayUIItem {}
   // class AirdayUIContainer {}
@@ -209,7 +208,7 @@ test.skip("mem adapter", () => {
   // const solidAdapter = new SolidAdapterExample();
 });
 
-test.skip("Get all libraries", async () => {});
-test.skip("Create library", async () => {});
-test.skip("Delete library", async () => {});
-test.skip("Sync local pending changes from idb", async () => {});
+test.todo("Get all libraries", async () => {});
+test.todo("Create library", async () => {});
+test.todo("Delete library", async () => {});
+test.todo("Sync local pending changes from idb", async () => {});
