@@ -93,7 +93,7 @@ test("Bearer authorisation", async () => {
   expect(bearerAuth.sessionData?.userId instanceof Uuidv4).toBeTrue();
 });
 
-test.only("Bearer refresh", async () => {
+test("Bearer refresh", async () => {
   const core = await createAuthenticatedCore("bearer-refresh@air.day");
   const bearerAuth = core.auth as BearerAuth;
   const ogToken = bearerAuth.sessionToken;
