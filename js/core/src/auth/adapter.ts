@@ -21,6 +21,7 @@ export enum AuthState {
 
 export interface AuthEventMap {
   initialised: SessionData;
+  refresh: SessionData;
   deauthenticated: {};
 }
 

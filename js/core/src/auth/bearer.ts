@@ -7,6 +7,7 @@ import {
   LocalSession,
   newLocalSession,
   SESSION_STORAGE_KEY,
+  SessionData,
 } from "./adapter";
 import { verifyToken } from "./token";
 import { Uuidv4 } from "../common/uuid";
@@ -87,13 +88,47 @@ export class BearerAuth extends AuthAdapter {
   persistSession(session: LocalSession | BearerSession) {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
-  async bootSession(session: LocalSession | BearerSession) {
+  async updateSession(session: BearerSession) {
+    const [sessionTokenData, refreshTokenData] = await Promise.all([
+      verifyToken(this.publicKey, session.sessionToken),
+      verifyToken(this.publicKey, session.refreshToken),
+    ]);
+    this.sessionToken = session.sessionToken;
+    this.refreshToken = session.refreshToken;
+    this.sessionExpiry = sessionTokenData.expiry;
+    this.refreshExpiry = refreshTokenData.expiry;
+    this.persistSession(session);
+    // TODO: Check session expiry here!
+    this.state = AuthState.Remote;
+    const sessionData: SessionData = {
+      type: "remote",
+      userId: sessionTokenData.userId,
+      primaryLibraryId: sessionTokenData.primaryLibraryId,
+    };
+    this.sessionData = sessionData;
+    this.scheduleRefresh();
+    return sessionData;
+  }
+  async refreshSession(session: BearerSession) {
+    try {
+      let sessionData = await this.updateSession(session);
+      this.events.emit("refresh", sessionData);
+    } catch (err) {
+      console.error(err);
+      // TODO: Refresh failed notification
+    }
+  }
+  async bootSession(
+    session: LocalSession | BearerSession,
+  ): Promise<SessionData> {
+    let sessionData: SessionData;
     if (this.state === AuthState.Initialising) {
       throw new Error("Attempted to boot concurrently. Stopping.");
     }
     this.state = AuthState.Initialising;
     switch (session.type) {
       case "local": {
+        sessionData = session;
         this.sessionData = session;
         this.persistSession(session);
         this.state = AuthState.Local;
@@ -101,51 +136,26 @@ export class BearerAuth extends AuthAdapter {
         break;
       }
       case "remote": {
-        let sessionTokenData, refreshTokenData;
         try {
-          const sessionData = await Promise.all([
-            verifyToken(this.publicKey, session.sessionToken),
-            verifyToken(this.publicKey, session.refreshToken),
-          ]);
-          sessionTokenData = sessionData[0];
-          refreshTokenData = sessionData[1];
+          sessionData = await this.updateSession(session);
+          this.events.emit("initialised", sessionData);
         } catch (err) {
-          console.warn(err);
-          // If this is extending a session,
-          return;
-        }
-        this.sessionToken = session.sessionToken;
-        this.refreshToken = session.refreshToken;
-        this.sessionExpiry = sessionTokenData.expiry;
-        this.refreshExpiry = refreshTokenData.expiry;
-        this.persistSession(session);
-        this.state = AuthState.Remote; // TODO: Or expired?!
-        this.sessionData = {
-          type: "remote",
-          userId: sessionTokenData.userId,
-          primaryLibraryId: sessionTokenData.primaryLibraryId,
-        };
-        this.events.emit("initialised", this.sessionData);
-        this.scheduleRefresh();
-        // Rules to implement:
-        // 1. Session expiry doesn't matter if refreshToken is still there - we can still initialised
-        // 2. If both expire - maybe we should just log out! - although we could just revert to a local state but without credentials
-        console.warn("Creating a new session");
-        if (!this.sessionData) {
-          // TODO: We may need to break this up
-          // If this is a first time, it should return an anon user
-          // otherwise it needs to check the kind of user
-          // We probably need to check the error type
-          const newSession = newLocalSession();
-          this.persistSession(newSession);
-          this.state = AuthState.Local;
-          this.sessionData = newSession;
-          this.events.emit("initialised", newSession);
+          // TODO: Session failure notification
+          console.error(err);
+          sessionData = this.newLocalSession();
           break;
         }
       }
     }
-    return this.sessionData;
+    return sessionData;
+  }
+  newLocalSession() {
+    const session = newLocalSession();
+    this.persistSession(session);
+    this.state = AuthState.Local;
+    this.sessionData = session;
+    this.events.emit("initialised", session);
+    return session;
   }
   requestHeaders(json: boolean = true): Record<string, string> {
     if (!this.sessionToken) throw new Error("User is not authenticated");
