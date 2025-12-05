@@ -19,14 +19,14 @@ export enum AuthState {
   ExpiredSession = "expired_session",
 }
 
-export interface WSEventMap {
-  authenticated: SessionData;
+export interface AuthEventMap {
+  initialised: SessionData;
   deauthenticated: {};
 }
 
 export abstract class AuthAdapter {
   constructor() {}
-  events = new EventEmitter<WSEventMap>();
+  events = new EventEmitter<AuthEventMap>();
   requestCredentials: RequestCredentials = "omit";
   sessionData?: SessionData;
   sessionExpiry?: Date;

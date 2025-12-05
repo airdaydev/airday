@@ -34,10 +34,12 @@ export class AirdayCore {
     }
     this.auth = opts.authAdapter;
     this.auth.events.on("authenticated", async (sessionData) => {
-      // TODO: Reset first
+      // TODO: Reset first!!
       // this.stopSync();
       await this.storage.initDb(sessionData.userId);
-      this.startSync();
+      if (this.auth.state === AuthState.Remote) {
+        this.startSync();
+      }
     });
     this.init().catch((err) => {
       console.warn(err);

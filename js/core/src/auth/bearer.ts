@@ -96,40 +96,51 @@ export class BearerAuth extends AuthAdapter {
       case "local": {
         this.sessionData = session;
         this.persistSession(session);
-        this.events.emit("authenticated", session);
         this.state = AuthState.Local;
+        this.events.emit("initialised", session);
         break;
       }
       case "remote": {
+        let sessionTokenData, refreshTokenData;
         try {
-          const [sessionTokenData, refreshTokenData] = await Promise.all([
+          const sessionData = await Promise.all([
             verifyToken(this.publicKey, session.sessionToken),
             verifyToken(this.publicKey, session.refreshToken),
           ]);
-          this.sessionToken = session.sessionToken;
-          this.refreshToken = session.refreshToken;
-          this.sessionExpiry = sessionTokenData.expiry;
-          this.refreshExpiry = refreshTokenData.expiry;
-          this.persistSession(session);
-          this.state = AuthState.Remote;
-          this.sessionData = {
-            type: "remote",
-            userId: sessionTokenData.userId,
-            primaryLibraryId: sessionTokenData.primaryLibraryId,
-          };
-          this.events.emit("authenticated", this.sessionData);
-          this.scheduleRefresh();
+          sessionTokenData = sessionData[0];
+          refreshTokenData = sessionData[1];
         } catch (err) {
-          // Rules to implement:
-          // 1. Session expiry doesn't matter if refreshToken is still there - we can still authenticated
-          // 2. If both expire - maybe we should just log out! - although we could just revert to a local state but without credentials
           console.warn(err);
-          console.warn("Creating a new session");
+          // If this is extending a session,
+          return;
+        }
+        this.sessionToken = session.sessionToken;
+        this.refreshToken = session.refreshToken;
+        this.sessionExpiry = sessionTokenData.expiry;
+        this.refreshExpiry = refreshTokenData.expiry;
+        this.persistSession(session);
+        this.state = AuthState.Remote; // TODO: Or expired?!
+        this.sessionData = {
+          type: "remote",
+          userId: sessionTokenData.userId,
+          primaryLibraryId: sessionTokenData.primaryLibraryId,
+        };
+        this.events.emit("initialised", this.sessionData);
+        this.scheduleRefresh();
+        // Rules to implement:
+        // 1. Session expiry doesn't matter if refreshToken is still there - we can still initialised
+        // 2. If both expire - maybe we should just log out! - although we could just revert to a local state but without credentials
+        console.warn("Creating a new session");
+        if (!this.sessionData) {
+          // TODO: We may need to break this up
+          // If this is a first time, it should return an anon user
+          // otherwise it needs to check the kind of user
+          // We probably need to check the error type
           const newSession = newLocalSession();
           this.persistSession(newSession);
           this.state = AuthState.Local;
           this.sessionData = newSession;
-          this.events.emit("authenticated", newSession);
+          this.events.emit("initialised", newSession);
           break;
         }
       }

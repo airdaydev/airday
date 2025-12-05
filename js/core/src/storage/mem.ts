@@ -16,7 +16,7 @@ export class AirdayMemStorage implements StorageAdapter {
   // TODO: op storage?
 
   async connect() {
-    console.warn("initialised mem storage adapter, no persistence enabled");
+    // TODO: Save name
   }
 
   async addOp(op: SyncOp, object: SyncObject) {
