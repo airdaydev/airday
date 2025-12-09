@@ -12,6 +12,7 @@ import { ULSpan } from "@airday/tracer";
 import { BearerAuth } from "../auth/bearer";
 
 interface WSEventMap {
+  end: {};
   authenticated: { userId: Uuidv4; libraryId: Uuidv4 };
   flushed: {};
 }
@@ -64,7 +65,12 @@ export class WebsocketManager {
     this.ws?.close();
   }
   stop() {
-    if (this.ac) this.ac.abort();
+    return new Promise((resolve) => {
+      this.events.once("end", () => resolve(null));
+      if (this.ac) {
+        this.ac.abort();
+      }
+    });
   }
   // connect with retries
   private connect() {
@@ -78,7 +84,7 @@ export class WebsocketManager {
     const ws = new WebSocket(this.address);
     this.ws = ws;
     ws.binaryType = "arraybuffer";
-    ws.addEventListener("open", (event) => {
+    ws.addEventListener("open", () => {
       this.connectionAttempts = 0;
       this.state = WSState.Connected;
       if (this.core.auth instanceof BearerAuth) {
@@ -108,7 +114,7 @@ export class WebsocketManager {
   frames(): AsyncIterable<MessageWrapperProto> {
     if (this.ws) {
       // TODO: Consider separating connect & producer so frames producer can be reused
-      throw new Error("Cannot call ws.frames() twice.");
+      throw new Error("ws.frames(): Cannot start second websocket connection");
     }
     console.debug(`WS connection attempt to ${this.address}`);
     // State
@@ -117,8 +123,6 @@ export class WebsocketManager {
     let done = false;
     // Resilience or closing
     const close = (event: Event) => {
-      // TODO: Reconsider abort controller negation here
-      // - if it doesn't exist it should have already aborted
       const aborted = !this.ac || this.ac.signal.aborted;
       if (event.type === "error") {
         // TODO: how to trigger an error?
@@ -127,14 +131,14 @@ export class WebsocketManager {
       this.state = WSState.Disconnected;
       this.ws = null;
       if (aborted) {
+        this.events.emit("end", {});
         done = true;
-      }
-      if (this.pendingResolve && aborted) {
-        this.pendingResolve({ value: undefined as any, done });
-        this.pendingResolve = null;
         this.ac = null;
-      }
-      if (!aborted && !this.ws) {
+        if (this.pendingResolve) {
+          this.pendingResolve({ value: undefined as any, done });
+          this.pendingResolve = null;
+        }
+      } else {
         this.connect();
       }
     };

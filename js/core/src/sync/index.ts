@@ -16,6 +16,7 @@ import {
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
+import { AuthState } from "../auth/adapter";
 
 interface SyncEventMap {
   flushed: {};
@@ -36,9 +37,16 @@ export function parseResponseProto(proto: ResponseProto): OpAck {
   };
 }
 
+const enum SyncState {
+  Stopped,
+  Started,
+  Stopping,
+}
+
 // TODO: Ack timeouts...?
 export class AirdaySync {
   core: AirdayCore;
+  syncState = SyncState.Stopped;
   outbox: SyncOp[] = []; // Ops ready to be pulled by ws
   pendingOps = new Map<HexUuid, SyncOp>(); // Ops handed off to websocket message already
   events = new EventEmitter<SyncEventMap>();
@@ -48,6 +56,33 @@ export class AirdaySync {
   snapshotLimit = 16; // Amount of ops to keep before we compact via snapshot
   constructor(core: AirdayCore) {
     this.core = core;
+  }
+  async start() {
+    if (this.core.auth.state !== AuthState.Remote) {
+      console.warn("attempted to startSync without credentials loaded");
+      return;
+    }
+    // TODO: This should be embedded in sync state / ws state
+    if (this.syncState !== SyncState.Stopped) {
+      throw new Error("Sync already started");
+    }
+    this.syncState = SyncState.Started;
+    try {
+      const protoFrames = this.core.ws.frames();
+      const parsedFrames = parseFrames(protoFrames);
+      for await (const frame of parsedFrames) {
+        console.debug("incoming frame", frame);
+        await this.handleFrame(frame);
+      }
+    } catch (err) {
+      console.error("startSync failed", err);
+    }
+    this.syncState = SyncState.Stopped;
+  }
+  // Stop but keep ingesting queued frames
+  async stop() {
+    this.syncState = SyncState.Stopping;
+    await this.core.ws.stop();
   }
   // TODO: rename as this only awaits pending batch response completions
   // TODO: Timeout!
