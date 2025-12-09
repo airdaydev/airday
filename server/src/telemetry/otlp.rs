@@ -6,6 +6,7 @@ use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // TODO: opentelemetry_otlp crate v0.30.0 has no logs compatibility (traces/metrics only)
@@ -18,9 +19,7 @@ pub fn setup(cfg: &AirdayConfig) {
     if cfg.log_level == "off" {
         level_filter = LevelFilter::OFF;
     }
-    let registry = tracing_subscriber::registry()
-        .with(level_filter)
-        .with(tracing_subscriber::fmt::layer());
+    let registry = tracing_subscriber::registry();
 
     if let Some(otlp_host) = cfg.otlp_host.as_deref() {
         let span_exporter = SpanExporterBuilder::new()
@@ -46,9 +45,16 @@ pub fn setup(cfg: &AirdayConfig) {
         global::set_tracer_provider(trace_provider);
 
         let telemetry_layer = tracing_opentelemetry::layer().with_tracer(tracer);
-        registry.with(telemetry_layer).init();
+        registry
+            .with(level_filter)
+            .with(tracing_subscriber::fmt::layer())
+            .with(telemetry_layer)
+            .init();
     } else {
-        registry.init();
+        registry
+            .with(level_filter)
+            .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
+            .init();
     }
     info!(level_filter = level_filter.to_string(), "Tracer started");
 }

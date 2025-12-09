@@ -27,12 +27,12 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, msg)
             }
             AppError::DatabaseError(msg) => {
-                current_span.set_attribute("error", true);
+                current_span.record("error", true);
                 error!(error_type = "DatabaseError", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, msg)
             }
             AppError::ServerError(msg) => {
-                current_span.set_attribute("error", true);
+                current_span.record("error", true);
                 error!(error_type = "ServerError", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, msg)
             }

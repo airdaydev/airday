@@ -15,7 +15,7 @@ use flatbuffers::FlatBufferBuilder;
 use futures_util::SinkExt;
 use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use opentelemetry::trace::{SpanContext, TraceContextExt, TraceState};
-use opentelemetry::{Context, TraceId};
+use opentelemetry::{Context, KeyValue, TraceId};
 use opentelemetry::{SpanId, TraceFlags};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -167,7 +167,6 @@ async fn read(
             let cur_span = Span::current();
             match msg {
                 Ok(Message::Binary(b)) => {
-                    cur_span.set_attribute("message_type", "binary");
                     // Set trace id
                     let cloned = b.clone();
                     let msg = root_as_message_wrapper_proto(&cloned)?;
@@ -178,7 +177,9 @@ async fn read(
                     let span_ctx = extract_span_ctx(msg);
                     let parent_ctx = Context::current().with_remote_span_context(span_ctx);
                     cur_span.set_parent(parent_ctx);
-                    match msg.message_type() {
+                    let msg_type = msg.message_type();
+                    cur_span.record("msg_type", msg_type.variant_name().unwrap_or("unknown"));
+                    match msg_type {
                         MessageProto::AuthenticateActionProto => {
                             let Some(msg) = msg.message_as_authenticate_action_proto() else {
                                 return Err(AppError::ValidationError(String::from(
@@ -197,6 +198,7 @@ async fn read(
                                     "Invalid session token",
                                 )));
                             };
+                            tracing::info!(user_id = %sesh.user_id.to_string(), "User Authenticated");
                             if let Ok(result) = state.db.user.get_by_id(&sesh.user_id).await {
                                 if let Some(user) = result {
                                     let mut builder = FlatBufferBuilder::new();
@@ -233,6 +235,7 @@ async fn read(
                                     "Unauthorised session",
                                 )));
                             };
+                            cur_span.record("user_id", user_id.to_string());
                             let mut op_vec: Vec<IncomingSyncOp> = Vec::new();
                             for op_raw in msg.batch().iter() {
                                 // TODO: Break this whole thing so we can propagate an error back to the top and send
@@ -295,6 +298,7 @@ async fn read(
                                     "Unauthorised session",
                                 )));
                             };
+                            cur_span.record("user_id", user_id.to_string());
                             let library_id = proto_uuid_to_uuid(msg.library_id());
                             let stream_id = proto_uuid_to_uuid(msg.stream_id());
                             let stream_request = StreamRequest {
@@ -331,7 +335,9 @@ async fn read(
                 }
             }
         }
-        .instrument(info_span!("ws_receive", socket_id = %socket_id))
+        .instrument(
+            info_span!("ws_receive", socket_id = %socket_id, msg_type = tracing::field::Empty, user_id = tracing::field::Empty),
+        )
         .await;
         // Per message error handler
         if let Err(err) = result {

@@ -145,8 +145,6 @@ pub async fn auth_websocket(
                 "User disconnected while authenticating",
             )));
         }
-        // TODO: Span?
-        println!("User {:?} authenticated!", sesh.user_id);
         return Ok(sesh);
     }
     Err(AppError::ValidationError(String::from(
