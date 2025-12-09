@@ -89,7 +89,6 @@ export class WebsocketManager {
       }
     });
     ws.addEventListener("message", (message: MessageEvent) => {
-      console.log("decoding msg");
       const msg = decodeFrame(message);
       console.log("msg decoded:", msg?.messageType());
       if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {

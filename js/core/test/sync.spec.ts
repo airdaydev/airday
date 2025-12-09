@@ -121,7 +121,6 @@ test.only("Phase 2 commit", async () => {
     outboxOpIdb.id.equals(outboxOp.id),
     "serialised version stored in idb",
   ).toBe(true);
-  console.log("wtf");
   // Flush is dead again! We could flush or we could track actual ops too
   await core.sync.flush();
   // We are only doing this after to ensure op-response fires
