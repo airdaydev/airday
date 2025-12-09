@@ -9,6 +9,7 @@ export function dbName(userId: Uuidv4) {
 // Generic persistence layer
 export abstract class StorageAdapter {
   abstract connect(userId: Uuidv4): Promise<void>;
+  // TODO: Consider changing this name to reflect outbox status / seq presence
   abstract addOp(op: SyncOp, object: SyncObject): Promise<void>;
   abstract updateObject(object: SyncObject): Promise<void>;
   abstract getByLibrary(libraryId: Uuidv4): Promise<any[]>;

@@ -21,10 +21,6 @@ export interface MQMessage {
   serialise(): Uint8Array;
 }
 
-export interface QueuedMessage {
-  message: MQMessage;
-}
-
 export enum WSState {
   Disconnected,
   Connecting,
@@ -43,7 +39,7 @@ export class WebsocketManager {
   maxWSBatch = 10; // max ws messages
   maxOpBatch = 1000; // Messages to send at once
   maxBufferedAmount = 1024 * 1024; // 1MB
-  outgoing: Array<QueuedMessage> = [];
+  outgoing: Array<MQMessage> = [];
   // Conn & incoming msg iterator
   private connectionAttempts = 0;
   private ws: WebSocket | null = null;
@@ -93,7 +89,9 @@ export class WebsocketManager {
       }
     });
     ws.addEventListener("message", (message: MessageEvent) => {
+      console.log("decoding msg");
       const msg = decodeFrame(message);
+      console.log("msg decoded:", msg?.messageType());
       if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {
         let span = spanFromFlatbuffer(msg.spanContext(), "ws:downstream");
         const authResponse = new AuthenticateResponseProto();
@@ -210,15 +208,10 @@ export class WebsocketManager {
   }
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
-  enqueue(message: QueuedMessage) {
+  enqueue(message: MQMessage) {
+    console.log("get enqueued");
     this.outgoing.push(message);
     this.startOutgoing();
-  }
-  enqueueAirdayMessage(message: MQMessage) {
-    const queuedMessage: QueuedMessage = {
-      message,
-    };
-    this.enqueue(queuedMessage);
   }
   outboundMessages() {
     return this.outgoing.length > 0 || this.core.sync.outbox.length > 0;
@@ -236,23 +229,18 @@ export class WebsocketManager {
       return;
     }
     // 2. Form batch
-    const batch: QueuedMessage[] = [];
+    const batch: MQMessage[] = [];
     while (this.outgoing.length > 0 && batch.length < this.maxWSBatch) {
       const item = this.outgoing[0];
       this.outgoing.shift();
       batch.push(item);
     }
     if (this.maxOpBatch > 0) {
-      const ops = this.core.sync.takeOps(this.maxOpBatch);
-      const message = new BatchSyncMessage(ops);
-      // TODO: Is The QueuedMessage vs MQMessages still needed?
-      const queuedMessage: QueuedMessage = {
-        message,
-      };
-      batch.push(queuedMessage);
+      const msg = this.core.sync.getBatch(this.maxOpBatch);
+      batch.push(msg);
     }
-    batch.map((item) => {
-      this.send(item.message.serialise());
+    batch.map((msg) => {
+      this.send(msg.serialise());
     });
     if (!this.outboundMessages()) {
       this.events.emit("flushed", {});

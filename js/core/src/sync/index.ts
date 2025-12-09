@@ -17,6 +17,7 @@ import {
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { AuthState } from "../auth/adapter";
+import { BatchSyncMessage } from "./fb";
 
 interface SyncEventMap {
   flushed: {};
@@ -96,8 +97,10 @@ export class AirdaySync {
   timestamp() {
     return globalTSProducer.timestamp();
   }
-  takeOps(count: number) {
-    return this.core.sync.outbox.splice(0, count);
+  getBatch(count: number) {
+    const ops = this.core.sync.outbox.splice(0, count);
+    const message = new BatchSyncMessage(ops);
+    return message;
   }
   initialSync() {
     // TODO: Prevent if not authorised
@@ -123,7 +126,7 @@ export class AirdaySync {
     this.streams.set(itemStream.key, itemStream); // TODO: differentiate index
     this.streams.set(itemStream.id.toHex(), itemStream);
     const req = itemStream.req();
-    this.core.ws.enqueueAirdayMessage(req);
+    this.core.ws.enqueue(req);
     return itemStream;
   }
   createList(list: any) {}
@@ -147,6 +150,7 @@ export class AirdaySync {
   async handleFrame(frame: ParsedFrame) {
     // TODO: Do something with spans
     const { msg, span } = frame;
+    console.log("handleFrame");
     // TODO: collect batches of each type or make new streams
     switch (Object.getPrototypeOf(msg)) {
       case LibrarySyncResponseProto: {
@@ -154,6 +158,7 @@ export class AirdaySync {
         break;
       }
       case BatchSyncOpProto: {
+        console.log("we got batch op");
         const typed = msg as BatchSyncOpProto;
         const streamContext = parseStreamCtx(typed.streamContext());
         if (streamContext) {
@@ -173,6 +178,7 @@ export class AirdaySync {
         break;
       }
       case BatchResponseProto: {
+        console.log("we got batch res");
         const typed = msg as BatchResponseProto;
         for (let i = 0; i < typed.batchLength(); i++) {
           const rawAck = typed.batch(i);
