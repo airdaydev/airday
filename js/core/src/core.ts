@@ -26,6 +26,8 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
+  }
+  async init() {
     this.auth.events.on("initialised", async (sessionData) => {
       await this.ws.stop();
       await this.storage.initDb(sessionData.userId);
@@ -33,18 +35,15 @@ export class AirdayCore {
         this.sync.start();
       }
     });
-    this.init().catch((err) => {
-      console.warn(err);
-      this.reset();
-    });
-  }
-  async init() {
     const session = getInitialSession();
-    const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
+    const sessionData = await (this.auth as BearerAuth).bootSession(session);
+    // TODO: ...
   }
   async reset() {
+    // TODO: Wipe session
     const session = newLocalSession();
-    const sessionData = await (this.auth as BearerAuth).bootSession(session); // TODO: ...
+    const sessionData = await (this.auth as BearerAuth).bootSession(session);
+    // TODO: ...
     await this.storage.initDb(sessionData.userId);
   }
 }

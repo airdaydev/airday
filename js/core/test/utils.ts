@@ -65,5 +65,6 @@ export async function createAuthenticatedCore(email: string) {
     password,
   });
   await core.auth.passwordAuth({ email, password });
+  await core.init();
   return core;
 }

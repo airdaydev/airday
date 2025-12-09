@@ -70,6 +70,7 @@ export class WebsocketManager {
       if (this.ac) {
         this.ac.abort();
       }
+      if (!this.ws) resolve(null);
     });
   }
   // connect with retries
@@ -226,10 +227,7 @@ export class WebsocketManager {
     if (!this.ws) return true;
     return this.ws.bufferedAmount > this.maxBufferedAmount;
   }
-  // TODO: This forms a batch of queued messages, then deals with ops
-  // TBH we probably don't need to batch any other kind of message and can fuck half of this off
   next() {
-    console.log(this.state);
     if (
       this.state !== WSState.Authorised ||
       !this.outboundMessages() ||
