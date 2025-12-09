@@ -75,7 +75,6 @@ test("Phase 1 commit", async () => {
 test("websocket lifecycle & self-healing", async () => {
   const core = await createAuthenticatedCore("websocket@air.day");
   expect(core.ws.state).toBe(WSState.Disconnected);
-  core.startSync();
   await core.ws.events.onceAsync("authenticated");
   expect(core.ws.state).toBe(WSState.Authorised);
   core.ws.disrupt();
@@ -86,7 +85,7 @@ test("websocket lifecycle & self-healing", async () => {
   expect(core.ws.state, "Self-healing reauthentication").toBe(
     WSState.Authorised,
   );
-  core.stopSync();
+  core.sync.stop();
 });
 
 // TODO: Test unauthenticated
@@ -122,6 +121,7 @@ test.only("Phase 2 commit", async () => {
     outboxOpIdb.id.equals(outboxOp.id),
     "serialised version stored in idb",
   ).toBe(true);
+  console.log("wtf");
   // Flush is dead again! We could flush or we could track actual ops too
   await core.sync.flush();
   // We are only doing this after to ensure op-response fires

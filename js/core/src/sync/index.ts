@@ -225,11 +225,16 @@ export class AirdaySync {
   };
   // Handler for a reply to an op originating from this client - 2nd phase commit
   private applyAck = async (ack: OpAck) => {
+    console.log("applying ack!");
     const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
     const obj = await this.core.storage.getObj(op.objId);
     if (obj) {
       obj.commitPatch(op);
       this.pendingOps.delete(op.id.toHex());
+      console.log("this.pendingOps.size", this.pendingOps.size);
+      if (!this.pendingOps.size) {
+        this.events.emit("flushed", {});
+      }
       return obj;
     } else {
       console.error(`Error retrieving opId`, ack.opId);

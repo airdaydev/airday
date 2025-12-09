@@ -13,9 +13,9 @@ interface AirdayCoreOpts {
 
 export class AirdayCore {
   readonly apiUrl: URL;
-  ws: WebsocketManager; // websocket layer
-  sync: AirdaySync; // airday item layer
-  storage: AirdayStorage; // mem & idb storage layer
+  ws: WebsocketManager;
+  sync: AirdaySync;
+  storage: AirdayStorage;
   auth: AuthAdapter;
   constructor(opts: AirdayCoreOpts) {
     this.apiUrl = opts.apiUrl;
@@ -26,8 +26,6 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.auth = opts.authAdapter;
-  }
-  async init() {
     this.auth.events.on("initialised", async (sessionData) => {
       await this.ws.stop();
       await this.storage.initDb(sessionData.userId);
@@ -35,6 +33,8 @@ export class AirdayCore {
         this.sync.start();
       }
     });
+  }
+  async init() {
     const session = getInitialSession();
     const sessionData = await (this.auth as BearerAuth).bootSession(session);
     // TODO: ...
