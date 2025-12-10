@@ -1,21 +1,18 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Ensure we are batching from server to client
 - [] test to confirm that we successful clear previous sesh when authenticating
-- [] an explicit bad session auth should trigger a logout
+- [] an explicit bad session auth should trigger a logout, right? (consider remote-kicked status or workflow)
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
 - [] purely offline library sync with proper library ids...
-- [] websocket resilience (reconnects/incr. backoffs) for async iter (fp-like)
-- [] websocket authentication bad path
+- [] websocket reconnect backs off
 - [] no valid ops found in batch (rust side) send test from js (off-by-1)
-- [] explicit test to catch off-by-one for streams etc
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
 - [] server metric endpoint
 - [] delete items (tombstones, same api)
 - [] snapshot api
-- [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp, not just the last generated
+- [] Probably a good idea: The merge needs to be monotonic from the last seen timestamp on each lww, not just the last generated - although if clocks go bad weird things happen...
 - [] airday type materialisation with reactivity
 - [] fan out sync ops to all subscribers per library
 - [] ensure inbox is the default, immutable list
