@@ -28,7 +28,7 @@ Coming 2026
 - sqlx-cli: (`cargo install sqlx-cli`)
 - flatbuffers (flatc cli)
 
-## Development Setup
+## Development Setup (MacOS & Arch Linux)
 ```bash
 sudo systemctl start docker # if not started
 pnpm run jaeger # to get tracing (system tests rely on this currently)
