@@ -1,6 +1,8 @@
-# Airday Community Edition
+# Airday Core
 
-[Airday](https://air.day/) calendar & tasks app monorepo
+[Airday](https://air.day/) calendar & tasks app monorepo. Powers both SaaS & self-hosted versions.*
+
+*Airday SaaS hosted at air.day front-end uses this repo exactly, but uses a modified server to deal with delivery.
 
 ⚠️ ATTN: Airday is undergoing extensive and frequent changes, it is not ready to use.
 
@@ -40,6 +42,6 @@ pnpm run kill-serverd # kill background server
 
 ---
 
-Airday Community Edition is AGPL-3.0 licensed software.
+Airday Core is AGPL-3.0 licensed software.
 
-Airday is designed to be a secure product. E2E encrypted fields should not be compromised and user data should not be leaked. If you believe you have found a security issue, please disclose responsibility at support@air.day.
+Airday is designed to be a secure product. E2EE fields should not be compromised and user data should not be leaked. If you believe you have found a security issue, please disclose responsibility at support@air.day.
