@@ -227,7 +227,6 @@ export class AirdaySync {
   };
   // Handler for a reply to an op originating from this client - 2nd phase commit
   private applyAck = async (ack: OpAck) => {
-    console.log("applying ack!");
     const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
     const obj = await this.core.storage.getObj(op.objId);
     if (obj) {

@@ -56,7 +56,7 @@ function validateSerialisedBearerSessionData(
   throw new Error("bad session");
 }
 
-export function getInitialSession(): BearerSession | LocalSession {
+export function getInitialBearerSession(): BearerSession | LocalSession {
   const stored = localStorage.getItem(SESSION_STORAGE_KEY);
   if (!stored) {
     // No stored session found, create new offline user

@@ -3,7 +3,7 @@ import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
 import { AuthAdapter, AuthState, newLocalSession } from "./auth/adapter";
-import { BearerAuth, getInitialSession } from "./auth/bearer";
+import { BearerAuth, getInitialBearerSession } from "./auth/bearer";
 
 interface AirdayCoreOpts {
   apiUrl: URL;
@@ -35,7 +35,7 @@ export class AirdayCore {
     });
   }
   async init() {
-    const session = getInitialSession();
+    const session = getInitialBearerSession();
     const sessionData = await (this.auth as BearerAuth).bootSession(session);
     // TODO: ...
   }

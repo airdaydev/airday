@@ -72,7 +72,12 @@ test("Phase 1 commit", async () => {
   expect(obj.pendingOps.size).toBe(2);
 });
 
-test.only("websocket lifecycle & self-healing", async () => {
+// test("websocket reauthenticating", async () => {
+//   const core = await createAuthenticatedCore(testEmail("websocket_reauth"));
+//   const core2 = await createAuthenticatedCore(testEmail("websocket_reauth_2"));
+// });
+
+test("websocket lifecycle & self-healing", async () => {
   const core = await createAuthenticatedCore(testEmail("websocket"));
   expect(core.ws.state).toBe(WSState.Disconnected);
   await core.ws.events.onceAsync("authenticated");
@@ -89,7 +94,7 @@ test.only("websocket lifecycle & self-healing", async () => {
 });
 
 // TODO: Test unauthenticated
-test.only("2-phase commit", async () => {
+test("2-phase commit", async () => {
   const core = await createAuthenticatedCore(testEmail("2_phase"));
   const libraryId = core.auth.sessionData?.primaryLibraryId!;
   const snapshot = new InitialSnapshotOp({
