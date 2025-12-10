@@ -107,12 +107,8 @@ impl WebsocketState {
 // }
 
 async fn handle_websocket_error(state: &AppState, socket_id: Uuid, error: AppError) {
-    println!("Websocket reply error!!, {:?}", error);
-    let err_msg = build_error_response_message(
-        &String::from("Failed to parse SyncStreamReqProto"),
-        None,
-        None,
-    );
+    tracing::error!("{}: {}", error.kind(), error.message());
+    let err_msg = build_error_response_message(&String::from(error.kind()), None, None);
     send_to_client(&state.ws, &socket_id, err_msg).await;
 }
 

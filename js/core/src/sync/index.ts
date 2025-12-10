@@ -9,6 +9,7 @@ import { SyncObject } from "./sync-object";
 import {
   BatchResponseProto,
   BatchSyncOpProto,
+  ErrorResponseProto,
   LibrarySyncResponseProto,
   MessageProto,
   MessageWrapperProto,
@@ -151,7 +152,6 @@ export class AirdaySync {
   async handleFrame(frame: ParsedFrame) {
     // TODO: Do something with spans
     const { msg, span } = frame;
-    console.log("handleFrame", Object.getPrototypeOf(msg), BatchResponseProto);
     // TODO: collect batches of each type or make new streams
     switch (msg.constructor) {
       case LibrarySyncResponseProto: {
@@ -277,10 +277,19 @@ export async function* parseFrames(frames: AsyncIterable<MessageWrapperProto>) {
         wrapper.message(msg);
         break;
       }
+      case MessageProto.ErrorResponseProto: {
+        const error = new ErrorResponseProto();
+        tracer.addTag(span, "proto_type", "error_response_proto");
+        wrapper.message(error);
+        console.error("ErrorResponseProto:", error.error());
+        continue;
+      }
       default: {
         // log error
         tracer.endSpan(span);
-        throw new Error("Unknown message type");
+        throw new Error(
+          `Unknown message type ${type} ${MessageProto.ErrorResponseProto}`,
+        );
       }
     }
     yield {

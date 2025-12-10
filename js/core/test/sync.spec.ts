@@ -159,7 +159,7 @@ test("2-phase commit", async () => {
 
 test.skip("fan out to connection on same library", () => {});
 
-test.skip("Catch up streams", async () => {
+test.only("Catch up streams", async () => {
   const core = await createAuthenticatedCore(testEmail("catch_up"));
   // create x items
   const libraryId = core.auth.sessionData?.primaryLibraryId!;
@@ -190,7 +190,7 @@ test.skip("Catch up streams", async () => {
   const res = await core.storage.adapter.getByLibrary(libraryId);
   console.log("res", res.length);
   // const res = await core.storage.(core.library.id!.toHex());
-  core.stopSync();
+  core.sync.stop();
 });
 
 test.todo("Delete attribute patches", async () => {});

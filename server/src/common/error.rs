@@ -4,7 +4,6 @@ use axum::response::{IntoResponse, Response};
 use flatbuffers::InvalidFlatbuffer;
 use serde_json::json;
 use tracing::{Span, error, warn};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -12,6 +11,26 @@ pub enum AppError {
     ValidationError(String),
     DatabaseError(String),
     ServerError(String),
+}
+
+impl AppError {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            AppError::AuthorisationError(_) => "AuthorisationError",
+            AppError::ValidationError(_) => "ValidationError",
+            AppError::DatabaseError(_) => "DatabaseError",
+            AppError::ServerError(_) => "ServerError",
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        match self {
+            AppError::AuthorisationError(msg) => msg,
+            AppError::ValidationError(msg) => msg,
+            AppError::DatabaseError(msg) => msg,
+            AppError::ServerError(msg) => msg,
+        }
+    }
 }
 
 impl IntoResponse for AppError {
