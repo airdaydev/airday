@@ -29,11 +29,12 @@ export interface OpAck {
 }
 
 export function parseResponseProto(proto: ResponseProto): OpAck {
+  const opId = Uuidv4.fromFBProto(proto.opId());
   if (!proto.success()) {
-    throw new Error(`Ack failed with error: ${proto.error()}`);
+    throw new Error(`Ack ${opId} failed with error: ${proto.error()}`);
   }
   return {
-    opId: Uuidv4.fromFBProto(proto.opId()),
+    opId,
     seq: proto.seq(),
   };
 }
@@ -72,7 +73,6 @@ export class AirdaySync {
       const protoFrames = this.core.ws.frames();
       const parsedFrames = parseFrames(protoFrames);
       for await (const frame of parsedFrames) {
-        console.debug("incoming frame", frame);
         await this.handleFrame(frame);
       }
     } catch (err) {
@@ -134,6 +134,7 @@ export class AirdaySync {
     await this.core.storage.adapter.addOp(op, obj);
     this.core.storage.setStateCache(obj);
     this.outbox.push(op);
+    this.core.ws.startOutgoing();
     this.pendingOps.set(op.id.toHex(), op);
   }
   initOutbox() {
@@ -150,15 +151,14 @@ export class AirdaySync {
   async handleFrame(frame: ParsedFrame) {
     // TODO: Do something with spans
     const { msg, span } = frame;
-    console.log("handleFrame");
+    console.log("handleFrame", Object.getPrototypeOf(msg), BatchResponseProto);
     // TODO: collect batches of each type or make new streams
-    switch (Object.getPrototypeOf(msg)) {
+    switch (msg.constructor) {
       case LibrarySyncResponseProto: {
         // this.handleOpBatch(message);
         break;
       }
       case BatchSyncOpProto: {
-        console.log("we got batch op");
         const typed = msg as BatchSyncOpProto;
         const streamContext = parseStreamCtx(typed.streamContext());
         if (streamContext) {
@@ -178,16 +178,12 @@ export class AirdaySync {
         break;
       }
       case BatchResponseProto: {
-        console.log("we got batch res");
         const typed = msg as BatchResponseProto;
         for (let i = 0; i < typed.batchLength(); i++) {
           const rawAck = typed.batch(i);
           if (!rawAck) {
             console.warn("Encountered invalid rawAck");
             continue;
-          }
-          if (!rawAck.success()) {
-            console.warn("Ack failure", rawAck.opId());
           }
           try {
             const ack = parseResponseProto(rawAck);

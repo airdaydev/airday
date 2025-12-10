@@ -90,7 +90,6 @@ export class WebsocketManager {
     });
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);
-      console.log("msg decoded:", msg?.messageType());
       if (msg?.messageType() === MessageProto.AuthenticateResponseProto) {
         let span = spanFromFlatbuffer(msg.spanContext(), "ws:downstream");
         const authResponse = new AuthenticateResponseProto();
@@ -208,7 +207,6 @@ export class WebsocketManager {
   // Explicit reconnect is useful for doing cookie authorisation
   reconnect() {}
   enqueue(message: MQMessage) {
-    console.log("get enqueued");
     this.outgoing.push(message);
     this.startOutgoing();
   }
@@ -219,7 +217,7 @@ export class WebsocketManager {
     if (!this.ws) return true;
     return this.ws.bufferedAmount > this.maxBufferedAmount;
   }
-  next() {
+  sendNextBatch() {
     if (
       this.state !== WSState.Authorised ||
       !this.outboundMessages() ||
@@ -252,9 +250,9 @@ export class WebsocketManager {
     }
     this.intervalId = null;
   }
-  private startOutgoing() {
+  startOutgoing() {
     if (this.intervalId) return; // Do nothing if interval is already going
-    this.intervalId = setInterval(() => this.next(), 50);
+    this.intervalId = setInterval(() => this.sendNextBatch(), 50);
   }
   flush() {
     return new Promise((resolve) => {

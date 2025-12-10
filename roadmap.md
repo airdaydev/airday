@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] reflow outgoing messages in js client
+- [] sort out race ack error in sync tests
 - [] an explicit bad session auth should trigger a logout
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)

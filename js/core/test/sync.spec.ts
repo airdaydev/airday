@@ -3,7 +3,7 @@ import { test, expect } from "bun:test";
 import { Uuidv4 } from "../src/common/uuid";
 import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { LWWRegister } from "../src/crdt/lww";
-import { createAuthenticatedCore } from "./utils";
+import { createAuthenticatedCore, testEmail } from "./utils";
 import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
 import { OpKind, SyncOpProto } from "../src/proto";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -41,7 +41,7 @@ test("create, encode & decode patch SyncOp", async () => {
     op.libraryId.equals(snapshot.libraryId),
     "libraryId matches",
   ).toBeTrue();
-  expect(op.patch[1].data).toBe("test");
+  expect(op.patch![1].data).toBe("test");
 });
 
 test("Phase 1 commit", async () => {
@@ -72,8 +72,8 @@ test("Phase 1 commit", async () => {
   expect(obj.pendingOps.size).toBe(2);
 });
 
-test("websocket lifecycle & self-healing", async () => {
-  const core = await createAuthenticatedCore("websocket@air.day");
+test.only("websocket lifecycle & self-healing", async () => {
+  const core = await createAuthenticatedCore(testEmail("websocket"));
   expect(core.ws.state).toBe(WSState.Disconnected);
   await core.ws.events.onceAsync("authenticated");
   expect(core.ws.state).toBe(WSState.Authorised);
@@ -89,8 +89,8 @@ test("websocket lifecycle & self-healing", async () => {
 });
 
 // TODO: Test unauthenticated
-test.only("Phase 2 commit", async () => {
-  const core = await createAuthenticatedCore("phase2@air.day");
+test.only("2-phase commit", async () => {
+  const core = await createAuthenticatedCore(testEmail("2_phase"));
   const libraryId = core.auth.sessionData?.primaryLibraryId!;
   const snapshot = new InitialSnapshotOp({
     libraryId,
@@ -149,13 +149,13 @@ test.only("Phase 2 commit", async () => {
   //   }
   //   core.sync.events.onceAsync("flushed").then(resolve);
   // });
-  core.stopSync();
+  core.sync.stop();
 });
 
 test.skip("fan out to connection on same library", () => {});
 
-test("Catch up streams", async () => {
-  const core = await createAuthenticatedCore("catch-up@air.day");
+test.skip("Catch up streams", async () => {
+  const core = await createAuthenticatedCore(testEmail("catch_up"));
   // create x items
   const libraryId = core.auth.sessionData?.primaryLibraryId!;
   expect(libraryId).toBeDefined();

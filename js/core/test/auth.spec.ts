@@ -6,6 +6,7 @@ import {
   createAuthenticatedCore,
   extractCookie,
   parseCookieValue,
+  testEmail,
 } from "./utils";
 import { BearerAuth } from "../src/auth/bearer";
 import { Uuidv4 } from "../src/common/uuid";
@@ -20,7 +21,7 @@ test("non-existent username & password", async () => {
   const core = createCore();
   await core.auth
     .passwordAuth({
-      email: "nope@nope.com",
+      email: testEmail("nope"),
       password: "1234",
     })
     .catch((d) => {
@@ -30,8 +31,8 @@ test("non-existent username & password", async () => {
 });
 
 test("Creating a user & default library", async () => {
-  const core = await createAuthenticatedCore("defaultlib@air.day");
-  const doubledEmail = "doubleup2@air.day";
+  const core = await createAuthenticatedCore(testEmail("defaultlib"));
+  const doubledEmail = testEmail("doubled");
   const res = await createUser(core.apiUrl, {
     email: doubledEmail,
     password: "fa09j20fiaj3fpaof",
@@ -52,14 +53,14 @@ test("Creating a user & default library", async () => {
   // Can't create a user without a password
   expect(
     createUser(core.apiUrl, {
-      email: "newtest@air.day",
+      email: testEmail("new_test"),
     }),
   ).rejects.toThrow();
 });
 
 test("Real account, bad password", async () => {
   const core = createCore();
-  const email = "real-acc@air.day";
+  const email = testEmail("realAcc");
   const password = "fa09j20fiaj3fpaof";
   await createUser(core.apiUrl, {
     email,
@@ -76,7 +77,7 @@ test("Real account, bad password", async () => {
 
 test("Bearer authorisation", async () => {
   const core = createCore();
-  const email = "daniel-pw@air.day";
+  const email = testEmail("daniel_pw");
   const password = "fa09j20fiaj3fpaof";
   await createUser(core.apiUrl, {
     email,
@@ -94,7 +95,7 @@ test("Bearer authorisation", async () => {
 });
 
 test("Bearer refresh", async () => {
-  const core = await createAuthenticatedCore("bearer-refresh@air.day");
+  const core = await createAuthenticatedCore(testEmail("bearer_refresh"));
   const bearerAuth = core.auth as BearerAuth;
   const ogToken = bearerAuth.sessionToken;
   const ogRefreshToken = bearerAuth.refreshToken;
