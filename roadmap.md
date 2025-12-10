@@ -1,7 +1,8 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] sort out race ack error in sync tests
+- [] Ensure we are batching from server to client
+- [] test to confirm that we successful clear previous sesh when authenticating
 - [] an explicit bad session auth should trigger a logout
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)

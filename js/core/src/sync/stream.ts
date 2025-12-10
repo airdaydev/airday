@@ -1,6 +1,5 @@
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
-import { AirdayCore } from "../core";
 import { StreamContextProto, StreamEventProto } from "../proto";
 import { SyncStreamReqMessage } from "./fb";
 
@@ -33,12 +32,10 @@ export class SyncStream {
         this.events.emit("data", {});
       }
       case StreamEventProto.Error: {
-        console.error("Stream ended with an error!");
-        this.events.emit("end", {});
+        console.error("Stream ended with an error!", streamContext.id);
         this.end();
       }
       case StreamEventProto.End: {
-        this.events.emit("end", {});
         this.end();
       }
     }
@@ -56,7 +53,6 @@ export class SyncStream {
     return req;
   }
   async end() {
-    // Called from outside
     this.finished = true;
     this.events.emit("end", {});
   }

@@ -144,7 +144,10 @@ export class AirdaySync {
   }
   processStreamContext(streamContext: StreamContext) {
     const stream = this.streams.get(streamContext.id.toHex());
-    if (!stream) return;
+    if (!stream) {
+      console.error(`Stream ${streamContext.id.toString()} not found`);
+      return;
+    }
     stream.processMessage(streamContext);
   }
   async handleFrame(frame: ParsedFrame) {
@@ -203,12 +206,6 @@ export class AirdaySync {
       }
     }
   }
-  handleStreamEvent = (streamContext: StreamContext) => {
-    const stream = this.streams.get(streamContext.id.toHex());
-    if (stream) {
-      stream.end();
-    }
-  };
   // Handler for incoming remote sync operations
   applyRemote = async (syncOp: SyncOp) => {
     const obj = await this.core.storage.getObj(syncOp.objId);

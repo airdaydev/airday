@@ -184,9 +184,9 @@ test.only("Catch up streams", async () => {
   // Retrieve all items
   const stream = core.sync.catchup(libraryId, 0n);
   await stream.done();
-  // HACK
-  await new Promise((resolve) => setTimeout(() => resolve(null), 5000));
-  // TODO: The processing is done before the items have actually been processed
+  // // HACK
+  await new Promise((resolve) => setTimeout(() => resolve(null), 500));
+  // // TODO: The processing is done before the items have actually been processed
   const res = await core.storage.adapter.getByLibrary(libraryId);
   console.log("res", res.length);
   // const res = await core.storage.(core.library.id!.toHex());
