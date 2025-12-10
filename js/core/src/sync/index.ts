@@ -14,13 +14,10 @@ import {
   MessageProto,
   MessageWrapperProto,
   ResponseProto,
-  StreamContextProto,
-  StreamEventProto,
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { AuthState } from "../auth/adapter";
-import { BatchSyncMessage } from "./fb";
 
 interface SyncEventMap {
   flushed: {};
