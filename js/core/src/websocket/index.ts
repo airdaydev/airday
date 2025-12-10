@@ -232,9 +232,12 @@ export class WebsocketManager {
       this.outgoing.shift();
       batch.push(item);
     }
-    if (this.maxOpBatch > 0) {
-      const msg = this.core.sync.getBatch(this.maxOpBatch);
-      batch.push(msg);
+    if (this.maxOpBatch > 0 && this.core.sync.outbox.length > 0) {
+      const ops = this.core.sync.getBatch(this.maxOpBatch);
+      if (ops.length) {
+        const msg = new BatchSyncMessage(ops);
+        batch.push(msg);
+      }
     }
     batch.map((msg) => {
       this.send(msg.serialise());

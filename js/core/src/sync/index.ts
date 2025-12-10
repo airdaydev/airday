@@ -99,9 +99,7 @@ export class AirdaySync {
     return globalTSProducer.timestamp();
   }
   getBatch(count: number) {
-    const ops = this.core.sync.outbox.splice(0, count);
-    const message = new BatchSyncMessage(ops);
-    return message;
+    return this.core.sync.outbox.splice(0, count);
   }
   initialSync() {
     // TODO: Prevent if not authorised
