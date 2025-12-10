@@ -227,7 +227,6 @@ export class AirdaySync {
     if (obj) {
       obj.commitPatch(op);
       this.unackedOps.delete(op.id.toHex());
-      console.log("this.unackedOps.size", this.unackedOps.size);
       if (!this.unackedOps.size) {
         this.events.emit("flushed", {});
       }
