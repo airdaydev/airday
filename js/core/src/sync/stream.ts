@@ -26,17 +26,20 @@ export class SyncStream {
     this.libraryId = libraryId;
     this.startSeq = startSeq;
   }
-  processMessage(streamContext: StreamContext) {
+  push(streamContext: StreamContext) {
     switch (streamContext.event) {
       case StreamEventProto.Data: {
         this.events.emit("data", {});
+        break;
       }
       case StreamEventProto.Error: {
-        console.error("Stream ended with an error!", streamContext.id);
+        console.error("Stream ended with an error!", streamContext);
         this.end();
+        break;
       }
       case StreamEventProto.End: {
         this.end();
+        break;
       }
     }
   }

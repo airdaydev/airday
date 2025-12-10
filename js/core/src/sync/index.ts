@@ -14,6 +14,8 @@ import {
   MessageProto,
   MessageWrapperProto,
   ResponseProto,
+  StreamContextProto,
+  StreamEventProto,
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
@@ -148,7 +150,7 @@ export class AirdaySync {
       console.error(`Stream ${streamContext.id.toString()} not found`);
       return;
     }
-    stream.processMessage(streamContext);
+    stream.push(streamContext);
   }
   async handleFrame(frame: ParsedFrame) {
     // TODO: Do something with spans
