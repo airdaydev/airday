@@ -7,7 +7,6 @@
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
 - [] purely offline library sync with proper library ids...
 - [] websocket reconnect backs off
-- [] no valid ops found in batch (rust side) send test from js (off-by-1)
 - [] analyse catch up stream api (limits via mpsc + select! + registers)
 - [] server metric endpoint
 - [] delete items (tombstones, same api)
