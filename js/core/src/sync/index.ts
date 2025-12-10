@@ -50,7 +50,7 @@ export class AirdaySync {
   core: AirdayCore;
   syncState = SyncState.Stopped;
   outbox: SyncOp[] = []; // Ops ready to be pulled by ws
-  pendingOps = new Map<HexUuid, SyncOp>(); // Ops handed off to websocket message already
+  unackedOps = new Map<HexUuid, SyncOp>(); // Ops awaiting ack
   events = new EventEmitter<SyncEventMap>();
   itemChecksum = new ChecksumStore();
   lastServerSeq: number | null = null;
@@ -90,7 +90,7 @@ export class AirdaySync {
   flush() {
     return new Promise((resolve) => {
       // TODO: This should also test ws outbound messages
-      if (this.pendingOps.size === 0) resolve(null);
+      if (this.unackedOps.size === 0) return resolve(null);
       this.events.once("flushed", resolve);
     });
   }
@@ -121,7 +121,7 @@ export class AirdaySync {
         `Existing stream [key=${itemStream.key}] already running`,
       );
     }
-    this.streams.set(itemStream.key, itemStream); // TODO: differentiate index
+    this.streams.set(itemStream.key, itemStream); // TODO: differentiate index (TODO: IF KEEPING THIS NEED TO DELETE)
     this.streams.set(itemStream.id.toHex(), itemStream);
     const req = itemStream.req();
     this.core.ws.enqueue(req);
@@ -133,7 +133,7 @@ export class AirdaySync {
     this.core.storage.setStateCache(obj);
     this.outbox.push(op);
     this.core.ws.startOutgoing();
-    this.pendingOps.set(op.id.toHex(), op);
+    this.unackedOps.set(op.id.toHex(), op);
   }
   initOutbox() {
     // Collects pending items from database to sync on boot
@@ -204,6 +204,7 @@ export class AirdaySync {
         break;
       }
     }
+    tracer.endSpan(span);
   }
   // Handler for incoming remote sync operations
   applyRemote = async (syncOp: SyncOp) => {
@@ -225,9 +226,9 @@ export class AirdaySync {
     const obj = await this.core.storage.getObj(op.objId);
     if (obj) {
       obj.commitPatch(op);
-      this.pendingOps.delete(op.id.toHex());
-      console.log("this.pendingOps.size", this.pendingOps.size);
-      if (!this.pendingOps.size) {
+      this.unackedOps.delete(op.id.toHex());
+      console.log("this.unackedOps.size", this.unackedOps.size);
+      if (!this.unackedOps.size) {
         this.events.emit("flushed", {});
       }
       return obj;
