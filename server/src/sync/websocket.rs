@@ -354,7 +354,7 @@ async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver
 }
 
 pub async fn send_to_client(ws: &WebsocketState, client_id: &Uuid, message: Vec<u8>) {
-    // tracing::info!("Sending to client");
+    tracing::info!("Sending message to client TODO: MORE INFO / ATTACHED TO TRACE?");
     let sender = {
         let mut connections = ws.conn_map.lock().unwrap();
         connections

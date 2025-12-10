@@ -51,7 +51,6 @@ pub async fn start_catchup_stream(
         .get_stream_head(&req.library_id)
         .await?;
     let mut cur = req.from_seq;
-    // TODO: Consider done conditions
     while cur <= head {
         if cancel.is_cancelled() {
             // TODO: Send cancelled stream msg
@@ -64,7 +63,8 @@ pub async fn start_catchup_stream(
             .seq_range(&req.library_id, cur, head, STREAM_BATCH_LEN as i64)
             .await?;
         let mut stream_event = StreamEventProto::Data;
-        if range.len() < STREAM_BATCH_LEN {
+        let last_batch = range.len() < STREAM_BATCH_LEN;
+        if last_batch {
             stream_event = StreamEventProto::End;
         }
         let mut fbb = FlatBufferBuilder::new();
@@ -75,10 +75,11 @@ pub async fn start_catchup_stream(
         let message_offset = build_batch_sync_op_msg(&mut fbb, &range, stream_context);
         let message = wrap_message(&mut fbb, MessageProto::BatchSyncOpProto, message_offset);
         send_to_client(&app_state.ws, &req.socket_id, message).await;
-        if range.len() == 0 {
+        if last_batch {
             break;
+        } else {
+            cur = range[range.len() - 1].seq;
         }
-        cur = range[range.len() - 1].seq;
     }
     Ok(())
 }

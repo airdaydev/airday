@@ -224,6 +224,10 @@ impl SyncOpModel for SyncOpModelSqlite {
         max_seq: i64,
         chunk_size: i64,
     ) -> Result<Vec<SyncOpSql>, sqlx::Error> {
+        // println!(
+        //     "from: {}, to: {}, chunk_size: {}",
+        //     from_seq, max_seq, chunk_size
+        // );
         sqlx::query_as::<_, SyncOpSql>(
             r#"SELECT op_id, seq, base_seq,
             op_kind, library_id,
