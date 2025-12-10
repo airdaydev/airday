@@ -346,11 +346,10 @@ async fn read(
 async fn write(mut sender: SplitSink<WebSocket, Message>, mut rx: mpsc::Receiver<Message>) {
     while let Some(message) = rx.recv().await {
         if let Err(_) = sender.send(message).await {
-            // eprintln!("Failed to send: {:?}", err);
+            tracing::error!("Failed to send TODO: MORE INFO / ATTACHED TO TRACE?");
             break;
         }
     }
-    // println!("Ending write");
 }
 
 pub async fn send_to_client(ws: &WebsocketState, client_id: &Uuid, message: Vec<u8>) {
@@ -364,7 +363,7 @@ pub async fn send_to_client(ws: &WebsocketState, client_id: &Uuid, message: Vec<
     if let Some(sender) = sender {
         if let Err(err) = sender.send(Message::Binary(message.into())).await {
             eprintln!("Failed to send message to client {}: {:?}", client_id, err);
-            // TODO: Consider disconnecting?
+            // TODO: Consider disconnecting??! or retrying?!
         }
     }
 }
