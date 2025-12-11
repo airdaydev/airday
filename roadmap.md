@@ -1,6 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
+- [] Automatic bearer refresh test
 - [] test to confirm that we successful clear previous sesh when authenticating
 - [] an explicit bad session auth should trigger a logout, right? (consider remote-kicked status or workflow)
 - [] cookie auth for websocket connection
@@ -42,7 +43,8 @@
 - [] protection against future dates being encoded in LWWRegisters
 - [] enforce batch size limits
 
-# Sync verification plan
+# Sync verification & security plan
+- [] Consider merkle-dag https://research.protocol.ai/publications/merkle-crdts-merkle-dags-meet-crdts/psaras2020.pdf
 - [] Reconsider how to index merkle tree
 - [] Node index should be based on id or created time (what timestamp?)
 - [] tree saved in a hashmap & serialised (maybe not necessary in JS if it's fast enough to booststrap - big if) - good idea in sqlite?
