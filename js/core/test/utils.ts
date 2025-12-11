@@ -7,7 +7,7 @@ import { BearerAuth } from "../src/auth/bearer";
 
 const TEST_RUN_ID = process.env.TEST_RUN_ID || Date.now();
 export const testEmail = (name: string) =>
-  `test_${name}.${TEST_RUN_ID}@air.day`;
+  `${name}.test_${TEST_RUN_ID}@air.day`;
 
 export function extractCookie(
   headers: Headers,
