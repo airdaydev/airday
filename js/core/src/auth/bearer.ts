@@ -16,7 +16,7 @@ export type BearerSession = TypeOf<typeof storedBearerSessionSchema>;
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
-export class Bearer extends AuthAdapter {
+export class BearerAdapter extends AuthAdapter {
   // Constructor fields
   readonly publicKey: string;
   // Dynamic fields
@@ -24,8 +24,9 @@ export class Bearer extends AuthAdapter {
   refreshToken?: string;
   sessionExpiry?: Date;
   refreshExpiry?: Date;
-  constructor(apiUrl: URL) {
+  constructor(apiUrl: URL, publicKey: string) {
     super(apiUrl);
+    this.publicKey = publicKey;
   }
   requestHeaders(json: boolean = true): Record<string, string> {
     if (!this.sessionToken) throw new Error("User is not authenticated");
@@ -62,7 +63,7 @@ export class Bearer extends AuthAdapter {
     // TODO: Failed refreshes, retries when offline
     const res = await refreshBearer(this.apiUrl, this.refreshToken);
     const session: BearerSession = {
-      type: "remote",
+      type: "bearer",
       refreshToken: res.data.refresh_token,
       sessionToken: res.data.session_token,
     };

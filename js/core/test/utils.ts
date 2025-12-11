@@ -3,7 +3,7 @@ import { loadToml, validateConfig } from "toml-config";
 import { AirdayCore } from "../src/index";
 import { createUser } from "../src/index";
 import { AirdayMemStorage } from "../src/storage/mem";
-import { BearerAuth } from "../src/auth/bearer";
+import { BearerAdapter } from "../src/auth/bearer";
 
 const TEST_RUN_ID = process.env.TEST_RUN_ID || Date.now();
 export const testEmail = (name: string) =>
@@ -46,7 +46,7 @@ export const config = validateConfig(schema, rawConfig);
 
 export function createCore() {
   const apiUrl = new URL(config.api_url);
-  const bearer = new BearerAuth(apiUrl, config.paseto_pk);
+  const bearer = new BearerAdapter(apiUrl, config.paseto_pk);
   const core = new AirdayCore({
     apiUrl: apiUrl,
     storageAdapter: new AirdayMemStorage(),
@@ -57,7 +57,7 @@ export function createCore() {
 
 export async function createAuthenticatedCore(email: string) {
   const apiUrl = new URL(config.api_url);
-  const bearer = new BearerAuth(apiUrl, config.paseto_pk);
+  const bearer = new BearerAdapter(apiUrl, config.paseto_pk);
   const core = new AirdayCore({
     apiUrl: apiUrl,
     storageAdapter: new AirdayMemStorage(),
@@ -69,6 +69,6 @@ export async function createAuthenticatedCore(email: string) {
     password,
   });
   // await core.init();
-  await core.auth.passwordAuth({ email, password });
+  await core.session.auth.passwordAuth({ email, password });
   return core;
 }

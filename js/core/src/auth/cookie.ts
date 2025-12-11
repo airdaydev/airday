@@ -7,7 +7,7 @@ export const storedCookieSession = v.object({
   refreshToken: v.string().required(),
 });
 
-export class Cookie extends AuthAdapter {
+export class CookieAdapter extends AuthAdapter {
   requestCredentials: RequestCredentials = "include";
   requestHeaders(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};

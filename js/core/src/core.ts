@@ -2,8 +2,8 @@ import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { AuthAdapter, AuthState, newLocalSession } from "./auth/adapter";
-import { BearerAuth, getInitialBearerSession } from "./auth/bearer";
+import { AuthAdapter } from "./auth/adapter";
+import { AirdaySession } from "./auth/auth";
 
 interface AirdayCoreOpts {
   apiUrl: URL;
@@ -16,34 +16,28 @@ export class AirdayCore {
   ws: WebsocketManager;
   sync: AirdaySync;
   storage: AirdayStorage;
-  auth: AuthAdapter;
+  session: AirdaySession;
   constructor(opts: AirdayCoreOpts) {
     this.apiUrl = opts.apiUrl;
     this.ws = new WebsocketManager(this);
     this.sync = new AirdaySync(this);
     this.storage = new AirdayStorage(this, opts.storageAdapter);
+    this.session = new AirdaySession(opts.authAdapter);
     if (!opts.authAdapter) {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
-    this.auth = opts.authAdapter;
-    this.auth.events.on("initialised", async (sessionData) => {
-      await this.ws.stop();
-      await this.storage.initDb(sessionData.userId);
-      if (this.auth.state === AuthState.Remote) {
-        this.sync.start();
-      }
-    });
+    // this.auth.events.on("initialised", async (sessionData) => {
+    //   await this.ws.stop();
+    //   await this.storage.initDb(sessionData.userId);
+    //   if (this.auth.state === AuthState.Remote) {
+    //     this.sync.start();
+    //   }
+    // });
   }
   async init() {
-    const session = getInitialBearerSession();
-    const sessionData = await (this.auth as BearerAuth).bootSession(session);
-    // TODO: ...
+    this.session.loadFromStorage();
   }
-  async reset() {
-    // TODO: Wipe session
-    const session = newLocalSession();
-    const sessionData = await (this.auth as BearerAuth).bootSession(session);
-    // TODO: ...
-    await this.storage.initDb(sessionData.userId);
-  }
+  // async reset() {
+  //   this.session.anon();
+  // }
 }

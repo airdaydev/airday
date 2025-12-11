@@ -1,4 +1,4 @@
-import { ensure, v } from "suretype";
+import { ensure } from "suretype";
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
 import { AuthAdapter } from "./adapter";
@@ -30,7 +30,7 @@ export interface SessionState {
   primaryLibraryId: Uuidv4;
 }
 
-export class Session {
+export class AirdaySession {
   auth: AuthAdapter;
   events = new EventEmitter<AuthEventMap>();
   type: SessionType = SessionType.None;
