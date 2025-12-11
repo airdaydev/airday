@@ -3,7 +3,7 @@ import { SESSION_STORAGE_KEY } from "./auth";
 import { passwordAuthSchema } from "../http/types";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { verifyToken } from "./token";
-import { AuthAdapterV2 } from "./adapter";
+import { AuthAdapter } from "./adapter";
 import { SessionLike } from "./types";
 
 export const storedBearerSessionSchema = v.object({
@@ -16,7 +16,7 @@ export type BearerSession = TypeOf<typeof storedBearerSessionSchema>;
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
-export class BearerV2 extends AuthAdapterV2 {
+export class Bearer extends AuthAdapter {
   // Constructor fields
   readonly publicKey: string;
   // Dynamic fields

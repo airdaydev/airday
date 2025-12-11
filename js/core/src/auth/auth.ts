@@ -1,7 +1,7 @@
 import { ensure, v } from "suretype";
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
-import { AuthAdapterV2 } from "./adapter";
+import { AuthAdapter } from "./adapter";
 import {
   AuthEventMap,
   SessionData,
@@ -31,11 +31,11 @@ export interface SessionState {
 }
 
 export class Session {
-  auth: AuthAdapterV2;
+  auth: AuthAdapter;
   events = new EventEmitter<AuthEventMap>();
   type: SessionType = SessionType.None;
   state?: SessionState;
-  constructor(auth: AuthAdapterV2) {
+  constructor(auth: AuthAdapter) {
     this.auth = auth;
   }
   anon() {

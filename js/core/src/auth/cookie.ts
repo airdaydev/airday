@@ -1,4 +1,5 @@
 import { v } from "suretype";
+import { AuthAdapter } from "./adapter";
 
 export const storedCookieSession = v.object({
   type: v.string().const("cookie").required(),
@@ -6,7 +7,7 @@ export const storedCookieSession = v.object({
   refreshToken: v.string().required(),
 });
 
-export class CookieV2 extends AuthAdapterV2 {
+export class Cookie extends AuthAdapter {
   requestCredentials: RequestCredentials = "include";
   requestHeaders(json: boolean = true): Record<string, string> {
     const headers: Record<string, string> = {};

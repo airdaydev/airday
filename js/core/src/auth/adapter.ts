@@ -2,7 +2,7 @@ import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { SessionLike } from "./types";
 
-export abstract class AuthAdapterV2 {
+export abstract class AuthAdapter {
   readonly apiUrl: URL;
   constructor(apiUrl: URL) {
     this.apiUrl = apiUrl;
