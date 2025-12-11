@@ -7,6 +7,18 @@ export const sessionLikeSchema = v.object({
 
 export type SessionLike = TypeOf<typeof sessionLikeSchema>;
 
+export interface LocalSession {
+  userId: Uuidv4;
+  primaryLibraryId: Uuidv4;
+}
+
+export function newLocalSession(): LocalSession {
+  return {
+    userId: new Uuidv4(),
+    primaryLibraryId: new Uuidv4(),
+  };
+}
+
 export interface AuthEventMap {
   initialised: SessionData;
   refresh: SessionData;

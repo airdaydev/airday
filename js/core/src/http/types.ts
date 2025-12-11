@@ -5,7 +5,8 @@ export const v_session_cookie = v.object({
   id: v.string().required(),
   expires: v.string().format("date-time").required(),
   refresh_expires: v.string().format("date-time").required(),
-  userId: v.string().required(),
+  user_id: v.string().required(),
+  primary_library_id: v.string().required(),
 });
 
 export const v_session_bearer = v.object({

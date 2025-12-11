@@ -13,6 +13,7 @@ export function getExpiryDelayMs(expiry: Date) {
 
 export abstract class AuthAdapter {
   readonly apiUrl: URL;
+  requestCredentials: RequestCredentials = "omit";
   constructor(apiUrl: URL) {
     this.apiUrl = apiUrl;
   }

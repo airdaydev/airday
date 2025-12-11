@@ -4,6 +4,7 @@ import { Uuidv4 } from "../common/uuid";
 import { AuthAdapter } from "./adapter";
 import {
   AuthEventMap,
+  newLocalSession,
   SessionData,
   SessionLike,
   sessionLikeSchema,
@@ -12,18 +13,6 @@ import {
 } from "./types";
 
 export const SESSION_STORAGE_KEY = "airday_session";
-
-export type LocalSession = {
-  userId: Uuidv4;
-  primaryLibraryId: Uuidv4;
-};
-
-export function newLocalSession(): LocalSession {
-  return {
-    userId: new Uuidv4(),
-    primaryLibraryId: new Uuidv4(),
-  };
-}
 
 export interface SessionState {
   userId: Uuidv4;

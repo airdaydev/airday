@@ -2,10 +2,10 @@
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
 - [] Automatic bearer refresh test
-- [] test to confirm that we successful clear previous sesh when authenticating
-- [] an explicit bad session auth should trigger a logout, right? (consider remote-kicked status or workflow)
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
+- [] test to confirm that we successful clear previous sesh when authenticating
+- [] an explicit bad session auth should trigger a logout, right? (consider remote-kicked status or workflow)
 - [] purely offline library sync with proper library ids...
 - [] websocket reconnect backs off
 - [] analyse catch up stream api (limits via mpsc + select! + registers)

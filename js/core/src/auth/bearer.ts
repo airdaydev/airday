@@ -71,7 +71,9 @@ export class BearerAdapter extends AuthAdapter {
     };
     await this.updateSession(session);
   }
-  signout() {}
+  signout() {
+    // TODO: Just clear & delete localstorage
+  }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     // Retries when offline
     const res = await passwordAuthBearer(this.apiUrl, opts);
