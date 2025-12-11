@@ -1,55 +1,48 @@
 import { TypeOf } from "suretype";
-import { EventEmitter } from "../common/events";
 import { passwordAuthSchema } from "../http/types";
-import { Uuidv4 } from "../common/uuid";
+import { SessionLike } from "./types";
 
-export const SESSION_STORAGE_KEY = "airday_session";
-
-export interface SessionData {
-  userId: Uuidv4;
-  primaryLibraryId: Uuidv4;
-  type: "remote" | "local";
-}
-
-export enum AuthState {
-  Uninitialised = "uninitialised",
-  Initialising = "initialising",
-  Remote = "remote",
-  Local = "local",
-  ExpiredSession = "expired_session",
-}
-
-export interface AuthEventMap {
-  initialised: SessionData;
-  refresh: SessionData;
-  deauthenticated: {};
-}
-
-export abstract class AuthAdapter {
-  constructor() {}
-  events = new EventEmitter<AuthEventMap>();
-  requestCredentials: RequestCredentials = "omit";
-  sessionData?: SessionData;
-  sessionExpiry?: Date;
-  refreshExpiry?: Date;
-  abstract state: AuthState;
+export abstract class AuthAdapterV2 {
+  readonly apiUrl: URL;
+  constructor(apiUrl: URL) {
+    this.apiUrl = apiUrl;
+  }
+  abstract attemptBoot(sessionLike: SessionLike): {};
   abstract requestHeaders(json?: boolean): Record<string, string>;
   abstract passwordAuth(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ): Promise<void>;
   abstract signout(): void;
-}
+  private scheduleRefresh() {
+    this.cancelScheduledRefresh();
 
-export type LocalSession = {
-  type: "local";
-  userId: Uuidv4;
-  primaryLibraryId: Uuidv4;
-};
+    if (!this.sessionExpiry) {
+      return;
+    }
 
-export function newLocalSession(): LocalSession {
-  return {
-    type: "local",
-    userId: new Uuidv4(),
-    primaryLibraryId: new Uuidv4(),
-  };
+    const now = Date.now();
+    const expiryMs = this.sessionExpiry.getTime();
+    const delay = expiryMs - now - REFRESH_BUFFER_MS;
+
+    if (delay <= 0) {
+      // Already past refresh window, refresh immediately
+      this.refreshBearer().catch((err) => {
+        console.warn("Immediate refresh failed:", err);
+      });
+      return;
+    }
+
+    this.refreshTimer = setTimeout(() => {
+      this.refreshBearer().catch((err) => {
+        console.warn("Scheduled refresh failed:", err);
+      });
+    }, delay);
+  }
+
+  private cancelScheduledRefresh() {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+  }
 }
