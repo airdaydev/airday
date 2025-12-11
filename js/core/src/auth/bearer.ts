@@ -3,7 +3,7 @@ import { SESSION_STORAGE_KEY } from "./auth";
 import { passwordAuthSchema } from "../http/types";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { verifyToken } from "./token";
-import { AuthAdapter } from "./adapter";
+import { AuthAdapter, getExpiryDelayMs } from "./adapter";
 import { SessionLike } from "./types";
 
 export const storedBearerSessionSchema = v.object({
@@ -14,8 +14,6 @@ export const storedBearerSessionSchema = v.object({
 
 export type BearerSession = TypeOf<typeof storedBearerSessionSchema>;
 
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
 export class BearerAdapter extends AuthAdapter {
   // Constructor fields
   readonly publicKey: string;
@@ -24,6 +22,8 @@ export class BearerAdapter extends AuthAdapter {
   refreshToken?: string;
   sessionExpiry?: Date;
   refreshExpiry?: Date;
+  // Refresh
+  refreshTimer?: number;
   constructor(apiUrl: URL, publicKey: string) {
     super(apiUrl);
     this.publicKey = publicKey;
@@ -51,6 +51,8 @@ export class BearerAdapter extends AuthAdapter {
     this.refreshToken = session.refreshToken;
     this.sessionExpiry = sessionTokenData.expiry;
     this.refreshExpiry = refreshTokenData.expiry;
+    // TODO: If refreshExpiry is finished, it's over
+    this.scheduleRefresh(sessionTokenData.expiry);
     this.persistSession(session);
   }
   persistSession(session: BearerSession) {
@@ -79,5 +81,22 @@ export class BearerAdapter extends AuthAdapter {
       sessionToken: res.data.session_token,
     };
     await this.updateSession(session);
+  }
+  private scheduleRefresh(expiry: Date) {
+    this.cancelScheduledRefresh();
+    if (expiry) {
+      const delay = getExpiryDelayMs(expiry);
+      if (delay <= 0) {
+        this.refresh(); // TODO: Catch?
+      } else {
+        this.refreshTimer = setTimeout(() => {
+          this.refresh().catch(() => {});
+        }, delay) as unknown as number; // TODO: Recall NodeJS version
+      }
+    }
+  }
+  private cancelScheduledRefresh() {
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = undefined;
   }
 }

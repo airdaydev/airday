@@ -2,6 +2,15 @@ import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { SessionLike } from "./types";
 
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+export function getExpiryDelayMs(expiry: Date) {
+  const now = Date.now();
+  const expiryMs = expiry.getTime();
+  const delay = expiryMs - now - REFRESH_BUFFER_MS;
+  return delay;
+}
+
 export abstract class AuthAdapter {
   readonly apiUrl: URL;
   constructor(apiUrl: URL) {
@@ -13,36 +22,4 @@ export abstract class AuthAdapter {
     opts: TypeOf<typeof passwordAuthSchema.schema>,
   ): Promise<void>;
   abstract signout(): void;
-  private scheduleRefresh() {
-    this.cancelScheduledRefresh();
-
-    if (!this.sessionExpiry) {
-      return;
-    }
-
-    const now = Date.now();
-    const expiryMs = this.sessionExpiry.getTime();
-    const delay = expiryMs - now - REFRESH_BUFFER_MS;
-
-    if (delay <= 0) {
-      // Already past refresh window, refresh immediately
-      this.refreshBearer().catch((err) => {
-        console.warn("Immediate refresh failed:", err);
-      });
-      return;
-    }
-
-    this.refreshTimer = setTimeout(() => {
-      this.refreshBearer().catch((err) => {
-        console.warn("Scheduled refresh failed:", err);
-      });
-    }, delay);
-  }
-
-  private cancelScheduledRefresh() {
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-      this.refreshTimer = undefined;
-    }
-  }
 }
