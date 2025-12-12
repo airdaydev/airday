@@ -55,6 +55,10 @@ export class BearerAdapter extends AuthAdapter {
     // TODO: If refreshExpiry is finished, it's over
     this.scheduleRefresh(sessionTokenData.expiry);
     this.persistSession(session);
+    this.events.emit("session", {
+      userId: sessionTokenData.userId,
+      primaryLibraryId: sessionTokenData.primaryLibraryId,
+    });
   }
   persistSession(session: BearerSession) {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));

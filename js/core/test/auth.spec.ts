@@ -2,23 +2,25 @@ import { test, expect } from "bun:test";
 import { createUser } from "../src/index";
 import { getRoot } from "../src/index";
 import {
-  createCore,
+  createBearerCore,
   createAuthenticatedCore,
   extractCookie,
   parseCookieValue,
   testEmail,
 } from "./utils";
-import { Uuidv4 } from "../src/common/uuid";
 import { BearerAdapter } from "../src/auth/bearer";
+import { CookieAdapter } from "../src/auth/cookie";
+import { Uuidv4 } from "../src/common/uuid";
+import { SessionType } from "../src/auth/types";
 
-test.only("Unauthorised API root url & version", async () => {
-  const core = createCore();
+test("Unauthorised API root url & version", async () => {
+  const core = createBearerCore();
   const d = await getRoot(core.apiUrl);
   expect(typeof d.data.version).toBe("string");
 });
 
 test("non-existent username & password", async () => {
-  const core = createCore();
+  const core = createBearerCore();
   await core.session.auth
     .passwordAuth({
       email: testEmail("nope"),
@@ -30,27 +32,23 @@ test("non-existent username & password", async () => {
     });
 });
 
-test("Creating a user & default library", async () => {
-  const core = await createAuthenticatedCore(testEmail("defaultlib"));
+test("can't create user with same email", async () => {
+  const core = createBearerCore();
   const doubledEmail = testEmail("doubled");
-  const res = await createUser(core.apiUrl, {
+  await createUser(core.apiUrl, {
     email: doubledEmail,
     password: "fa09j20fiaj3fpaof",
   });
-  expect(typeof res.data.id).toBe("string");
-  expect(res.data.id.length).toBe(36);
-  expect(res.data.primary_library.id).toHaveLength(36);
-  expect(typeof res.data.primary_library.name).toBe("string");
-
-  // Can't create another user with the same email
   expect(
     createUser(core.apiUrl, {
       email: doubledEmail,
       password: "fa09j20fiaj3fpaof",
     }),
   ).rejects.toThrow();
+});
 
-  // Can't create a user without a password
+test("password and email required for sign up", async () => {
+  const core = createBearerCore();
   expect(
     createUser(core.apiUrl, {
       email: testEmail("new_test"),
@@ -58,8 +56,28 @@ test("Creating a user & default library", async () => {
   ).rejects.toThrow();
 });
 
+test("User creation with bearer adapter", async () => {
+  const core = createBearerCore();
+  const creds = {
+    email: testEmail("defaults"),
+    password: "fa09j20fiaj3fpaof",
+  };
+  const user = await createUser(core.apiUrl, creds);
+  const userId = Uuidv4.fromString(user.data.id);
+  const libId = Uuidv4.fromString(user.data.primary_library.id);
+  expect(userId.equals(libId)).toBeFalse();
+  await core.session.auth.passwordAuth(creds);
+  expect(core.session.type).toBe(SessionType.Remote);
+  expect(core.session.state!.userId.equals(userId)).toBeTrue();
+  expect(core.session.state!.primaryLibraryId.equals(libId)).toBeTrue();
+  const bearerAuth = core.session.auth as BearerAdapter;
+  expect(bearerAuth.sessionExpiry instanceof Date).toBe(true);
+  expect(typeof bearerAuth.sessionToken).toBe("string");
+  expect(typeof bearerAuth.refreshToken).toBe("string");
+});
+
 test("Real account, bad password", async () => {
-  const core = createCore();
+  const core = createBearerCore();
   const email = testEmail("realAcc");
   const password = "fa09j20fiaj3fpaof";
   await createUser(core.apiUrl, {
@@ -75,26 +93,7 @@ test("Real account, bad password", async () => {
   ).rejects.toThrow();
 });
 
-test("Bearer authorisation", async () => {
-  const core = createCore();
-  const email = testEmail("daniel_pw");
-  const password = "fa09j20fiaj3fpaof";
-  await createUser(core.apiUrl, {
-    email,
-    password,
-  });
-  await core.session.auth.passwordAuth({
-    email,
-    password,
-  });
-  const bearerAuth = core.session.auth as BearerAdapter;
-  expect(bearerAuth.sessionExpiry instanceof Date).toBe(true);
-  expect(typeof bearerAuth.sessionToken).toBe("string");
-  expect(typeof bearerAuth.refreshToken).toBe("string");
-  // expect(bearerAuth.sessionData?.userId instanceof Uuidv4).toBeTrue();
-});
-
-test("Bearer refresh", async () => {
+test.only("Bearer refresh", async () => {
   const core = await createAuthenticatedCore(testEmail("bearer_refresh"));
   const bearerAuth = core.session.auth as BearerAdapter;
   const ogToken = bearerAuth.sessionToken;

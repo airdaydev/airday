@@ -5,7 +5,6 @@ import { AuthAdapter } from "./adapter";
 import {
   AuthEventMap,
   newLocalSession,
-  SessionData,
   SessionLike,
   sessionLikeSchema,
   SessionType,
@@ -26,6 +25,10 @@ export class AirdaySession {
   state?: SessionState;
   constructor(auth: AuthAdapter) {
     this.auth = auth;
+    this.auth.events.on("session", (session) => {
+      this.type = SessionType.Remote;
+      this.state = session;
+    });
   }
   anon() {
     // TODO: Clear AuthAdapter
@@ -42,6 +45,7 @@ export class AirdaySession {
           userId: Uuidv4.fromString(local.userId),
           primaryLibraryId: Uuidv4.fromString(local.primaryLibraryId),
         };
+        // TODO: Store local session
         return;
       } else {
         this.auth.attemptBoot(sessionLike);
@@ -61,5 +65,4 @@ export class AirdaySession {
     this.boot(sessionLike);
   }
   requestCredentials: RequestCredentials = "omit";
-  sessionData?: SessionData;
 }

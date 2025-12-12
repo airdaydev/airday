@@ -17,7 +17,7 @@ import {
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
-import { AuthState } from "../auth/adapter";
+import { SessionType } from "../auth/types";
 
 interface SyncEventMap {
   flushed: {};
@@ -60,7 +60,7 @@ export class AirdaySync {
     this.core = core;
   }
   async start() {
-    if (this.core.auth.state !== AuthState.Remote) {
+    if (this.core.session.type !== SessionType.Remote) {
       console.warn("attempted to startSync without credentials loaded");
       return;
     }
@@ -103,7 +103,7 @@ export class AirdaySync {
   initialSync() {
     // TODO: Prevent if not authorised
     this.getLibraries(); // TODO: currently a noop
-    this.catchup(this.core.auth.sessionData!.primaryLibraryId);
+    this.catchup(this.core.session.sessionData!.primaryLibraryId);
     // TODO: For each shared library, start list & item streams
     // TODO: Later, prioritise by active items, tombstoned items, completed items
     // TODO: Collect pending items, containers, libraries for pushing

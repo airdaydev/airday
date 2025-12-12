@@ -2,6 +2,8 @@ import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { SessionLike } from "./types";
 import { AuthenticateAction } from "../sync/fb";
+import { EventEmitter } from "../common/events";
+import { SessionState } from "./auth";
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
@@ -12,9 +14,14 @@ export function getExpiryDelayMs(expiry: Date) {
   return delay;
 }
 
+export interface AdapterEventMap {
+  session: SessionState;
+}
+
 export abstract class AuthAdapter {
   readonly apiUrl: URL;
   requestCredentials: RequestCredentials = "omit";
+  events = new EventEmitter<AdapterEventMap>();
   constructor(apiUrl: URL) {
     this.apiUrl = apiUrl;
   }

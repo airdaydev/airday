@@ -44,7 +44,7 @@ const schema = {
 const rawConfig = loadToml(import.meta.url, "../config.toml");
 export const config = validateConfig(schema, rawConfig);
 
-export function createCore() {
+export function createBearerCore() {
   const apiUrl = new URL(config.api_url);
   const bearer = new BearerAdapter(apiUrl, config.paseto_pk);
   const core = new AirdayCore({
@@ -68,7 +68,6 @@ export async function createAuthenticatedCore(email: string) {
     email,
     password,
   });
-  // await core.init();
   await core.session.auth.passwordAuth({ email, password });
   return core;
 }
