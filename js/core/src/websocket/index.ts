@@ -4,12 +4,11 @@ import {
   MessageProto,
 } from "../proto";
 import { type AirdayCore } from "../core";
-import { AuthenticateAction, BatchSyncMessage, decodeFrame } from "../sync/fb";
+import { BatchSyncMessage, decodeFrame } from "../sync/fb";
 import { Uuidv4 } from "../common/uuid";
 import { EventEmitter } from "../common/events";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
-import { BearerAuth } from "../auth/bearer";
 
 interface WSEventMap {
   end: {};
@@ -84,9 +83,7 @@ export class WebsocketManager {
     ws.addEventListener("open", () => {
       this.connectionAttempts = 0;
       this.state = WSState.Connected;
-      if (this.core.auth instanceof BearerAuth) {
-        this.bearerAuth();
-      }
+      this.bearerAuth();
     });
     ws.addEventListener("message", (message: MessageEvent) => {
       const msg = decodeFrame(message);
@@ -165,17 +162,11 @@ export class WebsocketManager {
   }
   private bearerAuth() {
     if (!this.ws) throw new Error("WS is not enabled");
-    const auth = this.core.auth;
-    if (auth instanceof BearerAuth && auth.sessionToken) {
-      // TODO: Check expiry etc
-      // Timeout for action completing?
-      const msg = new AuthenticateAction(auth.sessionToken);
+    const msg = this.core.session.auth.wsAuthMsg();
+    if (msg) {
       this.ws.send(msg.serialise());
       msg.complete();
-      return;
     }
-    console.warn("Cannot websocket bearer auth, no bearer token");
-    return;
   }
   send(data: any) {
     if (!this.ws) throw new Error("Cannot send, WS is not enabled");
@@ -191,9 +182,9 @@ export class WebsocketManager {
     }
     const userId = Uuidv4.fromFBProto(res.userId());
     const libraryId = Uuidv4.fromFBProto(res.libraryId());
-    const sameUserId = this.core.auth.sessionData!.userId.equals(userId);
+    const sameUserId = this.core.session.sessionData!.userId.equals(userId);
     const sameLibId =
-      this.core.auth.sessionData!.primaryLibraryId.equals(libraryId);
+      this.core.session.sessionData!.primaryLibraryId.equals(libraryId);
     if (!sameUserId || !sameLibId) {
       // TODO: Consider this error
       throw new Error("Fatal error: user id / lib id swapped or non-existent");

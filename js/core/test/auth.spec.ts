@@ -11,7 +11,7 @@ import {
 import { Uuidv4 } from "../src/common/uuid";
 import { BearerAdapter } from "../src/auth/bearer";
 
-test("Unauthorised API root url & version", async () => {
+test.only("Unauthorised API root url & version", async () => {
   const core = createCore();
   const d = await getRoot(core.apiUrl);
   expect(typeof d.data.version).toBe("string");

@@ -1,6 +1,7 @@
 import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
 import { SessionLike } from "./types";
+import { AuthenticateAction } from "../sync/fb";
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
@@ -16,6 +17,9 @@ export abstract class AuthAdapter {
   requestCredentials: RequestCredentials = "omit";
   constructor(apiUrl: URL) {
     this.apiUrl = apiUrl;
+  }
+  wsAuthMsg(): false | AuthenticateAction {
+    return false;
   }
   abstract attemptBoot(sessionLike: SessionLike): {};
   abstract requestHeaders(json?: boolean): Record<string, string>;

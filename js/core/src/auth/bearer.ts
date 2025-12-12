@@ -5,6 +5,7 @@ import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { verifyToken } from "./token";
 import { AuthAdapter, getExpiryDelayMs } from "./adapter";
 import { SessionLike } from "./types";
+import { AuthenticateAction } from "../sync/fb";
 
 export const storedBearerSessionSchema = v.object({
   type: v.string().const("bearer").required(),
@@ -100,5 +101,11 @@ export class BearerAdapter extends AuthAdapter {
   private cancelScheduledRefresh() {
     clearTimeout(this.refreshTimer);
     this.refreshTimer = undefined;
+  }
+  wsAuthMsg() {
+    if (this.sessionToken) {
+      return new AuthenticateAction(this.sessionToken);
+    }
+    return false;
   }
 }
