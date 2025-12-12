@@ -16,7 +16,7 @@ test("Sign in with cookie", async ({ page }) => {
   const email = testEmail("cookie");
   const password = "abcdefg123";
 
-  const result = await page.evaluate(
+  const res = await page.evaluate(
     async ({ email, password }) => {
       const { AirdayCore, createUser, AirdayIDBStorage, CookieAdapter } =
         window as any;
@@ -28,12 +28,13 @@ test("Sign in with cookie", async ({ page }) => {
         authAdapter: new CookieAdapter(apiUrl),
       });
 
-      const user = await createUser(core.apiUrl, { email, password });
-      return { success: true, user };
+      const res = await createUser(core.apiUrl, { email, password });
+      return res.data;
     },
     { email, password },
   );
 
-  expect(result.success).toBe(true);
-  expect(result.user).toBeDefined();
+  expect(res).toBeDefined();
+  expect(res.id.length).toBe(36);
+  expect(res.primary_library.id.length).toBe(36);
 });
