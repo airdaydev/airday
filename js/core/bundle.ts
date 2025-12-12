@@ -7,7 +7,7 @@ import { statSync } from "fs";
 import pkg from "./package.json";
 
 const bundleConfig: Bun.BuildConfig = {
-  entrypoints: ["./src/index.ts", "./src/playwright/browser-tests.ts"],
+  entrypoints: ["./src/index.ts"],
   outdir: "./dist",
   target: "browser",
   format: "esm",

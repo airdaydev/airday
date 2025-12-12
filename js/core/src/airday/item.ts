@@ -54,7 +54,7 @@ export class AirdayItem {
   }
   // TODO: This may not be necessary with initial population
   private internalValue(id: string) {
-    return this.syncObject.values[id]?.data;
+    // return this.syncObject.values[id]?.data;
   }
   react(change: Change) {
     // TODO: Map each change to update correct signal
