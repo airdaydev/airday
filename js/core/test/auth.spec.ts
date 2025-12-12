@@ -1,15 +1,8 @@
 import { test, expect } from "bun:test";
 import { createUser } from "../src/index";
 import { getRoot } from "../src/index";
-import {
-  createBearerCore,
-  createAuthenticatedCore,
-  extractCookie,
-  parseCookieValue,
-  testEmail,
-} from "./utils";
+import { createBearerCore, createAuthenticatedCore, testEmail } from "./utils";
 import { BearerAdapter } from "../src/auth/bearer";
-import { CookieAdapter } from "../src/auth/cookie";
 import { Uuidv4 } from "../src/common/uuid";
 import { SessionType } from "../src/auth/types";
 
@@ -18,6 +11,18 @@ test("Unauthorised API root url & version", async () => {
   const d = await getRoot(core.apiUrl);
   expect(typeof d.data.version).toBe("string");
 });
+
+test("Anon offline user", () => {
+  const core = createBearerCore();
+  expect(core.session.type, "Uninitialised auth").toBe(SessionType.None);
+  core.session.anon();
+  expect(core.session.type).toBe(SessionType.Local);
+  expect(core.session.state!.userId instanceof Uuidv4).toBe(true);
+  expect(core.session.state!.primaryLibraryId instanceof Uuidv4).toBe(true);
+});
+
+test.todo("Boot offline user from local storage", () => {});
+test.todo("Boot online user from local storage", () => {});
 
 test("non-existent username & password", async () => {
   const core = createBearerCore();
@@ -93,7 +98,7 @@ test("Real account, bad password", async () => {
   ).rejects.toThrow();
 });
 
-test.only("Bearer refresh", async () => {
+test("Bearer refresh", async () => {
   const core = await createAuthenticatedCore(testEmail("bearer_refresh"));
   const bearerAuth = core.session.auth as BearerAdapter;
   const ogToken = bearerAuth.sessionToken;
@@ -108,4 +113,3 @@ test.only("Bearer refresh", async () => {
 test.todo("Automatic bearer refresh", () => {});
 test.todo("Expired session token but valid refresh token", () => {});
 test.todo("Expired session & refresh tokens", () => {});
-test.todo("Anon offline user", () => {});
