@@ -19,6 +19,7 @@ pnpm run test-server
 
 # Run tests
 set +e # disable exit on error
+pnpm --dir ./js/core browser
 pnpm --dir ./js/core test
 TEST_EXIT_CODE=$?
 set -e # enable exit on error

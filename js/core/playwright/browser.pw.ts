@@ -11,7 +11,7 @@ test("Sign in with cookie", async ({ page }) => {
     console.error(`Page Error: ${error.message}`);
   });
 
-  await page.goto("/test.html");
+  await page.goto("/pw.html");
 
   const email = testEmail("cookie");
   const password = "abcdefg123";

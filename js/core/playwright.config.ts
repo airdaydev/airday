@@ -5,6 +5,7 @@ const baseURL = "http://localhost:3002";
 
 export default defineConfig({
   testDir: "./playwright",
+  testMatch: "*.pw.ts",
   use: {
     ...devices["Desktop Firefox"],
     baseURL,
