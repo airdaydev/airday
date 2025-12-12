@@ -9,7 +9,6 @@
   "scripts": {
     "build": "bun bundle.ts",
     "start": "bun run",
-    "fe_test_server": "bunx serve -l 3002",
     "playwright_retest": "bun playwright test",
     "playwright": "pnpm run -w serverd && bun run build && bun playwright test",
     "test": "bun test",

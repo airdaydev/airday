@@ -182,9 +182,9 @@ export class WebsocketManager {
     }
     const userId = Uuidv4.fromFBProto(res.userId());
     const libraryId = Uuidv4.fromFBProto(res.libraryId());
-    const sameUserId = this.core.session.sessionData!.userId.equals(userId);
+    const sameUserId = this.core.session.state!.userId.equals(userId);
     const sameLibId =
-      this.core.session.sessionData!.primaryLibraryId.equals(libraryId);
+      this.core.session.state!.primaryLibraryId.equals(libraryId);
     if (!sameUserId || !sameLibId) {
       // TODO: Consider this error
       throw new Error("Fatal error: user id / lib id swapped or non-existent");

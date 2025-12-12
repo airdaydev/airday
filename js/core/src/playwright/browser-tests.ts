@@ -2,31 +2,21 @@
 import { BrowserRunner, log } from "./runner";
 import { AirdayCore, createUser } from "../index";
 import { tracer } from "../tracer";
-import { LWWRegister } from "../crdt/lww";
-import { Uuidv4 } from "../common/uuid";
-import { SyncObject } from "../sync/sync-object";
 import { AirdayMemStorage } from "../storage/mem";
+import { CookieAdapter } from "../auth/cookie";
+import { AirdayIDBStorage } from "../storage/idb";
 
-// TODO: Performance testing!
-export async function authenticate(core: AirdayCore, email: string) {
-  const password = "fa09j20fiaj3fpaof";
-  await createUser(core, {
-    email,
-    password,
-  });
-  await core.loginWithPasswordBearer({ email, password });
-  return core;
-}
+// Inline testEmail to avoid pulling in Node.js-only test/utils dependencies
+const TEST_RUN_ID = Date.now();
+const testEmail = (name: string) => `${name}.test_${TEST_RUN_ID}@air.day`;
 
-export async function createTestCore() {
+export function createCookieCore() {
+  const apiUrl = new URL("http://localhost:3000");
   const core = new AirdayCore({
-    apiUrl: new URL("http://localhost:3000"),
-    storageAdapter: new AirdayMemStorage(),
+    apiUrl,
+    storageAdapter: new AirdayIDBStorage(),
+    authAdapter: new CookieAdapter(apiUrl),
   });
-  await authenticate(core, `${Math.random()}@airday.com}`);
-  await core.storage.adapter.connect();
-  core.ws.connect();
-  await core.ws.events.onceAsync("authenticated");
   return core;
 }
 
@@ -34,6 +24,17 @@ export const tests = async () => {
   const suite = new BrowserRunner();
 
   // TODO: Bring back a smoke test & indexeddb layer test
+  suite.test("Sign in with cookie", async (ctx) => {
+    const core = createCookieCore();
+    const creds = {
+      email: testEmail("cookie"),
+      password: "abcdefg123",
+    };
+    const user = await createUser(core.apiUrl, creds);
+    console.log(user);
+    ctx.assert(true);
+    // TODO: Check info etc
+  });
 
   // suite.test("Items stored in indexeddb", async (ctx) => {
   //   const core = await createTestCore();
