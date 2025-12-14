@@ -1,5 +1,6 @@
 import { TypeOf, v } from "suretype";
 import { Uuidv4 } from "../common/uuid";
+import { SessionState } from "./auth";
 
 export const sessionLikeSchema = v.object({
   type: v.string().required(),
@@ -19,8 +20,13 @@ export function newLocalSession(): LocalSession {
   };
 }
 
+export interface SessionState {
+  userId: Uuidv4;
+  primaryLibraryId: Uuidv4;
+}
+
 export interface AuthEventMap {
-  initialised: SessionData;
+  initialised: SessionState;
   refresh: SessionData;
   deauthenticated: {};
 }

@@ -96,7 +96,7 @@ test("websocket lifecycle & self-healing", async () => {
 // TODO: Test unauthenticated
 test("2-phase commit", async () => {
   const core = await createAuthenticatedCore(testEmail("2_phase"));
-  const libraryId = core.auth.sessionData?.primaryLibraryId!;
+  const libraryId = core.session.state?.primaryLibraryId!;
   const snapshot = new InitialSnapshotOp({
     libraryId,
     objKind: 0,
@@ -117,7 +117,7 @@ test("2-phase commit", async () => {
   await core.sync.queueOp(snapshot, obj);
   await core.sync.queueOp(patch, obj);
   // Test outbox - in mem version
-  const outboxOp = core.sync.pendingOps.get(snapshot.id.toHex())!;
+  const outboxOp = core.sync.unackedOps.get(snapshot.id.toHex())!;
   expect(outboxOp, "memory stored outbox op").toBe(snapshot);
   // Test outbox - idb version
   const outboxOpIdb = await core.storage.adapter.getOutboxOp(snapshot.id);
@@ -159,10 +159,10 @@ test("2-phase commit", async () => {
 
 test.skip("fan out to connection on same library", () => {});
 
-test.only("Catch up streams", async () => {
+test("Catch up streams", async () => {
   const core = await createAuthenticatedCore(testEmail("catch_up"));
   // create x items
-  const libraryId = core.auth.sessionData?.primaryLibraryId!;
+  const libraryId = core.session.state?.primaryLibraryId!;
   expect(libraryId).toBeDefined();
   for (let i = 0; i < 1000; i++) {
     const snapshot = new InitialSnapshotOp({

@@ -7,16 +7,12 @@ import {
   newLocalSession,
   SessionLike,
   sessionLikeSchema,
+  SessionState,
   SessionType,
   storedLocalSessionSchema,
 } from "./types";
 
 export const SESSION_STORAGE_KEY = "airday_session";
-
-export interface SessionState {
-  userId: Uuidv4;
-  primaryLibraryId: Uuidv4;
-}
 
 export class AirdaySession {
   auth: AuthAdapter;
@@ -28,6 +24,7 @@ export class AirdaySession {
     this.auth.events.on("session", (session) => {
       this.type = SessionType.Remote;
       this.state = session;
+      this.events.emit("initialised", session);
     });
   }
   anon() {
