@@ -36,7 +36,4 @@ export class AirdayCore {
       }
     });
   }
-  // async reset() {
-  //   this.session.anon();
-  // }
 }
