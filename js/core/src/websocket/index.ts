@@ -110,7 +110,6 @@ export class WebsocketManager {
       // TODO: Consider separating connect & producer so frames producer can be reused
       throw new Error("ws.frames(): Cannot start second websocket connection");
     }
-    console.debug(`WS connection attempt to ${this.address}`);
     // State
     const ws = this.connect();
     const self = this;
