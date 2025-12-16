@@ -1,7 +1,7 @@
 # Air Roadmap
 
 ## 2025 Q3-4 Working Alpha Prototype Sqlite
-- [] Local->Remote user upgrade - save existing library
+- [] Local->Remote user upgrade - save & remap existing library to new id
 - [] Automatic bearer refresh test
 - [] cookie auth for websocket connection
 - [] cookie source of truth = local storage (and negate if cookie not present or invalid) (client)
@@ -20,7 +20,6 @@
 - [] @airday/core - create & update lists
 - [] @airday/core - delete lists
 - [] @airday/core - create subitems / sequence
-- [] remap initial local library to new on sign up (LATER - OPTIONAL - otherwise keep the anonymous account active)
 - [] Glue core to app
 - [] UI - Create items
 - [] UI - Update items
@@ -33,11 +32,15 @@
 - [] Nav List UI - build & respect fractional indexing system
 - [] @airday/core - tracing fixes
 - [] get all libraries
+- [] Solve dire front-end list bugs
+- [] @airday/core - export database (this is so i can use it while i start work on sync protocol again)
+- [] @airday/core - import database  (this is so i can use it while i start work on sync protocol again)
+- [] CRDT week - boost understanding once app finally works
+- [] E2EE week - build prototype once app is working
 - [] handling browser tabs?!
 - [] cors review
 - [] Postgresql adapter with personal library setup on account creation
 - [] consider migrating to change seq version # now - for postgresql adapter...? - investigate can current version interop with postgresql version?
-- [] payload encryption
 - [] Message bus for fanning out incl. cache busting on postgres version
 - [] Benchmarking https://github.com/bheisler/criterion.rs
 - [] TODO: more cohesive error messaging system for websockets
@@ -183,7 +186,6 @@
 - [] Linux Tauri (or other) release (?)
 
 ## Features
-- [] @airday/core - export database to json
 - [] CalDAV bridge! (pull from event type - as opposed to event_encrypted type!)
 - [] User switching
 - [] List cal view
@@ -201,6 +203,7 @@
 - [] LLM Prompting / MCP
 - [] qwen3-1.7B exploration
 - [] Consider jmap calendar support
+- [] On sign up - start from scratch or start from existing
 
 ## References/notes/things to try
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
