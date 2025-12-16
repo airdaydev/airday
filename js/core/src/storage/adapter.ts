@@ -13,7 +13,7 @@ export abstract class StorageAdapter {
   // TODO: Consider changing this name to reflect outbox status / seq presence
   abstract addOp(op: SyncOp, object: SyncObject): Promise<void>;
   abstract updateObject(object: SyncObject): Promise<void>;
-  abstract createLibrary(library: Library): Promise<void>;
+  abstract addLibrary(library: Library): Promise<void>;
   abstract getLibrary(library: Uuidv4): Promise<Library | undefined>;
   abstract getByLibrary(libraryId: Uuidv4): Promise<any[]>;
   abstract getOutboxOp(id: Uuidv4): Promise<SyncOp>;

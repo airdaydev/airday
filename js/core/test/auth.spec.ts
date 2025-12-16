@@ -2,9 +2,9 @@ import { test, expect } from "bun:test";
 import { createUser } from "../src/index";
 import { getRoot } from "../src/index";
 import { createBearerCore, createAuthenticatedCore, testEmail } from "./utils";
-import { BearerAdapter } from "../src/auth/bearer";
+import { BearerAdapter } from "../src/session/bearer";
 import { Uuidv4 } from "../src/common/uuid";
-import { SessionType } from "../src/auth/types";
+import { SessionType } from "../src/session/types";
 import { Library } from "../src/common/library";
 
 test("Unauthorised API root url & version", async () => {
@@ -23,7 +23,8 @@ test.only("Anon offline user", async () => {
   const libId = core.session.state!.primaryLibraryId;
   expect(libId instanceof Uuidv4).toBe(true);
   // TODO: Take this from core.storage root method
-  const lib = await core.storage.adapter.getByLibrary(libId);
+  await core.storage.whenReady();
+  const lib = await core.storage.adapter.getLibrary(libId);
   expect(lib).toBeInstanceOf(Library);
 });
 

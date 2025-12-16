@@ -4,7 +4,7 @@ import { passwordAuthCookie, refreshCookie } from "../http/auth";
 import { passwordAuthSchema } from "../http/types";
 import { Uuidv4 } from "../common/uuid";
 import { SessionLike } from "./types";
-import { SESSION_STORAGE_KEY } from "./auth";
+import { SESSION_STORAGE_KEY } from ".";
 
 export const storedCookieSession = v.object({
   type: v.string().const("cookie").required(),

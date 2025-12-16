@@ -5,7 +5,7 @@ import { verifyToken } from "./token";
 import { AuthAdapter, getExpiryDelayMs } from "./adapter";
 import { SessionLike } from "./types";
 import { AuthenticateAction } from "../sync/fb";
-import { SESSION_STORAGE_KEY } from "./auth";
+import { SESSION_STORAGE_KEY } from ".";
 
 export const storedBearerSessionSchema = v.object({
   type: v.string().const("bearer").required(),

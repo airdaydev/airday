@@ -31,7 +31,7 @@ export class AirdayMemStorage implements StorageAdapter {
     if (storage) return;
     const newStorage = new SessionStorage();
     this.backend.set(userId, newStorage);
-    this.active = storage;
+    this.active = newStorage;
   }
 
   async addOp(op: SyncOp, object: SyncObject) {
@@ -108,14 +108,15 @@ export class AirdayMemStorage implements StorageAdapter {
     }
   }
 
-  async createLibrary(library: Library) {
+  async addLibrary(library: Library) {
     if (!this.active) throw new Error("Storage not active");
     this.active.libraries.set(library.id.toHex(), library);
   }
 
   async getLibrary(libraryId: Uuidv4): Promise<Library | undefined> {
     if (!this.active) throw new Error("Storage not active");
-    return this.active.libraries.get(libraryId.toHex());
+    const lib = this.active.libraries.get(libraryId.toHex());
+    return lib;
   }
 
   async clear(): Promise<void> {

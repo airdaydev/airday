@@ -2,9 +2,9 @@ import { WebsocketManager } from "./websocket";
 import { AirdaySync } from "./sync";
 import { AirdayStorage } from "./storage";
 import { StorageAdapter } from "./storage/adapter";
-import { AuthAdapter } from "./auth/adapter";
-import { AirdaySession } from "./auth/auth";
-import { SessionType } from "./auth/types";
+import { AuthAdapter } from "./session/adapter";
+import { AirdaySession } from "./session";
+import { SessionType } from "./session/types";
 
 interface AirdayCoreOpts {
   apiUrl: URL;
@@ -28,9 +28,13 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.session.events.on("initialised", async (sessionData) => {
+      console.log("initialised");
       // TODO: If sync is in an intermediate state, do not allow this to occur
       await this.ws.stop(); // TODO: Consider making this controlled by sync
-      await this.storage.initDb(sessionData.userId);
+      await this.storage.initDb(
+        sessionData,
+        this.session.type === SessionType.Remote,
+      );
       if (this.session.type === SessionType.Remote) {
         this.sync.start();
       }

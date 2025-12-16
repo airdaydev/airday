@@ -1,4 +1,5 @@
 // Memory storage for items (or all resources?)
+import { SessionState } from "../session/types";
 import { EventEmitter } from "../common/events";
 import { Library } from "../common/library";
 import {
@@ -14,13 +15,20 @@ import { StorageAdapter } from "./adapter";
 import { AirdayIDBStorage } from "./idb";
 
 interface StorageEventMap {
+  ready: {};
   upsert: { objects: SyncObject[] };
   delete: { ids: string[] };
+}
+
+enum StorageState {
+  NotReady,
+  Ready,
 }
 
 export class AirdayStorage {
   core: AirdayCore;
   adapter: StorageAdapter;
+  state = StorageState.NotReady;
   // Library storage
   primaryLibraryId?: Uuidv4;
   libraries: Map<LibraryHexUuid, Library> = new Map();
@@ -36,10 +44,29 @@ export class AirdayStorage {
     this.core = core;
     this.adapter = adapter || new AirdayIDBStorage();
   }
-  async initDb(userId: Uuidv4) {
+  async initDb(sessionState: SessionState, remote: boolean) {
     // TODO: Check DB status, may be connected
-    await this.adapter.connect(userId);
-    // Load up libs, outbox, then normal items
+    await this.adapter.connect(sessionState.userId);
+    // Construct primary library (TODO: Elsewhere?)
+    const library = new Library({
+      id: sessionState.primaryLibraryId,
+      remote,
+      name: "default",
+      primary: true,
+    });
+    await this.adapter.addLibrary(library);
+    this.state = StorageState.Ready;
+    this.events.emit("ready", {});
+  }
+  async whenReady(): Promise<void> {
+    if (this.state === StorageState.Ready) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.events.once("ready", () => {
+        resolve();
+      });
+    });
   }
   async getOp(id: Uuidv4): Promise<SyncOp> {
     let op = this.outbox.get(id.toHex());

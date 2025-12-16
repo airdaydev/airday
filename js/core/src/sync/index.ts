@@ -17,10 +17,11 @@ import {
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
-import { SessionType } from "../auth/types";
+import { SessionType } from "../session/types";
 import { Library } from "../common/library";
 
 interface SyncEventMap {
+  started: {};
   flushed: {};
 }
 
@@ -69,6 +70,7 @@ export class AirdaySync {
     if (this.syncState !== SyncState.Stopped) {
       throw new Error("Sync already started");
     }
+    this.events.emit("started", {});
     this.syncState = SyncState.Started;
     try {
       const protoFrames = this.core.ws.frames();
@@ -80,6 +82,17 @@ export class AirdaySync {
       console.error("startSync failed", err);
     }
     this.syncState = SyncState.Stopped;
+  }
+  // TODO: hmm
+  async whenStarted() {
+    return new Promise((resolve) => {
+      const res = () => resolve(null);
+      this.events.once("started", res);
+      if (this.syncState === SyncState.Started) {
+        this.events.off("started", res);
+        resolve(null);
+      }
+    });
   }
   // Stop but keep ingesting queued frames
   async stop() {
@@ -128,7 +141,7 @@ export class AirdaySync {
   }
   async createLibrary(name: string) {
     const library = new Library();
-    this.core.storage.adapter.createLibrary(library);
+    this.core.storage.adapter.addLibrary(library);
   }
   async queueOp(op: SyncOp, obj: SyncObject) {
     await this.core.storage.adapter.addOp(op, obj);

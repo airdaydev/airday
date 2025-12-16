@@ -3,7 +3,7 @@ import { loadToml, validateConfig } from "toml-config";
 import { AirdayCore } from "../src/index";
 import { createUser } from "../src/index";
 import { AirdayMemStorage } from "../src/storage/mem";
-import { BearerAdapter } from "../src/auth/bearer";
+import { BearerAdapter } from "../src/session/bearer";
 
 const TEST_RUN_ID = process.env.TEST_RUN_ID || Date.now();
 export const testEmail = (name: string) =>

@@ -58,6 +58,7 @@ export class AirdaySession {
       primaryLibraryId: session.primaryLibraryId,
     };
     persistLocalSession(session);
+    this.events.emit("initialised", session);
   }
   // This should really only trigger once, TODO: enforce?
   async loadFromStorage() {
