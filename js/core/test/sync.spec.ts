@@ -193,11 +193,14 @@ test("Create offline library", async () => {
   expect(stored).toBe(lib);
 });
 
+test.todo("Upgrade shared library to remote", async () => {
+  // Conditions: If remote user has offline library, trigger a lib sync req
+});
+
 test.todo("Get all libraries", async () => {});
 test.todo("fan out to connection on same library", () => {});
 test.todo("Sync back-off restart attempts", async () => {});
 test.todo("Upgrade local user to remote & sync ops", async () => {});
-test.todo("Upgrade library to remote", async () => {});
 test.todo("Sync local pending changes from idb, once online", async () => {});
 test.todo("Delete library", async () => {});
 test.todo("Delete attribute patches", async () => {});
