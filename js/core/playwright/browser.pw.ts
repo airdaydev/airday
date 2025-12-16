@@ -38,3 +38,5 @@ test("Sign in with cookie", async ({ page }) => {
   expect(res.id.length).toBe(36);
   expect(res.primary_library.id.length).toBe(36);
 });
+
+test.fixme("Handling multiple tabs ensures one WS connection", async () => {});
