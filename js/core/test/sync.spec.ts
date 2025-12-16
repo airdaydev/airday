@@ -1,13 +1,13 @@
 // Headless sync tests
-import { test, expect } from "bun:test";
-import { Uuidv4 } from "../src/common/uuid";
-import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
-import { LWWRegister } from "../src/crdt/lww";
-import { createAuthenticatedCore, testEmail } from "./utils";
-import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
-import { OpKind, SyncOpProto } from "../src/proto";
+import { expect, test } from "bun:test";
 import { Builder, ByteBuffer } from "flatbuffers";
+import { Uuidv4 } from "../src/common/uuid";
+import { LWWRegister } from "../src/crdt/lww";
+import { OpKind, SyncOpProto } from "../src/proto";
+import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
+import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
 import { WSState } from "../src/websocket";
+import { createAuthenticatedCore, testEmail } from "./utils";
 
 // TODO: Null state to clear? or explicit clear field?
 test("create, encode & decode patch SyncOp", async () => {
@@ -93,7 +93,6 @@ test("websocket lifecycle & self-healing", async () => {
   core.sync.stop();
 });
 
-// TODO: Test unauthenticated
 test("2-phase commit", async () => {
   const core = await createAuthenticatedCore(testEmail("2_phase"));
   const libraryId = core.session.state?.primaryLibraryId!;
@@ -127,33 +126,29 @@ test("2-phase commit", async () => {
     "serialised version stored in idb",
   ).toBe(true);
   // Flush is dead again! We could flush or we could track actual ops too
-  await core.sync.flush();
+  await core.sync.awaitAcks();
   // We are only doing this after to ensure op-response fires
-  // const syncObject = await core.storage.getObj(obj.id);
+  const syncObject = await core.storage.getObj(obj.id);
   // // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
-  // expect(syncObject, "obj cached in mem cache").toBe(obj);
-
-  // expect(
-  //   core.sync.outbox.length,
-  //   "ack message received & outbox message deleted",
-  // ).toBe(0);
-  // expect(
-  //   core.sync.pendingOps.size,
-  //   "ack message received & pending message index removed",
-  // ).toBe(0);
-  // expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
-  // const res = await core.storage.adapter.getByLibrary(core.library.id!);
-  // const item = res[0];
-  // expect(
-  //   syncObject!.id.equals(item.id),
-  //   "correct libraryId stored in idb",
-  // ).toBeTrue();
-  // await new Promise((resolve) => {
-  //   if (core.sync.outbox.size === 0) {
-  //     return resolve(null);
-  //   }
-  //   core.sync.events.onceAsync("flushed").then(resolve);
-  // });
+  expect(syncObject, "obj cached in mem cache").toBe(obj);
+  expect(
+    core.sync.outbox.length,
+    "ack message received & outbox message deleted",
+  ).toBe(0);
+  expect(
+    core.sync.unackedOps.size,
+    "ack message received & pending message index removed",
+  ).toBe(0);
+  expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
+  // Storage!?
+  const res = await core.storage.adapter.getByLibrary(
+    core.session.state?.primaryLibraryId!,
+  );
+  const item = res[0];
+  expect(
+    syncObject!.id.equals(item.id),
+    "correct libraryId stored in idb",
+  ).toBeTrue();
   core.sync.stop();
 });
 
@@ -177,19 +172,18 @@ test("Catch up streams", async () => {
     const obj = new SyncObject(snapshot);
     await core.sync.queueOp(snapshot, obj);
   }
-  await core.sync.flush();
+  await core.sync.awaitAcks();
   await core.storage.adapter.clear();
   const emptyRes = await core.storage.adapter.getByLibrary(libraryId);
   expect(emptyRes.length, "idb has been emptied").toBeEmpty();
   // Retrieve all items
   const stream = core.sync.catchup(libraryId, 0n);
   await stream.done();
-  // // HACK
+  // HACK
   await new Promise((resolve) => setTimeout(() => resolve(null), 500));
-  // // TODO: The processing is done before the items have actually been processed
+  // TODO: The processing is done before the items have actually been processed (TODO: Track this!)
   const res = await core.storage.adapter.getByLibrary(libraryId);
   console.log("res", res.length);
-  // const res = await core.storage.(core.library.id!.toHex());
   core.sync.stop();
 });
 
@@ -197,7 +191,7 @@ test.todo("Sync back-off restart attempts", async () => {});
 test.todo("Sync local pending changes from idb, once online", async () => {});
 test.todo("Upgrade local user to remote", async () => {});
 test.todo("Get all libraries", async () => {});
-test.todo("Create library", async () => {});
+test.todo("Create offline library", async () => {});
 test.todo("Upgrade library to remote", async () => {});
 test.todo("Delete library", async () => {});
 test.todo("Delete attribute patches", async () => {});

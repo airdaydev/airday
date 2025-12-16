@@ -11,7 +11,8 @@ import { StorageAdapter } from "./adapter";
 // In-memory storage adapter for headless testing environments
 export class AirdayMemStorage implements StorageAdapter {
   private syncObjects: Map<SyncObjectHexUuid, SyncObject> = new Map(); // TODO: Serialised version?
-  private libraryIndex: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map(); // TODO: id or outbox id?
+  private objLibKey: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map();
+  // TODO: Do we need a lib op key?
   private outbox: Map<HexUuid, SyncOp> = new Map(); // TODO: Serialised version?
   // TODO: op storage?
 
@@ -23,17 +24,18 @@ export class AirdayMemStorage implements StorageAdapter {
     // const outboxItem = op.toIdb(); TODO: serialise properly
     const opIdKey = op.id.toHex();
     const libraryKey = op.libraryId.toHex();
-    this.syncObjects.set(object.id.toHex(), object);
+    const objKey = object.id.toHex();
+    this.syncObjects.set(objKey, object);
     this.outbox.set(opIdKey, op);
-    if (!this.libraryIndex.has(libraryKey)) {
-      this.libraryIndex.set(libraryKey, new Set());
+    if (!this.objLibKey.has(libraryKey)) {
+      this.objLibKey.set(libraryKey, new Set());
     }
-    this.libraryIndex.get(libraryKey)!.add(opIdKey);
+    this.objLibKey.get(libraryKey)!.add(objKey);
   }
 
   async getByLibrary(libraryId: Uuidv4): Promise<any[]> {
     const libraryKey = libraryId.toHex();
-    const objectIds = this.libraryIndex.get(libraryKey);
+    const objectIds = this.objLibKey.get(libraryKey);
     if (!objectIds) {
       return [];
     }
@@ -72,11 +74,11 @@ export class AirdayMemStorage implements StorageAdapter {
       const obj = this.syncObjects.get(key);
       if (obj && obj.libraryId) {
         const libraryKey = obj.libraryId.toHex();
-        const librarySet = this.libraryIndex.get(libraryKey);
+        const librarySet = this.objLibKey.get(libraryKey);
         if (librarySet) {
           librarySet.delete(key);
           if (librarySet.size === 0) {
-            this.libraryIndex.delete(libraryKey);
+            this.objLibKey.delete(libraryKey);
           }
         }
       }
@@ -88,6 +90,6 @@ export class AirdayMemStorage implements StorageAdapter {
   async clear(): Promise<void> {
     this.syncObjects.clear();
     this.outbox.clear();
-    this.libraryIndex.clear();
+    this.objLibKey.clear();
   }
 }

@@ -85,9 +85,7 @@ export class AirdaySync {
     this.syncState = SyncState.Stopping;
     await this.core.ws.stop();
   }
-  // TODO: rename as this only awaits pending batch response completions
-  // TODO: Timeout!
-  flush() {
+  awaitAcks() {
     return new Promise((resolve) => {
       // TODO: This should also test ws outbound messages
       if (this.unackedOps.size === 0) return resolve(null);
@@ -223,6 +221,7 @@ export class AirdaySync {
   // Handler for a reply to an op originating from this client - 2nd phase commit
   private applyAck = async (ack: OpAck) => {
     const op = await this.core.storage.adapter.getOutboxOp(ack.opId);
+    op.seq = ack.seq;
     const obj = await this.core.storage.getObj(op.objId);
     if (obj) {
       obj.commitPatch(op);
