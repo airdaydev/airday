@@ -1,6 +1,5 @@
 import { TypeOf, v } from "suretype";
 import { Uuidv4 } from "../common/uuid";
-import { SessionState } from "./auth";
 
 export const sessionLikeSchema = v.object({
   type: v.string().required(),
@@ -8,13 +7,17 @@ export const sessionLikeSchema = v.object({
 
 export type SessionLike = TypeOf<typeof sessionLikeSchema>;
 
+export type SessionTypeString = "remote" | "local";
+
 export interface LocalSession {
+  type: "local";
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
 }
 
 export function newLocalSession(): LocalSession {
   return {
+    type: "local",
     userId: new Uuidv4(),
     primaryLibraryId: new Uuidv4(),
   };
@@ -42,7 +45,7 @@ export enum AuthState {
 export interface SessionData {
   userId: Uuidv4;
   primaryLibraryId: Uuidv4;
-  type: "remote" | "local";
+  type: SessionTypeString;
 }
 
 export enum SessionType {

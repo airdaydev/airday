@@ -4,6 +4,7 @@ import { Uuidv4 } from "../common/uuid";
 import { AuthAdapter } from "./adapter";
 import {
   AuthEventMap,
+  LocalSession,
   newLocalSession,
   SessionLike,
   sessionLikeSchema,
@@ -13,6 +14,26 @@ import {
 } from "./types";
 
 export const SESSION_STORAGE_KEY = "airday_session";
+
+export function persistLocalSession(session: LocalSession) {
+  const serialised = JSON.stringify({
+    type: "local",
+    userId: session.userId.toString(),
+    primaryLibraryId: session.primaryLibraryId.toString(),
+  });
+  localStorage.setItem(SESSION_STORAGE_KEY, serialised);
+}
+
+export function deserialiseLocalSession(
+  sessionLike: SessionLike,
+): LocalSession {
+  const local = ensure(storedLocalSessionSchema, sessionLike);
+  return {
+    type: "local",
+    userId: Uuidv4.fromString(local.userId),
+    primaryLibraryId: Uuidv4.fromString(local.primaryLibraryId),
+  };
+}
 
 export class AirdaySession {
   auth: AuthAdapter;
@@ -28,38 +49,49 @@ export class AirdaySession {
     });
   }
   anon() {
-    // TODO: Clear AuthAdapter
-    // Emit clear event
-    this.type = SessionType.Local;
-    this.state = newLocalSession();
+    this.bootLocalSession(newLocalSession());
   }
-  boot(sessionLike: SessionLike) {
-    try {
-      if (sessionLike.type === "local") {
-        const local = ensure(storedLocalSessionSchema, sessionLike);
-        this.type = SessionType.Local;
-        this.state = {
-          userId: Uuidv4.fromString(local.userId),
-          primaryLibraryId: Uuidv4.fromString(local.primaryLibraryId),
-        };
-        // TODO: Store local session
-        return;
-      } else {
-        this.auth.attemptBoot(sessionLike);
-      }
-    } catch (err) {
-      console.error("Failed to boot session", err);
-      this.anon();
-    }
+  bootLocalSession(session: LocalSession) {
+    this.type = SessionType.Local;
+    this.state = {
+      userId: session.userId,
+      primaryLibraryId: session.primaryLibraryId,
+    };
+    persistLocalSession(session);
   }
   // This should really only trigger once, TODO: enforce?
-  loadFromStorage() {
+  async loadFromStorage() {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!stored) {
-      return newLocalSession();
+      this.anon();
+      return;
     }
-    const sessionLike = ensure(sessionLikeSchema, stored);
-    this.boot(sessionLike);
+    let sessionLike;
+    try {
+      const parsed = JSON.parse(stored);
+      sessionLike = ensure(sessionLikeSchema, parsed);
+    } catch (err) {
+      console.error("Error passing session storage", err);
+    }
+    // is SessionLike
+    if (sessionLike) {
+      try {
+        // If a local session, handle here
+        if (sessionLike.type === "local") {
+          const session = deserialiseLocalSession(sessionLike);
+          this.bootLocalSession(session);
+          return;
+        } else {
+          // else attempt to handle in auth adapter
+          await this.auth.attemptBoot(sessionLike);
+        }
+      } catch (err) {
+        console.error("Failed to boot session", err);
+        this.anon();
+      }
+    } else {
+      this.anon();
+    }
   }
   requestCredentials: RequestCredentials = "omit";
 }

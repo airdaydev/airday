@@ -15,14 +15,43 @@ test("Unauthorised API root url & version", async () => {
 test("Anon offline user", () => {
   const core = createBearerCore();
   expect(core.session.type, "Uninitialised auth").toBe(SessionType.None);
+  expect(core.session.state).toBeUndefined();
   core.session.anon();
   expect(core.session.type).toBe(SessionType.Local);
   expect(core.session.state!.userId instanceof Uuidv4).toBe(true);
   expect(core.session.state!.primaryLibraryId instanceof Uuidv4).toBe(true);
 });
 
-test.todo("Boot offline user from local storage", () => {});
-test.todo("Boot online user from local storage", () => {});
+test("Boot offline user from local storage", async () => {
+  const core = createBearerCore();
+  core.session.anon();
+  const core2 = createBearerCore();
+  await core2.session.loadFromStorage();
+  expect(
+    core.session.state?.userId!.equals(core2.session.state?.userId!),
+  ).toBeTrue();
+  expect(
+    core.session.state?.primaryLibraryId!.equals(
+      core2.session.state?.primaryLibraryId!,
+    ),
+  ).toBeTrue();
+  expect(core2.session.type).toBe(SessionType.Local);
+});
+
+test("Boot online user from local storage", async () => {
+  const core = await createAuthenticatedCore(testEmail("boot_cache"));
+  const core2 = createBearerCore();
+  await core2.session.loadFromStorage();
+  expect(
+    core.session.state?.userId!.equals(core2.session.state?.userId!),
+  ).toBeTrue();
+  expect(
+    core.session.state?.primaryLibraryId!.equals(
+      core2.session.state?.primaryLibraryId!,
+    ),
+  ).toBeTrue();
+  expect(core.session.type).toBe(SessionType.Remote);
+});
 
 test("non-existent username & password", async () => {
   const core = createBearerCore();

@@ -14,6 +14,11 @@ export const storedCookieSession = v.object({
   sessionExpiry: v.number().required(),
 });
 
+export function persistCookieSession(session: CookieSession) {
+  const serialised = JSON.stringify(session);
+  localStorage.setItem(SESSION_STORAGE_KEY, serialised);
+}
+
 export type StoredCookieSession = TypeOf<typeof storedCookieSession>;
 
 interface CookieSession {
@@ -54,10 +59,7 @@ export class CookieAdapter extends AuthAdapter {
     // TODO: Other things
     // TODO: If refreshExpiry is finished, it's over
     this.scheduleRefresh(session.sessionExpiry);
-    this.persistSession(session);
-  }
-  persistSession(session: CookieSession) {
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    persistCookieSession(session);
   }
   async passwordAuth(opts: TypeOf<typeof passwordAuthSchema.schema>) {
     // Retries when offline

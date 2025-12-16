@@ -1,17 +1,22 @@
 import { ensure, TypeOf, v } from "suretype";
-import { SESSION_STORAGE_KEY } from "./auth";
 import { passwordAuthSchema } from "../http/types";
 import { passwordAuthBearer, refreshBearer } from "../http/auth";
 import { verifyToken } from "./token";
 import { AuthAdapter, getExpiryDelayMs } from "./adapter";
 import { SessionLike } from "./types";
 import { AuthenticateAction } from "../sync/fb";
+import { SESSION_STORAGE_KEY } from "./auth";
 
 export const storedBearerSessionSchema = v.object({
   type: v.string().const("bearer").required(),
   sessionToken: v.string().required(),
   refreshToken: v.string().required(),
 });
+
+export function persistBearerSession(session: BearerSession) {
+  const serialised = JSON.stringify(session);
+  localStorage.setItem(SESSION_STORAGE_KEY, serialised);
+}
 
 export type BearerSession = TypeOf<typeof storedBearerSessionSchema>;
 
@@ -54,14 +59,11 @@ export class BearerAdapter extends AuthAdapter {
     this.refreshExpiry = refreshTokenData.expiry;
     // TODO: If refreshExpiry is finished, it's over
     this.scheduleRefresh(sessionTokenData.expiry);
-    this.persistSession(session);
+    persistBearerSession(session);
     this.events.emit("session", {
       userId: sessionTokenData.userId,
       primaryLibraryId: sessionTokenData.primaryLibraryId,
     });
-  }
-  persistSession(session: BearerSession) {
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
   async refresh() {
     if (!this.refreshToken) {

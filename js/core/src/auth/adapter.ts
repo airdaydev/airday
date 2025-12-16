@@ -1,9 +1,8 @@
 import { TypeOf } from "suretype";
 import { passwordAuthSchema } from "../http/types";
-import { SessionLike } from "./types";
+import { SessionLike, SessionState } from "./types";
 import { AuthenticateAction } from "../sync/fb";
 import { EventEmitter } from "../common/events";
-import { SessionState } from "./auth";
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
@@ -28,7 +27,7 @@ export abstract class AuthAdapter {
   wsAuthMsg(): false | AuthenticateAction {
     return false;
   }
-  abstract attemptBoot(sessionLike: SessionLike): {};
+  abstract attemptBoot(sessionLike: SessionLike): Promise<void>;
   abstract requestHeaders(json?: boolean): Record<string, string>;
   abstract passwordAuth(
     opts: TypeOf<typeof passwordAuthSchema.schema>,
