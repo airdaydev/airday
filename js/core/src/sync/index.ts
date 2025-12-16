@@ -18,6 +18,7 @@ import {
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { SessionType } from "../auth/types";
+import { Library } from "../common/library";
 
 interface SyncEventMap {
   flushed: {};
@@ -125,7 +126,10 @@ export class AirdaySync {
     this.core.ws.enqueue(req);
     return itemStream;
   }
-  createList(list: any) {}
+  async createLibrary(name: string) {
+    const library = new Library();
+    this.core.storage.adapter.createLibrary(library);
+  }
   async queueOp(op: SyncOp, obj: SyncObject) {
     await this.core.storage.adapter.addOp(op, obj);
     this.core.storage.setStateCache(obj);

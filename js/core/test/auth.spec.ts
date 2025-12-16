@@ -5,6 +5,7 @@ import { createBearerCore, createAuthenticatedCore, testEmail } from "./utils";
 import { BearerAdapter } from "../src/auth/bearer";
 import { Uuidv4 } from "../src/common/uuid";
 import { SessionType } from "../src/auth/types";
+import { Library } from "../src/common/library";
 
 test("Unauthorised API root url & version", async () => {
   const core = createBearerCore();
@@ -12,14 +13,18 @@ test("Unauthorised API root url & version", async () => {
   expect(typeof d.data.version).toBe("string");
 });
 
-test("Anon offline user", () => {
+test.only("Anon offline user", async () => {
   const core = createBearerCore();
   expect(core.session.type, "Uninitialised auth").toBe(SessionType.None);
   expect(core.session.state).toBeUndefined();
   core.session.anon();
   expect(core.session.type).toBe(SessionType.Local);
   expect(core.session.state!.userId instanceof Uuidv4).toBe(true);
-  expect(core.session.state!.primaryLibraryId instanceof Uuidv4).toBe(true);
+  const libId = core.session.state!.primaryLibraryId;
+  expect(libId instanceof Uuidv4).toBe(true);
+  // TODO: Take this from core.storage root method
+  const lib = await core.storage.adapter.getByLibrary(libId);
+  expect(lib).toBeInstanceOf(Library);
 });
 
 test("Boot offline user from local storage", async () => {

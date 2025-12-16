@@ -7,7 +7,7 @@ import { OpKind, SyncOpProto } from "../src/proto";
 import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
 import { WSState } from "../src/websocket";
-import { createAuthenticatedCore, testEmail } from "./utils";
+import { createAuthenticatedCore, createBearerCore, testEmail } from "./utils";
 
 // TODO: Null state to clear? or explicit clear field?
 test("create, encode & decode patch SyncOp", async () => {
@@ -178,11 +178,13 @@ test("Catch up streams", async () => {
   core.sync.stop();
 });
 
+test.todo("Create offline library", async () => {
+  const core = createBearerCore();
+});
 test.todo("Get all libraries", async () => {});
 test.todo("fan out to connection on same library", () => {});
 test.todo("Sync back-off restart attempts", async () => {});
 test.todo("Upgrade local user to remote & sync ops", async () => {});
-test.todo("Create offline library", async () => {});
 test.todo("Upgrade library to remote", async () => {});
 test.todo("Sync local pending changes from idb, once online", async () => {});
 test.todo("Delete library", async () => {});

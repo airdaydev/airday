@@ -1,15 +1,17 @@
+import { Library } from "../common/library";
 import {
   HexUuid,
   LibraryHexUuid,
   SyncObjectHexUuid,
   Uuidv4,
 } from "../common/uuid";
-import { DBSyncObject, SyncObject } from "../sync/sync-object";
-import { SerialisedSyncOp, SyncOp } from "../sync/sync-op";
+import { SyncObject } from "../sync/sync-object";
+import { SyncOp } from "../sync/sync-op";
 import { StorageAdapter } from "./adapter";
 
 // In-memory storage adapter for headless testing environments
 export class AirdayMemStorage implements StorageAdapter {
+  private libraries: Map<LibraryHexUuid, Library> = new Map();
   private syncObjects: Map<SyncObjectHexUuid, SyncObject> = new Map(); // TODO: Serialised version?
   private objLibKey: Map<LibraryHexUuid, Set<SyncObjectHexUuid>> = new Map();
   // TODO: Do we need a lib op key?
@@ -85,6 +87,14 @@ export class AirdayMemStorage implements StorageAdapter {
       this.syncObjects.delete(key);
       this.outbox.delete(key);
     }
+  }
+
+  async createLibrary(library: Library) {
+    this.libraries.set(library.id.toHex(), library);
+  }
+
+  async getLibrary(libraryId: Uuidv4): Promise<Library | undefined> {
+    return this.libraries.get(libraryId.toHex());
   }
 
   async clear(): Promise<void> {
