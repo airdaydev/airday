@@ -1,10 +1,10 @@
 import { Uuidv4 } from "./uuid";
 
 interface LibraryConstructorOpts {
-  id: Uuidv4;
-  name: string;
-  remote: boolean;
-  primary: boolean;
+  id?: Uuidv4;
+  name?: string;
+  remote?: boolean;
+  primary?: boolean;
 }
 
 export class Library {
@@ -12,12 +12,10 @@ export class Library {
   name: string = "Primary";
   remote = false; // Has not been synced yet
   primary = false;
-  constructor(opts?: LibraryConstructorOpts) {
-    if (opts) {
-      this.id = opts.id;
-      this.name = opts.name;
-      this.remote = opts.remote;
-      this.primary = opts.primary;
-    }
+  constructor(opts: LibraryConstructorOpts = {}) {
+    if (opts.id) this.id = opts.id;
+    if (opts.name) this.name = opts.name;
+    if (opts.remote) this.remote = opts.remote;
+    if (opts.primary) this.primary = opts.primary;
   }
 }

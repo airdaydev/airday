@@ -8,6 +8,7 @@ import { NumericAttrMap, SyncObject } from "../src/sync/sync-object";
 import { InitialSnapshotOp, SyncOp } from "../src/sync/sync-op";
 import { WSState } from "../src/websocket";
 import { createAuthenticatedCore, createBearerCore, testEmail } from "./utils";
+import { Library } from "../src/common/library";
 
 // TODO: Null state to clear? or explicit clear field?
 test("create, encode & decode patch SyncOp", async () => {
@@ -178,9 +179,20 @@ test("Catch up streams", async () => {
   core.sync.stop();
 });
 
-test.todo("Create offline library", async () => {
+test("Create offline library", async () => {
   const core = createBearerCore();
+  core.session.anon();
+  // TODO: A more general ready func?
+  await core.storage.whenReady();
+  const lib = new Library({
+    name: "Shared library",
+    remote: false,
+  });
+  core.storage.adapter.addLibrary(lib);
+  const stored = await core.storage.adapter.getLibrary(lib.id);
+  expect(stored).toBe(lib);
 });
+
 test.todo("Get all libraries", async () => {});
 test.todo("fan out to connection on same library", () => {});
 test.todo("Sync back-off restart attempts", async () => {});

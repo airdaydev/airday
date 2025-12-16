@@ -13,7 +13,7 @@ test("Unauthorised API root url & version", async () => {
   expect(typeof d.data.version).toBe("string");
 });
 
-test.only("Anon offline user", async () => {
+test("Anon offline user", async () => {
   const core = createBearerCore();
   expect(core.session.type, "Uninitialised auth").toBe(SessionType.None);
   expect(core.session.state).toBeUndefined();
