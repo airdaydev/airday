@@ -193,26 +193,15 @@ test("Catch up streams", async () => {
   core.sync.stop();
 });
 
-test.todo("Delete attribute patches", async () => {});
-
-test.todo("Delete object patches", async () => {});
-test.todo("Snapshots", async () => {});
-test.todo("Merkle tree backed sync discrepency resolution", async () => {});
-test.todo("Double OP ids w different sha256s?", async () => {});
-
-test.todo("mem adapter", () => {
-  // // Examples for the solid adapter within the web app:
-  // class AirdayUIItem {}
-  // class AirdayUIContainer {}
-  // class SolidAdapterExample {
-  //   items: Map<string, AirdayUIItem> = new Map(); // reactive
-  //   containers: Map<string, AirdayUIContainer> = new Map(); // reactive
-  //   constructor() {}
-  // }
-  // const solidAdapter = new SolidAdapterExample();
-});
-
+test.todo("Sync back-off restart attempts", async () => {});
+test.todo("Sync local pending changes from idb, once online", async () => {});
+test.todo("Upgrade local user to remote", async () => {});
 test.todo("Get all libraries", async () => {});
 test.todo("Create library", async () => {});
+test.todo("Upgrade library to remote", async () => {});
 test.todo("Delete library", async () => {});
-test.todo("Sync local pending changes from idb", async () => {});
+test.todo("Delete attribute patches", async () => {});
+test.todo("Delete object patches", async () => {});
+test.todo("Snapshots", async () => {});
+test.todo("Handle sync discrepancies", async () => {});
+test.todo("Handle duplicate op ids with mismatched content", async () => {});
