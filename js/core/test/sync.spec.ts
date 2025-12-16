@@ -72,11 +72,6 @@ test("Phase 1 commit", async () => {
   expect(obj.pendingOps.size).toBe(2);
 });
 
-// test("websocket reauthenticating", async () => {
-//   const core = await createAuthenticatedCore(testEmail("websocket_reauth"));
-//   const core2 = await createAuthenticatedCore(testEmail("websocket_reauth_2"));
-// });
-
 test("websocket lifecycle & self-healing", async () => {
   const core = await createAuthenticatedCore(testEmail("websocket"));
   expect(core.ws.state).toBe(WSState.Disconnected);
@@ -125,11 +120,9 @@ test("2-phase commit", async () => {
     outboxOpIdb.id.equals(outboxOp.id),
     "serialised version stored in idb",
   ).toBe(true);
-  // Flush is dead again! We could flush or we could track actual ops too
+  // TODO: Consider tracking on op level
   await core.sync.awaitAcks();
-  // We are only doing this after to ensure op-response fires
   const syncObject = await core.storage.getObj(obj.id);
-  // // TODO: We should clear & check storage backed version too (at least in a dedicated test!)
   expect(syncObject, "obj cached in mem cache").toBe(obj);
   expect(
     core.sync.outbox.length,
@@ -140,7 +133,7 @@ test("2-phase commit", async () => {
     "ack message received & pending message index removed",
   ).toBe(0);
   expect(syncObject?.maxSeq, "seq persisted to sync object").toBe(1n);
-  // Storage!?
+  // Storage backed tests
   const res = await core.storage.adapter.getByLibrary(
     core.session.state?.primaryLibraryId!,
   );
@@ -151,8 +144,6 @@ test("2-phase commit", async () => {
   ).toBeTrue();
   core.sync.stop();
 });
-
-test.skip("fan out to connection on same library", () => {});
 
 test("Catch up streams", async () => {
   const core = await createAuthenticatedCore(testEmail("catch_up"));
@@ -187,12 +178,13 @@ test("Catch up streams", async () => {
   core.sync.stop();
 });
 
-test.todo("Sync back-off restart attempts", async () => {});
-test.todo("Sync local pending changes from idb, once online", async () => {});
-test.todo("Upgrade local user to remote", async () => {});
 test.todo("Get all libraries", async () => {});
+test.todo("fan out to connection on same library", () => {});
+test.todo("Sync back-off restart attempts", async () => {});
+test.todo("Upgrade local user to remote & sync ops", async () => {});
 test.todo("Create offline library", async () => {});
 test.todo("Upgrade library to remote", async () => {});
+test.todo("Sync local pending changes from idb, once online", async () => {});
 test.todo("Delete library", async () => {});
 test.todo("Delete attribute patches", async () => {});
 test.todo("Delete object patches", async () => {});
