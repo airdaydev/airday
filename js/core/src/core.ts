@@ -28,7 +28,6 @@ export class AirdayCore {
       throw new Error("AuthAdapter required in AirdayCore constructor");
     }
     this.session.events.on("initialised", async (sessionData) => {
-      console.log("initialised");
       // TODO: If sync is in an intermediate state, do not allow this to occur
       await this.ws.stop(); // TODO: Consider making this controlled by sync
       await this.storage.initDb(

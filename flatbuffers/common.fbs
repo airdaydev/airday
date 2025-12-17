@@ -1,0 +1,6 @@
+// fbs shared between application & sync layer
+namespace Common;
+
+struct UuidProto {
+  value: [uint8:16];
+}

@@ -1,0 +1,26 @@
+// TODO: In the case that we carry custom vals, we could use this format
+
+enum AttrTypeProto: ubyte { NONE=0, STRING=1, BOOL=2, I64=3, F64=4, BYTES=5 }
+
+// https://groups.google.com/g/flatbuffers/c/jcgLfSd1L0o?pli=1
+// (Messageboard discussing union vs wide table)
+table AttributeProto {
+  // Meta
+  field_id: short;
+  value_type: AttrTypeProto;
+  timestamp: LWWTimestampProto;
+  // Values
+  bool: bool;
+  i64_fb: long;
+  f64_fb: double;
+  string: string;
+  bytes: [ubyte];
+  // TODO: Mark as removed (always overriden)
+  clear: bool;
+}
+
+table AttributeSetProto { attributes: [AttributeProto]; }
+
+// AttributeSetProto is used for database storage of attrs
+// and is typically encrypted
+root_type AttributeSetProto;

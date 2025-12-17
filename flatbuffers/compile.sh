@@ -6,6 +6,7 @@ JS_DIR="$WORK_DIR/../js/core/src"
 RS_DIR="$WORK_DIR/../server/src/sync"
 rm -rf $JS_DIR/proto
 rm -rf $RS_DIR/proto_generated.rs
-flatc --ts -o $JS_DIR/ $WORK_DIR/proto.fbs
-flatc --rust -o $RS_DIR/ $WORK_DIR/proto.fbs
+flatc --ts -I $WORK_DIR -o $JS_DIR/ $WORK_DIR/proto.fbs
+flatc --ts -o $JS_DIR/ $WORK_DIR/airday_proto.fbs
+flatc --rust -I $WORK_DIR -o $RS_DIR/ $WORK_DIR/proto.fbs
 echo Compiled Flatbuffers for Typescript and Rust

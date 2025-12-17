@@ -1,0 +1,19 @@
+// Airday-specific object encoding
+include "common.fbs";
+
+struct LWWTimestampProto {
+  utc: long;
+  pid: long;
+}
+
+table ItemProto {
+  version: short;
+  id: Common.UuidProto (required);
+  name: string;
+}
+
+table EventProto {
+  version: short;
+  id: Common.UuidProto (required);
+  name: string;
+}
