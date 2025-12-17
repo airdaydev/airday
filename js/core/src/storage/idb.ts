@@ -3,6 +3,7 @@ import { SyncOp } from "../sync/sync-op";
 import { Uuidv4 } from "../common/uuid";
 import { dbName, StorageAdapter } from "./adapter";
 import { SyncObject } from "../sync/sync-object";
+import { Library } from "../common/library";
 
 const SYNC_STORE_NAME = "sync_object"; // snapshot of merged ops i.e. entire object
 const LIBRARY_STORE_NAME = "library";
@@ -96,6 +97,24 @@ export class AirdayIDBStorage implements StorageAdapter {
     const store = tx.objectStore(SYNC_STORE_NAME);
     await Promise.all(hexIds.map((id) => store.delete(id)));
     await tx.done;
+  };
+  addLibrary = async (library: Library): Promise<void> => {
+    await this.handle!.put(LIBRARY_STORE_NAME, {
+      id: library.id,
+      name: library.name,
+      remote: library.remote,
+      primary: library.primary,
+    });
+  };
+  getLibrary = async (id: Uuidv4): Promise<Library | undefined> => {
+    const raw = await this.handle!.get(LIBRARY_STORE_NAME, id);
+    if (!raw) return undefined;
+    return new Library({
+      id: Uuidv4.fromUint8Array(raw.id),
+      name: raw.name,
+      remote: raw.remote,
+      primary: raw.primary,
+    });
   };
   clear = async () => {
     await this.handle?.clear("sync_object");

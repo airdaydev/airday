@@ -1,0 +1,106 @@
+// These are kept around in case we want to add generic & dynamic props
+// But tbh this needs more thought
+export function serialiseAttr(
+  builder: Builder,
+  patch: NumericAttrMap,
+  fieldId: number,
+) {
+  const field = patch[fieldId];
+  if (!field) {
+    console.warn(`Could not find field ${fieldId} to serialise`);
+    return false;
+  }
+  let strOffset;
+  let valueType;
+  switch (typeof field.data) {
+    case "string": {
+      valueType = AttrTypeProto.STRING;
+      strOffset = builder.createString(field.data);
+      break;
+    }
+    case "boolean": {
+      valueType = AttrTypeProto.BOOL;
+      break;
+    }
+    case "number": {
+      valueType = AttrTypeProto.F64;
+      break;
+    }
+    default: {
+      console.warn(`unable to deserialise type=${typeof field.data}`);
+      return false;
+    }
+  }
+  AttributeProto.startAttributeProto(builder);
+  AttributeProto.addFieldId(builder, fieldId);
+  AttributeProto.addValueType(builder, valueType);
+  AttributeProto.addTimestamp(
+    builder,
+    field.timestamp.addToFlatBuffer(builder),
+  );
+  if (strOffset) {
+    AttributeProto.addString(builder, strOffset);
+  }
+  // TODO: Double type check...?
+  if (valueType === AttrTypeProto.F64 && typeof field.data === "number") {
+    AttributeProto.addF64Fb(builder, field.data);
+  }
+  if (valueType === AttrTypeProto.BOOL && typeof field.data === "boolean") {
+    AttributeProto.addBool(builder, field.data);
+  }
+  return AttributeProto.endAttributeProto(builder);
+}
+
+export function deserialiseAttr(attr: AttributeProto) {
+  const type = attr.valueType();
+  const rawTimestamp = attr.timestamp();
+  if (!rawTimestamp) {
+    throw new Error(`No timestamp found while deserialising attr!`);
+  }
+  const timestamp = LWWTimestamp.fromProto(rawTimestamp);
+  let data;
+  switch (type) {
+    case AttrTypeProto.BOOL: {
+      data = attr.bool();
+      break;
+    }
+    case AttrTypeProto.STRING: {
+      data = attr.string();
+      break;
+    }
+    case AttrTypeProto.F64: {
+      data = attr.f64Fb();
+      break;
+    }
+    case AttrTypeProto.I64: {
+      data = attr.i64Fb();
+      break;
+    }
+    case AttrTypeProto.BYTES: {
+      // TODO: Bytes is currently obviously not working
+      data = attr.bytes(0);
+      break;
+    }
+    default: {
+      throw new Error(`Unknown type - cannot deserialise`);
+    }
+  }
+  return new LWWRegister({
+    data,
+    timestamp,
+  });
+}
+
+export function parseAttrSet(buffer: Uint8Array) {
+  const state: NumericAttrMap = {};
+  const bb = new ByteBuffer(buffer);
+  const attrSet = AttributeSetProto.getRootAsAttributeSetProto(bb);
+  for (let i = 0; i < attrSet.attributesLength(); i++) {
+    const attr = attrSet.attributes(i);
+    if (attr) {
+      const lww = deserialiseAttr(attr);
+      state[attr.fieldId()] = lww;
+    }
+  }
+  return state;
+}

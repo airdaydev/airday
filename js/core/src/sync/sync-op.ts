@@ -4,7 +4,7 @@ import { OpKind, SyncOpProto } from "../proto/sync-proto.js";
 import { UuidProto } from "../proto/common-proto.js";
 import { NumericAttrMap, SyncObject } from "./sync-object";
 import { v, compile } from "suretype";
-import { serialiseAttr, parseAttrSet } from "./fb";
+// import { serialiseAttr, parseAttrSet } from "./fb";
 
 export interface OpHeader {
   id: Uuidv4;
@@ -131,7 +131,7 @@ export class SyncOp {
     // Parse the payload into a patch if it exists
     let patch: NumericAttrMap | undefined;
     if (payload && payload.length > 0) {
-      patch = parseAttrSet(payload);
+      // patch = parseAttrSet(payload);
     }
 
     return new SyncOp({
@@ -149,22 +149,22 @@ export class SyncOp {
       return new Uint8Array();
     }
     const builder = new Builder();
-    const attributes: number[] = [];
-    for (const key of Object.keys(this.patch)) {
-      const offset = serialiseAttr(builder, this.patch, Number(key));
-      if (offset) {
-        attributes.push(offset);
-      }
-    }
-    const attributesOffset = AttributeSetProto.createAttributesVector(
-      builder,
-      attributes,
-    );
-    const offset = AttributeSetProto.createAttributeSetProto(
-      builder,
-      attributesOffset,
-    );
-    builder.finish(offset);
+    // const attributes: number[] = [];
+    // for (const key of Object.keys(this.patch)) {
+    //   const offset = serialiseAttr(builder, this.patch, Number(key));
+    //   if (offset) {
+    //     attributes.push(offset);
+    //   }
+    // }
+    // const attributesOffset = AttributeSetProto.createAttributesVector(
+    //   builder,
+    //   attributes,
+    // );
+    // const offset = AttributeSetProto.createAttributeSetProto(
+    //   builder,
+    //   attributesOffset,
+    // );
+    // builder.finish(offset);
     return builder.asUint8Array();
   }
   addToFlatBuffer(builder: Builder) {

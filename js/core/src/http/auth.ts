@@ -6,7 +6,7 @@ import {
   v_session_bearer,
   v_session_cookie,
 } from "./types";
-import { AuthAdapter } from "../auth/adapter";
+import { AuthAdapter } from "../session/adapter";
 
 const jsonHeaders = {
   "Content-Type": "application/json",
