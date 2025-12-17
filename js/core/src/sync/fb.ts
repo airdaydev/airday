@@ -2,14 +2,14 @@ import { Builder, ByteBuffer, type Offset } from "flatbuffers";
 import {
   AuthenticateActionProto,
   SpanContextProto,
-  UuidProto,
   SyncStreamReqProto,
   MessageProto,
   MessageWrapperProto,
   BatchSyncOpProto,
-  AttrTypeProto,
-  AttributeProto,
-  AttributeSetProto,
+  // UuidProto,
+  // AttrTypeProto,
+  // AttributeProto,
+  // AttributeSetProto,
 } from "../proto";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import type { MQMessage } from "../websocket";

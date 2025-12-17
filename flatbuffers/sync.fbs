@@ -1,10 +1,10 @@
 // Flatbuffer serialisation for Sync layer
 include "common.fbs";
 
-namespace Proto;
+namespace SyncProto;
 
 table LibraryProto {
-  id: Common.UuidProto (required);
+  id: CommonProto.UuidProto (required);
   name: string;
 }
 
@@ -18,11 +18,11 @@ table SyncOpProto {
   // sync meta
   proto_version: ushort = 1; // TODO: Consider hoisting to parent
   op_kind: OpKind;
-  op_id: Common.UuidProto (required);
+  op_id: CommonProto.UuidProto (required);
   base_seq: long; // for snapshot only
   // path
-  library_id: Common.UuidProto (required);
-  obj_id: Common.UuidProto (required);
+  library_id: CommonProto.UuidProto (required);
+  obj_id: CommonProto.UuidProto (required);
   obj_kind: short;
   path: short;
   // data
@@ -34,8 +34,8 @@ table AuthenticateActionProto {
 }
 
 table AuthenticateResponseProto {
-  user_id: Common.UuidProto;
-  library_id: Common.UuidProto;
+  user_id: CommonProto.UuidProto;
+  library_id: CommonProto.UuidProto;
 }
 
 table LibrarySyncResponseProto {
@@ -43,15 +43,15 @@ table LibrarySyncResponseProto {
 }
 
 table ResponseProto {
-  op_id: Common.UuidProto (required);
+  op_id: CommonProto.UuidProto (required);
   success: bool;
   error: string;
   seq: long;
 }
 
 table SyncStreamReqProto {
-  stream_id: Common.UuidProto (required);
-  library_id: Common.UuidProto (required);
+  stream_id: CommonProto.UuidProto (required);
+  library_id: CommonProto.UuidProto (required);
   seq: long;
 }
 
@@ -63,7 +63,7 @@ enum StreamEventProto: byte {
 }
 
 struct StreamContextProto {
-  id: Common.UuidProto;
+  id: CommonProto.UuidProto;
   event: StreamEventProto;
 }
 
@@ -78,7 +78,7 @@ table BatchResponseProto {
 
 table ErrorResponseProto {
   stream_context: StreamContextProto;
-  message_id: Common.UuidProto;
+  message_id: CommonProto.UuidProto;
   error: string;
 }
 
@@ -97,7 +97,7 @@ union MessageProto {
 }
 
 table MessageWrapperProto {
-  message_id: Common.UuidProto;
+  message_id: CommonProto.UuidProto;
   span_context: SpanContextProto;
   message: MessageProto (required);
 }
