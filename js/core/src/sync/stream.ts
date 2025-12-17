@@ -1,6 +1,6 @@
 import { EventEmitter } from "../common/events";
 import { Uuidv4 } from "../common/uuid";
-import { StreamContextProto, StreamEventProto } from "../proto";
+import { StreamContextProto, StreamEventProto } from "../proto/sync-proto.js";
 import { SyncStreamReqMessage } from "./fb";
 
 export interface StreamContext {

@@ -2,7 +2,7 @@
 
 import { parse, stringify, v4 } from "uuid";
 import { hexToUint8Array, uint8ArrayToHex } from "uint8array-extras";
-import { UuidProto } from "../proto";
+import { UuidProto } from "../proto/common-proto.js";
 
 export type HexUuid = string; // for hash storage
 export type LibraryHexUuid = string;

@@ -1,5 +1,5 @@
 import { Tracer, TracerID } from "@airday/tracer";
-import { SpanContextProto } from "./proto";
+import { SpanContextProto } from "./proto/sync-proto.js";
 
 export const tracer = new Tracer("airday_js", {
   bypass: true,

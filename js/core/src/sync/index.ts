@@ -14,7 +14,7 @@ import {
   MessageProto,
   MessageWrapperProto,
   ResponseProto,
-} from "../proto";
+} from "../proto/sync-proto.js";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import { ULSpan } from "@airday/tracer";
 import { SessionType } from "../session/types";

@@ -2,7 +2,7 @@ import {
   MessageWrapperProto,
   AuthenticateResponseProto,
   MessageProto,
-} from "../proto";
+} from "../proto/sync-proto.js";
 import { type AirdayCore } from "../core";
 import { BatchSyncMessage, decodeFrame } from "../sync/fb";
 import { Uuidv4 } from "../common/uuid";

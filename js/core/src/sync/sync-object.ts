@@ -1,7 +1,7 @@
 import { LWWRegister } from "../crdt/lww";
 import { HexUuid, Uuidv4 } from "../common/uuid";
 import { compile, v, type TypeOf } from "suretype";
-import { OpKind } from "../proto";
+import { OpKind } from "../proto/sync-proto.js";
 import { OpHeader, SyncOp } from "./sync-op";
 
 export type KeyMap = { readonly [k: string]: number };

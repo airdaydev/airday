@@ -1,6 +1,7 @@
 import { Builder } from "flatbuffers";
 import { Uuidv4 } from "../common/uuid";
-import { AttributeSetProto, OpKind, SyncOpProto, UuidProto } from "../proto";
+import { OpKind, SyncOpProto } from "../proto/sync-proto.js";
+import { UuidProto } from "../proto/common-proto.js";
 import { NumericAttrMap, SyncObject } from "./sync-object";
 import { v, compile } from "suretype";
 import { serialiseAttr, parseAttrSet } from "./fb";

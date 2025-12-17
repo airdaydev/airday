@@ -1,5 +1,5 @@
 import { Builder } from "flatbuffers";
-import { LWWTimestampProto } from "../proto";
+import { LWWTimestampProto } from "../proto/airday-proto.js";
 import { type TypeOf, v, ensure } from "suretype";
 
 // BigInt process ID generated from high entropy-source, if available

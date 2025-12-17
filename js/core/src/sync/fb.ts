@@ -6,11 +6,8 @@ import {
   MessageProto,
   MessageWrapperProto,
   BatchSyncOpProto,
-  // UuidProto,
-  // AttrTypeProto,
-  // AttributeProto,
-  // AttributeSetProto,
-} from "../proto";
+} from "../proto/sync-proto.js";
+import { UuidProto } from "../proto/common-proto.js";
 import { spanFromFlatbuffer, tracer } from "../tracer";
 import type { MQMessage } from "../websocket";
 import type { ULSpan } from "@airday/tracer";
