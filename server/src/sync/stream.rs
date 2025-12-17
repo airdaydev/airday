@@ -11,8 +11,9 @@ use crate::{
     AppState,
     common::error::AppError,
     sync::{
+        common_generated::common_proto::UuidProto,
         fb::{build_batch_sync_op_msg, wrap_message},
-        proto_generated::proto::{MessageProto, StreamContextProto, StreamEventProto, UuidProto},
+        sync_generated::sync_proto::{MessageProto, StreamContextProto, StreamEventProto},
         websocket::send_to_client,
     },
 };

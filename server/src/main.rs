@@ -6,6 +6,9 @@ mod library;
 mod sync;
 mod telemetry;
 mod user;
+
+// Re-export for generated flatbuffer code
+pub use sync::common_generated;
 // Imports
 use crate::auth::cache::AuthCache;
 use crate::auth::paseto::PasetoKeys;

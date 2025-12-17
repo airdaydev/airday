@@ -3,7 +3,7 @@ use crate::{
     sync::{
         batch_response::BatchResponse,
         engine::{IncomingSyncOp, OpLibMap, SyncOpModel, SyncOpSql},
-        proto_generated::proto::OpKind,
+        sync_generated::sync_proto::OpKind,
     },
 };
 use async_trait::async_trait;

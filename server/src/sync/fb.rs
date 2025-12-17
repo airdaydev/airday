@@ -5,13 +5,14 @@ use crate::{
     common::error::AppError,
     sync::{
         batch_response::BatchResponse,
+        common_generated::common_proto::UuidProto,
         engine::SyncOpSql,
-        proto_generated::proto::{
+        sync_generated::sync_proto::{
             AuthenticateResponseProto, AuthenticateResponseProtoArgs, BatchResponseProto,
             BatchResponseProtoArgs, BatchSyncOpProto, BatchSyncOpProtoArgs, ErrorResponseProto,
             ErrorResponseProtoArgs, MessageProto, MessageWrapperProto, MessageWrapperProtoArgs,
             OpKind, ResponseProto, StreamContextProto, StreamEventProto, SyncOpProto,
-            SyncOpProtoArgs, UuidProto,
+            SyncOpProtoArgs,
         },
     },
     user::model::User,

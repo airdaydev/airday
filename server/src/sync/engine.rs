@@ -6,7 +6,7 @@ use crate::{
     sync::{
         batch_response::BatchResponse,
         fb::{build_batch_response_msg, wrap_message},
-        proto_generated::proto::MessageProto,
+        sync_generated::sync_proto::MessageProto,
         websocket::{WebsocketState, send_to_client},
     },
 };

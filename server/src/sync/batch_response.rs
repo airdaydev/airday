@@ -1,4 +1,5 @@
-use crate::sync::proto_generated::proto::{ResponseProto, ResponseProtoArgs, UuidProto};
+use crate::sync::common_generated::common_proto::UuidProto;
+use crate::sync::sync_generated::sync_proto::{ResponseProto, ResponseProtoArgs};
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use uuid::Uuid;
 
