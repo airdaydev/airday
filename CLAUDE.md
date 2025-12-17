@@ -3,9 +3,9 @@ This is Airday, a local-first tasks & calendar application. We are currently wor
 
 The flatbuffer definition is the source of truth for sync communication over websockets. There is also a slim HTTP api handling auth, user creation etc.
 
-The goal of this repo is to have a community edition backed by sqlite and a SaaS edition backed by Postgresql.
+The goal of this repo is to have a community edition backed by sqlite and a SaaS edition initially backed by Postgresql.
 
-This is a close to zero-knowledge e2ee server. Each SyncOp has an encrypted payload defining a map of LWW-Registers of various registers, as well as some metadata. In this way it is forward/back-compat. Snapshots are to be created by clients in a not yet determined means. I will add a text CRDT into the same db table later.
+This is a close to zero-knowledge e2ee server. Each SyncOp has an encrypted payload containing CRDTs as well as some metadata. I have a basic outline of a sync engine - mostly missing the actual E2EE implementation & further authenticity/integrity checks, as well as front-end prototypes. I am currently deciding which CRDTs to use to encode each object type & their attributes.
 
 App domain-specific objects are materialised on the client, the type determined by their obj_kind (transparent field on db).
 
@@ -27,4 +27,4 @@ App domain-specific objects are materialised on the client, the type determined 
 - Sync tests compiled to be run in playwright: 'js/core/src/test/browser.ts'
 
 ## Dependencies and setup instructions
-Everything is setup
+Everything should be setup, but all setup commands are above if required.
