@@ -2,8 +2,12 @@
   "name": "@airday/public",
   "version": "0.0.1",
   "description": "",
+  "workspaces": [
+    "web",
+    "js/*"
+  ],
   "scripts": {
-    "start": "pnpm --dir ./web start",
+    "start": "bun run --cwd ./web start",
     "gen_keys": "cargo run --bin gen_paseto_keys",
     "server": "cargo run --manifest-path ./server/Cargo.toml -- --config=./server/config.toml",
     "db": "sqlx database reset -y --source sqlite/migrations",
@@ -11,7 +15,7 @@
     "kill-server": "./kill-serverd.sh",
     "test": "./test.sh",
     "test-server": "cargo test --manifest-path server/Cargo.toml",
-    "test-core": "pnpm test --dir ./js/core",
+    "test-core": "bun run --cwd ./js/core test",
     "serverd": "./serverd.sh",
     "jaeger": "./telemetry/jaeger.sh"
   },

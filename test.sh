@@ -2,25 +2,25 @@
 set -e
 
 # Start jaeger if not started
-# pnpm run jaeger
+# bun run jaeger
 
 ## Offline package tests
-pnpm run --dir js/cal test --run
-pnpm run --dir js/list test --run
-pnpm run --dir js/tracer test --run
+bun run --cwd js/cal test --run
+bun run --cwd js/list test --run
+bun run --cwd js/tracer test --run
 
 # Database setup
 DATABASE_PATH="$HOME/.config/airday/test.db"
 export DATABASE_URL="sqlite:$DATABASE_PATH"
 
 ## Server tests
-pnpm run db # Note will reset test db
-pnpm run test-server
+bun run db # Note will reset test db
+bun run test-server
 
 # Run tests
 set +e # disable exit on error
-pnpm --dir ./js/core browser
-pnpm --dir ./js/core test
+bun run --cwd ./js/core browser
+bun run --cwd ./js/core test
 TEST_EXIT_CODE=$?
 set -e # enable exit on error
 

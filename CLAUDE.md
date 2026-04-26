@@ -10,14 +10,14 @@ This is a close to zero-knowledge e2ee server. Each SyncOp has an encrypted payl
 App domain-specific objects are materialised on the client, the type determined by their obj_kind (transparent field on db).
 
 ## Key commands
-- `pnpm run db`: Resets the database
-- `pnpm run fb`: Compiles flatbuffers
-- `pnpm run test`: Runs ALL tests in the repo
+- `bun run db`: Resets the database
+- `bun run fb`: Compiles flatbuffers
+- `bun run test`: Runs ALL tests in the repo
 - `cargo test --manifest-path ./server/Cargo.toml <TEST NAME> -- --nocapture 2>&1`: Run a particular test within server
-- `pnpm run test-core`: Tests entire JS core, automatically resets DB & runs server with in-mem sqlite against it
-- `pnpm run serverd`: Runs server in background, resetting DB
-- `pnpm run jaeger`: Runs dev jaeger in background
-- `pnpm --dir js/core test test/sync.spec.ts`: This tests the sync engine e2e
+- `bun run test-core`: Tests entire JS core, automatically resets DB & runs server with in-mem sqlite against it
+- `bun run serverd`: Runs server in background, resetting DB
+- `bun run jaeger`: Runs dev jaeger in background
+- `bun --cwd js/core test test/sync.spec.ts`: This tests the sync engine e2e
 
 ## Important file locations and conventions
 - Flatbuffer definitions: './flatbuffers/proto.fbs'

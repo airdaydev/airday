@@ -61,8 +61,8 @@ treeState.loadChildren([
 
 ## Development
 ```bash
-pnpm install
-pnpm run dev
+bun install
+bun run dev
 ```
 
 ## V3 roadmap
