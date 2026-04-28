@@ -1,34 +1,26 @@
-## Project Overview & Architecture
+## Operation Phoenix
 
+Greenfield rebuild of Airday. The repo has been gutted: every prior tree (`server/`, `js/`, `flatbuffers/`, `web/`, `ios/`, root `Cargo.toml`, `package.json`) has been renamed to `*-legacy/` or `*.legacy`. Sprint 1 is being built from scratch.
 
-RED ALERT: WE ARE CURRENTLY RUNNING OPERATION PHOENIX. WE ARE BUILDING V2 FROM THE ASHES OF THE UNFINISHED V1. WE WILL ALSO REFERENCE ../cooee - A MORE RECENT REPO BUILT ON SIMILAR BUT STRONGER FOUNDATIONS.
+## Source of truth
 
-This is Airday, a local-first tasks & calendar application. We are currently working on the data layer only, so we can ignore the UI components for now.
+- `phoenix.md` — sprint 1 thesis, scope, deliverable. Read this first.
+- `spec/*.md` — the contract for what's being built. **Before implementing anything, read the relevant spec.** Specs supersede `phoenix.md` where they disagree (specs are more recent).
+  - `architecture.md`, `auth.md`, `cli.md`, `data-model.md`, `encryption.md`, `storage.md`, `sync-protocol.md`, `testing.md`
+- `../cooee` — sibling repo on similar but stronger foundations. Useful reference for patterns.
 
-The flatbuffer definition is the source of truth for sync communication over websockets. There is also a slim HTTP api handling auth, user creation etc.
+## Legacy rule
 
-The goal of this repo is to have a community edition backed by sqlite and a SaaS edition initially backed by Postgresql.
+Anything under `*-legacy/` or named `*.legacy` is **reference-only**. Read it to crib patterns or recall prior decisions; do not edit it, do not grep it for current behaviour, do not import from it. The current implementation is whatever lives in (eventually) `core/`, `server/`, `cli/`, `crates/protocol/` — see `spec/architecture.md`.
 
-This is a close to zero-knowledge e2ee server. Each SyncOp has an encrypted payload containing CRDTs as well as some metadata. I have a basic outline of a sync engine - mostly missing the actual E2EE implementation & further authenticity/integrity checks, as well as front-end prototypes. I am currently deciding which CRDTs to use to encode each object type & their attributes.
+## Sprint 1 scope
 
-App domain-specific objects are materialised on the client, the type determined by their obj_kind (transparent field on db).
+**In:** Rust workspace — `core/` (Loro CRDT + E2EE + sync engine, native + wasm targets), `server/` (sqlite-backed dumb relay + auth + WS), `cli/` (first client + integration test surface), `crates/protocol/` (shared wire types). MessagePack on the wire everywhere (HTTP + WS). E2EE with password-derived KEK wrapping a DEK; recovery code in scope, server-assisted escrow deferred.
 
-## Key commands
-- `bun run db`: Resets the database
-- `bun run fb`: Compiles flatbuffers
-- `bun run test`: Runs ALL tests in the repo
-- `cargo test --manifest-path ./server/Cargo.toml <TEST NAME> -- --nocapture 2>&1`: Run a particular test within server
-- `bun run test-core`: Tests entire JS core, automatically resets DB & runs server with in-mem sqlite against it
-- `bun run serverd`: Runs server in background, resetting DB
-- `bun run jaeger`: Runs dev jaeger in background
-- `bun --cwd js/core test test/sync.spec.ts`: This tests the sync engine e2e
+**Out:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, flatbuffers, MCP, native app deployment. These live in `roadmap.md` for later sprints.
 
-## Important file locations and conventions
-- Flatbuffer definitions: './flatbuffers/proto.fbs'
-- JS Client Core: './js/core'
-- Server: './server'
-- Sqlite db schema: './sqlite/migrations/000_dev.sql'
-- Sync tests compiled to be run in playwright: 'js/core/src/test/browser.ts'
+## Build & run
 
-## Dependencies and setup instructions
-Everything should be setup, but all setup commands are above if required.
+Nothing is built yet — the workspace is being stood up. Commands will land here as crates appear. The legacy `bun run *` commands are dead (no `package.json` at root).
+
+When invoking wasm builds, always use `wasm-pack build core/` from the workspace root — bare `cargo build --target wasm32-...` will try to build `server`/`cli` for wasm and fail.
