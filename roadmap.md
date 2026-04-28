@@ -206,10 +206,7 @@
 - [] On sign up - start from scratch or start from existing
 
 ## References/notes/things to try
-- https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
+- Multi-browser https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
 - https://alexharri.com/blog/clipboard
+- PWA
 - https://developer.mozilla.org/en-US/docs/Web/Manifest/share_target pwa share target
-
-## Fractional indexing
-- https://observablehq.com/@dgreensp/implementing-fractional-indexing
-- www.figma.com/blog/realtime-editing-of-ordered-sequences/
