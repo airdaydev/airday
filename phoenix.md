@@ -4,9 +4,158 @@ Airday is a local-first, person list app intend for single users to write down &
 
 There is a primary list called "Current", a bin and multiple custom lists. The default custom list is "Holding". Binned items can be individually deleted, restored (either to its parent list if available or back to current) or the entire bin deleted.
 
-Data is E2EE.
+## Broad architecture
+- ZK server <-> many device, single user (at least semantically)
+- Web: Vanilla JS
+- Rust: Core app powers both saas & self-hosted
+- Feature flagged postgres module for saas
+- Feature flagged sqlite module for self-hosted
+- Server stores loro shallow snapshots + ops
+- E2EE via password derived KEK wrapping DEK
+- Server held KEK by default with opt-out (recovery code only)
+- Items (LoroMovableList<Item>)
+- List of lists (LoroMovableList)
+- Users
+- Device state (frontier, auth)
+- Stripe
 
-The data actions are:
+## Tables
+
+users (
+  id              uuid_v7 primary key,
+  email           text unique not null,
+  password_hash   text not null,            -- argon2id of password (server auth)
+  password_salt   bytea not null,           -- salt for KEK derivation (sent to client)
+  wrapped_dek     bytea not null,           -- DEK encrypted by KEK
+  wrapped_dek_nonce bytea not null,
+  created_at      timestamptz not null,
+  has_recovery_escrow boolean not null default true,
+  has_recovery_code   boolean not null default false,
+)
+
+-- TODO: Move to vault?
+recovery_escrow (
+  user_id         uuid primary key references users(id),
+  escrowed_dek    bytea not null,           -- DEK encrypted by server-held key
+  escrowed_dek_nonce bytea not null,
+  updated_at      timestamptz not null
+)
+
+-- Devices: per-device sync state
+devices (
+  id              uuid primary key,
+  user_id         uuid not null references users(id),
+  name            text not null,            -- "Dan's iPhone"
+  auth_token_hash text not null,            -- for device authentication to server
+  frontier        bytea not null,           -- encoded Loro version vector
+  state_hash      bytea,                    -- optional, for drift detection
+  last_seen_at    timestamptz not null,
+  created_at      timestamptz not null
+)
+
+-- Ops: encrypted CRDT operations, append-only
+ops (
+  id              bigserial primary key,    -- server-assigned sequence (for range queries)
+  user_id         uuid not null references users(id),
+  origin_device   uuid references devices(id),
+  payload         bytea not null,           -- encrypted Loro op blob
+  payload_nonce   bytea not null,
+  created_at      timestamptz not null
+)
+create index on ops (user_id, id);
+
+-- Snapshots: encrypted shallow snapshots, replaceable per user
+snapshots (
+  id              bigserial primary key,
+  user_id         uuid not null references users(id),
+  up_to_op_id     bigint not null,          -- snapshot covers ops with id <= this
+  payload         bytea,                    -- encrypted snapshot blob (null if offloaded)
+  payload_nonce   bytea,
+  storage_location text not null default 'inline',  -- 'inline' | 's3://bucket/key'
+  created_at      timestamptz not null
+)
+create index on snapshots (user_id, id desc);
+
+## Saas database
+-- SaaS / billing (separate concern, could be separate service)
+subscriptions (
+  user_id         uuid primary key references users(id),
+  stripe_customer_id text not null,
+  status          text not null,            -- 'active' | 'lapsed' | 'lifetime'
+  purchased_at    timestamptz,
+  expires_at      timestamptz                -- null for lifetime
+)
+
+## Front-end types
+
+enum RecoveryTier {
+    ServerEscrow,                        // default; server can assist recovery
+    RecoveryCodeOnly,                    // user-held code, no server escrow
+    NonCustodial,                        // password + devices only
+}
+
+struct UserAccount {
+  user_id: Uuid,
+  email: String,
+  recoverMode: RecoveryMode,
+  dek: SecretBytes, // unwrapped, in-memory only
+}
+
+struct Keys {
+    kek: SecretBytes,                    // derived from password + salt
+    dek: SecretBytes,                    // unwrapped from server's wrapped_dek
+}
+
+struct Device {
+    device_id: Uuid,
+    name: String,
+    auth_token: SecretString,
+    frontier: VersionVector,             // local Loro frontier
+}
+
+List {
+  id: uuid_v7,
+  label: String,
+}
+
+enum ItemType {
+  0 = Text
+}
+
+enum ItemStatus {
+    Live,
+    Parked,                              // (if you keep park as a state vs. just using a list)
+    Done,
+    Binned,
+    Deleted,
+}
+
+// Items: a MovableList of Maps. Each Map is one item.
+// Loro path: doc.get_movable_list("items")
+struct Item {
+  type: Text,
+  text: String,
+  list_id: String,                     // refers to ListMeta.id
+  status: ItemStatus,
+  created_at: i64,                     // millis since epoch
+  done_at: Option<i64>,
+}
+
+// Loro path: doc.get_movable_list("lists")
+struct ListMeta {
+  id: String,                          // stable string id (used in Item.list_id)
+  name: String,
+  created_at: i64,
+}
+
+(user_id, device_id) -> {
+  last_seen_at,
+  frontier,    // version vector for the user's whole document
+  state_hash,  // optional
+  active,
+}
+
+## Actions
 
 - create_item
 - edit_item
@@ -18,42 +167,76 @@ The data actions are:
 - rename_list
 - delete_list (except hot_list)
 
-An item is:
+## Protocol
+// === Sync messages (over the wire, JSON for v1) ===
 
-List {
-  id: uuid_v7,
-  label: String,
+#[derive(Serialize, Deserialize)]
+struct SyncEnvelope {
+    v: u32,                              // protocol version (always present)
+    device_id: Uuid,
+    auth_token: String,
+    payload: SyncPayload,
 }
 
-enum ItemType {
-  0 = Text
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum SyncPayload {
+    PushOps {
+        ops: Vec<EncryptedBlob>,
+        new_frontier: VersionVector,
+    },
+    PullOps {
+        since_op_id: i64,
+    },
+    PullSnapshot,
+    PushSnapshot {
+        up_to_op_id: i64,
+        snapshot: EncryptedBlob,
+    },
+    UpdateFrontier {
+        frontier: VersionVector,
+        state_hash: Option<Vec<u8>>,
+    },
 }
 
-Item {
-  id: uuid_v7,
-  type: ItemType,
-  text: String,
+#[derive(Serialize, Deserialize)]
+struct EncryptedBlob {
+    nonce: Vec<u8>,
+    ciphertext: Vec<u8>,
 }
 
-(user_id, device_id) -> {
-  last_seen_at,
-  frontier,    // version vector for the user's whole document
-  state_hash,  // optional
-  active,
+// === Auth / recovery messages ===
+
+#[derive(Serialize, Deserialize)]
+struct SignupRequest {
+    email: String,
+    password_hash: String,               // client-side hash for server auth
+    password_salt: Vec<u8>,              // salt for KEK derivation
+    wrapped_dek: EncryptedBlob,
+    tier: RecoveryTier,
+    escrowed_dek: Option<EncryptedBlob>, // present iff tier == ServerEscrow
+}
+
+#[derive(Serialize, Deserialize)]
+struct LoginRequest {
+    email: String,
+    password_hash: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LoginResponse {
+    user_id: Uuid,
+    password_salt: Vec<u8>,
+    wrapped_dek: EncryptedBlob,
+    tier: RecoveryTier,
 }
 
 ## Self-hosted/Saas split
 - Initially everything will go in the one repo
 - There will be a rust server that acts as the primary relay and auth mechanism. It will run off both sqlite and postgres.
-- The postgres version is multi-tenant &
+- The postgres version is multi-tenant
 - There will also be a saas orchestration server for payment, licensing etc.
 - Prior to release, a core repo will break out and private repo will take core as a submodule.
-
-## Storage:
-2x CRDTs:
-- Items (LoroMap<string, Item>)
-- List of lists (LoroMovableList)
-Device state (frontier, auth)
 
 ## List limits
 256 (max lists) * 4096 * (280 utf-8 chars) = ~300MB english, ~900MB Chinese / Japanese
@@ -78,19 +261,11 @@ Device state (frontier, auth)
 ## Storage
 - Postgresql module (via feature flag) for saas
 - Sqlite module (via feature flag) for self-hosted
-- Item kind + List kind
-- Ops are stored as op_type "op" per customer with Version Vector (compaction target)
-- Snapshots are stored as op_type "snapshot" per customer - pathway to s3 / alt-storage offload
+- ops: (user_id, version_vector, op_data, created_at)
+- snapshots: (user_id, version_vector, snapshot_data, created_at, storage_location)
 
 ## Bin lifecycle
 - Simply a status, full deletes happen at user request and happen on a device
-
-## General architecture
-- ZK server <-> Many clients, ZK requests snapshot from client to trim tombstones
-- Web: Vanilla JS
-- Rust: Core app (shared)
-- Loro moveable list seems like a good fit
-- Postgres
 
 ## Websocket
 - encode as JSON first, later try baremessages.org, messagepack, flatbuffer or protobuff
