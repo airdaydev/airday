@@ -5,5 +5,7 @@
 //! emits its native `bin` family rather than a sequence of u8s.
 
 pub mod auth;
+pub mod sync;
 
 pub use auth::*;
+pub use sync::*;

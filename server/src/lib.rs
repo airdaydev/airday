@@ -4,6 +4,7 @@ pub mod db;
 pub mod error;
 pub mod http;
 pub mod state;
+pub mod sync;
 
 pub use config::{Config, ConfigSource};
 pub use http::router;

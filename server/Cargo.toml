@@ -39,3 +39,6 @@ dirs = { workspace = true }
 [dev-dependencies]
 reqwest = { workspace = true }
 tempfile = "3"
+tokio-tungstenite = "0.24"
+http = "1"
+futures-util = "0.3"

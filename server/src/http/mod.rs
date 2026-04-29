@@ -3,10 +3,11 @@ pub mod msgpack;
 mod auth_routes;
 mod device_routes;
 
-use axum::routing::{delete, get, post};
+use axum::routing::{any, delete, get, post};
 use axum::Router;
 
 use crate::state::AppState;
+use crate::sync::ws_handler;
 
 pub const MSGPACK_CONTENT_TYPE: &str = "application/msgpack";
 
@@ -29,5 +30,6 @@ pub fn router(state: AppState) -> Router {
             get(device_routes::list).post(device_routes::register),
         )
         .route("/api/devices/{device_id}", delete(device_routes::revoke))
+        .route("/api/sync", any(ws_handler))
         .with_state(state)
 }

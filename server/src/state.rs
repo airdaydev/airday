@@ -2,11 +2,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::db::Db;
+use crate::sync::SyncSessions;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
     pub clock: Arc<dyn Clock>,
+    pub sync_sessions: SyncSessions,
 }
 
 impl AppState {
@@ -14,6 +16,7 @@ impl AppState {
         Ok(Self {
             db: Db::open(path).await?,
             clock: Arc::new(SystemClock),
+            sync_sessions: SyncSessions::new(),
         })
     }
 
@@ -21,6 +24,7 @@ impl AppState {
         Ok(Self {
             db: Db::open_in_memory().await?,
             clock: Arc::new(SystemClock),
+            sync_sessions: SyncSessions::new(),
         })
     }
 }
