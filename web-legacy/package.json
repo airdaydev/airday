@@ -16,7 +16,6 @@
   },
   "type": "module",
   "dependencies": {
-    "@airday/cal": "workspace:^",
     "@airday/keyboard": "workspace:^",
     "@airday/list": "workspace:^",
     "fractional-indexing": "^3.2.0",

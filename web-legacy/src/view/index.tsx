@@ -3,12 +3,11 @@ import styles from "./view.module.css";
 import { sessionContext } from "../store/context.js";
 import { Workspace } from "./workspace";
 import { PaneDropGuide } from "./pane-drop-guide";
-import { DoneView, DataView, UpNextView, CalendarView } from "./views";
+import { DoneView, DataView, UpNextView } from "./views";
 import { List } from "../list/list";
 import { Done } from "../list/done";
 import { Match, Switch } from "solid-js";
 import { UpNext } from "../list/up-next";
-import { Calendar } from "../cal/cal";
 
 function DataViewComponent(props: { view: DataView }) {
   return (
@@ -18,9 +17,6 @@ function DataViewComponent(props: { view: DataView }) {
       </Match>
       <Match when={props.view instanceof UpNextView}>
         <UpNext view={props.view} />
-      </Match>
-      <Match when={props.view instanceof CalendarView}>
-        <Calendar view={props.view} />
       </Match>
       <Match when={props.view instanceof DataView}>
         <List view={props.view} />
