@@ -7,11 +7,13 @@
 
 use std::path::{Path, PathBuf};
 
+use airday_core::{Doc, DocError};
 use serde::{Deserialize, Serialize};
 
 const ROOT_DIR: &str = "airday";
 const DEVICE_FILE: &str = "device.json";
 const SECRETS_FILE: &str = "secrets.json";
+const DOC_FILE: &str = "loro.bin";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -19,6 +21,8 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
     #[error("decode: {0}")]
     Decode(#[from] serde_json::Error),
+    #[error("doc: {0}")]
+    Doc(#[from] DocError),
     #[error("no XDG data directory available")]
     NoDataDir,
     #[error("not logged in")]
@@ -110,6 +114,20 @@ impl Profile {
         read_json(&self.dir.join(SECRETS_FILE))
     }
 
+    pub fn write_doc(&self, doc: &Doc) -> Result<(), ConfigError> {
+        let bytes = doc.save()?;
+        write_bytes(&self.dir.join(DOC_FILE), &bytes, 0o600)
+    }
+
+    pub fn read_doc(&self) -> Result<Doc, ConfigError> {
+        let bytes = std::fs::read(self.dir.join(DOC_FILE))?;
+        Ok(Doc::load(&bytes)?)
+    }
+
+    pub fn doc_path(&self) -> PathBuf {
+        self.dir.join(DOC_FILE)
+    }
+
     /// Wipe local state. Used by `airday logout`.
     pub fn purge(&self) -> Result<(), ConfigError> {
         if self.dir.exists() {
@@ -122,6 +140,14 @@ impl Profile {
 }
 
 fn root_dir() -> Result<PathBuf, ConfigError> {
+    // `AIRDAY_DATA_DIR` lets tests (and adventurous users) override the
+    // platform-default data dir without rebuilding. Production paths
+    // never set it.
+    if let Ok(v) = std::env::var("AIRDAY_DATA_DIR") {
+        if !v.is_empty() {
+            return Ok(PathBuf::from(v).join(ROOT_DIR));
+        }
+    }
     let base = dirs::data_local_dir().ok_or(ConfigError::NoDataDir)?;
     Ok(base.join(ROOT_DIR))
 }
@@ -149,6 +175,18 @@ fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), Co
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ConfigError> {
     let bytes = std::fs::read(path)?;
     Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn write_bytes(path: &Path, bytes: &[u8], _mode: u32) -> Result<(), ConfigError> {
+    std::fs::write(path, bytes)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perm = std::fs::metadata(path)?.permissions();
+        perm.set_mode(_mode);
+        std::fs::set_permissions(path, perm)?;
+    }
+    Ok(())
 }
 
 #[cfg(unix)]

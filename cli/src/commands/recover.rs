@@ -1,4 +1,4 @@
-use airday_core::{derive_recovery_master, parse_recovery_code, random_bytes, WrappedDek};
+use airday_core::{derive_recovery_master, parse_recovery_code, random_bytes, Doc, WrappedDek};
 use airday_protocol::{
     KdfParams, PasswordResetRequest, PasswordResetResponse, PreloginRequest, PreloginResponse,
     RecoverRequest, RecoverResponse,
@@ -118,6 +118,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: reset.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
+    profile.write_doc(&Doc::empty())?;
 
     println!("Recovery complete. Account {}.", recovered.account_id);
     Ok(())

@@ -1,4 +1,4 @@
-use airday_core::WrappedDek;
+use airday_core::{Doc, WrappedDek};
 use airday_protocol::{
     DeviceRegistration, LoginRequest, LoginResponse, PreloginRequest, PreloginResponse,
 };
@@ -88,6 +88,9 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: device.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
+    // Empty doc; the next subcommand's Session::open pulls from op
+    // id 0, applies device-1's seed + history, and we converge.
+    profile.write_doc(&Doc::empty())?;
 
     println!("Logged in to account {}", resp.account_id);
     if !resp.recovery_present {

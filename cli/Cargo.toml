@@ -8,6 +8,10 @@ license.workspace = true
 name = "airday"
 path = "src/main.rs"
 
+[lib]
+name = "airday_cli"
+path = "src/lib.rs"
+
 [dependencies]
 airday-protocol = { path = "../crates/protocol" }
 airday-core = { path = "../core" }
@@ -28,3 +32,11 @@ tracing-subscriber = { workspace = true }
 zeroize = { workspace = true }
 serde_json = "1"
 gethostname = "0.5"
+tokio-tungstenite = "0.24"
+http = "1"
+futures-util = "0.3"
+
+[dev-dependencies]
+airday-server = { path = "../server" }
+tempfile = "3"
+axum = { workspace = true }

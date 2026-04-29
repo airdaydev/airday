@@ -1,11 +1,5 @@
+use airday_cli::commands::Cli;
 use clap::Parser;
-
-mod commands;
-mod config;
-mod keystore;
-mod net;
-
-use commands::Cli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

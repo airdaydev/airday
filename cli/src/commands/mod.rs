@@ -14,8 +14,20 @@ const DEFAULT_SERVER: &str = "http://127.0.0.1:8080";
 #[derive(Parser, Debug)]
 #[command(name = "airday", version, about = "Airday CLI")]
 pub struct Cli {
+    /// Skip the WS connect attempt; mutate locally only. Pending ops
+    /// flush on the next online invocation. Equivalent to setting
+    /// `AIRDAY_OFFLINE=1`.
+    #[arg(long, global = true)]
+    offline: bool,
+
     #[command(subcommand)]
     cmd: Cmd,
+}
+
+impl Cli {
+    pub fn offline(&self) -> bool {
+        self.offline
+    }
 }
 
 #[derive(Subcommand, Debug)]

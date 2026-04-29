@@ -1,4 +1,4 @@
-use airday_core::{generate_recovery_code, random_bytes, Dek};
+use airday_core::{generate_recovery_code, random_bytes, Dek, Doc};
 use airday_protocol::{KdfParams, RecoveryMaterial, SignupRequest, SignupResponse};
 use clap::Parser;
 use dialoguer::{Confirm, Input};
@@ -118,6 +118,9 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: resp.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
+    // Seed the local doc with built-in lists. The seed travels to
+    // future devices as the first push on the op stream.
+    profile.write_doc(&Doc::new()?)?;
 
     println!("Account created: {email} ({})", resp.account_id);
     if let Some(code) = recovery_code_to_show {
