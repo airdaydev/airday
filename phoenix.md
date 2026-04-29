@@ -43,5 +43,6 @@ End-to-end integration tests prove this with a real server + multiple CLI client
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
+| [`spec/saas.md`](spec/saas.md) | Sprint 2+ contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 
 Out of scope for sprint 1 (live in `roadmap.md`): postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.

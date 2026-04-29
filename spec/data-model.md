@@ -58,9 +58,3 @@ The wire format for ops is whatever Loro emits — opaque bytes from the server'
 ## Limits
 
 256 lists × 4096 items × 280 chars ≈ 300 MB English / 900 MB CJK. Treat as soft caps for now; enforcement is out of scope sprint 1.
-
-## Open questions
-
-- Per-item priority / pinning — defer.
-- Tags — defer; sprint 1 is lists-only.
-- "Park" status from prior spec is dropped (use a custom list instead).

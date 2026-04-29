@@ -32,11 +32,19 @@ E2E is the load-bearing surface. Required matrix for sprint 1:
 - `TestCli` — spawns `airday` subprocess with isolated `XDG_DATA_HOME` and a stub keychain backend, exposes typed methods that wrap `--json`.
 - `wait_for(predicate, timeout)` — bounded polling helper. **Avoid raw `sleep`s in tests.**
 
+## Convergence assertions
+
+`core/` exposes `doc_fingerprint(doc) -> [u8; 32]` — a hash over the **canonical logical state** (items + lists + ordering + bin contents, walked in a deterministic order). Two replicas that have observed the same ops produce equal fingerprints; replicas that diverge produce different ones.
+
+Use the fingerprint for E2E and property-test convergence checks instead of comparing snapshot bytes. Snapshot bytes are **not** required to be stable across replicas — Loro's serialization carries per-replica metadata (peer-ids, internal ordering) that legitimately differs even at logical equality, and per-snapshot encryption nonces would mask byte-stability anyway. Logical-state fingerprinting is the right granularity for "did we converge."
+
+**Future:** a merkle chain/tree over the encrypted op stream is a separate, complementary primitive — commits to *causal history* rather than logical state, enabling O(log n) sync-diff and tamper-evident audit of the server's op log. Out of sprint 1.
+
 ## Determinism
 
 Where possible, expose a server-side "test event stream" (e.g. `--test-events <unix-socket>`) emitting `op_persisted`, `snapshot_requested`, `snapshot_uploaded`. Tests subscribe and react instead of polling.
 
 ## Open questions
 
-- Property tests for sync convergence (random op streams across N clients)?
+- **Property-test the convergence guarantee** (`proptest`) — generate random scenarios consisting of (a) op streams across N simulated clients (add / move / edit / done / bin / list-create / list-delete) and (b) random partial sync events between random pairs of clients, then drain to a full sync at the end. Property: every client's final doc state is byte-identical. Loro promises this; we're stress-testing *our integration* (sync engine, frontier tracking, snapshot handoff, encryption framing) — example tests miss the interleavings that find bugs here. Worth doing once the e2e matrix is green.
 - Should we require byte-stable Loro snapshots across replicas (depends on Loro peer-id determinism)?

@@ -18,7 +18,7 @@ Single binary `airday`. Subcommands:
 - `airday devices revoke <device_id>`
 
 ### Items
-- `airday add <text> [--list <list>]`
+- `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line
 - `airday ls [--list <list>]`
 - `airday done <item_id>`
 - `airday bin <item_id>`
@@ -39,7 +39,7 @@ Single binary `airday`. Subcommands:
 
 ## Local state
 
-Per-account dir under XDG paths (`~/.local/share/airday/<account-id-prefix>/` on linux, equivalents elsewhere):
+Single account per install. Per-account dir under XDG paths (`~/.local/share/airday/<account-id-prefix>/` on linux, equivalents elsewhere) — the prefix scopes state so a logout/re-signup as a different user doesn't collide with stale data, but only one account is active at a time:
 
 - `loro.bin` — local Loro doc snapshot, persisted on every commit
 - `device.json` — `{ device_id, server_url, last_acked_op_id, account_id, email }`
@@ -93,7 +93,3 @@ Default output: human-readable. `--json` flag on every read command emits machin
 
 Item ids: full uuid v7 hex internally, displayed as 6-char prefix (`a1b2c3`). Subcommands accept any unambiguous prefix; ambiguous prefix → error listing matches.
 
-## Open questions
-
-- Should `add` accept stdin (`airday add - <<<EOF`) for bulk capture? Probably yes.
-- Multi-account on one CLI install — defer; one account per `XDG_DATA_HOME`.

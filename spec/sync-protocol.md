@@ -39,6 +39,17 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 - Client decrypts ops and applies via Loro; Loro handles real causal ordering.
 - Client sends `Ack { last_acked_op_id }` after applying. Server stores in `devices.last_acked_op_id`.
 - **Horizon** = `min(last_acked_op_id)` across active devices. Equivalent to the meet of all device VVs at that point — the server doesn't need to see Loro VVs because every active device by definition has every op up to the horizon.
+- **`OpsBroadcast` is post-commit only.** Server fans out to other devices only after the originating `PushOps` is durable in storage. Otherwise a crash between broadcast and fsync could leave peers holding ops the sender will re-push (under new ids) on reconnect.
+
+## Backpressure
+
+`OpsBatch` chunks are sent **fire-and-forget** — the server emits them back-to-back without waiting for client acknowledgement. WebSocket sits on TCP, which has its own flow control: if the client can't drain its receive buffer fast enough (slow decrypt, low memory, paused tab), the TCP window closes and the server's `send` blocks. No application-level pacing required. This avoids paying RTT × chunk-count on catch-up — for a 10-chunk catch-up at 100 ms RTT, request-ack-request would burn 1 s of pure waiting; fire-and-forget burns 0.
+
+The application-level `Ack { last_acked_op_id }` is **decoupled from chunk delivery**. It's emitted by the client *after* successfully applying ops to the local Loro doc, not on receipt of bytes. Server uses it only for horizon tracking; it does not gate further sends. This decoupling makes resume-after-disconnect correct: the client persists `last_acked_op_id` only after Loro accepts the op, so reconnecting with `since_op_id = last_acked_op_id` replays from the last *applied* op, not the last *delivered* one. No double-apply, no skipped ops.
+
+The `complete: bool` on `OpsBatch` signals "no more chunks for this `PullOps`" — the client flushes its progress UI and considers the pull finished.
+
+**Chunk size:** **500 ops or 256 KiB per `OpsBatch`, whichever hits first.** Sized to single-frame the common case (a session's worth of ops, or hours-away reconnect), give chunked progress UX for catch-up (thousands of ops → 5–10 frames), and stay well under WS frame caps that intermediaries enforce (~1 MiB at common proxies). The byte cap is a safety net against a future op type larger than expected.
 
 ## Snapshot orchestration
 
@@ -51,7 +62,7 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 
 ## Active device definition
 
-A device is active if `last_seen_at > now − 30 days`. Stale devices do not block the horizon.
+A device is active if `last_seen_at > now − 30 days`. Stale devices do not block the horizon. Explicit revoke via `DELETE /api/devices/:id` (see `auth.md`) drops the device immediately — no need to wait out the 30-day window.
 
 A previously-stale device that reconnects with `last_acked_op_id < latest_snapshot.up_to_op_id` cannot resume from ops alone — it must `PullSnapshot` first, replace its local doc, then `PullOps` from `snapshot.up_to_op_id`.
 
@@ -60,10 +71,3 @@ A previously-stale device that reconnects with `last_acked_op_id < latest_snapsh
 Client maintains `last_acked_op_id` in local state. On reconnect: WS upgrade with token → `PullOps { since_op_id: last_acked_op_id }` → resume.
 
 Exponential backoff 1s → 30s.
-
-## Open questions
-
-- `OpsBatch` chunk size.
-- Should `OpsBroadcast` to other devices wait for sender's storage commit? (Yes — broadcast post-commit only, otherwise a server crash before fsync could divulge ops the sender doesn't think are persisted.)
-- WS frame size limits / backpressure for large initial pulls.
-- How to express "this device is gone for good, drop it from horizon math without waiting 30 days" — explicit `DELETE /devices/:id`.

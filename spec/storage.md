@@ -83,4 +83,3 @@ Single `001_init.sql` for sprint 1. Greenfield — until v1.0, we reset the DB r
 ## Open questions
 
 - Backup story for self-hosted (online backup via `VACUUM INTO`? out of scope for sprint 1).
-- Per-account size quota — out of scope sprint 1 but worth noting for SaaS.

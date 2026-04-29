@@ -6,6 +6,7 @@
 - **Master** — `Argon2id(password, master_salt)`. One expensive call per session.
 - **KEK** (key encryption key) — `HKDF(master, "airday/kek/v1")`. Wraps/unwraps the DEK. Client-only.
 - **Auth secret** — `HKDF(master, "airday/auth/v1")`. Sent to server as login credential. Server stores `SHA-256(auth_secret)`. HKDF is one-way — possessing `auth_secret` reveals neither `master` nor `kek`. See `auth.md` for the full password-handling invariant.
+- **Recovery code** — 12 words from the English BIP39 wordlist (2048 words). 128 bits of entropy + 4-bit checksum. Generated client-side at signup.
 - **Recovery master** — `Argon2id(recovery_code, recovery_salt)`.
 - **Recovery KEK** — `HKDF(recovery_master, "airday/recovery_kek/v1")`. Wraps/unwraps the DEK on the recovery path. Client-only.
 - **Recovery auth secret** — `HKDF(recovery_master, "airday/recovery_auth/v1")`. Proves possession of the recovery code to the server. Server stores `SHA-256(recovery_auth_secret)`. The recovery wrap is **only** released after this proof — same threat model as the password path: don't hand attackers harvestable wrap material in exchange for an email address.
@@ -69,8 +70,15 @@ Each op blob is independently encrypted with the DEK + a fresh 24-byte random no
 - CLI: DEK in memory only by default; OS keychain (macOS Keychain, libsecret on linux) for "stay logged in." Recovery code never persisted by client.
 - Web: TBD — sprint 2+.
 
-## Open questions
+## KDF parameters
 
-- Argon2id parameters — pick numbers that work on a low-end phone; document.
-- Recovery code length — 12 BIP39 words (128 bits) probably enough; confirm.
-- Recovery endpoint auth — how does the server know to release `recovery_wrapped_dek`? Options: (a) client proves knowledge of recovery code by including a code-derived hash, (b) endpoint is open and the wrap itself is the protection. (b) is simpler and the wrap is the actual gate.
+Default Argon2id: **`m = 64 MiB, t = 3, p = 1`**. Used for both `master` (password) and `recovery_master` (recovery code).
+
+- **Why 64 MiB.** Below ~32 MiB, commodity GPUs make weak passwords cheap to crack offline against the server-stored wrap. 64 MiB is the convergence point for E2EE consumer apps (Bitwarden, 1Password, ProtonMail all sit in this neighbourhood). Argon2 is the *only* defence for users with weak passwords once the DB leaks — don't shave memory to save 50ms.
+- **Why not 256 MiB.** WASM heap pressure. Mobile Safari is mean about big WASM allocations; cheap Android browsers will OOM-kill the worker. 64 MiB sails through everywhere we care about.
+- **Performance budget.** ~600–1000ms in WASM on a mid-range phone, ~150–300ms native on laptop. The benchmark bar is the slowest realistic client (WASM in mobile Safari on a ~2019 phone) — anything that breaks 2s there is a UX wound and gets reverted.
+
+**Per-user, server-stored, upgradable.** `kdf_params` lives alongside `master_salt` on the account row and is returned by `/prelogin`. New accounts use the server's current default; existing accounts keep their original params until next password change. This means raising the floor later doesn't break older accounts.
+
+**Password change upgrades params** to the current server default. Re-derivation happens on a path the user already pays for; no extra prompt.
+
