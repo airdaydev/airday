@@ -1,0 +1,14 @@
+{
+  "name": "@airday/config",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "config": "bun gen-config.ts dev"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

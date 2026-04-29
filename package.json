@@ -1,0 +1,20 @@
+{
+  "name": "airday",
+  "private": true,
+  "workspaces": ["js/*"],
+  "scripts": {
+    "config": "bun js/config/gen-config.ts",
+    "server": "cargo run -p airday-server --",
+    "cli": "cargo run -p airday --",
+    "build": "cargo build",
+    "build:wasm": "wasm-pack build core/",
+    "test": "cargo test",
+    "test:server": "cargo test -p airday-server",
+    "fmt": "cargo fmt --all",
+    "lint": "cargo clippy --workspace --all-targets -- -D warnings",
+    "typecheck": "tsc --noEmit -p js/config"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

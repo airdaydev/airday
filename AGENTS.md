@@ -21,6 +21,10 @@ Anything under `*-legacy/` or named `*.legacy` is **reference-only**. Read it to
 
 ## Build & run
 
-Nothing is built yet — the workspace is being stood up. Commands will land here as crates appear. The legacy `bun run *` commands are dead (no `package.json` at root).
+Root `package.json` is a Bun workspace (`js/*`) with thin script wrappers — there is no JS to build, the scripts just front cargo and the config generator:
 
-When invoking wasm builds, always use `wasm-pack build core/` from the workspace root — bare `cargo build --target wasm32-...` will try to build `server`/`cli` for wasm and fail.
+- `bun run config` — render `local/server.toml` from `js/config/templates/` (see `js/config/README.md`); `local/` holds gitignored dev artifacts
+- `bun run server` / `bun run cli` — `cargo run -p airday-server --` / `cargo run -p airday --`; pass flags after the script name (e.g. `bun run server -- --bind 0.0.0.0:8080`)
+- `bun run build` / `bun run test` / `bun run fmt` / `bun run lint` — cargo equivalents
+- `bun run build:wasm` — `wasm-pack build core/`. Always use this from the workspace root; bare `cargo build --target wasm32-...` will try to build `server`/`cli` for wasm and fail.
+- `bun run typecheck` — `tsc --noEmit -p js/config`

@@ -1,0 +1,114 @@
+//! Server runtime config.
+//!
+//! Precedence: defaults → `config.toml` → env vars → CLI flags. The
+//! file is optional; if it is missing the server runs on defaults.
+
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
+
+const DEFAULT_CONFIG_PATH: &str = "local/server.toml";
+
+/// How `Config::load` resolved the config path. The caller is expected
+/// to log this *after* the tracing subscriber is initialized — we can't
+/// log it from `load` itself because `log_level` comes from the config.
+#[derive(Debug, Clone)]
+pub enum ConfigSource {
+    File(PathBuf),
+    Defaults { tried: PathBuf },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Config {
+    #[serde(default = "default_bind")]
+    pub bind: String,
+    #[serde(default = "default_db")]
+    pub db: PathBuf,
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            bind: default_bind(),
+            db: default_db(),
+            log_level: default_log_level(),
+        }
+    }
+}
+
+fn default_bind() -> String {
+    "127.0.0.1:8080".to_string()
+}
+
+fn default_db() -> PathBuf {
+    // XDG Base Directory spec: $XDG_DATA_HOME, falling back to
+    // $HOME/.local/share. We don't follow OS-native conventions
+    // (`~/Library/Application Support` on macOS) on purpose — keeps the
+    // dev experience uniform across platforms and matches the rest of
+    // the Rust toolchain (cargo, rustup) behaviour.
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        if !xdg.is_empty() {
+            return PathBuf::from(xdg).join("airday/airday.sqlite");
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        return home.join(".local/share/airday/airday.sqlite");
+    }
+    PathBuf::from("airday.sqlite")
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+impl Config {
+    /// Read a config from disk. Missing file → defaults; parse error → panic
+    /// (a malformed config is operator error, not something to silently paper over).
+    /// Returns the source so the caller can log it once tracing is up.
+    pub fn load(path: Option<&Path>) -> (Self, ConfigSource) {
+        let path = path
+            .map(PathBuf::from)
+            .or_else(|| std::env::var("AIRDAY_CONFIG").ok().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH));
+
+        let (mut config, source) = match std::fs::read_to_string(&path) {
+            Ok(contents) => match toml::from_str(&contents) {
+                Ok(c) => (c, ConfigSource::File(path)),
+                Err(err) => panic!("failed to parse {}: {err}", path.display()),
+            },
+            Err(_) => (Config::default(), ConfigSource::Defaults { tried: path }),
+        };
+
+        if let Ok(v) = std::env::var("AIRDAY_BIND") {
+            config.bind = v;
+        }
+        if let Ok(v) = std::env::var("AIRDAY_DB_PATH") {
+            config.db = PathBuf::from(v);
+        }
+        if let Ok(v) = std::env::var("AIRDAY_LOG_LEVEL") {
+            config.log_level = v;
+        }
+
+        (config, source)
+    }
+
+    pub fn bind_addr(&self) -> anyhow::Result<SocketAddr> {
+        self.bind
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid bind address {:?}: {e}", self.bind))
+    }
+}
+
+impl ConfigSource {
+    pub fn log(&self) {
+        match self {
+            ConfigSource::File(path) => tracing::info!(path = %path.display(), "loaded config"),
+            ConfigSource::Defaults { tried } => {
+                tracing::info!(tried = %tried.display(), "no config file, using defaults")
+            }
+        }
+    }
+}

@@ -1,0 +1,130 @@
+#!/usr/bin/env bun
+
+import { mkdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import process from "node:process";
+
+const configDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = dirname(dirname(configDir));
+const templatesDir = join(configDir, "templates");
+
+type ProfileName = "dev";
+
+interface RenderFile {
+  template: string;
+  output: string;
+}
+
+interface Profile {
+  defaultSecretsFile: string;
+  files: RenderFile[];
+  buildEnv: (secrets: Record<string, string>) => Record<string, string | undefined>;
+}
+
+const profiles: Record<ProfileName, Profile> = {
+  dev: {
+    defaultSecretsFile: ".env",
+    files: [
+      { template: "server.dev.toml.tpl", output: "local/server.toml" },
+    ],
+    buildEnv: buildDevEnv,
+  },
+};
+
+if (import.meta.main) {
+  const profileArg = (Bun.argv[2] as ProfileName | undefined) ?? "dev";
+  const secretsArg = Bun.argv[3];
+  await run(profileArg, secretsArg);
+}
+
+export async function run(profileName: ProfileName, secretsPathArg?: string) {
+  const profile = profiles[profileName];
+  if (!profile) {
+    throw new Error(`Unknown profile: ${profileName}`);
+  }
+
+  const secretsFile = secretsPathArg
+    ? resolve(process.cwd(), secretsPathArg)
+    : join(configDir, profile.defaultSecretsFile);
+  const secrets = await parseEnvFile(secretsFile);
+  const env = profile.buildEnv(secrets);
+
+  for (const file of profile.files) {
+    const inputPath = join(templatesDir, file.template);
+    const absoluteOutputPath = join(repoRoot, file.output);
+    const template = await Bun.file(inputPath).text();
+    const rendered = renderTemplate(template, env);
+    mkdirSync(dirname(absoluteOutputPath), { recursive: true });
+    await Bun.write(absoluteOutputPath, rendered);
+    console.log(`generated ${file.output}`);
+  }
+}
+
+function renderTemplate(
+  template: string,
+  env: Record<string, string | undefined>,
+): string {
+  let output = template;
+
+  const ifEnvPattern = /{{-?\s*if\s+env\s+"([^"]+)"\s*}}([\s\S]*?){{-?\s*end\s*}}/g;
+  for (;;) {
+    const next = output.replace(ifEnvPattern, (_match, key: string, body: string) =>
+      env[key] ? body : "",
+    );
+    if (next === output) break;
+    output = next;
+  }
+
+  output = output.replace(/{{-?\s*mustEnv\s+"([^"]+)"\s*}}/g, (_match, key: string) => {
+    const value = env[key];
+    if (!value) {
+      throw new Error(`Missing required variable: ${key}`);
+    }
+    return value;
+  });
+
+  output = output.replace(
+    /{{-?\s*env\s+"([^"]+)"\s*}}/g,
+    (_match, key: string) => env[key] || "",
+  );
+  return output;
+}
+
+async function parseEnvFile(path: string): Promise<Record<string, string>> {
+  let raw: string;
+  try {
+    raw = await Bun.file(path).text();
+  } catch {
+    // Missing .env is fine for dev — every key has a default in buildDevEnv.
+    return {};
+  }
+
+  const out: Record<string, string> = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+function buildDevEnv(secrets: Record<string, string>) {
+  const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
+  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8080";
+  env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
+  // No default for AIRDAY_DB_PATH — when unset, the server picks an
+  // XDG path ($HOME/.local/share/airday/airday.sqlite) so the
+  // generated config.toml stays portable across machines.
+  return env;
+}
