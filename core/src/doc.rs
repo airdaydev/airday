@@ -366,6 +366,54 @@ impl Doc {
         item_view(&map)
     }
 
+    pub fn get_list_meta(&self, list_id: &str) -> Option<ListView> {
+        let (_, map) = self.find_list(list_id).ok()?;
+        list_view(&map)
+    }
+
+    /// Per-list nav view: ids of `Live` items in this list, in
+    /// MovableList order. Items whose `list_id` no longer exists
+    /// (orphaned by `delete_list`'s reassignment to `current`) won't
+    /// appear here for the deleted id by definition — they're now
+    /// under `current`.
+    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
+        self.iter_items()
+            .filter(|i| i.list_id == list_id && i.status == Status::Live)
+            .map(|i| i.id)
+            .collect()
+    }
+
+    /// Cross-list "Done" view: ids sorted by `done_at` descending.
+    /// Ties broken by id ascending so the order is deterministic across
+    /// devices despite client-clock skew.
+    pub fn done_item_ids(&self) -> Vec<String> {
+        let mut items: Vec<ItemView> = self
+            .iter_items()
+            .filter(|i| i.status == Status::Done)
+            .collect();
+        items.sort_by(|a, b| {
+            let at = a.done_at.unwrap_or(0);
+            let bt = b.done_at.unwrap_or(0);
+            bt.cmp(&at).then_with(|| a.id.cmp(&b.id))
+        });
+        items.into_iter().map(|i| i.id).collect()
+    }
+
+    /// Cross-list "Bin" view: ids sorted by `binned_at` descending.
+    /// Same tiebreaker as `done_item_ids`.
+    pub fn binned_item_ids(&self) -> Vec<String> {
+        let mut items: Vec<ItemView> = self
+            .iter_items()
+            .filter(|i| i.status == Status::Binned)
+            .collect();
+        items.sort_by(|a, b| {
+            let at = a.binned_at.unwrap_or(0);
+            let bt = b.binned_at.unwrap_or(0);
+            bt.cmp(&at).then_with(|| a.id.cmp(&b.id))
+        });
+        items.into_iter().map(|i| i.id).collect()
+    }
+
     fn iter_items(&self) -> impl Iterator<Item = ItemView> + '_ {
         let items = self.items();
         (0..items.len()).filter_map(move |i| item_map_at(&items, i).and_then(|m| item_view(&m)))
@@ -833,6 +881,79 @@ mod tests {
         a.mark_pushed();
         b.mark_pushed();
         assert_ne!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn view_helpers_empty_doc() {
+        let doc = Doc::new().unwrap();
+        assert_eq!(doc.live_item_ids(LIST_CURRENT), Vec::<String>::new());
+        assert_eq!(doc.done_item_ids(), Vec::<String>::new());
+        assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn live_item_ids_match_movable_list_order() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_CURRENT, "a").unwrap();
+        let b = doc.add_item(LIST_CURRENT, "b").unwrap();
+        let c = doc.add_item(LIST_CURRENT, "c").unwrap();
+        // Holding-list items must not leak into current's view.
+        let _h = doc.add_item(LIST_HOLDING, "h").unwrap();
+        // Done/binned items must not leak into the live view.
+        doc.set_item_status(&b, Status::Done).unwrap();
+        let d = doc.add_item(LIST_CURRENT, "d").unwrap();
+        doc.set_item_status(&d, Status::Binned).unwrap();
+
+        assert_eq!(doc.live_item_ids(LIST_CURRENT), vec![a, c]);
+    }
+
+    #[test]
+    fn done_item_ids_sorted_by_done_at_desc() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_CURRENT, "first").unwrap();
+        let second = doc.add_item(LIST_HOLDING, "second").unwrap();
+        let third = doc.add_item(LIST_CURRENT, "third").unwrap();
+        doc.set_item_status(&first, Status::Done).unwrap();
+        // tiny gap so the millisecond timestamps definitely differ
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_status(&second, Status::Done).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_status(&third, Status::Done).unwrap();
+
+        assert_eq!(doc.done_item_ids(), vec![third, second, first]);
+    }
+
+    #[test]
+    fn binned_item_ids_sorted_by_binned_at_desc() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_CURRENT, "a").unwrap();
+        let b = doc.add_item(LIST_CURRENT, "b").unwrap();
+        doc.set_item_status(&a, Status::Binned).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        doc.set_item_status(&b, Status::Binned).unwrap();
+        assert_eq!(doc.binned_item_ids(), vec![b, a]);
+    }
+
+    #[test]
+    fn deleted_list_orphans_appear_under_current() {
+        let doc = Doc::new().unwrap();
+        let mylist = doc.add_list("Errands").unwrap();
+        let id = doc.add_item(&mylist, "x").unwrap();
+        doc.delete_list(&mylist).unwrap();
+        // The user's view of the deleted list has been reassigned: the
+        // item now appears under `current`'s live view, and the deleted
+        // list's live view is empty.
+        assert!(doc.live_item_ids(&mylist).is_empty());
+        assert_eq!(doc.live_item_ids(LIST_CURRENT), vec![id]);
+    }
+
+    #[test]
+    fn get_list_meta_returns_view() {
+        let doc = Doc::new().unwrap();
+        let v = doc.get_list_meta(LIST_CURRENT).unwrap();
+        assert_eq!(v.id, LIST_CURRENT);
+        assert_eq!(v.name, "Current");
+        assert!(doc.get_list_meta("nope").is_none());
     }
 
     #[test]

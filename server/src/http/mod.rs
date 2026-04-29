@@ -3,8 +3,10 @@ pub mod msgpack;
 mod auth_routes;
 mod device_routes;
 
+use axum::http::{header, Method};
 use axum::routing::{any, delete, get, post};
 use axum::Router;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::state::AppState;
 use crate::sync::ws_handler;
@@ -12,6 +14,14 @@ use crate::sync::ws_handler;
 pub const MSGPACK_CONTENT_TYPE: &str = "application/msgpack";
 
 pub fn router(state: AppState) -> Router {
+    // Permissive CORS for slice 4: the dev web client runs on
+    // localhost:5173 and talks to localhost:8080. Tighten when we add
+    // a hosted deployment.
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+
     Router::new()
         .route("/api/account/signup", post(auth_routes::signup))
         .route("/api/account/prelogin", post(auth_routes::prelogin))
@@ -31,5 +41,6 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/devices/{device_id}", delete(device_routes::revoke))
         .route("/api/sync", any(ws_handler))
+        .layer(cors)
         .with_state(state)
 }

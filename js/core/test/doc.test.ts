@@ -6,7 +6,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, Doc, EncryptedBlob, MemStorage } from "../src/index.ts";
+import { Dek, Doc, EncryptedBlob } from "../wasm/airday_core_web.js";
+import { MemStorage } from "../src/index.ts";
 
 const LIST_CURRENT = "current";
 const LIST_HOLDING = "holding";

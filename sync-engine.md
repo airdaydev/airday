@@ -141,12 +141,15 @@ Do not put the whole engine in a worker.
    - Browser-target build (`--target bundler` if Vite, else `--target web`).
    - Bun tests cover the FFI contract with a stub `WebSocket`.
 
-4. **IDB adapter + first web client**
-   - `js/core/src/storage/idb.ts`, modeled on `js-legacy/core/src/storage/idb.ts`.
-   - Minimal one-screen UI: list / add / done / bin. Real sync from
-     day one, not an offline demo.
+4. **OPFS adapter + first web client** — *shipped; see `sync-engine-slice-4.md`.*
+   - `js/core/src/storage/opfs.ts` (we picked OPFS over IDB — Loro's
+     persistence shape is "write a blob, read it back"; cursors and
+     transactions are overkill).
+   - `js/web/` — Solid + Vite + TS, primavera-ui DnD, login + signup,
+     WS sync, OPFS encrypt-at-rest, debounced + visibility-hide save.
    - DEK lifetime: in-memory only, re-derived from password each
-     session.
+     session. OPFS bytes are sealed with the DEK so a compromised
+     origin can't read past doc state without the password.
 
 5. **UniFFI bridge** (when iOS/Android start)
    - Same `core` crate, generated Swift + Kotlin bindings.

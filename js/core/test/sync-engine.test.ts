@@ -13,7 +13,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Dek, Doc, SyncEngine } from "../src/index.ts";
+import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
 
 const LIST_CURRENT = "current";
 

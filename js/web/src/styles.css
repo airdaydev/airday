@@ -1,0 +1,254 @@
+/* Sprint-1 styling: enough structure to validate layout & dnd, no
+ * design polish. The primavera-dnd custom element brings its own
+ * positioning; everything outside is plain flex/grid. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+}
+
+.nav {
+  background: #f0f0f0;
+  border-right: 1px solid #d8d8d8;
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.nav-section {
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 16px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.nav-item[data-active] {
+  background: #e5e7eb;
+  font-weight: 600;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.main-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e5e5;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.main-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.add-form {
+  display: flex;
+  gap: 8px;
+}
+
+.add-form input {
+  padding: 6px 10px;
+  border: 1px solid #d4d4d4;
+  border-radius: 4px;
+  font: inherit;
+  width: 240px;
+}
+
+.add-form button {
+  padding: 6px 12px;
+  border: 1px solid #1a1a1a;
+  background: #1a1a1a;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dnd-host {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px;
+}
+
+primavera-dnd {
+  --dnd-select-bg: rgba(59, 130, 246, 0.15);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  border-bottom: 1px solid #efefef;
+}
+
+.row input[type="checkbox"] {
+  margin: 0;
+}
+
+.row-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+
+.row:hover .row-actions {
+  opacity: 1;
+}
+
+.row-actions button {
+  padding: 2px 6px;
+  border: 1px solid #d4d4d4;
+  background: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.row[data-status="done"] .row-text {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+}
+
+.status {
+  font-size: 12px;
+  color: #888;
+}
+
+.status[data-online] {
+  color: #22a34d;
+}
+
+.login-page {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 32px;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  width: 360px;
+  max-width: 90%;
+}
+
+.login-form h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.login-form input {
+  padding: 8px 10px;
+  border: 1px solid #d4d4d4;
+  border-radius: 4px;
+  font: inherit;
+}
+
+.login-form button[type="submit"] {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #1a1a1a;
+  background: #1a1a1a;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.login-form button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.login-form .link {
+  background: transparent;
+  border: 0;
+  color: #2563eb;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  padding: 4px;
+}
+
+.login-form .error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}

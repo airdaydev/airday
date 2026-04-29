@@ -8,7 +8,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { BunFileStorage, Doc } from "../src/index.ts";
+import { Doc } from "../wasm/airday_core_web.js";
+import { BunFileStorage } from "../src/index.ts";
 
 let root: string;
 

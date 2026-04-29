@@ -13,12 +13,16 @@ use airday_protocol::{
     PROTOCOL_VERSION,
 };
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{Query, State};
+use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
+use crate::auth::queries::{find_device_by_token_hash, touch_device_last_seen};
+use crate::auth::tokens::{decode_token, sha256};
 use crate::auth::DeviceAuth;
+use crate::error::ApiError;
 use crate::state::AppState;
 
 use super::queries;
@@ -27,16 +31,44 @@ use super::queries;
 /// when there's a build-info crate we'll plumb `CARGO_PKG_VERSION`.
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Browser clients can't set `Authorization` on a `WebSocket`, so we
+/// also accept the device token as a `?token=...` query param. This is
+/// a slice-4 shortcut — `sync-engine.md` flags ticket-exchange as the
+/// proper pattern; revisit when iOS/Android land.
+#[derive(Deserialize)]
+pub struct WsAuthQuery {
+    token: Option<String>,
+}
+
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    auth: DeviceAuth,
-) -> Response {
-    ws.on_upgrade(move |socket| async move {
+    Query(q): Query<WsAuthQuery>,
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
+    // Bearer header preferred; URL token is the browser-only fallback.
+    let raw_hex = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .map(str::to_owned)
+        .or(q.token);
+    let raw_hex = raw_hex.ok_or(ApiError::Unauthorized)?;
+    let raw = decode_token(&raw_hex).ok_or(ApiError::Unauthorized)?;
+    let hash = sha256(&raw).to_vec();
+    let lookup = find_device_by_token_hash(&state.db, hash)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let _ = touch_device_last_seen(&state.db, lookup.device_id).await;
+    let auth = DeviceAuth {
+        account_id: lookup.account_id,
+        device_id: lookup.device_id,
+    };
+    Ok(ws.on_upgrade(move |socket| async move {
         if let Err(e) = run_session(socket, state, auth).await {
             tracing::debug!(error = %e, "ws session ended");
         }
-    })
+    }))
 }
 
 #[derive(Debug, thiserror::Error)]

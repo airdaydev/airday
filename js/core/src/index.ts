@@ -1,17 +1,13 @@
-// @airday/core — JS facade for the wasm-bindgen wrapper plus the
-// pluggable storage adapter the eventual web/Bun clients will use to
-// persist `Doc` snapshots and per-device config.
+// @airday/core — storage adapters + types. The wasm-bindgen surface
+// (`Doc`, `Dek`, `SyncEngine`, ...) lives at `@airday/core/wasm` so
+// the conditional export resolves to the bundler-target build under
+// Vite and the nodejs-target build under Bun without callers
+// thinking about it.
 
-export {
-  Doc,
-  Dek,
-  EncryptedBlob,
-  EngineEvent,
-  SyncEngine,
-} from "../wasm/airday_core_web.js";
 export type {
   StorageAdapter,
   DeviceConfig,
 } from "./storage/adapter.ts";
 export { MemStorage } from "./storage/mem.ts";
 export { BunFileStorage } from "./storage/file.ts";
+export { OpfsStorage } from "./storage/opfs.ts";

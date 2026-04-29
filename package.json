@@ -8,12 +8,13 @@
     "cli": "cargo run -p airday --",
     "build": "cargo build",
     "build:wasm": "wasm-pack build core/web --target nodejs --out-dir ../../js/core/wasm --out-name airday_core_web",
+    "build:wasm:web": "wasm-pack build core/web --target bundler --out-dir ../../js/core/wasm-web --out-name airday_core_web",
     "test": "cargo test",
     "test:server": "cargo test -p airday-server",
     "test:core:js": "bun test --cwd js/core",
     "fmt": "cargo fmt --all",
     "lint": "cargo clippy --workspace --all-targets -- -D warnings",
-    "typecheck": "tsc --noEmit -p js/config && tsc --noEmit -p js/core"
+    "typecheck": "tsc --noEmit -p js/config && tsc --noEmit -p js/core && tsc --noEmit -p js/web"
   },
   "devDependencies": {
     "typescript": "^5"

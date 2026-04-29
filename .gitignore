@@ -4,6 +4,8 @@ serverd.log
 .env
 .DS_Store
 
+.playwright-mcp
+
 # Cargo
 Cargo.lock.legacy
 **/*.rs.bk
@@ -19,4 +21,3 @@ local/
 
 # wasm-pack output for js/core (built via `bun run build:wasm`)
 js/core/wasm/
-

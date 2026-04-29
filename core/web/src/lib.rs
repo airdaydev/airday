@@ -9,10 +9,11 @@
 use wasm_bindgen::prelude::*;
 
 use airday_core::{
-    Dek as CoreDek, Doc as CoreDoc, EngineOptions as CoreEngineOptions, Event as CoreEvent,
-    SyncEngine as CoreSyncEngine,
+    derive_password_master, kek_from_master, Dek as CoreDek, Doc as CoreDoc,
+    EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
+    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
-use airday_protocol::EncryptedBlob as CoreEncryptedBlob;
+use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
 /// Install the panic hook so Rust panics surface as readable JS errors
 /// in the console rather than `RuntimeError: unreachable`.
@@ -161,6 +162,40 @@ impl Doc {
         lists_to_json(&self.inner.all_lists())
     }
 
+    // -- view-id helpers (Stage 2 of slice 4): order-stable id arrays
+    //    that the JS store turns into per-view DnD sources --
+
+    /// Ids of `Live` items in `list_id`, in MovableList order.
+    #[wasm_bindgen(js_name = liveItemIds)]
+    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
+        self.inner.live_item_ids(list_id)
+    }
+
+    /// Ids of all `Done` items, sorted by `done_at` descending.
+    #[wasm_bindgen(js_name = doneItemIds)]
+    pub fn done_item_ids(&self) -> Vec<String> {
+        self.inner.done_item_ids()
+    }
+
+    /// Ids of all `Binned` items, sorted by `binned_at` descending.
+    #[wasm_bindgen(js_name = binnedItemIds)]
+    pub fn binned_item_ids(&self) -> Vec<String> {
+        self.inner.binned_item_ids()
+    }
+
+    /// Single-item read by id; returns the JSON shape of `itemsInListJson`'s
+    /// elements, or `null` if no such item.
+    #[wasm_bindgen(js_name = getItemJson)]
+    pub fn get_item_json(&self, item_id: &str) -> Option<String> {
+        self.inner.get_item(item_id).map(|i| item_to_json(&i))
+    }
+
+    /// Single-list-meta read by id; mirrors `getItemJson` for lists.
+    #[wasm_bindgen(js_name = getListMetaJson)]
+    pub fn get_list_meta_json(&self, list_id: &str) -> Option<String> {
+        self.inner.get_list_meta(list_id).map(|l| list_to_json(&l))
+    }
+
     // -- op stream --
 
     #[wasm_bindgen(js_name = hasPendingOps)]
@@ -219,10 +254,149 @@ impl Dek {
         })
     }
 
+    /// Duplicate the DEK handle. Needed because
+    /// `new SyncEngine(doc, dek, ...)` *consumes* the JS handle, but
+    /// we also want the DEK around for encrypt-at-rest via OPFS.
+    /// Named `dup` (not `clone`) to dodge the `Clone` trait clash on
+    /// the wasm wrapper while still being clear about the intent.
+    #[wasm_bindgen(js_name = clone)]
+    pub fn dup(&self) -> Dek {
+        Dek {
+            inner: self.inner.clone(),
+        }
+    }
+
     #[wasm_bindgen(js_name = toHex)]
     pub fn to_hex(&self) -> String {
         hex::encode(self.inner.as_bytes())
     }
+
+    /// Encrypt an arbitrary byte buffer with this DEK. Used by the
+    /// browser OPFS adapter to encrypt-at-rest local doc snapshots.
+    pub fn seal(&self, plaintext: &[u8]) -> Result<EncryptedBlob, JsError> {
+        let (ciphertext, nonce) = self.inner.seal(plaintext).map_err(js_err)?;
+        Ok(EncryptedBlob {
+            inner: CoreEncryptedBlob {
+                ciphertext,
+                nonce: nonce.to_vec(),
+            },
+        })
+    }
+
+    /// Decrypt a buffer previously produced by `seal`.
+    pub fn open(&self, blob: &EncryptedBlob) -> Result<Vec<u8>, JsError> {
+        self.inner
+            .open(&blob.inner.ciphertext, &blob.inner.nonce)
+            .map_err(js_err)
+    }
+}
+
+// ---------- Auth derivation ----------
+
+/// Result of `deriveLogin`: KEK (in-memory only — pass to `unwrapDek`)
+/// and the auth secret to ship to the server. Both are 32-byte arrays.
+#[wasm_bindgen]
+pub struct DerivedLogin {
+    kek: Vec<u8>,
+    auth_secret: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl DerivedLogin {
+    #[wasm_bindgen(getter)]
+    pub fn kek(&self) -> Vec<u8> {
+        self.kek.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = authSecret)]
+    pub fn auth_secret(&self) -> Vec<u8> {
+        self.auth_secret.clone()
+    }
+}
+
+/// Run Argon2id over `password + salt` and split the master into a
+/// `kek` (used to unwrap the DEK locally) and `auth_secret` (sent to
+/// the server as the login credential). Hundreds of milliseconds —
+/// the caller should show a spinner.
+///
+/// `m_kib`/`t`/`p` are the KdfParams the server returned from
+/// `/api/account/prelogin`.
+#[wasm_bindgen(js_name = deriveLogin)]
+pub fn derive_login(
+    password: &str,
+    salt: &[u8],
+    m_kib: u32,
+    t: u32,
+    p: u32,
+) -> Result<DerivedLogin, JsError> {
+    let params = CoreKdfParams { m_kib, t, p };
+    let master = derive_password_master(password.as_bytes(), salt, params).map_err(js_err)?;
+    let kek = kek_from_master(&master).map_err(js_err)?;
+    let auth = master.auth_secret().map_err(js_err)?;
+    Ok(DerivedLogin {
+        kek: kek.as_bytes().to_vec(),
+        auth_secret: auth.as_bytes().to_vec(),
+    })
+}
+
+/// `wrapDek` output: ciphertext + 24-byte XChaCha20-Poly1305 nonce.
+/// Pair with the local `kek` from `deriveLogin` at signup; ship both
+/// to `/api/account/signup` as `wrapped_dek` / `wrapped_dek_nonce`.
+#[wasm_bindgen]
+pub struct WrappedDekJs {
+    ciphertext: Vec<u8>,
+    nonce: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl WrappedDekJs {
+    #[wasm_bindgen(getter)]
+    pub fn ciphertext(&self) -> Vec<u8> {
+        self.ciphertext.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn nonce(&self) -> Vec<u8> {
+        self.nonce.clone()
+    }
+}
+
+/// Encrypt a DEK with a KEK. Used at signup and on password change /
+/// reset. Browser WebCrypto can't do XChaCha20-Poly1305 so this lives
+/// in wasm alongside the rest of the e2ee primitives.
+#[wasm_bindgen(js_name = wrapDek)]
+pub fn wrap_dek(kek_bytes: &[u8], dek: &Dek) -> Result<WrappedDekJs, JsError> {
+    let kek = CoreKek::from_bytes(kek_bytes).map_err(js_err)?;
+    let w = kek.wrap(&dek.inner).map_err(js_err)?;
+    Ok(WrappedDekJs {
+        ciphertext: w.ciphertext,
+        nonce: w.nonce.to_vec(),
+    })
+}
+
+/// Decrypt the DEK shipped from `/api/account/login` using the local
+/// `kek` from `deriveLogin`. Wrong password → throws.
+#[wasm_bindgen(js_name = unwrapDek)]
+pub fn unwrap_dek(
+    kek_bytes: &[u8],
+    wrapped_ciphertext: &[u8],
+    wrapped_nonce: &[u8],
+) -> Result<Dek, JsError> {
+    let kek = CoreKek::from_bytes(kek_bytes).map_err(js_err)?;
+    if wrapped_nonce.len() != AEAD_NONCE_LEN {
+        return Err(JsError::new(&format!(
+            "wrapped_dek_nonce: expected {AEAD_NONCE_LEN} bytes, got {}",
+            wrapped_nonce.len()
+        )));
+    }
+    let mut nonce = [0u8; AEAD_NONCE_LEN];
+    nonce.copy_from_slice(wrapped_nonce);
+    let wrapped = CoreWrappedDek {
+        ciphertext: wrapped_ciphertext.to_vec(),
+        nonce,
+    };
+    let dek = kek.unwrap(&wrapped).map_err(js_err)?;
+    Ok(Dek { inner: dek })
 }
 
 // ---------- EncryptedBlob ----------
@@ -472,6 +646,34 @@ impl SyncEngine {
     pub fn all_lists_json(&self) -> String {
         lists_to_json(&self.inner.doc().all_lists())
     }
+
+    #[wasm_bindgen(js_name = liveItemIds)]
+    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
+        self.inner.doc().live_item_ids(list_id)
+    }
+
+    #[wasm_bindgen(js_name = doneItemIds)]
+    pub fn done_item_ids(&self) -> Vec<String> {
+        self.inner.doc().done_item_ids()
+    }
+
+    #[wasm_bindgen(js_name = binnedItemIds)]
+    pub fn binned_item_ids(&self) -> Vec<String> {
+        self.inner.doc().binned_item_ids()
+    }
+
+    #[wasm_bindgen(js_name = getItemJson)]
+    pub fn get_item_json(&self, item_id: &str) -> Option<String> {
+        self.inner.doc().get_item(item_id).map(|i| item_to_json(&i))
+    }
+
+    #[wasm_bindgen(js_name = getListMetaJson)]
+    pub fn get_list_meta_json(&self, list_id: &str) -> Option<String> {
+        self.inner
+            .doc()
+            .get_list_meta(list_id)
+            .map(|l| list_to_json(&l))
+    }
 }
 
 // ---------- EngineEvent ----------
@@ -556,20 +758,43 @@ impl From<CoreEvent> for EngineEvent {
 
 // ---------- private helpers ----------
 
+fn list_to_json(l: &airday_core::ListView) -> String {
+    format!(
+        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
+        json_string(&l.id),
+        json_string(&l.name),
+        l.created_at
+    )
+}
+
 fn lists_to_json(lists: &[airday_core::ListView]) -> String {
     let mut s = String::from("[");
     for (i, l) in lists.iter().enumerate() {
         if i > 0 {
             s.push(',');
         }
-        s.push_str(&format!(
-            "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
-            json_string(&l.id),
-            json_string(&l.name),
-            l.created_at
-        ));
+        s.push_str(&list_to_json(l));
     }
     s.push(']');
+    s
+}
+
+fn item_to_json(it: &airday_core::ItemView) -> String {
+    let mut s = format!(
+        "{{\"id\":{},\"text\":{},\"listId\":{},\"status\":{},\"createdAt\":{}",
+        json_string(&it.id),
+        json_string(&it.text),
+        json_string(&it.list_id),
+        json_string(status_str(it.status)),
+        it.created_at,
+    );
+    if let Some(t) = it.done_at {
+        s.push_str(&format!(",\"doneAt\":{t}"));
+    }
+    if let Some(t) = it.binned_at {
+        s.push_str(&format!(",\"binnedAt\":{t}"));
+    }
+    s.push('}');
     s
 }
 
@@ -579,21 +804,7 @@ fn items_to_json(items: &[airday_core::ItemView]) -> String {
         if i > 0 {
             s.push(',');
         }
-        s.push_str(&format!(
-            "{{\"id\":{},\"text\":{},\"listId\":{},\"status\":{},\"createdAt\":{}",
-            json_string(&it.id),
-            json_string(&it.text),
-            json_string(&it.list_id),
-            json_string(status_str(it.status)),
-            it.created_at,
-        ));
-        if let Some(t) = it.done_at {
-            s.push_str(&format!(",\"doneAt\":{t}"));
-        }
-        if let Some(t) = it.binned_at {
-            s.push_str(&format!(",\"binnedAt\":{t}"));
-        }
-        s.push('}');
+        s.push_str(&item_to_json(it));
     }
     s.push(']');
     s

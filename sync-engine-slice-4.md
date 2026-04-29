@@ -194,6 +194,59 @@ reconnect.
 - `sync-engine.md` slice 4 bullet updated to reference this doc and
   note completion.
 
+## Manual smoke
+
+Standing-up checklist:
+
+```sh
+bun install                                            # workspace deps + primavera-ui link
+cd ../primavera-ui/packages/components && bun run build   # one-shot prereq, see js/web/README.md
+cd -  &&  bun run build:wasm  &&  bun run build:wasm:web  # nodejs + bundler wasm
+bun run server -- --db local/airday.db                 # one terminal
+bun --cwd js/web dev                                   # another — http://localhost:5173
+```
+
+Drive each path manually:
+
+- **Signup → app shell.** Click `Need an account? Sign up`, enter
+  email + password (≥10 chars). After ~150ms the form swaps to the
+  workspace with `Current` and `Holding` lists.
+- **Add / done / bin / restore.** In `Current`: type → `Add`. Tick
+  the row → it disappears (lands in `Done`). Hit `Bin` → it lands
+  in `Bin`. Open `Bin`, click `Restore` → back in the originating
+  list as live.
+- **Drag-reorder.** Add three items in `Current`, drag the bottom
+  one to the top. Order persists.
+- **Reload.** Refresh the tab; you'll have to log in again (DEK is
+  in-memory only). After login, items / lists are intact —
+  `OpfsStorage.getDoc` decrypts the cached snapshot before the WS
+  catch-up runs.
+- **Two-tab sync.** Open a second tab, log in as the same account.
+  Add an item in either tab; it appears in the other within a
+  second.
+- **CLI ↔ browser sync.** `bun run cli -- signup` (or `login`) on
+  the same server / account and make a mutation; the browser
+  reflects it. The reverse holds too.
+- **Empty bin.** In `Bin`, click `Empty bin`. Items vanish from this
+  device and the next push frame; another logged-in tab sees them
+  disappear within a second.
+
+If a tab gets into a wedged state (cumulative HMR + OPFS state can
+do this in dev), close it and `navigator.storage.getDirectory()` →
+`removeEntry` for the account dir to start clean.
+
+## Known follow-ups
+
+- Argon2id login spinner blocks the main thread for ~150ms each
+  time. Worker move is tracked in the parent doc.
+- Reconnect is fixed-delay only; no online/offline / visibility
+  smarts.
+- WS auth is `?token=…` on the URL — the slice-4 shortcut. Proper
+  ticket-exchange auth waits for iOS/Android.
+- Multi-tab sharing of the same engine on one origin would avoid
+  duplicate WS sessions per account; not worth the broadcast-channel
+  plumbing yet.
+
 ## Out of scope (still)
 
 Inherits the parent doc's deferred list, plus slice-4-specific:
