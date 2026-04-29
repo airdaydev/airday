@@ -37,6 +37,23 @@ Single binary `airday`. Subcommands:
 - `airday bin empty`
 - `airday bin rm <item_id>`
 
+### Status
+- `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_op_id`, pending-push op count, current offline mode. Read-only against local state; never opens a WS.
+
+## Sync lifecycle
+
+CLI subcommands are one-shot. Each invocation: open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command (mutating or not) → `PushOps` if anything changed → `Ack` → close. No background daemon in sprint 1.
+
+A future TUI (out of sprint 1) holds the WS open while running and surfaces `OpsBroadcast` reactively in the same `airday` binary. The daemon question stays deferred until the TUI exists and proves it needs more than that.
+
+Local Loro doc is always authoritative for reads. `airday ls` and friends never block on or fail because of sync state — they read local and exit. Sync exists to ingest other devices' ops and ship local ones, not to gate reads.
+
+### Connect behaviour
+
+- Default: attempt WS connect with a ~2s timeout. On failure (no network, captive portal, server down), fall back to local-only and print a one-line stderr warning: `offline — N ops pending push`.
+- `--offline` flag or `AIRDAY_OFFLINE=1`: skip the network attempt entirely, no warning. Mutations append to the local doc; the queue flushes on the next online invocation.
+- Pending local ops live in `loro.bin` alongside the rest of the doc state; the next online invocation pushes them as part of its normal `PushOps`.
+
 ## Local state
 
 Single account per install. Per-account dir under XDG paths (`~/.local/share/airday/<account-id-prefix>/` on linux, equivalents elsewhere) — the prefix scopes state so a logout/re-signup as a different user doesn't collide with stale data, but only one account is active at a time:
