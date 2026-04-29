@@ -29,5 +29,5 @@ this package automatically through conditional exports.
 ```sh
 bun install               # from repo root
 bun run build:wasm:web    # produces js/core/wasm-web/
-bun --cwd js/web dev      # http://localhost:5173
+bun --cwd js/web dev      # http://localhost:5176
 ```

@@ -6,7 +6,7 @@ import topLevelAwait from "vite-plugin-top-level-await";
 export default defineConfig({
   plugins: [wasm(), topLevelAwait(), solid()],
   server: {
-    port: 5173,
+    port: 5176,
   },
   // wasm-pack `--target bundler` ESM build that lives at
   // js/core/wasm-web/ — handled via vite-plugin-wasm.

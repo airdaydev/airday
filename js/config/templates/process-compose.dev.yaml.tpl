@@ -34,7 +34,7 @@ processes:
     readiness_probe:
       http_get:
         host: localhost
-        port: 5173
+        port: 5176
         path: /
       initial_delay_seconds: 2
       period_seconds: 2
