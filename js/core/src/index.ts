@@ -2,7 +2,13 @@
 // pluggable storage adapter the eventual web/Bun clients will use to
 // persist `Doc` snapshots and per-device config.
 
-export { Doc, Dek, EncryptedBlob } from "../wasm/airday_core_web.js";
+export {
+  Doc,
+  Dek,
+  EncryptedBlob,
+  EngineEvent,
+  SyncEngine,
+} from "../wasm/airday_core_web.js";
 export type {
   StorageAdapter,
   DeviceConfig,

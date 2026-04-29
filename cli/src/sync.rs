@@ -213,7 +213,7 @@ async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<
 
 async fn send_outbox(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<(), SyncError> {
     while let Some(bytes) = engine.pop_outbox() {
-        ws.send(Message::Binary(bytes.into())).await?;
+        ws.send(Message::Binary(bytes)).await?;
     }
     Ok(())
 }
