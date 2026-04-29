@@ -25,4 +25,9 @@ thiserror = { workspace = true }
 loro = { workspace = true }
 uuid = { workspace = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# `SystemTime::now()` panics on wasm32; bridge to the host's
+# `Date.now()` so `now_millis()` works in the browser and Bun.
+js-sys = "0.3"
+
 [dev-dependencies]

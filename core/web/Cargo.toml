@@ -1,0 +1,28 @@
+[package]
+name = "airday-core-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "wasm-bindgen wrappers around airday-core for JS/TS consumers."
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+airday-core = { path = ".." }
+airday-protocol = { path = "../../crates/protocol" }
+hex = { workspace = true }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+
+# Wasm-only flags for upstream crates that gate JS/web platform support
+# behind a feature. These pull through the dependency graph for the
+# wasm target so airday-core's `rand`/`uuid`/`getrandom` use the
+# browser/Node crypto + performance APIs instead of looking for libc.
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { workspace = true, features = ["js"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3"]

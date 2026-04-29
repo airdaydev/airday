@@ -17,9 +17,20 @@
         "typescript": "^5",
       },
     },
+    "js/core": {
+      "name": "@airday/core",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
   },
   "packages": {
     "@airday/config": ["@airday/config@workspace:js/config"],
+
+    "@airday/core": ["@airday/core@workspace:js/core"],
 
     "@types/bun": ["@types/bun@1.3.13", "", { "dependencies": { "bun-types": "1.3.13" } }, "sha512-9fqXWk5YIHGGnUau9TEi+qdlTYDAnOj+xLCmSTwXfAIqXr2x4tytJb43E9uCvt09zJURKXwAtkoH4nLQfzeTXw=="],
 

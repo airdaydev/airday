@@ -16,6 +16,7 @@
 //! "what's new since the last server interaction" as a single sealed
 //! blob without re-shipping ops we already saw.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use loro::{Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, ValueOrContainer, VersionVector};
@@ -610,11 +611,17 @@ fn hash_opt_i64(hasher: &mut Sha256, v: Option<i64>) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn now_millis() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn now_millis() -> i64 {
+    js_sys::Date::now() as i64
 }
 
 fn new_id() -> String {
