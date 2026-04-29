@@ -54,6 +54,10 @@ Server-side:
 - On login: client posts `auth_secret`; server SHA-256s and compares. SHA-256 is enough server-side because `auth_secret` already has Argon2id cost baked in; no rainbow-table risk.
 - A DB leak yields `password_hash`, not `auth_secret` → not directly usable to log in.
 
+## Password rules
+
+Minimum length **10 characters**, no composition rules. Client-enforced at every entry point (signup, password change, recovery reset) — the server never sees the password, so it cannot enforce this; the password is the KEK and weak input means weak crypto.
+
 ## Login is two-step
 
 Client cannot derive `auth_secret` without the salt. Standard pattern:

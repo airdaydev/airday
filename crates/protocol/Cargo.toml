@@ -1,0 +1,13 @@
+[package]
+name = "airday-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+uuid = { workspace = true }

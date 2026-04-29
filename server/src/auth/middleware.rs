@@ -1,0 +1,46 @@
+//! `DeviceAuth` extractor: validates an `Authorization: Bearer <hex>`
+//! header against the `devices` table and surfaces `(account_id,
+//! device_id)` to handlers.
+
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
+use uuid::Uuid;
+
+use crate::auth::queries::{find_device_by_token_hash, touch_device_last_seen};
+use crate::auth::tokens::{decode_token, sha256};
+use crate::error::ApiError;
+use crate::state::AppState;
+
+#[derive(Debug, Clone)]
+pub struct DeviceAuth {
+    pub account_id: Uuid,
+    pub device_id: Uuid,
+}
+
+impl FromRequestParts<AppState> for DeviceAuth {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let token = parts
+            .headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Bearer "))
+            .ok_or(ApiError::Unauthorized)?;
+        let raw = decode_token(token).ok_or(ApiError::Unauthorized)?;
+        let hash = sha256(&raw).to_vec();
+        let lookup = find_device_by_token_hash(&state.db, hash)
+            .await?
+            .ok_or(ApiError::Unauthorized)?;
+        // Best-effort touch — failure is non-fatal for this request and
+        // would only surface as a slightly stale `last_seen_at`.
+        let _ = touch_device_last_seen(&state.db, lookup.device_id).await;
+        Ok(Self {
+            account_id: lookup.account_id,
+            device_id: lookup.device_id,
+        })
+    }
+}

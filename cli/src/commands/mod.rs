@@ -1,0 +1,73 @@
+use clap::{Parser, Subcommand};
+use dialoguer::Password;
+
+pub const MIN_PASSWORD_LEN: usize = 10;
+
+mod login;
+mod logout;
+mod password;
+mod recover;
+mod signup;
+
+const DEFAULT_SERVER: &str = "http://127.0.0.1:8080";
+
+#[derive(Parser, Debug)]
+#[command(name = "airday", version, about = "Airday CLI")]
+pub struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand, Debug)]
+enum Cmd {
+    /// Create a new account on the given server.
+    Signup(signup::Args),
+    /// Log in to an existing account on a fresh device.
+    Login(login::Args),
+    /// Wipe local state. Does not revoke the device server-side.
+    Logout,
+    /// Use a recovery code to set a new password and bootstrap a fresh device.
+    Recover(recover::Args),
+    /// Change the password on the active account.
+    Password,
+}
+
+impl Cli {
+    pub async fn run(self) -> anyhow::Result<()> {
+        match self.cmd {
+            Cmd::Signup(a) => signup::run(a).await,
+            Cmd::Login(a) => login::run(a).await,
+            Cmd::Logout => logout::run().await,
+            Cmd::Recover(a) => recover::run(a).await,
+            Cmd::Password => password::run().await,
+        }
+    }
+}
+
+pub fn default_device_name() -> String {
+    gethostname::gethostname()
+        .into_string()
+        .unwrap_or_else(|_| "airday-cli".to_string())
+}
+
+pub fn default_server() -> String {
+    std::env::var("AIRDAY_SERVER").unwrap_or_else(|_| DEFAULT_SERVER.to_string())
+}
+
+/// Prompt for a new password with confirmation and the minimum-length rule.
+pub fn prompt_new_password(prompt: &str) -> anyhow::Result<String> {
+    let pw = Password::new()
+        .with_prompt(format!("{prompt} ({MIN_PASSWORD_LEN}+ characters)"))
+        .with_confirmation("Confirm password", "Passwords don't match")
+        .validate_with(|input: &String| -> Result<(), String> {
+            if input.chars().count() < MIN_PASSWORD_LEN {
+                Err(format!(
+                    "password must be at least {MIN_PASSWORD_LEN} characters"
+                ))
+            } else {
+                Ok(())
+            }
+        })
+        .interact()?;
+    Ok(pw)
+}

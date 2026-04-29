@@ -1,0 +1,39 @@
+[package]
+name = "airday-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "airday-server"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+airday-protocol = { path = "../crates/protocol" }
+airday-core = { path = "../core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+rmp-serde = { workspace = true }
+rusqlite = { workspace = true }
+tokio-rusqlite = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+reqwest = { workspace = true }
+tempfile = "3"

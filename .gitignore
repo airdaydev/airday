@@ -3,3 +3,14 @@ target
 serverd.log
 .env
 .DS_Store
+
+# Cargo
+Cargo.lock.legacy
+**/*.rs.bk
+
+# Local server state during dev
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
