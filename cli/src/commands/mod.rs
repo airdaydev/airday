@@ -14,7 +14,7 @@ pub mod resolve;
 mod signup;
 pub mod status;
 
-const DEFAULT_SERVER: &str = "http://127.0.0.1:8080";
+const DEFAULT_SERVER: &str = "http://127.0.0.1:8000";
 
 #[derive(Parser, Debug)]
 #[command(name = "airday", version, about = "Airday CLI")]

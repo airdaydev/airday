@@ -15,7 +15,7 @@ pub const MSGPACK_CONTENT_TYPE: &str = "application/msgpack";
 
 pub fn router(state: AppState) -> Router {
     // Permissive CORS for slice 4: the dev web client runs on
-    // localhost:5173 and talks to localhost:8080. Tighten when we add
+    // localhost:5173 and talks to localhost:8000. Tighten when we add
     // a hosted deployment.
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -23,6 +23,7 @@ pub fn router(state: AppState) -> Router {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
     Router::new()
+        .route("/healthz", get(|| async { "ok" }))
         .route("/api/account/signup", post(auth_routes::signup))
         .route("/api/account/prelogin", post(auth_routes::prelogin))
         .route("/api/account/login", post(auth_routes::login))

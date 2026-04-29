@@ -8,7 +8,7 @@ import type { SyncEngine } from "@airday/core/wasm";
 
 export interface SyncBridgeOpts {
   engine: SyncEngine;
-  /** Base URL of the airday server (e.g. http://localhost:8080). */
+  /** Base URL of the airday server (e.g. http://localhost:8000). */
   serverUrl: string;
   /** Device token from /api/account/login. */
   deviceToken: string;

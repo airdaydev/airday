@@ -24,7 +24,7 @@ Anything under `*-legacy/` or named `*.legacy` is **reference-only**. Read it to
 Root `package.json` is a Bun workspace (`js/*`) with thin script wrappers — there is no JS to build, the scripts just front cargo and the config generator:
 
 - `bun run config` — render `local/server.toml` from `js/config/templates/` (see `js/config/README.md`); `local/` holds gitignored dev artifacts
-- `bun run server` / `bun run cli` — `cargo run -p airday-server --` / `cargo run -p airday --`; pass flags after the script name (e.g. `bun run server -- --bind 0.0.0.0:8080`)
+- `bun run server` / `bun run cli` — `cargo run -p airday-server --` / `cargo run -p airday --`; pass flags after the script name (e.g. `bun run server -- --bind 0.0.0.0:8000`)
 - `bun run build` / `bun run test` / `bun run fmt` / `bun run lint` — cargo equivalents
 - `bun run build:wasm` — `wasm-pack build core/`. Always use this from the workspace root; bare `cargo build --target wasm32-...` will try to build `server`/`cli` for wasm and fail.
 - `bun run typecheck` — `tsc --noEmit -p js/config`

@@ -27,6 +27,7 @@ const profiles: Record<ProfileName, Profile> = {
     defaultSecretsFile: ".env",
     files: [
       { template: "server.dev.toml.tpl", output: "local/server.toml" },
+      { template: "process-compose.dev.yaml.tpl", output: "local/process-compose.yaml" },
     ],
     buildEnv: buildDevEnv,
   },
@@ -121,8 +122,14 @@ async function parseEnvFile(path: string): Promise<Record<string, string>> {
 
 function buildDevEnv(secrets: Record<string, string>) {
   const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
-  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8080";
+  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8000";
   env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
+  // Split bind into host/port so process-compose readiness probes can
+  // target them individually.
+  const colon = env.AIRDAY_BIND.lastIndexOf(":");
+  if (colon < 0) throw new Error(`AIRDAY_BIND must be host:port, got ${env.AIRDAY_BIND}`);
+  env.AIRDAY_HOST = env.AIRDAY_BIND.slice(0, colon);
+  env.AIRDAY_PORT = env.AIRDAY_BIND.slice(colon + 1);
   // No default for AIRDAY_DB_PATH — when unset, the server picks an
   // XDG path ($HOME/.local/share/airday/airday.sqlite) so the
   // generated config.toml stays portable across machines.

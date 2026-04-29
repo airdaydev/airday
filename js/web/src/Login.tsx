@@ -24,7 +24,7 @@ export interface Session {
   freshSignup: boolean;
 }
 
-const DEFAULT_SERVER = "http://localhost:8080";
+const DEFAULT_SERVER = "http://localhost:8000";
 
 function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;

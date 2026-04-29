@@ -13,8 +13,13 @@ bun js/config/gen-config.ts                    # or: cd js/config && bun run con
 Outputs:
 
 - `local/server.toml` — server config, picked up by `airday-server`'s default
-  `--config` path. The whole `local/` dir is gitignored and used for any other
-  generated dev artifacts as they show up.
+  `--config` path.
+- `local/process-compose.yaml` — `process-compose` recipe for running the
+  server + web dev stack together. Run from the repo root:
+  `process-compose -f local/process-compose.yaml`.
+
+The whole `local/` dir is gitignored and used for any other generated dev
+artifacts as they show up.
 
 ## Template syntax
 

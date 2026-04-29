@@ -40,7 +40,7 @@ impl Default for Config {
 }
 
 fn default_bind() -> String {
-    "127.0.0.1:8080".to_string()
+    "127.0.0.1:8000".to_string()
 }
 
 fn default_db() -> PathBuf {

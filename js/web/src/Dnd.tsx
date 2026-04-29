@@ -20,7 +20,9 @@ register();
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
-      "primavera-dnd": JSX.HTMLAttributes<HTMLElement>;
+      "primavera-dnd": JSX.HTMLAttributes<HTMLElement> & {
+        "attr:item-height"?: string;
+      };
     }
   }
 }
@@ -40,10 +42,6 @@ export function Dnd<T>(props: {
   let unsubChange: (() => void) | null = null;
 
   onMount(() => {
-    // Set attributes via setAttribute — primavera-dnd reads `item-height`
-    // through a getter only, so JSX attribute->property assignment
-    // (Solid's default for custom elements) throws.
-    el.setAttribute("item-height", String(props.itemHeight ?? 40));
     el.setRenderer({
       mount: (key, _item, container) => {
         const dispose = render(() => props.children(key), container);
@@ -64,9 +62,14 @@ export function Dnd<T>(props: {
   onCleanup(() => {
     if (unsubChange) unsubChange();
   });
+  // `attr:` forces setAttribute (Solid's default property-assign path
+  // throws — primavera-dnd exposes itemHeight as a getter only). Must
+  // be set on the JSX element so it lands before connectedCallback,
+  // otherwise DndVirtualization/DndCanvas cache the default 32.
   return (
     <primavera-dnd
       ref={el}
+      attr:item-height={String(props.itemHeight ?? 40)}
       style={{ height: "100%", display: "block" }}
     />
   );
