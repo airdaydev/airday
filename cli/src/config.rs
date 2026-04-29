@@ -39,6 +39,10 @@ pub struct DeviceConfig {
     /// the sync layer ships.
     #[serde(default)]
     pub last_acked_op_id: u64,
+    /// Unix millis of the last successful online flush. `None` means
+    /// no online flush has ever completed for this device.
+    #[serde(default)]
+    pub last_sync_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

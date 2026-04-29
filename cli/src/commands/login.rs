@@ -83,6 +83,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         server_url: args.server,
         device_id: device.device_id,
         last_acked_op_id: 0,
+        last_sync_at: None,
     })?;
     profile.write_secrets(&Secrets {
         device_token: device.device_token,

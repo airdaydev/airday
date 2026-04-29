@@ -167,6 +167,9 @@ impl Session {
             // Best-effort close — server will disconnect on its own
             // if the close frame is lost.
             let _ = ws.close(None).await;
+
+            self.device.last_sync_at = Some(now_millis());
+            self.profile.write_device(&self.device)?;
         }
         Ok(())
     }
@@ -267,6 +270,13 @@ impl Session {
 
 fn offline_requested(flag: bool) -> bool {
     flag || std::env::var("AIRDAY_OFFLINE").map(|v| v != "0" && !v.is_empty()).unwrap_or(false)
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn ws_url(server_url: &str) -> String {

@@ -3,11 +3,16 @@ use dialoguer::Password;
 
 pub const MIN_PASSWORD_LEN: usize = 10;
 
+pub mod bin;
+pub mod items;
+pub mod lists;
 mod login;
 mod logout;
 mod password;
 mod recover;
+pub mod resolve;
 mod signup;
+pub mod status;
 
 const DEFAULT_SERVER: &str = "http://127.0.0.1:8080";
 
@@ -42,16 +47,44 @@ enum Cmd {
     Recover(recover::Args),
     /// Change the password on the active account.
     Password,
+    /// Add an item.
+    Add(items::AddArgs),
+    /// List items.
+    Ls(items::LsArgs),
+    /// Mark an item done.
+    Done(items::IdArg),
+    /// Send an item to the bin (or operate on the bin namespace).
+    Bin(bin::BinArgs),
+    /// Restore an item from done/bin to live.
+    Restore(items::IdArg),
+    /// Move an item to a different list.
+    Mv(items::MvArgs),
+    /// Edit an item's text.
+    Edit(items::EditArgs),
+    /// Manage lists.
+    Lists(lists::ListsArgs),
+    /// Show local sync state.
+    Status(status::StatusArgs),
 }
 
 impl Cli {
     pub async fn run(self) -> anyhow::Result<()> {
+        let offline = self.offline();
         match self.cmd {
             Cmd::Signup(a) => signup::run(a).await,
             Cmd::Login(a) => login::run(a).await,
             Cmd::Logout => logout::run().await,
             Cmd::Recover(a) => recover::run(a).await,
             Cmd::Password => password::run().await,
+            Cmd::Add(a) => items::add(a, offline).await,
+            Cmd::Ls(a) => items::ls(a, offline).await,
+            Cmd::Done(a) => items::done(a, offline).await,
+            Cmd::Bin(a) => bin::run(a, offline).await,
+            Cmd::Restore(a) => items::restore(a, offline).await,
+            Cmd::Mv(a) => items::mv(a, offline).await,
+            Cmd::Edit(a) => items::edit(a, offline).await,
+            Cmd::Lists(a) => lists::run(a, offline).await,
+            Cmd::Status(a) => status::run(a).await,
         }
     }
 }

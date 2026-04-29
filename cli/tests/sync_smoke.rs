@@ -17,7 +17,9 @@ use airday_cli::config::{DeviceConfig, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
 use airday_cli::sync::Session;
 use airday_core::{derive_password_master, random_bytes, Dek, Doc, LIST_CURRENT};
-use airday_protocol::{KdfParams, SignupRequest, SignupResponse};
+use airday_protocol::{
+    DeviceCredential, DeviceRegistration, KdfParams, SignupRequest, SignupResponse,
+};
 use airday_server::sync::queries;
 use airday_server::{router, AppState};
 use reqwest::header::CONTENT_TYPE;
@@ -109,6 +111,7 @@ fn materialize_profile(
             server_url: server_url.into(),
             device_id: resp.device_id.clone(),
             last_acked_op_id: 0,
+            last_sync_at: None,
         })
         .unwrap();
     profile
@@ -183,6 +186,7 @@ async fn offline_flag_short_circuits_connect() {
             server_url: "http://127.0.0.1:1".into(), // guaranteed unreachable
             device_id: Uuid::now_v7().to_string(),
             last_acked_op_id: 0,
+            last_sync_at: None,
         })
         .unwrap();
     let dek = Dek::generate();
@@ -200,6 +204,72 @@ async fn offline_flag_short_circuits_connect() {
     assert!(started.elapsed() < Duration::from_millis(500));
     assert!(!session.is_online());
     session.flush().await.unwrap();
+}
+
+#[tokio::test]
+async fn second_device_observes_first_devices_items_via_pull() {
+    let server = TestServer::start().await;
+    let dek = Dek::generate();
+    let signup = signup_via_http(&server, &dek).await;
+
+    // Device A: full profile, seeded doc.
+    let tmp_a = tempfile::tempdir().unwrap();
+    let profile_a = materialize_profile(tmp_a.path(), &server.base, &signup, &dek, true);
+
+    // Device B: register a second device on the same account, share
+    // the DEK (paranthesis: the real device-2 path derives the DEK
+    // from password+wrap; here we cheat because we already have it).
+    let device_b = register_device_b(&server, &signup.device_token).await;
+    let tmp_b = tempfile::tempdir().unwrap();
+    let profile_b = Profile { dir: tmp_b.path().to_path_buf() };
+    profile_b
+        .write_device(&DeviceConfig {
+            account_id: signup.account_id.clone(),
+            email: "smoke-test@example.com".into(),
+            server_url: server.base.clone(),
+            device_id: device_b.device_id.clone(),
+            last_acked_op_id: 0,
+            last_sync_at: None,
+        })
+        .unwrap();
+    profile_b
+        .write_secrets(&Secrets {
+            device_token: device_b.device_token.clone(),
+            dek_hex: dek_to_hex(&dek),
+        })
+        .unwrap();
+    profile_b.write_doc(&Doc::empty()).unwrap();
+
+    // A pushes a new item.
+    let session_a = Session::open_with_profile(profile_a, false).await.unwrap();
+    let item_id = session_a.doc.add_item(LIST_CURRENT, "from-A").unwrap();
+    session_a.flush().await.unwrap();
+
+    // B opens a session — its pull should ingest A's seed + add_item
+    // blob and surface the item.
+    let session_b = Session::open_with_profile(profile_b, false).await.unwrap();
+    assert!(session_b.is_online());
+    let view = session_b.doc.get_item(&item_id).unwrap();
+    assert_eq!(view.text, "from-A");
+    assert_eq!(view.list_id, LIST_CURRENT);
+    session_b.flush().await.unwrap();
+}
+
+async fn register_device_b(server: &TestServer, owner_token: &str) -> DeviceCredential {
+    let bytes = rmp_serde::to_vec_named(&DeviceRegistration {
+        name: "device-b".into(),
+    })
+    .unwrap();
+    let resp = http()
+        .post(format!("{}/api/devices", server.base))
+        .header(CONTENT_TYPE, MSGPACK)
+        .bearer_auth(owner_token)
+        .body(bytes)
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
 }
 
 async fn wait_for_ops(
