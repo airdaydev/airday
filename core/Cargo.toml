@@ -10,6 +10,8 @@ path = "src/lib.rs"
 [dependencies]
 airday-protocol = { path = "../crates/protocol" }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
+rmp-serde = { workspace = true }
 argon2 = { workspace = true }
 chacha20poly1305 = { workspace = true }
 hkdf = { workspace = true }
@@ -20,5 +22,7 @@ zeroize = { workspace = true }
 bip39 = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
+loro = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]

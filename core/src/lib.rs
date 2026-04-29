@@ -1,8 +1,7 @@
-//! Airday core: encryption + (later) Loro CRDT engine + sync logic.
-//!
-//! Sprint 1 currently exposes only the auth-time crypto primitives.
-//! The Loro doc and sync engine arrive once the auth crust is solid.
+//! Airday core: encryption + Loro CRDT engine + sync logic.
 
 pub mod crypto;
+pub mod doc;
 
 pub use crypto::*;
+pub use doc::{Doc, DocError, ItemView, ListView, Status, LIST_CURRENT, LIST_HOLDING};

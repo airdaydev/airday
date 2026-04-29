@@ -50,6 +50,7 @@ hex = "0.4"
 thiserror = "1"
 anyhow = "1"
 bytes = "1"
+loro = "1.10"
 
 # observability
 tracing = "0.1"
