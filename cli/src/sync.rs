@@ -1,9 +1,11 @@
-//! CLI-side sync runtime.
+//! CLI-side sync runtime — a thin tokio-tungstenite adapter that
+//! drives the sans-IO `airday_core::SyncEngine`.
 //!
 //! `Session` is the per-invocation handle: open at command start, mutate
-//! the local Loro doc, `flush()` at end. Open does the WS handshake and
-//! initial pull; flush saves `loro.bin`, pushes any pending ops, and
-//! advances the device's `last_acked_op_id`.
+//! the local Loro doc via `session.doc()`, `flush()` at end. Open does
+//! the WS handshake and initial pull through the engine; flush saves
+//! `loro.bin`, asks the engine to push pending ops, advances the
+//! device's `last_acked_op_id`.
 //!
 //! Offline behavior matches `spec/cli.md`:
 //! - Default: 2s connect timeout. Failure → local-only with a stderr
@@ -13,14 +15,9 @@
 
 use std::time::Duration;
 
-use airday_core::{Dek, Doc};
-use airday_protocol::{
-    ClientFrame, Hello, HelloAck, HelloRejected, ServerFrame, StoredOp, PROTOCOL_VERSION,
-};
+use airday_core::{Doc, EngineOptions, Event, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
@@ -41,14 +38,8 @@ pub enum SyncError {
     Doc(#[from] airday_core::DocError),
     #[error("ws: {0}")]
     Ws(String),
-    #[error("encode: {0}")]
-    Encode(#[from] rmp_serde::encode::Error),
-    #[error("decode: {0}")]
-    Decode(#[from] rmp_serde::decode::Error),
-    #[error("server rejected handshake: {0}")]
-    HandshakeRejected(String),
-    #[error("unexpected server frame: {0}")]
-    UnexpectedFrame(String),
+    #[error("engine: {0}")]
+    Engine(String),
 }
 
 impl From<tokio_tungstenite::tungstenite::Error> for SyncError {
@@ -63,12 +54,8 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub struct Session {
     profile: Profile,
     device: DeviceConfig,
-    dek: Dek,
-    pub doc: Doc,
+    engine: SyncEngine,
     ws: Option<WsStream>,
-    /// Highest op id we know about — bumped by pull and by our own
-    /// pushes' assigned ids. Acked once on flush.
-    highest_seen_op_id: u64,
 }
 
 impl Session {
@@ -98,15 +85,22 @@ impl Session {
             }
             Err(e) => return Err(e.into()),
         };
-        let highest_seen_op_id = device.last_acked_op_id;
+
+        let engine = SyncEngine::new(
+            doc,
+            dek,
+            device.last_acked_op_id,
+            EngineOptions {
+                client_name: "airday-cli".into(),
+                client_version: env!("CARGO_PKG_VERSION").into(),
+            },
+        );
 
         let mut session = Session {
             profile,
             device,
-            dek,
-            doc,
+            engine,
             ws: None,
-            highest_seen_op_id,
         };
 
         if offline_requested(offline) {
@@ -127,58 +121,47 @@ impl Session {
         self.ws.is_some()
     }
 
+    /// Borrow the local doc — commands read and mutate via this. Doc's
+    /// own methods take `&self` (loro uses interior mutability) so a
+    /// shared reference is enough for both reads and writes.
+    pub fn doc(&self) -> &Doc {
+        self.engine.doc()
+    }
+
     /// Persist the doc, push any pending ops, ack the frontier, close
     /// the socket. Local persistence runs first so a network failure
     /// after a mutation can't silently drop the change.
     pub async fn flush(mut self) -> Result<(), SyncError> {
-        self.profile.write_doc(&self.doc)?;
+        self.profile.write_doc(self.engine.doc())?;
 
-        if let Some(ws) = self.ws.as_mut() {
-            if let Some(blob) = self.doc.pending_export(&self.dek)? {
-                send_frame(ws, &ClientFrame::PushOps { ops: vec![blob] }).await?;
-                let resp: ServerFrame = recv_frame(ws).await?;
-                let assigned = match resp {
-                    ServerFrame::OpsAck { assigned_ids } => assigned_ids,
-                    other => {
-                        return Err(SyncError::UnexpectedFrame(format!("{other:?}")));
-                    }
-                };
-                if let Some(top) = assigned.iter().copied().max() {
-                    self.highest_seen_op_id = self.highest_seen_op_id.max(top);
-                }
-                self.doc.mark_pushed();
-                // Re-save with the advanced last_pushed_vv so a crash
-                // between push and ack doesn't re-export the same ops.
-                self.profile.write_doc(&self.doc)?;
-            }
+        if let Some(mut ws) = self.ws.take() {
+            self.engine.flush();
+            drive_until_idle(&mut ws, &mut self.engine).await?;
 
-            if self.highest_seen_op_id > self.device.last_acked_op_id {
-                send_frame(
-                    ws,
-                    &ClientFrame::Ack {
-                        last_acked_op_id: self.highest_seen_op_id,
-                    },
-                )
-                .await?;
-                self.device.last_acked_op_id = self.highest_seen_op_id;
-                self.profile.write_device(&self.device)?;
+            // Re-save with the advanced `last_pushed_vv` so a crash
+            // between push and ack doesn't re-export the same ops.
+            self.profile.write_doc(self.engine.doc())?;
+
+            let acked = self.engine.highest_seen_op_id();
+            if acked > self.device.last_acked_op_id {
+                self.device.last_acked_op_id = acked;
             }
+            self.device.last_sync_at = Some(now_millis());
+            self.profile.write_device(&self.device)?;
 
             // Best-effort close — server will disconnect on its own
             // if the close frame is lost.
             let _ = ws.close(None).await;
-
-            self.device.last_sync_at = Some(now_millis());
-            self.profile.write_device(&self.device)?;
         }
         Ok(())
     }
 
     async fn try_connect_and_pull(&mut self) -> Result<(), SyncError> {
-        let mut ws = tokio::time::timeout(CONNECT_TIMEOUT, self.connect()).await
+        let mut ws = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
+            .await
             .map_err(|_| SyncError::Ws(format!("connect timed out after {CONNECT_TIMEOUT:?}")))??;
-        self.handshake(&mut ws).await?;
-        self.pull_initial(&mut ws).await?;
+        self.engine.handle_connected();
+        drive_until_idle(&mut ws, &mut self.engine).await?;
         self.ws = Some(ws);
         Ok(())
     }
@@ -198,78 +181,55 @@ impl Session {
         let (ws, _) = tokio_tungstenite::connect_async(req).await?;
         Ok(ws)
     }
+}
 
-    async fn handshake(&self, ws: &mut WsStream) -> Result<(), SyncError> {
-        send_frame(
-            ws,
-            &Hello {
-                client: "airday-cli".into(),
-                client_version: env!("CARGO_PKG_VERSION").into(),
-                supported_protocol_versions: vec![PROTOCOL_VERSION],
-            },
-        )
-        .await?;
-        // Server sends either HelloAck or HelloRejected — both decode
-        // from the same envelope; peek at the bytes once and try each.
-        let bytes = recv_bytes(ws).await?;
-        if let Ok(ack) = rmp_serde::from_slice::<HelloAck>(&bytes) {
-            if ack.protocol_version != PROTOCOL_VERSION {
-                return Err(SyncError::HandshakeRejected(format!(
-                    "server picked protocol {} but client speaks {PROTOCOL_VERSION}",
-                    ack.protocol_version
-                )));
+/// Shuffle bytes between the WS and the engine until the engine
+/// reports `Idle`. Drains the outbox after every step so a stalled
+/// engine can't sit on a frame the server is waiting for.
+///
+/// Engine `Error` events become `SyncError::Engine` — they're how the
+/// engine surfaces handshake rejection and frame-decode failures.
+async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<(), SyncError> {
+    loop {
+        send_outbox(ws, engine).await?;
+        for event in drain_events(engine) {
+            if let Event::Error(msg) = event {
+                return Err(SyncError::Engine(msg));
             }
+        }
+        if !engine.is_online() {
+            return Err(SyncError::Engine("engine disconnected mid-drive".into()));
+        }
+        if engine.is_idle() {
+            // One last sweep: handling earlier bytes might have queued
+            // an Ack that hasn't been flushed yet.
+            send_outbox(ws, engine).await?;
             return Ok(());
         }
-        if let Ok(rej) = rmp_serde::from_slice::<HelloRejected>(&bytes) {
-            return Err(SyncError::HandshakeRejected(rej.reason));
-        }
-        Err(SyncError::UnexpectedFrame(
-            "first server frame was neither HelloAck nor HelloRejected".into(),
-        ))
-    }
-
-    async fn pull_initial(&mut self, ws: &mut WsStream) -> Result<(), SyncError> {
-        send_frame(
-            ws,
-            &ClientFrame::PullOps {
-                since_op_id: self.device.last_acked_op_id,
-            },
-        )
-        .await?;
-        loop {
-            let frame: ServerFrame = recv_frame(ws).await?;
-            match frame {
-                ServerFrame::OpsBatch { ops, complete } => {
-                    self.apply_batch(ops)?;
-                    if complete {
-                        return Ok(());
-                    }
-                }
-                // Broadcast frames may arrive interleaved with the
-                // pull stream if peers are pushing right now — apply
-                // and keep waiting for the pull's terminating batch.
-                ServerFrame::OpsBroadcast { ops } => {
-                    self.apply_batch(ops)?;
-                }
-                other => {
-                    return Err(SyncError::UnexpectedFrame(format!("{other:?}")));
-                }
-            }
-        }
-    }
-
-    fn apply_batch(&mut self, ops: Vec<StoredOp>) -> Result<(), SyncError> {
-        for op in ops {
-            self.doc.apply_remote(&self.dek, &op.blob)?;
-            self.highest_seen_op_id = self.highest_seen_op_id.max(op.id);
-        }
-        Ok(())
+        let bytes = recv_bytes(ws).await?;
+        engine.handle_server_bytes(&bytes);
     }
 }
 
+async fn send_outbox(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<(), SyncError> {
+    while let Some(bytes) = engine.pop_outbox() {
+        ws.send(Message::Binary(bytes.into())).await?;
+    }
+    Ok(())
+}
+
+fn drain_events(engine: &mut SyncEngine) -> Vec<Event> {
+    let mut out = Vec::new();
+    while let Some(ev) = engine.pop_event() {
+        out.push(ev);
+    }
+    out
+}
+
 fn offline_requested(flag: bool) -> bool {
-    flag || std::env::var("AIRDAY_OFFLINE").map(|v| v != "0" && !v.is_empty()).unwrap_or(false)
+    flag || std::env::var("AIRDAY_OFFLINE")
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false)
 }
 
 fn now_millis() -> i64 {
@@ -289,17 +249,6 @@ fn ws_url(server_url: &str) -> String {
         trimmed.to_string()
     };
     format!("{base}/api/sync")
-}
-
-async fn send_frame<T: Serialize>(ws: &mut WsStream, value: &T) -> Result<(), SyncError> {
-    let bytes = rmp_serde::to_vec_named(value)?;
-    ws.send(Message::Binary(bytes)).await?;
-    Ok(())
-}
-
-async fn recv_frame<T: DeserializeOwned>(ws: &mut WsStream) -> Result<T, SyncError> {
-    let bytes = recv_bytes(ws).await?;
-    Ok(rmp_serde::from_slice(&bytes)?)
 }
 
 async fn recv_bytes(ws: &mut WsStream) -> Result<Vec<u8>, SyncError> {
@@ -325,9 +274,18 @@ mod tests {
 
     #[test]
     fn ws_url_strips_http_scheme() {
-        assert_eq!(ws_url("http://localhost:8080"), "ws://localhost:8080/api/sync");
-        assert_eq!(ws_url("https://airday.example/"), "wss://airday.example/api/sync");
-        assert_eq!(ws_url("ws://localhost:9000"), "ws://localhost:9000/api/sync");
+        assert_eq!(
+            ws_url("http://localhost:8080"),
+            "ws://localhost:8080/api/sync"
+        );
+        assert_eq!(
+            ws_url("https://airday.example/"),
+            "wss://airday.example/api/sync"
+        );
+        assert_eq!(
+            ws_url("ws://localhost:9000"),
+            "ws://localhost:9000/api/sync"
+        );
     }
 
     #[test]

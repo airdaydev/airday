@@ -138,40 +138,40 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     let tmp = tempfile::tempdir().unwrap();
     let profile = materialize_profile(tmp.path(), &server.base, &signup, &dek, true);
 
-    // First open: connect, handshake, pull (empty), no ops yet.
+    // First open: connect, handshake, pull (empty). The seed counts
+    // as pending so the engine auto-pushes it during open; the
+    // user's add_item then ships on flush. Two blobs land server-side.
     let session = Session::open_with_profile(profile, false).await.unwrap();
     assert!(session.is_online(), "expected to connect to local server");
-    let item_id = session.doc.add_item(LIST_CURRENT, "hello world").unwrap();
+    let item_id = session.doc().add_item(LIST_CURRENT, "hello world").unwrap();
     session.flush().await.unwrap();
 
-    // Server's op log should now contain exactly one blob (the seed +
-    // the add_item, packed as a single Updates blob).
     let account_id = Uuid::parse_str(&signup.account_id).unwrap();
-    let batch = wait_for_ops(&server, account_id, 1).await;
-    assert_eq!(batch.ops.len(), 1, "expected one op blob on server");
-    let assigned_id = batch.ops[0].id;
+    let batch = wait_for_ops(&server, account_id, 2).await;
+    assert_eq!(batch.ops.len(), 2, "seed-push + add-item-push");
+    let highest_assigned = batch.ops.iter().map(|o| o.id).max().unwrap();
 
-    // Device's frontier should have advanced to the assigned id.
+    // Device's frontier should have advanced to the highest assigned id.
     let device_uuid = Uuid::parse_str(&signup.device_id).unwrap();
     let acked = queries::get_last_acked_op_id(&server.state.db, device_uuid)
         .await
         .unwrap();
-    assert_eq!(acked, assigned_id);
+    assert_eq!(acked, highest_assigned);
 
     // Re-open. last_acked_op_id is persisted, so the pull is empty,
     // and `pending_export` should be `None`.
     let profile2 = reopen_profile(tmp.path());
     let session2 = Session::open_with_profile(profile2, false).await.unwrap();
     assert!(session2.is_online());
-    assert!(session2.doc.get_item(&item_id).is_some(), "item survived round-trip");
-    assert!(!session2.doc.has_pending_ops(), "no new local mutations");
+    assert!(session2.doc().get_item(&item_id).is_some(), "item survived round-trip");
+    assert!(!session2.doc().has_pending_ops(), "no new local mutations");
     session2.flush().await.unwrap();
 
     // No new op blobs should have been pushed.
     let after = queries::fetch_ops_batch(&server.state.db, account_id, 0)
         .await
         .unwrap();
-    assert_eq!(after.ops.len(), 1, "second flush must not re-push");
+    assert_eq!(after.ops.len(), 2, "second flush must not re-push");
 }
 
 #[tokio::test]
@@ -242,14 +242,14 @@ async fn second_device_observes_first_devices_items_via_pull() {
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, false).await.unwrap();
-    let item_id = session_a.doc.add_item(LIST_CURRENT, "from-A").unwrap();
+    let item_id = session_a.doc().add_item(LIST_CURRENT, "from-A").unwrap();
     session_a.flush().await.unwrap();
 
     // B opens a session — its pull should ingest A's seed + add_item
     // blob and surface the item.
     let session_b = Session::open_with_profile(profile_b, false).await.unwrap();
     assert!(session_b.is_online());
-    let view = session_b.doc.get_item(&item_id).unwrap();
+    let view = session_b.doc().get_item(&item_id).unwrap();
     assert_eq!(view.text, "from-A");
     assert_eq!(view.list_id, LIST_CURRENT);
     session_b.flush().await.unwrap();

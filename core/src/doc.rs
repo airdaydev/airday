@@ -19,7 +19,9 @@
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use loro::{Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, ValueOrContainer, VersionVector};
+use loro::{
+    Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, ValueOrContainer, VersionVector,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -161,6 +163,15 @@ impl Doc {
         &self.last_pushed_vv
     }
 
+    /// Snapshot of the oplog VV — every commit currently in the log,
+    /// across every peer we've seen. Sync engine captures this at the
+    /// moment of `pending_export` and feeds it back via
+    /// `mark_pushed_at` on ack so a mutation made *during* the in-flight
+    /// push doesn't get marked-as-pushed alongside the ops on the wire.
+    pub fn oplog_vv(&self) -> VersionVector {
+        self.inner.oplog_vv()
+    }
+
     /// True iff there are local commits the server hasn't seen.
     pub fn has_pending_ops(&self) -> bool {
         // `Updates { from: oplog_vv }` is empty; `Updates { from: VV<oplog }` isn't.
@@ -259,7 +270,9 @@ impl Doc {
         let items = self.items();
         let mut removed = 0;
         for idx in (0..items.len()).rev() {
-            let Some(map) = item_map_at(&items, idx) else { continue };
+            let Some(map) = item_map_at(&items, idx) else {
+                continue;
+            };
             if read_status(&map) == Some(Status::Binned) {
                 items.delete(idx, 1)?;
                 removed += 1;
@@ -309,7 +322,9 @@ impl Doc {
         let (idx, _) = self.find_list(list_id)?;
         let items = self.items();
         for i in 0..items.len() {
-            let Some(map) = item_map_at(&items, i) else { continue };
+            let Some(map) = item_map_at(&items, i) else {
+                continue;
+            };
             if read_string(&map, KEY_LIST_ID).as_deref() == Some(list_id) {
                 map.insert(KEY_LIST_ID, LIST_CURRENT)?;
             }
@@ -374,16 +389,30 @@ impl Doc {
         }))
     }
 
-    /// Mark the local view as "everything in oplog has now been
-    /// shipped." Call after the server's `OpsAck` lands so a follow-up
-    /// `pending_export` doesn't re-send the same updates.
+    /// Mark the local view as "everything currently in oplog has now
+    /// been shipped." Caller-friendly shortcut for the common
+    /// synchronous case (CLI tests). The sync engine uses
+    /// `mark_pushed_at` instead so a concurrent local mutation between
+    /// `pending_export` and the server's `OpsAck` isn't silently
+    /// included in the advance.
     pub fn mark_pushed(&mut self) {
-        self.last_pushed_vv = self.inner.oplog_vv();
+        let vv = self.inner.oplog_vv();
+        self.last_pushed_vv.merge(&vv);
     }
 
-    /// Decrypt and apply a peer op blob. After applying, also advances
-    /// `last_pushed_vv` so we don't echo peer updates back through the
-    /// next `pending_export` (the server already has them).
+    /// Merge `vv` into `last_pushed_vv`. Pair with `oplog_vv()` captured
+    /// at the moment of `pending_export` — on the server's ack, this
+    /// advances only past the ops that were actually on the wire,
+    /// leaving any concurrently-committed local mutations in the
+    /// pending set.
+    pub fn mark_pushed_at(&mut self, vv: VersionVector) {
+        self.last_pushed_vv.merge(&vv);
+    }
+
+    /// Decrypt and apply a peer op blob. Advances `last_pushed_vv` for
+    /// the imported peers only — the server clearly has those ops, but
+    /// any local commits already in the oplog stay in the pending set
+    /// until our own push lands.
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
         if blob.nonce.len() != AEAD_NONCE_LEN {
             return Err(DocError::Invalid(format!(
@@ -392,8 +421,15 @@ impl Doc {
             )));
         }
         let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
-        self.inner.import(&plaintext)?;
-        self.last_pushed_vv = self.inner.oplog_vv();
+        let status = self.inner.import(&plaintext)?;
+        // VersionRange is `(start, end)` per peer — `end` is the
+        // exclusive upper bound, which matches `VersionVector`'s
+        // counter semantics (cf. loro `VersionRange::from_vv`).
+        let mut imported_vv = VersionVector::new();
+        for (peer, (_, end)) in status.success.iter() {
+            imported_vv.insert(*peer, *end);
+        }
+        self.last_pushed_vv.merge(&imported_vv);
         Ok(())
     }
 
@@ -418,7 +454,10 @@ impl Doc {
         inner.import(&envelope.snapshot)?;
         let last_pushed_vv = VersionVector::decode(&envelope.last_pushed_vv)
             .map_err(|e| DocError::Loro(e.to_string()))?;
-        Ok(Self { inner, last_pushed_vv })
+        Ok(Self {
+            inner,
+            last_pushed_vv,
+        })
     }
 
     // ---------- fingerprint ----------
@@ -585,7 +624,9 @@ fn absolute_index_for_list_position(
         if i == current_idx {
             continue;
         }
-        let Some(map) = item_map_at(items, i) else { continue };
+        let Some(map) = item_map_at(items, i) else {
+            continue;
+        };
         if read_string(&map, KEY_LIST_ID).as_deref() == Some(target_list_id) {
             if seen == target_index {
                 return i;

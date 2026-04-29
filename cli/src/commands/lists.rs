@@ -38,7 +38,7 @@ pub async fn run(args: ListsArgs, offline: bool) -> anyhow::Result<()> {
 
 async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let lists = session.doc.all_lists();
+    let lists = session.doc().all_lists();
     if json {
         print_json(&lists.iter().map(list_json).collect::<Vec<_>>())?;
     } else {
@@ -52,7 +52,7 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
 
 async fn add(name: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = session.doc.add_list(name)?;
+    let id = session.doc().add_list(name)?;
     session.flush().await?;
     println!("{}", short_id(&id));
     Ok(())
@@ -60,8 +60,8 @@ async fn add(name: &str, offline: bool) -> anyhow::Result<()> {
 
 async fn rename(list_prefix: &str, name: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_list_id(&session.doc, list_prefix)?;
-    session.doc.rename_list(&id, name)?;
+    let id = resolve_list_id(session.doc(), list_prefix)?;
+    session.doc().rename_list(&id, name)?;
     session.flush().await?;
     println!("{}", short_id(&id));
     Ok(())
@@ -69,8 +69,8 @@ async fn rename(list_prefix: &str, name: &str, offline: bool) -> anyhow::Result<
 
 async fn rm(list_prefix: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_list_id(&session.doc, list_prefix)?;
-    session.doc.delete_list(&id)?;
+    let id = resolve_list_id(session.doc(), list_prefix)?;
+    session.doc().delete_list(&id)?;
     session.flush().await?;
     println!("{}", short_id(&id));
     Ok(())

@@ -50,7 +50,7 @@ pub async fn run(args: BinArgs, offline: bool) -> anyhow::Result<()> {
 
 async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let items = session.doc.binned_items();
+    let items = session.doc().binned_items();
     if json {
         let v: Vec<BinnedJson> = items
             .iter()
@@ -73,7 +73,7 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
 
 async fn empty(offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let removed = session.doc.empty_bin()?;
+    let removed = session.doc().empty_bin()?;
     session.flush().await?;
     println!("removed {removed}");
     Ok(())
@@ -81,8 +81,8 @@ async fn empty(offline: bool) -> anyhow::Result<()> {
 
 async fn rm(item_prefix: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_item_id(&session.doc, item_prefix)?;
-    session.doc.delete_binned(&id)?;
+    let id = resolve_item_id(session.doc(), item_prefix)?;
+    session.doc().delete_binned(&id)?;
     session.flush().await?;
     println!("{}", short_id(&id));
     Ok(())

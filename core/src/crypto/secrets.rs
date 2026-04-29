@@ -38,7 +38,9 @@ macro_rules! key32 {
 
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.debug_tuple(stringify!($name)).field(&"<redacted>").finish()
+                f.debug_tuple(stringify!($name))
+                    .field(&"<redacted>")
+                    .finish()
             }
         }
     };
@@ -60,7 +62,10 @@ key32!(
     AuthSecret,
     "Login credential sent to the server. The server stores SHA-256(self)."
 );
-key32!(Dek, "Data-encryption key. Encrypts every op + snapshot blob.");
+key32!(
+    Dek,
+    "Data-encryption key. Encrypts every op + snapshot blob."
+);
 
 impl Dek {
     /// Generate a fresh random DEK. Called once at signup.
