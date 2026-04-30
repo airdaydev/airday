@@ -13,7 +13,12 @@ import {
   Show,
 } from "solid-js";
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import { OpfsStorage } from "@airday/core";
+import {
+  NullStorage,
+  OpfsStorage,
+  probeOpfs,
+  type StorageAdapter,
+} from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
@@ -51,6 +56,13 @@ export function App() {
     null,
   );
   const [bootError, setBootError] = createSignal<string | null>(null);
+  const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
+
+  void (async () => {
+    const ok = await probeOpfs();
+    if (!ok) console.warn("OPFS not available");
+    setOpfsOk(ok);
+  })();
 
   // Probe the vault on mount. If a wrapped DEK is present and we can
   // unwrap it, the device cookie should still be valid — the WS pump
@@ -91,7 +103,7 @@ export function App() {
 
   return (
     <Show
-      when={session() !== undefined}
+      when={session() !== undefined && opfsOk() !== null}
       fallback={<div class="empty">Loading…</div>}
     >
       <Show when={session()} fallback={<Login onSession={setSession} />}>
@@ -105,6 +117,7 @@ export function App() {
             online={online()}
             setOnline={setOnline}
             logout={logout}
+            opfsOk={opfsOk() ?? false}
           />
         )}
       </Show>
@@ -121,6 +134,7 @@ function BootGate(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
+  opfsOk: boolean;
 }) {
   // Try to restore a doc + frontier from OPFS. On signup we always
   // start with a seeded Doc.create(); on login we prefer OPFS if the
@@ -132,6 +146,10 @@ function BootGate(props: {
     try {
       if (props.session.freshSignup) {
         props.setBoot({ doc: Doc.create(), lastAcked: 0n });
+        return;
+      }
+      if (!props.opfsOk) {
+        props.setBoot({ doc: Doc.empty(), lastAcked: 0n });
         return;
       }
       const storage = new OpfsStorage(
@@ -165,6 +183,7 @@ function BootGate(props: {
           setOnline={props.setOnline}
           online={props.online}
           logout={props.logout}
+          opfsOk={props.opfsOk}
         />
       )}
     </Show>
@@ -178,6 +197,7 @@ function MainApp(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
+  opfsOk: boolean;
 }) {
   // eslint-disable-next-line no-console
   console.debug(
@@ -198,11 +218,9 @@ function MainApp(props: {
   );
   const app = createSyncedApp(engine);
 
-  const storage = new OpfsStorage(
-    props.session.accountId,
-    dekForStorage,
-    EncryptedBlob,
-  );
+  const storage: StorageAdapter = props.opfsOk
+    ? new OpfsStorage(props.session.accountId, dekForStorage, EncryptedBlob)
+    : new NullStorage();
 
   const bridge = new SyncBridge({
     engine,

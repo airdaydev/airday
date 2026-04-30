@@ -122,7 +122,6 @@ body,
 
 .nav-item[data-active] {
   background: var(--bg-active);
-  font-weight: 600;
 }
 
 .main {

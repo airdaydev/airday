@@ -10,4 +10,5 @@ export type {
 } from "./storage/adapter.ts";
 export { MemStorage } from "./storage/mem.ts";
 export { BunFileStorage } from "./storage/file.ts";
-export { OpfsStorage } from "./storage/opfs.ts";
+export { OpfsStorage, probeOpfs } from "./storage/opfs.ts";
+export { NullStorage } from "./storage/null.ts";
