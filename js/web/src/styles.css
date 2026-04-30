@@ -80,7 +80,6 @@ body,
 
 .nav {
   background: var(--bg-nav);
-  border-right: 1px solid var(--border-strong);
   padding: 16px 0;
   overflow-y: auto;
 }
@@ -124,8 +123,6 @@ body,
 
 .main-header {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
   display: flex;
   align-items: center;
   justify-content: space-between;
