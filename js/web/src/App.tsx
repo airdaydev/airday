@@ -16,6 +16,7 @@ import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { OpfsStorage } from "@airday/core";
 import { DndSource, type DndOp } from "@primavera-ui/components/dnd";
 import { api } from "./api.ts";
+import { dekVault } from "./dekVault.ts";
 import { Dnd } from "./Dnd.tsx";
 import { Login, type Session } from "./Login.tsx";
 import { createSyncedApp, type DocApp } from "./store.ts";
@@ -30,12 +31,39 @@ const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
 
 export function App() {
-  const [session, setSession] = createSignal<Session | null>(null);
+  // `undefined` = vault probe still in flight; `null` = no session, show
+  // login; `Session` = logged in. Booting straight into Login would
+  // flash the form for users who already have a persisted session.
+  const [session, setSession] = createSignal<Session | null | undefined>(
+    undefined,
+  );
   const [online, setOnline] = createSignal(false);
   const [boot, setBoot] = createSignal<{ doc: Doc; lastAcked: bigint } | null>(
     null,
   );
   const [bootError, setBootError] = createSignal<string | null>(null);
+
+  // Probe the vault on mount. If a wrapped DEK is present and we can
+  // unwrap it, the device cookie should still be valid — the WS pump
+  // will surface the failure if it isn't.
+  void (async () => {
+    try {
+      const v = await dekVault.load();
+      if (v) {
+        setSession({
+          email: v.email,
+          accountId: v.accountId,
+          deviceId: v.deviceId,
+          dek: v.dek,
+          freshSignup: false,
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn("vault load failed:", e);
+    }
+    setSession(null);
+  })();
 
   const logout = async () => {
     try {
@@ -43,9 +71,9 @@ export function App() {
     } catch (e) {
       // Best-effort: even if the server call fails (offline, expired
       // cookie), drop local state so the next login is clean.
-      // eslint-disable-next-line no-console
       console.warn("logout call failed:", e);
     }
+    await dekVault.clear();
     setBoot(null);
     setBootError(null);
     setOnline(false);
@@ -53,19 +81,24 @@ export function App() {
   };
 
   return (
-    <Show when={session()} fallback={<Login onSession={setSession} />}>
-      {(s) => (
-        <BootGate
-          session={s()}
-          boot={boot()}
-          bootError={bootError()}
-          setBoot={setBoot}
-          setBootError={setBootError}
-          online={online()}
-          setOnline={setOnline}
-          logout={logout}
-        />
-      )}
+    <Show
+      when={session() !== undefined}
+      fallback={<div class="empty">Loading…</div>}
+    >
+      <Show when={session()} fallback={<Login onSession={setSession} />}>
+        {(s) => (
+          <BootGate
+            session={s()}
+            boot={boot()}
+            bootError={bootError()}
+            setBoot={setBoot}
+            setBootError={setBootError}
+            online={online()}
+            setOnline={setOnline}
+            logout={logout}
+          />
+        )}
+      </Show>
     </Show>
   );
 }

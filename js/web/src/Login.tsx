@@ -12,6 +12,7 @@ import {
   wrapDek,
 } from "@airday/core/wasm";
 import { api, ApiError, type LoginResponse } from "./api.ts";
+import { dekVault } from "./dekVault.ts";
 
 export interface Session {
   email: string;
@@ -131,13 +132,15 @@ async function doLogin(
     throw new Error("server did not return a device credential");
   }
   const dek = unwrapDek(derived.kek, resp.wrapped_dek, resp.wrapped_dek_nonce);
-  return {
+  const session: Session = {
     email,
     accountId: resp.account_id,
     deviceId: resp.device.device_id,
     dek,
     freshSignup: false,
   };
+  await persistVault(session);
+  return session;
 }
 
 async function doSignup(
@@ -168,13 +171,31 @@ async function doSignup(
     wrapped_dek_nonce: wrapped.nonce,
     device_name: deviceName,
   });
-  return {
+  const session: Session = {
     email,
     accountId: resp.account_id,
     deviceId: resp.device_id,
     dek,
     freshSignup: true,
   };
+  await persistVault(session);
+  return session;
+}
+
+async function persistVault(session: Session): Promise<void> {
+  // Wrap the DEK and stash it in IndexedDB so a reload skips the
+  // password prompt. Failure is non-fatal — the in-memory session is
+  // still usable; the user just gets bounced back to login on reload.
+  try {
+    await dekVault.save({
+      accountId: session.accountId,
+      email: session.email,
+      deviceId: session.deviceId,
+      dek: session.dek.clone(),
+    });
+  } catch (e) {
+    console.warn("dekVault.save failed; session will not survive reload:", e);
+  }
 }
 
 function randomBytes(n: number): Uint8Array {
