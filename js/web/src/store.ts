@@ -23,6 +23,14 @@ export interface ListMetaView {
   createdAt: number;
 }
 
+export interface WorkspaceSnapshot {
+  lists: ListMetaView[];
+  itemsById: Record<string, ItemView>;
+  liveIdsByList: Record<string, string[]>;
+  doneIds: string[];
+  binnedIds: string[];
+}
+
 export interface DocApp {
   engine: SyncEngine;
   version: Accessor<number>;
@@ -49,6 +57,7 @@ export interface DocApp {
   doneItemIds(): string[];
   binnedItemIds(): string[];
   getItem(id: string): ItemView | undefined;
+  snapshot(): WorkspaceSnapshot;
 }
 
 export function createSyncedApp(engine: SyncEngine): DocApp {
@@ -141,6 +150,48 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       version();
       const json = engine.getItemJson(id);
       return json ? (JSON.parse(json) as ItemView) : undefined;
+    },
+    snapshot() {
+      version();
+
+      const lists = JSON.parse(engine.allListsJson()) as ListMetaView[];
+      const liveIdsByList: Record<string, string[]> = {};
+      const itemsById: Record<string, ItemView> = {};
+
+      for (const list of lists) {
+        const ids = engine.liveItemIds(list.id);
+        liveIdsByList[list.id] = ids;
+        for (const id of ids) {
+          const json = engine.getItemJson(id);
+          if (!json) continue;
+          const item = JSON.parse(json) as ItemView;
+          itemsById[item.id] = item;
+        }
+      }
+
+      const doneIds = engine.doneItemIds();
+      for (const id of doneIds) {
+        const json = engine.getItemJson(id);
+        if (!json) continue;
+        const item = JSON.parse(json) as ItemView;
+        itemsById[item.id] = item;
+      }
+
+      const binnedIds = engine.binnedItemIds();
+      for (const id of binnedIds) {
+        const json = engine.getItemJson(id);
+        if (!json) continue;
+        const item = JSON.parse(json) as ItemView;
+        itemsById[item.id] = item;
+      }
+
+      return {
+        lists,
+        itemsById,
+        liveIdsByList,
+        doneIds,
+        binnedIds,
+      };
     },
   };
 }

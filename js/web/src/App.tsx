@@ -17,7 +17,11 @@ import { Dnd, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
-import { createSyncedApp, type DocApp } from "./store.ts";
+import {
+  createSyncedApp,
+  type DocApp,
+  type ItemView,
+} from "./store.ts";
 import { SyncBridge } from "./sync.ts";
 
 type ViewKey =
@@ -277,27 +281,44 @@ function Workspace(props: {
 }) {
   const app = props.app;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "current" });
-  const lists = createMemo(() => app.allLists());
+  const snapshot = createMemo(() => app.snapshot());
 
-  const orderedIds = createMemo<string[]>(() => {
+  const orderedIds = createMemo((): string[] => {
+    const snap = snapshot();
     const v = view();
-    if (v.kind === "list") return app.liveItemIds(v.id);
-    if (v.kind === "done") return app.doneItemIds();
-    return app.binnedItemIds();
+    if (v.kind === "list") return snap.liveIdsByList[v.id] ?? [];
+    if (v.kind === "done") return snap.doneIds;
+    return snap.binnedIds;
   });
 
-  const items = createMemo<{ id: string }[]>(() =>
-    orderedIds().map((id) => ({ id })),
-  );
+  const items = createMemo((): ItemView[] => {
+    const snap = snapshot();
+    return orderedIds()
+      .map((id) => snap.itemsById[id])
+      .filter((item): item is ItemView => item !== undefined);
+  });
 
-  const onReorder = (op: DndOp<{ id: string }>) => {
+  const onReorder = (op: DndOp<ItemView>) => {
     if (op.type !== "move") return;
     const v = view();
     if (v.kind !== "list") return;
     const ids = orderedIds();
-    for (const key of op.keys) {
-      const target = ids.indexOf(String(key));
-      if (target >= 0) app.moveItem(String(key), v.id, target);
+    const movedIds = op.keys.map(String).filter((id) => ids.includes(id));
+    if (movedIds.length === 0) return;
+
+    const remaining = ids.filter((id) => !movedIds.includes(id));
+    const insertAt =
+      op.beforeKey === null
+        ? remaining.length
+        : (() => {
+            const idx = remaining.indexOf(String(op.beforeKey));
+            return idx >= 0 ? idx : remaining.length;
+          })();
+    const nextIds = [...remaining];
+    nextIds.splice(insertAt, 0, ...movedIds);
+
+    for (const [index, id] of nextIds.entries()) {
+      if (ids[index] !== id) app.moveItem(id, v.id, index);
     }
   };
 
@@ -309,10 +330,10 @@ function Workspace(props: {
 
   return (
     <div class="app">
-      <Nav app={app} lists={lists()} view={view()} setView={setView} />
+      <Nav app={app} lists={snapshot().lists} view={view()} setView={setView} />
       <main class="main">
         <header class="main-header">
-          <h1>{viewTitle(view(), lists())}</h1>
+          <h1>{viewTitle(view(), snapshot().lists)}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <span class="status" data-online={props.online ? "" : undefined}>
               {props.online ? "● online" : "○ offline"}
@@ -323,7 +344,7 @@ function Workspace(props: {
             <button type="button" onClick={() => props.logout()}>
               Log out
             </button>
-            <Show when={view().kind === "bin" && app.binnedItemIds().length > 0}>
+            <Show when={view().kind === "bin" && snapshot().binnedIds.length > 0}>
               <button type="button" onClick={() => app.emptyBin()}>
                 Empty bin
               </button>
@@ -345,7 +366,7 @@ function Workspace(props: {
               onReorder={onReorder}
               style={{ height: "100%", display: "block" }}
             >
-              {(item) => <Row id={item().id} app={app} />}
+              {(item) => <Row item={item} app={app} />}
             </Dnd>
           </Show>
         </div>
@@ -458,42 +479,40 @@ function AddForm(props: { onAdd: (text: string) => void }) {
   );
 }
 
-function Row(props: { id: string; app: DocApp }) {
-  const item = createMemo(() => props.app.getItem(props.id));
+function Row(props: { item: () => ItemView; app: DocApp }) {
   return (
-    <Show when={item()}>
-      {(it) => (
-        <div class="row" data-status={it().status}>
-          <input
-            type="checkbox"
-            checked={it().status === "done"}
-            onChange={(e) =>
-              props.app.setStatus(it().id, e.currentTarget.checked ? "done" : "live")
-            }
-          />
-          <span class="row-text">{it().text}</span>
-          <div class="row-actions">
-            <Show when={it().status !== "binned"}>
-              <button type="button" onClick={() => props.app.setStatus(it().id, "binned")}>
-                Bin
-              </button>
-            </Show>
-            <Show when={it().status === "binned"}>
-              <button type="button" onClick={() => props.app.setStatus(it().id, "live")}>
-                Restore
-              </button>
-              <button type="button" onClick={() => props.app.deleteBinned(it().id)}>
-                Delete
-              </button>
-            </Show>
-            <Show when={it().status === "done"}>
-              <button type="button" onClick={() => props.app.setStatus(it().id, "live")}>
-                Undo
-              </button>
-            </Show>
-          </div>
-        </div>
-      )}
-    </Show>
+    <div class="row" data-status={props.item().status}>
+      <input
+        type="checkbox"
+        checked={props.item().status === "done"}
+        onChange={(e) =>
+          props.app.setStatus(
+            props.item().id,
+            e.currentTarget.checked ? "done" : "live",
+          )
+        }
+      />
+      <span class="row-text">{props.item().text}</span>
+      <div class="row-actions">
+        <Show when={props.item().status !== "binned"}>
+          <button type="button" onClick={() => props.app.setStatus(props.item().id, "binned")}>
+            Bin
+          </button>
+        </Show>
+        <Show when={props.item().status === "binned"}>
+          <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
+            Restore
+          </button>
+          <button type="button" onClick={() => props.app.deleteBinned(props.item().id)}>
+            Delete
+          </button>
+        </Show>
+        <Show when={props.item().status === "done"}>
+          <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
+            Undo
+          </button>
+        </Show>
+      </div>
+    </div>
   );
 }
