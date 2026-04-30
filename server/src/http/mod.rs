@@ -28,6 +28,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/account/prelogin", post(auth_routes::prelogin))
         .route("/api/account/login", post(auth_routes::login))
         .route("/api/account/recover", post(auth_routes::recover))
+        .route("/api/account/logout", post(auth_routes::logout))
         .route(
             "/api/account/password/change",
             post(auth_routes::password_change),

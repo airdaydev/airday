@@ -7,6 +7,7 @@ POST   /api/account/signup
 POST   /api/account/prelogin           (returns salt(s) for an email)
 POST   /api/account/login              (password path)
 POST   /api/account/recover            (recovery-code path; gated by recovery_auth_secret)
+POST   /api/account/logout             (authed; revokes calling device + clears cookie)
 POST   /api/account/password/change    (change password, authed by device token + current_auth_secret)
 POST   /api/account/password/reset     (set new password, authed by recovery_session_token)
 GET    /api/devices                    (list current account's devices)
@@ -14,18 +15,25 @@ POST   /api/devices                    (register a new device)
 DELETE /api/devices/:device_id
 ```
 
-WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>`. Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. No per-message auth. (Frame encoding + version handshake: see `sync-protocol.md`.)
+WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>` (CLI) or the `airday_device` cookie (web). Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. No per-message auth. (Frame encoding + version handshake: see `sync-protocol.md`.)
 
 All HTTP request and response bodies are MessagePack-encoded (`Content-Type: application/msgpack`). Same encoding as the WS path; one wire format across the system.
 
 ## Token model
 
 - Opaque random 32-byte token, hex-encoded. Stored server-side as `auth_token_hash` (SHA-256 is sufficient — the token is already high-entropy).
-- Issued per-device on registration. Revocable via `DELETE /api/devices/:id`.
+- Issued per-device on registration. Forever-lived. Revocable via `DELETE /api/devices/:id` (or `POST /api/account/logout` for the calling device).
+- Same token, two transports: CLI sends `Authorization: Bearer <token>`; web receives an HttpOnly cookie and never touches the token from JS.
 
-**Sprint 1 (CLI only):** forever tokens. Adds zero security in the CLI threat model — if your host is compromised, the attacker has the DEK from keychain/memory anyway, so token expiry doesn't help.
+Forever tokens in both threat models. A compromised CLI host hands the attacker the DEK from keychain anyway; a browser owned by XSS already drives the live session and can re-derive everything from local crypto state. Splitting into short access + long refresh shrinks the XSS exposure window but doesn't change what an active payload can reach. Single tier for now; revisit when there's a re-auth boundary that crypto state actually depends on.
 
-**When web ships (sprint 2+):** add `POST /api/account/refresh`. Short-lived access token + long-lived refresh token in HttpOnly cookie. XSS is the real threat in browsers and refresh tokens are the standard mitigation. CLI keeps forever tokens via the same auth endpoints.
+### Web (cookie transport)
+
+- Token-issuing endpoints (`signup`, `login`, `password/reset`, `POST /devices`) attach `Set-Cookie: airday_device=<token>; HttpOnly; Secure; SameSite=Strict; Path=/` alongside the response body. Body keeps the token because the CLI consumes it; web ignores the body's token field and trusts the cookie.
+- `DeviceAuth` extractor and the WS upgrade try `Authorization: Bearer` first, fall back to the `airday_device` cookie. CLI is unaffected.
+- `POST /api/account/logout` (authed): revokes the calling device's token server-side and emits `Set-Cookie: airday_device=; Max-Age=0`. `DELETE /api/devices/:id` retains its existing semantics (revoke any device by id) and does not touch cookies.
+- Web bundle and API must share registrable domain (`SameSite=Strict` permits same-site cross-origin, e.g. `app.airday.io` → `api.airday.io`). Self-hosted instances serve their own bundle from their own domain; we do not support one web bundle pointed at arbitrary remote APIs.
+- CSRF mitigation: `SameSite=Strict`. No double-submit token in sprint 2.
 
 ## Account model
 

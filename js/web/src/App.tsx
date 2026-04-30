@@ -15,6 +15,7 @@ import {
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { OpfsStorage } from "@airday/core";
 import { DndSource, type DndOp } from "@primavera-ui/components/dnd";
+import { api } from "./api.ts";
 import { Dnd } from "./Dnd.tsx";
 import { Login, type Session } from "./Login.tsx";
 import { createSyncedApp, type DocApp } from "./store.ts";
@@ -36,6 +37,21 @@ export function App() {
   );
   const [bootError, setBootError] = createSignal<string | null>(null);
 
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (e) {
+      // Best-effort: even if the server call fails (offline, expired
+      // cookie), drop local state so the next login is clean.
+      // eslint-disable-next-line no-console
+      console.warn("logout call failed:", e);
+    }
+    setBoot(null);
+    setBootError(null);
+    setOnline(false);
+    setSession(null);
+  };
+
   return (
     <Show when={session()} fallback={<Login onSession={setSession} />}>
       {(s) => (
@@ -47,6 +63,7 @@ export function App() {
           setBootError={setBootError}
           online={online()}
           setOnline={setOnline}
+          logout={logout}
         />
       )}
     </Show>
@@ -61,6 +78,7 @@ function BootGate(props: {
   setBootError: (m: string | null) => void;
   online: boolean;
   setOnline: (b: boolean) => void;
+  logout: () => void;
 }) {
   // Try to restore a doc + frontier from OPFS. On signup we always
   // start with a seeded Doc.create(); on login we prefer OPFS if the
@@ -104,6 +122,7 @@ function BootGate(props: {
           bootError={props.bootError}
           setOnline={props.setOnline}
           online={props.online}
+          logout={props.logout}
         />
       )}
     </Show>
@@ -116,6 +135,7 @@ function MainApp(props: {
   bootError: string | null;
   online: boolean;
   setOnline: (b: boolean) => void;
+  logout: () => void;
 }) {
   // eslint-disable-next-line no-console
   console.debug(
@@ -144,8 +164,6 @@ function MainApp(props: {
 
   const bridge = new SyncBridge({
     engine,
-    serverUrl: props.session.serverUrl,
-    deviceToken: props.session.deviceToken,
     onChange: (kind) => {
       if (kind === "online") props.setOnline(true);
       if (kind === "offline") props.setOnline(false);
@@ -171,7 +189,10 @@ function MainApp(props: {
         storage.putDevice({
           accountId: props.session.accountId,
           email: props.session.email,
-          serverUrl: props.session.serverUrl,
+          // Bundle is served from the same origin as the API; record
+          // that origin for completeness even though the cookie is the
+          // load-bearing piece of "which server am I talking to".
+          serverUrl: window.location.origin,
           deviceId: props.session.deviceId,
           lastAckedOpId: Number(lastAcked),
           lastSyncAt: Date.now(),
@@ -207,10 +228,22 @@ function MainApp(props: {
     (window as any).__airday = { app, engine, bridge, storage };
   }
 
-  return <Workspace app={app} session={props.session} online={props.online} />;
+  return (
+    <Workspace
+      app={app}
+      session={props.session}
+      online={props.online}
+      logout={props.logout}
+    />
+  );
 }
 
-function Workspace(props: { app: DocApp; session: Session; online: boolean }) {
+function Workspace(props: {
+  app: DocApp;
+  session: Session;
+  online: boolean;
+  logout: () => void;
+}) {
   const app = props.app;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "current" });
   const lists = createMemo(() => app.allLists());
@@ -273,6 +306,12 @@ function Workspace(props: { app: DocApp; session: Session; online: boolean }) {
             <span class="status" data-online={props.online ? "" : undefined}>
               {props.online ? "● online" : "○ offline"}
             </span>
+            <span class="status" title={props.session.email}>
+              {props.session.email}
+            </span>
+            <button type="button" onClick={() => props.logout()}>
+              Log out
+            </button>
             <Show when={view().kind === "bin" && app.binnedItemIds().length > 0}>
               <button type="button" onClick={() => app.emptyBin()}>
                 Empty bin

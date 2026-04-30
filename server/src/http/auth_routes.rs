@@ -6,10 +6,12 @@ use airday_protocol::{
     SignupRequest, SignupResponse,
 };
 use axum::extract::State;
+use axum::http::{header, HeaderMap};
 
+use crate::auth::cookie;
 use crate::auth::queries::{
     self, create_account, create_device, create_recovery_session, find_account_by_email,
-    find_account_by_id, update_password, NewAccount, PasswordUpdate,
+    find_account_by_id, revoke_device, update_password, NewAccount, PasswordUpdate,
 };
 use crate::auth::tokens::{encode_token, generate_token, sha256};
 use crate::auth::DeviceAuth;
@@ -23,7 +25,7 @@ const RECOVERY_SESSION_TTL_MILLIS: i64 = 15 * 60 * 1000;
 pub async fn signup(
     State(state): State<AppState>,
     Msgpack(req): Msgpack<SignupRequest>,
-) -> ApiResult<Msgpack<SignupResponse>> {
+) -> ApiResult<(HeaderMap, Msgpack<SignupResponse>)> {
     if req.email.trim().is_empty() {
         return Err(ApiError::BadRequest("email is required".into()));
     }
@@ -54,11 +56,15 @@ pub async fn signup(
             ApiError::Internal(e)
         }
     })?;
-    Ok(Msgpack(SignupResponse {
-        account_id: created.account_id.to_string(),
-        device_id: created.device_id.to_string(),
-        device_token: encode_token(&device_token),
-    }))
+    let token_hex = encode_token(&device_token);
+    Ok((
+        cookie_headers(cookie::set_cookie(&token_hex)),
+        Msgpack(SignupResponse {
+            account_id: created.account_id.to_string(),
+            device_id: created.device_id.to_string(),
+            device_token: token_hex,
+        }),
+    ))
 }
 
 pub async fn prelogin(
@@ -78,7 +84,7 @@ pub async fn prelogin(
 pub async fn login(
     State(state): State<AppState>,
     Msgpack(req): Msgpack<LoginRequest>,
-) -> ApiResult<Msgpack<LoginResponse>> {
+) -> ApiResult<(HeaderMap, Msgpack<LoginResponse>)> {
     let account = find_account_by_email(&state.db, req.email)
         .await?
         .ok_or(ApiError::InvalidCredentials)?;
@@ -106,13 +112,23 @@ pub async fn login(
         None
     };
     let recovery_present = account.recovery_present();
-    Ok(Msgpack(LoginResponse {
-        account_id: account.id.to_string(),
-        wrapped_dek: account.wrapped_dek,
-        wrapped_dek_nonce: account.wrapped_dek_nonce,
-        recovery_present,
-        device,
-    }))
+    // Cookie only when this call also registered a device for the
+    // caller — otherwise no token was minted for them and there's
+    // nothing to set.
+    let headers = match device.as_ref() {
+        Some(cred) => cookie_headers(cookie::set_cookie(&cred.device_token)),
+        None => HeaderMap::new(),
+    };
+    Ok((
+        headers,
+        Msgpack(LoginResponse {
+            account_id: account.id.to_string(),
+            wrapped_dek: account.wrapped_dek,
+            wrapped_dek_nonce: account.wrapped_dek_nonce,
+            recovery_present,
+            device,
+        }),
+    ))
 }
 
 pub async fn recover(
@@ -184,7 +200,7 @@ pub async fn password_change(
 pub async fn password_reset(
     State(state): State<AppState>,
     Msgpack(req): Msgpack<PasswordResetRequest>,
-) -> ApiResult<Msgpack<PasswordResetResponse>> {
+) -> ApiResult<(HeaderMap, Msgpack<PasswordResetResponse>)> {
     if req.device_name.trim().is_empty() {
         return Err(ApiError::BadRequest("device_name is required".into()));
     }
@@ -216,10 +232,30 @@ pub async fn password_reset(
     )
     .await?;
 
-    Ok(Msgpack(PasswordResetResponse {
-        device_id: device_id.to_string(),
-        device_token: encode_token(&device_token),
-    }))
+    let token_hex = encode_token(&device_token);
+    Ok((
+        cookie_headers(cookie::set_cookie(&token_hex)),
+        Msgpack(PasswordResetResponse {
+            device_id: device_id.to_string(),
+            device_token: token_hex,
+        }),
+    ))
+}
+
+pub async fn logout(
+    State(state): State<AppState>,
+    auth: DeviceAuth,
+) -> ApiResult<(HeaderMap, ())> {
+    // `revoke_device` is idempotent — a stale cookie pointing at an
+    // already-revoked device won't 404 us into a useless error here.
+    let _ = revoke_device(&state.db, auth.account_id, auth.device_id).await?;
+    Ok((cookie_headers(cookie::clear_cookie()), ()))
+}
+
+fn cookie_headers(value: axum::http::HeaderValue) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::SET_COOKIE, value);
+    headers
 }
 
 /// Constant-time byte slice equality. For password / token comparisons.

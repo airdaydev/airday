@@ -1,6 +1,9 @@
-// Slim msgpack-over-fetch HTTP client for the auth surface. The
-// server's `Content-Type: application/msgpack` matches the CLI's
-// reqwest path; this is the same wire format with browser primitives.
+// Slim msgpack-over-fetch HTTP client for the auth surface. Same wire
+// format as the CLI; relative paths because the bundle is always served
+// from the same origin as the API (vite proxy in dev, single host in
+// prod). The device token rides as an HttpOnly cookie set by the server
+// — never touched from JS — so this module deliberately knows nothing
+// about it on the read side.
 
 import { encode, decode } from "@msgpack/msgpack";
 
@@ -20,6 +23,8 @@ export interface PreloginResponse {
 
 export interface DeviceCredential {
   device_id: string;
+  /** Present on the wire for CLI parity; the web client ignores this
+   *  field and relies on the `airday_device` cookie instead. */
   device_token: string;
 }
 
@@ -47,24 +52,22 @@ export class ApiError extends Error {
   }
 }
 
-export class AirdayApi {
-  constructor(public readonly baseUrl: string) {}
-
+export const api = {
   async prelogin(email: string): Promise<PreloginResponse> {
-    return this.post("/api/account/prelogin", { email });
-  }
+    return post("/api/account/prelogin", { email });
+  },
 
   async login(args: {
     email: string;
     auth_secret: Uint8Array;
     device_name: string;
   }): Promise<LoginResponse> {
-    return this.post("/api/account/login", {
+    return post("/api/account/login", {
       email: args.email,
       auth_secret: args.auth_secret,
       register_device: { name: args.device_name },
     });
-  }
+  },
 
   async signup(args: {
     email: string;
@@ -75,7 +78,7 @@ export class AirdayApi {
     wrapped_dek_nonce: Uint8Array;
     device_name: string;
   }): Promise<{ account_id: string; device_id: string; device_token: string }> {
-    return this.post("/api/account/signup", {
+    return post("/api/account/signup", {
       email: args.email,
       master_salt: args.master_salt,
       kdf_params: args.kdf_params,
@@ -85,32 +88,41 @@ export class AirdayApi {
       recovery: null,
       device_name: args.device_name,
     });
-  }
+  },
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": MSGPACK_CT,
-        Accept: MSGPACK_CT,
-      },
-      body: encode(body),
-    });
-    const buf = new Uint8Array(await res.arrayBuffer());
-    if (!res.ok) {
-      let err: ApiErrorBody | null = null;
-      try {
-        err = decode(buf) as ApiErrorBody;
-      } catch {
-        // body wasn't msgpack — surface a generic error
-      }
-      throw new ApiError(
-        res.status,
-        err?.code ?? "http_error",
-        err?.message ?? `${res.status} ${res.statusText}`,
-      );
+  /** Server revokes the calling device's token + emits a clear-cookie. */
+  async logout(): Promise<void> {
+    await post<unknown>("/api/account/logout", {});
+  },
+};
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    // Default for same-origin is already 'same-origin', but be explicit:
+    // the cookie carrying the device token is the auth here, and an
+    // accidental `'omit'` would silently break logged-in calls.
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": MSGPACK_CT,
+      Accept: MSGPACK_CT,
+    },
+    body: encode(body),
+  });
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (!res.ok) {
+    let err: ApiErrorBody | null = null;
+    try {
+      err = decode(buf) as ApiErrorBody;
+    } catch {
+      // body wasn't msgpack — surface a generic error
     }
-    return decode(buf) as T;
+    throw new ApiError(
+      res.status,
+      err?.code ?? "http_error",
+      err?.message ?? `${res.status} ${res.statusText}`,
+    );
   }
+  if (buf.length === 0) return undefined as T;
+  return decode(buf) as T;
 }

@@ -1,11 +1,13 @@
-//! `DeviceAuth` extractor: validates an `Authorization: Bearer <hex>`
-//! header against the `devices` table and surfaces `(account_id,
+//! `DeviceAuth` extractor: validates a device token presented via
+//! `Authorization: Bearer <hex>` (CLI) or the `airday_device` cookie
+//! (web) against the `devices` table and surfaces `(account_id,
 //! device_id)` to handlers.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use uuid::Uuid;
 
+use crate::auth::cookie;
 use crate::auth::queries::{find_device_by_token_hash, touch_device_last_seen};
 use crate::auth::tokens::{decode_token, sha256};
 use crate::error::ApiError;
@@ -24,12 +26,13 @@ impl FromRequestParts<AppState> for DeviceAuth {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let token = parts
+        let bearer = parts
             .headers
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.strip_prefix("Bearer "))
-            .ok_or(ApiError::Unauthorized)?;
+            .and_then(|s| s.strip_prefix("Bearer "));
+        let cookie_token = cookie::token_from_cookies(&parts.headers);
+        let token = bearer.or(cookie_token).ok_or(ApiError::Unauthorized)?;
         let raw = decode_token(token).ok_or(ApiError::Unauthorized)?;
         let hash = sha256(&raw).to_vec();
         let lookup = find_device_by_token_hash(&state.db, hash)

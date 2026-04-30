@@ -1,17 +1,14 @@
 // WebSocket pump bridging a `SyncEngine` to a browser `WebSocket`.
 // The engine is sans-IO; this file is the thin transport adapter
 // described in `sync-engine.md`. Reconnect is fixed-delay (no
-// backoff); ticket-exchange auth is deferred — the device token
-// rides on the URL per the slice-4 plan.
+// backoff). Auth is the `airday_device` cookie — sent automatically
+// by the browser on the WS upgrade — so this module never sees the
+// device token.
 
 import type { SyncEngine } from "@airday/core/wasm";
 
 export interface SyncBridgeOpts {
   engine: SyncEngine;
-  /** Base URL of the airday server (e.g. http://localhost:8000). */
-  serverUrl: string;
-  /** Device token from /api/account/login. */
-  deviceToken: string;
   /** Called whenever the engine emits an event (incl. `opsApplied`),
    *  on each new outbox drain, and on connection state flips. The
    *  caller uses this to bump its UI store. */
@@ -58,8 +55,7 @@ export class SyncBridge {
 
   private connect(): void {
     if (this.stopped) return;
-    const url = wsUrl(this.opts.serverUrl, this.opts.deviceToken);
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(wsUrl());
     ws.binaryType = "arraybuffer";
     this.ws = ws;
 
@@ -112,9 +108,7 @@ export class SyncBridge {
   }
 }
 
-function wsUrl(serverUrl: string, token: string): string {
-  const u = new URL("/api/sync", serverUrl);
-  u.protocol = u.protocol.replace(/^http/, "ws");
-  u.searchParams.set("token", token);
-  return u.toString();
+function wsUrl(): string {
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}/api/sync`;
 }

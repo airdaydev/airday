@@ -1,6 +1,8 @@
-// Login + signup form for slice 4. Argon2id runs on the main thread
-// per the parent doc; show a "deriving keys…" spinner during the
-// ~hundreds-of-ms hit.
+// Login + signup form. Argon2id runs on the main thread per the parent
+// doc; show a "deriving keys…" spinner during the ~hundreds-of-ms hit.
+// The API origin is the page's origin (vite proxies /api/* in dev) — no
+// runtime server picker; self-hosters serve their own bundle from their
+// own domain.
 
 import { createSignal, Show } from "solid-js";
 import {
@@ -9,14 +11,12 @@ import {
   unwrapDek,
   wrapDek,
 } from "@airday/core/wasm";
-import { AirdayApi, ApiError, type LoginResponse } from "./api.ts";
+import { api, ApiError, type LoginResponse } from "./api.ts";
 
 export interface Session {
-  serverUrl: string;
   email: string;
   accountId: string;
   deviceId: string;
-  deviceToken: string;
   dek: Dek;
   /** True iff this session was created via signup (we're device 1
    *  and need to seed the doc with built-in lists). False for a
@@ -24,14 +24,11 @@ export interface Session {
   freshSignup: boolean;
 }
 
-const DEFAULT_SERVER = "http://localhost:8000";
-
 function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
 }
 
 export function Login(props: { onSession: (s: Session) => void }) {
-  const [serverUrl, setServerUrl] = createSignal(DEFAULT_SERVER);
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [deviceName, setDeviceName] = createSignal(defaultDeviceName());
@@ -46,8 +43,8 @@ export function Login(props: { onSession: (s: Session) => void }) {
     try {
       const session =
         mode() === "login"
-          ? await doLogin(serverUrl(), email(), password(), deviceName())
-          : await doSignup(serverUrl(), email(), password(), deviceName());
+          ? await doLogin(email(), password(), deviceName())
+          : await doSignup(email(), password(), deviceName());
       props.onSession(session);
     } catch (err) {
       setError(humanError(err));
@@ -60,16 +57,6 @@ export function Login(props: { onSession: (s: Session) => void }) {
     <div class="login-page">
       <form class="login-form" onSubmit={submit}>
         <h1>{mode() === "login" ? "Log in" : "Sign up"}</h1>
-        <label>
-          Server
-          <input
-            type="url"
-            required
-            value={serverUrl()}
-            disabled={busy()}
-            onInput={(e) => setServerUrl(e.currentTarget.value)}
-          />
-        </label>
         <label>
           Email
           <input
@@ -123,12 +110,10 @@ export function Login(props: { onSession: (s: Session) => void }) {
 }
 
 async function doLogin(
-  serverUrl: string,
   email: string,
   password: string,
   deviceName: string,
 ): Promise<Session> {
-  const api = new AirdayApi(serverUrl.replace(/\/+$/, ""));
   const pre = await api.prelogin(email);
   const derived = deriveLogin(
     password,
@@ -147,23 +132,19 @@ async function doLogin(
   }
   const dek = unwrapDek(derived.kek, resp.wrapped_dek, resp.wrapped_dek_nonce);
   return {
-    serverUrl: api.baseUrl,
     email,
     accountId: resp.account_id,
     deviceId: resp.device.device_id,
-    deviceToken: resp.device.device_token,
     dek,
     freshSignup: false,
   };
 }
 
 async function doSignup(
-  serverUrl: string,
   email: string,
   password: string,
   deviceName: string,
 ): Promise<Session> {
-  const api = new AirdayApi(serverUrl.replace(/\/+$/, ""));
   // Default Argon2id params (mirror `KdfParams::DEFAULT` in the
   // protocol crate) plus a fresh random 16-byte salt.
   const kdfParams = { m_kib: 64 * 1024, t: 3, p: 1 };
@@ -188,11 +169,9 @@ async function doSignup(
     device_name: deviceName,
   });
   return {
-    serverUrl: api.baseUrl,
     email,
     accountId: resp.account_id,
     deviceId: resp.device_id,
-    deviceToken: resp.device_token,
     dek,
     freshSignup: true,
   };

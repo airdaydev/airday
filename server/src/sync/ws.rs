@@ -19,6 +19,7 @@ use axum::response::Response;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::cookie;
 use crate::auth::queries::{find_device_by_token_hash, touch_device_last_seen};
 use crate::auth::tokens::{decode_token, sha256};
 use crate::auth::DeviceAuth;
@@ -31,10 +32,10 @@ use super::queries;
 /// when there's a build-info crate we'll plumb `CARGO_PKG_VERSION`.
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Browser clients can't set `Authorization` on a `WebSocket`, so we
-/// also accept the device token as a `?token=...` query param. This is
-/// a slice-4 shortcut — `sync-engine.md` flags ticket-exchange as the
-/// proper pattern; revisit when iOS/Android land.
+/// `?token=...` is a non-browser fallback (e.g. test clients that can't
+/// set headers on WS upgrades). Browsers use the `airday_device` cookie,
+/// which the user-agent attaches to the upgrade request automatically;
+/// CLI uses the `Authorization` header.
 #[derive(Deserialize)]
 pub struct WsAuthQuery {
     token: Option<String>,
@@ -46,14 +47,18 @@ pub async fn ws_handler(
     Query(q): Query<WsAuthQuery>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    // Bearer header preferred; URL token is the browser-only fallback.
-    let raw_hex = headers
+    // Preference order: bearer header (CLI) → cookie (web) → query param
+    // (test fallback). All three reach the same hash lookup.
+    let bearer = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer "))
-        .map(str::to_owned)
-        .or(q.token);
-    let raw_hex = raw_hex.ok_or(ApiError::Unauthorized)?;
+        .map(str::to_owned);
+    let cookie_token = cookie::token_from_cookies(&headers).map(str::to_owned);
+    let raw_hex = bearer
+        .or(cookie_token)
+        .or(q.token)
+        .ok_or(ApiError::Unauthorized)?;
     let raw = decode_token(&raw_hex).ok_or(ApiError::Unauthorized)?;
     let hash = sha256(&raw).to_vec();
     let lookup = find_device_by_token_hash(&state.db, hash)

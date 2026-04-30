@@ -1,3 +1,4 @@
+pub mod cookie;
 pub mod middleware;
 pub mod queries;
 pub mod tokens;

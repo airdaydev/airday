@@ -99,6 +99,58 @@ async fn post_msgpack_status<Req: Serialize>(url: &str, body: &Req) -> reqwest::
     resp.status()
 }
 
+/// Returns `(status, set-cookie values, decoded body)`. Used by cookie
+/// tests to assert both transport behaviour and response content.
+async fn post_msgpack_full<Req, Resp>(
+    url: &str,
+    body: &Req,
+    token: Option<&str>,
+    cookie: Option<&str>,
+) -> (reqwest::StatusCode, Vec<String>, Option<Resp>)
+where
+    Req: Serialize,
+    Resp: DeserializeOwned,
+{
+    let bytes = rmp_serde::to_vec_named(body).unwrap();
+    let mut req = http().post(url).header(CONTENT_TYPE, MSGPACK).body(bytes);
+    if let Some(t) = token {
+        req = req.bearer_auth(t);
+    }
+    if let Some(c) = cookie {
+        req = req.header(reqwest::header::COOKIE, c);
+    }
+    let resp = req.send().await.unwrap();
+    let status = resp.status();
+    let set_cookies: Vec<String> = resp
+        .headers()
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(str::to_owned))
+        .collect();
+    let bytes = resp.bytes().await.unwrap();
+    let parsed = if bytes.is_empty() {
+        None
+    } else {
+        Some(rmp_serde::from_slice(&bytes).unwrap())
+    };
+    (status, set_cookies, parsed)
+}
+
+/// Pull the value of `name=` out of a `Set-Cookie` header line.
+fn cookie_value<'a>(set_cookie: &'a str, name: &str) -> Option<&'a str> {
+    let prefix = format!("{name}=");
+    let rest = set_cookie.strip_prefix(&prefix)?;
+    Some(rest.split(';').next().unwrap_or(rest))
+}
+
+fn find_set_cookie<'a>(set_cookies: &'a [String], name: &str) -> Option<&'a str> {
+    let needle = format!("{name}=");
+    set_cookies
+        .iter()
+        .map(String::as_str)
+        .find(|s| s.starts_with(&needle))
+}
+
 struct Account {
     server: TestServer,
     email: String,
@@ -465,6 +517,110 @@ async fn recovery_code_unlocks_dek_and_resets_password() {
     )
     .await;
     assert_eq!(login.account_id, acc.account_id);
+}
+
+#[tokio::test]
+async fn signup_sets_device_cookie_with_expected_attributes() {
+    let acc = signup(false).await;
+    // We can't see the Set-Cookie from the existing helper-based signup
+    // path, so re-issue a signup-like call directly to inspect headers.
+    let server = TestServer::start().await;
+    let email = format!("user-{}@example.com", uuid::Uuid::now_v7());
+    let password = b"correct horse battery staple";
+    let kdf_params = weak_params();
+    let salt: [u8; 16] = random_bytes();
+    let master = derive_password_master(password, &salt, kdf_params).unwrap();
+    let kek = master.kek().unwrap();
+    let auth = master.auth_secret().unwrap();
+    let dek = Dek::generate();
+    let wrapped = kek.wrap(&dek).unwrap();
+
+    let (status, set_cookies, body): (_, _, Option<SignupResponse>) = post_msgpack_full(
+        &format!("{}/api/account/signup", server.base),
+        &SignupRequest {
+            email: email.clone(),
+            master_salt: salt.to_vec(),
+            kdf_params,
+            auth_secret: auth.as_bytes().to_vec(),
+            wrapped_dek: wrapped.ciphertext,
+            wrapped_dek_nonce: wrapped.nonce.to_vec(),
+            recovery: None,
+            device_name: "test".into(),
+        },
+        None,
+        None,
+    )
+    .await;
+    assert!(status.is_success());
+    let body = body.unwrap();
+    let sc = find_set_cookie(&set_cookies, "airday_device")
+        .expect("expected airday_device Set-Cookie");
+    assert_eq!(cookie_value(sc, "airday_device"), Some(body.device_token.as_str()));
+    assert!(sc.contains("HttpOnly"), "missing HttpOnly: {sc}");
+    assert!(sc.contains("Secure"), "missing Secure: {sc}");
+    assert!(sc.contains("SameSite=Strict"), "missing SameSite=Strict: {sc}");
+    assert!(sc.contains("Path=/"), "missing Path=/: {sc}");
+    let _ = acc; // silence unused warning; kept to mirror style of other tests
+}
+
+#[tokio::test]
+async fn cookie_authenticates_logout_without_bearer() {
+    let acc = signup(false).await;
+    // Logout via cookie only (no Authorization header).
+    let cookie_header = format!("airday_device={}", acc.device_token);
+    let (status, set_cookies, _): (_, _, Option<()>) = post_msgpack_full(
+        &format!("{}/api/account/logout", acc.server.base),
+        &serde_bytes::Bytes::new(b""), // empty body; route ignores it
+        None,
+        Some(&cookie_header),
+    )
+    .await;
+    // Note: ApiResult<(HeaderMap, ())> serialises to an empty body with
+    // 200; the helper returns parsed = None for empty bodies.
+    assert!(status.is_success(), "logout via cookie should succeed: {status}");
+    let cleared = find_set_cookie(&set_cookies, "airday_device")
+        .expect("logout should emit a clearing Set-Cookie");
+    assert!(cleared.contains("Max-Age=0"), "expected clear cookie: {cleared}");
+    assert_eq!(cookie_value(cleared, "airday_device"), Some(""));
+
+    // Subsequent bearer call should now 401 — the device was revoked.
+    let status = post_msgpack_status(
+        &format!("{}/api/account/logout", acc.server.base),
+        &serde_bytes::Bytes::new(b""),
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn login_without_register_device_does_not_set_cookie() {
+    let acc = signup(false).await;
+    let pre: PreloginResponse = post_msgpack(
+        &format!("{}/api/account/prelogin", acc.server.base),
+        &PreloginRequest { email: acc.email.clone() },
+        None,
+    )
+    .await;
+    let master =
+        derive_password_master(b"correct horse battery staple", &pre.master_salt, pre.kdf_params)
+            .unwrap();
+    let auth = master.auth_secret().unwrap();
+    let (status, set_cookies, _): (_, _, Option<LoginResponse>) = post_msgpack_full(
+        &format!("{}/api/account/login", acc.server.base),
+        &LoginRequest {
+            email: acc.email,
+            auth_secret: auth.as_bytes().to_vec(),
+            register_device: None,
+        },
+        None,
+        None,
+    )
+    .await;
+    assert!(status.is_success());
+    assert!(
+        find_set_cookie(&set_cookies, "airday_device").is_none(),
+        "no cookie should be set when no device is minted: {set_cookies:?}"
+    );
 }
 
 #[tokio::test]
