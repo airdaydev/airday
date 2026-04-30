@@ -281,6 +281,7 @@ function Workspace(props: {
 }) {
   const app = props.app;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "current" });
+  const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const snapshot = createMemo(() => app.snapshot());
 
   const orderedIds = createMemo((): string[] => {
@@ -296,6 +297,22 @@ function Workspace(props: {
     return orderedIds()
       .map((id) => snap.itemsById[id])
       .filter((item): item is ItemView => item !== undefined);
+  });
+
+  const dndRevision = createMemo(() => {
+    const v = view();
+    return `${v.kind}:${v.kind === "list" ? v.id : "-"}:${orderedIds().join("|")}`;
+  });
+
+  createEffect(() => {
+    const next = items();
+    setDndItems(next);
+    // eslint-disable-next-line no-console
+    console.debug("workspace.items", {
+      view: view(),
+      orderedIds: orderedIds(),
+      itemIds: next.map((item) => item.id),
+    });
   });
 
   const onReorder = (op: DndOp<ItemView>) => {
@@ -317,8 +334,30 @@ function Workspace(props: {
     const nextIds = [...remaining];
     nextIds.splice(insertAt, 0, ...movedIds);
 
+    // eslint-disable-next-line no-console
+    console.debug("workspace.onReorder", {
+      listId: v.id,
+      beforeKey: op.beforeKey === null ? null : String(op.beforeKey),
+      movedIds,
+      orderBefore: ids,
+      remaining,
+      insertAt,
+      orderPlanned: nextIds,
+    });
+
     for (const [index, id] of nextIds.entries()) {
-      if (ids[index] !== id) app.moveItem(id, v.id, index);
+      if (ids[index] !== id) {
+        // eslint-disable-next-line no-console
+        console.debug("workspace.onReorder:applyMove", {
+          listId: v.id,
+          id,
+          currentIndex: ids.indexOf(id),
+          targetIndex: index,
+          orderBeforeStep: ids,
+          orderPlanned: nextIds,
+        });
+        app.moveItem(id, v.id, index);
+      }
     }
   };
 
@@ -359,15 +398,18 @@ function Workspace(props: {
             when={orderedIds().length > 0}
             fallback={<div class="empty">Nothing here yet.</div>}
           >
-            <Dnd
-              items={items()}
-              getKey={(it) => it.id}
-              itemHeight={40}
-              onReorder={onReorder}
-              style={{ height: "100%", display: "block" }}
-            >
-              {(item) => <Row item={item} app={app} />}
-            </Dnd>
+            <Show keyed when={dndRevision()}>
+              <Dnd
+                items={dndItems()}
+                setItems={setDndItems}
+                getKey={(it) => it.id}
+                itemHeight={40}
+                onReorder={onReorder}
+                style={{ height: "100%", display: "block" }}
+              >
+                {(item) => <Row item={item} app={app} />}
+              </Dnd>
+            </Show>
           </Show>
         </div>
       </main>
