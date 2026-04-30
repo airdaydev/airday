@@ -58,6 +58,13 @@
   box-sizing: border-box;
 }
 
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 html,
 body,
 #root {
@@ -72,6 +79,8 @@ body,
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .app {

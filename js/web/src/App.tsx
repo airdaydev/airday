@@ -307,7 +307,7 @@ function Workspace(props: {
 
   const dndRevision = createMemo(() => {
     const v = view();
-    return `${v.kind}:${v.kind === "list" ? v.id : "-"}:${orderedIds().join("|")}`;
+    return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
   });
 
   createEffect(() => {
