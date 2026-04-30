@@ -3,7 +3,7 @@
  * positioning; everything outside is plain flex/grid. */
 
 :root {
-  --bg: #fafafa;
+  --bg: #ffffff;
   --bg-elevated: #ffffff;
   --bg-nav: #f0f0f0;
   --bg-hover: rgba(0, 0, 0, 0.04);
@@ -24,7 +24,8 @@
   --success: #22a34d;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
-  --dnd-select-bg: rgba(59, 130, 246, 0.15);
+  --dnd-select-bg: #dbeafe;
+  --dnd-placeholder-color: #cbd5e1;
 }
 
 [data-theme="dark"] {
@@ -49,7 +50,8 @@
   --success: #4ade80;
   --error-bg: #2a1215;
   --error-text: #f87171;
-  --dnd-select-bg: rgba(96, 165, 250, 0.2);
+  --dnd-select-bg: #1e3a5f;
+  --dnd-placeholder-color: #475569;
 }
 
 * {
@@ -165,17 +167,17 @@ body,
   padding: 8px 12px;
 }
 
-primavera-dnd {
-  --dnd-select-bg: var(--dnd-select-bg);
-}
-
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
   height: 100%;
-  border-bottom: 1px solid var(--border-row);
+  background: var(--bg-elevated);
+}
+
+[aria-selected="true"] .row {
+  background: var(--dnd-select-bg);
 }
 
 .row input[type="checkbox"] {
