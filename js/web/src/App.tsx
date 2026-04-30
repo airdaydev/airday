@@ -13,6 +13,7 @@ import {
 } from "solid-js";
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { OpfsStorage } from "@airday/core";
+import { ContextMenu } from "@kobalte/core/context-menu";
 import { Dnd, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -544,40 +545,83 @@ function AddForm(props: { onAdd: (text: string) => void }) {
   );
 }
 
+// Right-click action targets: if the row is part of a multi-select,
+// the action applies to the whole selection; otherwise it acts on the
+// row alone — even if some other rows are selected. Selection state
+// lives on the primavera-dnd item containers as `data-selected` /
+// `data-key`, set by the web component when items are clicked.
+function getActionTargets(rowEl: HTMLElement, selfId: string): string[] {
+  const dnd = rowEl.closest("primavera-dnd");
+  if (!dnd) return [selfId];
+  const ids = Array.from(
+    dnd.querySelectorAll<HTMLElement>("[data-selected]"),
+  )
+    .map((el) => el.dataset.key)
+    .filter((k): k is string => typeof k === "string");
+  if (ids.length === 0 || !ids.includes(selfId)) return [selfId];
+  return ids;
+}
+
 function Row(props: { item: () => ItemView; app: DocApp }) {
+  let rowEl: HTMLDivElement | undefined;
+  const binTargets = () => {
+    if (!rowEl) return [props.item().id];
+    return getActionTargets(rowEl, props.item().id).filter((id) => {
+      const it = props.app.getItem(id);
+      return it !== undefined && it.status !== "binned";
+    });
+  };
+  const onBin = () => {
+    for (const id of binTargets()) props.app.setStatus(id, "binned");
+  };
   return (
-    <div class="row" data-status={props.item().status}>
-      <input
-        type="checkbox"
-        checked={props.item().status === "done"}
-        onChange={(e) =>
-          props.app.setStatus(
-            props.item().id,
-            e.currentTarget.checked ? "done" : "live",
-          )
-        }
-      />
-      <span class="row-text">{props.item().text}</span>
-      <div class="row-actions">
-        <Show when={props.item().status !== "binned"}>
-          <button type="button" onClick={() => props.app.setStatus(props.item().id, "binned")}>
-            Bin
-          </button>
-        </Show>
-        <Show when={props.item().status === "binned"}>
-          <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
-            Restore
-          </button>
-          <button type="button" onClick={() => props.app.deleteBinned(props.item().id)}>
-            Delete
-          </button>
-        </Show>
-        <Show when={props.item().status === "done"}>
-          <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
-            Undo
-          </button>
-        </Show>
-      </div>
-    </div>
+    <ContextMenu>
+      <ContextMenu.Trigger
+        ref={(el) => (rowEl = el)}
+        class="row"
+        data-status={props.item().status}
+      >
+        <input
+          type="checkbox"
+          checked={props.item().status === "done"}
+          onChange={(e) =>
+            props.app.setStatus(
+              props.item().id,
+              e.currentTarget.checked ? "done" : "live",
+            )
+          }
+        />
+        <span class="row-text">{props.item().text}</span>
+        <div class="row-actions">
+          <Show when={props.item().status !== "binned"}>
+            <button type="button" onClick={() => props.app.setStatus(props.item().id, "binned")}>
+              Bin
+            </button>
+          </Show>
+          <Show when={props.item().status === "binned"}>
+            <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
+              Restore
+            </button>
+            <button type="button" onClick={() => props.app.deleteBinned(props.item().id)}>
+              Delete
+            </button>
+          </Show>
+          <Show when={props.item().status === "done"}>
+            <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
+              Undo
+            </button>
+          </Show>
+        </div>
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content class="context-menu-content">
+          <Show when={props.item().status !== "binned"}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onBin}>
+              Bin
+            </ContextMenu.Item>
+          </Show>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu>
   );
 }
