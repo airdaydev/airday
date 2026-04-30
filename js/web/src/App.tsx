@@ -8,13 +8,14 @@ import {
   createMemo,
   createSignal,
   For,
+  on,
   onCleanup,
   Show,
 } from "solid-js";
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { OpfsStorage } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
-import { Dnd, type DndOp } from "@primavera-ui/components/dnd/solid";
+import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
@@ -291,6 +292,15 @@ function Workspace(props: {
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const snapshot = createMemo(() => app.snapshot());
 
+  // One selection model per Workspace instance — the Dnd component is
+  // re-keyed on view change (so it remounts), but we re-use the selection
+  // object so consumers always read from the same handle. Stale block
+  // anchors from the previous view's keys would resolve to position 0
+  // (giving phantom selection at the top of the new list), so clear when
+  // the view switches.
+  const selection = new DndSelection();
+  createEffect(on(view, () => selection.clear(), { defer: true }));
+
   const orderedIds = createMemo((): string[] => {
     const snap = snapshot();
     const v = view();
@@ -429,11 +439,12 @@ function Workspace(props: {
                 items={dndItems()}
                 setItems={setDndItems}
                 getKey={(it) => it.id}
+                selection={selection}
                 itemHeight={40}
                 onReorder={onReorder}
                 style={{ height: "100%", display: "block" }}
               >
-                {(item) => <Row item={item} app={app} />}
+                {(item) => <Row item={item} app={app} selection={selection} />}
               </Dnd>
             </Show>
           </Show>
@@ -545,39 +556,34 @@ function AddForm(props: { onAdd: (text: string) => void }) {
   );
 }
 
-// Right-click action targets: if the row is part of a multi-select,
-// the action applies to the whole selection; otherwise it acts on the
-// row alone — even if some other rows are selected. Selection state
-// lives on the primavera-dnd item containers as `data-selected` /
-// `data-key`, set by the web component when items are clicked.
-function getActionTargets(rowEl: HTMLElement, selfId: string): string[] {
-  const dnd = rowEl.closest("primavera-dnd");
-  if (!dnd) return [selfId];
-  const ids = Array.from(
-    dnd.querySelectorAll<HTMLElement>("[data-selected]"),
-  )
-    .map((el) => el.dataset.key)
-    .filter((k): k is string => typeof k === "string");
-  if (ids.length === 0 || !ids.includes(selfId)) return [selfId];
-  return ids;
-}
-
-function Row(props: { item: () => ItemView; app: DocApp }) {
-  let rowEl: HTMLDivElement | undefined;
-  const binTargets = () => {
-    if (!rowEl) return [props.item().id];
-    return getActionTargets(rowEl, props.item().id).filter((id) => {
-      const it = props.app.getItem(id);
+function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection }) {
+  // If the right-clicked row is already in the multi-select, act on the
+  // whole selection; otherwise act on this row alone. The onOpenChange
+  // hook below makes sure that an unselected row becomes the sole
+  // selection before the menu actually opens.
+  const binTargets = (): string[] => {
+    const id = props.item().id;
+    const ids = props.selection.isSelected(id)
+      ? props.selection.getSelectedKeys().map(String)
+      : [id];
+    return ids.filter((k) => {
+      const it = props.app.getItem(k);
       return it !== undefined && it.status !== "binned";
     });
   };
   const onBin = () => {
     for (const id of binTargets()) props.app.setStatus(id, "binned");
   };
+  const onOpenChange = (open: boolean) => {
+    if (!open) return;
+    const id = props.item().id;
+    if (!props.selection.isSelected(id)) {
+      props.selection.selectOnly(id);
+    }
+  };
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenu.Trigger
-        ref={(el) => (rowEl = el)}
         class="row"
         data-status={props.item().status}
       >
@@ -593,11 +599,6 @@ function Row(props: { item: () => ItemView; app: DocApp }) {
         />
         <span class="row-text">{props.item().text}</span>
         <div class="row-actions">
-          <Show when={props.item().status !== "binned"}>
-            <button type="button" onClick={() => props.app.setStatus(props.item().id, "binned")}>
-              Bin
-            </button>
-          </Show>
           <Show when={props.item().status === "binned"}>
             <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
               Restore
