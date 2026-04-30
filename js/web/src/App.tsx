@@ -23,6 +23,7 @@ import {
   type ItemView,
 } from "./store.ts";
 import { SyncBridge } from "./sync.ts";
+import { createTheme, type ThemePreference } from "./theme.ts";
 
 type ViewKey =
   | { kind: "list"; id: string }
@@ -31,6 +32,10 @@ type ViewKey =
 
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
+
+// Module-level so the OS-preference listener is registered exactly
+// once for the lifetime of the page.
+const theme = createTheme();
 
 export function App() {
   // `undefined` = vault probe still in flight; `null` = no session, show
@@ -282,6 +287,7 @@ function Workspace(props: {
   const app = props.app;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "current" });
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
+  const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const snapshot = createMemo(() => app.snapshot());
 
   const orderedIds = createMemo((): string[] => {
@@ -380,6 +386,20 @@ function Workspace(props: {
             <span class="status" title={props.session.email}>
               {props.session.email}
             </span>
+            <select
+              class="theme-select"
+              aria-label="Appearance"
+              value={themePref()}
+              onChange={(e) => {
+                const pref = e.currentTarget.value as ThemePreference;
+                setThemePref(pref);
+                theme.set(pref);
+              }}
+            >
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
             <button type="button" onClick={() => props.logout()}>
               Log out
             </button>

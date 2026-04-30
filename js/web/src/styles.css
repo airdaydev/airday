@@ -2,6 +2,56 @@
  * design polish. The primavera-dnd custom element brings its own
  * positioning; everything outside is plain flex/grid. */
 
+:root {
+  --bg: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-nav: #f0f0f0;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: #e5e7eb;
+  --text: #1a1a1a;
+  --text-muted: #555;
+  --text-subtle: #777;
+  --text-faint: #888;
+  --text-empty: #999;
+  --border: #e5e5e5;
+  --border-strong: #d8d8d8;
+  --border-input: #d4d4d4;
+  --border-row: #efefef;
+  --btn-primary-bg: #1a1a1a;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #ffffff;
+  --link: #2563eb;
+  --success: #22a34d;
+  --error-bg: #fee2e2;
+  --error-text: #991b1b;
+  --dnd-select-bg: rgba(59, 130, 246, 0.15);
+}
+
+[data-theme="dark"] {
+  --bg: #111113;
+  --bg-elevated: #1a1a1c;
+  --bg-nav: #161618;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: #2a2a2e;
+  --text: #e5e5e5;
+  --text-muted: #aaa;
+  --text-subtle: #888;
+  --text-faint: #777;
+  --text-empty: #666;
+  --border: #2a2a2a;
+  --border-strong: #2a2a2a;
+  --border-input: #333;
+  --border-row: #222;
+  --btn-primary-bg: #e5e5e5;
+  --btn-primary-text: #111;
+  --btn-secondary-bg: #222;
+  --link: #60a5fa;
+  --success: #4ade80;
+  --error-bg: #2a1215;
+  --error-text: #f87171;
+  --dnd-select-bg: rgba(96, 165, 250, 0.2);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -18,8 +68,8 @@ body,
     "Segoe UI",
     sans-serif;
   font-size: 14px;
-  color: #1a1a1a;
-  background: #fafafa;
+  color: var(--text);
+  background: var(--bg);
 }
 
 .app {
@@ -29,8 +79,8 @@ body,
 }
 
 .nav {
-  background: #f0f0f0;
-  border-right: 1px solid #d8d8d8;
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border-strong);
   padding: 16px 0;
   overflow-y: auto;
 }
@@ -41,7 +91,7 @@ body,
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #777;
+  color: var(--text-subtle);
 }
 
 .nav-item {
@@ -57,11 +107,11 @@ body,
 }
 
 .nav-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-hover);
 }
 
 .nav-item[data-active] {
-  background: #e5e7eb;
+  background: var(--bg-active);
   font-weight: 600;
 }
 
@@ -74,8 +124,8 @@ body,
 
 .main-header {
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e5e5;
-  background: white;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -94,17 +144,19 @@ body,
 
 .add-form input {
   padding: 6px 10px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid var(--border-input);
   border-radius: 4px;
   font: inherit;
   width: 240px;
+  background: var(--bg-elevated);
+  color: var(--text);
 }
 
 .add-form button {
   padding: 6px 12px;
-  border: 1px solid #1a1a1a;
-  background: #1a1a1a;
-  color: white;
+  border: 1px solid var(--btn-primary-bg);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
@@ -117,7 +169,7 @@ body,
 }
 
 primavera-dnd {
-  --dnd-select-bg: rgba(59, 130, 246, 0.15);
+  --dnd-select-bg: var(--dnd-select-bg);
 }
 
 .row {
@@ -126,7 +178,7 @@ primavera-dnd {
   gap: 8px;
   padding: 0 12px;
   height: 100%;
-  border-bottom: 1px solid #efefef;
+  border-bottom: 1px solid var(--border-row);
 }
 
 .row input[type="checkbox"] {
@@ -152,8 +204,9 @@ primavera-dnd {
 
 .row-actions button {
   padding: 2px 6px;
-  border: 1px solid #d4d4d4;
-  background: white;
+  border: 1px solid var(--border-input);
+  background: var(--btn-secondary-bg);
+  color: var(--text);
   border-radius: 3px;
   cursor: pointer;
   font-size: 12px;
@@ -161,22 +214,33 @@ primavera-dnd {
 
 .row[data-status="done"] .row-text {
   text-decoration: line-through;
-  color: #888;
+  color: var(--text-faint);
 }
 
 .empty {
   padding: 40px 20px;
   text-align: center;
-  color: #999;
+  color: var(--text-empty);
 }
 
 .status {
   font-size: 12px;
-  color: #888;
+  color: var(--text-faint);
 }
 
 .status[data-online] {
-  color: #22a34d;
+  color: var(--success);
+}
+
+.theme-select {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .login-page {
@@ -184,7 +248,7 @@ primavera-dnd {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
+  background: var(--bg);
 }
 
 .login-form {
@@ -192,8 +256,8 @@ primavera-dnd {
   flex-direction: column;
   gap: 12px;
   padding: 32px;
-  background: white;
-  border: 1px solid #e5e5e5;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 8px;
   width: 360px;
   max-width: 90%;
@@ -209,22 +273,24 @@ primavera-dnd {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .login-form input {
   padding: 8px 10px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid var(--border-input);
   border-radius: 4px;
   font: inherit;
+  background: var(--bg-elevated);
+  color: var(--text);
 }
 
 .login-form button[type="submit"] {
   margin-top: 8px;
   padding: 10px;
-  border: 1px solid #1a1a1a;
-  background: #1a1a1a;
-  color: white;
+  border: 1px solid var(--btn-primary-bg);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
@@ -238,7 +304,7 @@ primavera-dnd {
 .login-form .link {
   background: transparent;
   border: 0;
-  color: #2563eb;
+  color: var(--link);
   cursor: pointer;
   text-align: center;
   font: inherit;
@@ -246,8 +312,8 @@ primavera-dnd {
 }
 
 .login-form .error {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--error-bg);
+  color: var(--error-text);
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 13px;

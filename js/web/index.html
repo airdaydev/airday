@@ -6,6 +6,16 @@
     <title>Airday</title>
   </head>
   <body>
+    <script>
+      try {
+        var m = document.cookie.match(/(?:^|; )theme=([01])/);
+        if (m) {
+          document.documentElement.dataset.theme = m[1] === "1" ? "dark" : "light";
+        } else {
+          document.documentElement.dataset.theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
   </body>
