@@ -185,6 +185,10 @@ body,
   background: var(--bg-elevated);
 }
 
+[data-theme="dark"] .row {
+  background: var(--bg);
+}
+
 [aria-selected="true"] .row {
   background: var(--dnd-select-bg);
 }
