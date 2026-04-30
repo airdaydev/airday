@@ -60,6 +60,20 @@ this is the index.
   (`set_item_status(Live)`); the design call is which list it lands
   in. Items already keep their `list_id` per the data-model spec.
 - **Touch / mobile DnD.** primavera-dnd is desktop-only currently.
+- **Dnd renderer protocol — Solid-native rewrite.** Vanilla Dnd
+  currently calls `renderer.mount(key, item, container)` per row,
+  which forces every framework wrapper into one Solid root per row:
+  context (`<ThemeContext.Provider>`, `<ErrorBoundary>`) doesn't
+  cross, owner trees fragment, idiomatic patterns like
+  `<For each={…}>` don't apply. Path: change the vanilla container's
+  contract to expose "keys to render" as a signal-shaped data
+  surface and let framework wrappers iterate via their native
+  primitive. Solid wrapper becomes a single root with `<For>`;
+  React/Svelte adapters get their own. Big change to primavera-ui
+  but fixes the architectural smell properly. Time it to when we
+  next touch the renderer protocol for another reason (row groups,
+  sticky headers, expandable rows beyond what the current
+  per-key-mount API handles).
 - **Playwright / browser test harness.** Manual smoke today; not
   worth the harness setup until UI surface stabilises.
 - **Done/Bin ordering stability.** `done_at` / `binned_at` are client

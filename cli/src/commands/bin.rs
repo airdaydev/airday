@@ -3,8 +3,8 @@
 //! `airday bin <id>` (the verb) lives in [`super::items::bin`]; this
 //! module owns the namespace operations and the dispatcher that picks
 //! between them. Clap's `external_subcommand` captures any token that
-//! isn't a known sub-subcommand, which we then treat as an item-id
-//! prefix and route to the verb.
+//! isn't a known sub-subcommand, which we then treat as an item id
+//! and route to the verb.
 
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -12,7 +12,6 @@ use serde::Serialize;
 use crate::sync::Session;
 
 use super::items::{print_json, IdArg};
-use super::resolve::{resolve_item_id, short_id};
 
 #[derive(Parser, Debug)]
 pub struct BinArgs {
@@ -30,7 +29,7 @@ pub enum BinSub {
     Empty,
     /// Hard-delete a single binned item.
     Rm(IdArg),
-    /// Anything else is treated as an item-id prefix to bin.
+    /// Anything else is treated as an item id to bin.
     #[command(external_subcommand)]
     Item(Vec<String>),
 }
@@ -64,7 +63,7 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
         print_json(&v)?;
     } else {
         for i in &items {
-            println!("{}  {}", short_id(&i.id), i.text);
+            println!("{}  {}", i.id, i.text);
         }
     }
     session.flush().await?;
@@ -79,12 +78,11 @@ async fn empty(offline: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn rm(item_prefix: &str, offline: bool) -> anyhow::Result<()> {
+async fn rm(item_id: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_item_id(session.doc(), item_prefix)?;
-    session.doc().delete_binned(&id)?;
+    session.doc().delete_binned(item_id)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{item_id}");
     Ok(())
 }
 

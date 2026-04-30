@@ -10,7 +10,6 @@ mod login;
 mod logout;
 mod password;
 mod recover;
-pub mod resolve;
 mod signup;
 pub mod status;
 

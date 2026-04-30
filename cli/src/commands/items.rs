@@ -13,8 +13,6 @@ use serde::Serialize;
 
 use crate::sync::Session;
 
-use super::resolve::{resolve_item_id, resolve_list_id, short_id};
-
 // ---------- add ----------
 
 #[derive(Parser, Debug)]
@@ -28,18 +26,17 @@ pub struct AddArgs {
 
 pub async fn add(args: AddArgs, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let list_id = resolve_list_id(session.doc(), &args.list)?;
     let texts = collect_texts(&args.text)?;
     if texts.is_empty() {
         anyhow::bail!("no item text provided");
     }
     let mut ids = Vec::with_capacity(texts.len());
     for text in &texts {
-        ids.push(session.doc().add_item(&list_id, text)?);
+        ids.push(session.doc().add_item(&args.list, text)?);
     }
     session.flush().await?;
     for id in ids {
-        println!("{}", short_id(&id));
+        println!("{id}");
     }
     Ok(())
 }
@@ -81,8 +78,7 @@ pub struct LsArgs {
 
 pub async fn ls(args: LsArgs, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let list_id = resolve_list_id(session.doc(), &args.list)?;
-    let mut items = session.doc().items_in_list(&list_id, false);
+    let mut items = session.doc().items_in_list(&args.list, false);
     if !args.done {
         items.retain(|i| i.status != Status::Done);
     }
@@ -133,7 +129,7 @@ fn print_items(items: &[ItemView]) {
             Status::Done => "x",
             Status::Binned => "~",
         };
-        println!("{}  [{mark}] {}", short_id(&item.id), item.text);
+        println!("{}  [{mark}] {}", item.id, item.text);
     }
 }
 
@@ -162,12 +158,11 @@ pub async fn restore(args: IdArg, offline: bool) -> anyhow::Result<()> {
     set_status(&args.item_id, Status::Live, offline).await
 }
 
-async fn set_status(item_prefix: &str, status: Status, offline: bool) -> anyhow::Result<()> {
+async fn set_status(item_id: &str, status: Status, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_item_id(session.doc(), item_prefix)?;
-    session.doc().set_item_status(&id, status)?;
+    session.doc().set_item_status(item_id, status)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{item_id}");
     Ok(())
 }
 
@@ -181,15 +176,13 @@ pub struct MvArgs {
 
 pub async fn mv(args: MvArgs, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_item_id(session.doc(), &args.item_id)?;
-    let list_id = resolve_list_id(session.doc(), &args.list)?;
     // Append at the end of the target list (target_index = current
     // length). `move_item` clamps to the existing range, so passing a
     // huge index is safe — but the explicit count here is clearer.
-    let target_idx = session.doc().items_in_list(&list_id, true).len();
-    session.doc().move_item(&id, &list_id, target_idx)?;
+    let target_idx = session.doc().items_in_list(&args.list, true).len();
+    session.doc().move_item(&args.item_id, &args.list, target_idx)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{}", args.item_id);
     Ok(())
 }
 
@@ -203,9 +196,8 @@ pub struct EditArgs {
 
 pub async fn edit(args: EditArgs, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_item_id(session.doc(), &args.item_id)?;
-    session.doc().edit_item_text(&id, &args.text)?;
+    session.doc().edit_item_text(&args.item_id, &args.text)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{}", args.item_id);
     Ok(())
 }

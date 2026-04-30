@@ -6,7 +6,6 @@ use serde::Serialize;
 use crate::config::Profile;
 
 use super::items::print_json;
-use super::resolve::short_id;
 
 #[derive(Parser, Debug)]
 pub struct StatusArgs {
@@ -48,7 +47,7 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
             offline_mode: offline,
         })?;
     } else {
-        println!("Account: {} ({})", device.email, short_id(&device.account_id));
+        println!("Account: {} ({})", device.email, device.account_id);
         println!("Device:  {}", device.device_id);
         println!("Server:  {}", device.server_url);
         println!(

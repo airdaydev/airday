@@ -7,7 +7,6 @@ use serde::Serialize;
 use crate::sync::Session;
 
 use super::items::print_json;
-use super::resolve::{resolve_list_id, short_id};
 
 #[derive(Parser, Debug)]
 pub struct ListsArgs {
@@ -43,7 +42,7 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
         print_json(&lists.iter().map(list_json).collect::<Vec<_>>())?;
     } else {
         for l in &lists {
-            println!("{}  {}", short_id(&l.id), l.name);
+            println!("{}  {}", l.id, l.name);
         }
     }
     session.flush().await?;
@@ -54,25 +53,23 @@ async fn add(name: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
     let id = session.doc().add_list(name)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{id}");
     Ok(())
 }
 
-async fn rename(list_prefix: &str, name: &str, offline: bool) -> anyhow::Result<()> {
+async fn rename(list_id: &str, name: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_list_id(session.doc(), list_prefix)?;
-    session.doc().rename_list(&id, name)?;
+    session.doc().rename_list(list_id, name)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{list_id}");
     Ok(())
 }
 
-async fn rm(list_prefix: &str, offline: bool) -> anyhow::Result<()> {
+async fn rm(list_id: &str, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    let id = resolve_list_id(session.doc(), list_prefix)?;
-    session.doc().delete_list(&id)?;
+    session.doc().delete_list(list_id)?;
     session.flush().await?;
-    println!("{}", short_id(&id));
+    println!("{list_id}");
     Ok(())
 }
 
