@@ -351,18 +351,23 @@ function Workspace(props: {
       orderPlanned: nextIds,
     });
 
+    const currentIds = [...ids];
     for (const [index, id] of nextIds.entries()) {
-      if (ids[index] !== id) {
+      if (currentIds[index] !== id) {
+        const currentIndex = currentIds.indexOf(id);
+        if (currentIndex < 0) continue;
         // eslint-disable-next-line no-console
         console.debug("workspace.onReorder:applyMove", {
           listId: v.id,
           id,
-          currentIndex: ids.indexOf(id),
+          currentIndex,
           targetIndex: index,
-          orderBeforeStep: ids,
+          orderBeforeStep: currentIds,
           orderPlanned: nextIds,
         });
         app.moveItem(id, v.id, index);
+        currentIds.splice(currentIndex, 1);
+        currentIds.splice(index, 0, id);
       }
     }
   };

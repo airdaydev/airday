@@ -218,13 +218,16 @@ impl Doc {
     ) -> Result<(), DocError> {
         self.assert_list_exists(target_list_id)?;
         let (idx, map) = self.find_item(item_id)?;
-        map.insert(KEY_LIST_ID, target_list_id)?;
+        let moving_status = read_status(&map)
+            .ok_or_else(|| DocError::Invalid(format!("item `{item_id}` is missing status")))?;
         let items = self.items();
         // `target_index` is the desired index *within target_list_id*;
         // map it onto an absolute index in the global items list by
         // counting matching entries up to that point. Sprint 1 cap is
         // 4096 items so the linear scan is fine.
-        let abs = absolute_index_for_list_position(&items, target_list_id, target_index, idx);
+        let abs =
+            absolute_index_for_list_position(&items, target_list_id, target_index, idx, moving_status);
+        map.insert(KEY_LIST_ID, target_list_id)?;
         if abs != idx {
             items.mov(idx, abs)?;
         }
@@ -670,6 +673,7 @@ fn absolute_index_for_list_position(
     target_list_id: &str,
     target_index: usize,
     current_idx: usize,
+    moving_status: Status,
 ) -> usize {
     let mut seen = 0usize;
     for i in 0..items.len() {
@@ -679,12 +683,18 @@ fn absolute_index_for_list_position(
         let Some(map) = item_map_at(items, i) else {
             continue;
         };
-        if read_string(&map, KEY_LIST_ID).as_deref() == Some(target_list_id) {
-            if seen == target_index {
-                return i;
-            }
-            seen += 1;
+        if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
+            continue;
         }
+        // Live-list reorders originate from the visible per-list view,
+        // so hidden done/binned items must not consume target slots.
+        if moving_status == Status::Live && read_status(&map) != Some(Status::Live) {
+            continue;
+        }
+        if seen == target_index {
+            return i;
+        }
+        seen += 1;
     }
     items.len().saturating_sub(1)
 }
@@ -952,6 +962,20 @@ mod tests {
         // list's live view is empty.
         assert!(doc.live_item_ids(&mylist).is_empty());
         assert_eq!(doc.live_item_ids(LIST_NOW), vec![id]);
+    }
+
+    #[test]
+    fn move_live_item_uses_visible_target_index() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let hidden = doc.add_item(&other, "hidden").unwrap();
+        doc.set_item_status(&hidden, Status::Done).unwrap();
+        let anchor = doc.add_item(&other, "anchor").unwrap();
+        let moved = doc.add_item(LIST_NOW, "moved").unwrap();
+
+        doc.move_item(&moved, &other, 1).unwrap();
+
+        assert_eq!(doc.live_item_ids(&other), vec![anchor, moved]);
     }
 
     #[test]
