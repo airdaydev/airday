@@ -9,10 +9,12 @@ import type { SyncEngine } from "@airday/core/wasm";
 
 export interface SyncBridgeOpts {
   engine: SyncEngine;
-  /** Called whenever the engine emits an event (incl. `opsApplied`),
-   *  on each new outbox drain, and on connection state flips. The
-   *  caller uses this to bump its UI store. */
-  onChange: (kind: "online" | "offline" | "ops" | "drain") => void;
+  /** Connection-state flips. Domain-level state changes flow through
+   *  the engine's `AppEvent` queue instead — `onAppEvents` below. */
+  onChange: (kind: "online" | "offline" | "drain") => void;
+  /** Called after every server frame so the host can drain the
+   *  doc's `AppEvent` queue and dispatch into its UI store. */
+  onAppEvents: () => void;
 }
 
 const RECONNECT_DELAY_MS = 1500;
@@ -64,7 +66,8 @@ export class SyncBridge {
       console.debug("ws open");
       this.opts.engine.handleConnected();
       this.pumpOutbox();
-      this.drainEvents();
+      this.drainEngineEvents();
+      this.opts.onAppEvents();
       this.opts.onChange("online");
     };
     ws.onmessage = (ev) => {
@@ -74,7 +77,10 @@ export class SyncBridge {
       console.debug("ws recv", data.length, "bytes");
       this.opts.engine.handleServerBytes(data);
       this.pumpOutbox();
-      this.drainEvents();
+      this.drainEngineEvents();
+      // Domain deltas accumulated by `apply_remote` flow into the doc's
+      // queue; the host drains them and dispatches to the Solid store.
+      this.opts.onAppEvents();
     };
     ws.onclose = (ev) => {
       // eslint-disable-next-line no-console
@@ -91,12 +97,10 @@ export class SyncBridge {
     };
   }
 
-  private drainEvents(): void {
-    let sawOps = false;
+  private drainEngineEvents(): void {
     while (true) {
       const ev = this.opts.engine.popEvent();
       if (!ev) break;
-      if (ev.kind === "opsApplied") sawOps = true;
       if (ev.kind === "error") {
         // Surface engine errors to the console so dev-time debugging
         // doesn't require re-instrumenting the bridge.
@@ -104,7 +108,6 @@ export class SyncBridge {
         console.error("sync engine:", ev.message);
       }
     }
-    if (sawOps) this.opts.onChange("ops");
   }
 }
 

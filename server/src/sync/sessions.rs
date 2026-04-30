@@ -39,7 +39,6 @@ struct Inner {
 
 struct Subscriber {
     sub_id: u64,
-    device_id: Uuid,
     tx: mpsc::Sender<Vec<u8>>,
 }
 
@@ -49,6 +48,15 @@ pub struct Subscription {
     account_id: Uuid,
     sub_id: u64,
     pub rx: mpsc::Receiver<Vec<u8>>,
+}
+
+impl Subscription {
+    /// Per-connection subscriber id. Pass to `broadcast` so a push from
+    /// this session is excluded only from *its own* WS, not from peer
+    /// tabs that happen to share the same `device_id`.
+    pub fn sub_id(&self) -> u64 {
+        self.sub_id
+    }
 }
 
 impl Drop for Subscription {
@@ -62,7 +70,7 @@ impl SyncSessions {
         Self::default()
     }
 
-    pub fn subscribe(&self, account_id: Uuid, device_id: Uuid) -> Subscription {
+    pub fn subscribe(&self, account_id: Uuid) -> Subscription {
         let (tx, rx) = mpsc::channel(CHANNEL_CAPACITY);
         let sub_id = next_sub_id();
         let mut inner = self.inner.lock().unwrap();
@@ -70,7 +78,7 @@ impl SyncSessions {
             .accounts
             .entry(account_id)
             .or_default()
-            .push(Subscriber { sub_id, device_id, tx });
+            .push(Subscriber { sub_id, tx });
         Subscription {
             sessions: self.clone(),
             account_id,
@@ -90,13 +98,20 @@ impl SyncSessions {
     }
 
     /// Fan out an op set to every subscriber on `account_id` except
-    /// `exclude_device`. Returns the number of subscribers that
-    /// received it (slow / closed receivers are dropped from the
-    /// registry as a side effect).
+    /// `exclude_sub`. Excluding by `sub_id` rather than `device_id`
+    /// matters for multi-tab on the same device — both tabs share the
+    /// device cookie, so a `device_id` filter would silence tab-to-tab
+    /// broadcast on the same device. Each WS connection still gets a
+    /// fresh `sub_id` so the originating tab is excluded but its peer
+    /// tabs receive the frame.
+    ///
+    /// Returns the number of subscribers that received it (slow /
+    /// closed receivers are dropped from the registry as a side
+    /// effect).
     pub fn broadcast(
         &self,
         account_id: Uuid,
-        exclude_device: Uuid,
+        exclude_sub: u64,
         ops: Vec<StoredOp>,
     ) -> usize {
         if ops.is_empty() {
@@ -113,7 +128,7 @@ impl SyncSessions {
         let mut inner = self.inner.lock().unwrap();
         if let Some(subs) = inner.accounts.get_mut(&account_id) {
             subs.retain(|s| {
-                if s.device_id == exclude_device {
+                if s.sub_id == exclude_sub {
                     return true;
                 }
                 match s.tx.try_send(bytes.clone()) {

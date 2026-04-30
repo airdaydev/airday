@@ -46,9 +46,6 @@ pub enum Event {
     /// finished. Catch-up done; from here on, broadcasts deliver peer
     /// ops live.
     PulledInitial,
-    /// One or more remote ops were applied to the local doc. May fire
-    /// many times during catch-up and once per broadcast frame after.
-    OpsApplied,
     /// Our own `PushOps` was acked and `Doc::last_pushed_vv` advanced.
     Pushed,
     /// The highest server-assigned op id we know about advanced to
@@ -155,6 +152,14 @@ impl SyncEngine {
     /// is empty.
     pub fn pop_event(&mut self) -> Option<Event> {
         self.events.pop_front()
+    }
+
+    /// Drain the next domain-level change event from the underlying
+    /// doc. Pair with `pop_event` — the engine emits protocol events
+    /// (`ConnStateChanged`, `Pushed`, `FrontierAdvanced`, `Error`),
+    /// the doc emits `AppEvent`s (item / list lifecycle).
+    pub fn pop_app_event(&self) -> Option<crate::events::AppEvent> {
+        self.doc.pop_event()
     }
 
     /// Caller has a usable socket. Engine sends `Hello`, transitions to
@@ -338,11 +343,9 @@ impl SyncEngine {
         if ops.is_empty() {
             return;
         }
-        let mut applied_any = false;
         for op in ops {
             match self.doc.apply_remote(&self.dek, &op.blob) {
                 Ok(()) => {
-                    applied_any = true;
                     if op.id > self.highest_seen_op_id {
                         self.highest_seen_op_id = op.id;
                         self.events.push_back(Event::FrontierAdvanced { id: op.id });
@@ -355,9 +358,11 @@ impl SyncEngine {
                 }
             }
         }
-        if applied_any {
-            self.events.push_back(Event::OpsApplied);
-        }
+        // Domain-level deltas (`AppEvent`) flow through `Doc`'s own
+        // queue — drained by the host alongside this protocol event
+        // queue. The engine no longer fires a coarse "OpsApplied"
+        // signal; consumers poll `Doc::pop_event` for granular
+        // `ItemAdded` / `ItemTextChanged` / etc.
     }
 
     fn queue_ack_if_advanced(&mut self) {
@@ -756,8 +761,16 @@ mod tests {
             }],
         }));
         let events = drain_events(&mut eng);
-        assert!(events.contains(&Event::OpsApplied));
         assert!(events.contains(&Event::FrontierAdvanced { id: 7 }));
+        // Granular AppEvent: the peer item shows up on the doc's queue.
+        let app_evs: Vec<_> =
+            std::iter::from_fn(|| eng.pop_app_event()).collect();
+        assert!(
+            app_evs
+                .iter()
+                .any(|e| matches!(e, crate::events::AppEvent::ItemAdded { text, .. } if text == "from peer")),
+            "expected ItemAdded for `from peer` in {app_evs:?}"
+        );
         assert_eq!(eng.highest_seen_op_id(), 7);
         // Frontier advance should produce an Ack.
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));

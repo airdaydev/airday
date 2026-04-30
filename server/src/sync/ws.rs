@@ -132,13 +132,14 @@ async fn run_session(
     // Subscribe *after* a successful handshake so we never deliver
     // peer broadcasts to a session that hasn't agreed on the protocol
     // version. Subscription is RAII — dropping deregisters.
-    let mut sub = state.sync_sessions.subscribe(auth.account_id, auth.device_id);
+    let mut sub = state.sync_sessions.subscribe(auth.account_id);
 
+    let sub_id = sub.sub_id();
     loop {
         tokio::select! {
             client_frame = recv_msgpack::<ClientFrame>(&mut socket) => {
                 match client_frame {
-                    Ok(frame) => handle_frame(&mut socket, &state, &auth, frame).await?,
+                    Ok(frame) => handle_frame(&mut socket, &state, &auth, sub_id, frame).await?,
                     Err(SessionError::Closed) => return Ok(()),
                     Err(e) => return Err(e),
                 }
@@ -155,10 +156,11 @@ async fn handle_frame(
     socket: &mut WebSocket,
     state: &AppState,
     auth: &DeviceAuth,
+    sub_id: u64,
     frame: ClientFrame,
 ) -> Result<(), SessionError> {
     match frame {
-        ClientFrame::PushOps { ops } => push_ops(socket, state, auth, ops).await,
+        ClientFrame::PushOps { ops } => push_ops(socket, state, auth, sub_id, ops).await,
         ClientFrame::PullOps { since_op_id } => pull_ops(socket, state, auth, since_op_id).await,
         ClientFrame::Ack { last_acked_op_id } => {
             queries::advance_last_acked_op_id(&state.db, auth.device_id, last_acked_op_id).await?;
@@ -178,6 +180,7 @@ async fn push_ops(
     socket: &mut WebSocket,
     state: &AppState,
     auth: &DeviceAuth,
+    sub_id: u64,
     ops: Vec<EncryptedBlob>,
 ) -> Result<(), SessionError> {
     if ops.is_empty() {
@@ -206,7 +209,7 @@ async fn push_ops(
         .collect();
     state
         .sync_sessions
-        .broadcast(auth.account_id, auth.device_id, stored);
+        .broadcast(auth.account_id, sub_id, stored);
 
     send_msgpack(socket, &ServerFrame::OpsAck { assigned_ids }).await
 }

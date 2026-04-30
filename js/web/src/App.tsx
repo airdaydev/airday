@@ -28,6 +28,7 @@ import {
   createSyncedApp,
   type DocApp,
   type ItemView,
+  type ListView,
 } from "./store.ts";
 import { SyncBridge } from "./sync.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
@@ -227,17 +228,17 @@ function MainApp(props: {
     onChange: (kind) => {
       if (kind === "online") props.setOnline(true);
       if (kind === "offline") props.setOnline(false);
-      if (kind === "ops") app.tick();
     },
+    onAppEvents: () => app.drainEvents(),
   });
   app.setOnFlush(() => bridge.pumpOutbox());
   bridge.start();
   onCleanup(() => bridge.stop());
 
   // Debounced persistence. Every doc change (local mutation or
-  // remote apply) ticks `version`; we coalesce a window of 500ms and
-  // write a fresh snapshot. The visibility-hidden listener is the
-  // belt-and-suspenders save for tab-close.
+  // remote apply) bumps `app.version()`; we coalesce a window of
+  // 500ms and write a fresh snapshot. The visibility-hidden listener
+  // is the belt-and-suspenders save for tab-close.
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   const saveNow = async () => {
     saveTimer = null;
@@ -267,7 +268,6 @@ function MainApp(props: {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(saveNow, 500);
   };
-  // Track version() so saves run on every doc change.
   createEffect(() => {
     app.version();
     scheduleSave();
@@ -305,10 +305,10 @@ function Workspace(props: {
   logout: () => void;
 }) {
   const app = props.app;
+  const state = app.state;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "now" });
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
-  const snapshot = createMemo(() => app.snapshot());
 
   // One selection model per Workspace instance — the Dnd component is
   // re-keyed on view change (so it remounts), but we re-use the selection
@@ -319,20 +319,33 @@ function Workspace(props: {
   const selection = new DndSelection();
   createEffect(on(view, () => selection.clear(), { defer: true }));
 
-  const orderedIds = createMemo((): string[] => {
-    const snap = snapshot();
+  // Per-view item slice. Each `state.itemsById[id]` access is a tracked
+  // path on the store proxy, so adds/removes to itemsOrder and field
+  // changes on individual items both flow through this memo without
+  // either invalidating the other.
+  const items = createMemo((): ItemView[] => {
     const v = view();
-    if (v.kind === "list") return snap.liveIdsByList[v.id] ?? [];
-    if (v.kind === "done") return snap.doneIds;
-    return snap.binnedIds;
+    const all = state.itemsOrder
+      .map((id) => state.itemsById[id])
+      .filter((it): it is ItemView => it !== undefined);
+    if (v.kind === "list") {
+      return all.filter((it) => it.listId === v.id && it.status === "live");
+    }
+    if (v.kind === "done") {
+      return all
+        .filter((it) => it.status === "done")
+        .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
+    }
+    return all
+      .filter((it) => it.status === "binned")
+      .sort((a, b) => (b.binnedAt ?? 0) - (a.binnedAt ?? 0));
   });
 
-  const items = createMemo((): ItemView[] => {
-    const snap = snapshot();
-    return orderedIds()
-      .map((id) => snap.itemsById[id])
-      .filter((item): item is ItemView => item !== undefined);
-  });
+  const lists = createMemo((): ListView[] =>
+    state.listsOrder
+      .map((id) => state.listsById[id])
+      .filter((l): l is ListView => l !== undefined),
+  );
 
   const dndRevision = createMemo(() => {
     const v = view();
@@ -348,7 +361,7 @@ function Workspace(props: {
     if (op.type !== "move") return;
     const v = view();
     if (v.kind !== "list") return;
-    const ids = orderedIds();
+    const ids = items().map((it) => it.id);
     const movedIds = op.keys.map(String).filter((id) => ids.includes(id));
     if (movedIds.length === 0) return;
 
@@ -383,10 +396,10 @@ function Workspace(props: {
 
   return (
     <div class="app">
-      <Nav app={app} lists={snapshot().lists} view={view()} setView={setView} />
+      <Nav app={app} lists={lists()} view={view()} setView={setView} />
       <main class="main">
         <header class="main-header">
-          <h1>{viewTitle(view(), snapshot().lists)}</h1>
+          <h1>{viewTitle(view(), lists())}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <span class="status" data-online={props.online ? "" : undefined}>
               {props.online ? "● online" : "○ offline"}
@@ -411,7 +424,12 @@ function Workspace(props: {
             <button type="button" onClick={() => props.logout()}>
               Log out
             </button>
-            <Show when={view().kind === "bin" && snapshot().binnedIds.length > 0}>
+            <Show
+              when={
+                view().kind === "bin" &&
+                items().length > 0
+              }
+            >
               <button type="button" onClick={() => app.emptyBin()}>
                 Empty bin
               </button>
@@ -423,7 +441,7 @@ function Workspace(props: {
         </header>
         <div class="dnd-host">
           <Show
-            when={orderedIds().length > 0}
+            when={items().length > 0}
             fallback={<div class="empty">Nothing here yet.</div>}
           >
             <Show keyed when={dndRevision()}>

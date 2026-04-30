@@ -366,6 +366,43 @@ async fn push_on_a_broadcasts_to_b_not_a() {
 }
 
 #[tokio::test]
+async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
+    // Multi-tab on the same device: two WS connections share the
+    // device cookie. Broadcast must exclude only the originating
+    // *connection*, not every connection sharing the device id —
+    // otherwise tab→tab updates silently drop.
+    let acc = signup_account().await;
+
+    let mut tab_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut tab_a).await;
+    let mut tab_b = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut tab_b).await;
+    wait_for_subscribers(&acc, 2).await;
+
+    let blobs = vec![fake_blob(11)];
+    send_msgpack(&mut tab_a, &ClientFrame::PushOps { ops: blobs.clone() }).await;
+
+    // Tab A — its own ack, no broadcast echo.
+    let assigned_ids = match recv_msgpack::<ServerFrame>(&mut tab_a).await {
+        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
+        other => panic!("expected OpsAck on A, got {other:?}"),
+    };
+    assert_eq!(assigned_ids.len(), 1);
+
+    // Tab B — receives the broadcast even though it shares device_id.
+    let broadcast = match recv_msgpack::<ServerFrame>(&mut tab_b).await {
+        ServerFrame::OpsBroadcast { ops } => ops,
+        other => panic!("expected OpsBroadcast on B, got {other:?}"),
+    };
+    let want: Vec<StoredOp> = assigned_ids
+        .into_iter()
+        .zip(blobs)
+        .map(|(id, blob)| StoredOp { id, blob })
+        .collect();
+    assert_eq!(broadcast, want);
+}
+
+#[tokio::test]
 async fn subscriber_unregisters_on_disconnect() {
     let acc = signup_account().await;
     let _device_b = register_second_device(&acc, "device-b").await;

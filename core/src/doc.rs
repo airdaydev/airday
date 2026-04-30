@@ -20,6 +20,9 @@
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use std::collections::{HashMap, VecDeque};
+use std::sync::Mutex;
+
 use loro::{
     Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, ValueOrContainer, VersionVector,
 };
@@ -28,6 +31,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::crypto::{Dek, AEAD_NONCE_LEN};
+use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
 pub const LIST_NOW: &str = "now";
@@ -133,6 +137,11 @@ pub struct ListView {
 pub struct Doc {
     inner: LoroDoc,
     last_pushed_vv: VersionVector,
+    /// Domain-level change events. Mutation methods push directly;
+    /// `apply_remote` does state-diff and pushes a batch. Drain via
+    /// `pop_event` / `drain_events`. Wrapped in `Mutex` so mutation
+    /// methods can stay `&self` (Loro's interior-mutability shape).
+    events: Mutex<VecDeque<AppEvent>>,
 }
 
 impl Doc {
@@ -147,6 +156,7 @@ impl Doc {
         Ok(Self {
             inner,
             last_pushed_vv: VersionVector::default(),
+            events: Mutex::new(VecDeque::new()),
         })
     }
 
@@ -156,6 +166,7 @@ impl Doc {
         Self {
             last_pushed_vv: inner.oplog_vv(),
             inner,
+            events: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -196,6 +207,17 @@ impl Doc {
         map.insert(KEY_STATUS, STATUS_LIVE)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
+        let index = items.len().saturating_sub(1);
+        self.push_event(AppEvent::ItemAdded {
+            id: id.clone(),
+            list_id: list_id.to_string(),
+            text: text.to_string(),
+            status: Status::Live,
+            created_at: now,
+            done_at: None,
+            binned_at: None,
+            index,
+        });
         Ok(id)
     }
 
@@ -207,6 +229,10 @@ impl Doc {
         let (_, map) = self.find_item(item_id)?;
         map.insert(KEY_TEXT, text)?;
         self.inner.commit();
+        self.push_event(AppEvent::ItemTextChanged {
+            id: item_id.to_string(),
+            text: text.to_string(),
+        });
         Ok(())
     }
 
@@ -220,6 +246,7 @@ impl Doc {
         let (idx, map) = self.find_item(item_id)?;
         let moving_status = read_status(&map)
             .ok_or_else(|| DocError::Invalid(format!("item `{item_id}` is missing status")))?;
+        let prev_list_id = read_string(&map, KEY_LIST_ID);
         let items = self.items();
         // `target_index` is the desired index *within target_list_id*;
         // map it onto an absolute index in the global items list by
@@ -232,6 +259,18 @@ impl Doc {
             items.mov(idx, abs)?;
         }
         self.inner.commit();
+        if prev_list_id.as_deref() != Some(target_list_id) {
+            self.push_event(AppEvent::ItemListChanged {
+                id: item_id.to_string(),
+                list_id: target_list_id.to_string(),
+            });
+        }
+        if abs != idx {
+            self.push_event(AppEvent::ItemMoved {
+                id: item_id.to_string(),
+                index: abs,
+            });
+        }
         Ok(())
     }
 
@@ -239,21 +278,30 @@ impl Doc {
         let (_, map) = self.find_item(item_id)?;
         let now = now_millis();
         map.insert(KEY_STATUS, status.as_wire())?;
-        match status {
+        let (done_at, binned_at) = match status {
             Status::Live => {
                 let _ = map.delete(KEY_DONE_AT);
                 let _ = map.delete(KEY_BINNED_AT);
+                (None, None)
             }
             Status::Done => {
                 map.insert(KEY_DONE_AT, now)?;
                 let _ = map.delete(KEY_BINNED_AT);
+                (Some(now), None)
             }
             Status::Binned => {
                 map.insert(KEY_BINNED_AT, now)?;
                 let _ = map.delete(KEY_DONE_AT);
+                (None, Some(now))
             }
-        }
+        };
         self.inner.commit();
+        self.push_event(AppEvent::ItemStatusChanged {
+            id: item_id.to_string(),
+            status,
+            done_at,
+            binned_at,
+        });
         Ok(())
     }
 
@@ -264,6 +312,9 @@ impl Doc {
         }
         self.items().delete(idx, 1)?;
         self.inner.commit();
+        self.push_event(AppEvent::ItemRemoved {
+            id: item_id.to_string(),
+        });
         Ok(())
     }
 
@@ -271,20 +322,25 @@ impl Doc {
     /// so deletions don't shift indices we haven't visited yet.
     pub fn empty_bin(&self) -> Result<usize, DocError> {
         let items = self.items();
-        let mut removed = 0;
+        let mut removed_ids = Vec::new();
         for idx in (0..items.len()).rev() {
             let Some(map) = item_map_at(&items, idx) else {
                 continue;
             };
             if read_status(&map) == Some(Status::Binned) {
+                if let Some(id) = read_string(&map, KEY_ID) {
+                    removed_ids.push(id);
+                }
                 items.delete(idx, 1)?;
-                removed += 1;
             }
         }
-        if removed > 0 {
+        if !removed_ids.is_empty() {
             self.inner.commit();
+            for id in &removed_ids {
+                self.push_event(AppEvent::ItemRemoved { id: id.clone() });
+            }
         }
-        Ok(removed)
+        Ok(removed_ids.len())
     }
 
     // ---------- mutations: lists ----------
@@ -302,6 +358,13 @@ impl Doc {
         map.insert(KEY_NAME, name)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
+        let index = lists.len().saturating_sub(1);
+        self.push_event(AppEvent::ListAdded {
+            id: id.clone(),
+            name: name.to_string(),
+            created_at: now,
+            index,
+        });
         Ok(id)
     }
 
@@ -313,6 +376,10 @@ impl Doc {
         let (_, map) = self.find_list(list_id)?;
         map.insert(KEY_NAME, name)?;
         self.inner.commit();
+        self.push_event(AppEvent::ListRenamed {
+            id: list_id.to_string(),
+            name: name.to_string(),
+        });
         Ok(())
     }
 
@@ -324,16 +391,29 @@ impl Doc {
         }
         let (idx, _) = self.find_list(list_id)?;
         let items = self.items();
+        let mut reassigned: Vec<String> = Vec::new();
         for i in 0..items.len() {
             let Some(map) = item_map_at(&items, i) else {
                 continue;
             };
             if read_string(&map, KEY_LIST_ID).as_deref() == Some(list_id) {
                 map.insert(KEY_LIST_ID, LIST_NOW)?;
+                if let Some(id) = read_string(&map, KEY_ID) {
+                    reassigned.push(id);
+                }
             }
         }
         self.lists().delete(idx, 1)?;
         self.inner.commit();
+        for id in reassigned {
+            self.push_event(AppEvent::ItemListChanged {
+                id,
+                list_id: LIST_NOW.to_string(),
+            });
+        }
+        self.push_event(AppEvent::ListRemoved {
+            id: list_id.to_string(),
+        });
         Ok(())
     }
 
@@ -464,6 +544,11 @@ impl Doc {
     /// the imported peers only — the server clearly has those ops, but
     /// any local commits already in the oplog stay in the pending set
     /// until our own push lands.
+    ///
+    /// Snapshots state before the import and diffs after, pushing
+    /// per-id `AppEvent`s into the queue so consumers can mirror the
+    /// changes into a UI store with surgical writes — without having
+    /// to walk Loro's per-container diff tree.
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
         if blob.nonce.len() != AEAD_NONCE_LEN {
             return Err(DocError::Invalid(format!(
@@ -471,6 +556,8 @@ impl Doc {
                 blob.nonce.len()
             )));
         }
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let pre_lists: Vec<ListView> = self.all_lists();
         let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
         let status = self.inner.import(&plaintext)?;
         // VersionRange is `(start, end)` per peer — `end` is the
@@ -481,7 +568,70 @@ impl Doc {
             imported_vv.insert(*peer, *end);
         }
         self.last_pushed_vv.merge(&imported_vv);
+        let post_items: Vec<ItemView> = self.iter_items().collect();
+        let post_lists: Vec<ListView> = self.all_lists();
+        let mut emitted = Vec::new();
+        diff_lists(&pre_lists, &post_lists, &mut emitted);
+        diff_items(&pre_items, &post_items, &mut emitted);
+        if !emitted.is_empty() {
+            let mut q = self.events.lock().expect("events mutex poisoned");
+            for ev in emitted {
+                q.push_back(ev);
+            }
+        }
         Ok(())
+    }
+
+    // ---------- event queue ----------
+
+    /// Pop the next domain event, FIFO. UI consumers drain this on each
+    /// engine tick. See `snapshot_events` for the synthetic backfill
+    /// emitted on first attach.
+    pub fn pop_event(&self) -> Option<AppEvent> {
+        self.events.lock().ok()?.pop_front()
+    }
+
+    /// Drain everything currently queued.
+    pub fn drain_events(&self) -> Vec<AppEvent> {
+        self.events
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// Synthetic event burst for current state. A fresh consumer calls
+    /// this once on attach to materialize lists + items via the same
+    /// dispatcher it uses for live deltas — no separate "load initial"
+    /// code path.
+    pub fn snapshot_events(&self) -> Vec<AppEvent> {
+        let mut out = Vec::new();
+        for (idx, list) in self.all_lists().into_iter().enumerate() {
+            out.push(AppEvent::ListAdded {
+                id: list.id,
+                name: list.name,
+                created_at: list.created_at,
+                index: idx,
+            });
+        }
+        for (idx, item) in self.iter_items().enumerate() {
+            out.push(AppEvent::ItemAdded {
+                id: item.id,
+                list_id: item.list_id,
+                text: item.text,
+                status: item.status,
+                created_at: item.created_at,
+                done_at: item.done_at,
+                binned_at: item.binned_at,
+                index: idx,
+            });
+        }
+        out
+    }
+
+    fn push_event(&self, ev: AppEvent) {
+        if let Ok(mut q) = self.events.lock() {
+            q.push_back(ev);
+        }
     }
 
     // ---------- persistence ----------
@@ -508,6 +658,7 @@ impl Doc {
         Ok(Self {
             inner,
             last_pushed_vv,
+            events: Mutex::new(VecDeque::new()),
         })
     }
 
@@ -729,6 +880,124 @@ fn now_millis() -> i64 {
 
 fn new_id() -> String {
     Uuid::now_v7().simple().to_string()
+}
+
+/// Diff two ordered slices of `ItemView` by id and emit `AppEvent`s for
+/// the transitions a UI store needs to mirror. Used by `apply_remote`
+/// where Loro applies a possibly-large batch of peer ops in one go and
+/// the cheapest path to per-id deltas is "snapshot before, snapshot
+/// after, walk both maps once."
+fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
+    let pre_by_id: HashMap<&str, (usize, &ItemView)> = pre
+        .iter()
+        .enumerate()
+        .map(|(i, it)| (it.id.as_str(), (i, it)))
+        .collect();
+    let post_by_id: HashMap<&str, (usize, &ItemView)> = post
+        .iter()
+        .enumerate()
+        .map(|(i, it)| (it.id.as_str(), (i, it)))
+        .collect();
+
+    for it in pre {
+        if !post_by_id.contains_key(it.id.as_str()) {
+            out.push(AppEvent::ItemRemoved { id: it.id.clone() });
+        }
+    }
+    for (post_idx, post_it) in post.iter().enumerate() {
+        match pre_by_id.get(post_it.id.as_str()) {
+            None => {
+                out.push(AppEvent::ItemAdded {
+                    id: post_it.id.clone(),
+                    list_id: post_it.list_id.clone(),
+                    text: post_it.text.clone(),
+                    status: post_it.status,
+                    created_at: post_it.created_at,
+                    done_at: post_it.done_at,
+                    binned_at: post_it.binned_at,
+                    index: post_idx,
+                });
+            }
+            Some(&(pre_idx, pre_it)) => {
+                if pre_it.text != post_it.text {
+                    out.push(AppEvent::ItemTextChanged {
+                        id: post_it.id.clone(),
+                        text: post_it.text.clone(),
+                    });
+                }
+                if pre_it.status != post_it.status
+                    || pre_it.done_at != post_it.done_at
+                    || pre_it.binned_at != post_it.binned_at
+                {
+                    out.push(AppEvent::ItemStatusChanged {
+                        id: post_it.id.clone(),
+                        status: post_it.status,
+                        done_at: post_it.done_at,
+                        binned_at: post_it.binned_at,
+                    });
+                }
+                if pre_it.list_id != post_it.list_id {
+                    out.push(AppEvent::ItemListChanged {
+                        id: post_it.id.clone(),
+                        list_id: post_it.list_id.clone(),
+                    });
+                }
+                if pre_idx != post_idx {
+                    out.push(AppEvent::ItemMoved {
+                        id: post_it.id.clone(),
+                        index: post_idx,
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Diff two ordered slices of `ListView`. Mirror of `diff_items` for
+/// the lists root container.
+fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
+    let pre_by_id: HashMap<&str, (usize, &ListView)> = pre
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.id.as_str(), (i, l)))
+        .collect();
+    let post_by_id: HashMap<&str, (usize, &ListView)> = post
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.id.as_str(), (i, l)))
+        .collect();
+
+    for l in pre {
+        if !post_by_id.contains_key(l.id.as_str()) {
+            out.push(AppEvent::ListRemoved { id: l.id.clone() });
+        }
+    }
+    for (post_idx, post_l) in post.iter().enumerate() {
+        match pre_by_id.get(post_l.id.as_str()) {
+            None => {
+                out.push(AppEvent::ListAdded {
+                    id: post_l.id.clone(),
+                    name: post_l.name.clone(),
+                    created_at: post_l.created_at,
+                    index: post_idx,
+                });
+            }
+            Some(&(pre_idx, pre_l)) => {
+                if pre_l.name != post_l.name {
+                    out.push(AppEvent::ListRenamed {
+                        id: post_l.id.clone(),
+                        name: post_l.name.clone(),
+                    });
+                }
+                if pre_idx != post_idx {
+                    out.push(AppEvent::ListMoved {
+                        id: post_l.id.clone(),
+                        index: post_idx,
+                    });
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -998,5 +1267,179 @@ mod tests {
         let mut b = Doc::empty();
         let err = b.apply_remote(&dek2, &blob).unwrap_err();
         assert!(matches!(err, DocError::Crypto(_)));
+    }
+
+    // ---------- AppEvent tests ----------
+
+    #[test]
+    fn local_add_item_emits_item_added() {
+        let doc = Doc::new().unwrap();
+        // Drain any seed events from Doc::new (currently none — seeds
+        // happen before the queue is observable from outside, but
+        // future-proof the test against that changing).
+        let _ = doc.drain_events();
+        let id = doc.add_item(LIST_NOW, "milk").unwrap();
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1);
+        match &evs[0] {
+            AppEvent::ItemAdded {
+                id: eid,
+                list_id,
+                text,
+                status,
+                index,
+                ..
+            } => {
+                assert_eq!(eid, &id);
+                assert_eq!(list_id, LIST_NOW);
+                assert_eq!(text, "milk");
+                assert_eq!(*status, Status::Live);
+                assert_eq!(*index, 0);
+            }
+            other => panic!("expected ItemAdded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_edit_text_emits_text_changed() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_NOW, "old").unwrap();
+        let _ = doc.drain_events();
+        doc.edit_item_text(&id, "new").unwrap();
+        let evs = doc.drain_events();
+        assert!(matches!(
+            evs.as_slice(),
+            [AppEvent::ItemTextChanged { id: eid, text }] if eid == &id && text == "new"
+        ));
+    }
+
+    #[test]
+    fn local_set_status_emits_status_changed_with_timestamps() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_NOW, "task").unwrap();
+        let _ = doc.drain_events();
+        doc.set_item_status(&id, Status::Done).unwrap();
+        let evs = doc.drain_events();
+        match evs.as_slice() {
+            [AppEvent::ItemStatusChanged {
+                id: eid,
+                status,
+                done_at,
+                binned_at,
+            }] => {
+                assert_eq!(eid, &id);
+                assert_eq!(*status, Status::Done);
+                assert!(done_at.is_some());
+                assert!(binned_at.is_none());
+            }
+            other => panic!("unexpected events: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_delete_list_emits_reassign_then_remove() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let id = doc.add_item(&other, "in other").unwrap();
+        let _ = doc.drain_events();
+        doc.delete_list(&other).unwrap();
+        let evs = doc.drain_events();
+        // ItemListChanged for the orphan, then ListRemoved.
+        let mut saw_reassign = false;
+        let mut saw_removed = false;
+        for ev in &evs {
+            match ev {
+                AppEvent::ItemListChanged { id: eid, list_id } => {
+                    assert_eq!(eid, &id);
+                    assert_eq!(list_id, LIST_NOW);
+                    saw_reassign = true;
+                }
+                AppEvent::ListRemoved { id: lid } => {
+                    assert_eq!(lid, &other);
+                    saw_removed = true;
+                }
+                _ => {}
+            }
+        }
+        assert!(saw_reassign && saw_removed, "events: {evs:?}");
+    }
+
+    #[test]
+    fn apply_remote_emits_item_added_for_peer_inserts() {
+        let dek = Dek::generate();
+        let a = Doc::new().unwrap();
+        let item_id = a.add_item(LIST_NOW, "from peer").unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+
+        let mut b = Doc::empty();
+        let _ = b.drain_events();
+        b.apply_remote(&dek, &blob).unwrap();
+        let evs = b.drain_events();
+
+        // Should include ListAdded for the seeded lists and ItemAdded
+        // for the peer item.
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_NOW)),
+            "expected ListAdded for `now`: {evs:?}"
+        );
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, AppEvent::ItemAdded { id, .. } if id == &item_id)),
+            "expected ItemAdded for peer item: {evs:?}"
+        );
+    }
+
+    #[test]
+    fn apply_remote_emits_text_changed_for_peer_edits() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_NOW, "old").unwrap();
+        let setup_blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &setup_blob).unwrap();
+        let _ = b.drain_events();
+
+        a.edit_item_text(&id, "new").unwrap();
+        let edit_blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &edit_blob).unwrap();
+        let evs = b.drain_events();
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, AppEvent::ItemTextChanged { id: eid, text } if eid == &id && text == "new")),
+            "expected ItemTextChanged in {evs:?}"
+        );
+    }
+
+    #[test]
+    fn snapshot_events_materializes_current_state() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_NOW, "a").unwrap();
+        let b = doc.add_item(&other, "b").unwrap();
+        let _ = doc.drain_events();
+
+        let snap = doc.snapshot_events();
+        // ListAdded events come first, then ItemAdded events.
+        let lists: Vec<&str> = snap
+            .iter()
+            .filter_map(|e| match e {
+                AppEvent::ListAdded { id, .. } => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        let items: Vec<&str> = snap
+            .iter()
+            .filter_map(|e| match e {
+                AppEvent::ItemAdded { id, .. } => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(lists.contains(&LIST_NOW));
+        assert!(lists.contains(&other.as_str()));
+        assert!(items.contains(&a.as_str()));
+        assert!(items.contains(&b.as_str()));
     }
 }

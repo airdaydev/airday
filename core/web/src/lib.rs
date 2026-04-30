@@ -9,8 +9,8 @@
 use wasm_bindgen::prelude::*;
 
 use airday_core::{
-    derive_password_master, kek_from_master, Dek as CoreDek, Doc as CoreDoc,
-    EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
+    derive_password_master, kek_from_master, AppEvent as CoreAppEvent, Dek as CoreDek,
+    Doc as CoreDoc, EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
     SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
@@ -510,6 +510,29 @@ impl SyncEngine {
         self.inner.pop_event().map(EngineEvent::from)
     }
 
+    /// Drain the next domain-level change event. Pair with `popEvent`
+    /// — that one carries protocol/connection events; this one carries
+    /// item / list lifecycle deltas the UI store mirrors.
+    #[wasm_bindgen(js_name = popAppEvent)]
+    pub fn pop_app_event(&self) -> Option<AppEventJs> {
+        self.inner.pop_app_event().map(AppEventJs::from)
+    }
+
+    /// Synthetic event burst describing current doc state — `ListAdded`
+    /// for every list, then `ItemAdded` for every item. Consumers feed
+    /// this through the same dispatcher used for live deltas, so a
+    /// fresh attach is "current state, then live changes" without a
+    /// separate "load initial" path.
+    #[wasm_bindgen(js_name = snapshotEvents)]
+    pub fn snapshot_events(&self) -> Vec<AppEventJs> {
+        self.inner
+            .doc()
+            .snapshot_events()
+            .into_iter()
+            .map(AppEventJs::from)
+            .collect()
+    }
+
     // -- introspection --
 
     #[wasm_bindgen(js_name = isOnline)]
@@ -728,12 +751,6 @@ impl From<CoreEvent> for EngineEvent {
                 op_id: None,
                 message: None,
             },
-            CoreEvent::OpsApplied => EngineEvent {
-                kind: "opsApplied",
-                online: None,
-                op_id: None,
-                message: None,
-            },
             CoreEvent::Pushed => EngineEvent {
                 kind: "pushed",
                 online: None,
@@ -751,6 +768,187 @@ impl From<CoreEvent> for EngineEvent {
                 online: None,
                 op_id: None,
                 message: Some(message),
+            },
+        }
+    }
+}
+
+// ---------- AppEventJs ----------
+
+/// Flat JS-friendly view of `airday_core::AppEvent`. The host switches
+/// on `kind` and reads only the fields documented for that variant —
+/// every other getter returns `undefined`.
+///
+/// Variant → fields:
+/// - `itemAdded` — id, listId, text, status, createdAt, doneAt?, binnedAt?, index
+/// - `itemRemoved` — id
+/// - `itemMoved` — id, index
+/// - `itemTextChanged` — id, text
+/// - `itemStatusChanged` — id, status, doneAt?, binnedAt?
+/// - `itemListChanged` — id, listId
+/// - `listAdded` — id, name, createdAt, index
+/// - `listRemoved` — id
+/// - `listMoved` — id, index
+/// - `listRenamed` — id, name
+#[wasm_bindgen]
+pub struct AppEventJs {
+    kind: &'static str,
+    id: String,
+    list_id: Option<String>,
+    text: Option<String>,
+    name: Option<String>,
+    status: Option<&'static str>,
+    created_at: Option<i64>,
+    done_at: Option<i64>,
+    binned_at: Option<i64>,
+    index: Option<usize>,
+}
+
+#[wasm_bindgen]
+impl AppEventJs {
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        self.kind.to_string()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+    #[wasm_bindgen(getter, js_name = listId)]
+    pub fn list_id(&self) -> Option<String> {
+        self.list_id.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn text(&self) -> Option<String> {
+        self.text.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn status(&self) -> Option<String> {
+        self.status.map(|s| s.to_string())
+    }
+    #[wasm_bindgen(getter, js_name = createdAt)]
+    pub fn created_at(&self) -> Option<i64> {
+        self.created_at
+    }
+    #[wasm_bindgen(getter, js_name = doneAt)]
+    pub fn done_at(&self) -> Option<i64> {
+        self.done_at
+    }
+    #[wasm_bindgen(getter, js_name = binnedAt)]
+    pub fn binned_at(&self) -> Option<i64> {
+        self.binned_at
+    }
+    #[wasm_bindgen(getter)]
+    pub fn index(&self) -> Option<usize> {
+        self.index
+    }
+}
+
+impl From<CoreAppEvent> for AppEventJs {
+    fn from(e: CoreAppEvent) -> Self {
+        let blank = AppEventJs {
+            kind: "",
+            id: String::new(),
+            list_id: None,
+            text: None,
+            name: None,
+            status: None,
+            created_at: None,
+            done_at: None,
+            binned_at: None,
+            index: None,
+        };
+        match e {
+            CoreAppEvent::ItemAdded {
+                id,
+                list_id,
+                text,
+                status,
+                created_at,
+                done_at,
+                binned_at,
+                index,
+            } => AppEventJs {
+                kind: "itemAdded",
+                id,
+                list_id: Some(list_id),
+                text: Some(text),
+                status: Some(status_str(status)),
+                created_at: Some(created_at),
+                done_at,
+                binned_at,
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ItemRemoved { id } => AppEventJs {
+                kind: "itemRemoved",
+                id,
+                ..blank
+            },
+            CoreAppEvent::ItemMoved { id, index } => AppEventJs {
+                kind: "itemMoved",
+                id,
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ItemTextChanged { id, text } => AppEventJs {
+                kind: "itemTextChanged",
+                id,
+                text: Some(text),
+                ..blank
+            },
+            CoreAppEvent::ItemStatusChanged {
+                id,
+                status,
+                done_at,
+                binned_at,
+            } => AppEventJs {
+                kind: "itemStatusChanged",
+                id,
+                status: Some(status_str(status)),
+                done_at,
+                binned_at,
+                ..blank
+            },
+            CoreAppEvent::ItemListChanged { id, list_id } => AppEventJs {
+                kind: "itemListChanged",
+                id,
+                list_id: Some(list_id),
+                ..blank
+            },
+            CoreAppEvent::ListAdded {
+                id,
+                name,
+                created_at,
+                index,
+            } => AppEventJs {
+                kind: "listAdded",
+                id,
+                name: Some(name),
+                created_at: Some(created_at),
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ListRemoved { id } => AppEventJs {
+                kind: "listRemoved",
+                id,
+                ..blank
+            },
+            CoreAppEvent::ListMoved { id, index } => AppEventJs {
+                kind: "listMoved",
+                id,
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ListRenamed { id, name } => AppEventJs {
+                kind: "listRenamed",
+                id,
+                name: Some(name),
+                ..blank
             },
         }
     }
