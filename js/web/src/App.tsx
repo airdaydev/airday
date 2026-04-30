@@ -10,14 +10,12 @@ import {
   For,
   onCleanup,
   Show,
-  untrack,
 } from "solid-js";
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { OpfsStorage } from "@airday/core";
-import { DndSource, type DndOp } from "@primavera-ui/components/dnd";
+import { Dnd, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
-import { Dnd } from "./Dnd.tsx";
 import { Login, type Session } from "./Login.tsx";
 import { createSyncedApp, type DocApp } from "./store.ts";
 import { SyncBridge } from "./sync.ts";
@@ -288,31 +286,11 @@ function Workspace(props: {
     return app.binnedItemIds();
   });
 
-  const sourceForView = createMemo<DndSource<{ id: string }>>(() => {
-    view();
-    return untrack(
-      () =>
-        new DndSource<{ id: string }>({
-          getKey: (it) => it.id,
-          getOrder: () => orderedIds(),
-          getItem: (key) => ({ id: String(key) }),
-        }),
-    );
-  });
+  const items = createMemo<{ id: string }[]>(() =>
+    orderedIds().map((id) => ({ id })),
+  );
 
-  let prevSrc: DndSource<{ id: string }> | null = null;
-  createEffect(() => {
-    const ids = orderedIds();
-    const src = sourceForView();
-    if (src !== prevSrc) {
-      prevSrc = src;
-      return;
-    }
-    const txn = src.apply([{ type: "reset", keys: [...ids] }]);
-    src._commitState(txn);
-  });
-
-  const onDndChange = (op: DndOp<{ id: string }>) => {
+  const onReorder = (op: DndOp<{ id: string }>) => {
     if (op.type !== "move") return;
     const v = view();
     if (v.kind !== "list") return;
@@ -360,8 +338,14 @@ function Workspace(props: {
             when={orderedIds().length > 0}
             fallback={<div class="empty">Nothing here yet.</div>}
           >
-            <Dnd source={sourceForView()} itemHeight={40} onChange={onDndChange}>
-              {(key) => <Row id={String(key)} app={app} />}
+            <Dnd
+              items={items()}
+              getKey={(it) => it.id}
+              itemHeight={40}
+              onReorder={onReorder}
+              style={{ height: "100%", display: "block" }}
+            >
+              {(item) => <Row id={item().id} app={app} />}
             </Dnd>
           </Show>
         </div>
