@@ -342,12 +342,6 @@ function Workspace(props: {
   createEffect(() => {
     const next = items();
     setDndItems(next);
-    // eslint-disable-next-line no-console
-    console.debug("workspace.items", {
-      view: view(),
-      orderedIds: orderedIds(),
-      itemIds: next.map((item) => item.id),
-    });
   });
 
   const onReorder = (op: DndOp<ItemView>) => {
@@ -369,31 +363,11 @@ function Workspace(props: {
     const nextIds = [...remaining];
     nextIds.splice(insertAt, 0, ...movedIds);
 
-    // eslint-disable-next-line no-console
-    console.debug("workspace.onReorder", {
-      listId: v.id,
-      beforeKey: op.beforeKey === null ? null : String(op.beforeKey),
-      movedIds,
-      orderBefore: ids,
-      remaining,
-      insertAt,
-      orderPlanned: nextIds,
-    });
-
     const currentIds = [...ids];
     for (const [index, id] of nextIds.entries()) {
       if (currentIds[index] !== id) {
         const currentIndex = currentIds.indexOf(id);
         if (currentIndex < 0) continue;
-        // eslint-disable-next-line no-console
-        console.debug("workspace.onReorder:applyMove", {
-          listId: v.id,
-          id,
-          currentIndex,
-          targetIndex: index,
-          orderBeforeStep: currentIds,
-          orderPlanned: nextIds,
-        });
         app.moveItem(id, v.id, index);
         currentIds.splice(currentIndex, 1);
         currentIds.splice(index, 0, id);

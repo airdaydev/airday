@@ -96,25 +96,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       flush();
     },
     moveItem(id, listId, index) {
-      const before = engine.liveItemIds(listId);
-      const fromIndex = before.indexOf(id);
-      // eslint-disable-next-line no-console
-      console.debug("app.moveItem:start", {
-        id,
-        listId,
-        fromIndex,
-        targetIndex: index,
-        orderBefore: before,
-      });
       engine.moveItem(id, listId, index);
-      const after = engine.liveItemIds(listId);
-      // eslint-disable-next-line no-console
-      console.debug("app.moveItem:end", {
-        id,
-        listId,
-        targetIndex: index,
-        orderAfter: after,
-      });
       tick();
       flush();
     },
