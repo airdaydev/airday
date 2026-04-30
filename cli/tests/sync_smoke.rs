@@ -16,7 +16,7 @@ use std::time::Duration;
 use airday_cli::config::{DeviceConfig, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
 use airday_cli::sync::Session;
-use airday_core::{derive_password_master, random_bytes, Dek, Doc, LIST_CURRENT};
+use airday_core::{derive_password_master, random_bytes, Dek, Doc, LIST_NOW};
 use airday_protocol::{
     DeviceCredential, DeviceRegistration, KdfParams, SignupRequest, SignupResponse,
 };
@@ -143,7 +143,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     // user's add_item then ships on flush. Two blobs land server-side.
     let session = Session::open_with_profile(profile, false).await.unwrap();
     assert!(session.is_online(), "expected to connect to local server");
-    let item_id = session.doc().add_item(LIST_CURRENT, "hello world").unwrap();
+    let item_id = session.doc().add_item(LIST_NOW, "hello world").unwrap();
     session.flush().await.unwrap();
 
     let account_id = Uuid::parse_str(&signup.account_id).unwrap();
@@ -242,7 +242,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, false).await.unwrap();
-    let item_id = session_a.doc().add_item(LIST_CURRENT, "from-A").unwrap();
+    let item_id = session_a.doc().add_item(LIST_NOW, "from-A").unwrap();
     session_a.flush().await.unwrap();
 
     // B opens a session — its pull should ingest A's seed + add_item
@@ -251,7 +251,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
     assert!(session_b.is_online());
     let view = session_b.doc().get_item(&item_id).unwrap();
     assert_eq!(view.text, "from-A");
-    assert_eq!(view.list_id, LIST_CURRENT);
+    assert_eq!(view.list_id, LIST_NOW);
     session_b.flush().await.unwrap();
 }
 

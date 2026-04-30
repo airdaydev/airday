@@ -1,9 +1,9 @@
 //! ID prefix resolution.
 //!
 //! Subcommands accept any unambiguous prefix of an item or list id —
-//! the user types `a1b2c3`, we expand it to the full uuid hex. Built-in
-//! lists (`current`, `holding`) match literally regardless of length so
-//! `airday ls --list current` always works.
+//! the user types `a1b2c3`, we expand it to the full uuid hex. The
+//! built-in `now` list matches literally regardless of length so
+//! `airday ls --list now` always works.
 
 use airday_core::{Doc, ItemView, ListView};
 
@@ -37,7 +37,7 @@ pub fn resolve_item_id(doc: &Doc, prefix: &str) -> Result<String, ResolveError> 
 }
 
 /// Resolve a user-supplied prefix to a single list's full id. Accepts
-/// the built-in ids (`current`, `holding`) verbatim.
+/// the built-in id (`now`) verbatim.
 pub fn resolve_list_id(doc: &Doc, prefix: &str) -> Result<String, ResolveError> {
     let prefix = prefix.trim();
     let lists = doc.all_lists();
@@ -67,8 +67,8 @@ fn pick_one(
     }
 }
 
-/// 6-char display form of an id. Built-in list ids (`current`,
-/// `holding`) round-trip verbatim because they're already short.
+/// 6-char display form of an id. The built-in `now` list id round-trips
+/// verbatim because it's already short.
 pub fn short_id(id: &str) -> String {
     if id.len() <= 6 {
         return id.to_string();
@@ -90,12 +90,12 @@ pub fn short_list_id(list: &ListView) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use airday_core::{LIST_CURRENT, LIST_HOLDING};
+    use airday_core::LIST_NOW;
 
     #[test]
     fn resolves_unique_item_prefix() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_CURRENT, "thing").unwrap();
+        let id = doc.add_item(LIST_NOW, "thing").unwrap();
         let prefix = &id[..6];
         assert_eq!(resolve_item_id(&doc, prefix).unwrap(), id);
     }
@@ -106,8 +106,8 @@ mod tests {
         // common "" prefix — every id starts with the empty string, so
         // an empty prefix is the most-ambiguous case.
         let doc = Doc::new().unwrap();
-        let _a = doc.add_item(LIST_CURRENT, "a").unwrap();
-        let _b = doc.add_item(LIST_CURRENT, "b").unwrap();
+        let _a = doc.add_item(LIST_NOW, "a").unwrap();
+        let _b = doc.add_item(LIST_NOW, "b").unwrap();
         let err = resolve_item_id(&doc, "").unwrap_err();
         match err {
             ResolveError::Ambiguous { matches, .. } => assert_eq!(matches.len(), 2),
@@ -125,15 +125,18 @@ mod tests {
     #[test]
     fn builtin_list_resolves_verbatim() {
         let doc = Doc::new().unwrap();
-        assert_eq!(resolve_list_id(&doc, LIST_CURRENT).unwrap(), LIST_CURRENT);
-        assert_eq!(resolve_list_id(&doc, LIST_HOLDING).unwrap(), LIST_HOLDING);
+        assert_eq!(resolve_list_id(&doc, LIST_NOW).unwrap(), LIST_NOW);
     }
 
     #[test]
     fn user_list_resolves_by_prefix() {
         let doc = Doc::new().unwrap();
         let id = doc.add_list("Errands").unwrap();
-        let prefix = &id[..6];
+        // uuidv7 hex: first 12 chars are the ms timestamp, char 12 is
+        // the version nibble — so any prefix ≤ 13 chars can collide
+        // with the seeded "Later" list for hours. 16 chars puts us well
+        // into the random bits.
+        let prefix = &id[..16];
         assert_eq!(resolve_list_id(&doc, prefix).unwrap(), id);
     }
 }

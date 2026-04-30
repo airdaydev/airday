@@ -9,8 +9,9 @@
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //!
 //! The bin is *not* a list — `Status::Binned` items keep their
-//! `list_id`. Two well-known list ids are seeded on init:
-//! [`LIST_CURRENT`] and [`LIST_HOLDING`].
+//! `list_id`. One well-known list id is seeded on init: [`LIST_NOW`].
+//! A second "Later" list is seeded with a fresh uuid so it behaves like
+//! any user-created list (rename, delete, etc.).
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
 //! "what's new since the last server interaction" as a single sealed
@@ -29,8 +30,7 @@ use uuid::Uuid;
 use crate::crypto::{Dek, AEAD_NONCE_LEN};
 use airday_protocol::EncryptedBlob;
 
-pub const LIST_CURRENT: &str = "current";
-pub const LIST_HOLDING: &str = "holding";
+pub const LIST_NOW: &str = "now";
 
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";
@@ -313,11 +313,11 @@ impl Doc {
         Ok(())
     }
 
-    /// Refuses for the always-on `current` list. Items in the deleted
-    /// list are reassigned to `current` so nothing falls off the doc.
+    /// Refuses for the always-on `now` list. Items in the deleted
+    /// list are reassigned to `now` so nothing falls off the doc.
     pub fn delete_list(&self, list_id: &str) -> Result<(), DocError> {
-        if list_id == LIST_CURRENT {
-            return Err(DocError::CannotDeleteBuiltin(LIST_CURRENT.into()));
+        if list_id == LIST_NOW {
+            return Err(DocError::CannotDeleteBuiltin(LIST_NOW.into()));
         }
         let (idx, _) = self.find_list(list_id)?;
         let items = self.items();
@@ -326,7 +326,7 @@ impl Doc {
                 continue;
             };
             if read_string(&map, KEY_LIST_ID).as_deref() == Some(list_id) {
-                map.insert(KEY_LIST_ID, LIST_CURRENT)?;
+                map.insert(KEY_LIST_ID, LIST_NOW)?;
             }
         }
         self.lists().delete(idx, 1)?;
@@ -373,9 +373,9 @@ impl Doc {
 
     /// Per-list nav view: ids of `Live` items in this list, in
     /// MovableList order. Items whose `list_id` no longer exists
-    /// (orphaned by `delete_list`'s reassignment to `current`) won't
+    /// (orphaned by `delete_list`'s reassignment to `now`) won't
     /// appear here for the deleted id by definition — they're now
-    /// under `current`.
+    /// under `now`.
     pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
         self.iter_items()
             .filter(|i| i.list_id == list_id && i.status == Status::Live)
@@ -597,12 +597,16 @@ struct LocalState {
 
 fn seed_builtins(doc: &LoroDoc) -> Result<(), DocError> {
     let lists = doc.get_movable_list(ROOT_LISTS);
-    let now = now_millis();
-    for (id, name) in [(LIST_CURRENT, "Current"), (LIST_HOLDING, "Holding")] {
+    let now_ts = now_millis();
+    // "Now" is the always-on built-in — stable id so delete_list can
+    // refuse it and orphans can be reassigned. "Later" is just a
+    // pre-seeded user list: fresh uuid, deletable like any other.
+    let later_id = new_id();
+    for (id, name) in [(LIST_NOW, "Now"), (later_id.as_str(), "Later")] {
         let map = lists.push_container(LoroMap::new())?;
         map.insert(KEY_ID, id)?;
         map.insert(KEY_NAME, name)?;
-        map.insert(KEY_CREATED_AT, now)?;
+        map.insert(KEY_CREATED_AT, now_ts)?;
     }
     Ok(())
 }
@@ -726,25 +730,26 @@ mod tests {
     fn new_doc_has_builtin_lists() {
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
-        let ids: Vec<_> = lists.iter().map(|l| l.id.as_str()).collect();
-        assert!(ids.contains(&LIST_CURRENT));
-        assert!(ids.contains(&LIST_HOLDING));
+        let names: Vec<_> = lists.iter().map(|l| l.name.as_str()).collect();
+        assert!(lists.iter().any(|l| l.id == LIST_NOW));
+        assert!(names.contains(&"Now"));
+        assert!(names.contains(&"Later"));
     }
 
     #[test]
     fn add_item_round_trips_through_get() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_CURRENT, "buy milk").unwrap();
+        let id = doc.add_item(LIST_NOW, "buy milk").unwrap();
         let view = doc.get_item(&id).unwrap();
         assert_eq!(view.text, "buy milk");
-        assert_eq!(view.list_id, LIST_CURRENT);
+        assert_eq!(view.list_id, LIST_NOW);
         assert_eq!(view.status, Status::Live);
     }
 
     #[test]
     fn empty_text_rejected() {
         let doc = Doc::new().unwrap();
-        let err = doc.add_item(LIST_CURRENT, "   ").unwrap_err();
+        let err = doc.add_item(LIST_NOW, "   ").unwrap_err();
         assert!(matches!(err, DocError::Invalid(_)));
     }
 
@@ -758,7 +763,7 @@ mod tests {
     #[test]
     fn status_transitions_clear_other_timestamps() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_CURRENT, "thing").unwrap();
+        let id = doc.add_item(LIST_NOW, "thing").unwrap();
         doc.set_item_status(&id, Status::Done).unwrap();
         assert!(doc.get_item(&id).unwrap().done_at.is_some());
         doc.set_item_status(&id, Status::Binned).unwrap();
@@ -775,8 +780,8 @@ mod tests {
     #[test]
     fn empty_bin_removes_only_binned() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_CURRENT, "keep").unwrap();
-        let b = doc.add_item(LIST_CURRENT, "drop").unwrap();
+        let a = doc.add_item(LIST_NOW, "keep").unwrap();
+        let b = doc.add_item(LIST_NOW, "drop").unwrap();
         doc.set_item_status(&b, Status::Binned).unwrap();
         let removed = doc.empty_bin().unwrap();
         assert_eq!(removed, 1);
@@ -787,7 +792,7 @@ mod tests {
     #[test]
     fn delete_binned_only_works_for_binned() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_CURRENT, "live").unwrap();
+        let id = doc.add_item(LIST_NOW, "live").unwrap();
         assert!(matches!(
             doc.delete_binned(&id).unwrap_err(),
             DocError::NotBinned
@@ -798,20 +803,20 @@ mod tests {
     }
 
     #[test]
-    fn delete_list_reassigns_items_to_current() {
+    fn delete_list_reassigns_items_to_now() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "milk").unwrap();
         doc.delete_list(&mylist).unwrap();
         let view = doc.get_item(&id).unwrap();
-        assert_eq!(view.list_id, LIST_CURRENT);
+        assert_eq!(view.list_id, LIST_NOW);
     }
 
     #[test]
-    fn delete_current_refused() {
+    fn delete_now_refused() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
-            doc.delete_list(LIST_CURRENT).unwrap_err(),
+            doc.delete_list(LIST_NOW).unwrap_err(),
             DocError::CannotDeleteBuiltin(_)
         ));
     }
@@ -819,7 +824,7 @@ mod tests {
     #[test]
     fn save_load_round_trip_preserves_state() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_CURRENT, "persisted").unwrap();
+        let id = doc.add_item(LIST_NOW, "persisted").unwrap();
         let bytes = doc.save().unwrap();
         let restored = Doc::load(&bytes).unwrap();
         assert_eq!(restored.get_item(&id).unwrap().text, "persisted");
@@ -845,7 +850,7 @@ mod tests {
             .expect("seed counts as pending until first push");
         a.mark_pushed();
 
-        let item_a = a.add_item(LIST_CURRENT, "from A").unwrap();
+        let item_a = a.add_item(LIST_NOW, "from A").unwrap();
 
         // Replica B starts empty (sprint-1 device-2 path uses snapshot,
         // but the convergence guarantee is what we're testing).
@@ -859,7 +864,7 @@ mod tests {
         assert!(b.get_item(&item_a).is_some());
 
         // B mutates concurrently, ships back to A.
-        let item_b = b.add_item(LIST_HOLDING, "from B").unwrap();
+        let item_b = b.add_item(LIST_NOW, "from B").unwrap();
         let blob_b1 = b.pending_export(&dek).unwrap().unwrap();
         b.mark_pushed();
         a.apply_remote(&dek, &blob_b1).unwrap();
@@ -876,8 +881,8 @@ mod tests {
         // (built-in lists with the same ids; created_at differs by
         // wall-clock millis but the test doesn't pin equal docs — it
         // just shows that adding-and-not-syncing diverges).
-        let _ = a.add_item(LIST_CURRENT, "A only").unwrap();
-        let _ = b.add_item(LIST_CURRENT, "B only").unwrap();
+        let _ = a.add_item(LIST_NOW, "A only").unwrap();
+        let _ = b.add_item(LIST_NOW, "B only").unwrap();
         a.mark_pushed();
         b.mark_pushed();
         assert_ne!(a.fingerprint(), b.fingerprint());
@@ -886,7 +891,7 @@ mod tests {
     #[test]
     fn view_helpers_empty_doc() {
         let doc = Doc::new().unwrap();
-        assert_eq!(doc.live_item_ids(LIST_CURRENT), Vec::<String>::new());
+        assert_eq!(doc.live_item_ids(LIST_NOW), Vec::<String>::new());
         assert_eq!(doc.done_item_ids(), Vec::<String>::new());
         assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
@@ -894,25 +899,27 @@ mod tests {
     #[test]
     fn live_item_ids_match_movable_list_order() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_CURRENT, "a").unwrap();
-        let b = doc.add_item(LIST_CURRENT, "b").unwrap();
-        let c = doc.add_item(LIST_CURRENT, "c").unwrap();
-        // Holding-list items must not leak into current's view.
-        let _h = doc.add_item(LIST_HOLDING, "h").unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_NOW, "a").unwrap();
+        let b = doc.add_item(LIST_NOW, "b").unwrap();
+        let c = doc.add_item(LIST_NOW, "c").unwrap();
+        // Items in another list must not leak into now's view.
+        let _h = doc.add_item(&other, "h").unwrap();
         // Done/binned items must not leak into the live view.
         doc.set_item_status(&b, Status::Done).unwrap();
-        let d = doc.add_item(LIST_CURRENT, "d").unwrap();
+        let d = doc.add_item(LIST_NOW, "d").unwrap();
         doc.set_item_status(&d, Status::Binned).unwrap();
 
-        assert_eq!(doc.live_item_ids(LIST_CURRENT), vec![a, c]);
+        assert_eq!(doc.live_item_ids(LIST_NOW), vec![a, c]);
     }
 
     #[test]
     fn done_item_ids_sorted_by_done_at_desc() {
         let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_CURRENT, "first").unwrap();
-        let second = doc.add_item(LIST_HOLDING, "second").unwrap();
-        let third = doc.add_item(LIST_CURRENT, "third").unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let first = doc.add_item(LIST_NOW, "first").unwrap();
+        let second = doc.add_item(&other, "second").unwrap();
+        let third = doc.add_item(LIST_NOW, "third").unwrap();
         doc.set_item_status(&first, Status::Done).unwrap();
         // tiny gap so the millisecond timestamps definitely differ
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -926,8 +933,8 @@ mod tests {
     #[test]
     fn binned_item_ids_sorted_by_binned_at_desc() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_CURRENT, "a").unwrap();
-        let b = doc.add_item(LIST_CURRENT, "b").unwrap();
+        let a = doc.add_item(LIST_NOW, "a").unwrap();
+        let b = doc.add_item(LIST_NOW, "b").unwrap();
         doc.set_item_status(&a, Status::Binned).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
         doc.set_item_status(&b, Status::Binned).unwrap();
@@ -935,24 +942,24 @@ mod tests {
     }
 
     #[test]
-    fn deleted_list_orphans_appear_under_current() {
+    fn deleted_list_orphans_appear_under_now() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "x").unwrap();
         doc.delete_list(&mylist).unwrap();
         // The user's view of the deleted list has been reassigned: the
-        // item now appears under `current`'s live view, and the deleted
+        // item now appears under `now`'s live view, and the deleted
         // list's live view is empty.
         assert!(doc.live_item_ids(&mylist).is_empty());
-        assert_eq!(doc.live_item_ids(LIST_CURRENT), vec![id]);
+        assert_eq!(doc.live_item_ids(LIST_NOW), vec![id]);
     }
 
     #[test]
     fn get_list_meta_returns_view() {
         let doc = Doc::new().unwrap();
-        let v = doc.get_list_meta(LIST_CURRENT).unwrap();
-        assert_eq!(v.id, LIST_CURRENT);
-        assert_eq!(v.name, "Current");
+        let v = doc.get_list_meta(LIST_NOW).unwrap();
+        assert_eq!(v.id, LIST_NOW);
+        assert_eq!(v.name, "Now");
         assert!(doc.get_list_meta("nope").is_none());
     }
 
@@ -961,7 +968,7 @@ mod tests {
         let dek1 = Dek::generate();
         let dek2 = Dek::generate();
         let a = Doc::new().unwrap();
-        let _ = a.add_item(LIST_CURRENT, "x").unwrap();
+        let _ = a.add_item(LIST_NOW, "x").unwrap();
         let blob = a.pending_export(&dek1).unwrap().unwrap();
 
         let mut b = Doc::empty();

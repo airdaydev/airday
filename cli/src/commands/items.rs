@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemView, Status, LIST_CURRENT};
+use airday_core::{ItemView, Status, LIST_NOW};
 use clap::Parser;
 use serde::Serialize;
 
@@ -21,8 +21,8 @@ use super::resolve::{resolve_item_id, resolve_list_id, short_id};
 pub struct AddArgs {
     /// Item text. Use `-` to read one item per non-blank line from stdin.
     pub text: String,
-    /// Target list. Defaults to `current`.
-    #[arg(long, default_value = LIST_CURRENT)]
+    /// Target list. Defaults to `now`.
+    #[arg(long, default_value = LIST_NOW)]
     pub list: String,
 }
 
@@ -68,8 +68,8 @@ fn collect_texts(arg: &str) -> anyhow::Result<Vec<String>> {
 
 #[derive(Parser, Debug)]
 pub struct LsArgs {
-    /// List to show. Defaults to `current`.
-    #[arg(long, default_value = LIST_CURRENT)]
+    /// List to show. Defaults to `now`.
+    #[arg(long, default_value = LIST_NOW)]
     pub list: String,
     /// Include items marked `Done`.
     #[arg(long)]

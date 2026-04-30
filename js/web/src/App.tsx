@@ -285,7 +285,7 @@ function Workspace(props: {
   logout: () => void;
 }) {
   const app = props.app;
-  const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "current" });
+  const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "now" });
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const snapshot = createMemo(() => app.snapshot());
@@ -369,7 +369,7 @@ function Workspace(props: {
 
   const addItem = (text: string) => {
     const v = view();
-    const listId = v.kind === "list" ? v.id : "current";
+    const listId = v.kind === "list" ? v.id : "now";
     app.addItem(listId, text);
   };
 
@@ -462,7 +462,6 @@ function Nav(props: {
   };
   return (
     <nav class="nav">
-      <div class="nav-section">Lists</div>
       <For each={props.lists}>
         {(l) => (
           <button
@@ -498,7 +497,6 @@ function Nav(props: {
           />
         </form>
       </Show>
-      <div class="nav-section">Cross-list</div>
       <button
         type="button"
         class="nav-item"
