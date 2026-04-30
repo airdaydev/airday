@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemView, Status, LIST_NOW};
+use airday_core::{ItemView, Status, LIST_MAIN};
 use clap::Parser;
 use serde::Serialize;
 
@@ -19,8 +19,8 @@ use crate::sync::Session;
 pub struct AddArgs {
     /// Item text. Use `-` to read one item per non-blank line from stdin.
     pub text: String,
-    /// Target list. Defaults to `now`.
-    #[arg(long, default_value = LIST_NOW)]
+    /// Target list. Defaults to `main`.
+    #[arg(long, default_value = LIST_MAIN)]
     pub list: String,
 }
 
@@ -65,8 +65,8 @@ fn collect_texts(arg: &str) -> anyhow::Result<Vec<String>> {
 
 #[derive(Parser, Debug)]
 pub struct LsArgs {
-    /// List to show. Defaults to `now`.
-    #[arg(long, default_value = LIST_NOW)]
+    /// List to show. Defaults to `main`.
+    #[arg(long, default_value = LIST_MAIN)]
     pub list: String,
     /// Include items marked `Done`.
     #[arg(long)]

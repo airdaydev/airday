@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Doc } from "../wasm/airday_core_web.js";
 
-const LIST_NOW = "now";
+const LIST_MAIN = "main";
 
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
@@ -16,7 +16,7 @@ async function sleep(ms: number) {
 describe("Doc view helpers", () => {
   test("empty doc returns empty arrays for every view", () => {
     const doc = Doc.create();
-    expect(doc.liveItemIds(LIST_NOW)).toEqual([]);
+    expect(doc.liveItemIds(LIST_MAIN)).toEqual([]);
     expect(doc.doneItemIds()).toEqual([]);
     expect(doc.binnedItemIds()).toEqual([]);
   });
@@ -24,23 +24,23 @@ describe("Doc view helpers", () => {
   test("liveItemIds returns ids in MovableList order, scoped to list and status", async () => {
     const doc = Doc.create();
     const other = doc.addList("Other");
-    const a = doc.addItem(LIST_NOW, "a");
-    const b = doc.addItem(LIST_NOW, "b");
-    const c = doc.addItem(LIST_NOW, "c");
+    const a = doc.addItem(LIST_MAIN, "a");
+    const b = doc.addItem(LIST_MAIN, "b");
+    const c = doc.addItem(LIST_MAIN, "c");
     doc.addItem(other, "h"); // must not appear in now's view
     doc.setItemDone(b);
-    const d = doc.addItem(LIST_NOW, "d");
+    const d = doc.addItem(LIST_MAIN, "d");
     doc.binItem(d);
 
-    expect(doc.liveItemIds(LIST_NOW)).toEqual([a, c]);
+    expect(doc.liveItemIds(LIST_MAIN)).toEqual([a, c]);
     expect(doc.liveItemIds(other).length).toBe(1);
   });
 
   test("doneItemIds sorted by doneAt desc with id tiebreaker", async () => {
     const doc = Doc.create();
-    const first = doc.addItem(LIST_NOW, "first");
-    const second = doc.addItem(LIST_NOW, "second");
-    const third = doc.addItem(LIST_NOW, "third");
+    const first = doc.addItem(LIST_MAIN, "first");
+    const second = doc.addItem(LIST_MAIN, "second");
+    const third = doc.addItem(LIST_MAIN, "third");
     doc.setItemDone(first);
     await sleep(2);
     doc.setItemDone(second);
@@ -52,8 +52,8 @@ describe("Doc view helpers", () => {
 
   test("binnedItemIds sorted by binnedAt desc", async () => {
     const doc = Doc.create();
-    const a = doc.addItem(LIST_NOW, "a");
-    const b = doc.addItem(LIST_NOW, "b");
+    const a = doc.addItem(LIST_MAIN, "a");
+    const b = doc.addItem(LIST_MAIN, "b");
     doc.binItem(a);
     await sleep(2);
     doc.binItem(b);
@@ -62,18 +62,18 @@ describe("Doc view helpers", () => {
 
   test("getItemJson and getListMetaJson round-trip through JSON.parse", () => {
     const doc = Doc.create();
-    const id = doc.addItem(LIST_NOW, "xyz");
+    const id = doc.addItem(LIST_MAIN, "xyz");
 
     const item = JSON.parse(doc.getItemJson(id)!);
     expect(item.id).toBe(id);
     expect(item.text).toBe("xyz");
-    expect(item.listId).toBe(LIST_NOW);
+    expect(item.listId).toBe(LIST_MAIN);
     expect(item.status).toBe("live");
 
     expect(doc.getItemJson("does-not-exist")).toBeUndefined();
 
-    const list = JSON.parse(doc.getListMetaJson(LIST_NOW)!);
-    expect(list.id).toBe(LIST_NOW);
+    const list = JSON.parse(doc.getListMetaJson(LIST_MAIN)!);
+    expect(list.id).toBe(LIST_MAIN);
     expect(list.name).toBe("Now");
 
     expect(doc.getListMetaJson("nope")).toBeUndefined();

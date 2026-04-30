@@ -424,7 +424,7 @@ impl SyncEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::doc::{Doc, LIST_NOW};
+    use crate::doc::{Doc, LIST_MAIN};
     use airday_protocol::{EncryptedBlob, ServerFrame, StoredOp};
 
     fn opts() -> EngineOptions {
@@ -629,7 +629,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
 
-        eng.doc_mut().add_item(LIST_NOW, "thing").unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "thing").unwrap();
         eng.flush();
         let frame: ClientFrame = dec(&eng.pop_outbox().expect("PushOps"));
         let blob = match frame {
@@ -683,12 +683,12 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // First mutation + flush starts a push.
-        eng.doc_mut().add_item(LIST_NOW, "first").unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "first").unwrap();
         eng.flush();
         let _first_push = eng.pop_outbox().expect("first PushOps");
 
         // Mutate again while the push is in flight.
-        let item_id = eng.doc_mut().add_item(LIST_NOW, "during-push").unwrap();
+        let item_id = eng.doc_mut().add_item(LIST_MAIN, "during-push").unwrap();
         eng.flush();
         // No new wire bytes yet — engine is in PushingDirty, waiting.
         assert!(eng.pop_outbox().is_none());
@@ -729,7 +729,7 @@ mod tests {
         let _ = eng.pop_outbox().unwrap(); // PullOps
 
         // User mutates and flushes while we're still Pulling.
-        eng.doc_mut().add_item(LIST_NOW, "during pull").unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "during pull").unwrap();
         eng.flush();
         assert!(eng.pop_outbox().is_none(), "Pulling defers push until Idle");
 
@@ -752,7 +752,7 @@ mod tests {
         // Build a remote-origin blob, hand it to the engine via
         // OpsBroadcast with an assigned id of 7.
         let remote_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_NOW, "from peer").unwrap();
+            d.add_item(LIST_MAIN, "from peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredOp {
@@ -784,7 +784,7 @@ mod tests {
         // Local doc reflects the applied peer op.
         let names: Vec<_> = eng
             .doc()
-            .items_in_list(LIST_NOW, false)
+            .items_in_list(LIST_MAIN, false)
             .into_iter()
             .map(|i| i.text)
             .collect();
@@ -800,14 +800,14 @@ mod tests {
 
         // Mutate locally, start a push.
         eng.doc_mut()
-            .add_item(LIST_NOW, "local-pushing")
+            .add_item(LIST_MAIN, "local-pushing")
             .unwrap();
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
 
         // Broadcast arrives during Pushing.
         let remote_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_NOW, "peer-during-push").unwrap();
+            d.add_item(LIST_MAIN, "peer-during-push").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredOp {
@@ -820,7 +820,7 @@ mod tests {
         // Peer op applied.
         assert!(eng
             .doc()
-            .items_in_list(LIST_NOW, false)
+            .items_in_list(LIST_MAIN, false)
             .iter()
             .any(|i| i.text == "peer-during-push"));
 
@@ -853,7 +853,7 @@ mod tests {
 
         // First batch: not complete, engine stays Pulling.
         let blob1 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_NOW, "p1").unwrap();
+            d.add_item(LIST_MAIN, "p1").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredOp { id: 1, blob: blob1 }],
@@ -865,7 +865,7 @@ mod tests {
 
         // Second batch: complete=true, transitions to Idle.
         let blob2 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_NOW, "p2").unwrap();
+            d.add_item(LIST_MAIN, "p2").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredOp { id: 2, blob: blob2 }],
@@ -882,7 +882,7 @@ mod tests {
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.doc_mut().add_item(LIST_NOW, "stranded").unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "stranded").unwrap();
         eng.flush();
         let _ = eng.pop_outbox().unwrap();
         let _ = drain_events(&mut eng);
@@ -1036,7 +1036,7 @@ mod tests {
         let _ = drain_outbox(&mut a);
 
         // -- A makes a local change and pushes --
-        let item_a = a.doc_mut().add_item(LIST_NOW, "from-a").unwrap();
+        let item_a = a.doc_mut().add_item(LIST_MAIN, "from-a").unwrap();
         a.flush();
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushOps"));
         let push_ops = match push {

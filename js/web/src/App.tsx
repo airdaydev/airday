@@ -306,7 +306,7 @@ function Workspace(props: {
 }) {
   const app = props.app;
   const state = app.state;
-  const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "now" });
+  const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "main" });
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
 
@@ -390,7 +390,7 @@ function Workspace(props: {
 
   const addItem = (text: string) => {
     const v = view();
-    const listId = v.kind === "list" ? v.id : "now";
+    const listId = v.kind === "list" ? v.id : "main";
     app.addItem(listId, text);
   };
 
@@ -450,7 +450,7 @@ function Workspace(props: {
                 setItems={setDndItems}
                 getKey={(it) => it.id}
                 selection={selection}
-                itemHeight={40}
+                itemHeight={28}
                 onReorder={onReorder}
                 style={{ height: "100%", display: "block" }}
               >

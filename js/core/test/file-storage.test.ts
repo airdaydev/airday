@@ -27,7 +27,7 @@ describe("BunFileStorage", () => {
     expect(await storage.getDoc()).toBeNull();
 
     const doc = Doc.create();
-    doc.addItem("now", "persisted via Bun");
+    doc.addItem("main", "persisted via Bun");
     const before = doc.fingerprint();
 
     await storage.putDoc(doc.save());

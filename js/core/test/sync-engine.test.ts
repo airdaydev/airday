@@ -15,7 +15,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
 
-const LIST_NOW = "now";
+const LIST_MAIN = "main";
 
 function newEngine(): SyncEngine {
   // Use create() so the seeded built-ins are present — exercises
@@ -94,9 +94,9 @@ describe("transport callbacks", () => {
 describe("doc passthrough", () => {
   test("addItem through the engine is visible via itemsInListJson", () => {
     const eng = newEngine();
-    const id = eng.addItem(LIST_NOW, "buy milk");
+    const id = eng.addItem(LIST_MAIN, "buy milk");
     const items = JSON.parse(
-      eng.itemsInListJson(LIST_NOW, false),
+      eng.itemsInListJson(LIST_MAIN, false),
     ) as Array<{ id: string; text: string }>;
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe(id);
@@ -109,7 +109,7 @@ describe("doc passthrough", () => {
       id: string;
       name: string;
     }>;
-    expect(lists.some((l) => l.id === LIST_NOW)).toBe(true);
+    expect(lists.some((l) => l.id === LIST_MAIN)).toBe(true);
     const names = lists.map((l) => l.name);
     expect(names).toContain("Now");
     expect(names).toContain("Later");
@@ -124,7 +124,7 @@ describe("doc passthrough", () => {
 
   test("flush before connect is a queued no-op (no outbox bytes)", () => {
     const eng = newEngine();
-    eng.addItem(LIST_NOW, "later");
+    eng.addItem(LIST_MAIN, "later");
     eng.flush();
     expect(eng.popOutbox()).toBeUndefined();
   });
@@ -133,7 +133,7 @@ describe("doc passthrough", () => {
 describe("save / load round trip", () => {
   test("engine.save() → Doc.load() → new SyncEngine preserves fingerprint", () => {
     const a = newEngine();
-    a.addItem(LIST_NOW, "persist me");
+    a.addItem(LIST_MAIN, "persist me");
     const fingerprintBefore = a.fingerprint();
     const snapshot = a.save();
 
@@ -151,7 +151,7 @@ describe("save / load round trip", () => {
 
     expect(fingerprintAfter).toEqual(fingerprintBefore);
     const items = JSON.parse(
-      restored.itemsInListJson(LIST_NOW, false),
+      restored.itemsInListJson(LIST_MAIN, false),
     ) as Array<{ text: string }>;
     expect(items.find((i) => i.text === "persist me")).toBeDefined();
   });

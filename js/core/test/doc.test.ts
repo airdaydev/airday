@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { Dek, Doc, EncryptedBlob } from "../wasm/airday_core_web.js";
 import { MemStorage } from "../src/index.ts";
 
-const LIST_NOW = "now";
+const LIST_MAIN = "main";
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
@@ -22,7 +22,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 describe("Doc + MemStorage", () => {
   test("addItem → save → put → get → load → fingerprint matches", async () => {
     const doc = Doc.create();
-    const itemId = doc.addItem(LIST_NOW, "buy milk");
+    const itemId = doc.addItem(LIST_MAIN, "buy milk");
 
     const before = doc.fingerprint();
     const bytes = doc.save();
@@ -37,7 +37,7 @@ describe("Doc + MemStorage", () => {
 
     expect(bytesEqual(before, after)).toBe(true);
 
-    const items = JSON.parse(restored.itemsInListJson(LIST_NOW, false));
+    const items = JSON.parse(restored.itemsInListJson(LIST_MAIN, false));
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe(itemId);
     expect(items[0].text).toBe("buy milk");
@@ -71,7 +71,7 @@ describe("Doc + MemStorage", () => {
       id: string;
       name: string;
     }>;
-    expect(lists.some((l) => l.id === LIST_NOW)).toBe(true);
+    expect(lists.some((l) => l.id === LIST_MAIN)).toBe(true);
     const names = lists.map((l) => l.name);
     expect(names).toContain("Now");
     expect(names).toContain("Later");
@@ -98,7 +98,7 @@ describe("Op stream round trip via two replicas", () => {
     expect(seedBlob).toBeDefined();
     a.markPushed();
 
-    const itemId = a.addItem(LIST_NOW, "from A");
+    const itemId = a.addItem(LIST_MAIN, "from A");
     const opBlob = a.pendingExport(dek);
     expect(opBlob).toBeDefined();
     a.markPushed();
@@ -110,7 +110,7 @@ describe("Op stream round trip via two replicas", () => {
 
     expect(bytesEqual(a.fingerprint(), b.fingerprint())).toBe(true);
 
-    const items = JSON.parse(b.itemsInListJson(LIST_NOW, false));
+    const items = JSON.parse(b.itemsInListJson(LIST_MAIN, false));
     expect(items.find((i: { id: string }) => i.id === itemId)).toBeDefined();
   });
 
