@@ -3,6 +3,9 @@
 
 bind = "{{ env "AIRDAY_BIND" }}"
 log_level = "{{ env "AIRDAY_LOG_LEVEL" }}"
+# Plain HTTP in dev: Safari drops Secure cookies on http://localhost
+# (Chromium/Firefox don't, but we develop on the strictest of the three).
+secure_cookies = {{ env "AIRDAY_SECURE_COOKIES" }}
 {{- if env "AIRDAY_DB_PATH" }}
 db = "{{ env "AIRDAY_DB_PATH" }}"
 {{- end }}

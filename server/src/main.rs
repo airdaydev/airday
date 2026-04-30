@@ -47,7 +47,9 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let state = AppState::open(&cfg.db).await?;
+    let state = AppState::open(&cfg.db)
+        .await?
+        .with_secure_cookies(cfg.secure_cookies);
     let app = router(state);
 
     let addr = cfg.bind_addr()?;

@@ -58,7 +58,7 @@ pub async fn signup(
     })?;
     let token_hex = encode_token(&device_token);
     Ok((
-        cookie_headers(cookie::set_cookie(&token_hex)),
+        cookie_headers(cookie::set_cookie(&token_hex, state.secure_cookies)),
         Msgpack(SignupResponse {
             account_id: created.account_id.to_string(),
             device_id: created.device_id.to_string(),
@@ -116,7 +116,7 @@ pub async fn login(
     // caller — otherwise no token was minted for them and there's
     // nothing to set.
     let headers = match device.as_ref() {
-        Some(cred) => cookie_headers(cookie::set_cookie(&cred.device_token)),
+        Some(cred) => cookie_headers(cookie::set_cookie(&cred.device_token, state.secure_cookies)),
         None => HeaderMap::new(),
     };
     Ok((
@@ -234,7 +234,7 @@ pub async fn password_reset(
 
     let token_hex = encode_token(&device_token);
     Ok((
-        cookie_headers(cookie::set_cookie(&token_hex)),
+        cookie_headers(cookie::set_cookie(&token_hex, state.secure_cookies)),
         Msgpack(PasswordResetResponse {
             device_id: device_id.to_string(),
             device_token: token_hex,
@@ -249,7 +249,7 @@ pub async fn logout(
     // `revoke_device` is idempotent — a stale cookie pointing at an
     // already-revoked device won't 404 us into a useless error here.
     let _ = revoke_device(&state.db, auth.account_id, auth.device_id).await?;
-    Ok((cookie_headers(cookie::clear_cookie()), ()))
+    Ok((cookie_headers(cookie::clear_cookie(state.secure_cookies)), ()))
 }
 
 fn cookie_headers(value: axum::http::HeaderValue) -> HeaderMap {

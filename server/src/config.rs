@@ -27,6 +27,13 @@ pub struct Config {
     pub db: PathBuf,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// Set the `Secure` attribute on the device-auth cookie. Default
+    /// `true` (production behind TLS); flip to `false` for plain-HTTP
+    /// dev because Safari refuses to store/return `Secure` cookies on
+    /// `http://localhost` (Chromium/Firefox treat localhost as secure
+    /// and don't care).
+    #[serde(default = "default_secure_cookies")]
+    pub secure_cookies: bool,
 }
 
 impl Default for Config {
@@ -35,6 +42,7 @@ impl Default for Config {
             bind: default_bind(),
             db: default_db(),
             log_level: default_log_level(),
+            secure_cookies: default_secure_cookies(),
         }
     }
 }
@@ -64,6 +72,10 @@ fn default_log_level() -> String {
     "info".to_string()
 }
 
+fn default_secure_cookies() -> bool {
+    true
+}
+
 impl Config {
     /// Read a config from disk. Missing file → defaults; parse error → panic
     /// (a malformed config is operator error, not something to silently paper over).
@@ -90,6 +102,9 @@ impl Config {
         }
         if let Ok(v) = std::env::var("AIRDAY_LOG_LEVEL") {
             config.log_level = v;
+        }
+        if let Ok(v) = std::env::var("AIRDAY_SECURE_COOKIES") {
+            config.secure_cookies = matches!(v.as_str(), "1" | "true" | "TRUE");
         }
 
         (config, source)

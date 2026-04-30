@@ -9,21 +9,25 @@ use axum::http::{header, HeaderMap, HeaderValue};
 pub const COOKIE_NAME: &str = "airday_device";
 
 /// `Set-Cookie` value for a freshly-issued token. `Path=/` so the cookie
-/// applies to /api/* and the WS upgrade. `Secure` is a no-op on
-/// `localhost` in modern browsers (treated as a secure context) so dev
-/// over plain HTTP still works.
-pub fn set_cookie(token: &str) -> HeaderValue {
+/// applies to /api/* and the WS upgrade. `secure` controls the `Secure`
+/// attribute — Chromium/Firefox treat `http://localhost` as a secure
+/// context so it can stay on, but Safari/WebKit does not, so plain-HTTP
+/// dev needs it disabled via `Config::secure_cookies = false`.
+pub fn set_cookie(token: &str, secure: bool) -> HeaderValue {
+    let secure_attr = if secure { " Secure;" } else { "" };
     HeaderValue::from_str(&format!(
-        "{COOKIE_NAME}={token}; HttpOnly; Secure; SameSite=Strict; Path=/"
+        "{COOKIE_NAME}={token}; HttpOnly;{secure_attr} SameSite=Strict; Path=/"
     ))
     .expect("device token is hex; cookie value is ASCII-safe")
 }
 
 /// `Set-Cookie` value used by logout to clear the cookie.
-pub fn clear_cookie() -> HeaderValue {
-    HeaderValue::from_static(
-        "airday_device=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0",
-    )
+pub fn clear_cookie(secure: bool) -> HeaderValue {
+    let secure_attr = if secure { " Secure;" } else { "" };
+    HeaderValue::from_str(&format!(
+        "{COOKIE_NAME}=; HttpOnly;{secure_attr} SameSite=Strict; Path=/; Max-Age=0"
+    ))
+    .expect("static cookie attributes are ASCII-safe")
 }
 
 /// Extract the device token from any `Cookie:` header on the request.

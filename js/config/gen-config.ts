@@ -124,6 +124,7 @@ function buildDevEnv(secrets: Record<string, string>) {
   const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
   env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8000";
   env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
+  env.AIRDAY_SECURE_COOKIES = env.AIRDAY_SECURE_COOKIES || "false";
   // Split bind into host/port so process-compose readiness probes can
   // target them individually.
   const colon = env.AIRDAY_BIND.lastIndexOf(":");
