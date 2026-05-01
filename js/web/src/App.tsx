@@ -408,7 +408,7 @@ function Workspace(props: {
     const data = e.clipboardData?.getData("text") ?? "";
     const lines = data
       .split(/\r?\n/)
-      .map((l) => l.trim())
+      .map((l) => l.trim().replace(/^-\s+(?:\[[^\]]*\]\s*)?/, ""))
       .filter((l) => l.length > 0);
     if (lines.length === 0) return;
     e.preventDefault();
