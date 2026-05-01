@@ -433,7 +433,17 @@ function Workspace(props: {
 
   return (
     <div class="app">
-      <Nav app={app} lists={lists()} view={view()} setView={setView} />
+      <Nav
+        app={app}
+        lists={lists()}
+        view={view()}
+        setView={setView}
+        themePref={themePref()}
+        onThemeChange={(pref) => {
+          setThemePref(pref);
+          theme.set(pref);
+        }}
+      />
       <main class="main">
         <header class="main-header">
           <h1>{viewTitle(view(), lists())}</h1>
@@ -447,41 +457,6 @@ function Workspace(props: {
                 <CloudOffIcon />
               </span>
             </Show>
-            <SegmentedControl
-              class="theme-segmented"
-              aria-label="Appearance"
-              value={themePref()}
-              onChange={(value) => {
-                const pref = value as ThemePreference;
-                setThemePref(pref);
-                theme.set(pref);
-              }}
-            >
-              <SegmentedControl.Item value="auto" class="theme-segment">
-                <SegmentedControl.ItemInput />
-                <SegmentedControl.ItemControl class="theme-segment-control">
-                  <SegmentedControl.ItemLabel>Auto</SegmentedControl.ItemLabel>
-                </SegmentedControl.ItemControl>
-              </SegmentedControl.Item>
-              <SegmentedControl.Item value="light" class="theme-segment">
-                <SegmentedControl.ItemInput />
-                <SegmentedControl.ItemControl
-                  class="theme-segment-control"
-                  aria-label="Light"
-                >
-                  <SunIcon />
-                </SegmentedControl.ItemControl>
-              </SegmentedControl.Item>
-              <SegmentedControl.Item value="dark" class="theme-segment">
-                <SegmentedControl.ItemInput />
-                <SegmentedControl.ItemControl
-                  class="theme-segment-control"
-                  aria-label="Dark"
-                >
-                  <MoonIcon />
-                </SegmentedControl.ItemControl>
-              </SegmentedControl.Item>
-            </SegmentedControl>
             <DropdownMenu>
               <DropdownMenu.Trigger
                 class="avatar-trigger"
@@ -617,6 +592,8 @@ function Nav(props: {
   lists: { id: string; name: string }[];
   view: ViewKey;
   setView: (v: ViewKey) => void;
+  themePref: ThemePreference;
+  onThemeChange: (pref: ThemePreference) => void;
 }) {
   const [adding, setAdding] = createSignal(false);
   const [name, setName] = createSignal("");
@@ -778,6 +755,39 @@ function Nav(props: {
             />
           </form>
         </Show>
+      </div>
+      <div class="nav-footer">
+        <SegmentedControl
+          class="theme-segmented"
+          aria-label="Appearance"
+          value={props.themePref}
+          onChange={(value) => props.onThemeChange(value as ThemePreference)}
+        >
+          <SegmentedControl.Item value="auto" class="theme-segment">
+            <SegmentedControl.ItemInput />
+            <SegmentedControl.ItemControl class="theme-segment-control">
+              <SegmentedControl.ItemLabel>Auto</SegmentedControl.ItemLabel>
+            </SegmentedControl.ItemControl>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="light" class="theme-segment">
+            <SegmentedControl.ItemInput />
+            <SegmentedControl.ItemControl
+              class="theme-segment-control"
+              aria-label="Light"
+            >
+              <SunIcon />
+            </SegmentedControl.ItemControl>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="dark" class="theme-segment">
+            <SegmentedControl.ItemInput />
+            <SegmentedControl.ItemControl
+              class="theme-segment-control"
+              aria-label="Dark"
+            >
+              <MoonIcon />
+            </SegmentedControl.ItemControl>
+          </SegmentedControl.Item>
+        </SegmentedControl>
       </div>
     </nav>
   );

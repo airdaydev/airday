@@ -100,14 +100,17 @@ body,
   background: var(--bg-nav);
   padding: 8px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-group {
   margin-bottom: 16px;
 }
 
-.nav-group:last-child {
-  margin-bottom: 0;
+.nav-footer {
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .nav-section {
@@ -162,6 +165,7 @@ body,
   flex-direction: column;
   height: 100%;
   min-width: 0;
+  overflow-y: scroll;
 }
 
 .main-header {
@@ -205,7 +209,6 @@ body,
 .dnd-host {
   flex: 1;
   min-height: 0;
-  padding: 8px 12px;
 }
 
 .row {
