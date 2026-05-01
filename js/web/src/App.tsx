@@ -673,18 +673,37 @@ function Nav(props: {
             onReorder={onReorder}
           >
             {(l) => (
-              <button
-                type="button"
-                class="nav-item"
-                data-active={
-                  props.view.kind === "list" && props.view.id === l().id
-                    ? ""
-                    : undefined
-                }
-                onClick={() => props.setView({ kind: "list", id: l().id })}
-              >
-                {l().name}
-              </button>
+              <ContextMenu>
+                <ContextMenu.Trigger
+                  as="button"
+                  type="button"
+                  class="nav-item"
+                  data-active={
+                    props.view.kind === "list" && props.view.id === l().id
+                      ? ""
+                      : undefined
+                  }
+                  onClick={() => props.setView({ kind: "list", id: l().id })}
+                >
+                  {l().name}
+                </ContextMenu.Trigger>
+                <ContextMenu.Portal>
+                  <ContextMenu.Content class="context-menu-content">
+                    <ContextMenu.Item
+                      class="context-menu-item"
+                      onSelect={() => {
+                        const id = l().id;
+                        if (props.view.kind === "list" && props.view.id === id) {
+                          props.setView({ kind: "list", id: "main" });
+                        }
+                        props.app.deleteList(id);
+                      }}
+                    >
+                      Delete
+                    </ContextMenu.Item>
+                  </ContextMenu.Content>
+                </ContextMenu.Portal>
+              </ContextMenu>
             )}
           </Dnd>
         </Show>
