@@ -590,6 +590,14 @@ function Nav(props: {
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
   createEffect(() => setDndLists(otherLists()));
 
+  const navSelection = new DndSelection();
+  let navEl!: HTMLElement;
+  const onDocClick = (e: MouseEvent) => {
+    if (!navEl.contains(e.target as Node)) navSelection.clear();
+  };
+  document.addEventListener("click", onDocClick);
+  onCleanup(() => document.removeEventListener("click", onDocClick));
+
   // Section 2 only contains non-main lists; main is pinned at absolute
   // index 0, so a section-2 position K maps to absolute index K + 1.
   const onReorder = (op: DndOp<NavList>) => {
@@ -620,7 +628,7 @@ function Nav(props: {
     }
   };
   return (
-    <nav class="nav">
+    <nav class="nav" ref={navEl}>
       <div class="nav-group">
         <Show when={mainList()}>
           {(l) => (
@@ -661,6 +669,7 @@ function Nav(props: {
             getKey={(l) => l.id}
             itemHeight={28}
             multi={false}
+            selection={navSelection}
             onReorder={onReorder}
           >
             {(l) => (
