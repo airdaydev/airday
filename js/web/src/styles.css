@@ -234,6 +234,13 @@ body,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  outline: none;
+}
+
+.row[data-expanded] .row-text {
+  white-space: pre-wrap;
+  overflow: visible;
+  cursor: text;
 }
 
 .row[data-status="done"] .row-text {

@@ -491,10 +491,19 @@ function Workspace(props: {
                 getKey={(it) => it.id}
                 selection={selection}
                 itemHeight={28}
+                expandable
+                clearOnClickOutside
                 onReorder={onReorder}
                 style={{ height: "100%", display: "block" }}
               >
-                {(item) => <Row item={item} app={app} selection={selection} />}
+                {(item, expanded) => (
+                  <Row
+                    item={item}
+                    expanded={expanded}
+                    app={app}
+                    selection={selection}
+                  />
+                )}
               </Dnd>
             </Show>
           </Show>
@@ -829,7 +838,58 @@ function AddForm(props: { onAdd: (text: string) => void }) {
   );
 }
 
-function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection }) {
+function Row(props: {
+  item: () => ItemView;
+  expanded: () => boolean;
+  app: DocApp;
+  selection: DndSelection;
+}) {
+  let textRef!: HTMLSpanElement;
+
+  // Order matters: this effect must run *before* the model-mirror effect
+  // below. On collapse, both fire in the same tick — if the mirror runs
+  // first, it overwrites the user's edit with the stale model text and
+  // we save nothing.
+  createEffect(
+    on(
+      props.expanded,
+      (now, prev) => {
+        if (!prev && now) {
+          queueMicrotask(() => {
+            textRef.focus();
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(textRef);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          });
+          return;
+        }
+        if (prev && !now) {
+          const next = (textRef.textContent ?? "").trim();
+          const current = props.item().text;
+          if (!next) {
+            textRef.textContent = current;
+          } else if (next !== current) {
+            props.app.editItemText(props.item().id, next);
+          }
+          // Focus is still on the now-non-editable span; bounce it back
+          // to the dnd listbox so arrow-key nav works without a click.
+          const listbox = textRef.closest<HTMLElement>('[role="listbox"]');
+          listbox?.focus();
+        }
+      },
+      { defer: true },
+    ),
+  );
+
+  // Mirror the model into the DOM while not expanded. While expanded
+  // we leave the DOM alone so live edits aren't clobbered by reactive
+  // updates from peer text changes.
+  createEffect(() => {
+    if (!props.expanded()) textRef.textContent = props.item().text;
+  });
+
   // If the right-clicked row is already in the multi-select, act on the
   // whole selection; otherwise act on this row alone. The onOpenChange
   // hook below makes sure that an unselected row becomes the sole
@@ -884,6 +944,7 @@ function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection
       <ContextMenu.Trigger
         class="row"
         data-status={props.item().status}
+        data-expanded={props.expanded() ? "" : undefined}
       >
         <input
           type="checkbox"
@@ -895,7 +956,37 @@ function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection
             )
           }
         />
-        <span class="row-text">{props.item().text}</span>
+        <span
+          ref={textRef}
+          class="row-text"
+          contentEditable={props.expanded()}
+          onClick={(e) => {
+            if (props.expanded()) e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            if (props.expanded()) e.stopPropagation();
+          }}
+          on:keydown={(e) => {
+            // Native (non-delegated) so the bubble order is span → dnd
+            // listbox; Solid's delegated `onKeyDown` fires at document
+            // level *after* the listbox sees the event, so a delegated
+            // stopPropagation here would be too late (Cmd+A would still
+            // hit the dnd's select-all).
+            if (!props.expanded()) return;
+            if (e.key === "Enter" && !e.shiftKey) {
+              // Suppress the newline; bounce off the dnd's Escape
+              // handler (bound on its listbox) to drive collapse, which
+              // triggers the save effect above.
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+              );
+              return;
+            }
+            // Don't let the dnd intercept keys the contenteditable owns.
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
+        />
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
