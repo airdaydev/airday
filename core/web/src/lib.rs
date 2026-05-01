@@ -78,6 +78,31 @@ impl Doc {
         self.inner.add_item(list_id, text).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = addItemAt)]
+    pub fn add_item_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .add_item_at(list_id, text, target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = addItemsAt)]
+    pub fn add_items_at(
+        &self,
+        list_id: &str,
+        texts: Vec<String>,
+        target_index: usize,
+    ) -> Result<Vec<String>, JsError> {
+        let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        self.inner
+            .add_items_at(list_id, &refs, target_index)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = editItemText)]
     pub fn edit_item_text(&self, item_id: &str, text: &str) -> Result<(), JsError> {
         self.inner.edit_item_text(item_id, text).map_err(js_err)
@@ -584,6 +609,33 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = addItem)]
     pub fn add_item(&self, list_id: &str, text: &str) -> Result<String, JsError> {
         self.inner.doc().add_item(list_id, text).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = addItemAt)]
+    pub fn add_item_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .doc()
+            .add_item_at(list_id, text, target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = addItemsAt)]
+    pub fn add_items_at(
+        &self,
+        list_id: &str,
+        texts: Vec<String>,
+        target_index: usize,
+    ) -> Result<Vec<String>, JsError> {
+        let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        self.inner
+            .doc()
+            .add_items_at(list_id, &refs, target_index)
+            .map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = editItemText)]

@@ -395,6 +395,35 @@ function Workspace(props: {
     app.addItem(listId, text);
   };
 
+  // Paste anywhere in a list view drops the clipboard contents in as items,
+  // one per non-empty line. Skip when the paste targets an editable element
+  // (add form, row edit, list rename) so normal paste still works there.
+  // If any rows are selected, insert immediately after the last-selected one;
+  // otherwise append.
+  const onPaste = (e: ClipboardEvent) => {
+    const v = view();
+    if (v.kind !== "list") return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const data = e.clipboardData?.getData("text") ?? "";
+    const lines = data
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (lines.length === 0) return;
+    e.preventDefault();
+    const visible = items().map((it) => it.id);
+    const selectedHere = selection
+      .getSelectedKeys()
+      .map((k) => visible.indexOf(String(k)))
+      .filter((idx) => idx >= 0);
+    const insertAt =
+      selectedHere.length === 0 ? visible.length : Math.max(...selectedHere) + 1;
+    app.addItemsAt(v.id, lines, insertAt);
+  };
+  document.addEventListener("paste", onPaste);
+  onCleanup(() => document.removeEventListener("paste", onPaste));
+
   return (
     <div class="app">
       <Nav app={app} lists={lists()} view={view()} setView={setView} />

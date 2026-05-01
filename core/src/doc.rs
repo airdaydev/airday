@@ -221,6 +221,85 @@ impl Doc {
         Ok(id)
     }
 
+    /// Insert a new item as the `target_index`-th live entry of
+    /// `list_id`, in a single Loro op. `target_index` past the end of
+    /// the visible live items appends. Use this in preference to
+    /// `add_item` + `move_item` whenever the caller knows the
+    /// destination — it skips the intermediate "appended at end" state
+    /// peers and the local UI would otherwise observe.
+    pub fn add_item_at(
+        &self,
+        list_id: &str,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, DocError> {
+        let text = text.trim();
+        if text.is_empty() {
+            return Err(DocError::Invalid("item text is empty".into()));
+        }
+        self.assert_list_exists(list_id)?;
+        let items = self.items();
+        let abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
+        let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
+        self.inner.commit();
+        self.push_event(AppEvent::ItemAdded {
+            id: id.clone(),
+            list_id: list_id.to_string(),
+            text: text.to_string(),
+            status: Status::Live,
+            created_at: now,
+            done_at: None,
+            binned_at: None,
+            index: abs,
+        });
+        Ok(id)
+    }
+
+    /// Bulk-insert `texts` as a contiguous run of live items starting
+    /// at the `target_index`-th visible position of `list_id`. All
+    /// inserts land in a single Loro commit (one outbound op group).
+    /// Validation is upfront: any empty-after-trim entry rejects the
+    /// whole batch so callers don't see partial state.
+    pub fn add_items_at(
+        &self,
+        list_id: &str,
+        texts: &[&str],
+        target_index: usize,
+    ) -> Result<Vec<String>, DocError> {
+        let trimmed: Vec<&str> = texts.iter().map(|t| t.trim()).collect();
+        if trimmed.iter().any(|t| t.is_empty()) {
+            return Err(DocError::Invalid("item text is empty".into()));
+        }
+        self.assert_list_exists(list_id)?;
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+        let items = self.items();
+        let initial_abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
+        let mut ids = Vec::with_capacity(trimmed.len());
+        let mut events = Vec::with_capacity(trimmed.len());
+        for (i, text) in trimmed.iter().enumerate() {
+            let abs = initial_abs + i;
+            let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
+            events.push(AppEvent::ItemAdded {
+                id: id.clone(),
+                list_id: list_id.to_string(),
+                text: (*text).to_string(),
+                status: Status::Live,
+                created_at: now,
+                done_at: None,
+                binned_at: None,
+                index: abs,
+            });
+            ids.push(id);
+        }
+        self.inner.commit();
+        for ev in events {
+            self.push_event(ev);
+        }
+        Ok(ids)
+    }
+
     pub fn edit_item_text(&self, item_id: &str, text: &str) -> Result<(), DocError> {
         let text = text.trim();
         if text.is_empty() {
@@ -752,6 +831,32 @@ impl Doc {
     fn assert_list_exists(&self, list_id: &str) -> Result<(), DocError> {
         self.find_list(list_id).map(|_| ())
     }
+
+    /// Materialize a new live-item LoroMap at absolute position `abs`
+    /// in `items` and populate the standard keys. Caller is responsible
+    /// for the surrounding `commit()` and event emission so a batch can
+    /// share both. Returns `(id, created_at)`.
+    fn write_new_item(
+        &self,
+        items: &LoroMovableList,
+        list_id: &str,
+        text: &str,
+        abs: usize,
+    ) -> Result<(String, i64), DocError> {
+        let map = if abs >= items.len() {
+            items.push_container(LoroMap::new())?
+        } else {
+            items.insert_container(abs, LoroMap::new())?
+        };
+        let id = new_id();
+        let now = now_millis();
+        map.insert(KEY_ID, id.as_str())?;
+        map.insert(KEY_TEXT, text)?;
+        map.insert(KEY_LIST_ID, list_id)?;
+        map.insert(KEY_STATUS, STATUS_LIVE)?;
+        map.insert(KEY_CREATED_AT, now)?;
+        Ok((id, now))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -829,6 +934,35 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
         name: read_string(map, KEY_NAME)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
     })
+}
+
+/// Translate "insert as the Nth visible (live) entry of
+/// `target_list_id`" into an absolute index suitable for
+/// `LoroMovableList::insert_container` / `push_container`. Returns
+/// `items.len()` when `target_index` is past the end so the caller can
+/// fall back to `push_container`.
+fn absolute_insertion_index_for_list_position(
+    items: &LoroMovableList,
+    target_list_id: &str,
+    target_index: usize,
+) -> usize {
+    let mut seen = 0usize;
+    for i in 0..items.len() {
+        let Some(map) = item_map_at(items, i) else {
+            continue;
+        };
+        if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
+            continue;
+        }
+        if read_status(&map) != Some(Status::Live) {
+            continue;
+        }
+        if seen == target_index {
+            return i;
+        }
+        seen += 1;
+    }
+    items.len()
 }
 
 /// Walk the items list and translate "the Nth entry in `target_list`"
@@ -1427,6 +1561,130 @@ mod tests {
                 .any(|e| matches!(e, AppEvent::ItemTextChanged { id: eid, text } if eid == &id && text == "new")),
             "expected ItemTextChanged in {evs:?}"
         );
+    }
+
+    #[test]
+    fn add_item_at_inserts_at_target_position() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, mid, b, c]);
+    }
+
+    #[test]
+    fn add_item_at_appends_when_target_past_end() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item_at(LIST_MAIN, "b", 99).unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b]);
+    }
+
+    #[test]
+    fn add_item_at_skips_other_lists_and_non_live_when_counting() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _hidden = doc.add_item(&other, "hidden").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let done = doc.add_item(LIST_MAIN, "done").unwrap();
+        doc.set_item_status(&done, Status::Done).unwrap();
+        // Position 1 in main's live view should land between a and b
+        // regardless of the other-list and done items in between.
+        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, mid, b]);
+    }
+
+    #[test]
+    fn add_item_at_emits_item_added_with_absolute_index() {
+        let doc = Doc::new().unwrap();
+        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let _ = doc.drain_events();
+        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1);
+        match &evs[0] {
+            AppEvent::ItemAdded { id, index, .. } => {
+                assert_eq!(id, &mid);
+                assert_eq!(*index, 1);
+            }
+            other => panic!("expected ItemAdded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn add_item_at_rejects_empty_text() {
+        let doc = Doc::new().unwrap();
+        let err = doc.add_item_at(LIST_MAIN, "  ", 0).unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)));
+    }
+
+    #[test]
+    fn add_items_at_inserts_in_order() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let ids = doc
+            .add_items_at(LIST_MAIN, &["x", "y", "z"], 1)
+            .unwrap();
+        assert_eq!(ids.len(), 3);
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![a, ids[0].clone(), ids[1].clone(), ids[2].clone(), b],
+        );
+    }
+
+    #[test]
+    fn add_items_at_appends_when_target_past_end() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 99).unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, ids[0].clone(), ids[1].clone()]);
+    }
+
+    #[test]
+    fn add_items_at_emits_one_event_per_item_with_increasing_indices() {
+        let doc = Doc::new().unwrap();
+        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let _ = doc.drain_events();
+        let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 1).unwrap();
+        let evs = doc.drain_events();
+        let added: Vec<(String, usize)> = evs
+            .iter()
+            .filter_map(|e| match e {
+                AppEvent::ItemAdded { id, index, .. } => Some((id.clone(), *index)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(added.len(), 2);
+        assert_eq!(added[0], (ids[0].clone(), 1));
+        assert_eq!(added[1], (ids[1].clone(), 2));
+    }
+
+    #[test]
+    fn add_items_at_rejects_batch_atomically_on_empty_text() {
+        let doc = Doc::new().unwrap();
+        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _ = doc.drain_events();
+        let err = doc
+            .add_items_at(LIST_MAIN, &["ok", "  ", "also ok"], 0)
+            .unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)));
+        // Nothing landed.
+        assert_eq!(doc.live_item_ids(LIST_MAIN).len(), 1);
+        assert!(doc.drain_events().is_empty());
+    }
+
+    #[test]
+    fn add_items_at_empty_input_is_a_noop() {
+        let doc = Doc::new().unwrap();
+        let _ = doc.drain_events();
+        let ids = doc.add_items_at(LIST_MAIN, &[], 0).unwrap();
+        assert!(ids.is_empty());
+        assert!(doc.drain_events().is_empty());
     }
 
     #[test]

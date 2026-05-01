@@ -57,6 +57,14 @@ export interface DocApp {
   getItem(id: string): ItemView | undefined;
   // Mutations
   addItem(listId: string, text: string): string;
+  /** Insert a single item at `indexInList` (per the live-item view of
+   *  `listId`). Past-end indices append. Single Loro op — no
+   *  intermediate "appended at end" state. */
+  addItemAt(listId: string, text: string, indexInList: number): string;
+  /** Bulk-insert `texts` as a contiguous run starting at
+   *  `indexInList`. Single commit, single drain — peers and the local
+   *  UI see one update, not N. */
+  addItemsAt(listId: string, texts: string[], indexInList: number): string[];
   /** Clone a live item's text and place the copy directly after the
    *  original. Returns the new id, or null if the source is missing or
    *  not live. */
@@ -203,10 +211,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
 
   const drainEvents = (): void => {
     let dispatched = 0;
-    // Batch so a multi-event drain (e.g. addItem + moveItem from
-    // duplicateItem, or a server frame applying many remote ops) shows
-    // up as one reactive update — otherwise consumers like the dnd
-    // briefly see the intermediate order and animate through it.
+    // Batch so a multi-event drain (e.g. addItemsAt for a multi-line
+    // paste, or a server frame applying many remote ops) shows up as
+    // one reactive update — otherwise consumers like the dnd briefly
+    // see the intermediate order and animate through it.
     batch(() => {
       while (true) {
         const ev = engine.popAppEvent();
@@ -249,6 +257,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       flush();
       return id;
     },
+    addItemAt(listId, text, indexInList) {
+      const id = engine.addItemAt(listId, text, indexInList);
+      flush();
+      return id;
+    },
+    addItemsAt(listId, texts, indexInList) {
+      const ids = engine.addItemsAt(listId, texts, indexInList);
+      flush();
+      return ids;
+    },
     duplicateItem(id) {
       const orig = state.itemsById[id];
       if (!orig || orig.status !== "live") return null;
@@ -264,8 +282,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         cursor++;
       }
       if (foundIdx < 0) return null;
-      const newId = engine.addItem(orig.listId, orig.text);
-      engine.moveItem(newId, orig.listId, foundIdx + 1);
+      const newId = engine.addItemAt(orig.listId, orig.text, foundIdx + 1);
       flush();
       return newId;
     },
