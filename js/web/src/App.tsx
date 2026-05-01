@@ -660,6 +660,7 @@ function Nav(props: {
             setItems={setDndLists}
             getKey={(l) => l.id}
             itemHeight={28}
+            multi={false}
             onReorder={onReorder}
           >
             {(l) => (
