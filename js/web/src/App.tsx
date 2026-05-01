@@ -504,8 +504,8 @@ function Workspace(props: {
                 itemHeight={28}
                 expandable
                 clearOnClickOutside
+                fillHeight
                 onReorder={onReorder}
-                style={{ height: "100%", display: "block" }}
               >
                 {(item, expanded) => (
                   <Row
