@@ -419,7 +419,14 @@ function Workspace(props: {
       .filter((idx) => idx >= 0);
     const insertAt =
       selectedHere.length === 0 ? visible.length : Math.max(...selectedHere) + 1;
-    app.addItemsAt(v.id, lines, insertAt);
+    const ids = app.addItemsAt(v.id, lines, insertAt);
+    if (ids.length === 0) return;
+    // Wait for the dnd's source to absorb the new ids — see the
+    // matching note in onDuplicate.
+    queueMicrotask(() => {
+      selection.selectOnly(ids[0]);
+      if (ids.length > 1) selection.extendActive(ids[ids.length - 1]);
+    });
   };
   document.addEventListener("paste", onPaste);
   onCleanup(() => document.removeEventListener("paste", onPaste));
@@ -962,10 +969,24 @@ function Row(props: {
     }
   };
   const onDuplicate = () => {
+    const newIds: string[] = [];
     for (const id of targetIds()) {
       const it = props.app.getItem(id);
-      if (it && it.status === "live") props.app.duplicateItem(id);
+      if (!it || it.status !== "live") continue;
+      const newId = props.app.duplicateItem(id);
+      if (newId) newIds.push(newId);
     }
+    if (newIds.length === 0) return;
+    // Wait for the dnd's source to absorb the new ids before touching
+    // selection — selection.updateOrder fires on source.onChange, and
+    // selectOnly/addBlock on a key the order map doesn't yet know about
+    // leaves it unselected visually.
+    queueMicrotask(() => {
+      props.selection.selectOnly(newIds[0]);
+      for (let i = 1; i < newIds.length; i++) {
+        props.selection.addBlock(newIds[i]);
+      }
+    });
   };
   const onOpenChange = (open: boolean) => {
     if (!open) return;
