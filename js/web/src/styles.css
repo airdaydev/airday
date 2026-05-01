@@ -239,15 +239,28 @@ body,
 
 .row input[type="checkbox"] {
   margin: 0;
+  position: relative;
+  top: 2px;
+}
+
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .row-text {
-  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   outline: none;
+}
+
+.row-description {
+  color: var(--text-subtle);
 }
 
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)

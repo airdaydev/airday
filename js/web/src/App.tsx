@@ -1022,37 +1022,42 @@ function Row(props: {
             )
           }
         />
-        <span
-          ref={textRef}
-          class="row-text"
-          contentEditable={props.expanded()}
-          onClick={(e) => {
-            if (props.expanded()) e.stopPropagation();
-          }}
-          onPointerDown={(e) => {
-            if (props.expanded()) e.stopPropagation();
-          }}
-          on:keydown={(e) => {
-            // Native (non-delegated) so the bubble order is span → dnd
-            // listbox; Solid's delegated `onKeyDown` fires at document
-            // level *after* the listbox sees the event, so a delegated
-            // stopPropagation here would be too late (Cmd+A would still
-            // hit the dnd's select-all).
-            if (!props.expanded()) return;
-            if (e.key === "Enter" && !e.shiftKey) {
-              // Suppress the newline; bounce off the dnd's Escape
-              // handler (bound on its listbox) to drive collapse, which
-              // triggers the save effect above.
-              e.preventDefault();
-              (e.currentTarget as HTMLElement).dispatchEvent(
-                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-              );
-              return;
-            }
-            // Don't let the dnd intercept keys the contenteditable owns.
-            if (e.key !== "Escape") e.stopPropagation();
-          }}
-        />
+        <div class="row-body">
+          <span
+            ref={textRef}
+            class="row-text"
+            contentEditable={props.expanded()}
+            onClick={(e) => {
+              if (props.expanded()) e.stopPropagation();
+            }}
+            onPointerDown={(e) => {
+              if (props.expanded()) e.stopPropagation();
+            }}
+            on:keydown={(e) => {
+              // Native (non-delegated) so the bubble order is span → dnd
+              // listbox; Solid's delegated `onKeyDown` fires at document
+              // level *after* the listbox sees the event, so a delegated
+              // stopPropagation here would be too late (Cmd+A would still
+              // hit the dnd's select-all).
+              if (!props.expanded()) return;
+              if (e.key === "Enter" && !e.shiftKey) {
+                // Suppress the newline; bounce off the dnd's Escape
+                // handler (bound on its listbox) to drive collapse, which
+                // triggers the save effect above.
+                e.preventDefault();
+                (e.currentTarget as HTMLElement).dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+                );
+                return;
+              }
+              // Don't let the dnd intercept keys the contenteditable owns.
+              if (e.key !== "Escape") e.stopPropagation();
+            }}
+          />
+          <Show when={props.expanded()}>
+            <div class="row-description">Notes</div>
+          </Show>
+        </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
