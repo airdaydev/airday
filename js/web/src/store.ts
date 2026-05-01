@@ -8,7 +8,7 @@
 // invalidate the iteration and vice versa.
 
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
-import { createSignal, type Accessor } from "solid-js";
+import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 export type ItemStatus = "live" | "done" | "binned";
@@ -57,6 +57,10 @@ export interface DocApp {
   getItem(id: string): ItemView | undefined;
   // Mutations
   addItem(listId: string, text: string): string;
+  /** Clone a live item's text and place the copy directly after the
+   *  original. Returns the new id, or null if the source is missing or
+   *  not live. */
+  duplicateItem(id: string): string | null;
   editItemText(id: string, text: string): void;
   setStatus(id: string, status: ItemStatus): void;
   moveItem(id: string, listId: string, indexInList: number): void;
@@ -199,13 +203,19 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
 
   const drainEvents = (): void => {
     let dispatched = 0;
-    while (true) {
-      const ev = engine.popAppEvent();
-      if (!ev) break;
-      dispatch(ev);
-      dispatched++;
-    }
-    if (dispatched > 0) setVersion((v) => v + 1);
+    // Batch so a multi-event drain (e.g. addItem + moveItem from
+    // duplicateItem, or a server frame applying many remote ops) shows
+    // up as one reactive update — otherwise consumers like the dnd
+    // briefly see the intermediate order and animate through it.
+    batch(() => {
+      while (true) {
+        const ev = engine.popAppEvent();
+        if (!ev) break;
+        dispatch(ev);
+        dispatched++;
+      }
+      if (dispatched > 0) setVersion((v) => v + 1);
+    });
   };
 
   // Materialize current doc state once. Same dispatcher as the live
@@ -238,6 +248,26 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       const id = engine.addItem(listId, text);
       flush();
       return id;
+    },
+    duplicateItem(id) {
+      const orig = state.itemsById[id];
+      if (!orig || orig.status !== "live") return null;
+      let foundIdx = -1;
+      let cursor = 0;
+      for (const oid of state.itemsOrder) {
+        const it = state.itemsById[oid];
+        if (!it || it.listId !== orig.listId || it.status !== "live") continue;
+        if (oid === id) {
+          foundIdx = cursor;
+          break;
+        }
+        cursor++;
+      }
+      if (foundIdx < 0) return null;
+      const newId = engine.addItem(orig.listId, orig.text);
+      engine.moveItem(newId, orig.listId, foundIdx + 1);
+      flush();
+      return newId;
     },
     editItemText(id, text) {
       engine.editItemText(id, text);

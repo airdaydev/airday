@@ -932,6 +932,12 @@ function Row(props: {
       if (it && it.status === "binned") props.app.deleteBinned(id);
     }
   };
+  const onDuplicate = () => {
+    for (const id of targetIds()) {
+      const it = props.app.getItem(id);
+      if (it && it.status === "live") props.app.duplicateItem(id);
+    }
+  };
   const onOpenChange = (open: boolean) => {
     if (!open) return;
     const id = props.item().id;
@@ -993,6 +999,9 @@ function Row(props: {
           <Show when={props.item().status === "live"}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
               Mark as done
+            </ContextMenu.Item>
+            <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
+              Duplicate
             </ContextMenu.Item>
           </Show>
           <Show when={props.item().status === "done"}>

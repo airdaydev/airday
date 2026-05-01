@@ -165,7 +165,7 @@ body,
 }
 
 .main-header {
-  padding: 16px 20px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -210,7 +210,12 @@ body,
 
 .row {
   display: flex;
-  align-items: center;
+  /* flex-start (not center) so the content's vertical position doesn't
+     shift when the row toggles between collapsed and expanded heights —
+     align-items can't be transitioned, so a center→flex-start flip on
+     collapse would snap the content to the row's middle and then ride
+     it to the top as the height animates. */
+  align-items: flex-start;
   gap: 8px;
   padding: 6px;
   height: 100%;
@@ -231,14 +236,27 @@ body,
 
 .row-text {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   outline: none;
 }
 
+/* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
+   makes it a scroll container, which trips the browser's caret-scroll-into-view
+   while typing in the expanded row's contenteditable: text wraps below the
+   dnd-item's still-collapsed clip, the browser scrolls the dnd-item up to
+   reveal the caret, and the ResizeObserver-driven height transition then
+   "settles" it back. `clip` clips identically but isn't a scroll container,
+   so the browser leaves it alone. */
+.dnd-host .dnd-item {
+  overflow: clip;
+}
+
 .row[data-expanded] .row-text {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   overflow: visible;
   cursor: text;
 }
