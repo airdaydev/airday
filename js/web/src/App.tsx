@@ -20,6 +20,8 @@ import {
   type StorageAdapter,
 } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
+import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -401,29 +403,68 @@ function Workspace(props: {
         <header class="main-header">
           <h1>{viewTitle(view(), lists())}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
-            <span class="status" data-online={props.online ? "" : undefined}>
-              {props.online ? "● online" : "○ offline"}
-            </span>
-            <span class="status" title={props.session.email}>
-              {props.session.email}
-            </span>
-            <select
-              class="theme-select"
+            <Show when={!props.online}>
+              <span
+                class="offline-indicator"
+                title="Disconnected"
+                aria-label="Disconnected"
+              >
+                <CloudOffIcon />
+              </span>
+            </Show>
+            <SegmentedControl
+              class="theme-segmented"
               aria-label="Appearance"
               value={themePref()}
-              onChange={(e) => {
-                const pref = e.currentTarget.value as ThemePreference;
+              onChange={(value) => {
+                const pref = value as ThemePreference;
                 setThemePref(pref);
                 theme.set(pref);
               }}
             >
-              <option value="auto">Auto</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-            <button type="button" onClick={() => props.logout()}>
-              Log out
-            </button>
+              <SegmentedControl.Item value="auto" class="theme-segment">
+                <SegmentedControl.ItemInput />
+                <SegmentedControl.ItemControl class="theme-segment-control">
+                  <SegmentedControl.ItemLabel>Auto</SegmentedControl.ItemLabel>
+                </SegmentedControl.ItemControl>
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="light" class="theme-segment">
+                <SegmentedControl.ItemInput />
+                <SegmentedControl.ItemControl
+                  class="theme-segment-control"
+                  aria-label="Light"
+                >
+                  <SunIcon />
+                </SegmentedControl.ItemControl>
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="dark" class="theme-segment">
+                <SegmentedControl.ItemInput />
+                <SegmentedControl.ItemControl
+                  class="theme-segment-control"
+                  aria-label="Dark"
+                >
+                  <MoonIcon />
+                </SegmentedControl.ItemControl>
+              </SegmentedControl.Item>
+            </SegmentedControl>
+            <DropdownMenu>
+              <DropdownMenu.Trigger
+                class="avatar-trigger"
+                aria-label="Account"
+              />
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content class="dropdown-menu-content">
+                  <div class="dropdown-menu-label">{props.session.email}</div>
+                  <DropdownMenu.Separator class="dropdown-menu-separator" />
+                  <DropdownMenu.Item
+                    class="dropdown-menu-item"
+                    onSelect={() => props.logout()}
+                  >
+                    Log out
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu>
             <Show
               when={
                 view().kind === "bin" &&
@@ -461,6 +502,63 @@ function Workspace(props: {
         </div>
       </main>
     </div>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function CloudOffIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
   );
 }
 
