@@ -26,6 +26,13 @@
   --error-text: #991b1b;
   --dnd-select-bg: #dbeafe;
   --dnd-placeholder-color: #cbd5e1;
+  --dnd-drag-shadow: 0 12px 60px #00000026, 0 12px 32px -16px #0009321f;
+}
+
+/* Round the primavera-dnd drag overlay clones. The package exposes no
+ * class hook on the wrappers, so we target them structurally. */
+body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
+  border-radius: 3px;
 }
 
 [data-theme="dark"] {
