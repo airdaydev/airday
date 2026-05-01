@@ -218,26 +218,6 @@ body,
   text-overflow: ellipsis;
 }
 
-.row-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-}
-
-.row:hover .row-actions {
-  opacity: 1;
-}
-
-.row-actions button {
-  padding: 2px 6px;
-  border: 1px solid var(--border-input);
-  background: var(--btn-secondary-bg);
-  color: var(--text);
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
 .row[data-status="done"] .row-text {
   text-decoration: line-through;
   color: var(--text-faint);

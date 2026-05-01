@@ -759,18 +759,43 @@ function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection
   // whole selection; otherwise act on this row alone. The onOpenChange
   // hook below makes sure that an unselected row becomes the sole
   // selection before the menu actually opens.
-  const binTargets = (): string[] => {
+  const targetIds = (): string[] => {
     const id = props.item().id;
-    const ids = props.selection.isSelected(id)
+    return props.selection.isSelected(id)
       ? props.selection.getSelectedKeys().map(String)
       : [id];
-    return ids.filter((k) => {
+  };
+  const binTargets = (): string[] =>
+    targetIds().filter((k) => {
       const it = props.app.getItem(k);
       return it !== undefined && it.status !== "binned";
     });
-  };
   const onBin = () => {
     for (const id of binTargets()) props.app.setStatus(id, "binned");
+  };
+  const onMarkDone = () => {
+    for (const id of targetIds()) {
+      const it = props.app.getItem(id);
+      if (it && it.status === "live") props.app.setStatus(id, "done");
+    }
+  };
+  const onMarkNotDone = () => {
+    for (const id of targetIds()) {
+      const it = props.app.getItem(id);
+      if (it && it.status === "done") props.app.setStatus(id, "live");
+    }
+  };
+  const onRestore = () => {
+    for (const id of targetIds()) {
+      const it = props.app.getItem(id);
+      if (it && it.status === "binned") props.app.setStatus(id, "live");
+    }
+  };
+  const onDelete = () => {
+    for (const id of targetIds()) {
+      const it = props.app.getItem(id);
+      if (it && it.status === "binned") props.app.deleteBinned(id);
+    }
   };
   const onOpenChange = (open: boolean) => {
     if (!open) return;
@@ -796,27 +821,30 @@ function Row(props: { item: () => ItemView; app: DocApp; selection: DndSelection
           }
         />
         <span class="row-text">{props.item().text}</span>
-        <div class="row-actions">
-          <Show when={props.item().status === "binned"}>
-            <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
-              Restore
-            </button>
-            <button type="button" onClick={() => props.app.deleteBinned(props.item().id)}>
-              Delete
-            </button>
-          </Show>
-          <Show when={props.item().status === "done"}>
-            <button type="button" onClick={() => props.app.setStatus(props.item().id, "live")}>
-              Undo
-            </button>
-          </Show>
-        </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
+          <Show when={props.item().status === "live"}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
+              Mark as done
+            </ContextMenu.Item>
+          </Show>
+          <Show when={props.item().status === "done"}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
+              Mark as not done
+            </ContextMenu.Item>
+          </Show>
           <Show when={props.item().status !== "binned"}>
             <ContextMenu.Item class="context-menu-item" onSelect={onBin}>
-              Bin
+              Move to bin
+            </ContextMenu.Item>
+          </Show>
+          <Show when={props.item().status === "binned"}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onRestore}>
+              Restore
+            </ContextMenu.Item>
+            <ContextMenu.Item class="context-menu-item" onSelect={onDelete}>
+              Delete
             </ContextMenu.Item>
           </Show>
         </ContextMenu.Content>
