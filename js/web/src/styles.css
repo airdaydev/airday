@@ -211,6 +211,10 @@ body,
   min-height: 0;
 }
 
+.dnd-host > primavera-dnd {
+  margin-left: 12px;
+}
+
 .row {
   display: flex;
   /* flex-start (not center) so the content's vertical position doesn't
