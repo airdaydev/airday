@@ -24,7 +24,7 @@ processes:
       failure_threshold: 60
 
   web:
-    command: bun run dev
+    command: bun run dev -- --host 0.0.0.0
     working_dir: ./js/web
     depends_on:
       wasm:
