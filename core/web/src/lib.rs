@@ -138,6 +138,11 @@ impl Doc {
         self.inner.rename_list(list_id, name).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = moveList)]
+    pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
+        self.inner.move_list(list_id, target_index).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = deleteList)]
     pub fn delete_list(&self, list_id: &str) -> Result<(), JsError> {
         self.inner.delete_list(list_id).map_err(js_err)
@@ -646,6 +651,14 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = renameList)]
     pub fn rename_list(&self, list_id: &str, name: &str) -> Result<(), JsError> {
         self.inner.doc().rename_list(list_id, name).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = moveList)]
+    pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .move_list(list_id, target_index)
+            .map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = deleteList)]

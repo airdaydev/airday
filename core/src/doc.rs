@@ -383,6 +383,23 @@ impl Doc {
         Ok(())
     }
 
+    pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), DocError> {
+        let lists = self.lists();
+        let (from, _) = self.find_list(list_id)?;
+        let len = lists.len();
+        let to = target_index.min(len.saturating_sub(1));
+        if from == to {
+            return Ok(());
+        }
+        lists.mov(from, to)?;
+        self.inner.commit();
+        self.push_event(AppEvent::ListMoved {
+            id: list_id.to_string(),
+            index: to,
+        });
+        Ok(())
+    }
+
     /// Refuses for the always-on `now` list. Items in the deleted
     /// list are reassigned to `now` so nothing falls off the doc.
     pub fn delete_list(&self, list_id: &str) -> Result<(), DocError> {

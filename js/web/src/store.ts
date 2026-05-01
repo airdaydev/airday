@@ -64,6 +64,7 @@ export interface DocApp {
   emptyBin(): number;
   addList(name: string): string;
   renameList(id: string, name: string): void;
+  moveList(id: string, index: number): void;
   deleteList(id: string): void;
 }
 
@@ -268,6 +269,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     renameList(id, name) {
       engine.renameList(id, name);
+      flush();
+    },
+    moveList(id, index) {
+      engine.moveList(id, index);
       flush();
     },
     deleteList(id) {
