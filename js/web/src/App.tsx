@@ -585,59 +585,79 @@ function Nav(props: {
     setAdding(false);
     props.setView({ kind: "list", id });
   };
+  const mainList = () => props.lists.find((l) => l.id === "main");
+  const otherLists = () => props.lists.filter((l) => l.id !== "main");
   return (
     <nav class="nav">
-      <For each={props.lists}>
-        {(l) => (
-          <button
-            type="button"
-            class="nav-item"
-            data-active={
-              props.view.kind === "list" && props.view.id === l.id ? "" : undefined
-            }
-            onClick={() => props.setView({ kind: "list", id: l.id })}
-          >
-            {l.name}
-          </button>
-        )}
-      </For>
-      <Show
-        when={adding()}
-        fallback={
-          <button type="button" class="nav-item" onClick={() => setAdding(true)}>
-            + New list
-          </button>
-        }
-      >
-        <form class="add-form" style={{ padding: "4px 12px" }} onSubmit={submit}>
-          <input
-            autofocus
-            type="text"
-            placeholder="List name"
-            value={name()}
-            onInput={(e) => setName(e.currentTarget.value)}
-            onBlur={() => {
-              if (!name().trim()) setAdding(false);
-            }}
-          />
-        </form>
-      </Show>
-      <button
-        type="button"
-        class="nav-item"
-        data-active={props.view.kind === "done" ? "" : undefined}
-        onClick={() => props.setView({ kind: "done" })}
-      >
-        Done
-      </button>
-      <button
-        type="button"
-        class="nav-item"
-        data-active={props.view.kind === "bin" ? "" : undefined}
-        onClick={() => props.setView({ kind: "bin" })}
-      >
-        Bin
-      </button>
+      <div class="nav-group">
+        <Show when={mainList()}>
+          {(l) => (
+            <button
+              type="button"
+              class="nav-item"
+              data-active={
+                props.view.kind === "list" && props.view.id === l().id ? "" : undefined
+              }
+              onClick={() => props.setView({ kind: "list", id: l().id })}
+            >
+              {l().name}
+            </button>
+          )}
+        </Show>
+        <button
+          type="button"
+          class="nav-item"
+          data-active={props.view.kind === "done" ? "" : undefined}
+          onClick={() => props.setView({ kind: "done" })}
+        >
+          Done
+        </button>
+        <button
+          type="button"
+          class="nav-item"
+          data-active={props.view.kind === "bin" ? "" : undefined}
+          onClick={() => props.setView({ kind: "bin" })}
+        >
+          Bin
+        </button>
+      </div>
+      <div class="nav-group">
+        <For each={otherLists()}>
+          {(l) => (
+            <button
+              type="button"
+              class="nav-item"
+              data-active={
+                props.view.kind === "list" && props.view.id === l.id ? "" : undefined
+              }
+              onClick={() => props.setView({ kind: "list", id: l.id })}
+            >
+              {l.name}
+            </button>
+          )}
+        </For>
+        <Show
+          when={adding()}
+          fallback={
+            <button type="button" class="nav-item" onClick={() => setAdding(true)}>
+              + New list
+            </button>
+          }
+        >
+          <form class="add-form" style={{ padding: "4px 12px" }} onSubmit={submit}>
+            <input
+              autofocus
+              type="text"
+              placeholder="List name"
+              value={name()}
+              onInput={(e) => setName(e.currentTarget.value)}
+              onBlur={() => {
+                if (!name().trim()) setAdding(false);
+              }}
+            />
+          </form>
+        </Show>
+      </div>
     </nav>
   );
 }

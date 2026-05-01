@@ -102,6 +102,14 @@ body,
   overflow-y: auto;
 }
 
+.nav-group {
+  margin-bottom: 16px;
+}
+
+.nav-group:last-child {
+  margin-bottom: 0;
+}
+
 .nav-section {
   padding: 8px 16px 4px;
   font-size: 11px;
