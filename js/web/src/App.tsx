@@ -634,7 +634,10 @@ function Nav(props: {
               }
               onClick={() => props.setView({ kind: "list", id: l().id })}
             >
-              {l().name}
+              <EditableNavLabel
+                name={l().name}
+                onSave={(name) => props.app.renameList(l().id, name)}
+              />
             </button>
           )}
         </Show>
@@ -684,7 +687,10 @@ function Nav(props: {
                   }
                   onClick={() => props.setView({ kind: "list", id: l().id })}
                 >
-                  {l().name}
+                  <EditableNavLabel
+                    name={l().name}
+                    onSave={(name) => props.app.renameList(l().id, name)}
+                  />
                 </ContextMenu.Trigger>
                 <ContextMenu.Portal>
                   <ContextMenu.Content class="context-menu-content">
@@ -729,6 +735,75 @@ function Nav(props: {
         </Show>
       </div>
     </nav>
+  );
+}
+
+function EditableNavLabel(props: {
+  name: string;
+  onSave: (name: string) => void;
+}) {
+  let ref!: HTMLSpanElement;
+  const [editing, setEditing] = createSignal(false);
+
+  // While not editing, the span's text mirrors the model. While editing
+  // we leave the DOM alone so the user's in-flight edits aren't clobbered
+  // by reactive updates (including ones from peer renames).
+  createEffect(() => {
+    if (!editing()) ref.textContent = props.name;
+  });
+
+  const startEdit = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (editing()) return;
+    setEditing(true);
+    queueMicrotask(() => {
+      ref.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(ref);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+  };
+
+  const save = () => {
+    if (!editing()) return;
+    const next = (ref.textContent ?? "").trim();
+    setEditing(false);
+    if (next !== props.name) props.onSave(next);
+    else ref.textContent = props.name;
+  };
+
+  const cancel = () => {
+    if (!editing()) return;
+    setEditing(false);
+    ref.textContent = props.name;
+  };
+
+  return (
+    <span
+      ref={ref}
+      class="nav-item-label"
+      contentEditable={editing()}
+      onDblClick={startEdit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          save();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          cancel();
+        }
+      }}
+      onBlur={save}
+      onClick={(e) => {
+        if (editing()) e.stopPropagation();
+      }}
+      onPointerDown={(e) => {
+        if (editing()) e.stopPropagation();
+      }}
+    />
   );
 }
 

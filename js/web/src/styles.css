@@ -139,6 +139,24 @@ body,
   background: var(--bg-active);
 }
 
+.nav-item-label {
+  display: block;
+  width: calc(100% + 32px);
+  margin: -6px -16px;
+  padding: 6px 16px;
+  outline: none;
+}
+
+.nav-item-label[contenteditable="true"] {
+  cursor: text;
+}
+
+.nav-item-label:empty::before {
+  content: "List";
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
 .main {
   display: flex;
   flex-direction: column;

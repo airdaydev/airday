@@ -370,9 +370,6 @@ impl Doc {
 
     pub fn rename_list(&self, list_id: &str, name: &str) -> Result<(), DocError> {
         let name = name.trim();
-        if name.is_empty() {
-            return Err(DocError::Invalid("list name is empty".into()));
-        }
         let (_, map) = self.find_list(list_id)?;
         map.insert(KEY_NAME, name)?;
         self.inner.commit();
