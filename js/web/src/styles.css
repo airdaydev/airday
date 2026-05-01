@@ -257,6 +257,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   outline: none;
+  line-height: 1.3em;
 }
 
 .row-description {
