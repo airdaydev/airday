@@ -10,6 +10,7 @@
     "build:wasm": "wasm-pack build core/web --target nodejs --out-dir ../../js/core/wasm --out-name airday_core_web",
     "build:wasm:web": "wasm-pack build core/web --target bundler --out-dir ../../js/core/wasm-web --out-name airday_core_web",
     "start": "process-compose -f local/process-compose.yaml",
+    "wipe": "scripts/wipe-db.sh",
     "test": "cargo test",
     "test:server": "cargo test -p airday-server",
     "test:core:js": "bun test --cwd js/core",

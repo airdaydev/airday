@@ -131,8 +131,10 @@ function buildDevEnv(secrets: Record<string, string>) {
   if (colon < 0) throw new Error(`AIRDAY_BIND must be host:port, got ${env.AIRDAY_BIND}`);
   env.AIRDAY_HOST = env.AIRDAY_BIND.slice(0, colon);
   env.AIRDAY_PORT = env.AIRDAY_BIND.slice(colon + 1);
-  // No default for AIRDAY_DB_PATH — when unset, the server picks an
-  // XDG path ($HOME/.local/share/airday/airday.sqlite) so the
-  // generated config.toml stays portable across machines.
+  // Pin the dev DB inside the gitignored `local/` dir so all dev
+  // artifacts live next to each other and `bun run wipe` has a
+  // hardcoded, repo-scoped target. Resolved relative to the server's
+  // cwd, which is the repo root under `bun run server`.
+  env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "local/airday.sqlite";
   return env;
 }
