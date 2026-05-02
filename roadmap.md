@@ -74,6 +74,23 @@ this is the index.
   next touch the renderer protocol for another reason (row groups,
   sticky headers, expandable rows beyond what the current
   per-key-mount API handles).
+- **In-list "add item" pseudo-row.** UX target: clicking Add injects
+  an empty row at the cursor position, already expanded for typing;
+  Enter (or non-empty blur) commits via `app.addItem`, empty blur
+  discards. Spike tried a Workspace `pendingNew` signal that splices
+  a UI-only row into `dndItems` plus a new declarative
+  `expandedKey`/`onExpandedChange` controlled-expansion API on
+  `primavera-dnd`. The Add click bubbles to `document` after the
+  signals update, so the dnd's `onDocumentClick` collapses the
+  freshly-expanded pseudo-row on the same event that opened it; even
+  with `stopPropagation` on the trigger the controlled-expansion +
+  click-outside-collapse heuristic didn't compose cleanly (subsequent
+  dblclicks no-op'd against stale internal state). Likely fix is to
+  drop the document-click auto-collapse in controlled mode and let
+  the consumer wire its own dismissal, or render the new-item row
+  outside the dnd and accept the loss of position-aware insertion.
+  The primavera-side `expandedKey` prop landed but is currently
+  unused.
 - **Playwright / browser test harness.** Manual smoke today; not
   worth the harness setup until UI surface stabilises.
 - **Done/Bin ordering stability.** `done_at` / `binned_at` are client
