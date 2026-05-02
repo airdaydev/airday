@@ -13,6 +13,7 @@ export function Settings(props: {
   onThemeChange: (pref: ThemePreference) => void;
   session: Session;
   logout: () => void;
+  onLoginRequested: () => void;
 }) {
   const [section, setSection] = createSignal<Section>("appearance");
   return (
@@ -87,19 +88,44 @@ export function Settings(props: {
               </Show>
               <Show when={section() === "account"}>
                 <h2 class="settings-section-title">Account</h2>
-                <div class="settings-row">
-                  <div class="settings-row-label">Email</div>
-                  <div class="settings-row-value">{props.session.email}</div>
-                </div>
-                <div class="settings-row">
-                  <button
-                    type="button"
-                    class="settings-logout"
-                    onClick={() => props.logout()}
-                  >
-                    Log out
-                  </button>
-                </div>
+                <Show
+                  when={props.session.anonymous}
+                  fallback={
+                    <>
+                      <div class="settings-row">
+                        <div class="settings-row-label">Email</div>
+                        <div class="settings-row-value">
+                          {props.session.email}
+                        </div>
+                      </div>
+                      <div class="settings-row">
+                        <button
+                          type="button"
+                          class="settings-logout"
+                          onClick={() => props.logout()}
+                        >
+                          Log out
+                        </button>
+                      </div>
+                    </>
+                  }
+                >
+                  <div class="settings-row">
+                    <div class="settings-row-value">
+                      You're using a local-only account. Sign up or log
+                      in to back up your data and sync across devices.
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <button
+                      type="button"
+                      class="settings-logout"
+                      onClick={() => props.onLoginRequested()}
+                    >
+                      Log in / Sign up
+                    </button>
+                  </div>
+                </Show>
               </Show>
             </section>
           </Dialog.Content>

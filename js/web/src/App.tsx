@@ -1,7 +1,12 @@
-// Top-level app. Login form gates the main UI; on success we open a
-// Doc + SyncEngine and start the WebSocket pump. The post-login UI
-// is the same shape as Stage 3's Doc-only build, but every read /
-// mutation goes through the engine so peer ops apply live.
+// Top-level app. First visit auto-creates a local-only anonymous
+// session (DEK generated client-side, no server account) and drops
+// straight into the workspace — no auth gate. Sync stays off until
+// the user signs up or logs in via Settings, which swaps the
+// anonymous session for an authenticated one and clobbers the local
+// doc (option C — punt the migration; document is in `phoenix.md`).
+// After auth the UI is the same shape as the Doc-only build but
+// every read / mutation goes through the engine so peer ops apply
+// live.
 
 import {
   createEffect,
@@ -12,7 +17,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
+import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import {
   NullStorage,
   OpfsStorage,
@@ -96,18 +101,20 @@ function formatRelative(ts: number, now: number): string {
 }
 
 export function App() {
-  // `undefined` = vault probe still in flight; `null` = no session, show
-  // login; `Session` = logged in. Booting straight into Login would
-  // flash the form for users who already have a persisted session.
-  const [session, setSession] = createSignal<Session | null | undefined>(
-    undefined,
-  );
+  // `undefined` = vault probe still in flight; once it resolves we
+  // either restore the persisted session or auto-mint a fresh
+  // anonymous one — `session()` is never null after that point.
+  const [session, setSession] = createSignal<Session | undefined>(undefined);
   const [online, setOnline] = createSignal(false);
   const [boot, setBoot] = createSignal<{ doc: Doc; lastAcked: bigint } | null>(
     null,
   );
   const [bootError, setBootError] = createSignal<string | null>(null);
   const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
+  // When true, the Login form takes over the viewport. Reachable from
+  // the anonymous Settings panel; on success the new authenticated
+  // session swaps in (keyed remount) and this flips back to false.
+  const [showLogin, setShowLogin] = createSignal(false);
 
   void (async () => {
     const ok = await probeOpfs();
@@ -116,13 +123,17 @@ export function App() {
   })();
 
   // Probe the vault on mount. If a wrapped DEK is present and we can
-  // unwrap it, the device cookie should still be valid — the WS pump
-  // will surface the failure if it isn't.
+  // unwrap it, restore that session — for authenticated records, the
+  // device cookie should still be valid (the WS pump will surface the
+  // failure if it isn't); for anonymous records, OPFS is the source
+  // of truth. If there's no record at all, mint a fresh anonymous
+  // session so the user lands directly in the app.
   void (async () => {
     try {
       const v = await dekVault.load();
       if (v) {
         setSession({
+          anonymous: v.anonymous,
           email: v.email,
           accountId: v.accountId,
           deviceId: v.deviceId,
@@ -134,22 +145,40 @@ export function App() {
     } catch (e) {
       console.warn("vault load failed:", e);
     }
-    setSession(null);
+    setSession(await createAnonymousSession());
   })();
 
+  // Logout: tear down server-side state and replace the session with
+  // a fresh anonymous one. Anonymous sessions also flow through here
+  // (e.g. "discard local data") — `api.logout` no-ops cleanly when
+  // there's no device cookie.
   const logout = async () => {
-    try {
-      await api.logout();
-    } catch (e) {
-      // Best-effort: even if the server call fails (offline, expired
-      // cookie), drop local state so the next login is clean.
-      console.warn("logout call failed:", e);
+    const current = session();
+    if (current && !current.anonymous) {
+      try {
+        await api.logout();
+      } catch (e) {
+        // Best-effort: even if the server call fails (offline, expired
+        // cookie), drop local state so the next login is clean.
+        console.warn("logout call failed:", e);
+      }
     }
     await dekVault.clear();
     setBoot(null);
     setBootError(null);
     setOnline(false);
-    setSession(null);
+    setSession(await createAnonymousSession());
+  };
+
+  const onAuthenticated = (s: Session) => {
+    // Local-only anonymous data is left to drift in OPFS under the
+    // old anon accountId. It'll never be addressed again — option C
+    // says clobber, not migrate. A future cleanup pass can reap it.
+    setBoot(null);
+    setBootError(null);
+    setOnline(false);
+    setShowLogin(false);
+    setSession(s);
   };
 
   return (
@@ -157,23 +186,58 @@ export function App() {
       when={session() !== undefined && opfsOk() !== null}
       fallback={<div class="empty">Loading…</div>}
     >
-      <Show when={session()} fallback={<Login onSession={setSession} />}>
-        {(s) => (
-          <BootGate
-            session={s()}
-            boot={boot()}
-            bootError={bootError()}
-            setBoot={setBoot}
-            setBootError={setBootError}
-            online={online()}
-            setOnline={setOnline}
-            logout={logout}
-            opfsOk={opfsOk() ?? false}
-          />
-        )}
+      <Show
+        when={!showLogin()}
+        fallback={
+          <Login onSession={onAuthenticated} onCancel={() => setShowLogin(false)} />
+        }
+      >
+        <Show keyed when={session()}>
+          {(s) => (
+            <BootGate
+              session={s}
+              boot={boot()}
+              bootError={bootError()}
+              setBoot={setBoot}
+              setBootError={setBootError}
+              online={online()}
+              setOnline={setOnline}
+              logout={logout}
+              onLoginRequested={() => setShowLogin(true)}
+              opfsOk={opfsOk() ?? false}
+            />
+          )}
+        </Show>
       </Show>
     </Show>
   );
+}
+
+async function createAnonymousSession(): Promise<Session> {
+  const accountId = `anon-${crypto.randomUUID()}`;
+  const dek = Dek.generate();
+  const session: Session = {
+    anonymous: true,
+    accountId,
+    email: null,
+    deviceId: null,
+    dek,
+    // Seed the doc on first run — Doc.create() includes the built-in
+    // "Later" list. On reload we read OPFS instead.
+    freshSignup: true,
+  };
+  try {
+    await dekVault.save({
+      anonymous: true,
+      accountId,
+      email: null,
+      deviceId: null,
+      dek: dek.clone(),
+    });
+  } catch (e) {
+    console.warn("dekVault.save failed for anonymous session:", e);
+  }
+  return session;
 }
 
 function BootGate(props: {
@@ -185,6 +249,7 @@ function BootGate(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
+  onLoginRequested: () => void;
   opfsOk: boolean;
 }) {
   // Try to restore a doc + frontier from OPFS. On signup we always
@@ -234,6 +299,7 @@ function BootGate(props: {
           setOnline={props.setOnline}
           online={props.online}
           logout={props.logout}
+          onLoginRequested={props.onLoginRequested}
           opfsOk={props.opfsOk}
         />
       )}
@@ -248,6 +314,7 @@ function MainApp(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
+  onLoginRequested: () => void;
   opfsOk: boolean;
 }) {
   // eslint-disable-next-line no-console
@@ -257,12 +324,14 @@ function MainApp(props: {
     "lastAcked=",
     String(props.boot.lastAcked),
   );
-  // Dek is consumed by SyncEngine — clone first so we can also use
-  // it for OPFS encrypt-at-rest.
-  const dekForStorage = props.session.dek.clone();
+  // Both SyncEngine and OpfsStorage consume their Dek argument, and
+  // the session-level Dek must stay valid across MainApp remounts
+  // (the user can flip into the Login form and Cancel back, which
+  // unmounts and re-mounts this whole tree). So clone for each
+  // consumer; the original on `props.session.dek` is untouched.
   const engine = new SyncEngine(
     props.boot.doc,
-    props.session.dek,
+    props.session.dek.clone(),
     props.boot.lastAcked,
     CLIENT_NAME,
     CLIENT_VERSION,
@@ -270,20 +339,31 @@ function MainApp(props: {
   const app = createSyncedApp(engine);
 
   const storage: StorageAdapter = props.opfsOk
-    ? new OpfsStorage(props.session.accountId, dekForStorage, EncryptedBlob)
+    ? new OpfsStorage(
+        props.session.accountId,
+        props.session.dek.clone(),
+        EncryptedBlob,
+      )
     : new NullStorage();
 
-  const bridge = new SyncBridge({
-    engine,
-    onChange: (kind) => {
-      if (kind === "online") props.setOnline(true);
-      if (kind === "offline") props.setOnline(false);
-    },
-    onAppEvents: () => app.drainEvents(),
-  });
-  app.setOnFlush(() => bridge.pumpOutbox());
-  bridge.start();
-  onCleanup(() => bridge.stop());
+  // Anonymous sessions are local-only by definition — no account on
+  // the server to authenticate to. Skip the WebSocket pump entirely;
+  // local mutations still flow through the engine for OPFS persist.
+  let bridge: SyncBridge | null = null;
+  if (!props.session.anonymous) {
+    bridge = new SyncBridge({
+      engine,
+      onChange: (kind) => {
+        if (kind === "online") props.setOnline(true);
+        if (kind === "offline") props.setOnline(false);
+      },
+      onAppEvents: () => app.drainEvents(),
+    });
+    const b = bridge;
+    app.setOnFlush(() => b.pumpOutbox());
+    bridge.start();
+    onCleanup(() => b.stop());
+  }
 
   // Debounced persistence. Every doc change (local mutation or
   // remote apply) bumps `app.version()`; we coalesce a window of
@@ -294,21 +374,30 @@ function MainApp(props: {
     saveTimer = null;
     try {
       const bytes = engine.save();
-      const lastAcked = engine.highestSeenOpId();
-      await Promise.all([
-        storage.putDoc(bytes),
-        storage.putDevice({
-          accountId: props.session.accountId,
-          email: props.session.email,
-          // Bundle is served from the same origin as the API; record
-          // that origin for completeness even though the cookie is the
-          // load-bearing piece of "which server am I talking to".
-          serverUrl: window.location.origin,
-          deviceId: props.session.deviceId,
-          lastAckedOpId: Number(lastAcked),
-          lastSyncAt: Date.now(),
-        }),
-      ]);
+      // Anonymous sessions skip the device record — its DeviceConfig
+      // shape requires email + deviceId, neither of which exist
+      // before signup, and lastAckedOpId / lastSyncAt are meaningless
+      // without a server peer. The doc snapshot still rides through
+      // putDoc so reload restores local data.
+      if (props.session.anonymous) {
+        await storage.putDoc(bytes);
+      } else {
+        const lastAcked = engine.highestSeenOpId();
+        await Promise.all([
+          storage.putDoc(bytes),
+          storage.putDevice({
+            accountId: props.session.accountId,
+            email: props.session.email!,
+            // Bundle is served from the same origin as the API; record
+            // that origin for completeness even though the cookie is the
+            // load-bearing piece of "which server am I talking to".
+            serverUrl: window.location.origin,
+            deviceId: props.session.deviceId!,
+            lastAckedOpId: Number(lastAcked),
+            lastSyncAt: Date.now(),
+          }),
+        ]);
+      }
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("opfs save failed:", e);
@@ -344,6 +433,7 @@ function MainApp(props: {
       session={props.session}
       online={props.online}
       logout={props.logout}
+      onLoginRequested={props.onLoginRequested}
     />
   );
 }
@@ -353,6 +443,7 @@ function Workspace(props: {
   session: Session;
   online: boolean;
   logout: () => void;
+  onLoginRequested: () => void;
 }) {
   const app = props.app;
   const state = app.state;
@@ -611,6 +702,7 @@ function Workspace(props: {
         session={props.session}
         logout={props.logout}
         onOpenSettings={() => setSettingsOpen(true)}
+        onLoginRequested={props.onLoginRequested}
       />
       <Settings
         open={settingsOpen()}
@@ -622,12 +714,16 @@ function Workspace(props: {
         }}
         session={props.session}
         logout={props.logout}
+        onLoginRequested={() => {
+          setSettingsOpen(false);
+          props.onLoginRequested();
+        }}
       />
       <main class="main">
         <header class="main-header">
           <h1>{viewTitle(view(), lists())}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
-            <Show when={!props.online}>
+            <Show when={!props.session.anonymous && !props.online}>
               <span
                 class="offline-indicator"
                 title="Disconnected"
@@ -723,6 +819,7 @@ function Nav(props: {
   session: Session;
   logout: () => void;
   onOpenSettings: () => void;
+  onLoginRequested: () => void;
 }) {
   const [adding, setAdding] = createSignal(false);
   const [name, setName] = createSignal("");
@@ -880,7 +977,11 @@ function Nav(props: {
           />
           <DropdownMenu.Portal>
             <DropdownMenu.Content class="dropdown-menu-content">
-              <div class="dropdown-menu-label">{props.session.email}</div>
+              <div class="dropdown-menu-label">
+                {props.session.anonymous
+                  ? "Local-only account"
+                  : props.session.email}
+              </div>
               <DropdownMenu.Separator class="dropdown-menu-separator" />
               <DropdownMenu.Item
                 class="dropdown-menu-item"
@@ -888,12 +989,24 @@ function Nav(props: {
               >
                 Settings
               </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => props.logout()}
+              <Show
+                when={props.session.anonymous}
+                fallback={
+                  <DropdownMenu.Item
+                    class="dropdown-menu-item"
+                    onSelect={() => props.logout()}
+                  >
+                    Log out
+                  </DropdownMenu.Item>
+                }
               >
-                Log out
-              </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  class="dropdown-menu-item"
+                  onSelect={() => props.onLoginRequested()}
+                >
+                  Log in / Sign up
+                </DropdownMenu.Item>
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu>

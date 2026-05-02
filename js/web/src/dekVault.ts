@@ -23,16 +23,20 @@ const STORE = "vault";
 const KEY = "current";
 
 export interface VaultedSession {
+  /** Local-only sessions with no server account behind them. Email
+   *  and deviceId are null in this mode. */
+  anonymous: boolean;
   accountId: string;
-  email: string;
-  deviceId: string;
+  email: string | null;
+  deviceId: string | null;
   dek: Dek;
 }
 
 interface VaultRecord {
+  anonymous: boolean;
   accountId: string;
-  email: string;
-  deviceId: string;
+  email: string | null;
+  deviceId: string | null;
   wrappingKey: CryptoKey;
   iv: Uint8Array;
   wrappedDek: Uint8Array;
@@ -58,9 +62,12 @@ export const dekVault = {
       );
       const dek = Dek.fromHex(toHex(dekBytes));
       return {
+        // Records written before anonymous mode landed have no flag;
+        // they're authenticated by definition.
+        anonymous: rec.anonymous ?? false,
         accountId: rec.accountId,
-        email: rec.email,
-        deviceId: rec.deviceId,
+        email: rec.email ?? null,
+        deviceId: rec.deviceId ?? null,
         dek,
       };
     } catch (e) {
@@ -88,6 +95,7 @@ export const dekVault = {
       ),
     );
     const rec: VaultRecord = {
+      anonymous: s.anonymous,
       accountId: s.accountId,
       email: s.email,
       deviceId: s.deviceId,

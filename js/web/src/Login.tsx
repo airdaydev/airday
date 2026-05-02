@@ -15,13 +15,23 @@ import { api, ApiError, type LoginResponse } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 
 export interface Session {
-  email: string;
+  /** Local-only session with no server account behind it. The web client
+   *  drops a freshly-generated DEK into the vault on first visit so the
+   *  user can use the app without an auth wall; sync stays off until they
+   *  sign up or log in. */
+  anonymous: boolean;
+  /** Account id — server-issued for authenticated sessions, locally
+   *  generated (`anon-<uuid>`) for anonymous ones. Used to namespace OPFS. */
   accountId: string;
-  deviceId: string;
+  /** Null on anonymous sessions. */
+  email: string | null;
+  /** Null on anonymous sessions. */
+  deviceId: string | null;
   dek: Dek;
   /** True iff this session was created via signup (we're device 1
-   *  and need to seed the doc with built-in lists). False for a
-   *  login session, where built-ins arrive via the initial pull. */
+   *  and need to seed the doc with built-in lists), or for a freshly
+   *  minted anonymous session. False for login sessions and for
+   *  reload-restored sessions where OPFS is the source of truth. */
   freshSignup: boolean;
 }
 
@@ -29,7 +39,13 @@ function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
 }
 
-export function Login(props: { onSession: (s: Session) => void }) {
+export function Login(props: {
+  onSession: (s: Session) => void;
+  /** Optional escape hatch — when present we render a Cancel link
+   *  that returns to whatever was on screen before. Used when login
+   *  is reached from inside an anonymous session. */
+  onCancel?: () => void;
+}) {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [deviceName, setDeviceName] = createSignal(defaultDeviceName());
@@ -102,6 +118,16 @@ export function Login(props: { onSession: (s: Session) => void }) {
         >
           {mode() === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
         </button>
+        <Show when={props.onCancel}>
+          <button
+            type="button"
+            class="link"
+            onClick={() => props.onCancel?.()}
+            disabled={busy()}
+          >
+            Cancel
+          </button>
+        </Show>
         <Show when={error()}>
           <div class="error">{error()}</div>
         </Show>
@@ -133,6 +159,7 @@ async function doLogin(
   }
   const dek = unwrapDek(derived.kek, resp.wrapped_dek, resp.wrapped_dek_nonce);
   const session: Session = {
+    anonymous: false,
     email,
     accountId: resp.account_id,
     deviceId: resp.device.device_id,
@@ -172,6 +199,7 @@ async function doSignup(
     device_name: deviceName,
   });
   const session: Session = {
+    anonymous: false,
     email,
     accountId: resp.account_id,
     deviceId: resp.device_id,
@@ -188,6 +216,7 @@ async function persistVault(session: Session): Promise<void> {
   // still usable; the user just gets bounced back to login on reload.
   try {
     await dekVault.save({
+      anonymous: session.anonymous,
       accountId: session.accountId,
       email: session.email,
       deviceId: session.deviceId,
