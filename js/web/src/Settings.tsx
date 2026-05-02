@@ -23,7 +23,6 @@ export function Settings(props: {
         <div class="dialog-positioner">
           <Dialog.Content class="settings-dialog">
             <aside class="settings-sidebar">
-              <Dialog.Title class="settings-title">Settings</Dialog.Title>
               <button
                 type="button"
                 class="settings-nav-item"
@@ -57,6 +56,7 @@ export function Settings(props: {
                       props.onThemeChange(value as ThemePreference)
                     }
                   >
+                    <SegmentedControl.Indicator class="theme-segment-indicator" />
                     <SegmentedControl.Item value="auto" class="theme-segment">
                       <SegmentedControl.ItemInput />
                       <SegmentedControl.ItemControl class="theme-segment-control">
