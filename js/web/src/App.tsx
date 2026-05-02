@@ -480,6 +480,64 @@ function Workspace(props: {
   document.addEventListener("paste", onPaste);
   onCleanup(() => document.removeEventListener("paste", onPaste));
 
+  // Delete / Backspace on the active view: bin live or done items, hard-
+  // delete binned ones. Skip when focus is inside an editable surface so
+  // the AddForm, row edit, and list rename keep their native behaviour.
+  const onDeleteKey = (e: KeyboardEvent) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const v = view();
+    const visibleIds = items().map((it) => it.id);
+    const visibleSet = new Set(visibleIds);
+    const ids = selection
+      .getSelectedKeys()
+      .map(String)
+      .filter((id) => visibleSet.has(id));
+    if (ids.length === 0) return;
+    e.preventDefault();
+    const deleteSet = new Set(ids);
+    // Pick the survivor to focus next: first surviving id after the
+    // bottom-most deleted row, else the new last surviving id.
+    let lastIdx = -1;
+    for (let i = visibleIds.length - 1; i >= 0; i--) {
+      if (deleteSet.has(visibleIds[i])) {
+        lastIdx = i;
+        break;
+      }
+    }
+    let nextId: string | null = null;
+    for (let i = lastIdx + 1; i < visibleIds.length; i++) {
+      if (!deleteSet.has(visibleIds[i])) {
+        nextId = visibleIds[i];
+        break;
+      }
+    }
+    if (nextId === null) {
+      for (let i = visibleIds.length - 1; i >= 0; i--) {
+        if (!deleteSet.has(visibleIds[i])) {
+          nextId = visibleIds[i];
+          break;
+        }
+      }
+    }
+    if (v.kind === "bin") {
+      for (const id of ids) app.deleteBinned(id);
+    } else {
+      for (const id of ids) app.setStatus(id, "binned");
+    }
+    if (nextId === null) {
+      selection.clear();
+    } else {
+      const target = nextId;
+      // Wait for the dnd source to absorb the removals before
+      // selecting — matches onDuplicate/onPaste.
+      queueMicrotask(() => selection.selectOnly(target));
+    }
+  };
+  document.addEventListener("keydown", onDeleteKey);
+  onCleanup(() => document.removeEventListener("keydown", onDeleteKey));
+
   // Drag items into a list nav button to move them to that list as the
   // first items. Discriminate from the nav's own list-reorder drag by
   // checking detail.items[0] for an item-shaped record (`listId` is
