@@ -1153,6 +1153,10 @@ function Row(props: {
   selection: DndSelection;
 }) {
   let textRef!: HTMLSpanElement;
+  // Captured by dblclick before the row expands so we can place the caret
+  // where the user pointed instead of selecting all. Captured pre-expand
+  // because layout may shift once the row becomes editable.
+  let dblClickCaret: { node: Node; offset: number } | null = null;
 
   // Order matters: this effect must run *before* the model-mirror effect
   // below. On collapse, both fire in the same tick — if the mirror runs
@@ -1163,17 +1167,25 @@ function Row(props: {
       props.expanded,
       (now, prev) => {
         if (!prev && now) {
+          const caret = dblClickCaret;
+          dblClickCaret = null;
           queueMicrotask(() => {
             textRef.focus();
             const sel = window.getSelection();
             const range = document.createRange();
-            range.selectNodeContents(textRef);
+            if (caret && textRef.contains(caret.node)) {
+              range.setStart(caret.node, caret.offset);
+              range.collapse(true);
+            } else {
+              range.selectNodeContents(textRef);
+            }
             sel?.removeAllRanges();
             sel?.addRange(range);
           });
           return;
         }
         if (prev && !now) {
+          dblClickCaret = null;
           const next = (textRef.textContent ?? "").trim();
           const current = props.item().text;
           if (!next) {
@@ -1190,6 +1202,40 @@ function Row(props: {
       { defer: true },
     ),
   );
+
+  const captureDblClickCaret = (e: MouseEvent) => {
+    type CPFP = (
+      x: number,
+      y: number,
+    ) => { offsetNode: Node; offset: number } | null;
+    const cpfp = (
+      document as unknown as { caretPositionFromPoint?: CPFP }
+    ).caretPositionFromPoint;
+    let node: Node | null = null;
+    let offset = 0;
+    if (cpfp) {
+      const pos = cpfp.call(document, e.clientX, e.clientY);
+      if (pos) {
+        node = pos.offsetNode;
+        offset = pos.offset;
+      }
+    }
+    if (!node) {
+      const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+      if (range) {
+        node = range.startContainer;
+        offset = range.startOffset;
+      }
+    }
+    if (node && textRef.contains(node)) {
+      dblClickCaret = { node, offset };
+      return;
+    }
+    // Click landed outside the text span — typically the row's padding
+    // above or below the text. Snap to the end of the text instead of
+    // falling through to select-all.
+    dblClickCaret = { node: textRef, offset: textRef.childNodes.length };
+  };
 
   // Mirror the model into the DOM while not expanded. While expanded
   // we leave the DOM alone so live edits aren't clobbered by reactive
@@ -1273,6 +1319,15 @@ function Row(props: {
         class="row"
         data-status={props.item().status}
         data-expanded={props.expanded() ? "" : undefined}
+        on:dblclick={(e) => {
+          // Listen at the row level (not the text span) so dblclicks in
+          // the row's padding above/below the text still capture a caret.
+          // Native (non-delegated) so it runs in the bubble phase before
+          // the dnd listbox's dblclick handler triggers expansion — once
+          // the row expands, contentEditable flips and layout may shift.
+          if (props.expanded()) return;
+          captureDblClickCaret(e);
+        }}
       >
         <input
           type="checkbox"
