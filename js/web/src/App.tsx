@@ -612,6 +612,8 @@ function Workspace(props: {
           setThemePref(pref);
           theme.set(pref);
         }}
+        session={props.session}
+        logout={props.logout}
       />
       <main class="main">
         <header class="main-header">
@@ -626,24 +628,6 @@ function Workspace(props: {
                 <CloudOffIcon />
               </span>
             </Show>
-            <DropdownMenu>
-              <DropdownMenu.Trigger
-                class="avatar-trigger"
-                aria-label="Account"
-              />
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content class="dropdown-menu-content">
-                  <div class="dropdown-menu-label">{props.session.email}</div>
-                  <DropdownMenu.Separator class="dropdown-menu-separator" />
-                  <DropdownMenu.Item
-                    class="dropdown-menu-item"
-                    onSelect={() => props.logout()}
-                  >
-                    Log out
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu>
             <Show
               when={
                 view().kind === "bin" &&
@@ -767,6 +751,8 @@ function Nav(props: {
   setView: (v: ViewKey) => void;
   themePref: ThemePreference;
   onThemeChange: (pref: ThemePreference) => void;
+  session: Session;
+  logout: () => void;
 }) {
   const [adding, setAdding] = createSignal(false);
   const [name, setName] = createSignal("");
@@ -917,6 +903,24 @@ function Nav(props: {
         </Show>
       </div>
       <div class="nav-footer">
+        <DropdownMenu>
+          <DropdownMenu.Trigger
+            class="avatar-trigger"
+            aria-label="Account"
+          />
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="dropdown-menu-content">
+              <div class="dropdown-menu-label">{props.session.email}</div>
+              <DropdownMenu.Separator class="dropdown-menu-separator" />
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => props.logout()}
+              >
+                Log out
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu>
         <SegmentedControl
           class="theme-segmented"
           aria-label="Appearance"
