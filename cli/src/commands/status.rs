@@ -58,10 +58,7 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
                 .unwrap_or_else(|| "never".into())
         );
         println!("Last acked op id: {}", device.last_acked_op_id);
-        println!(
-            "Pending changes: {}",
-            if pending { "yes" } else { "no" }
-        );
+        println!("Pending changes: {}", if pending { "yes" } else { "no" });
         if offline {
             println!("Mode: offline (AIRDAY_OFFLINE)");
         } else {

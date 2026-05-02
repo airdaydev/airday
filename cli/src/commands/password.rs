@@ -19,7 +19,9 @@ pub async fn run() -> anyhow::Result<()> {
     let pre: PreloginResponse = client
         .post(
             "/api/account/prelogin",
-            &PreloginRequest { email: device.email.clone() },
+            &PreloginRequest {
+                email: device.email.clone(),
+            },
         )
         .await?;
 
@@ -37,8 +39,7 @@ pub async fn run() -> anyhow::Result<()> {
     let new_master = {
         let pw = new_password;
         let salt = new_master_salt.to_vec();
-        tokio::task::spawn_blocking(move || derive_master(&pw, &salt, KdfParams::DEFAULT))
-            .await??
+        tokio::task::spawn_blocking(move || derive_master(&pw, &salt, KdfParams::DEFAULT)).await??
     };
     let new_kek = new_master.kek()?;
     let new_auth = new_master.auth_secret()?;

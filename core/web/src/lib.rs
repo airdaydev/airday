@@ -258,6 +258,36 @@ impl Doc {
             .apply_remote(&dek.inner, &blob.inner)
             .map_err(js_err)
     }
+
+    // -- undo / redo --
+
+    pub fn undo(&self) -> Result<bool, JsError> {
+        self.inner.undo().map_err(js_err)
+    }
+
+    pub fn redo(&self) -> Result<bool, JsError> {
+        self.inner.redo().map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = canUndo)]
+    pub fn can_undo(&self) -> bool {
+        self.inner.can_undo()
+    }
+
+    #[wasm_bindgen(js_name = canRedo)]
+    pub fn can_redo(&self) -> bool {
+        self.inner.can_redo()
+    }
+
+    #[wasm_bindgen(js_name = beginUndoGroup)]
+    pub fn begin_undo_group(&self) -> Result<(), JsError> {
+        self.inner.begin_undo_group().map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = endUndoGroup)]
+    pub fn end_undo_group(&self) {
+        self.inner.end_undo_group();
+    }
 }
 
 // ---------- Dek ----------
@@ -716,6 +746,36 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = deleteList)]
     pub fn delete_list(&self, list_id: &str) -> Result<(), JsError> {
         self.inner.doc().delete_list(list_id).map_err(js_err)
+    }
+
+    // -- undo / redo --
+
+    pub fn undo(&self) -> Result<bool, JsError> {
+        self.inner.doc().undo().map_err(js_err)
+    }
+
+    pub fn redo(&self) -> Result<bool, JsError> {
+        self.inner.doc().redo().map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = canUndo)]
+    pub fn can_undo(&self) -> bool {
+        self.inner.doc().can_undo()
+    }
+
+    #[wasm_bindgen(js_name = canRedo)]
+    pub fn can_redo(&self) -> bool {
+        self.inner.doc().can_redo()
+    }
+
+    #[wasm_bindgen(js_name = beginUndoGroup)]
+    pub fn begin_undo_group(&self) -> Result<(), JsError> {
+        self.inner.doc().begin_undo_group().map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = endUndoGroup)]
+    pub fn end_undo_group(&self) {
+        self.inner.doc().end_undo_group();
     }
 
     // -- reads --

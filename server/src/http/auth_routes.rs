@@ -97,13 +97,8 @@ pub async fn login(
             return Err(ApiError::BadRequest("device.name is required".into()));
         }
         let token = generate_token();
-        let device_id = create_device(
-            &state.db,
-            account.id,
-            reg.name,
-            sha256(&token).to_vec(),
-        )
-        .await?;
+        let device_id =
+            create_device(&state.db, account.id, reg.name, sha256(&token).to_vec()).await?;
         Some(DeviceCredential {
             device_id: device_id.to_string(),
             device_token: encode_token(&token),
@@ -139,11 +134,7 @@ pub async fn recover(
         .await?
         .ok_or(ApiError::InvalidCredentials)?;
     // Only accounts that opted into a recovery code can use this path.
-    let (
-        Some(recovery_auth_hash),
-        Some(recovery_wrapped_dek),
-        Some(recovery_wrapped_dek_nonce),
-    ) = (
+    let (Some(recovery_auth_hash), Some(recovery_wrapped_dek), Some(recovery_wrapped_dek_nonce)) = (
         account.recovery_auth_hash.as_deref(),
         account.recovery_wrapped_dek.clone(),
         account.recovery_wrapped_dek_nonce.clone(),
@@ -242,14 +233,14 @@ pub async fn password_reset(
     ))
 }
 
-pub async fn logout(
-    State(state): State<AppState>,
-    auth: DeviceAuth,
-) -> ApiResult<(HeaderMap, ())> {
+pub async fn logout(State(state): State<AppState>, auth: DeviceAuth) -> ApiResult<(HeaderMap, ())> {
     // `revoke_device` is idempotent — a stale cookie pointing at an
     // already-revoked device won't 404 us into a useless error here.
     let _ = revoke_device(&state.db, auth.account_id, auth.device_id).await?;
-    Ok((cookie_headers(cookie::clear_cookie(state.secure_cookies)), ()))
+    Ok((
+        cookie_headers(cookie::clear_cookie(state.secure_cookies)),
+        (),
+    ))
 }
 
 fn cookie_headers(value: axum::http::HeaderValue) -> HeaderMap {

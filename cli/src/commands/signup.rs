@@ -4,7 +4,7 @@ use clap::Parser;
 use dialoguer::{Confirm, Input};
 
 use crate::config::{DeviceConfig, Profile, Secrets};
-use crate::keystore::{derive_master, dek_to_hex};
+use crate::keystore::{dek_to_hex, derive_master};
 use crate::net::Client;
 
 use super::{default_device_name, default_server, prompt_new_password};
@@ -29,15 +29,13 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         None => Input::new().with_prompt("Email").interact_text()?,
     };
     let password = prompt_new_password("Password")?;
-    let device_name = args
-        .device_name
-        .unwrap_or_else(|| {
-            Input::new()
-                .with_prompt("Device name")
-                .default(default_device_name())
-                .interact_text()
-                .unwrap_or_else(|_| default_device_name())
-        });
+    let device_name = args.device_name.unwrap_or_else(|| {
+        Input::new()
+            .with_prompt("Device name")
+            .default(default_device_name())
+            .interact_text()
+            .unwrap_or_else(|_| default_device_name())
+    });
 
     let want_recovery = if args.no_recovery {
         false

@@ -159,7 +159,10 @@ fn root_dir() -> Result<PathBuf, ConfigError> {
 fn account_id_prefix(account_id: &str) -> String {
     // First 8 hex chars of the uuid (without dashes) is enough for
     // local disambiguation between accounts on the same machine.
-    let stripped: String = account_id.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+    let stripped: String = account_id
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect();
     stripped.chars().take(8).collect()
 }
 

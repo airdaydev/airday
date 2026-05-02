@@ -35,18 +35,12 @@ where
 {
     fn into_response(self) -> Response {
         match rmp_serde::to_vec_named(&self.0) {
-            Ok(bytes) => (
-                [(header::CONTENT_TYPE, super::MSGPACK_CONTENT_TYPE)],
-                bytes,
-            )
-                .into_response(),
+            Ok(bytes) => {
+                ([(header::CONTENT_TYPE, super::MSGPACK_CONTENT_TYPE)], bytes).into_response()
+            }
             Err(e) => {
                 tracing::error!(error = %e, "msgpack encode failed");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "msgpack encode failed",
-                )
-                    .into_response()
+                (StatusCode::INTERNAL_SERVER_ERROR, "msgpack encode failed").into_response()
             }
         }
     }

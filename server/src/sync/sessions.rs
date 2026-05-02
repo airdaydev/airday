@@ -108,12 +108,7 @@ impl SyncSessions {
     /// Returns the number of subscribers that received it (slow /
     /// closed receivers are dropped from the registry as a side
     /// effect).
-    pub fn broadcast(
-        &self,
-        account_id: Uuid,
-        exclude_sub: u64,
-        ops: Vec<StoredOp>,
-    ) -> usize {
+    pub fn broadcast(&self, account_id: Uuid, exclude_sub: u64, ops: Vec<StoredOp>) -> usize {
         if ops.is_empty() {
             return 0;
         }

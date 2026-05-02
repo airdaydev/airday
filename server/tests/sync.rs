@@ -26,7 +26,11 @@ use uuid::Uuid;
 const MSGPACK: &str = "application/msgpack";
 
 fn weak_params() -> KdfParams {
-    KdfParams { m_kib: 8, t: 1, p: 1 }
+    KdfParams {
+        m_kib: 8,
+        t: 1,
+        p: 1,
+    }
 }
 
 struct TestServer {
@@ -47,7 +51,12 @@ impl TestServer {
         let handle = tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
-        Self { base, ws_base, state, handle }
+        Self {
+            base,
+            ws_base,
+            state,
+            handle,
+        }
     }
 }
 
@@ -148,9 +157,8 @@ async fn signup_account() -> Account {
     }
 }
 
-type WsStream = tokio_tungstenite::WebSocketStream<
-    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
->;
+type WsStream =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect_ws(server: &TestServer, token: &str) -> WsStream {
     let url = format!("{}/api/sync", server.ws_base);
@@ -207,11 +215,7 @@ async fn handshake_then_push_pull_ack_round_trips() {
 
     // Push three ops.
     let blobs = vec![fake_blob(1), fake_blob(2), fake_blob(3)];
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::PushOps { ops: blobs.clone() },
-    )
-    .await;
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs.clone() }).await;
     let resp: ServerFrame = recv_msgpack(&mut ws).await;
     let assigned_ids = match resp {
         ServerFrame::OpsAck { assigned_ids } => assigned_ids,
@@ -234,7 +238,13 @@ async fn handshake_then_push_pull_ack_round_trips() {
 
     // Ack the last id and verify it persisted.
     let last = *assigned_ids.last().unwrap();
-    send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_op_id: last }).await;
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: last,
+        },
+    )
+    .await;
     // Ack is fire-and-forget — give the server a tick to commit, then
     // read the row directly.
     let stored = wait_for_acked(&acc, last).await;
@@ -261,7 +271,9 @@ async fn ack_does_not_move_backwards() {
     // Push one op so there's something to ack against.
     send_msgpack(
         &mut ws,
-        &ClientFrame::PushOps { ops: vec![fake_blob(1)] },
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(1)],
+        },
     )
     .await;
     let resp: ServerFrame = recv_msgpack(&mut ws).await;
@@ -270,10 +282,22 @@ async fn ack_does_not_move_backwards() {
         other => panic!("expected OpsAck, got {other:?}"),
     };
 
-    send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_op_id: id }).await;
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: id,
+        },
+    )
+    .await;
     wait_for_acked(&acc, id).await;
     // Stale ack from a slow client mustn't drag the frontier down.
-    send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_op_id: 0 }).await;
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: 0,
+        },
+    )
+    .await;
     // Give the server time to *not* apply it.
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     let stored = queries::get_last_acked_op_id(&acc.server.state.db, acc.device_id)
@@ -328,11 +352,7 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     wait_for_subscribers(&acc, 2).await;
 
     let blobs = vec![fake_blob(7), fake_blob(8)];
-    send_msgpack(
-        &mut ws_a,
-        &ClientFrame::PushOps { ops: blobs.clone() },
-    )
-    .await;
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs.clone() }).await;
 
     // A receives its own OpsAck; A must NOT receive a broadcast for
     // its own push. Asserting absence requires a small wait —
@@ -357,11 +377,7 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     assert_eq!(broadcast, want);
 
     // A's stream should have nothing pending.
-    let nothing = tokio::time::timeout(
-        std::time::Duration::from_millis(200),
-        ws_a.next(),
-    )
-    .await;
+    let nothing = tokio::time::timeout(std::time::Duration::from_millis(200), ws_a.next()).await;
     assert!(nothing.is_err(), "A unexpectedly received: {nothing:?}");
 }
 
@@ -431,7 +447,11 @@ async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {
 async fn wait_for_subscribers(acc: &Account, target: usize) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        let count = acc.server.state.sync_sessions.subscriber_count(acc.account_id);
+        let count = acc
+            .server
+            .state
+            .sync_sessions
+            .subscriber_count(acc.account_id);
         if (target == 0 && count == 0) || (target > 0 && count >= target) {
             return;
         }

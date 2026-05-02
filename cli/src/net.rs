@@ -42,7 +42,8 @@ impl Client {
         Req: Serialize,
         Resp: DeserializeOwned,
     {
-        self.send(Method::POST, path, Some(body), None::<&str>).await
+        self.send(Method::POST, path, Some(body), None::<&str>)
+            .await
     }
 
     #[allow(dead_code)]
@@ -68,7 +69,9 @@ impl Client {
     where
         Req: Serialize,
     {
-        let _: Empty = self.send(Method::POST, path, Some(body), Some(token)).await?;
+        let _: Empty = self
+            .send(Method::POST, path, Some(body), Some(token))
+            .await?;
         Ok(())
     }
 
@@ -77,7 +80,8 @@ impl Client {
     where
         Resp: DeserializeOwned,
     {
-        self.send::<(), _>(Method::GET, path, None, Some(token)).await
+        self.send::<(), _>(Method::GET, path, None, Some(token))
+            .await
     }
 
     #[allow(dead_code)]

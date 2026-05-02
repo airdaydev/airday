@@ -28,7 +28,8 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
 use loro::{
-    Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, ValueOrContainer, VersionVector,
+    Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, UndoManager, ValueOrContainer,
+    VersionVector,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -150,6 +151,20 @@ pub struct Doc {
     /// `pop_event` / `drain_events`. Wrapped in `Mutex` so mutation
     /// methods can stay `&self` (Loro's interior-mutability shape).
     events: Mutex<VecDeque<AppEvent>>,
+    /// Per-session undo/redo. Bound to the local peer at construction;
+    /// only records local commits. Remote ops imported by
+    /// `apply_remote` carry origin `"remote"` and are filtered out by
+    /// prefix — see `spec/sync-protocol.md` "Commit origin tagging".
+    undo: Mutex<UndoManager>,
+}
+
+/// Configure an UndoManager bound to `inner`, excluding remote-tagged
+/// commits. Construct *after* any seeding/snapshot import so those
+/// operations aren't eligible for undo.
+fn make_undo_manager(inner: &LoroDoc) -> UndoManager {
+    let mut um = UndoManager::new(inner);
+    um.add_exclude_origin_prefix("remote");
+    um
 }
 
 impl Doc {
@@ -161,20 +176,24 @@ impl Doc {
         let inner = LoroDoc::new();
         seed_builtins(&inner)?;
         inner.commit();
+        let undo = Mutex::new(make_undo_manager(&inner));
         Ok(Self {
             inner,
             last_pushed_vv: VersionVector::default(),
             events: Mutex::new(VecDeque::new()),
+            undo,
         })
     }
 
     /// Empty doc — used by device 2 before snapshot import.
     pub fn empty() -> Self {
         let inner = LoroDoc::new();
+        let undo = Mutex::new(make_undo_manager(&inner));
         Self {
             last_pushed_vv: inner.oplog_vv(),
             inner,
             events: Mutex::new(VecDeque::new()),
+            undo,
         }
     }
 
@@ -339,8 +358,13 @@ impl Doc {
         // map it onto an absolute index in the global items list by
         // counting matching entries up to that point. Sprint 1 cap is
         // 4096 items so the linear scan is fine.
-        let abs =
-            absolute_index_for_list_position(&items, target_list_id, target_index, idx, moving_status);
+        let abs = absolute_index_for_list_position(
+            &items,
+            target_list_id,
+            target_index,
+            idx,
+            moving_status,
+        );
         map.insert(KEY_LIST_ID, target_list_id)?;
         if abs != idx {
             items.mov(idx, abs)?;
@@ -666,7 +690,7 @@ impl Doc {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
-        let status = self.inner.import(&plaintext)?;
+        let status = self.inner.import_with(&plaintext, "remote")?;
         // VersionRange is `(start, end)` per peer — `end` is the
         // exclusive upper bound, which matches `VersionVector`'s
         // counter semantics (cf. loro `VersionRange::from_vv`).
@@ -687,6 +711,75 @@ impl Doc {
             }
         }
         Ok(())
+    }
+
+    // ---------- undo / redo ----------
+
+    /// Undo the most recent eligible local commit. Remote-applied ops
+    /// are filtered out by origin prefix and never enter the stack.
+    /// Returns `true` if a step was applied. Diffs state pre/post and
+    /// emits per-id `AppEvent`s the same way `apply_remote` does —
+    /// undo bypasses the per-mutation event-pushing.
+    pub fn undo(&self) -> Result<bool, DocError> {
+        self.apply_undo_op(|um| um.undo())
+    }
+
+    /// Redo the most recently undone step.
+    pub fn redo(&self) -> Result<bool, DocError> {
+        self.apply_undo_op(|um| um.redo())
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.undo.lock().map(|um| um.can_undo()).unwrap_or(false)
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.undo.lock().map(|um| um.can_redo()).unwrap_or(false)
+    }
+
+    /// Open a manual group: every commit between this and
+    /// `end_undo_group` collapses to a single undo step. Use for
+    /// JS-side bulk loops (multi-row delete, drag-drop of N items)
+    /// where the per-call `commit()` boundary would otherwise produce
+    /// N undo steps. Conflicting remote imports auto-close the group;
+    /// non-conflicting ones stay outside it. Re-opening before
+    /// `end_undo_group` is an error (Loro contract).
+    pub fn begin_undo_group(&self) -> Result<(), DocError> {
+        let mut um = self.undo.lock().expect("undo mutex poisoned");
+        um.group_start().map_err(DocError::from)
+    }
+
+    /// Close the active manual group. Safe to call after the group was
+    /// auto-closed by a conflicting remote import (becomes a no-op).
+    pub fn end_undo_group(&self) {
+        let mut um = self.undo.lock().expect("undo mutex poisoned");
+        um.group_end();
+    }
+
+    fn apply_undo_op<F>(&self, op: F) -> Result<bool, DocError>
+    where
+        F: FnOnce(&mut UndoManager) -> loro::LoroResult<bool>,
+    {
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let pre_lists: Vec<ListView> = self.all_lists();
+        let did = {
+            let mut um = self.undo.lock().expect("undo mutex poisoned");
+            op(&mut um)?
+        };
+        if did {
+            let post_items: Vec<ItemView> = self.iter_items().collect();
+            let post_lists: Vec<ListView> = self.all_lists();
+            let mut emitted = Vec::new();
+            diff_lists(&pre_lists, &post_lists, &mut emitted);
+            diff_items(&pre_items, &post_items, &mut emitted);
+            if !emitted.is_empty() {
+                let mut q = self.events.lock().expect("events mutex poisoned");
+                for ev in emitted {
+                    q.push_back(ev);
+                }
+            }
+        }
+        Ok(did)
     }
 
     // ---------- event queue ----------
@@ -762,10 +855,12 @@ impl Doc {
         inner.import(&envelope.snapshot)?;
         let last_pushed_vv = VersionVector::decode(&envelope.last_pushed_vv)
             .map_err(|e| DocError::Loro(e.to_string()))?;
+        let undo = Mutex::new(make_undo_manager(&inner));
         Ok(Self {
             inner,
             last_pushed_vv,
             events: Mutex::new(VecDeque::new()),
+            undo,
         })
     }
 
@@ -1681,9 +1776,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let ids = doc
-            .add_items_at(LIST_MAIN, &["x", "y", "z"], 1)
-            .unwrap();
+        let ids = doc.add_items_at(LIST_MAIN, &["x", "y", "z"], 1).unwrap();
         assert_eq!(ids.len(), 3);
         assert_eq!(
             doc.live_item_ids(LIST_MAIN),
@@ -1696,7 +1789,10 @@ mod tests {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 99).unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, ids[0].clone(), ids[1].clone()]);
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![a, ids[0].clone(), ids[1].clone()]
+        );
     }
 
     #[test]
@@ -1771,5 +1867,116 @@ mod tests {
         assert!(lists.contains(&other.as_str()));
         assert!(items.contains(&a.as_str()));
         assert!(items.contains(&b.as_str()));
+    }
+
+    #[test]
+    fn fresh_doc_cannot_undo_seed() {
+        // Seed runs before the UndoManager is created, so it isn't on
+        // the stack — the doc opens with nothing to undo.
+        let doc = Doc::new().unwrap();
+        assert!(!doc.can_undo());
+        assert!(!doc.can_redo());
+        assert!(!doc.undo().unwrap());
+    }
+
+    #[test]
+    fn undo_reverses_local_add_and_redo_replays_it() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
+        assert!(doc.can_undo());
+
+        assert!(doc.undo().unwrap());
+        assert!(doc.get_item(&id).is_none());
+        assert!(doc.can_redo());
+
+        assert!(doc.redo().unwrap());
+        let view = doc.get_item(&id).unwrap();
+        assert_eq!(view.text, "buy milk");
+    }
+
+    #[test]
+    fn undo_emits_app_events() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "thing").unwrap();
+        let _ = doc.drain_events();
+
+        assert!(doc.undo().unwrap());
+        let evs = doc.drain_events();
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, AppEvent::ItemRemoved { id: i, .. } if i == &id)),
+            "expected an ItemRemoved event for the undone add, got {evs:?}"
+        );
+    }
+
+    #[test]
+    fn undo_group_collapses_loop_to_single_step() {
+        // Each per-iteration mutation method commits independently, so
+        // a JS-side bulk loop would produce N undo steps. Wrapping in
+        // begin/end_undo_group must collapse them into one.
+        let doc = Doc::new().unwrap();
+        let ids: Vec<String> = (0..3)
+            .map(|i| doc.add_item(LIST_MAIN, &format!("item {i}")).unwrap())
+            .collect();
+
+        doc.begin_undo_group().unwrap();
+        for id in &ids {
+            doc.set_item_status(id, Status::Done).unwrap();
+        }
+        doc.end_undo_group();
+
+        for id in &ids {
+            assert_eq!(doc.get_item(id).unwrap().status, Status::Done);
+        }
+
+        assert!(doc.undo().unwrap());
+        for id in &ids {
+            assert_eq!(
+                doc.get_item(id).unwrap().status,
+                Status::Live,
+                "the whole bulk transition should reverse in one undo"
+            );
+        }
+        // The three add_item commits are still individually undoable;
+        // grouping only affected the bulk-status block.
+        assert!(doc.can_undo());
+    }
+
+    #[test]
+    fn undo_skips_remote_ops() {
+        // Remote ops imported via `apply_remote` carry origin "remote"
+        // and must not be undoable from the local UndoManager. Local
+        // mutations made on top of remote state remain undoable.
+        let dek = Dek::generate();
+
+        let mut a = Doc::new().unwrap();
+        let seed_blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let remote_id = a.add_item(LIST_MAIN, "from A").unwrap();
+        let remote_blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed_blob).unwrap();
+        b.apply_remote(&dek, &remote_blob).unwrap();
+        // Two remote imports landed but b has made no local commits.
+        assert!(!b.can_undo(), "remote-only ops must not be undoable");
+
+        let local_id = b.add_item(LIST_MAIN, "local on top").unwrap();
+        assert!(b.can_undo());
+
+        assert!(b.undo().unwrap());
+        assert!(
+            b.get_item(&local_id).is_none(),
+            "local add should be reversed"
+        );
+        assert!(
+            b.get_item(&remote_id).is_some(),
+            "remote item must survive the local undo"
+        );
+        assert!(
+            !b.can_undo(),
+            "remote ops still must not be undoable after local undo"
+        );
     }
 }

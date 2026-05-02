@@ -1,8 +1,6 @@
 //! Device list / register / revoke handlers. All require bearer auth.
 
-use airday_protocol::{
-    Device, DeviceCredential, DeviceRegistration, DevicesListResponse,
-};
+use airday_protocol::{Device, DeviceCredential, DeviceRegistration, DevicesListResponse};
 use axum::extract::{Path, State};
 use uuid::Uuid;
 
@@ -58,8 +56,8 @@ pub async fn revoke(
     auth: DeviceAuth,
     Path(device_id): Path<String>,
 ) -> ApiResult<()> {
-    let target =
-        Uuid::parse_str(&device_id).map_err(|_| ApiError::BadRequest("invalid device id".into()))?;
+    let target = Uuid::parse_str(&device_id)
+        .map_err(|_| ApiError::BadRequest("invalid device id".into()))?;
     let removed = revoke_device(&state.db, auth.account_id, target).await?;
     if !removed {
         return Err(ApiError::NotFound);

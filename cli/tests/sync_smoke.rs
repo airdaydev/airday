@@ -28,7 +28,11 @@ use uuid::Uuid;
 const MSGPACK: &str = "application/msgpack";
 
 fn weak_params() -> KdfParams {
-    KdfParams { m_kib: 8, t: 1, p: 1 }
+    KdfParams {
+        m_kib: 8,
+        t: 1,
+        p: 1,
+    }
 }
 
 struct TestServer {
@@ -47,7 +51,11 @@ impl TestServer {
         let handle = tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
-        Self { base, state, handle }
+        Self {
+            base,
+            state,
+            handle,
+        }
     }
 }
 
@@ -88,7 +96,11 @@ async fn signup_via_http(server: &TestServer, dek: &Dek) -> SignupResponse {
         .send()
         .await
         .unwrap();
-    assert!(resp.status().is_success(), "signup failed: {}", resp.status());
+    assert!(
+        resp.status().is_success(),
+        "signup failed: {}",
+        resp.status()
+    );
     rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
 }
 
@@ -103,7 +115,9 @@ fn materialize_profile(
     seed_doc: bool,
 ) -> Profile {
     std::fs::create_dir_all(data_dir).unwrap();
-    let profile = Profile { dir: data_dir.to_path_buf() };
+    let profile = Profile {
+        dir: data_dir.to_path_buf(),
+    };
     profile
         .write_device(&DeviceConfig {
             account_id: resp.account_id.clone(),
@@ -120,13 +134,19 @@ fn materialize_profile(
             dek_hex: dek_to_hex(dek),
         })
         .unwrap();
-    let doc = if seed_doc { Doc::new().unwrap() } else { Doc::empty() };
+    let doc = if seed_doc {
+        Doc::new().unwrap()
+    } else {
+        Doc::empty()
+    };
     profile.write_doc(&doc).unwrap();
     profile
 }
 
 fn reopen_profile(data_dir: &std::path::Path) -> Profile {
-    Profile { dir: data_dir.to_path_buf() }
+    Profile {
+        dir: data_dir.to_path_buf(),
+    }
 }
 
 #[tokio::test]
@@ -163,7 +183,10 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     let profile2 = reopen_profile(tmp.path());
     let session2 = Session::open_with_profile(profile2, false).await.unwrap();
     assert!(session2.is_online());
-    assert!(session2.doc().get_item(&item_id).is_some(), "item survived round-trip");
+    assert!(
+        session2.doc().get_item(&item_id).is_some(),
+        "item survived round-trip"
+    );
     assert!(!session2.doc().has_pending_ops(), "no new local mutations");
     session2.flush().await.unwrap();
 
@@ -177,7 +200,9 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
 #[tokio::test]
 async fn offline_flag_short_circuits_connect() {
     let tmp = tempfile::tempdir().unwrap();
-    let profile = Profile { dir: tmp.path().to_path_buf() };
+    let profile = Profile {
+        dir: tmp.path().to_path_buf(),
+    };
     let fake_account = Uuid::now_v7().to_string();
     profile
         .write_device(&DeviceConfig {
@@ -221,7 +246,9 @@ async fn second_device_observes_first_devices_items_via_pull() {
     // from password+wrap; here we cheat because we already have it).
     let device_b = register_device_b(&server, &signup.device_token).await;
     let tmp_b = tempfile::tempdir().unwrap();
-    let profile_b = Profile { dir: tmp_b.path().to_path_buf() };
+    let profile_b = Profile {
+        dir: tmp_b.path().to_path_buf(),
+    };
     profile_b
         .write_device(&DeviceConfig {
             account_id: signup.account_id.clone(),

@@ -77,11 +77,9 @@ impl Db {
     async fn apply_migration(&self, name: &'static str, sql: &'static str) -> anyhow::Result<()> {
         self.call(move |c| {
             let already: bool = c
-                .query_row(
-                    "SELECT 1 FROM _migrations WHERE name = ?",
-                    [name],
-                    |r| r.get::<_, i64>(0),
-                )
+                .query_row("SELECT 1 FROM _migrations WHERE name = ?", [name], |r| {
+                    r.get::<_, i64>(0)
+                })
                 .map(|_| true)
                 .or_else(|e| match e {
                     rusqlite::Error::QueryReturnedNoRows => Ok(false),

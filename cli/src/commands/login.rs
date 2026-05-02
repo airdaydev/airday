@@ -37,7 +37,12 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 
     let client = Client::new(args.server.clone());
     let pre: PreloginResponse = client
-        .post("/api/account/prelogin", &PreloginRequest { email: email.clone() })
+        .post(
+            "/api/account/prelogin",
+            &PreloginRequest {
+                email: email.clone(),
+            },
+        )
         .await?;
 
     println!("Deriving keys…");

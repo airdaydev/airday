@@ -15,8 +15,16 @@ pub enum KeystoreError {
     Hex(#[from] hex::FromHexError),
 }
 
-pub fn derive_master(password: &str, salt: &[u8], params: KdfParams) -> Result<PasswordMaster, KeystoreError> {
-    Ok(airday_core::derive_password_master(password.as_bytes(), salt, params)?)
+pub fn derive_master(
+    password: &str,
+    salt: &[u8],
+    params: KdfParams,
+) -> Result<PasswordMaster, KeystoreError> {
+    Ok(airday_core::derive_password_master(
+        password.as_bytes(),
+        salt,
+        params,
+    )?)
 }
 
 pub fn dek_from_hex(hex_dek: &str) -> Result<Dek, KeystoreError> {

@@ -239,11 +239,7 @@ pub async fn list_devices(db: &Db, account_id: Uuid) -> anyhow::Result<Vec<Devic
     .await
 }
 
-pub async fn revoke_device(
-    db: &Db,
-    account_id: Uuid,
-    device_id: Uuid,
-) -> anyhow::Result<bool> {
+pub async fn revoke_device(db: &Db, account_id: Uuid, device_id: Uuid) -> anyhow::Result<bool> {
     let acc_bytes = account_id.as_bytes().to_vec();
     let dev_bytes = device_id.as_bytes().to_vec();
     let n = db
@@ -274,7 +270,10 @@ pub async fn find_device_by_token_hash(
             |r| {
                 let id = uuid_from_blob(r.get::<_, Vec<u8>>(0)?)?;
                 let account_id = uuid_from_blob(r.get::<_, Vec<u8>>(1)?)?;
-                Ok(DeviceLookup { account_id, device_id: id })
+                Ok(DeviceLookup {
+                    account_id,
+                    device_id: id,
+                })
             },
         )
         .optional()

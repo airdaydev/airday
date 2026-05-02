@@ -33,12 +33,20 @@ pub enum AppEvent {
     /// Item removed from the doc (deleteBinned / emptyBin). Status
     /// changes to Binned do *not* emit this — they emit
     /// `ItemStatusChanged`.
-    ItemRemoved { id: String },
+    ItemRemoved {
+        id: String,
+    },
     /// Item changed position in the global items MovableList. Emitted
     /// for both intra-list reorders and inter-list moves; the
     /// accompanying `ItemListChanged` (if any) carries the new list_id.
-    ItemMoved { id: String, index: usize },
-    ItemTextChanged { id: String, text: String },
+    ItemMoved {
+        id: String,
+        index: usize,
+    },
+    ItemTextChanged {
+        id: String,
+        text: String,
+    },
     /// Status transitions bundle their timestamp fields. Going to
     /// `Live` clears both timestamps; `Done` sets `done_at`; `Binned`
     /// sets `binned_at`.
@@ -51,7 +59,10 @@ pub enum AppEvent {
     /// Item's `list_id` field changed without changing position
     /// (e.g. orphan reassignment when a list is deleted), or alongside
     /// an `ItemMoved` (cross-list drag).
-    ItemListChanged { id: String, list_id: String },
+    ItemListChanged {
+        id: String,
+        list_id: String,
+    },
 
     // ---------- lists ----------
     ListAdded {
@@ -60,7 +71,15 @@ pub enum AppEvent {
         created_at: i64,
         index: usize,
     },
-    ListRemoved { id: String },
-    ListMoved { id: String, index: usize },
-    ListRenamed { id: String, name: String },
+    ListRemoved {
+        id: String,
+    },
+    ListMoved {
+        id: String,
+        index: usize,
+    },
+    ListRenamed {
+        id: String,
+        name: String,
+    },
 }

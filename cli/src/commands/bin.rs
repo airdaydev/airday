@@ -40,7 +40,15 @@ pub async fn run(args: BinArgs, offline: bool) -> anyhow::Result<()> {
         BinSub::Empty => empty(offline).await,
         BinSub::Rm(id) => rm(&id.item_id, offline).await,
         BinSub::Item(tokens) => match tokens.as_slice() {
-            [id] => super::items::bin(IdArg { item_id: id.clone() }, offline).await,
+            [id] => {
+                super::items::bin(
+                    IdArg {
+                        item_id: id.clone(),
+                    },
+                    offline,
+                )
+                .await
+            }
             [] => anyhow::bail!("expected an item id; try `airday bin show`"),
             _ => anyhow::bail!("unexpected extra arguments after item id"),
         },

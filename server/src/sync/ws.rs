@@ -109,9 +109,7 @@ async fn run_session(
         let _ = send_msgpack(
             &mut socket,
             &HelloRejected {
-                reason: format!(
-                    "no shared protocol version (server speaks {PROTOCOL_VERSION})"
-                ),
+                reason: format!("no shared protocol version (server speaks {PROTOCOL_VERSION})"),
             },
         )
         .await;
@@ -194,8 +192,7 @@ async fn push_ops(
     }
 
     let blobs_for_broadcast = ops.clone();
-    let assigned_ids =
-        queries::insert_ops(&state.db, auth.account_id, auth.device_id, ops).await?;
+    let assigned_ids = queries::insert_ops(&state.db, auth.account_id, auth.device_id, ops).await?;
 
     // Post-commit fan-out, before acking the originator. Both branches
     // are correct (the originator's ack and peer broadcasts are
@@ -262,12 +259,8 @@ async fn recv_msgpack<T: DeserializeOwned>(socket: &mut WebSocket) -> Result<T, 
     }
 }
 
-async fn send_msgpack<T: Serialize>(
-    socket: &mut WebSocket,
-    value: &T,
-) -> Result<(), SessionError> {
+async fn send_msgpack<T: Serialize>(socket: &mut WebSocket, value: &T) -> Result<(), SessionError> {
     let bytes = rmp_serde::to_vec_named(value)?;
     socket.send(Message::Binary(bytes.into())).await?;
     Ok(())
 }
-

@@ -763,8 +763,7 @@ mod tests {
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::FrontierAdvanced { id: 7 }));
         // Granular AppEvent: the peer item shows up on the doc's queue.
-        let app_evs: Vec<_> =
-            std::iter::from_fn(|| eng.pop_app_event()).collect();
+        let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
         assert!(
             app_evs
                 .iter()
@@ -799,9 +798,7 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // Mutate locally, start a push.
-        eng.doc_mut()
-            .add_item(LIST_MAIN, "local-pushing")
-            .unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "local-pushing").unwrap();
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
 

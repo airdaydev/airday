@@ -23,7 +23,11 @@ use std::sync::OnceLock;
 const MSGPACK: &str = "application/msgpack";
 
 fn weak_params() -> KdfParams {
-    KdfParams { m_kib: 8, t: 1, p: 1 }
+    KdfParams {
+        m_kib: 8,
+        t: 1,
+        p: 1,
+    }
 }
 
 struct TestServer {
@@ -67,7 +71,12 @@ where
         req = req.bearer_auth(t);
     }
     let resp = req.send().await.unwrap();
-    assert!(resp.status().is_success(), "expected 2xx, got {}: {}", resp.status(), resp.text().await.unwrap_or_default());
+    assert!(
+        resp.status().is_success(),
+        "expected 2xx, got {}: {}",
+        resp.status(),
+        resp.text().await.unwrap_or_default()
+    );
     let bytes = resp.bytes().await.unwrap();
     rmp_serde::from_slice(&bytes).unwrap()
 }
@@ -170,8 +179,7 @@ async fn signup(with_recovery: bool) -> Account {
     let kdf_params = weak_params();
 
     let master_salt: [u8; 16] = random_bytes();
-    let master =
-        derive_password_master(password.as_bytes(), &master_salt, kdf_params).unwrap();
+    let master = derive_password_master(password.as_bytes(), &master_salt, kdf_params).unwrap();
     let kek = master.kek().unwrap();
     let auth_secret = master.auth_secret().unwrap();
     let dek = Dek::generate();
@@ -182,8 +190,7 @@ async fn signup(with_recovery: bool) -> Account {
     let recovery = if with_recovery {
         let code = generate_recovery_code().unwrap();
         let salt: [u8; 16] = random_bytes();
-        let r_master =
-            derive_recovery_master(code.as_str(), &salt, kdf_params).unwrap();
+        let r_master = derive_recovery_master(code.as_str(), &salt, kdf_params).unwrap();
         let r_kek = r_master.kek().unwrap();
         let r_auth = r_master.auth_secret().unwrap();
         let r_wrapped = r_kek.wrap(&dek).unwrap();
@@ -236,7 +243,9 @@ async fn signup_then_login_returns_same_dek() {
 
     let pre: PreloginResponse = post_msgpack(
         &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest { email: acc.email.clone() },
+        &PreloginRequest {
+            email: acc.email.clone(),
+        },
         None,
     )
     .await;
@@ -253,14 +262,18 @@ async fn signup_then_login_returns_same_dek() {
         &LoginRequest {
             email: acc.email.clone(),
             auth_secret: auth.as_bytes().to_vec(),
-            register_device: Some(DeviceRegistration { name: "second-device".into() }),
+            register_device: Some(DeviceRegistration {
+                name: "second-device".into(),
+            }),
         },
         None,
     )
     .await;
     assert_eq!(login.account_id, acc.account_id);
     assert!(!login.recovery_present);
-    let device = login.device.expect("register_device should produce credential");
+    let device = login
+        .device
+        .expect("register_device should produce credential");
     assert!(!device.device_token.is_empty());
 
     let kek = master.kek().unwrap();
@@ -280,7 +293,9 @@ async fn login_with_wrong_password_is_rejected() {
 
     let pre: PreloginResponse = post_msgpack(
         &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest { email: acc.email.clone() },
+        &PreloginRequest {
+            email: acc.email.clone(),
+        },
         None,
     )
     .await;
@@ -305,7 +320,9 @@ async fn prelogin_unknown_email_is_404() {
     let server = TestServer::start().await;
     let status = post_msgpack_status(
         &format!("{}/api/account/prelogin", server.base),
-        &PreloginRequest { email: "nope@nowhere".into() },
+        &PreloginRequest {
+            email: "nope@nowhere".into(),
+        },
     )
     .await;
     assert_eq!(status, reqwest::StatusCode::NOT_FOUND);
@@ -355,9 +372,12 @@ async fn password_change_rotates_login_credentials() {
     let new_auth = new_master.auth_secret().unwrap();
     let new_wrapped = new_kek.wrap(&acc.dek).unwrap();
 
-    let current_master =
-        derive_password_master(b"correct horse battery staple", &acc.master_salt, acc.kdf_params)
-            .unwrap();
+    let current_master = derive_password_master(
+        b"correct horse battery staple",
+        &acc.master_salt,
+        acc.kdf_params,
+    )
+    .unwrap();
     let current_auth = current_master.auth_secret().unwrap();
 
     post_msgpack_no_response(
@@ -377,13 +397,18 @@ async fn password_change_rotates_login_credentials() {
     // Old password no longer works.
     let pre: PreloginResponse = post_msgpack(
         &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest { email: acc.email.clone() },
+        &PreloginRequest {
+            email: acc.email.clone(),
+        },
         None,
     )
     .await;
-    let old_master =
-        derive_password_master(b"correct horse battery staple", &pre.master_salt, pre.kdf_params)
-            .unwrap();
+    let old_master = derive_password_master(
+        b"correct horse battery staple",
+        &pre.master_salt,
+        pre.kdf_params,
+    )
+    .unwrap();
     let old_auth = old_master.auth_secret().unwrap();
     let status = post_msgpack_status(
         &format!("{}/api/account/login", acc.server.base),
@@ -429,14 +454,15 @@ async fn recovery_code_unlocks_dek_and_resets_password() {
 
     let pre: PreloginResponse = post_msgpack(
         &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest { email: acc.email.clone() },
+        &PreloginRequest {
+            email: acc.email.clone(),
+        },
         None,
     )
     .await;
     assert_eq!(pre.recovery_salt.as_ref(), Some(&recovery_salt));
 
-    let r_master =
-        derive_recovery_master(&recovery_code, &recovery_salt, pre.kdf_params).unwrap();
+    let r_master = derive_recovery_master(&recovery_code, &recovery_salt, pre.kdf_params).unwrap();
     let r_kek = r_master.kek().unwrap();
     let r_auth = r_master.auth_secret().unwrap();
 
@@ -553,12 +579,18 @@ async fn signup_sets_device_cookie_with_expected_attributes() {
     .await;
     assert!(status.is_success());
     let body = body.unwrap();
-    let sc = find_set_cookie(&set_cookies, "airday_device")
-        .expect("expected airday_device Set-Cookie");
-    assert_eq!(cookie_value(sc, "airday_device"), Some(body.device_token.as_str()));
+    let sc =
+        find_set_cookie(&set_cookies, "airday_device").expect("expected airday_device Set-Cookie");
+    assert_eq!(
+        cookie_value(sc, "airday_device"),
+        Some(body.device_token.as_str())
+    );
     assert!(sc.contains("HttpOnly"), "missing HttpOnly: {sc}");
     assert!(sc.contains("Secure"), "missing Secure: {sc}");
-    assert!(sc.contains("SameSite=Strict"), "missing SameSite=Strict: {sc}");
+    assert!(
+        sc.contains("SameSite=Strict"),
+        "missing SameSite=Strict: {sc}"
+    );
     assert!(sc.contains("Path=/"), "missing Path=/: {sc}");
     let _ = acc; // silence unused warning; kept to mirror style of other tests
 }
@@ -577,10 +609,16 @@ async fn cookie_authenticates_logout_without_bearer() {
     .await;
     // Note: ApiResult<(HeaderMap, ())> serialises to an empty body with
     // 200; the helper returns parsed = None for empty bodies.
-    assert!(status.is_success(), "logout via cookie should succeed: {status}");
+    assert!(
+        status.is_success(),
+        "logout via cookie should succeed: {status}"
+    );
     let cleared = find_set_cookie(&set_cookies, "airday_device")
         .expect("logout should emit a clearing Set-Cookie");
-    assert!(cleared.contains("Max-Age=0"), "expected clear cookie: {cleared}");
+    assert!(
+        cleared.contains("Max-Age=0"),
+        "expected clear cookie: {cleared}"
+    );
     assert_eq!(cookie_value(cleared, "airday_device"), Some(""));
 
     // Subsequent bearer call should now 401 — the device was revoked.
@@ -597,13 +635,18 @@ async fn login_without_register_device_does_not_set_cookie() {
     let acc = signup(false).await;
     let pre: PreloginResponse = post_msgpack(
         &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest { email: acc.email.clone() },
+        &PreloginRequest {
+            email: acc.email.clone(),
+        },
         None,
     )
     .await;
-    let master =
-        derive_password_master(b"correct horse battery staple", &pre.master_salt, pre.kdf_params)
-            .unwrap();
+    let master = derive_password_master(
+        b"correct horse battery staple",
+        &pre.master_salt,
+        pre.kdf_params,
+    )
+    .unwrap();
     let auth = master.auth_secret().unwrap();
     let (status, set_cookies, _): (_, _, Option<LoginResponse>) = post_msgpack_full(
         &format!("{}/api/account/login", acc.server.base),

@@ -74,6 +74,19 @@ export interface DocApp {
   renameList(id: string, name: string): void;
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
+  /** Per-session local undo. Returns whether a step was applied so the
+   *  caller can decide whether to `preventDefault()` the keybinding.
+   *  Remote-applied ops are excluded by origin tag — see
+   *  `spec/sync-protocol.md` "Commit origin tagging". */
+  undo(): boolean;
+  redo(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  /** Bracket a JS-side bulk loop so its N per-call commits collapse
+   *  to a single undo step. Returns whatever `fn` returns; closes the
+   *  group in `finally` so a thrown mutation doesn't leak an open
+   *  group. Do not nest — Loro errors if a group is opened twice. */
+  withUndoGroup<T>(fn: () => T): T;
 }
 
 export function createSyncedApp(engine: SyncEngine): DocApp {
@@ -302,6 +315,30 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     deleteList(id) {
       engine.deleteList(id);
       flush();
+    },
+    undo() {
+      const did = engine.undo();
+      if (did) flush();
+      return did;
+    },
+    redo() {
+      const did = engine.redo();
+      if (did) flush();
+      return did;
+    },
+    canUndo() {
+      return engine.canUndo();
+    },
+    canRedo() {
+      return engine.canRedo();
+    },
+    withUndoGroup(fn) {
+      engine.beginUndoGroup();
+      try {
+        return fn();
+      } finally {
+        engine.endUndoGroup();
+      }
     },
   };
 }

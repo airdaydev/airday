@@ -519,15 +519,17 @@ function Workspace(props: {
     nextIds.splice(insertAt, 0, ...movedIds);
 
     const currentIds = [...ids];
-    for (const [index, id] of nextIds.entries()) {
-      if (currentIds[index] !== id) {
-        const currentIndex = currentIds.indexOf(id);
-        if (currentIndex < 0) continue;
-        app.moveItem(id, v.id, index);
-        currentIds.splice(currentIndex, 1);
-        currentIds.splice(index, 0, id);
+    app.withUndoGroup(() => {
+      for (const [index, id] of nextIds.entries()) {
+        if (currentIds[index] !== id) {
+          const currentIndex = currentIds.indexOf(id);
+          if (currentIndex < 0) continue;
+          app.moveItem(id, v.id, index);
+          currentIds.splice(currentIndex, 1);
+          currentIds.splice(index, 0, id);
+        }
       }
-    }
+    });
   };
 
   const addItem = (text: string) => {
@@ -613,11 +615,13 @@ function Workspace(props: {
         }
       }
     }
-    if (v.kind === "bin") {
-      for (const id of ids) app.deleteBinned(id);
-    } else {
-      for (const id of ids) app.setStatus(id, "binned");
-    }
+    app.withUndoGroup(() => {
+      if (v.kind === "bin") {
+        for (const id of ids) app.deleteBinned(id);
+      } else {
+        for (const id of ids) app.setStatus(id, "binned");
+      }
+    });
     if (nextId === null) {
       selection.clear();
     } else {
@@ -675,6 +679,23 @@ function Workspace(props: {
   document.addEventListener("keydown", onDuplicateKey);
   onCleanup(() => document.removeEventListener("keydown", onDuplicateKey));
 
+  // Cmd/Ctrl+Z (undo) and Cmd/Ctrl+Shift+Z (redo). Skipped when focus
+  // is in an editable surface so the browser's native text-undo handles
+  // mid-typing in inputs/textareas/contenteditable rows. Only swallows
+  // the keystroke when the engine actually applied a step — otherwise
+  // the OS / browser still gets a shot at it.
+  const onUndoRedoKey = (e: KeyboardEvent) => {
+    if (e.key !== "z" && e.key !== "Z") return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.altKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const did = e.shiftKey ? app.redo() : app.undo();
+    if (did) e.preventDefault();
+  };
+  document.addEventListener("keydown", onUndoRedoKey);
+  onCleanup(() => document.removeEventListener("keydown", onUndoRedoKey));
+
   // Drag items into a list nav button to move them to that list as the
   // first items. Discriminate from the nav's own list-reorder drag by
   // checking detail.items[0] for an item-shaped record (`listId` is
@@ -719,9 +740,11 @@ function Workspace(props: {
     // Sort by current global order so multi-select drops preserve the
     // user's visible ordering rather than landing in selection order.
     const idsInOrder = state.itemsOrder.filter((id) => draggedKeys.has(id));
-    for (const [i, id] of idsInOrder.entries()) {
-      app.moveItem(id, target.listId, i);
-    }
+    app.withUndoGroup(() => {
+      for (const [i, id] of idsInOrder.entries()) {
+        app.moveItem(id, target.listId, i);
+      }
+    });
     // When dragging out of the current list, the rows are no longer
     // visible here — leaving them "selected" means a phantom block
     // anchor lingers. Same-list drops keep selection so the user can
@@ -902,6 +925,18 @@ function Nav(props: {
 
   const navSelection = new DndSelection();
 
+  // Reactive read-throughs of the engine's undo state. `app.version`
+  // bumps on every dispatched event (local mutation, undo/redo, remote
+  // import), which is exactly when undo availability can change.
+  const canUndo = (): boolean => {
+    props.app.version();
+    return props.app.canUndo();
+  };
+  const canRedo = (): boolean => {
+    props.app.version();
+    return props.app.canRedo();
+  };
+
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
     const ids = props.lists.map((l) => l.id);
@@ -1043,6 +1078,27 @@ function Nav(props: {
                   ? "Local-only account"
                   : props.session.email}
               </div>
+              <DropdownMenu.Separator class="dropdown-menu-separator" />
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                disabled={!canUndo()}
+                onSelect={() => {
+                  props.app.undo();
+                }}
+              >
+                <span>Undo</span>
+                <kbd class="menu-shortcut">⌘Z</kbd>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                disabled={!canRedo()}
+                onSelect={() => {
+                  props.app.redo();
+                }}
+              >
+                <span>Redo</span>
+                <kbd class="menu-shortcut">⌘⇧Z</kbd>
+              </DropdownMenu.Item>
               <DropdownMenu.Separator class="dropdown-menu-separator" />
               <DropdownMenu.Item
                 class="dropdown-menu-item"
@@ -1307,31 +1363,41 @@ function Row(props: {
       return it !== undefined && it.status !== "binned";
     });
   const onBin = () => {
-    for (const id of binTargets()) props.app.setStatus(id, "binned");
+    props.app.withUndoGroup(() => {
+      for (const id of binTargets()) props.app.setStatus(id, "binned");
+    });
   };
   const onMarkDone = () => {
-    for (const id of targetIds()) {
-      const it = props.app.getItem(id);
-      if (it && it.status === "live") props.app.setStatus(id, "done");
-    }
+    props.app.withUndoGroup(() => {
+      for (const id of targetIds()) {
+        const it = props.app.getItem(id);
+        if (it && it.status === "live") props.app.setStatus(id, "done");
+      }
+    });
   };
   const onMarkNotDone = () => {
-    for (const id of targetIds()) {
-      const it = props.app.getItem(id);
-      if (it && it.status === "done") props.app.setStatus(id, "live");
-    }
+    props.app.withUndoGroup(() => {
+      for (const id of targetIds()) {
+        const it = props.app.getItem(id);
+        if (it && it.status === "done") props.app.setStatus(id, "live");
+      }
+    });
   };
   const onRestore = () => {
-    for (const id of targetIds()) {
-      const it = props.app.getItem(id);
-      if (it && it.status === "binned") props.app.setStatus(id, "live");
-    }
+    props.app.withUndoGroup(() => {
+      for (const id of targetIds()) {
+        const it = props.app.getItem(id);
+        if (it && it.status === "binned") props.app.setStatus(id, "live");
+      }
+    });
   };
   const onDelete = () => {
-    for (const id of targetIds()) {
-      const it = props.app.getItem(id);
-      if (it && it.status === "binned") props.app.deleteBinned(id);
-    }
+    props.app.withUndoGroup(() => {
+      for (const id of targetIds()) {
+        const it = props.app.getItem(id);
+        if (it && it.status === "binned") props.app.deleteBinned(id);
+      }
+    });
   };
   const onDuplicate = () => {
     props.duplicateBlock(targetIds());

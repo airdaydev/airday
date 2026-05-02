@@ -73,16 +73,13 @@ pub async fn fetch_ops_batch(
              ORDER BY id ASC
              LIMIT ?",
         )?;
-        let rows = stmt.query_map(
-            params![acc_bytes, since_op_id as i64, limit],
-            |r| {
-                Ok((
-                    r.get::<_, i64>(0)? as u64,
-                    r.get::<_, Vec<u8>>(1)?,
-                    r.get::<_, Vec<u8>>(2)?,
-                ))
-            },
-        )?;
+        let rows = stmt.query_map(params![acc_bytes, since_op_id as i64, limit], |r| {
+            Ok((
+                r.get::<_, i64>(0)? as u64,
+                r.get::<_, Vec<u8>>(1)?,
+                r.get::<_, Vec<u8>>(2)?,
+            ))
+        })?;
         let mut ops = Vec::new();
         let mut bytes = 0usize;
         let mut over_count = false;

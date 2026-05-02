@@ -45,7 +45,9 @@ fn collect_texts(arg: &str) -> anyhow::Result<Vec<String>> {
     if arg == "-" {
         let stdin = std::io::stdin();
         if stdin.is_terminal() {
-            anyhow::bail!("`add -` reads from stdin but stdin is a tty — pipe input or pass text directly");
+            anyhow::bail!(
+                "`add -` reads from stdin but stdin is a tty — pipe input or pass text directly"
+            );
         }
         let mut out = Vec::new();
         for line in stdin.lock().lines() {
@@ -180,7 +182,9 @@ pub async fn mv(args: MvArgs, offline: bool) -> anyhow::Result<()> {
     // length). `move_item` clamps to the existing range, so passing a
     // huge index is safe — but the explicit count here is clearer.
     let target_idx = session.doc().items_in_list(&args.list, true).len();
-    session.doc().move_item(&args.item_id, &args.list, target_idx)?;
+    session
+        .doc()
+        .move_item(&args.item_id, &args.list, target_idx)?;
     session.flush().await?;
     println!("{}", args.item_id);
     Ok(())
