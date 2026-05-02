@@ -21,12 +21,12 @@ import {
 } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
+import { Settings } from "./Settings.tsx";
 import {
   createSyncedApp,
   type DocApp,
@@ -359,6 +359,7 @@ function Workspace(props: {
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "main" });
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
 
   // One selection model per Workspace instance — the Dnd component is
   // re-keyed on view change (so it remounts), but we re-use the selection
@@ -607,6 +608,13 @@ function Workspace(props: {
         lists={lists()}
         view={view()}
         setView={setView}
+        session={props.session}
+        logout={props.logout}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <Settings
+        open={settingsOpen()}
+        onOpenChange={setSettingsOpen}
         themePref={themePref()}
         onThemeChange={(pref) => {
           setThemePref(pref);
@@ -678,43 +686,6 @@ function Workspace(props: {
   );
 }
 
-function SunIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
-
 function CloudOffIcon() {
   return (
     <svg
@@ -749,10 +720,9 @@ function Nav(props: {
   lists: { id: string; name: string }[];
   view: ViewKey;
   setView: (v: ViewKey) => void;
-  themePref: ThemePreference;
-  onThemeChange: (pref: ThemePreference) => void;
   session: Session;
   logout: () => void;
+  onOpenSettings: () => void;
 }) {
   const [adding, setAdding] = createSignal(false);
   const [name, setName] = createSignal("");
@@ -914,6 +884,12 @@ function Nav(props: {
               <DropdownMenu.Separator class="dropdown-menu-separator" />
               <DropdownMenu.Item
                 class="dropdown-menu-item"
+                onSelect={() => props.onOpenSettings()}
+              >
+                Settings
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
                 onSelect={() => props.logout()}
               >
                 Log out
@@ -921,37 +897,6 @@ function Nav(props: {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu>
-        <SegmentedControl
-          class="theme-segmented"
-          aria-label="Appearance"
-          value={props.themePref}
-          onChange={(value) => props.onThemeChange(value as ThemePreference)}
-        >
-          <SegmentedControl.Item value="auto" class="theme-segment">
-            <SegmentedControl.ItemInput />
-            <SegmentedControl.ItemControl class="theme-segment-control">
-              <SegmentedControl.ItemLabel>Auto</SegmentedControl.ItemLabel>
-            </SegmentedControl.ItemControl>
-          </SegmentedControl.Item>
-          <SegmentedControl.Item value="light" class="theme-segment">
-            <SegmentedControl.ItemInput />
-            <SegmentedControl.ItemControl
-              class="theme-segment-control"
-              aria-label="Light"
-            >
-              <SunIcon />
-            </SegmentedControl.ItemControl>
-          </SegmentedControl.Item>
-          <SegmentedControl.Item value="dark" class="theme-segment">
-            <SegmentedControl.ItemInput />
-            <SegmentedControl.ItemControl
-              class="theme-segment-control"
-              aria-label="Dark"
-            >
-              <MoonIcon />
-            </SegmentedControl.ItemControl>
-          </SegmentedControl.Item>
-        </SegmentedControl>
       </div>
     </nav>
   );

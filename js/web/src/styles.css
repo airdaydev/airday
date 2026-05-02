@@ -184,6 +184,7 @@ body,
   height: 100%;
   min-width: 0;
   overflow-y: scroll;
+  padding: 0 8px;
 }
 
 .main-header {
@@ -547,4 +548,146 @@ body,
   background: var(--border);
   margin: 4px 0;
   border: none;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.dialog-positioner {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 101;
+  padding: 24px;
+}
+
+.settings-dialog {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  width: min(720px, 100%);
+  height: min(480px, 100%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  outline: none;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .settings-dialog {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.settings-sidebar {
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border);
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-title {
+  margin: 0 0 12px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-nav-item[data-active] {
+  background: var(--bg-active);
+}
+
+.settings-content {
+  position: relative;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.settings-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.settings-section-title {
+  margin: 0 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-label {
+  color: var(--text-muted);
+}
+
+.settings-row-value {
+  color: var(--text);
+}
+
+.settings-logout {
+  padding: 6px 12px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.settings-logout:hover {
+  background: var(--bg-hover);
 }
