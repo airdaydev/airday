@@ -692,6 +692,22 @@ function Workspace(props: {
     document.removeEventListener("primavera-dnd-dragend", onDndDragEnd);
   });
 
+  // While a row is expanded: right-click inside it → native browser menu;
+  // right-click anywhere else → noop. Capture-phase so we run before
+  // Kobalte's ContextMenu trigger sees the event.
+  const onContextMenu = (e: MouseEvent) => {
+    const expanded = document.querySelector<HTMLElement>('.row[data-expanded=""]');
+    if (!expanded) return;
+    if (expanded.contains(e.target as Node)) {
+      e.stopPropagation();
+    } else {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+  document.addEventListener("contextmenu", onContextMenu, true);
+  onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
+
   return (
     <div class="app">
       <Nav
@@ -747,36 +763,35 @@ function Workspace(props: {
             </Show>
           </div>
         </header>
-        <div class="dnd-host">
-          <Show
-            when={items().length > 0}
-            fallback={<div class="empty">Nothing here yet.</div>}
-          >
-            <Show keyed when={dndRevision()}>
-              <Dnd
-                items={dndItems()}
-                setItems={setDndItems}
-                getKey={(it) => it.id}
-                selection={selection}
-                itemHeight={28}
-                expandable
-                clearOnClickOutside
-                fillHeight
-                reorder={view().kind === "list"}
-                onReorder={onReorder}
-              >
-                {(item, expanded) => (
-                  <Row
-                    item={item}
-                    expanded={expanded}
-                    app={app}
-                    selection={selection}
-                  />
-                )}
-              </Dnd>
-            </Show>
+        <Show
+          when={items().length > 0}
+          fallback={<div class="dnd-host empty">Nothing here yet.</div>}
+        >
+          <Show keyed when={dndRevision()}>
+            <Dnd
+              class="dnd-host"
+              items={dndItems()}
+              setItems={setDndItems}
+              getKey={(it) => it.id}
+              selection={selection}
+              itemHeight={28}
+              expandable
+              clearOnClickOutside
+              fillHeight
+              reorder={view().kind === "list"}
+              onReorder={onReorder}
+            >
+              {(item, expanded) => (
+                <Row
+                  item={item}
+                  expanded={expanded}
+                  app={app}
+                  selection={selection}
+                />
+              )}
+            </Dnd>
           </Show>
-        </div>
+        </Show>
       </main>
     </div>
   );

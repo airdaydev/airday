@@ -236,10 +236,6 @@ body {
   overflow: hidden;
 }
 
-.dnd-host > primavera-dnd {
-  margin-left: 12px;
-}
-
 .dnd-host .dnd-parent {
   padding: 0 8px;
 }
@@ -260,6 +256,11 @@ body {
   padding: 6px;
   height: 100%;
   background: var(--bg-elevated);
+  transition: 0.2s opacity;
+}
+
+.dnd-host[data-expanded] .row:not([data-expanded]) {
+  opacity: 0.5;
 }
 
 [data-theme="dark"] .row {
