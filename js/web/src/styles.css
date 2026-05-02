@@ -283,7 +283,6 @@ body,
 }
 
 .row[data-status="done"] .row-text {
-  text-decoration: line-through;
   color: var(--text-faint);
 }
 
