@@ -264,6 +264,14 @@ body,
   color: var(--text-subtle);
 }
 
+.row-timestamp {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+  font-size: 13px;
+  white-space: nowrap;
+  line-height: 1.3em;
+}
+
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
    makes it a scroll container, which trips the browser's caret-scroll-into-view
    while typing in the expanded row's contenteditable: text wraps below the

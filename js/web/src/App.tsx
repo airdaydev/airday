@@ -46,6 +46,53 @@ const CLIENT_VERSION = "0.1.0";
 // once for the lifetime of the page.
 const theme = createTheme();
 
+// Shared 60s tick for relative-time labels ("5m ago"). One signal, one
+// interval — every Row that reads it stays fresh without spawning its
+// own timer.
+const [nowMs, setNowMs] = createSignal(Date.now());
+setInterval(() => setNowMs(Date.now()), 60_000);
+
+const timeFmt = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
+const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+const monthDayFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+});
+const monthDayYearFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+function calendarDayDiff(later: Date, earlier: Date): number {
+  const a = new Date(later.getFullYear(), later.getMonth(), later.getDate()).getTime();
+  const b = new Date(earlier.getFullYear(), earlier.getMonth(), earlier.getDate()).getTime();
+  return Math.round((a - b) / 86_400_000);
+}
+
+function statusTimestamp(it: ItemView): number | undefined {
+  if (it.status === "done") return it.doneAt;
+  if (it.status === "binned") return it.binnedAt;
+  return undefined;
+}
+
+function formatRelative(ts: number, now: number): string {
+  const diffMs = now - ts;
+  if (diffMs < 60_000) return "just now";
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+  if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)}h ago`;
+  const tsDate = new Date(ts);
+  const nowDate = new Date(now);
+  const days = calendarDayDiff(nowDate, tsDate);
+  if (days === 1) return `Yesterday ${timeFmt.format(tsDate)}`;
+  if (days < 7) return `${weekdayFmt.format(tsDate)} ${timeFmt.format(tsDate)}`;
+  if (tsDate.getFullYear() === nowDate.getFullYear()) return monthDayFmt.format(tsDate);
+  return monthDayYearFmt.format(tsDate);
+}
+
 export function App() {
   // `undefined` = vault probe still in flight; `null` = no session, show
   // login; `Session` = logged in. Booting straight into Login would
@@ -1052,6 +1099,13 @@ function Row(props: {
             <div class="row-description">Notes</div>
           </Show>
         </div>
+        <Show when={statusTimestamp(props.item())}>
+          {(ts) => (
+            <span class="row-timestamp" title={new Date(ts()).toLocaleString()}>
+              {formatRelative(ts(), nowMs())}
+            </span>
+          )}
+        </Show>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
