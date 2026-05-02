@@ -142,6 +142,10 @@ body,
   background: var(--bg-active);
 }
 
+.nav-item[data-drop-active] {
+  background: var(--dnd-select-bg);
+}
+
 .nav-item-label {
   display: block;
   width: calc(100% + 32px);

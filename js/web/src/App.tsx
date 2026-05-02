@@ -23,6 +23,7 @@ import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
+import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
@@ -479,6 +480,68 @@ function Workspace(props: {
   document.addEventListener("paste", onPaste);
   onCleanup(() => document.removeEventListener("paste", onPaste));
 
+  // Drag items into a list nav button to move them to that list as the
+  // first items. Discriminate from the nav's own list-reorder drag by
+  // checking detail.items[0] for an item-shaped record (`listId` is
+  // present on ItemView, absent on ListView). Bubbling + composed means
+  // a single document-level listener catches both Dnd instances.
+  const findDropTarget = (
+    x: number,
+    y: number,
+  ): { el: HTMLElement; listId: string } | null => {
+    const el = document
+      .elementFromPoint(x, y)
+      ?.closest<HTMLElement>("[data-drop-list-id]");
+    if (!el) return null;
+    return { el, listId: el.dataset.dropListId! };
+  };
+  const clearDropHighlight = () => {
+    document
+      .querySelectorAll<HTMLElement>("[data-drop-active]")
+      .forEach((el) => delete el.dataset.dropActive);
+  };
+  const isItemDrag = (items: readonly unknown[]): boolean =>
+    items.length > 0 &&
+    typeof items[0] === "object" &&
+    items[0] !== null &&
+    "listId" in items[0];
+
+  const onDndDragMove = (e: Event) => {
+    const ce = e as CustomEvent<DndDragEventDetail>;
+    if (!isItemDrag(ce.detail.items)) return;
+    clearDropHighlight();
+    const target = findDropTarget(ce.detail.x, ce.detail.y);
+    if (target) target.el.dataset.dropActive = "";
+  };
+  const onDndDragEnd = (e: Event) => {
+    const ce = e as CustomEvent<DndDragEventDetail>;
+    clearDropHighlight();
+    if (!isItemDrag(ce.detail.items)) return;
+    const target = findDropTarget(ce.detail.x, ce.detail.y);
+    if (!target) return;
+    ce.preventDefault();
+    const draggedKeys = new Set(ce.detail.keys.map(String));
+    // Sort by current global order so multi-select drops preserve the
+    // user's visible ordering rather than landing in selection order.
+    const idsInOrder = state.itemsOrder.filter((id) => draggedKeys.has(id));
+    for (const [i, id] of idsInOrder.entries()) {
+      app.moveItem(id, target.listId, i);
+    }
+    // When dragging out of the current list, the rows are no longer
+    // visible here — leaving them "selected" means a phantom block
+    // anchor lingers. Same-list drops keep selection so the user can
+    // continue acting on the rows they just rearranged.
+    const v = view();
+    const sameList = v.kind === "list" && v.id === target.listId;
+    if (!sameList) selection.clear();
+  };
+  document.addEventListener("primavera-dnd-dragmove", onDndDragMove);
+  document.addEventListener("primavera-dnd-dragend", onDndDragEnd);
+  onCleanup(() => {
+    document.removeEventListener("primavera-dnd-dragmove", onDndDragMove);
+    document.removeEventListener("primavera-dnd-dragend", onDndDragEnd);
+  });
+
   return (
     <div class="app">
       <Nav
@@ -702,6 +765,7 @@ function Nav(props: {
           data-active={
             props.view.kind === "list" && props.view.id === "main" ? "" : undefined
           }
+          data-drop-list-id="main"
           onClick={() => props.setView({ kind: "list", id: "main" })}
         >
           Now
@@ -750,6 +814,7 @@ function Nav(props: {
                       ? ""
                       : undefined
                   }
+                  data-drop-list-id={l().id}
                   onClick={() => props.setView({ kind: "list", id: l().id })}
                 >
                   <EditableNavLabel
