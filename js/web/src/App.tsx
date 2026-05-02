@@ -9,6 +9,7 @@ import {
   createSignal,
   on,
   onCleanup,
+  onMount,
   Show,
 } from "solid-js";
 import { Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
@@ -552,6 +553,7 @@ function Workspace(props: {
                 expandable
                 clearOnClickOutside
                 fillHeight
+                reorder={view().kind === "list"}
                 onReorder={onReorder}
               >
                 {(item, expanded) => (
@@ -783,18 +785,12 @@ function Nav(props: {
             </button>
           }
         >
-          <form class="add-form" style={{ padding: "4px 12px" }} onSubmit={submit}>
-            <input
-              autofocus
-              type="text"
-              placeholder="List name"
-              value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
-              onBlur={() => {
-                if (!name().trim()) setAdding(false);
-              }}
-            />
-          </form>
+          <NewListForm
+            name={name()}
+            setName={setName}
+            onSubmit={submit}
+            onDismiss={() => setAdding(false)}
+          />
         </Show>
       </div>
       <div class="nav-footer">
@@ -831,6 +827,31 @@ function Nav(props: {
         </SegmentedControl>
       </div>
     </nav>
+  );
+}
+
+function NewListForm(props: {
+  name: string;
+  setName: (v: string) => void;
+  onSubmit: (e: Event) => void;
+  onDismiss: () => void;
+}) {
+  let inputRef!: HTMLInputElement;
+  onMount(() => inputRef.focus());
+  return (
+    <form onSubmit={props.onSubmit}>
+      <input
+        ref={inputRef}
+        class="nav-item nav-item-input"
+        type="text"
+        placeholder="+ New list"
+        value={props.name}
+        onInput={(e) => props.setName(e.currentTarget.value)}
+        onBlur={() => {
+          if (!props.name.trim()) props.onDismiss();
+        }}
+      />
+    </form>
   );
 }
 

@@ -150,6 +150,17 @@ body,
   outline: none;
 }
 
+.nav-item-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.nav-item-input:focus {
+  background: var(--bg-hover);
+}
+
 .nav-item-label[contenteditable="true"] {
   cursor: text;
 }
