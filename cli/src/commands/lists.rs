@@ -20,7 +20,9 @@ pub struct ListsArgs {
 pub enum ListsCmd {
     /// Add a new list.
     Add { name: String },
-    /// Rename an existing list (built-ins included).
+    /// Rename a user-created list. The reserved `main` list is not
+    /// renamable from the doc layer (its label is client-side until a
+    /// meta CRDT lands).
     Rename { list: String, name: String },
     /// Delete a user-created list. Items are reassigned to `current`.
     Rm { list: String },

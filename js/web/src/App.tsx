@@ -582,7 +582,10 @@ function CloudOffIcon() {
 }
 
 function viewTitle(v: ViewKey, lists: { id: string; name: string }[]): string {
-  if (v.kind === "list") return lists.find((l) => l.id === v.id)?.name ?? v.id;
+  if (v.kind === "list") {
+    if (v.id === "main") return "Now";
+    return lists.find((l) => l.id === v.id)?.name ?? v.id;
+  }
   if (v.kind === "done") return "Done";
   return "Bin";
 }
@@ -606,19 +609,18 @@ function Nav(props: {
     setAdding(false);
     props.setView({ kind: "list", id });
   };
-  const mainList = () => props.lists.find((l) => l.id === "main");
-  const otherLists = createMemo(() => props.lists.filter((l) => l.id !== "main"));
+  // `main` is a reserved id with no MovableList entry — clients
+  // render it as a static nav button, so the dnd source is just
+  // `props.lists` directly.
   type NavList = { id: string; name: string };
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
-  createEffect(() => setDndLists(otherLists()));
+  createEffect(() => setDndLists(props.lists));
 
   const navSelection = new DndSelection();
 
-  // Section 2 only contains non-main lists; main is pinned at absolute
-  // index 0, so a section-2 position K maps to absolute index K + 1.
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
-    const ids = otherLists().map((l) => l.id);
+    const ids = props.lists.map((l) => l.id);
     const movedIds = op.keys.map(String).filter((id) => ids.includes(id));
     if (movedIds.length === 0) return;
     const remaining = ids.filter((id) => !movedIds.includes(id));
@@ -631,13 +633,12 @@ function Nav(props: {
           })();
     const nextIds = [...remaining];
     nextIds.splice(insertAt, 0, ...movedIds);
-    const offset = mainList() ? 1 : 0;
     const currentIds = [...ids];
     for (const [index, id] of nextIds.entries()) {
       if (currentIds[index] !== id) {
         const currentIndex = currentIds.indexOf(id);
         if (currentIndex < 0) continue;
-        props.app.moveList(id, index + offset);
+        props.app.moveList(id, index);
         currentIds.splice(currentIndex, 1);
         currentIds.splice(index, 0, id);
       }
@@ -646,23 +647,16 @@ function Nav(props: {
   return (
     <nav class="nav">
       <div class="nav-group">
-        <Show when={mainList()}>
-          {(l) => (
-            <button
-              type="button"
-              class="nav-item"
-              data-active={
-                props.view.kind === "list" && props.view.id === l().id ? "" : undefined
-              }
-              onClick={() => props.setView({ kind: "list", id: l().id })}
-            >
-              <EditableNavLabel
-                name={l().name}
-                onSave={(name) => props.app.renameList(l().id, name)}
-              />
-            </button>
-          )}
-        </Show>
+        <button
+          type="button"
+          class="nav-item"
+          data-active={
+            props.view.kind === "list" && props.view.id === "main" ? "" : undefined
+          }
+          onClick={() => props.setView({ kind: "list", id: "main" })}
+        >
+          Now
+        </button>
         <button
           type="button"
           class="nav-item"
@@ -681,7 +675,7 @@ function Nav(props: {
         </button>
       </div>
       <div class="nav-group">
-        <Show when={otherLists().length > 0}>
+        <Show when={props.lists.length > 0}>
           <Dnd
             items={dndLists()}
             setItems={setDndLists}

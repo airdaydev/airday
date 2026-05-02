@@ -9,9 +9,13 @@
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //!
 //! The bin is *not* a list — `Status::Binned` items keep their
-//! `list_id`. One well-known list id is seeded on init: [`LIST_MAIN`].
-//! A second "Later" list is seeded with a fresh uuid so it behaves like
-//! any user-created list (rename, delete, etc.).
+//! `list_id`. One well-known list id is *reserved*: [`LIST_MAIN`].
+//! It has **no MovableList entry** — items reference it by string id
+//! and clients render it with a hardcoded label ("Now"). A future
+//! meta-CRDT will hold things like the user's chosen label for it; for
+//! now main is non-renamable and non-movable. A "Later" list is seeded
+//! as a real MovableList entry so the doc isn't empty on first open;
+//! it behaves like any user-created list.
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
 //! "what's new since the last server interaction" as a single sealed
@@ -91,6 +95,10 @@ pub enum DocError {
     ListNotFound(String),
     #[error("can't delete the built-in list `{0}`")]
     CannotDeleteBuiltin(String),
+    #[error("can't move the built-in list `{0}`")]
+    CannotMoveBuiltin(String),
+    #[error("can't rename the built-in list `{0}`")]
+    CannotRenameBuiltin(String),
     #[error("item is not in the bin")]
     NotBinned,
     #[error("invalid input: {0}")]
@@ -448,6 +456,9 @@ impl Doc {
     }
 
     pub fn rename_list(&self, list_id: &str, name: &str) -> Result<(), DocError> {
+        if list_id == LIST_MAIN {
+            return Err(DocError::CannotRenameBuiltin(LIST_MAIN.into()));
+        }
         let name = name.trim();
         let (_, map) = self.find_list(list_id)?;
         map.insert(KEY_NAME, name)?;
@@ -460,6 +471,9 @@ impl Doc {
     }
 
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), DocError> {
+        if list_id == LIST_MAIN {
+            return Err(DocError::CannotMoveBuiltin(LIST_MAIN.into()));
+        }
         let lists = self.lists();
         let (from, _) = self.find_list(list_id)?;
         let len = lists.len();
@@ -829,6 +843,9 @@ impl Doc {
     }
 
     fn assert_list_exists(&self, list_id: &str) -> Result<(), DocError> {
+        if list_id == LIST_MAIN {
+            return Ok(());
+        }
         self.find_list(list_id).map(|_| ())
     }
 
@@ -869,20 +886,18 @@ struct LocalState {
 }
 
 fn seed_builtins(doc: &LoroDoc) -> Result<(), DocError> {
+    // `LIST_MAIN` is a *reserved id*, not a MovableList entry — items
+    // reference it as the string "main" and clients render its label
+    // client-side (until we add a meta CRDT for things like a custom
+    // name). "Later" is a regular user list, seeded so the doc has
+    // something to show on first open.
     let lists = doc.get_movable_list(ROOT_LISTS);
     let now_ts = now_millis();
-    // The "main" list is the always-on built-in — stable id so
-    // delete_list can refuse it and orphans can be reassigned. "Now"
-    // is the starting display label; users can rename it. "Later" is
-    // just a pre-seeded user list: fresh uuid, deletable like any
-    // other.
     let later_id = new_id();
-    for (id, name) in [(LIST_MAIN, "Now"), (later_id.as_str(), "Later")] {
-        let map = lists.push_container(LoroMap::new())?;
-        map.insert(KEY_ID, id)?;
-        map.insert(KEY_NAME, name)?;
-        map.insert(KEY_CREATED_AT, now_ts)?;
-    }
+    let map = lists.push_container(LoroMap::new())?;
+    map.insert(KEY_ID, later_id.as_str())?;
+    map.insert(KEY_NAME, "Later")?;
+    map.insert(KEY_CREATED_AT, now_ts)?;
     Ok(())
 }
 
@@ -1156,13 +1171,43 @@ mod tests {
     use crate::crypto::Dek;
 
     #[test]
-    fn new_doc_has_builtin_lists() {
+    fn new_doc_has_seeded_later_only() {
+        // Main is a reserved id with no MovableList entry; the only
+        // seeded list is "Later".
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
-        let names: Vec<_> = lists.iter().map(|l| l.name.as_str()).collect();
-        assert!(lists.iter().any(|l| l.id == LIST_MAIN));
-        assert!(names.contains(&"Now"));
-        assert!(names.contains(&"Later"));
+        assert_eq!(lists.len(), 1);
+        assert_eq!(lists[0].name, "Later");
+        assert_ne!(lists[0].id, LIST_MAIN);
+        assert!(!lists.iter().any(|l| l.id == LIST_MAIN));
+    }
+
+    #[test]
+    fn add_item_to_main_works_without_movable_list_entry() {
+        // `LIST_MAIN` is virtual — items can address it even though
+        // no MovableList entry exists for it.
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "milk").unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![id]);
+    }
+
+    #[test]
+    fn move_list_refuses_main() {
+        let doc = Doc::new().unwrap();
+        assert!(matches!(
+            doc.move_list(LIST_MAIN, 0).unwrap_err(),
+            DocError::CannotMoveBuiltin(_)
+        ));
+    }
+
+    #[test]
+    fn rename_list_refuses_main() {
+        let doc = Doc::new().unwrap();
+        assert!(matches!(
+            doc.rename_list(LIST_MAIN, "Today").unwrap_err(),
+            DocError::CannotRenameBuiltin(_)
+        ));
     }
 
     #[test]
@@ -1400,9 +1445,13 @@ mod tests {
     #[test]
     fn get_list_meta_returns_view() {
         let doc = Doc::new().unwrap();
-        let v = doc.get_list_meta(LIST_MAIN).unwrap();
-        assert_eq!(v.id, LIST_MAIN);
-        assert_eq!(v.name, "Now");
+        // Main has no MovableList entry, so no metadata in the doc —
+        // clients render its label themselves.
+        assert!(doc.get_list_meta(LIST_MAIN).is_none());
+        // Seeded "Later" list does have metadata.
+        let later = &doc.all_lists()[0];
+        let v = doc.get_list_meta(&later.id).unwrap();
+        assert_eq!(v.name, "Later");
         assert!(doc.get_list_meta("nope").is_none());
     }
 
@@ -1526,12 +1575,18 @@ mod tests {
         b.apply_remote(&dek, &blob).unwrap();
         let evs = b.drain_events();
 
-        // Should include ListAdded for the seeded lists and ItemAdded
-        // for the peer item.
+        // Should include ListAdded for the seeded "Later" list and
+        // ItemAdded for the peer item. Main has no MovableList entry,
+        // so no ListAdded is emitted for it.
         assert!(
             evs.iter()
+                .any(|e| matches!(e, AppEvent::ListAdded { name, .. } if name == "Later")),
+            "expected ListAdded for `Later`: {evs:?}"
+        );
+        assert!(
+            !evs.iter()
                 .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_MAIN)),
-            "expected ListAdded for `now`: {evs:?}"
+            "main is virtual; no ListAdded should be emitted: {evs:?}"
         );
         assert!(
             evs.iter()
@@ -1711,7 +1766,8 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert!(lists.contains(&LIST_MAIN));
+        // Main is virtual; no ListAdded is emitted for it.
+        assert!(!lists.contains(&LIST_MAIN));
         assert!(lists.contains(&other.as_str()));
         assert!(items.contains(&a.as_str()));
         assert!(items.contains(&b.as_str()));
