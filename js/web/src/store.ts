@@ -65,10 +65,6 @@ export interface DocApp {
    *  `indexInList`. Single commit, single drain — peers and the local
    *  UI see one update, not N. */
   addItemsAt(listId: string, texts: string[], indexInList: number): string[];
-  /** Clone a live item's text and place the copy directly after the
-   *  original. Returns the new id, or null if the source is missing or
-   *  not live. */
-  duplicateItem(id: string): string | null;
   editItemText(id: string, text: string): void;
   setStatus(id: string, status: ItemStatus): void;
   moveItem(id: string, listId: string, indexInList: number): void;
@@ -266,25 +262,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       const ids = engine.addItemsAt(listId, texts, indexInList);
       flush();
       return ids;
-    },
-    duplicateItem(id) {
-      const orig = state.itemsById[id];
-      if (!orig || orig.status !== "live") return null;
-      let foundIdx = -1;
-      let cursor = 0;
-      for (const oid of state.itemsOrder) {
-        const it = state.itemsById[oid];
-        if (!it || it.listId !== orig.listId || it.status !== "live") continue;
-        if (oid === id) {
-          foundIdx = cursor;
-          break;
-        }
-        cursor++;
-      }
-      if (foundIdx < 0) return null;
-      const newId = engine.addItemAt(orig.listId, orig.text, foundIdx + 1);
-      flush();
-      return newId;
     },
     editItemText(id, text) {
       engine.editItemText(id, text);

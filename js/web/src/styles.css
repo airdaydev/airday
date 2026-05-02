@@ -272,9 +272,39 @@ body {
 }
 
 .row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
   margin: 0;
   position: relative;
-  top: 2px;
+  top: 1px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.row input[type="checkbox"]:hover {
+  border-color: var(--text-muted);
+}
+
+.row input[type="checkbox"]:checked {
+  background-color: var(--success);
+  border-color: var(--success);
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
 }
 
 .row-body {

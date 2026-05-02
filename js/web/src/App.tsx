@@ -630,6 +630,51 @@ function Workspace(props: {
   document.addEventListener("keydown", onDeleteKey);
   onCleanup(() => document.removeEventListener("keydown", onDeleteKey));
 
+  // Duplicate live items as a contiguous block immediately after the
+  // bottom-most source row — same shape as paste — rather than each
+  // clone sitting under its own original. Shared by Cmd+D and the row
+  // context menu's Duplicate action so both behave identically.
+  const duplicateBlock = (sourceIds: readonly string[]): void => {
+    const v = view();
+    if (v.kind !== "list") return;
+    const visible = items().map((it) => it.id);
+    const sourceSet = new Set(sourceIds);
+    const sourcesInOrder: { idx: number; text: string }[] = [];
+    visible.forEach((id, idx) => {
+      if (!sourceSet.has(id)) return;
+      const it = app.getItem(id);
+      if (!it || it.status !== "live") return;
+      sourcesInOrder.push({ idx, text: it.text });
+    });
+    if (sourcesInOrder.length === 0) return;
+    const insertAt = sourcesInOrder[sourcesInOrder.length - 1].idx + 1;
+    const texts = sourcesInOrder.map((s) => s.text);
+    const newIds = app.addItemsAt(v.id, texts, insertAt);
+    if (newIds.length === 0) return;
+    // Wait for the dnd's source to absorb the new ids — selectOnly on a
+    // key the order map doesn't yet know about leaves it visually
+    // unselected.
+    queueMicrotask(() => {
+      selection.selectOnly(newIds[0]);
+      if (newIds.length > 1) selection.extendActive(newIds[newIds.length - 1]);
+    });
+  };
+
+  // Cmd/Ctrl+D: duplicate the current selection.
+  const onDuplicateKey = (e: KeyboardEvent) => {
+    if (e.key !== "d" && e.key !== "D") return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.shiftKey || e.altKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const ids = selection.getSelectedKeys().map(String);
+    if (ids.length === 0) return;
+    e.preventDefault();
+    duplicateBlock(ids);
+  };
+  document.addEventListener("keydown", onDuplicateKey);
+  onCleanup(() => document.removeEventListener("keydown", onDuplicateKey));
+
   // Drag items into a list nav button to move them to that list as the
   // first items. Discriminate from the nav's own list-reorder drag by
   // checking detail.items[0] for an item-shaped record (`listId` is
@@ -787,6 +832,7 @@ function Workspace(props: {
                   expanded={expanded}
                   app={app}
                   selection={selection}
+                  duplicateBlock={duplicateBlock}
                 />
               )}
             </Dnd>
@@ -1151,6 +1197,7 @@ function Row(props: {
   expanded: () => boolean;
   app: DocApp;
   selection: DndSelection;
+  duplicateBlock: (sourceIds: readonly string[]) => void;
 }) {
   let textRef!: HTMLSpanElement;
   // Captured by dblclick before the row expands so we can place the caret
@@ -1287,24 +1334,7 @@ function Row(props: {
     }
   };
   const onDuplicate = () => {
-    const newIds: string[] = [];
-    for (const id of targetIds()) {
-      const it = props.app.getItem(id);
-      if (!it || it.status !== "live") continue;
-      const newId = props.app.duplicateItem(id);
-      if (newId) newIds.push(newId);
-    }
-    if (newIds.length === 0) return;
-    // Wait for the dnd's source to absorb the new ids before touching
-    // selection — selection.updateOrder fires on source.onChange, and
-    // selectOnly/addBlock on a key the order map doesn't yet know about
-    // leaves it unselected visually.
-    queueMicrotask(() => {
-      props.selection.selectOnly(newIds[0]);
-      for (let i = 1; i < newIds.length; i++) {
-        props.selection.addBlock(newIds[i]);
-      }
-    });
+    props.duplicateBlock(targetIds());
   };
   const onOpenChange = (open: boolean) => {
     if (!open) return;
