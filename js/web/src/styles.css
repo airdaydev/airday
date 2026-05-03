@@ -202,22 +202,7 @@ body {
   font-weight: 500;
 }
 
-.add-form {
-  display: flex;
-  gap: 8px;
-}
-
-.add-form input {
-  padding: 6px 10px;
-  border: 1px solid var(--border-input);
-  border-radius: 4px;
-  font: inherit;
-  width: 240px;
-  background: var(--bg-elevated);
-  color: var(--text);
-}
-
-.add-form button {
+.add-button {
   padding: 6px 12px;
   border: 1px solid var(--btn-primary-bg);
   background: var(--btn-primary-bg);
@@ -225,6 +210,11 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
+}
+
+.add-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .dnd-host {
@@ -235,7 +225,7 @@ body {
 }
 
 .dnd-host .dnd-parent {
-  padding: 0 8px;
+  padding: 0 8px 8px;
 }
 
 .dnd-drop-placeholder {

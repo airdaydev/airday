@@ -92,6 +92,13 @@ function statusTimestamp(it: ItemView): number | undefined {
   return undefined;
 }
 
+// Draft items live only in the dnd's items list — never in the engine —
+// until the user commits them. The id prefix is the discriminator the
+// Row uses to switch between "edit existing" and "create new" save paths
+// on collapse.
+const DRAFT_ID_PREFIX = "__draft__";
+const isDraftId = (id: string): boolean => id.startsWith(DRAFT_ID_PREFIX);
+
 function formatRelative(ts: number, now: number): string {
   const diffMs = now - ts;
   if (diffMs < 60_000) return "just now";
@@ -465,6 +472,20 @@ function Workspace(props: {
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const [settingsOpen, setSettingsOpen] = createSignal(false);
 
+  // Draft state: a transient ItemView injected into dndItems but not into
+  // the store. `insertIndex` is captured at draft-start time so collapse
+  // commits at the same slot the user originally clicked from (e.g. after
+  // their selection), even if peer ops shift the list around in the
+  // meantime. expandedKey is controlled here so we can drive it open on
+  // draft start and react when the controller collapses (Escape, click-
+  // outside, or any other path).
+  const [draft, setDraft] = createSignal<{
+    item: ItemView;
+    insertIndex: number;
+    listId: string;
+  } | null>(null);
+  const [expandedKey, setExpandedKey] = createSignal<string | null>(null);
+
   // One selection model per Workspace instance — the Dnd component is
   // re-keyed on view change (so it remounts), but we re-use the selection
   // object so consumers always read from the same handle. Stale block
@@ -472,7 +493,19 @@ function Workspace(props: {
   // (giving phantom selection at the top of the new list), so clear when
   // the view switches.
   const selection = new DndSelection();
-  createEffect(on(view, () => selection.clear(), { defer: true }));
+  createEffect(
+    on(
+      view,
+      () => {
+        selection.clear();
+        // A draft is scoped to the list it was started in; switching
+        // away discards it (no save) and collapses.
+        setDraft(null);
+        setExpandedKey(null);
+      },
+      { defer: true },
+    ),
+  );
 
   // Per-view item slice. Each `state.itemsById[id]` access is a tracked
   // path on the store proxy, so adds/removes to itemsOrder and field
@@ -509,7 +542,15 @@ function Workspace(props: {
 
   createEffect(() => {
     const next = items();
-    setDndItems(next);
+    const d = draft();
+    if (!d) {
+      setDndItems(next);
+      return;
+    }
+    const merged = [...next];
+    const at = Math.min(Math.max(d.insertIndex, 0), merged.length);
+    merged.splice(at, 0, d.item);
+    setDndItems(merged);
   });
 
   const onReorder = (op: DndOp<ItemView>) => {
@@ -545,10 +586,48 @@ function Workspace(props: {
     });
   };
 
-  const addItem = (text: string) => {
+  // Start a draft row: pseudo-item just below the topmost selected
+  // item (or at the top if nothing is selected). Expanding it via the
+  // controlled `expandedKey` flips the row into edit mode through the
+  // same path used for existing rows. If a draft is already open, no-op
+  // — the natural click-outside collapse on the existing draft will
+  // settle it first.
+  const startDraft = () => {
     const v = view();
-    const listId = v.kind === "list" ? v.id : "main";
-    app.addItem(listId, text);
+    if (v.kind !== "list") return;
+    if (draft() !== null) return;
+    const ids = items().map((i) => i.id);
+    const top = selection.getSelectionTop();
+    let insertIndex = 0;
+    if (top !== null) {
+      const idx = ids.indexOf(String(top));
+      if (idx >= 0) insertIndex = idx + 1;
+    }
+    const id = `${DRAFT_ID_PREFIX}${crypto.randomUUID()}`;
+    const draftItem: ItemView = {
+      id,
+      listId: v.id,
+      text: "",
+      status: "live",
+      createdAt: Date.now(),
+    };
+    setDraft({ item: draftItem, insertIndex, listId: v.id });
+    setExpandedKey(id);
+  };
+
+  // Called by the draft Row from its collapse effect. Empty text → drop;
+  // non-empty → real item via addItemAt at the captured slot, then
+  // re-anchor selection so the user lands on what they just created.
+  const settleDraft = (text: string) => {
+    const d = draft();
+    if (!d) return;
+    setDraft(null);
+    if (!text) return;
+    const newId = app.addItemAt(d.listId, text, d.insertIndex);
+    // The store dispatch that adds the new item runs before this
+    // microtask, so by then `selection.updateOrder` has already seen
+    // the new id and the selection anchor is valid.
+    queueMicrotask(() => selection.selectOnly(newId));
   };
 
   // Paste anywhere in a list view drops the clipboard contents in as items,
@@ -865,12 +944,30 @@ function Workspace(props: {
               </button>
             </Show>
             <Show when={view().kind === "list"}>
-              <AddForm onAdd={addItem} />
+              <button
+                type="button"
+                class="add-button"
+                onClick={(e) => {
+                  // The dnd controller has a document-level click listener
+                  // that collapses any expansion when a click lands outside
+                  // the expanded row. The Add button is outside the dnd, so
+                  // this same click would immediately collapse the draft we
+                  // just opened. stopImmediatePropagation halts further
+                  // document-level listeners (Solid's delegate runs first
+                  // since it registers eagerly during render; the dnd's
+                  // listener registers later in onMount).
+                  e.stopImmediatePropagation();
+                  startDraft();
+                }}
+                disabled={draft() !== null}
+              >
+                Add
+              </button>
             </Show>
           </div>
         </header>
         <Show
-          when={items().length > 0}
+          when={dndItems().length > 0}
           fallback={<div class="dnd-host empty">Nothing here yet.</div>}
         >
           <Show keyed when={dndRevision()}>
@@ -881,6 +978,10 @@ function Workspace(props: {
               setItems={setDndItems}
               getKey={(it) => it.id}
               selection={selection}
+              expandedKey={expandedKey()}
+              onExpandedChange={(k) =>
+                setExpandedKey(k == null ? null : String(k))
+              }
               itemHeight={28}
               expandable
               clearOnClickOutside
@@ -895,6 +996,7 @@ function Workspace(props: {
                   app={app}
                   selection={selection}
                   duplicateBlock={duplicateBlock}
+                  onDraftSettle={settleDraft}
                 />
               )}
             </Dnd>
@@ -1272,34 +1374,16 @@ function EditableNavLabel(props: {
   );
 }
 
-function AddForm(props: { onAdd: (text: string) => void }) {
-  const [text, setText] = createSignal("");
-  const submit = (e: Event) => {
-    e.preventDefault();
-    const t = text().trim();
-    if (!t) return;
-    props.onAdd(t);
-    setText("");
-  };
-  return (
-    <form class="add-form" onSubmit={submit}>
-      <input
-        type="text"
-        placeholder="Add an item…"
-        value={text()}
-        onInput={(e) => setText(e.currentTarget.value)}
-      />
-      <button type="submit">Add</button>
-    </form>
-  );
-}
-
 function Row(props: {
   item: () => ItemView;
   expanded: () => boolean;
   app: DocApp;
   selection: DndSelection;
   duplicateBlock: (sourceIds: readonly string[]) => void;
+  /** Called by a draft row from its collapse effect with the trimmed
+   *  edit text. Empty text means drop the draft; non-empty means the
+   *  workspace should commit it as a real item. */
+  onDraftSettle?: (text: string) => void;
 }) {
   let textRef!: HTMLSpanElement;
   // Captured by dblclick before the row expands so we can place the caret
@@ -1340,6 +1424,16 @@ function Row(props: {
         if (prev && !now) {
           dblClickCaret = null;
           const next = (textRef.textContent ?? "").trim();
+          // Draft path: the row is a transient pseudo-item that has no
+          // engine-side record yet. Hand the trimmed text back to the
+          // workspace, which decides commit (addItemAt) vs drop. Skip the
+          // editItemText path — there's no item to edit.
+          if (isDraftId(props.item().id)) {
+            props.onDraftSettle?.(next);
+            const listbox = textRef.closest<HTMLElement>('[role="listbox"]');
+            listbox?.focus();
+            return;
+          }
           const current = props.item().text;
           if (!next) {
             textRef.textContent = current;
