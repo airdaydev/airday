@@ -33,6 +33,7 @@ import {
   type DndOp,
 } from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
+import caretDownSvg from "./icons/caret-down.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
@@ -1106,17 +1107,24 @@ function Nav(props: {
       <div class="nav-footer">
         <DropdownMenu>
           <DropdownMenu.Trigger
-            class="avatar-trigger"
+            class="account-trigger"
             aria-label="Account"
-          />
+          >
+            <Show
+              when={!props.session.anonymous}
+              fallback={<span class="account-trigger-label">Local user</span>}
+            >
+              <span class="account-trigger-avatar" aria-hidden="true" />
+              <span class="account-trigger-label">Pro</span>
+            </Show>
+            <span
+              class="account-trigger-caret"
+              aria-hidden="true"
+              innerHTML={caretDownSvg}
+            />
+          </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content class="dropdown-menu-content">
-              <div class="dropdown-menu-label">
-                {props.session.anonymous
-                  ? "Local-only account"
-                  : props.session.email}
-              </div>
-              <DropdownMenu.Separator class="dropdown-menu-separator" />
               <DropdownMenu.Item
                 class="dropdown-menu-item"
                 disabled={!canUndo()}
