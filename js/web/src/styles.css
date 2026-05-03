@@ -190,6 +190,7 @@ body {
 }
 
 .main-header {
+  height: 3em;
   padding: 8px 12px;
   display: flex;
   align-items: center;
@@ -208,8 +209,8 @@ body {
   justify-content: center;
   padding: 4px 6px;
   border: none;
-  background: #e1e1e1;
-  color: black;
+  background: var(--bg-active);
+  color: var(--text);
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
