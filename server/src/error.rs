@@ -50,8 +50,8 @@ impl ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, code) = self.status_and_code();
-        if matches!(status, StatusCode::INTERNAL_SERVER_ERROR) {
-            tracing::error!(error = %self, "internal error");
+        if let ApiError::Internal(err) = &self {
+            tracing::error!(error = ?err, "internal error");
         }
         let body = ErrorBody {
             code: code.to_string(),

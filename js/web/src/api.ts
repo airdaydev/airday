@@ -36,6 +36,17 @@ export interface LoginResponse {
   device?: DeviceCredential;
 }
 
+export interface Device {
+  id: string;
+  name: string;
+  last_seen_at: number;
+  created_at: number;
+}
+
+export interface DevicesListResponse {
+  devices: Device[];
+}
+
 export interface ApiErrorBody {
   code: string;
   message: string;
@@ -94,11 +105,26 @@ export const api = {
   async logout(): Promise<void> {
     await post<unknown>("/api/account/logout", {});
   },
+
+  async listDevices(): Promise<DevicesListResponse> {
+    return get("/api/devices");
+  },
 };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "POST", body: encode(body) });
+}
+
+async function get<T>(path: string): Promise<T> {
+  return request<T>(path, { method: "GET" });
+}
+
+async function request<T>(
+  path: string,
+  init: { method: string; body?: BodyInit },
+): Promise<T> {
   const res = await fetch(path, {
-    method: "POST",
+    method: init.method,
     // Default for same-origin is already 'same-origin', but be explicit:
     // the cookie carrying the device token is the auth here, and an
     // accidental `'omit'` would silently break logged-in calls.
@@ -107,7 +133,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       "Content-Type": MSGPACK_CT,
       Accept: MSGPACK_CT,
     },
-    body: encode(body),
+    body: init.body,
   });
   const buf = new Uint8Array(await res.arrayBuffer());
   if (!res.ok) {

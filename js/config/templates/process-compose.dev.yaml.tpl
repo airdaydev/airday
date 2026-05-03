@@ -14,6 +14,7 @@ processes:
     command: cargo run -p airday-server
     environment:
       - RUST_LOG={{ env "AIRDAY_LOG_LEVEL" }}
+      - RUST_BACKTRACE=1
     readiness_probe:
       http_get:
         host: {{ env "AIRDAY_HOST" }}

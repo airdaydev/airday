@@ -1,10 +1,11 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { api, type Device } from "./api.ts";
 import type { Session } from "./Login.tsx";
 import type { ThemePreference } from "./theme.ts";
 
-type Section = "appearance" | "account";
+type Section = "appearance" | "account" | "devices";
 
 export function Settings(props: {
   open: boolean;
@@ -16,6 +17,36 @@ export function Settings(props: {
   onLoginRequested: () => void;
 }) {
   const [section, setSection] = createSignal<Section>("appearance");
+  const [devices, setDevices] = createSignal<Device[] | null>(null);
+  const [devicesError, setDevicesError] = createSignal<string | null>(null);
+  const [devicesLoading, setDevicesLoading] = createSignal(false);
+
+  async function loadDevices() {
+    setDevicesError(null);
+    setDevicesLoading(true);
+    try {
+      const res = await api.listDevices();
+      setDevices(res.devices);
+    } catch (e) {
+      setDevicesError(e instanceof Error ? e.message : "Failed to load devices");
+    } finally {
+      setDevicesLoading(false);
+    }
+  }
+
+  // Lazy-load when entering the Devices section while authenticated.
+  createEffect(() => {
+    if (
+      props.open &&
+      section() === "devices" &&
+      !props.session.anonymous &&
+      devices() === null &&
+      !devicesLoading()
+    ) {
+      void loadDevices();
+    }
+  });
+
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange} modal>
       <Dialog.Portal>
@@ -38,6 +69,14 @@ export function Settings(props: {
                 onClick={() => setSection("account")}
               >
                 Account
+              </button>
+              <button
+                type="button"
+                class="settings-nav-item"
+                data-active={section() === "devices" ? "" : undefined}
+                onClick={() => setSection("devices")}
+              >
+                Devices
               </button>
             </aside>
             <section class="settings-content">
@@ -127,6 +166,53 @@ export function Settings(props: {
                   </div>
                 </Show>
               </Show>
+              <Show when={section() === "devices"}>
+                <h2 class="settings-section-title">Devices</h2>
+                <Show
+                  when={!props.session.anonymous}
+                  fallback={
+                    <div class="settings-row">
+                      <div class="settings-row-value">
+                        Log in to see devices linked to your account.
+                      </div>
+                    </div>
+                  }
+                >
+                  <Show when={devicesLoading() && devices() === null}>
+                    <div class="settings-row">
+                      <div class="settings-row-value">Loading…</div>
+                    </div>
+                  </Show>
+                  <Show when={devicesError()}>
+                    <div class="settings-row">
+                      <div class="settings-row-value">{devicesError()}</div>
+                    </div>
+                  </Show>
+                  <Show when={devices()}>
+                    <ul class="device-list">
+                      <For each={devices()!}>
+                        {(d) => (
+                          <li class="device-row">
+                            <div class="device-row-main">
+                              <div class="device-name">
+                                {d.name}
+                                <Show when={d.id === props.session.deviceId}>
+                                  <span class="device-current-tag">
+                                    This device
+                                  </span>
+                                </Show>
+                              </div>
+                              <div class="device-meta">
+                                Last seen {formatRelative(d.last_seen_at)}
+                              </div>
+                            </div>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </Show>
+              </Show>
             </section>
           </Dialog.Content>
         </div>
@@ -170,6 +256,24 @@ function MoonIcon() {
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
+}
+
+function formatRelative(ms: number): string {
+  const diffSec = Math.round((Date.now() - ms) / 1000);
+  if (diffSec < 60) return "just now";
+  if (diffSec < 3600) {
+    const m = Math.floor(diffSec / 60);
+    return `${m} minute${m === 1 ? "" : "s"} ago`;
+  }
+  if (diffSec < 86400) {
+    const h = Math.floor(diffSec / 3600);
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
+  if (diffSec < 86400 * 7) {
+    const d = Math.floor(diffSec / 86400);
+    return `${d} day${d === 1 ? "" : "s"} ago`;
+  }
+  return new Date(ms).toLocaleDateString();
 }
 
 function CloseIcon() {

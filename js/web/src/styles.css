@@ -203,7 +203,10 @@ body {
 }
 
 .add-button {
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
   border: none;
   background: #e1e1e1;
   color: black;
@@ -679,7 +682,7 @@ body {
 .settings-sidebar {
   background: var(--bg-nav);
   border-right: 1px solid var(--border);
-  padding: 16px 8px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -708,7 +711,7 @@ body {
 
 .settings-content {
   position: relative;
-  padding: 24px 28px;
+  padding: 12px;
   overflow-y: auto;
 }
 
@@ -772,4 +775,50 @@ body {
 
 .settings-logout:hover {
   background: var(--bg-hover);
+}
+
+.device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.device-row:last-child {
+  border-bottom: 0;
+}
+
+.device-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.device-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.device-current-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.device-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
 }

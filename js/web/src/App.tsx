@@ -34,6 +34,7 @@ import {
 } from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
 import caretDownSvg from "./icons/caret-down.svg?raw";
+import plusSvg from "./icons/plus.svg?raw";
 import faviconPng from "./icons/favicon.png";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -961,9 +962,9 @@ function Workspace(props: {
                   startDraft();
                 }}
                 disabled={draft() !== null}
-              >
-                Add
-              </button>
+                aria-label="Add"
+                innerHTML={plusSvg}
+              />
             </Show>
           </div>
         </header>
