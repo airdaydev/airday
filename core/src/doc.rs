@@ -11,7 +11,7 @@
 //! The bin is *not* a list — `Status::Binned` items keep their
 //! `list_id`. One well-known list id is *reserved*: [`LIST_MAIN`].
 //! It has **no MovableList entry** — items reference it by string id
-//! and clients render it with a hardcoded label ("Now"). A future
+//! and clients render it with a hardcoded label ("Desk"). A future
 //! meta-CRDT will hold things like the user's chosen label for it; for
 //! now main is non-renamable and non-movable. A "Later" list is seeded
 //! as a real MovableList entry so the doc isn't empty on first open;

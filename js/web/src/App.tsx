@@ -1031,7 +1031,7 @@ function CloudOffIcon() {
 
 function viewTitle(v: ViewKey, lists: { id: string; name: string }[]): string {
   if (v.kind === "list") {
-    if (v.id === "main") return "Now";
+    if (v.id === "main") return "Desk";
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
   if (v.kind === "done") return "Done";
@@ -1118,7 +1118,7 @@ function Nav(props: {
           data-drop-list-id="main"
           onClick={() => props.setView({ kind: "list", id: "main" })}
         >
-          Now
+          Desk
         </button>
         <button
           type="button"
