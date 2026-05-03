@@ -343,6 +343,13 @@ function MainApp(props: {
   );
   const app = createSyncedApp(engine);
 
+  if (import.meta.env.DEV) {
+    (window as unknown as { __app: typeof app }).__app = app;
+    onCleanup(() => {
+      delete (window as unknown as { __app?: typeof app }).__app;
+    });
+  }
+
   const storage: StorageAdapter = props.opfsOk
     ? new OpfsStorage(
         props.session.accountId,
