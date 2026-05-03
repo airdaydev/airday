@@ -234,7 +234,9 @@ impl Doc {
         map.insert(KEY_STATUS, STATUS_LIVE)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
-        let index = items.len().saturating_sub(1);
+        let index = self
+            .visible_item_index(&id)
+            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -269,6 +271,9 @@ impl Doc {
         let abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
         let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
         self.inner.commit();
+        let index = self
+            .visible_item_index(&id)
+            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -277,7 +282,7 @@ impl Doc {
             created_at: now,
             done_at: None,
             binned_at: None,
-            index: abs,
+            index,
         });
         Ok(id)
     }
@@ -304,25 +309,28 @@ impl Doc {
         let items = self.items();
         let initial_abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
         let mut ids = Vec::with_capacity(trimmed.len());
-        let mut events = Vec::with_capacity(trimmed.len());
+        let mut pending = Vec::with_capacity(trimmed.len());
         for (i, text) in trimmed.iter().enumerate() {
             let abs = initial_abs + i;
             let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
-            events.push(AppEvent::ItemAdded {
-                id: id.clone(),
+            pending.push((id.clone(), (*text).to_string(), now));
+            ids.push(id);
+        }
+        self.inner.commit();
+        for (id, text, now) in pending {
+            let index = self
+                .visible_item_index(&id)
+                .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
+            self.push_event(AppEvent::ItemAdded {
+                id,
                 list_id: list_id.to_string(),
-                text: (*text).to_string(),
+                text,
                 status: Status::Live,
                 created_at: now,
                 done_at: None,
                 binned_at: None,
-                index: abs,
+                index,
             });
-            ids.push(id);
-        }
-        self.inner.commit();
-        for ev in events {
-            self.push_event(ev);
         }
         Ok(ids)
     }
@@ -370,6 +378,9 @@ impl Doc {
             items.mov(idx, abs)?;
         }
         self.inner.commit();
+        let index = self
+            .visible_item_index(item_id)
+            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
         if prev_list_id.as_deref() != Some(target_list_id) {
             self.push_event(AppEvent::ItemListChanged {
                 id: item_id.to_string(),
@@ -379,7 +390,7 @@ impl Doc {
         if abs != idx {
             self.push_event(AppEvent::ItemMoved {
                 id: item_id.to_string(),
-                index: abs,
+                index,
             });
         }
         Ok(())
@@ -469,7 +480,9 @@ impl Doc {
         map.insert(KEY_NAME, name)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
-        let index = lists.len().saturating_sub(1);
+        let index = self
+            .visible_list_index(&id)
+            .ok_or_else(|| DocError::ListNotFound(id.clone()))?;
         self.push_event(AppEvent::ListAdded {
             id: id.clone(),
             name: name.to_string(),
@@ -507,9 +520,12 @@ impl Doc {
         }
         lists.mov(from, to)?;
         self.inner.commit();
+        let index = self
+            .visible_list_index(list_id)
+            .ok_or_else(|| DocError::ListNotFound(list_id.to_string()))?;
         self.push_event(AppEvent::ListMoved {
             id: list_id.to_string(),
-            index: to,
+            index,
         });
         Ok(())
     }
@@ -872,10 +888,9 @@ impl Doc {
     /// canonical serialization of the visible item / list state.
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        // Lists: walk by stored order (the user-visible order), feed
-        // a length-prefixed canonical encoding of each list.
-        let mut lists = self.all_lists();
-        lists.sort_by(|a, b| a.id.cmp(&b.id));
+        // Lists: walk by stored order because ordering is part of the
+        // logical state surfaced to users.
+        let lists = self.all_lists();
         hasher.update(b"L");
         hasher.update((lists.len() as u32).to_be_bytes());
         for l in &lists {
@@ -883,12 +898,8 @@ impl Doc {
             hash_str(&mut hasher, &l.name);
             hasher.update(l.created_at.to_be_bytes());
         }
-        // Items: sort by id for determinism — Loro's MovableList
-        // ordering can converge to logically-equal-but-physically-
-        // different positions across replicas mid-merge, but ids are
-        // stable.
-        let mut items: Vec<ItemView> = self.iter_items().collect();
-        items.sort_by(|a, b| a.id.cmp(&b.id));
+        // Items: walk by MovableList order for the same reason.
+        let items: Vec<ItemView> = self.iter_items().collect();
         hasher.update(b"I");
         hasher.update((items.len() as u32).to_be_bytes());
         for i in &items {
@@ -935,6 +946,14 @@ impl Doc {
             }
         }
         Err(DocError::ListNotFound(list_id.into()))
+    }
+
+    fn visible_item_index(&self, item_id: &str) -> Option<usize> {
+        self.iter_items().position(|it| it.id == item_id)
+    }
+
+    fn visible_list_index(&self, list_id: &str) -> Option<usize> {
+        self.all_lists().iter().position(|l| l.id == list_id)
     }
 
     fn assert_list_exists(&self, list_id: &str) -> Result<(), DocError> {
@@ -1086,7 +1105,7 @@ fn absolute_index_for_list_position(
     current_idx: usize,
     moving_status: Status,
 ) -> usize {
-    let mut seen = 0usize;
+    let mut matching = Vec::new();
     for i in 0..items.len() {
         if i == current_idx {
             continue;
@@ -1102,12 +1121,20 @@ fn absolute_index_for_list_position(
         if moving_status == Status::Live && read_status(&map) != Some(Status::Live) {
             continue;
         }
-        if seen == target_index {
-            return i;
-        }
-        seen += 1;
+        matching.push(i);
     }
-    items.len().saturating_sub(1)
+    let Some(&anchor) = matching.get(target_index) else {
+        return items.len().saturating_sub(1);
+    };
+    // `target_index` is expressed in the post-move filtered view, but
+    // Loro expects an absolute destination in the pre-move list. When
+    // the item is moving forward, removing it shifts the anchor left by
+    // one, so adjust the absolute index back into the current list.
+    if current_idx < anchor {
+        anchor.saturating_sub(1)
+    } else {
+        anchor
+    }
 }
 
 fn hash_str(hasher: &mut Sha256, s: &str) {
@@ -1458,6 +1485,22 @@ mod tests {
     }
 
     #[test]
+    fn fingerprint_diverges_when_order_diverges() {
+        let a = Doc::new().unwrap();
+        let b = Doc::new().unwrap();
+        let a1 = a.add_item(LIST_MAIN, "one").unwrap();
+        let a2 = a.add_item(LIST_MAIN, "two").unwrap();
+        let b1 = b.add_item(LIST_MAIN, "one").unwrap();
+        let b2 = b.add_item(LIST_MAIN, "two").unwrap();
+
+        a.move_item(&a1, LIST_MAIN, 1).unwrap();
+
+        assert_eq!(a.live_item_ids(LIST_MAIN), vec![a2, a1]);
+        assert_eq!(b.live_item_ids(LIST_MAIN), vec![b1, b2]);
+        assert_ne!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
     fn view_helpers_empty_doc() {
         let doc = Doc::new().unwrap();
         assert_eq!(doc.live_item_ids(LIST_MAIN), Vec::<String>::new());
@@ -1762,6 +1805,26 @@ mod tests {
             }
             other => panic!("expected ItemAdded, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn local_move_item_emits_destination_absolute_index() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
+        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let _ = doc.drain_events();
+
+        doc.move_item(&moved, LIST_MAIN, 0).unwrap();
+
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![moved.clone(), first, third]);
+        let evs = doc.drain_events();
+        assert!(
+            evs.iter().any(
+                |e| matches!(e, AppEvent::ItemMoved { id, index } if id == &moved && *index == 0)
+            ),
+            "expected ItemMoved to absolute index 0, got {evs:?}"
+        );
     }
 
     #[test]
