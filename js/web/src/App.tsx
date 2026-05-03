@@ -26,7 +26,12 @@ import {
 } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { Dnd, DndSelection, type DndOp } from "@primavera-ui/components/dnd/solid";
+import {
+  Dnd,
+  DndSelection,
+  type DndImperative,
+  type DndOp,
+} from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -696,6 +701,31 @@ function Workspace(props: {
   document.addEventListener("keydown", onUndoRedoKey);
   onCleanup(() => document.removeEventListener("keydown", onUndoRedoKey));
 
+  // Enter: expand the topmost selected row, or collapse the expanded row
+  // (collapse runs the save effect in Row). The expanded-row's
+  // contenteditable owns Enter while editing — it dispatches an Escape to
+  // drive collapse — so the editable-surface guard below keeps us from
+  // double-handling there.
+  let dndHandle: DndImperative | null = null;
+  const onEnterExpand = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    if (!dndHandle) return;
+    if (dndHandle.getExpanded() !== null) {
+      e.preventDefault();
+      dndHandle.setExpanded(null);
+      return;
+    }
+    const top = selection.getSelectionTop();
+    if (top === null) return;
+    e.preventDefault();
+    dndHandle.setExpanded(top);
+  };
+  document.addEventListener("keydown", onEnterExpand);
+  onCleanup(() => document.removeEventListener("keydown", onEnterExpand));
+
   // Drag items into a list nav button to move them to that list as the
   // first items. Discriminate from the nav's own list-reorder drag by
   // checking detail.items[0] for an item-shaped record (`listId` is
@@ -838,6 +868,7 @@ function Workspace(props: {
           <Show keyed when={dndRevision()}>
             <Dnd
               class="dnd-host"
+              ref={(h) => (dndHandle = h)}
               items={dndItems()}
               setItems={setDndItems}
               getKey={(it) => it.id}
@@ -1280,7 +1311,11 @@ function Row(props: {
               range.setStart(caret.node, caret.offset);
               range.collapse(true);
             } else {
+              // No dblclick caret (e.g. expanded via Enter): drop the cursor
+              // at the end of the text so typing appends rather than
+              // overwriting a select-all.
               range.selectNodeContents(textRef);
+              range.collapse(false);
             }
             sel?.removeAllRanges();
             sel?.addRange(range);
@@ -1456,8 +1491,14 @@ function Row(props: {
               if (e.key === "Enter" && !e.shiftKey) {
                 // Suppress the newline; bounce off the dnd's Escape
                 // handler (bound on its listbox) to drive collapse, which
-                // triggers the save effect above.
+                // triggers the save effect above. Stop propagation so the
+                // workspace's document-level Enter handler doesn't see the
+                // original event after the synchronous Escape dispatch has
+                // already flipped contentEditable off on this span — the
+                // editable-surface guard there would no longer match and
+                // it would re-expand the row.
                 e.preventDefault();
+                e.stopPropagation();
                 (e.currentTarget as HTMLElement).dispatchEvent(
                   new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
                 );
