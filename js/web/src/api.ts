@@ -8,6 +8,7 @@
 import { encode, decode } from "@msgpack/msgpack";
 
 export const MSGPACK_CT = "application/msgpack";
+export const REQUEST_ID_HEADER = "X-Request-Id";
 
 export interface KdfParams {
   m_kib: number;
@@ -56,6 +57,7 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
+    public readonly requestId: string,
     message: string,
   ) {
     super(message);
@@ -123,6 +125,7 @@ async function request<T>(
   path: string,
   init: { method: string; body?: BodyInit },
 ): Promise<T> {
+  const requestId = newRequestId();
   const res = await fetch(path, {
     method: init.method,
     // Default for same-origin is already 'same-origin', but be explicit:
@@ -132,9 +135,11 @@ async function request<T>(
     headers: {
       "Content-Type": MSGPACK_CT,
       Accept: MSGPACK_CT,
+      [REQUEST_ID_HEADER]: requestId,
     },
     body: init.body,
   });
+  const echoedRequestId = res.headers.get(REQUEST_ID_HEADER) ?? requestId;
   const buf = new Uint8Array(await res.arrayBuffer());
   if (!res.ok) {
     let err: ApiErrorBody | null = null;
@@ -146,9 +151,14 @@ async function request<T>(
     throw new ApiError(
       res.status,
       err?.code ?? "http_error",
+      echoedRequestId,
       err?.message ?? `${res.status} ${res.statusText}`,
     );
   }
   if (buf.length === 0) return undefined as T;
   return decode(buf) as T;
+}
+
+function newRequestId(): string {
+  return crypto.randomUUID();
 }
