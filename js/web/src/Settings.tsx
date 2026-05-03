@@ -14,7 +14,6 @@ export function Settings(props: {
   onThemeChange: (pref: ThemePreference) => void;
   session: Session;
   logout: () => void;
-  onLoginRequested: () => void;
 }) {
   const [section, setSection] = createSignal<Section>("appearance");
   const [devices, setDevices] = createSignal<Device[] | null>(null);
@@ -151,18 +150,10 @@ export function Settings(props: {
                 >
                   <div class="settings-row">
                     <div class="settings-row-value">
-                      You're using a local-only account. Sign up or log
-                      in to back up your data and sync across devices.
+                      You're using a local-only account. Use Sign in or
+                      Sign up from the account menu to back up your data
+                      and sync across devices.
                     </div>
-                  </div>
-                  <div class="settings-row">
-                    <button
-                      type="button"
-                      class="settings-logout"
-                      onClick={() => props.onLoginRequested()}
-                    >
-                      Log in / Sign up
-                    </button>
                   </div>
                 </Show>
               </Show>

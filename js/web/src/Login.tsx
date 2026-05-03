@@ -1,8 +1,8 @@
-// Login + signup form. Argon2id runs on the main thread per the parent
-// doc; show a "deriving keys…" spinner during the ~hundreds-of-ms hit.
-// The API origin is the page's origin (vite proxies /api/* in dev) — no
-// runtime server picker; self-hosters serve their own bundle from their
-// own domain.
+// Auth form (login + signup). Argon2id runs on the main thread per the
+// parent doc; show a "deriving keys…" spinner during the ~hundreds-of-ms
+// hit. The API origin is the page's origin (vite proxies /api/* in dev)
+// — no runtime server picker; self-hosters serve their own bundle from
+// their own domain.
 
 import { createSignal, Show } from "solid-js";
 import {
@@ -39,17 +39,16 @@ function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
 }
 
-export function Login(props: {
+export function AuthForm(props: {
+  initialMode?: "login" | "signup";
   onSession: (s: Session) => void;
-  /** Optional escape hatch — when present we render a Cancel link
-   *  that returns to whatever was on screen before. Used when login
-   *  is reached from inside an anonymous session. */
-  onCancel?: () => void;
 }) {
+  const [mode, setMode] = createSignal<"login" | "signup">(
+    props.initialMode ?? "login",
+  );
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [deviceName, setDeviceName] = createSignal(defaultDeviceName());
-  const [mode, setMode] = createSignal<"login" | "signup">("login");
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -71,68 +70,61 @@ export function Login(props: {
   };
 
   return (
-    <div class="login-page">
-      <form class="login-form" onSubmit={submit}>
-        <h1>{mode() === "login" ? "Log in" : "Sign up"}</h1>
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            autocomplete="email"
-            value={email()}
-            disabled={busy()}
-            onInput={(e) => setEmail(e.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            minLength={10}
-            autocomplete={mode() === "login" ? "current-password" : "new-password"}
-            value={password()}
-            disabled={busy()}
-            onInput={(e) => setPassword(e.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Device name
-          <input
-            type="text"
-            required
-            value={deviceName()}
-            disabled={busy()}
-            onInput={(e) => setDeviceName(e.currentTarget.value)}
-          />
-        </label>
-        <button type="submit" disabled={busy()}>
-          {busy() ? "Deriving keys…" : mode() === "login" ? "Log in" : "Create account"}
-        </button>
-        <button
-          type="button"
-          class="link"
-          onClick={() => setMode(mode() === "login" ? "signup" : "login")}
+    <form class="auth-form" onSubmit={submit}>
+      <label>
+        Email
+        <input
+          type="email"
+          required
+          autocomplete="email"
+          value={email()}
           disabled={busy()}
-        >
-          {mode() === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
-        </button>
-        <Show when={props.onCancel}>
-          <button
-            type="button"
-            class="link"
-            onClick={() => props.onCancel?.()}
-            disabled={busy()}
-          >
-            Cancel
-          </button>
-        </Show>
-        <Show when={error()}>
-          <div class="error">{error()}</div>
-        </Show>
-      </form>
-    </div>
+          onInput={(e) => setEmail(e.currentTarget.value)}
+        />
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          required
+          minLength={10}
+          autocomplete={mode() === "login" ? "current-password" : "new-password"}
+          value={password()}
+          disabled={busy()}
+          onInput={(e) => setPassword(e.currentTarget.value)}
+        />
+      </label>
+      <label>
+        Device name
+        <input
+          type="text"
+          required
+          value={deviceName()}
+          disabled={busy()}
+          onInput={(e) => setDeviceName(e.currentTarget.value)}
+        />
+      </label>
+      <button type="submit" disabled={busy()}>
+        {busy()
+          ? "Deriving keys…"
+          : mode() === "login"
+            ? "Sign in"
+            : "Create account"}
+      </button>
+      <button
+        type="button"
+        class="auth-form-toggle"
+        disabled={busy()}
+        onClick={() => setMode(mode() === "login" ? "signup" : "login")}
+      >
+        {mode() === "login"
+          ? "Don't have an account? Sign up"
+          : "Have an account? Sign in"}
+      </button>
+      <Show when={error()}>
+        <div class="error">{error()}</div>
+      </Show>
+    </form>
   );
 }
 

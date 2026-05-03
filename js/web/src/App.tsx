@@ -26,6 +26,7 @@ import {
 } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
+import { Popover } from "@kobalte/core/popover";
 import {
   Dnd,
   DndSelection,
@@ -33,12 +34,11 @@ import {
   type DndOp,
 } from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
-import caretDownSvg from "./icons/caret-down.svg?raw";
+import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
-import faviconPng from "./icons/favicon.png";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
-import { Login, type Session } from "./Login.tsx";
+import { AuthForm, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
 import {
   createSyncedApp,
@@ -126,10 +126,6 @@ export function App() {
   );
   const [bootError, setBootError] = createSignal<string | null>(null);
   const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
-  // When true, the Login form takes over the viewport. Reachable from
-  // the anonymous Settings panel; on success the new authenticated
-  // session swaps in (keyed remount) and this flips back to false.
-  const [showLogin, setShowLogin] = createSignal(false);
 
   void (async () => {
     const ok = await probeOpfs();
@@ -192,7 +188,6 @@ export function App() {
     setBoot(null);
     setBootError(null);
     setOnline(false);
-    setShowLogin(false);
     setSession(s);
   };
 
@@ -201,28 +196,21 @@ export function App() {
       when={session() !== undefined && opfsOk() !== null}
       fallback={<div class="empty">Loading…</div>}
     >
-      <Show
-        when={!showLogin()}
-        fallback={
-          <Login onSession={onAuthenticated} onCancel={() => setShowLogin(false)} />
-        }
-      >
-        <Show keyed when={session()}>
-          {(s) => (
-            <BootGate
-              session={s}
-              boot={boot()}
-              bootError={bootError()}
-              setBoot={setBoot}
-              setBootError={setBootError}
-              online={online()}
-              setOnline={setOnline}
-              logout={logout}
-              onLoginRequested={() => setShowLogin(true)}
-              opfsOk={opfsOk() ?? false}
-            />
-          )}
-        </Show>
+      <Show keyed when={session()}>
+        {(s) => (
+          <BootGate
+            session={s}
+            boot={boot()}
+            bootError={bootError()}
+            setBoot={setBoot}
+            setBootError={setBootError}
+            online={online()}
+            setOnline={setOnline}
+            logout={logout}
+            onSession={onAuthenticated}
+            opfsOk={opfsOk() ?? false}
+          />
+        )}
       </Show>
     </Show>
   );
@@ -264,7 +252,7 @@ function BootGate(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
-  onLoginRequested: () => void;
+  onSession: (s: Session) => void;
   opfsOk: boolean;
 }) {
   // Try to restore a doc + frontier from OPFS. On signup we always
@@ -314,7 +302,7 @@ function BootGate(props: {
           setOnline={props.setOnline}
           online={props.online}
           logout={props.logout}
-          onLoginRequested={props.onLoginRequested}
+          onSession={props.onSession}
           opfsOk={props.opfsOk}
         />
       )}
@@ -329,7 +317,7 @@ function MainApp(props: {
   online: boolean;
   setOnline: (b: boolean) => void;
   logout: () => void;
-  onLoginRequested: () => void;
+  onSession: (s: Session) => void;
   opfsOk: boolean;
 }) {
   // eslint-disable-next-line no-console
@@ -341,9 +329,9 @@ function MainApp(props: {
   );
   // Both SyncEngine and OpfsStorage consume their Dek argument, and
   // the session-level Dek must stay valid across MainApp remounts
-  // (the user can flip into the Login form and Cancel back, which
-  // unmounts and re-mounts this whole tree). So clone for each
-  // consumer; the original on `props.session.dek` is untouched.
+  // (anonymous → authed swap remounts this whole tree on the Session
+  // key). So clone for each consumer; the original on
+  // `props.session.dek` is untouched.
   const engine = new SyncEngine(
     props.boot.doc,
     props.session.dek.clone(),
@@ -455,7 +443,7 @@ function MainApp(props: {
       session={props.session}
       online={props.online}
       logout={props.logout}
-      onLoginRequested={props.onLoginRequested}
+      onSession={props.onSession}
     />
   );
 }
@@ -465,7 +453,7 @@ function Workspace(props: {
   session: Session;
   online: boolean;
   logout: () => void;
-  onLoginRequested: () => void;
+  onSession: (s: Session) => void;
 }) {
   const app = props.app;
   const state = app.state;
@@ -905,7 +893,7 @@ function Workspace(props: {
         session={props.session}
         logout={props.logout}
         onOpenSettings={() => setSettingsOpen(true)}
-        onLoginRequested={props.onLoginRequested}
+        onSession={props.onSession}
       />
       <Settings
         open={settingsOpen()}
@@ -917,10 +905,6 @@ function Workspace(props: {
         }}
         session={props.session}
         logout={props.logout}
-        onLoginRequested={() => {
-          setSettingsOpen(false);
-          props.onLoginRequested();
-        }}
       />
       <main class="main">
         <header class="main-header">
@@ -1046,9 +1030,14 @@ function Nav(props: {
   session: Session;
   logout: () => void;
   onOpenSettings: () => void;
-  onLoginRequested: () => void;
+  onSession: (s: Session) => void;
 }) {
   const [adding, setAdding] = createSignal(false);
+  const [authOpen, setAuthOpen] = createSignal(false);
+  const handleSession = (s: Session) => {
+    setAuthOpen(false);
+    props.onSession(s);
+  };
   const [name, setName] = createSignal("");
   const submit = (e: Event) => {
     e.preventDefault();
@@ -1209,29 +1198,23 @@ function Nav(props: {
         </Show>
       </div>
       <div class="nav-footer">
+        <Show when={props.session.anonymous}>
+          <Popover open={authOpen()} onOpenChange={setAuthOpen}>
+            <Popover.Trigger class="signin-button">Sign in</Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content class="auth-popover">
+                <h3 class="auth-popover-title">Welcome</h3>
+                <AuthForm onSession={handleSession} />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover>
+        </Show>
         <DropdownMenu>
           <DropdownMenu.Trigger
-            class="account-trigger"
-            aria-label="Account"
-          >
-            <Show
-              when={!props.session.anonymous}
-              fallback={<span class="account-trigger-label">Local user</span>}
-            >
-              <img
-                class="account-trigger-avatar"
-                src={faviconPng}
-                alt=""
-                aria-hidden="true"
-              />
-              <span class="account-trigger-label">Pro</span>
-            </Show>
-            <span
-              class="account-trigger-caret"
-              aria-hidden="true"
-              innerHTML={caretDownSvg}
-            />
-          </DropdownMenu.Trigger>
+            class="nav-menu-trigger"
+            aria-label="Menu"
+            innerHTML={dotsVerticalSvg}
+          />
           <DropdownMenu.Portal>
             <DropdownMenu.Content class="dropdown-menu-content">
               <DropdownMenu.Item
@@ -1261,22 +1244,12 @@ function Nav(props: {
               >
                 Settings
               </DropdownMenu.Item>
-              <Show
-                when={props.session.anonymous}
-                fallback={
-                  <DropdownMenu.Item
-                    class="dropdown-menu-item"
-                    onSelect={() => props.logout()}
-                  >
-                    Log out
-                  </DropdownMenu.Item>
-                }
-              >
+              <Show when={!props.session.anonymous}>
                 <DropdownMenu.Item
                   class="dropdown-menu-item"
-                  onSelect={() => props.onLoginRequested()}
+                  onSelect={() => props.logout()}
                 >
-                  Log in / Sign up
+                  Log out
                 </DropdownMenu.Item>
               </Show>
             </DropdownMenu.Content>
