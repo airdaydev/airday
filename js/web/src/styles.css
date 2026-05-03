@@ -110,7 +110,7 @@ body {
 }
 
 .nav-group {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .nav-footer {
@@ -190,7 +190,7 @@ body {
 }
 
 .main-header {
-  padding: 8px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -204,9 +204,9 @@ body {
 
 .add-button {
   padding: 6px 12px;
-  border: 1px solid var(--btn-primary-bg);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-text);
+  border: none;
+  background: #e1e1e1;
+  color: black;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
