@@ -1,9 +1,11 @@
 pub mod msgpack;
+pub mod request_id;
 
 mod auth_routes;
 mod device_routes;
 
 use axum::http::{header, Method};
+use axum::middleware;
 use axum::routing::{any, delete, get, post};
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
@@ -20,7 +22,12 @@ pub fn router(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            request_id::REQUEST_ID_HEADER,
+        ])
+        .expose_headers([request_id::REQUEST_ID_HEADER]);
 
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
@@ -43,6 +50,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/devices/{device_id}", delete(device_routes::revoke))
         .route("/api/sync", any(ws_handler))
+        .layer(middleware::from_fn(request_id::middleware))
         .layer(cors)
         .with_state(state)
 }
