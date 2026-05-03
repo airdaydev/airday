@@ -317,7 +317,7 @@ body {
 }
 
 .row-description {
-  color: var(--text-subtle);
+  color: var(--text-empty);
 }
 
 .row-timestamp {
@@ -344,6 +344,12 @@ body {
   overflow-wrap: anywhere;
   overflow: visible;
   cursor: text;
+}
+
+.row[data-expanded] .row-text:empty::before {
+  content: "New item";
+  color: var(--text-empty);
+  pointer-events: none;
 }
 
 .empty {

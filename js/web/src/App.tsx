@@ -1597,6 +1597,15 @@ function Row(props: {
             onPointerDown={(e) => {
               if (props.expanded()) e.stopPropagation();
             }}
+            on:input={() => {
+              // Browsers (Chrome, Firefox) leave a stray <br> behind when
+              // the user deletes the last character of a contenteditable,
+              // which defeats the `:empty::before` placeholder. Strip it
+              // when the visible text is empty so the placeholder returns.
+              if (textRef.textContent === "" && textRef.firstChild) {
+                textRef.replaceChildren();
+              }
+            }}
             on:keydown={(e) => {
               // Native (non-delegated) so the bubble order is span → dnd
               // listbox; Solid's delegated `onKeyDown` fires at document
