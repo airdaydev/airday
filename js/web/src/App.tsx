@@ -34,6 +34,7 @@ import {
 } from "@primavera-ui/components/dnd/solid";
 import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
 import caretDownSvg from "./icons/caret-down.svg?raw";
+import faviconPng from "./icons/favicon.png";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { Login, type Session } from "./Login.tsx";
@@ -1216,7 +1217,12 @@ function Nav(props: {
               when={!props.session.anonymous}
               fallback={<span class="account-trigger-label">Local user</span>}
             >
-              <span class="account-trigger-avatar" aria-hidden="true" />
+              <img
+                class="account-trigger-avatar"
+                src={faviconPng}
+                alt=""
+                aria-hidden="true"
+              />
               <span class="account-trigger-label">Pro</span>
             </Show>
             <span

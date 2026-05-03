@@ -565,9 +565,8 @@ body {
 .account-trigger-avatar {
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  background: var(--bg-active);
   flex-shrink: 0;
+  object-fit: cover;
 }
 
 .account-trigger-label {
