@@ -3,6 +3,7 @@ name = "airday-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+build = "build.rs"
 
 [[bin]]
 name = "airday-server"

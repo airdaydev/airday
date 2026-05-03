@@ -1,5 +1,6 @@
 //! All sqlite reads/writes touching accounts / devices / recovery sessions.
 
+use anyhow::Context;
 use airday_protocol::KdfParams;
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
@@ -249,7 +250,8 @@ pub async fn revoke_device(db: &Db, account_id: Uuid, device_id: Uuid) -> anyhow
                 params![dev_bytes, acc_bytes],
             )
         })
-        .await?;
+        .await
+        .context("auth.queries revoke_device delete row")?;
     Ok(n > 0)
 }
 

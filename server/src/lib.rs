@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod build_info;
 pub mod config;
 pub mod db;
 pub mod error;

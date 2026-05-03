@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use airday_server::{router, AppState, Config};
+use airday_server::{build_info, router, AppState, Config};
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -54,7 +54,11 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = cfg.bind_addr()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!(addr = %listener.local_addr()?, "airday-server listening");
+    tracing::info!(
+        addr = %listener.local_addr()?,
+        build.git_sha = build_info::GIT_SHA,
+        "airday-server listening"
+    );
     axum::serve(listener, app).await?;
     Ok(())
 }

@@ -1,7 +1,9 @@
 use airday_protocol::ErrorBody;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use rusqlite::ffi::ErrorCode;
 
+use crate::build_info;
 use crate::http::msgpack::Msgpack;
 
 #[derive(Debug, thiserror::Error)]
@@ -51,7 +53,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, code) = self.status_and_code();
         if let ApiError::Internal(err) = &self {
-            tracing::error!(error = ?err, "internal error");
+            log_internal_error(err);
         }
         let body = ErrorBody {
             code: code.to_string(),
@@ -74,3 +76,48 @@ impl From<tokio_rusqlite::Error> for ApiError {
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;
+
+fn log_internal_error(err: &anyhow::Error) {
+    let (kind, code) = classify_internal_error(err);
+    tracing::error!(
+        build.git_sha = build_info::GIT_SHA,
+        error.kind = kind,
+        error.code = code,
+        error.message = %err,
+        error.root_cause = %err.root_cause(),
+        error.chain = %format_error_chain(err),
+        "internal error"
+    );
+}
+
+fn format_error_chain(err: &anyhow::Error) -> String {
+    err.chain()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(": ")
+}
+
+fn classify_internal_error(err: &anyhow::Error) -> (&'static str, &'static str) {
+    for cause in err.chain() {
+        if let Some(sqlite) = cause.downcast_ref::<rusqlite::Error>() {
+            return classify_rusqlite_error(sqlite);
+        }
+    }
+    ("internal", "internal")
+}
+
+fn classify_rusqlite_error(err: &rusqlite::Error) -> (&'static str, &'static str) {
+    match err {
+        rusqlite::Error::SqliteFailure(inner, _) => match inner.code {
+            ErrorCode::ConstraintViolation => match inner.extended_code {
+                787 => ("db", "sqlite.foreign_key"),
+                1555 | 2067 => ("db", "sqlite.unique"),
+                _ => ("db", "sqlite.constraint"),
+            },
+            ErrorCode::DatabaseBusy => ("db", "sqlite.busy"),
+            ErrorCode::DatabaseLocked => ("db", "sqlite.locked"),
+            _ => ("db", "sqlite.error"),
+        },
+        _ => ("db", "sqlite.error"),
+    }
+}

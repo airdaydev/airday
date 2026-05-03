@@ -1,5 +1,6 @@
 //! Account / password / recovery HTTP handlers.
 
+use anyhow::Context;
 use airday_protocol::{
     DeviceCredential, LoginRequest, LoginResponse, PasswordChangeRequest, PasswordResetRequest,
     PasswordResetResponse, PreloginRequest, PreloginResponse, RecoverRequest, RecoverResponse,
@@ -233,10 +234,16 @@ pub async fn password_reset(
     ))
 }
 
+#[tracing::instrument(
+    skip(state),
+    fields(account_id = %auth.account_id, device_id = %auth.device_id)
+)]
 pub async fn logout(State(state): State<AppState>, auth: DeviceAuth) -> ApiResult<(HeaderMap, ())> {
     // `revoke_device` is idempotent — a stale cookie pointing at an
     // already-revoked device won't 404 us into a useless error here.
-    let _ = revoke_device(&state.db, auth.account_id, auth.device_id).await?;
+    let _ = revoke_device(&state.db, auth.account_id, auth.device_id)
+        .await
+        .context("auth.logout revoke_device")?;
     Ok((
         cookie_headers(cookie::clear_cookie(state.secure_cookies)),
         (),
