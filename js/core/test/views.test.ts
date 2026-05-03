@@ -72,9 +72,14 @@ describe("Doc view helpers", () => {
 
     expect(doc.getItemJson("does-not-exist")).toBeUndefined();
 
-    const list = JSON.parse(doc.getListMetaJson(LIST_MAIN)!);
-    expect(list.id).toBe(LIST_MAIN);
-    expect(list.name).toBe("Now");
+    // `main` is a reserved id with no MovableList entry — clients render
+    // its label themselves, so getListMetaJson(LIST_MAIN) is undefined.
+    expect(doc.getListMetaJson(LIST_MAIN)).toBeUndefined();
+
+    const userListId = doc.addList("Groceries");
+    const list = JSON.parse(doc.getListMetaJson(userListId)!);
+    expect(list.id).toBe(userListId);
+    expect(list.name).toBe("Groceries");
 
     expect(doc.getListMetaJson("nope")).toBeUndefined();
   });

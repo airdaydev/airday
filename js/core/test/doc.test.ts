@@ -71,10 +71,10 @@ describe("Doc + MemStorage", () => {
       id: string;
       name: string;
     }>;
-    expect(lists.some((l) => l.id === LIST_MAIN)).toBe(true);
-    const names = lists.map((l) => l.name);
-    expect(names).toContain("Now");
-    expect(names).toContain("Later");
+    // `main` is a reserved id, not a MovableList entry — only "Later"
+    // is seeded as a real list.
+    expect(lists.some((l) => l.id === LIST_MAIN)).toBe(false);
+    expect(lists.map((l) => l.name)).toContain("Later");
   });
 });
 
