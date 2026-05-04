@@ -48,6 +48,7 @@ const ROOT_LISTS: &str = "lists";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
+const KEY_NOTES: &str = "notes";
 const KEY_LIST_ID: &str = "list_id";
 const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
@@ -99,6 +100,7 @@ impl From<loro::LoroEncodeError> for DocError {
 pub struct ItemView {
     pub id: String,
     pub text: String,
+    pub notes: String,
     pub list_id: String,
     pub created_at: i64,
     pub done_at: Option<i64>,
@@ -222,6 +224,7 @@ impl Doc {
             id: id.clone(),
             list_id: list_id.to_string(),
             text: text.to_string(),
+            notes: String::new(),
             created_at: now,
             done_at: None,
             binned_at: None,
@@ -258,6 +261,7 @@ impl Doc {
             id: id.clone(),
             list_id: list_id.to_string(),
             text: text.to_string(),
+            notes: String::new(),
             created_at: now,
             done_at: None,
             binned_at: None,
@@ -304,6 +308,7 @@ impl Doc {
                 id,
                 list_id: list_id.to_string(),
                 text,
+                notes: String::new(),
                 created_at: now,
                 done_at: None,
                 binned_at: None,
@@ -324,6 +329,20 @@ impl Doc {
         self.push_event(AppEvent::ItemTextChanged {
             id: item_id.to_string(),
             text: text.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Set an item's free-form notes. Empty is allowed (clears the
+    /// note); leading/trailing whitespace is preserved verbatim because
+    /// notes are intentionally a freeform plain-text field.
+    pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), DocError> {
+        let (_, map) = self.find_item(item_id)?;
+        map.insert(KEY_NOTES, notes)?;
+        self.inner.commit();
+        self.push_event(AppEvent::ItemNotesChanged {
+            id: item_id.to_string(),
+            notes: notes.to_string(),
         });
         Ok(())
     }
@@ -838,6 +857,7 @@ impl Doc {
                 id: item.id,
                 list_id: item.list_id,
                 text: item.text,
+                notes: item.notes,
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
@@ -908,6 +928,7 @@ impl Doc {
         for i in &items {
             hash_str(&mut hasher, &i.id);
             hash_str(&mut hasher, &i.text);
+            hash_str(&mut hasher, &i.notes);
             hash_str(&mut hasher, &i.list_id);
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
@@ -1046,6 +1067,10 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
+        // Pre-notes items don't have the key — default to empty so old
+        // snapshots load and items added before the migration round-trip
+        // through `get_item` cleanly.
+        notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: read_string(map, KEY_LIST_ID)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
@@ -1198,6 +1223,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     id: post_it.id.clone(),
                     list_id: post_it.list_id.clone(),
                     text: post_it.text.clone(),
+                    notes: post_it.notes.clone(),
                     created_at: post_it.created_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
@@ -1209,6 +1235,12 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ItemTextChanged {
                         id: post_it.id.clone(),
                         text: post_it.text.clone(),
+                    });
+                }
+                if pre_it.notes != post_it.notes {
+                    out.push(AppEvent::ItemNotesChanged {
+                        id: post_it.id.clone(),
+                        notes: post_it.notes.clone(),
                     });
                 }
                 if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {

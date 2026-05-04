@@ -356,6 +356,31 @@ body {
   color: var(--text-empty);
 }
 
+.row-notes {
+  /* Reset the textarea's UA chrome so it sits flush in the row body
+     like the row-text contenteditable above it. Height is set
+     imperatively from JS to match content (auto-grow). */
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  line-height: 1.3em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.row-notes::placeholder {
+  color: var(--text-empty);
+}
+
 .row-timestamp {
   flex-shrink: 0;
   color: var(--text-subtle);

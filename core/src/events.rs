@@ -22,6 +22,7 @@ pub enum AppEvent {
         id: String,
         list_id: String,
         text: String,
+        notes: String,
         created_at: i64,
         done_at: Option<i64>,
         binned_at: Option<i64>,
@@ -43,6 +44,10 @@ pub enum AppEvent {
     ItemTextChanged {
         id: String,
         text: String,
+    },
+    ItemNotesChanged {
+        id: String,
+        notes: String,
     },
     /// Done/binned flags changed. The two are independent — an event is
     /// emitted whenever either timestamp transitions on/off, and the

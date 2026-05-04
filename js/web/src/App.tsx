@@ -618,6 +618,7 @@ function Workspace(props: {
       id,
       listId: v.id,
       text: "",
+      notes: "",
       createdAt: Date.now(),
     };
     setDraft({ item: draftItem, insertIndex, listId: v.id });
@@ -1433,6 +1434,53 @@ function EditableNavLabel(props: {
   );
 }
 
+// Free-form notes editor. Mounted only while the row is expanded; on
+// unmount (i.e. on collapse) we flush the current text back through
+// `editItemNotes` if it differs from the model. Live peer changes during
+// edit are intentionally ignored — last-collapse-wins, matching how the
+// row-text editor behaves while expanded. A textarea (rather than a
+// contenteditable div) so newline round-trips are byte-faithful and we
+// don't have to fight browser-inserted <div>/<br> markup.
+function NotesField(props: { item: () => ItemView; app: DocApp }) {
+  let ref!: HTMLTextAreaElement;
+  const initial = props.item().notes;
+  // Match content height so the field grows with the note instead of
+  // showing an internal scrollbar. Run after each input so paste / type
+  // / delete all stay in sync.
+  const autosize = () => {
+    ref.style.height = "auto";
+    ref.style.height = `${ref.scrollHeight}px`;
+  };
+  onMount(() => {
+    ref.value = initial;
+    autosize();
+  });
+  onCleanup(() => {
+    const next = ref.value;
+    if (next !== props.item().notes) {
+      props.app.editItemNotes(props.item().id, next);
+    }
+  });
+  return (
+    <textarea
+      ref={ref}
+      class="row-notes"
+      placeholder="Notes"
+      rows={1}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onInput={autosize}
+      on:keydown={(e) => {
+        // Native (non-delegated) so the bubble order is textarea → dnd
+        // listbox; otherwise the listbox would intercept arrows / Cmd+A
+        // before we see them. Escape stays uncaught so it can collapse
+        // the row through the dnd's handler.
+        if (e.key !== "Escape") e.stopPropagation();
+      }}
+    />
+  );
+}
+
 function Row(props: {
   item: () => ItemView;
   expanded: () => boolean;
@@ -1681,8 +1729,8 @@ function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          <Show when={props.expanded()}>
-            <div class="row-description">Notes</div>
+          <Show when={props.expanded() && !isDraftId(props.item().id)}>
+            <NotesField item={props.item} app={props.app} />
           </Show>
         </div>
         <Show when={statusTimestamp(props.item())}>

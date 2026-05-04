@@ -108,6 +108,11 @@ impl Doc {
         self.inner.edit_item_text(item_id, text).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = editItemNotes)]
+    pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), JsError> {
+        self.inner.edit_item_notes(item_id, notes).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveItem)]
     pub fn move_item(
         &self,
@@ -665,6 +670,14 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = editItemNotes)]
+    pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .edit_item_notes(item_id, notes)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveItem)]
     pub fn move_item(
         &self,
@@ -886,10 +899,11 @@ impl From<CoreEvent> for EngineEvent {
 /// every other getter returns `undefined`.
 ///
 /// Variant → fields:
-/// - `itemAdded` — id, listId, text, createdAt, doneAt?, binnedAt?, index
+/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, index
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, index
 /// - `itemTextChanged` — id, text
+/// - `itemNotesChanged` — id, notes
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?
 /// - `itemListChanged` — id, listId
 /// - `listAdded` — id, name, createdAt, index
@@ -902,6 +916,7 @@ pub struct AppEventJs {
     id: String,
     list_id: Option<String>,
     text: Option<String>,
+    notes: Option<String>,
     name: Option<String>,
     created_at: Option<i64>,
     done_at: Option<i64>,
@@ -926,6 +941,10 @@ impl AppEventJs {
     #[wasm_bindgen(getter)]
     pub fn text(&self) -> Option<String> {
         self.text.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn notes(&self) -> Option<String> {
+        self.notes.clone()
     }
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> Option<String> {
@@ -956,6 +975,7 @@ impl From<CoreAppEvent> for AppEventJs {
             id: String::new(),
             list_id: None,
             text: None,
+            notes: None,
             name: None,
             created_at: None,
             done_at: None,
@@ -967,6 +987,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 list_id,
                 text,
+                notes,
                 created_at,
                 done_at,
                 binned_at,
@@ -976,6 +997,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 list_id: Some(list_id),
                 text: Some(text),
+                notes: Some(notes),
                 created_at: Some(created_at),
                 done_at,
                 binned_at,
@@ -997,6 +1019,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 kind: "itemTextChanged",
                 id,
                 text: Some(text),
+                ..blank
+            },
+            CoreAppEvent::ItemNotesChanged { id, notes } => AppEventJs {
+                kind: "itemNotesChanged",
+                id,
+                notes: Some(notes),
                 ..blank
             },
             CoreAppEvent::ItemStatusChanged {
@@ -1075,9 +1103,10 @@ fn lists_to_json(lists: &[airday_core::ListView]) -> String {
 
 fn item_to_json(it: &airday_core::ItemView) -> String {
     let mut s = format!(
-        "{{\"id\":{},\"text\":{},\"listId\":{},\"createdAt\":{}",
+        "{{\"id\":{},\"text\":{},\"notes\":{},\"listId\":{},\"createdAt\":{}",
         json_string(&it.id),
         json_string(&it.text),
+        json_string(&it.notes),
         json_string(&it.list_id),
         it.created_at,
     );

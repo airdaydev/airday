@@ -17,6 +17,7 @@ import { createStore, produce } from "solid-js/store";
 export interface ItemView {
   id: string;
   text: string;
+  notes: string;
   listId: string;
   createdAt: number;
   doneAt?: number;
@@ -72,6 +73,9 @@ export interface DocApp {
    *  UI see one update, not N. */
   addItemsAt(listId: string, texts: string[], indexInList: number): string[];
   editItemText(id: string, text: string): void;
+  /** Set the free-form notes string. Empty clears it; whitespace is
+   *  preserved verbatim. */
+  editItemNotes(id: string, notes: string): void;
   /** Set or clear an item's done flag. Independent of binned. */
   setDone(id: string, done: boolean): void;
   /** Set or clear an item's binned flag. Independent of done — binning a
@@ -115,6 +119,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           id: ev.id,
           listId: ev.listId ?? "",
           text: ev.text ?? "",
+          notes: ev.notes ?? "",
           createdAt: Number(ev.createdAt ?? 0),
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
@@ -158,6 +163,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemTextChanged": {
         if (state.itemsById[ev.id]) {
           setState("itemsById", ev.id, "text", ev.text ?? "");
+        }
+        break;
+      }
+      case "itemNotesChanged": {
+        if (state.itemsById[ev.id]) {
+          setState("itemsById", ev.id, "notes", ev.notes ?? "");
         }
         break;
       }
@@ -286,6 +297,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     editItemText(id, text) {
       engine.editItemText(id, text);
+      flush();
+    },
+    editItemNotes(id, notes) {
+      engine.editItemNotes(id, notes);
       flush();
     },
     setDone(id, done) {
