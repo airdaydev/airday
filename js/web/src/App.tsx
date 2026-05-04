@@ -833,19 +833,23 @@ function Workspace(props: {
   onCleanup(() => document.removeEventListener("keydown", onSpaceAdd));
 
   // Drag items into a list nav button to move them to that list as the
-  // first items. Discriminate from the nav's own list-reorder drag by
-  // checking detail.items[0] for an item-shaped record (`listId` is
-  // present on ItemView, absent on ListView). Bubbling + composed means
-  // a single document-level listener catches both Dnd instances.
-  const findDropTarget = (
-    x: number,
-    y: number,
-  ): { el: HTMLElement; listId: string } | null => {
+  // first items, or onto Bin to status-bin them. Discriminate from the
+  // nav's own list-reorder drag by checking detail.items[0] for an
+  // item-shaped record (`listId` is present on ItemView, absent on
+  // ListView). Bubbling + composed means a single document-level
+  // listener catches both Dnd instances.
+  type DropTarget =
+    | { kind: "list"; el: HTMLElement; listId: string }
+    | { kind: "bin"; el: HTMLElement };
+  const findDropTarget = (x: number, y: number): DropTarget | null => {
     const el = document
       .elementFromPoint(x, y)
-      ?.closest<HTMLElement>("[data-drop-list-id]");
+      ?.closest<HTMLElement>("[data-drop-list-id], [data-drop-bin]");
     if (!el) return null;
-    return { el, listId: el.dataset.dropListId! };
+    if (el.dataset.dropListId !== undefined) {
+      return { kind: "list", el, listId: el.dataset.dropListId };
+    }
+    return { kind: "bin", el };
   };
   const clearDropHighlight = () => {
     document
@@ -876,6 +880,18 @@ function Workspace(props: {
     // Sort by current global order so multi-select drops preserve the
     // user's visible ordering rather than landing in selection order.
     const idsInOrder = state.itemsOrder.filter((id) => draggedKeys.has(id));
+    if (target.kind === "bin") {
+      const toBin = idsInOrder.filter((id) => {
+        const it = app.getItem(id);
+        return it !== undefined && it.status !== "binned";
+      });
+      if (toBin.length === 0) return;
+      app.withUndoGroup(() => {
+        for (const id of toBin) app.setStatus(id, "binned");
+      });
+      selection.clear();
+      return;
+    }
     app.withUndoGroup(() => {
       for (const [i, id] of idsInOrder.entries()) {
         app.moveItem(id, target.listId, i);
@@ -1156,6 +1172,7 @@ function Nav(props: {
           type="button"
           class="nav-item"
           data-active={props.view.kind === "bin" ? "" : undefined}
+          data-drop-bin=""
           onClick={() => props.setView({ kind: "bin" })}
         >
           Bin
@@ -1238,7 +1255,6 @@ function Nav(props: {
             <Popover.Trigger class="signin-button">Sign in</Popover.Trigger>
             <Popover.Portal>
               <Popover.Content class="auth-popover">
-                <h3 class="auth-popover-title">Welcome</h3>
                 <AuthForm onSession={handleSession} />
               </Popover.Content>
             </Popover.Portal>
@@ -1278,6 +1294,15 @@ function Nav(props: {
                 onSelect={() => props.onOpenSettings()}
               >
                 Settings
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                as="a"
+                href="https://air.day/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Airday website
               </DropdownMenu.Item>
               <Show when={!props.session.anonymous}>
                 <DropdownMenu.Item

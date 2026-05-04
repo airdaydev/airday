@@ -48,7 +48,7 @@ export function AuthForm(props: {
   );
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
-  const [deviceName, setDeviceName] = createSignal(defaultDeviceName());
+  const [deviceName] = createSignal(defaultDeviceName());
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -71,6 +71,9 @@ export function AuthForm(props: {
 
   return (
     <form class="auth-form" onSubmit={submit}>
+      <h3 class="auth-popover-title">
+        {mode() === "login" ? "Sign in" : "Sign up"}
+      </h3>
       <label>
         Email
         <input
@@ -94,22 +97,13 @@ export function AuthForm(props: {
           onInput={(e) => setPassword(e.currentTarget.value)}
         />
       </label>
-      <label>
-        Device name
-        <input
-          type="text"
-          required
-          value={deviceName()}
-          disabled={busy()}
-          onInput={(e) => setDeviceName(e.currentTarget.value)}
-        />
-      </label>
+      <input type="hidden" value={deviceName()} />
       <button type="submit" disabled={busy()}>
         {busy()
           ? "Deriving keys…"
           : mode() === "login"
             ? "Sign in"
-            : "Create account"}
+            : "Sign up"}
       </button>
       <button
         type="button"
