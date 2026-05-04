@@ -60,6 +60,12 @@ type ViewKey =
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
 
+// Done items linger in their live list this long after being marked
+// done, so the user sees the strike-through before the row drops out.
+// The state change is instant — this is purely a render-time tail
+// derived from doneAt, not a separate "pending" set.
+const DONE_LINGER_MS = 3_000;
+
 // Module-level so the OS-preference listener is registered exactly
 // once for the lifetime of the page.
 const theme = createTheme();
@@ -515,6 +521,47 @@ function Workspace(props: {
     ),
   );
 
+  // Linger group for the active list view: the unbroken chain of
+  // recently-done items walking back from the latest click. A new
+  // Done click within DONE_LINGER_MS of the previous extends the
+  // whole chain, so a burst of clicks all leave together at the
+  // latest's expiry; a click after a gap starts a fresh chain.
+  const lingerChain = createMemo(
+    (): { ids: Set<string>; expiry: number } => {
+      const v = view();
+      if (v.kind !== "list") return { ids: new Set(), expiry: -Infinity };
+      const done: ItemView[] = [];
+      for (const id of state.itemsOrder) {
+        const it = state.itemsById[id];
+        if (!it || it.listId !== v.id || isBinned(it) || !isDone(it)) continue;
+        done.push(it);
+      }
+      if (done.length === 0) return { ids: new Set(), expiry: -Infinity };
+      done.sort((a, b) => b.doneAt! - a.doneAt!);
+      const ids = new Set<string>();
+      let prev = done[0].doneAt!;
+      for (const it of done) {
+        if (prev - it.doneAt! >= DONE_LINGER_MS) break;
+        ids.add(it.id);
+        prev = it.doneAt!;
+      }
+      return { ids, expiry: done[0].doneAt! + DONE_LINGER_MS };
+    },
+  );
+
+  // Self-arms a single timeout for the chain's expiry — fires once
+  // when the whole group should flush. Re-arms automatically when a
+  // new click extends the chain (lingerChain memo changes).
+  const [lingerTick, setLingerTick] = createSignal(0);
+  createEffect(() => {
+    lingerTick();
+    const { expiry } = lingerChain();
+    const remaining = expiry - Date.now();
+    if (remaining <= 0) return;
+    const t = setTimeout(() => setLingerTick((n) => n + 1), remaining);
+    onCleanup(() => clearTimeout(t));
+  });
+
   // Per-view item slice. Each `state.itemsById[id]` access is a tracked
   // path on the store proxy, so adds/removes to itemsOrder and field
   // changes on individual items both flow through this memo without
@@ -525,7 +572,15 @@ function Workspace(props: {
       .map((id) => state.itemsById[id])
       .filter((it): it is ItemView => it !== undefined);
     if (v.kind === "list") {
-      return all.filter((it) => it.listId === v.id && isInListView(it));
+      lingerTick();
+      const { ids: lingerIds, expiry } = lingerChain();
+      const groupActive = Date.now() < expiry;
+      return all.filter(
+        (it) =>
+          it.listId === v.id &&
+          !isBinned(it) &&
+          (!isDone(it) || (groupActive && lingerIds.has(it.id))),
+      );
     }
     if (v.kind === "done") {
       // Done view excludes binned items: a done-then-binned item lives

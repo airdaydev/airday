@@ -21,7 +21,6 @@
   --btn-primary-text: #ffffff;
   --btn-secondary-bg: #ffffff;
   --link: #2563eb;
-  --success: #22a34d;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
   --dnd-select-bg: #dbeafe;
@@ -54,7 +53,6 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
   --btn-primary-text: #111;
   --btn-secondary-bg: #222;
   --link: #60a5fa;
-  --success: #4ade80;
   --error-bg: #2a1215;
   --error-text: #f87171;
   --dnd-select-bg: #1e3a5f;
@@ -322,8 +320,8 @@ body {
 }
 
 .row input[type="checkbox"]:checked {
-  background-color: var(--success);
-  border-color: var(--success);
+  background-color: var(--link);
+  border-color: var(--link);
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat;
   background-position: center;
