@@ -248,6 +248,10 @@ body {
   font: inherit;
 }
 
+.add-button svg {
+  width: 13px;
+}
+
 .add-button:disabled {
   opacity: 0.5;
   cursor: default;
