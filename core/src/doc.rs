@@ -26,7 +26,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;
 
 use loro::{
@@ -355,25 +355,8 @@ impl Doc {
     ) -> Result<(), DocError> {
         self.assert_list_exists(target_list_id)?;
         let (idx, map) = self.find_item(item_id)?;
-        let moving_in_list_view =
-            read_i64(&map, KEY_DONE_AT).is_none() && read_i64(&map, KEY_BINNED_AT).is_none();
         let prev_list_id = read_string(&map, KEY_LIST_ID);
-        let items = self.items();
-        // `target_index` is the desired index *within target_list_id*;
-        // map it onto an absolute index in the global items list by
-        // counting matching entries up to that point. Sprint 1 cap is
-        // 4096 items so the linear scan is fine.
-        let abs = absolute_index_for_list_position(
-            &items,
-            target_list_id,
-            target_index,
-            idx,
-            moving_in_list_view,
-        );
-        map.insert(KEY_LIST_ID, target_list_id)?;
-        if abs != idx {
-            items.mov(idx, abs)?;
-        }
+        let abs = self.move_item_inner(item_id, target_list_id, target_index)?;
         self.inner.commit();
         let index = self
             .visible_item_index(item_id)
@@ -422,6 +405,39 @@ impl Doc {
         Ok(())
     }
 
+    /// Set or clear done state for many items in one commit.
+    pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        assert_unique_item_ids(item_ids)?;
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let mut changed = false;
+        for item_id in item_ids {
+            let (_, map) = self.find_item(item_id)?;
+            let prev_done = read_i64(&map, KEY_DONE_AT);
+            let new_done = match (done, prev_done) {
+                (true, Some(_)) | (false, None) => continue,
+                (true, None) => Some(now_millis()),
+                (false, Some(_)) => None,
+            };
+            changed = true;
+            match new_done {
+                Some(t) => {
+                    map.insert(KEY_DONE_AT, t)?;
+                }
+                None => {
+                    let _ = map.delete(KEY_DONE_AT);
+                }
+            }
+        }
+        if changed {
+            self.inner.commit();
+            self.emit_item_diffs(&pre_items);
+        }
+        Ok(())
+    }
+
     /// Set or clear an item's binned state. Independent of `done` —
     /// binning a done item keeps it done; restoring (unbinning) leaves
     /// the done state alone.
@@ -452,6 +468,39 @@ impl Doc {
         Ok(())
     }
 
+    /// Set or clear binned state for many items in one commit.
+    pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        assert_unique_item_ids(item_ids)?;
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let mut changed = false;
+        for item_id in item_ids {
+            let (_, map) = self.find_item(item_id)?;
+            let prev_binned = read_i64(&map, KEY_BINNED_AT);
+            let new_binned = match (binned, prev_binned) {
+                (true, Some(_)) | (false, None) => continue,
+                (true, None) => Some(now_millis()),
+                (false, Some(_)) => None,
+            };
+            changed = true;
+            match new_binned {
+                Some(t) => {
+                    map.insert(KEY_BINNED_AT, t)?;
+                }
+                None => {
+                    let _ = map.delete(KEY_BINNED_AT);
+                }
+            }
+        }
+        if changed {
+            self.inner.commit();
+            self.emit_item_diffs(&pre_items);
+        }
+        Ok(())
+    }
+
     pub fn delete_binned(&self, item_id: &str) -> Result<(), DocError> {
         let (idx, map) = self.find_item(item_id)?;
         if read_i64(&map, KEY_BINNED_AT).is_none() {
@@ -462,6 +511,32 @@ impl Doc {
         self.push_event(AppEvent::ItemRemoved {
             id: item_id.to_string(),
         });
+        Ok(())
+    }
+
+    /// Hard-delete the subset of binned items identified by `item_ids`
+    /// in one commit. Errors if any id is not currently binned.
+    pub fn delete_binned_items(&self, item_ids: &[&str]) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        assert_unique_item_ids(item_ids)?;
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let mut positions = Vec::with_capacity(item_ids.len());
+        for item_id in item_ids {
+            let (idx, map) = self.find_item(item_id)?;
+            if read_i64(&map, KEY_BINNED_AT).is_none() {
+                return Err(DocError::NotBinned);
+            }
+            positions.push(idx);
+        }
+        positions.sort_unstable();
+        let items = self.items();
+        for idx in positions.into_iter().rev() {
+            items.delete(idx, 1)?;
+        }
+        self.inner.commit();
+        self.emit_item_diffs(&pre_items);
         Ok(())
     }
 
@@ -1010,6 +1085,42 @@ impl Doc {
         map.insert(KEY_CREATED_AT, now)?;
         Ok((id, now))
     }
+
+    fn move_item_inner(
+        &self,
+        item_id: &str,
+        target_list_id: &str,
+        target_index: usize,
+    ) -> Result<usize, DocError> {
+        let (idx, map) = self.find_item(item_id)?;
+        let moving_in_list_view =
+            read_i64(&map, KEY_DONE_AT).is_none() && read_i64(&map, KEY_BINNED_AT).is_none();
+        let items = self.items();
+        let abs = absolute_index_for_list_position(
+            &items,
+            target_list_id,
+            target_index,
+            idx,
+            moving_in_list_view,
+        );
+        map.insert(KEY_LIST_ID, target_list_id)?;
+        if abs != idx {
+            items.mov(idx, abs)?;
+        }
+        Ok(abs)
+    }
+
+    fn emit_item_diffs(&self, pre_items: &[ItemView]) {
+        let post_items: Vec<ItemView> = self.iter_items().collect();
+        let mut emitted = Vec::new();
+        diff_items(pre_items, &post_items, &mut emitted);
+        if !emitted.is_empty() {
+            let mut q = self.events.lock().expect("events mutex poisoned");
+            for ev in emitted {
+                q.push_back(ev);
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1019,6 +1130,16 @@ struct LocalState {
     snapshot: Vec<u8>,
     #[serde(with = "serde_bytes")]
     last_pushed_vv: Vec<u8>,
+}
+
+fn assert_unique_item_ids(item_ids: &[&str]) -> Result<(), DocError> {
+    let mut seen = HashSet::with_capacity(item_ids.len());
+    for item_id in item_ids {
+        if !seen.insert(*item_id) {
+            return Err(DocError::Invalid(format!("duplicate item id: {item_id}")));
+        }
+    }
+    Ok(())
 }
 
 fn seed_builtins(doc: &LoroDoc) -> Result<(), DocError> {
@@ -1885,7 +2006,10 @@ mod tests {
 
         doc.move_item(&moved, LIST_MAIN, 0).unwrap();
 
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![moved.clone(), first, third]);
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![moved.clone(), first, third]
+        );
         let evs = doc.drain_events();
         assert!(
             evs.iter().any(
@@ -1893,6 +2017,35 @@ mod tests {
             ),
             "expected ItemMoved to absolute index 0, got {evs:?}"
         );
+    }
+
+    #[test]
+    fn set_items_binned_updates_many_in_one_call() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+
+        doc.set_items_binned(&[first.as_str(), second.as_str()], true)
+            .unwrap();
+
+        assert_eq!(doc.live_item_ids(LIST_MAIN), Vec::<String>::new());
+        assert_eq!(doc.binned_item_ids().len(), 2);
+    }
+
+    #[test]
+    fn delete_binned_items_removes_many_in_one_call() {
+        let doc = Doc::new().unwrap();
+        let keep = doc.add_item(LIST_MAIN, "keep").unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        doc.set_items_binned(&[first.as_str(), second.as_str()], true)
+            .unwrap();
+
+        doc.delete_binned_items(&[first.as_str(), second.as_str()])
+            .unwrap();
+
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![keep]);
+        assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
 
     #[test]
@@ -2070,6 +2223,120 @@ mod tests {
         // The three add_item commits are still individually undoable;
         // grouping only affected the bulk-status block.
         assert!(doc.can_undo());
+    }
+
+    #[test]
+    fn reorder_loop_downward_block_keeps_order() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let fourth = doc.add_item(LIST_MAIN, "fourth").unwrap();
+
+        let ids = vec![first.clone(), second.clone(), third.clone(), fourth.clone()];
+        let moved_ids = vec![second.clone(), third.clone()];
+        let remaining = vec![first.clone(), fourth.clone()];
+        let mut next_ids = remaining;
+        next_ids.splice(2..2, moved_ids.clone());
+        let mut current_ids = ids;
+
+        doc.begin_undo_group().unwrap();
+        for (index, id) in next_ids.iter().enumerate() {
+            if current_ids[index] != *id {
+                let current_index = current_ids
+                    .iter()
+                    .position(|cur| cur == id)
+                    .expect("moved id must still exist");
+                doc.move_item(id, LIST_MAIN, index).unwrap();
+                current_ids.remove(current_index);
+                current_ids.insert(index, id.clone());
+            }
+        }
+        doc.end_undo_group();
+
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![first, fourth, second, third]
+        );
+    }
+
+    #[test]
+    fn reorder_loop_undo_redo_round_trips_small_block() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let fourth = doc.add_item(LIST_MAIN, "fourth").unwrap();
+        let ids = vec![first.clone(), second.clone(), third.clone(), fourth.clone()];
+        let moved_ids = vec![second.clone(), third.clone()];
+        let remaining = vec![first.clone(), fourth.clone()];
+        let mut next_ids = remaining;
+        next_ids.splice(2..2, moved_ids.clone());
+        let mut current_ids = ids.clone();
+
+        doc.begin_undo_group().unwrap();
+        for (index, id) in next_ids.iter().enumerate() {
+            if current_ids[index] != *id {
+                let current_index = current_ids
+                    .iter()
+                    .position(|cur| cur == id)
+                    .expect("moved id must still exist");
+                doc.move_item(id, LIST_MAIN, index).unwrap();
+                current_ids.remove(current_index);
+                current_ids.insert(index, id.clone());
+            }
+        }
+        doc.end_undo_group();
+
+        let after_move = doc.live_item_ids(LIST_MAIN);
+        assert_eq!(after_move, next_ids);
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+
+        assert!(doc.redo().unwrap());
+        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
+    }
+
+    #[test]
+    fn reorder_loop_undo_redo_round_trips_larger_block() {
+        let doc = Doc::new().unwrap();
+        let texts: Vec<String> = (0..20).map(|i| format!("item {i}")).collect();
+        let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let ids = doc.add_items_at(LIST_MAIN, &text_refs, 0).unwrap();
+
+        let moved_ids = vec![ids[5].clone(), ids[6].clone(), ids[7].clone()];
+        let remaining: Vec<String> = ids
+            .iter()
+            .filter(|id| !moved_ids.contains(id))
+            .cloned()
+            .collect();
+        let mut next_ids = remaining;
+        next_ids.splice(10..10, moved_ids.clone());
+        let mut current_ids = ids.clone();
+
+        doc.begin_undo_group().unwrap();
+        for (index, id) in next_ids.iter().enumerate() {
+            if current_ids[index] != *id {
+                let current_index = current_ids
+                    .iter()
+                    .position(|cur| cur == id)
+                    .expect("moved id must still exist");
+                doc.move_item(id, LIST_MAIN, index).unwrap();
+                current_ids.remove(current_index);
+                current_ids.insert(index, id.clone());
+            }
+        }
+        doc.end_undo_group();
+
+        let after_move = doc.live_item_ids(LIST_MAIN);
+        assert_eq!(after_move, next_ids);
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+
+        assert!(doc.redo().unwrap());
+        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
     }
 
     #[test]

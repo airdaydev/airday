@@ -1,7 +1,7 @@
 //! All sqlite reads/writes touching accounts / devices / recovery sessions.
 
-use anyhow::Context;
 use airday_protocol::KdfParams;
+use anyhow::Context;
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 

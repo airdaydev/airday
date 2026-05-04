@@ -623,7 +623,8 @@ function Workspace(props: {
     const v = view();
     if (v.kind !== "list") return;
     const ids = items().map((it) => it.id);
-    const movedIds = op.keys.map(String).filter((id) => ids.includes(id));
+    const movedSet = new Set(op.keys.map(String));
+    const movedIds = ids.filter((id) => movedSet.has(id));
     if (movedIds.length === 0) return;
 
     const remaining = ids.filter((id) => !movedIds.includes(id));
@@ -638,17 +639,15 @@ function Workspace(props: {
     nextIds.splice(insertAt, 0, ...movedIds);
 
     const currentIds = [...ids];
-    app.withUndoGroup(() => {
-      for (const [index, id] of nextIds.entries()) {
-        if (currentIds[index] !== id) {
-          const currentIndex = currentIds.indexOf(id);
-          if (currentIndex < 0) continue;
-          app.moveItem(id, v.id, index);
-          currentIds.splice(currentIndex, 1);
-          currentIds.splice(index, 0, id);
-        }
+    for (const [index, id] of nextIds.entries()) {
+      if (currentIds[index] !== id) {
+        const currentIndex = currentIds.indexOf(id);
+        if (currentIndex < 0) continue;
+        app.moveItem(id, v.id, index);
+        currentIds.splice(currentIndex, 1);
+        currentIds.splice(index, 0, id);
       }
-    });
+    }
   };
 
   // Start a draft row: pseudo-item just below the topmost selected
@@ -772,13 +771,8 @@ function Workspace(props: {
         }
       }
     }
-    app.withUndoGroup(() => {
-      if (v.kind === "bin") {
-        for (const id of ids) app.deleteBinned(id);
-      } else {
-        for (const id of ids) app.setBinned(id, true);
-      }
-    });
+    if (v.kind === "bin") app.deleteBinnedMany(ids);
+    else app.setBinnedMany(ids, true);
     if (nextId === null) {
       selection.clear();
     } else {
@@ -948,23 +942,26 @@ function Workspace(props: {
         return it !== undefined && !isBinned(it);
       });
       if (toBin.length === 0) return;
-      app.withUndoGroup(() => {
-        for (const id of toBin) app.setBinned(id, true);
-      });
+      app.setBinnedMany(toBin, true);
       selection.clear();
       return;
     }
-    app.withUndoGroup(() => {
-      for (const [i, id] of idsInOrder.entries()) {
-        const it = app.getItem(id);
-        // Drop into a list = "put this back into the visible list view".
-        // Both flags must clear; otherwise the item stays in done/bin
-        // and `moveItem`'s target_index counts the wrong slots.
-        if (it && isDone(it)) app.setDone(id, false);
-        if (it && isBinned(it)) app.setBinned(id, false);
-        app.moveItem(id, target.listId, i);
-      }
+    const toUndone = idsInOrder.filter((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isDone(it);
     });
+    const toUnbin = idsInOrder.filter((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isBinned(it);
+    });
+    // Do not group reorder moves into one undo step. Larger grouped
+    // move bursts currently corrupt redo in core; keep these as
+    // stepwise moves until reorder has a dedicated undo-safe path.
+    if (toUndone.length > 0) app.setDoneMany(toUndone, false);
+    if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
+    for (const [i, id] of idsInOrder.entries()) {
+      app.moveItem(id, target.listId, i);
+    }
     // When dragging out of the current list, the rows are no longer
     // visible here — leaving them "selected" means a phantom block
     // anchor lingers. Same-list drops keep selection so the user can
@@ -1669,39 +1666,39 @@ function Row(props: {
       return it !== undefined && !isBinned(it);
     });
   const onBin = () => {
-    props.app.withUndoGroup(() => {
-      for (const id of binTargets()) props.app.setBinned(id, true);
-    });
+    const ids = binTargets();
+    if (ids.length === 0) return;
+    props.app.setBinnedMany(ids, true);
   };
   const onMarkDone = () => {
-    props.app.withUndoGroup(() => {
-      for (const id of targetIds()) props.app.setDone(id, true);
-    });
+    const ids = targetIds();
+    if (ids.length === 0) return;
+    props.app.setDoneMany(ids, true);
   };
   const onMarkNotDone = () => {
-    props.app.withUndoGroup(() => {
-      for (const id of targetIds()) props.app.setDone(id, false);
-    });
+    const ids = targetIds();
+    if (ids.length === 0) return;
+    props.app.setDoneMany(ids, false);
   };
   // Restore from bin: clear binned only, preserving done state. A
   // done-then-binned item lands back in the Done view; a plain binned
   // item back in its list. The user can flip done off explicitly via
   // the row checkbox or "Mark as not done" if needed.
   const onRestore = () => {
-    props.app.withUndoGroup(() => {
-      for (const id of targetIds()) {
-        const it = props.app.getItem(id);
-        if (it && isBinned(it)) props.app.setBinned(id, false);
-      }
+    const ids = targetIds().filter((id) => {
+      const it = props.app.getItem(id);
+      return it !== undefined && isBinned(it);
     });
+    if (ids.length === 0) return;
+    props.app.setBinnedMany(ids, false);
   };
   const onDelete = () => {
-    props.app.withUndoGroup(() => {
-      for (const id of targetIds()) {
-        const it = props.app.getItem(id);
-        if (it && isBinned(it)) props.app.deleteBinned(id);
-      }
+    const ids = targetIds().filter((id) => {
+      const it = props.app.getItem(id);
+      return it !== undefined && isBinned(it);
     });
+    if (ids.length === 0) return;
+    props.app.deleteBinnedMany(ids);
   };
   const onDuplicate = () => {
     props.duplicateBlock(targetIds());

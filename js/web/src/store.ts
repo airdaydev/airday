@@ -9,7 +9,7 @@
 
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
-import { createStore, produce } from "solid-js/store";
+import { createStore, produce, reconcile } from "solid-js/store";
 
 /** Done and binned are independent flags — an item can be both. The
  *  presence of the timestamp *is* the flag; there's no separate
@@ -78,11 +78,14 @@ export interface DocApp {
   editItemNotes(id: string, notes: string): void;
   /** Set or clear an item's done flag. Independent of binned. */
   setDone(id: string, done: boolean): void;
+  setDoneMany(ids: string[], done: boolean): void;
   /** Set or clear an item's binned flag. Independent of done — binning a
    *  done item keeps it done; restoring keeps the done state alone. */
   setBinned(id: string, binned: boolean): void;
+  setBinnedMany(ids: string[], binned: boolean): void;
   moveItem(id: string, listId: string, indexInList: number): void;
   deleteBinned(id: string): void;
+  deleteBinnedMany(ids: string[]): void;
   emptyBin(): number;
   addList(name: string): string;
   renameList(id: string, name: string): void;
@@ -103,6 +106,64 @@ export interface DocApp {
   withUndoGroup<T>(fn: () => T): T;
 }
 
+const COARSE_BATCH_THRESHOLD = 64;
+const COARSE_EVENT_KINDS = new Set([
+  "itemMoved",
+  "itemRemoved",
+  "itemStatusChanged",
+  "itemListChanged",
+]);
+
+function materializeState(events: readonly AppEventJs[]): WorkspaceState {
+  const itemsOrder: string[] = [];
+  const itemsById: Record<string, ItemView> = {};
+  const listsOrder: string[] = [];
+  const listsById: Record<string, ListView> = {};
+
+  for (const ev of events) {
+    switch (ev.kind) {
+      case "itemAdded": {
+        itemsById[ev.id] = {
+          id: ev.id,
+          listId: ev.listId ?? "",
+          text: ev.text ?? "",
+          notes: ev.notes ?? "",
+          createdAt: Number(ev.createdAt ?? 0),
+          doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
+          binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
+        };
+        itemsOrder.push(ev.id);
+        break;
+      }
+      case "listAdded": {
+        listsById[ev.id] = {
+          id: ev.id,
+          name: ev.name ?? "",
+          createdAt: Number(ev.createdAt ?? 0),
+        };
+        listsOrder.push(ev.id);
+        break;
+      }
+    }
+  }
+
+  return {
+    itemsOrder,
+    itemsById,
+    listsOrder,
+    listsById,
+  };
+}
+
+function shouldUseCoarseProjection(events: readonly AppEventJs[]): boolean {
+  if (events.length < COARSE_BATCH_THRESHOLD) return false;
+  let coarseCandidates = 0;
+  for (const ev of events) {
+    if (COARSE_EVENT_KINDS.has(ev.kind)) coarseCandidates++;
+  }
+  return coarseCandidates >= events.length / 2;
+}
+
 export function createSyncedApp(engine: SyncEngine): DocApp {
   const [state, setState] = createStore<WorkspaceState>({
     itemsOrder: [],
@@ -111,6 +172,8 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     listsById: {},
   });
   const [version, setVersion] = createSignal(0);
+  let undoGroupDepth = 0;
+  let flushDeferred = false;
 
   const dispatch = (ev: AppEventJs): void => {
     switch (ev.kind) {
@@ -238,30 +301,39 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   };
 
   const drainEvents = (): void => {
-    let dispatched = 0;
+    const events: AppEventJs[] = [];
+    while (true) {
+      const ev = engine.popAppEvent();
+      if (!ev) break;
+      events.push(ev);
+    }
+    const coarse = shouldUseCoarseProjection(events);
     // Batch so a multi-event drain (e.g. addItemsAt for a multi-line
     // paste, or a server frame applying many remote ops) shows up as
     // one reactive update — otherwise consumers like the dnd briefly
     // see the intermediate order and animate through it.
     batch(() => {
-      while (true) {
-        const ev = engine.popAppEvent();
-        if (!ev) break;
-        dispatch(ev);
-        dispatched++;
+      if (coarse) {
+        const snapshot = engine.snapshotEvents();
+        setState(reconcile(materializeState(snapshot)));
+      } else {
+        for (const ev of events) dispatch(ev);
       }
-      if (dispatched > 0) setVersion((v) => v + 1);
+      if (events.length > 0) setVersion((v) => v + 1);
     });
   };
 
   // Materialize current doc state once. Same dispatcher as the live
   // path — no separate "load initial" code, no snapshot/diff.
-  for (const ev of engine.snapshotEvents()) {
-    dispatch(ev);
-  }
+  const initialSnapshot = engine.snapshotEvents();
+  setState(reconcile(materializeState(initialSnapshot)));
 
   let onFlush: () => void = () => {};
   const flush = (): void => {
+    if (undoGroupDepth > 0) {
+      flushDeferred = true;
+      return;
+    }
     engine.flush();
     onFlush();
     // Local mutations enqueue AppEvents synchronously; pull them so
@@ -307,8 +379,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       engine.setItemDone(id, done);
       flush();
     },
+    setDoneMany(ids, done) {
+      engine.setItemsDone(ids, done);
+      flush();
+    },
     setBinned(id, binned) {
       engine.setItemBinned(id, binned);
+      flush();
+    },
+    setBinnedMany(ids, binned) {
+      engine.setItemsBinned(ids, binned);
       flush();
     },
     moveItem(id, listId, indexInList) {
@@ -317,6 +397,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     deleteBinned(id) {
       engine.deleteBinned(id);
+      flush();
+    },
+    deleteBinnedMany(ids) {
+      engine.deleteBinnedItems(ids);
       flush();
     },
     emptyBin() {
@@ -358,11 +442,23 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       return engine.canRedo();
     },
     withUndoGroup(fn) {
-      engine.beginUndoGroup();
+      const outermost = undoGroupDepth === 0;
+      undoGroupDepth++;
+      if (outermost) {
+        flushDeferred = false;
+        engine.beginUndoGroup();
+      }
       try {
         return fn();
       } finally {
-        engine.endUndoGroup();
+        undoGroupDepth--;
+        if (outermost) {
+          engine.endUndoGroup();
+          if (flushDeferred) {
+            flushDeferred = false;
+            flush();
+          }
+        }
       }
     },
   };

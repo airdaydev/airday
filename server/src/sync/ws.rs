@@ -131,7 +131,9 @@ async fn run_session(
             let _ = send_msgpack(
                 &mut socket,
                 &HelloRejected {
-                    reason: format!("no shared protocol version (server speaks {PROTOCOL_VERSION})"),
+                    reason: format!(
+                        "no shared protocol version (server speaks {PROTOCOL_VERSION})"
+                    ),
                 },
             )
             .await;
@@ -198,10 +200,7 @@ async fn handle_frame(
         ClientFrame::PushOps { ops } => push_ops(socket, state, auth, sub_id, ops).await,
         ClientFrame::PullOps { since_op_id } => pull_ops(socket, state, auth, since_op_id).await,
         ClientFrame::Ack { last_acked_op_id } => {
-            let ack_span = tracing::info_span!(
-                "ws.ack",
-                last_acked_op_id = last_acked_op_id
-            );
+            let ack_span = tracing::info_span!("ws.ack", last_acked_op_id = last_acked_op_id);
             queries::advance_last_acked_op_id(&state.db, auth.device_id, last_acked_op_id).await?;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
@@ -241,8 +240,7 @@ async fn push_ops(
 
     async {
         let blobs_for_broadcast = ops.clone();
-        let assigned_ids =
-            queries::insert_ops(&state.db, auth.account_id, ops).await?;
+        let assigned_ids = queries::insert_ops(&state.db, auth.account_id, ops).await?;
 
         // Post-commit fan-out, before acking the originator. Both branches
         // are correct (the originator's ack and peer broadcasts are

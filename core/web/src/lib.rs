@@ -130,14 +130,32 @@ impl Doc {
         self.inner.set_item_done(item_id, done).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setItemsDone)]
+    pub fn set_items_done(&self, item_ids: Vec<String>, done: bool) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.set_items_done(&refs, done).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = setItemBinned)]
     pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), JsError> {
         self.inner.set_item_binned(item_id, binned).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setItemsBinned)]
+    pub fn set_items_binned(&self, item_ids: Vec<String>, binned: bool) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.set_items_binned(&refs, binned).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = deleteBinned)]
     pub fn delete_binned(&self, item_id: &str) -> Result<(), JsError> {
         self.inner.delete_binned(item_id).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = deleteBinnedItems)]
+    pub fn delete_binned_items(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.delete_binned_items(&refs).map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = emptyBin)]
@@ -699,6 +717,12 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setItemsDone)]
+    pub fn set_items_done(&self, item_ids: Vec<String>, done: bool) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.doc().set_items_done(&refs, done).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = setItemBinned)]
     pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), JsError> {
         self.inner
@@ -707,9 +731,24 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setItemsBinned)]
+    pub fn set_items_binned(&self, item_ids: Vec<String>, binned: bool) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner
+            .doc()
+            .set_items_binned(&refs, binned)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = deleteBinned)]
     pub fn delete_binned(&self, item_id: &str) -> Result<(), JsError> {
         self.inner.doc().delete_binned(item_id).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = deleteBinnedItems)]
+    pub fn delete_binned_items(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.doc().delete_binned_items(&refs).map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = emptyBin)]

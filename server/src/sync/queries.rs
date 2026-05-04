@@ -29,12 +29,7 @@ pub async fn insert_ops(
                  VALUES (?, ?, ?, ?)",
             )?;
             for blob in &blobs {
-                stmt.execute(params![
-                    acc_bytes,
-                    blob.ciphertext,
-                    blob.nonce,
-                    now,
-                ])?;
+                stmt.execute(params![acc_bytes, blob.ciphertext, blob.nonce, now,])?;
                 ids.push(tx.last_insert_rowid() as u64);
             }
         }
