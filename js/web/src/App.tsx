@@ -38,6 +38,7 @@ import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
+import { FindPalette } from "./FindPalette.tsx";
 import { AuthForm, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
 import {
@@ -484,6 +485,7 @@ function Workspace(props: {
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [findOpen, setFindOpen] = createSignal(false);
   const matchesKbDevice = createKbDeviceSignal();
 
   // Draft state: a transient ItemView injected into dndItems but not into
@@ -1007,6 +1009,7 @@ function Workspace(props: {
         onOpenSettings={() => setSettingsOpen(true)}
         onSession={props.onSession}
       />
+      <FindPalette open={findOpen()} onOpenChange={setFindOpen} />
       <Settings
         open={settingsOpen()}
         onOpenChange={setSettingsOpen}
