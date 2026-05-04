@@ -42,6 +42,9 @@ import { AuthForm, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
 import {
   createSyncedApp,
+  isBinned,
+  isDone,
+  isInListView,
   type DocApp,
   type ItemView,
   type ListView,
@@ -88,10 +91,12 @@ function calendarDayDiff(later: Date, earlier: Date): number {
   return Math.round((a - b) / 86_400_000);
 }
 
+// Surface the most recent state-changing timestamp. Binned wins over
+// done because it's the later transition: a done-then-binned item shows
+// when it was binned in the Bin view; a plain done item shows doneAt in
+// the Done view.
 function statusTimestamp(it: ItemView): number | undefined {
-  if (it.status === "done") return it.doneAt;
-  if (it.status === "binned") return it.binnedAt;
-  return undefined;
+  return it.binnedAt ?? it.doneAt;
 }
 
 // Draft items live only in the dnd's items list — never in the engine —
@@ -520,15 +525,17 @@ function Workspace(props: {
       .map((id) => state.itemsById[id])
       .filter((it): it is ItemView => it !== undefined);
     if (v.kind === "list") {
-      return all.filter((it) => it.listId === v.id && it.status === "live");
+      return all.filter((it) => it.listId === v.id && isInListView(it));
     }
     if (v.kind === "done") {
+      // Done view excludes binned items: a done-then-binned item lives
+      // in the Bin (see context menu — Bin owns the next transition).
       return all
-        .filter((it) => it.status === "done")
+        .filter((it) => isDone(it) && !isBinned(it))
         .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
     }
     return all
-      .filter((it) => it.status === "binned")
+      .filter(isBinned)
       .sort((a, b) => (b.binnedAt ?? 0) - (a.binnedAt ?? 0));
   });
 
@@ -611,7 +618,6 @@ function Workspace(props: {
       id,
       listId: v.id,
       text: "",
-      status: "live",
       createdAt: Date.now(),
     };
     setDraft({ item: draftItem, insertIndex, listId: v.id });
@@ -714,7 +720,7 @@ function Workspace(props: {
       if (v.kind === "bin") {
         for (const id of ids) app.deleteBinned(id);
       } else {
-        for (const id of ids) app.setStatus(id, "binned");
+        for (const id of ids) app.setBinned(id, true);
       }
     });
     if (nextId === null) {
@@ -742,7 +748,7 @@ function Workspace(props: {
     visible.forEach((id, idx) => {
       if (!sourceSet.has(id)) return;
       const it = app.getItem(id);
-      if (!it || it.status !== "live") return;
+      if (!it || !isInListView(it)) return;
       sourcesInOrder.push({ idx, text: it.text });
     });
     if (sourcesInOrder.length === 0) return;
@@ -883,11 +889,11 @@ function Workspace(props: {
     if (target.kind === "bin") {
       const toBin = idsInOrder.filter((id) => {
         const it = app.getItem(id);
-        return it !== undefined && it.status !== "binned";
+        return it !== undefined && !isBinned(it);
       });
       if (toBin.length === 0) return;
       app.withUndoGroup(() => {
-        for (const id of toBin) app.setStatus(id, "binned");
+        for (const id of toBin) app.setBinned(id, true);
       });
       selection.clear();
       return;
@@ -895,7 +901,11 @@ function Workspace(props: {
     app.withUndoGroup(() => {
       for (const [i, id] of idsInOrder.entries()) {
         const it = app.getItem(id);
-        if (it && it.status !== "live") app.setStatus(id, "live");
+        // Drop into a list = "put this back into the visible list view".
+        // Both flags must clear; otherwise the item stays in done/bin
+        // and `moveItem`'s target_index counts the wrong slots.
+        if (it && isDone(it)) app.setDone(id, false);
+        if (it && isBinned(it)) app.setBinned(id, false);
         app.moveItem(id, target.listId, i);
       }
     });
@@ -938,6 +948,7 @@ function Workspace(props: {
         view={view()}
         setView={setView}
         session={props.session}
+        online={props.online}
         logout={props.logout}
         onOpenSettings={() => setSettingsOpen(true)}
         onSession={props.onSession}
@@ -957,15 +968,6 @@ function Workspace(props: {
         <header class="main-header">
           <h1>{viewTitle(view(), lists())}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
-            <Show when={!props.session.anonymous && !props.online}>
-              <span
-                class="offline-indicator"
-                title="Disconnected"
-                aria-label="Disconnected"
-              >
-                <CloudOffIcon />
-              </span>
-            </Show>
             <Show
               when={
                 view().kind === "bin" &&
@@ -1081,6 +1083,7 @@ function Nav(props: {
   view: ViewKey;
   setView: (v: ViewKey) => void;
   session: Session;
+  online: boolean;
   logout: () => void;
   onOpenSettings: () => void;
   onSession: (s: Session) => void;
@@ -1261,6 +1264,20 @@ function Nav(props: {
               </Popover.Content>
             </Popover.Portal>
           </Popover>
+        </Show>
+        <Show when={!props.session.anonymous}>
+          <span class="pro-badge">
+            Pro
+            <Show when={!props.online}>
+              <span
+                class="offline-indicator"
+                title="Disconnected"
+                aria-label="Disconnected"
+              >
+                <CloudOffIcon />
+              </span>
+            </Show>
+          </span>
         </Show>
         <DropdownMenu>
           <DropdownMenu.Trigger
@@ -1546,34 +1563,32 @@ function Row(props: {
   const binTargets = (): string[] =>
     targetIds().filter((k) => {
       const it = props.app.getItem(k);
-      return it !== undefined && it.status !== "binned";
+      return it !== undefined && !isBinned(it);
     });
   const onBin = () => {
     props.app.withUndoGroup(() => {
-      for (const id of binTargets()) props.app.setStatus(id, "binned");
+      for (const id of binTargets()) props.app.setBinned(id, true);
     });
   };
   const onMarkDone = () => {
     props.app.withUndoGroup(() => {
-      for (const id of targetIds()) {
-        const it = props.app.getItem(id);
-        if (it && it.status === "live") props.app.setStatus(id, "done");
-      }
+      for (const id of targetIds()) props.app.setDone(id, true);
     });
   };
   const onMarkNotDone = () => {
     props.app.withUndoGroup(() => {
-      for (const id of targetIds()) {
-        const it = props.app.getItem(id);
-        if (it && it.status === "done") props.app.setStatus(id, "live");
-      }
+      for (const id of targetIds()) props.app.setDone(id, false);
     });
   };
+  // Restore from bin: clear binned only, preserving done state. A
+  // done-then-binned item lands back in the Done view; a plain binned
+  // item back in its list. The user can flip done off explicitly via
+  // the row checkbox or "Mark as not done" if needed.
   const onRestore = () => {
     props.app.withUndoGroup(() => {
       for (const id of targetIds()) {
         const it = props.app.getItem(id);
-        if (it && it.status === "binned") props.app.setStatus(id, "live");
+        if (it && isBinned(it)) props.app.setBinned(id, false);
       }
     });
   };
@@ -1581,7 +1596,7 @@ function Row(props: {
     props.app.withUndoGroup(() => {
       for (const id of targetIds()) {
         const it = props.app.getItem(id);
-        if (it && it.status === "binned") props.app.deleteBinned(id);
+        if (it && isBinned(it)) props.app.deleteBinned(id);
       }
     });
   };
@@ -1599,7 +1614,8 @@ function Row(props: {
     <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenu.Trigger
         class="row"
-        data-status={props.item().status}
+        data-done={isDone(props.item()) ? "" : undefined}
+        data-binned={isBinned(props.item()) ? "" : undefined}
         data-expanded={props.expanded() ? "" : undefined}
         on:dblclick={(e) => {
           // Listen at the row level (not the text span) so dblclicks in
@@ -1613,12 +1629,9 @@ function Row(props: {
       >
         <input
           type="checkbox"
-          checked={props.item().status === "done"}
+          checked={isDone(props.item())}
           onChange={(e) =>
-            props.app.setStatus(
-              props.item().id,
-              e.currentTarget.checked ? "done" : "live",
-            )
+            props.app.setDone(props.item().id, e.currentTarget.checked)
           }
         />
         <div class="row-body">
@@ -1682,25 +1695,27 @@ function Row(props: {
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
-          <Show when={props.item().status === "live"}>
+          <Show when={!isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
               Mark as done
             </ContextMenu.Item>
-            <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
-              Duplicate
-            </ContextMenu.Item>
           </Show>
-          <Show when={props.item().status === "done"}>
+          <Show when={isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
               Mark as not done
             </ContextMenu.Item>
           </Show>
-          <Show when={props.item().status !== "binned"}>
+          <Show when={isInListView(props.item())}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
+              Duplicate
+            </ContextMenu.Item>
+          </Show>
+          <Show when={!isBinned(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onBin}>
               Move to bin
             </ContextMenu.Item>
           </Show>
-          <Show when={props.item().status === "binned"}>
+          <Show when={isBinned(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onRestore}>
               Restore
             </ContextMenu.Item>

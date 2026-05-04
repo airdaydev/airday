@@ -3,13 +3,15 @@
 //!
 //! Layout matches `spec/data-model.md`:
 //! - root container `items` (`LoroMovableList`) — each entry is a
-//!   `LoroMap` with `id`, `text`, `list_id`, `status`, `created_at`,
-//!   optional `done_at`, optional `binned_at`.
+//!   `LoroMap` with `id`, `text`, `list_id`, `created_at`, optional
+//!   `done_at`, optional `binned_at`. `done` and `binned` are
+//!   orthogonal: an item can be both. Presence of the timestamp is
+//!   the flag — there's no separate boolean.
 //! - root container `lists` (`LoroMovableList`) — each entry is a
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //!
-//! The bin is *not* a list — `Status::Binned` items keep their
-//! `list_id`. One well-known list id is *reserved*: [`LIST_MAIN`].
+//! The bin is *not* a list — binned items keep their `list_id`. One
+//! well-known list id is *reserved*: [`LIST_MAIN`].
 //! It has **no MovableList entry** — items reference it by string id
 //! and clients render it with a hardcoded label ("Desk"). A future
 //! meta-CRDT will hold things like the user's chosen label for it; for
@@ -47,44 +49,10 @@ const ROOT_LISTS: &str = "lists";
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
 const KEY_LIST_ID: &str = "list_id";
-const KEY_STATUS: &str = "status";
 const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
-
-const STATUS_LIVE: &str = "live";
-const STATUS_DONE: &str = "done";
-const STATUS_BINNED: &str = "binned";
-
-/// Item lifecycle. `Live` is the default; `Done` and `Binned` carry a
-/// timestamp; deletion of `Binned` items is the only path that
-/// removes an item from the doc.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
-    Live,
-    Done,
-    Binned,
-}
-
-impl Status {
-    fn as_wire(&self) -> &'static str {
-        match self {
-            Status::Live => STATUS_LIVE,
-            Status::Done => STATUS_DONE,
-            Status::Binned => STATUS_BINNED,
-        }
-    }
-
-    fn from_wire(s: &str) -> Option<Self> {
-        match s {
-            STATUS_LIVE => Some(Status::Live),
-            STATUS_DONE => Some(Status::Done),
-            STATUS_BINNED => Some(Status::Binned),
-            _ => None,
-        }
-    }
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -125,15 +93,29 @@ impl From<loro::LoroEncodeError> for DocError {
 }
 
 /// Stable view of a single item, surfaced to clients (CLI list, fingerprint).
+/// `done_at`/`binned_at` are independent: an item can be both done and
+/// binned. `done` and `binned` are derived predicates, not stored fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemView {
     pub id: String,
     pub text: String,
     pub list_id: String,
-    pub status: Status,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
+}
+
+impl ItemView {
+    pub fn is_done(&self) -> bool {
+        self.done_at.is_some()
+    }
+    pub fn is_binned(&self) -> bool {
+        self.binned_at.is_some()
+    }
+    /// Visible in a per-list view: neither done nor binned.
+    pub fn is_in_list_view(&self) -> bool {
+        !self.is_done() && !self.is_binned()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,7 +213,6 @@ impl Doc {
         map.insert(KEY_ID, id.as_str())?;
         map.insert(KEY_TEXT, text)?;
         map.insert(KEY_LIST_ID, list_id)?;
-        map.insert(KEY_STATUS, STATUS_LIVE)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
         let index = self
@@ -241,7 +222,6 @@ impl Doc {
             id: id.clone(),
             list_id: list_id.to_string(),
             text: text.to_string(),
-            status: Status::Live,
             created_at: now,
             done_at: None,
             binned_at: None,
@@ -278,7 +258,6 @@ impl Doc {
             id: id.clone(),
             list_id: list_id.to_string(),
             text: text.to_string(),
-            status: Status::Live,
             created_at: now,
             done_at: None,
             binned_at: None,
@@ -325,7 +304,6 @@ impl Doc {
                 id,
                 list_id: list_id.to_string(),
                 text,
-                status: Status::Live,
                 created_at: now,
                 done_at: None,
                 binned_at: None,
@@ -358,8 +336,8 @@ impl Doc {
     ) -> Result<(), DocError> {
         self.assert_list_exists(target_list_id)?;
         let (idx, map) = self.find_item(item_id)?;
-        let moving_status = read_status(&map)
-            .ok_or_else(|| DocError::Invalid(format!("item `{item_id}` is missing status")))?;
+        let moving_in_list_view =
+            read_i64(&map, KEY_DONE_AT).is_none() && read_i64(&map, KEY_BINNED_AT).is_none();
         let prev_list_id = read_string(&map, KEY_LIST_ID);
         let items = self.items();
         // `target_index` is the desired index *within target_list_id*;
@@ -371,7 +349,7 @@ impl Doc {
             target_list_id,
             target_index,
             idx,
-            moving_status,
+            moving_in_list_view,
         );
         map.insert(KEY_LIST_ID, target_list_id)?;
         if abs != idx {
@@ -396,40 +374,68 @@ impl Doc {
         Ok(())
     }
 
-    pub fn set_item_status(&self, item_id: &str, status: Status) -> Result<(), DocError> {
+    /// Set or clear an item's done state. Independent of `binned` —
+    /// flipping done leaves `binned_at` untouched.
+    pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), DocError> {
         let (_, map) = self.find_item(item_id)?;
-        let now = now_millis();
-        map.insert(KEY_STATUS, status.as_wire())?;
-        let (done_at, binned_at) = match status {
-            Status::Live => {
-                let _ = map.delete(KEY_DONE_AT);
-                let _ = map.delete(KEY_BINNED_AT);
-                (None, None)
-            }
-            Status::Done => {
-                map.insert(KEY_DONE_AT, now)?;
-                let _ = map.delete(KEY_BINNED_AT);
-                (Some(now), None)
-            }
-            Status::Binned => {
-                map.insert(KEY_BINNED_AT, now)?;
-                let _ = map.delete(KEY_DONE_AT);
-                (None, Some(now))
-            }
+        let prev_done = read_i64(&map, KEY_DONE_AT);
+        let new_done = match (done, prev_done) {
+            (true, Some(_)) => return Ok(()),
+            (false, None) => return Ok(()),
+            (true, None) => Some(now_millis()),
+            (false, Some(_)) => None,
         };
+        match new_done {
+            Some(t) => {
+                map.insert(KEY_DONE_AT, t)?;
+            }
+            None => {
+                let _ = map.delete(KEY_DONE_AT);
+            }
+        }
+        let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
-            status,
-            done_at,
+            done_at: new_done,
             binned_at,
+        });
+        Ok(())
+    }
+
+    /// Set or clear an item's binned state. Independent of `done` —
+    /// binning a done item keeps it done; restoring (unbinning) leaves
+    /// the done state alone.
+    pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), DocError> {
+        let (_, map) = self.find_item(item_id)?;
+        let prev_binned = read_i64(&map, KEY_BINNED_AT);
+        let new_binned = match (binned, prev_binned) {
+            (true, Some(_)) => return Ok(()),
+            (false, None) => return Ok(()),
+            (true, None) => Some(now_millis()),
+            (false, Some(_)) => None,
+        };
+        match new_binned {
+            Some(t) => {
+                map.insert(KEY_BINNED_AT, t)?;
+            }
+            None => {
+                let _ = map.delete(KEY_BINNED_AT);
+            }
+        }
+        let done_at = read_i64(&map, KEY_DONE_AT);
+        self.inner.commit();
+        self.push_event(AppEvent::ItemStatusChanged {
+            id: item_id.to_string(),
+            done_at,
+            binned_at: new_binned,
         });
         Ok(())
     }
 
     pub fn delete_binned(&self, item_id: &str) -> Result<(), DocError> {
         let (idx, map) = self.find_item(item_id)?;
-        if read_status(&map) != Some(Status::Binned) {
+        if read_i64(&map, KEY_BINNED_AT).is_none() {
             return Err(DocError::NotBinned);
         }
         self.items().delete(idx, 1)?;
@@ -440,8 +446,8 @@ impl Doc {
         Ok(())
     }
 
-    /// Hard-deletes every item with `Status::Binned`. Walks back-to-front
-    /// so deletions don't shift indices we haven't visited yet.
+    /// Hard-deletes every binned item. Walks back-to-front so deletions
+    /// don't shift indices we haven't visited yet.
     pub fn empty_bin(&self) -> Result<usize, DocError> {
         let items = self.items();
         let mut removed_ids = Vec::new();
@@ -449,7 +455,7 @@ impl Doc {
             let Some(map) = item_map_at(&items, idx) else {
                 continue;
             };
-            if read_status(&map) == Some(Status::Binned) {
+            if read_i64(&map, KEY_BINNED_AT).is_some() {
                 if let Some(id) = read_string(&map, KEY_ID) {
                     removed_ids.push(id);
                 }
@@ -568,14 +574,12 @@ impl Doc {
 
     pub fn items_in_list(&self, list_id: &str, include_binned: bool) -> Vec<ItemView> {
         self.iter_items()
-            .filter(|i| i.list_id == list_id && (include_binned || i.status != Status::Binned))
+            .filter(|i| i.list_id == list_id && (include_binned || !i.is_binned()))
             .collect()
     }
 
     pub fn binned_items(&self) -> Vec<ItemView> {
-        self.iter_items()
-            .filter(|i| i.status == Status::Binned)
-            .collect()
+        self.iter_items().filter(|i| i.is_binned()).collect()
     }
 
     pub fn all_lists(&self) -> Vec<ListView> {
@@ -601,25 +605,27 @@ impl Doc {
         list_view(&map)
     }
 
-    /// Per-list nav view: ids of `Live` items in this list, in
-    /// MovableList order. Items whose `list_id` no longer exists
-    /// (orphaned by `delete_list`'s reassignment to `now`) won't
-    /// appear here for the deleted id by definition — they're now
-    /// under `now`.
+    /// Per-list nav view: ids of items in this list that are neither
+    /// done nor binned, in MovableList order. Items whose `list_id` no
+    /// longer exists (orphaned by `delete_list`'s reassignment to
+    /// `main`) won't appear here for the deleted id by definition —
+    /// they're now under `main`.
     pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
         self.iter_items()
-            .filter(|i| i.list_id == list_id && i.status == Status::Live)
+            .filter(|i| i.list_id == list_id && i.is_in_list_view())
             .map(|i| i.id)
             .collect()
     }
 
-    /// Cross-list "Done" view: ids sorted by `done_at` descending.
-    /// Ties broken by id ascending so the order is deterministic across
-    /// devices despite client-clock skew.
+    /// Cross-list "Done" view: ids of done-but-not-binned items, sorted
+    /// by `done_at` descending. Ties broken by id ascending so the
+    /// order is deterministic across devices despite client-clock skew.
+    /// Binned items are excluded — Bin owns them in the UI even if
+    /// they're also done.
     pub fn done_item_ids(&self) -> Vec<String> {
         let mut items: Vec<ItemView> = self
             .iter_items()
-            .filter(|i| i.status == Status::Done)
+            .filter(|i| i.is_done() && !i.is_binned())
             .collect();
         items.sort_by(|a, b| {
             let at = a.done_at.unwrap_or(0);
@@ -630,12 +636,10 @@ impl Doc {
     }
 
     /// Cross-list "Bin" view: ids sorted by `binned_at` descending.
-    /// Same tiebreaker as `done_item_ids`.
+    /// Includes items that are also done — done-ness is preserved when
+    /// binning. Same tiebreaker as `done_item_ids`.
     pub fn binned_item_ids(&self) -> Vec<String> {
-        let mut items: Vec<ItemView> = self
-            .iter_items()
-            .filter(|i| i.status == Status::Binned)
-            .collect();
+        let mut items: Vec<ItemView> = self.iter_items().filter(|i| i.is_binned()).collect();
         items.sort_by(|a, b| {
             let at = a.binned_at.unwrap_or(0);
             let bt = b.binned_at.unwrap_or(0);
@@ -834,7 +838,6 @@ impl Doc {
                 id: item.id,
                 list_id: item.list_id,
                 text: item.text,
-                status: item.status,
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
@@ -906,7 +909,6 @@ impl Doc {
             hash_str(&mut hasher, &i.id);
             hash_str(&mut hasher, &i.text);
             hash_str(&mut hasher, &i.list_id);
-            hash_str(&mut hasher, i.status.as_wire());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
@@ -984,7 +986,6 @@ impl Doc {
         map.insert(KEY_ID, id.as_str())?;
         map.insert(KEY_TEXT, text)?;
         map.insert(KEY_LIST_ID, list_id)?;
-        map.insert(KEY_STATUS, STATUS_LIVE)?;
         map.insert(KEY_CREATED_AT, now)?;
         Ok((id, now))
     }
@@ -1041,16 +1042,11 @@ fn read_i64(map: &LoroMap, key: &str) -> Option<i64> {
     value.into_i64().ok()
 }
 
-fn read_status(map: &LoroMap) -> Option<Status> {
-    Status::from_wire(&read_string(map, KEY_STATUS)?)
-}
-
 fn item_view(map: &LoroMap) -> Option<ItemView> {
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
         list_id: read_string(map, KEY_LIST_ID)?,
-        status: read_status(map)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
@@ -1065,11 +1061,11 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
     })
 }
 
-/// Translate "insert as the Nth visible (live) entry of
-/// `target_list_id`" into an absolute index suitable for
-/// `LoroMovableList::insert_container` / `push_container`. Returns
-/// `items.len()` when `target_index` is past the end so the caller can
-/// fall back to `push_container`.
+/// Translate "insert as the Nth visible entry of `target_list_id`"
+/// (i.e., among items that are neither done nor binned) into an
+/// absolute index suitable for `LoroMovableList::insert_container` /
+/// `push_container`. Returns `items.len()` when `target_index` is past
+/// the end so the caller can fall back to `push_container`.
 fn absolute_insertion_index_for_list_position(
     items: &LoroMovableList,
     target_list_id: &str,
@@ -1083,7 +1079,7 @@ fn absolute_insertion_index_for_list_position(
         if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
             continue;
         }
-        if read_status(&map) != Some(Status::Live) {
+        if !is_in_list_view(&map) {
             continue;
         }
         if seen == target_index {
@@ -1092,6 +1088,10 @@ fn absolute_insertion_index_for_list_position(
         seen += 1;
     }
     items.len()
+}
+
+fn is_in_list_view(map: &LoroMap) -> bool {
+    read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none()
 }
 
 /// Walk the items list and translate "the Nth entry in `target_list`"
@@ -1103,7 +1103,7 @@ fn absolute_index_for_list_position(
     target_list_id: &str,
     target_index: usize,
     current_idx: usize,
-    moving_status: Status,
+    moving_in_list_view: bool,
 ) -> usize {
     let mut matching = Vec::new();
     for i in 0..items.len() {
@@ -1116,9 +1116,9 @@ fn absolute_index_for_list_position(
         if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
             continue;
         }
-        // Live-list reorders originate from the visible per-list view,
-        // so hidden done/binned items must not consume target slots.
-        if moving_status == Status::Live && read_status(&map) != Some(Status::Live) {
+        // List-view reorders originate from the visible per-list view,
+        // so done/binned items must not consume target slots.
+        if moving_in_list_view && !is_in_list_view(&map) {
             continue;
         }
         matching.push(i);
@@ -1198,7 +1198,6 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     id: post_it.id.clone(),
                     list_id: post_it.list_id.clone(),
                     text: post_it.text.clone(),
-                    status: post_it.status,
                     created_at: post_it.created_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
@@ -1212,13 +1211,9 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                         text: post_it.text.clone(),
                     });
                 }
-                if pre_it.status != post_it.status
-                    || pre_it.done_at != post_it.done_at
-                    || pre_it.binned_at != post_it.binned_at
-                {
+                if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {
                     out.push(AppEvent::ItemStatusChanged {
                         id: post_it.id.clone(),
-                        status: post_it.status,
                         done_at: post_it.done_at,
                         binned_at: post_it.binned_at,
                     });
@@ -1339,7 +1334,8 @@ mod tests {
         let view = doc.get_item(&id).unwrap();
         assert_eq!(view.text, "buy milk");
         assert_eq!(view.list_id, LIST_MAIN);
-        assert_eq!(view.status, Status::Live);
+        assert!(!view.is_done());
+        assert!(!view.is_binned());
     }
 
     #[test]
@@ -1357,20 +1353,38 @@ mod tests {
     }
 
     #[test]
-    fn status_transitions_clear_other_timestamps() {
+    fn done_and_binned_are_orthogonal() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "thing").unwrap();
-        doc.set_item_status(&id, Status::Done).unwrap();
-        assert!(doc.get_item(&id).unwrap().done_at.is_some());
-        doc.set_item_status(&id, Status::Binned).unwrap();
+        doc.set_item_done(&id, true).unwrap();
+        assert!(doc.get_item(&id).unwrap().is_done());
+        // Binning a done item must keep it done.
+        doc.set_item_binned(&id, true).unwrap();
         let v = doc.get_item(&id).unwrap();
-        assert_eq!(v.status, Status::Binned);
-        assert!(v.binned_at.is_some());
-        assert!(v.done_at.is_none());
-        doc.set_item_status(&id, Status::Live).unwrap();
+        assert!(v.is_done(), "done state must survive binning");
+        assert!(v.is_binned());
+        // Restoring (unbinning) must keep it done.
+        doc.set_item_binned(&id, false).unwrap();
         let v = doc.get_item(&id).unwrap();
-        assert!(v.done_at.is_none());
-        assert!(v.binned_at.is_none());
+        assert!(v.is_done(), "done state must survive restore");
+        assert!(!v.is_binned());
+        // Unmarking done leaves binned alone (already false here).
+        doc.set_item_done(&id, false).unwrap();
+        let v = doc.get_item(&id).unwrap();
+        assert!(!v.is_done());
+        assert!(!v.is_binned());
+    }
+
+    #[test]
+    fn set_done_idempotent() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "thing").unwrap();
+        doc.set_item_done(&id, true).unwrap();
+        let first = doc.get_item(&id).unwrap().done_at.unwrap();
+        let _ = doc.drain_events();
+        doc.set_item_done(&id, true).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().done_at, Some(first));
+        assert!(doc.drain_events().is_empty(), "no-op must not emit events");
     }
 
     #[test]
@@ -1378,7 +1392,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "keep").unwrap();
         let b = doc.add_item(LIST_MAIN, "drop").unwrap();
-        doc.set_item_status(&b, Status::Binned).unwrap();
+        doc.set_item_binned(&b, true).unwrap();
         let removed = doc.empty_bin().unwrap();
         assert_eq!(removed, 1);
         assert!(doc.get_item(&a).is_some());
@@ -1393,7 +1407,7 @@ mod tests {
             doc.delete_binned(&id).unwrap_err(),
             DocError::NotBinned
         ));
-        doc.set_item_status(&id, Status::Binned).unwrap();
+        doc.set_item_binned(&id, true).unwrap();
         doc.delete_binned(&id).unwrap();
         assert!(doc.get_item(&id).is_none());
     }
@@ -1518,9 +1532,9 @@ mod tests {
         // Items in another list must not leak into now's view.
         let _h = doc.add_item(&other, "h").unwrap();
         // Done/binned items must not leak into the live view.
-        doc.set_item_status(&b, Status::Done).unwrap();
+        doc.set_item_done(&b, true).unwrap();
         let d = doc.add_item(LIST_MAIN, "d").unwrap();
-        doc.set_item_status(&d, Status::Binned).unwrap();
+        doc.set_item_binned(&d, true).unwrap();
 
         assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c]);
     }
@@ -1532,12 +1546,12 @@ mod tests {
         let first = doc.add_item(LIST_MAIN, "first").unwrap();
         let second = doc.add_item(&other, "second").unwrap();
         let third = doc.add_item(LIST_MAIN, "third").unwrap();
-        doc.set_item_status(&first, Status::Done).unwrap();
+        doc.set_item_done(&first, true).unwrap();
         // tiny gap so the millisecond timestamps definitely differ
         std::thread::sleep(std::time::Duration::from_millis(2));
-        doc.set_item_status(&second, Status::Done).unwrap();
+        doc.set_item_done(&second, true).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        doc.set_item_status(&third, Status::Done).unwrap();
+        doc.set_item_done(&third, true).unwrap();
 
         assert_eq!(doc.done_item_ids(), vec![third, second, first]);
     }
@@ -1547,9 +1561,9 @@ mod tests {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        doc.set_item_status(&a, Status::Binned).unwrap();
+        doc.set_item_binned(&a, true).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        doc.set_item_status(&b, Status::Binned).unwrap();
+        doc.set_item_binned(&b, true).unwrap();
         assert_eq!(doc.binned_item_ids(), vec![b, a]);
     }
 
@@ -1571,7 +1585,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let hidden = doc.add_item(&other, "hidden").unwrap();
-        doc.set_item_status(&hidden, Status::Done).unwrap();
+        doc.set_item_done(&hidden, true).unwrap();
         let anchor = doc.add_item(&other, "anchor").unwrap();
         let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
 
@@ -1623,14 +1637,16 @@ mod tests {
                 id: eid,
                 list_id,
                 text,
-                status,
+                done_at,
+                binned_at,
                 index,
                 ..
             } => {
                 assert_eq!(eid, &id);
                 assert_eq!(list_id, LIST_MAIN);
                 assert_eq!(text, "milk");
-                assert_eq!(*status, Status::Live);
+                assert!(done_at.is_none());
+                assert!(binned_at.is_none());
                 assert_eq!(*index, 0);
             }
             other => panic!("expected ItemAdded, got {other:?}"),
@@ -1651,23 +1667,43 @@ mod tests {
     }
 
     #[test]
-    fn local_set_status_emits_status_changed_with_timestamps() {
+    fn local_set_done_emits_status_changed_with_timestamps() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "task").unwrap();
         let _ = doc.drain_events();
-        doc.set_item_status(&id, Status::Done).unwrap();
+        doc.set_item_done(&id, true).unwrap();
         let evs = doc.drain_events();
         match evs.as_slice() {
             [AppEvent::ItemStatusChanged {
                 id: eid,
-                status,
                 done_at,
                 binned_at,
             }] => {
                 assert_eq!(eid, &id);
-                assert_eq!(*status, Status::Done);
                 assert!(done_at.is_some());
                 assert!(binned_at.is_none());
+            }
+            other => panic!("unexpected events: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn local_set_binned_preserves_done_in_event() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "task").unwrap();
+        doc.set_item_done(&id, true).unwrap();
+        let _ = doc.drain_events();
+        doc.set_item_binned(&id, true).unwrap();
+        let evs = doc.drain_events();
+        match evs.as_slice() {
+            [AppEvent::ItemStatusChanged {
+                id: eid,
+                done_at,
+                binned_at,
+            }] => {
+                assert_eq!(eid, &id);
+                assert!(done_at.is_some(), "done state must be preserved");
+                assert!(binned_at.is_some());
             }
             other => panic!("unexpected events: {other:?}"),
         }
@@ -1782,7 +1818,7 @@ mod tests {
         let _hidden = doc.add_item(&other, "hidden").unwrap();
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
         let done = doc.add_item(LIST_MAIN, "done").unwrap();
-        doc.set_item_status(&done, Status::Done).unwrap();
+        doc.set_item_done(&done, true).unwrap();
         // Position 1 in main's live view should land between a and b
         // regardless of the other-list and done items in between.
         let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
@@ -1984,19 +2020,18 @@ mod tests {
 
         doc.begin_undo_group().unwrap();
         for id in &ids {
-            doc.set_item_status(id, Status::Done).unwrap();
+            doc.set_item_done(id, true).unwrap();
         }
         doc.end_undo_group();
 
         for id in &ids {
-            assert_eq!(doc.get_item(id).unwrap().status, Status::Done);
+            assert!(doc.get_item(id).unwrap().is_done());
         }
 
         assert!(doc.undo().unwrap());
         for id in &ids {
-            assert_eq!(
-                doc.get_item(id).unwrap().status,
-                Status::Live,
+            assert!(
+                !doc.get_item(id).unwrap().is_done(),
                 "the whole bulk transition should reverse in one undo"
             );
         }

@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemView, Status, LIST_MAIN};
+use airday_core::{ItemView, LIST_MAIN};
 use clap::Parser;
 use serde::Serialize;
 
@@ -82,7 +82,7 @@ pub async fn ls(args: LsArgs, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
     let mut items = session.doc().items_in_list(&args.list, false);
     if !args.done {
-        items.retain(|i| i.status != Status::Done);
+        items.retain(|i| !i.is_done());
     }
     if args.json {
         print_json(&items.iter().map(item_json).collect::<Vec<_>>())?;
@@ -98,7 +98,6 @@ struct ItemJson<'a> {
     id: &'a str,
     text: &'a str,
     list_id: &'a str,
-    status: &'static str,
     created_at: i64,
     done_at: Option<i64>,
     binned_at: Option<i64>,
@@ -109,29 +108,30 @@ fn item_json(item: &ItemView) -> ItemJson<'_> {
         id: &item.id,
         text: &item.text,
         list_id: &item.list_id,
-        status: status_wire(item.status),
         created_at: item.created_at,
         done_at: item.done_at,
         binned_at: item.binned_at,
     }
 }
 
-fn status_wire(s: Status) -> &'static str {
-    match s {
-        Status::Live => "live",
-        Status::Done => "done",
-        Status::Binned => "binned",
-    }
-}
-
 fn print_items(items: &[ItemView]) {
     for item in items {
-        let mark = match item.status {
-            Status::Live => " ",
-            Status::Done => "x",
-            Status::Binned => "~",
+        // Two slots so done+binned can both show. `~` (binned) takes
+        // precedence in the box; done is a trailing `(done)` tag for
+        // items that are also binned.
+        let mark = if item.is_binned() {
+            "~"
+        } else if item.is_done() {
+            "x"
+        } else {
+            " "
         };
-        println!("{}  [{mark}] {}", item.id, item.text);
+        let suffix = if item.is_binned() && item.is_done() {
+            " (done)"
+        } else {
+            ""
+        };
+        println!("{}  [{mark}] {}{suffix}", item.id, item.text);
     }
 }
 
@@ -149,22 +149,29 @@ pub struct IdArg {
 }
 
 pub async fn done(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    set_status(&args.item_id, Status::Done, offline).await
+    let session = Session::open(offline).await?;
+    session.doc().set_item_done(&args.item_id, true)?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
 }
 
 pub async fn bin(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    set_status(&args.item_id, Status::Binned, offline).await
-}
-
-pub async fn restore(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    set_status(&args.item_id, Status::Live, offline).await
-}
-
-async fn set_status(item_id: &str, status: Status, offline: bool) -> anyhow::Result<()> {
     let session = Session::open(offline).await?;
-    session.doc().set_item_status(item_id, status)?;
+    session.doc().set_item_binned(&args.item_id, true)?;
     session.flush().await?;
-    println!("{item_id}");
+    println!("{}", args.item_id);
+    Ok(())
+}
+
+/// Restore from the bin. Done state is preserved — a done-then-binned
+/// item pops back into the Done view, a plain binned item back into
+/// its list. Use a follow-up command to toggle done off if needed.
+pub async fn restore(args: IdArg, offline: bool) -> anyhow::Result<()> {
+    let session = Session::open(offline).await?;
+    session.doc().set_item_binned(&args.item_id, false)?;
+    session.flush().await?;
+    println!("{}", args.item_id);
     Ok(())
 }
 

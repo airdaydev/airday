@@ -11,17 +11,23 @@ import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
-export type ItemStatus = "live" | "done" | "binned";
-
+/** Done and binned are independent flags — an item can be both. The
+ *  presence of the timestamp *is* the flag; there's no separate
+ *  boolean. Helpers below derive predicates without recomputing. */
 export interface ItemView {
   id: string;
   text: string;
   listId: string;
-  status: ItemStatus;
   createdAt: number;
   doneAt?: number;
   binnedAt?: number;
 }
+
+export const isDone = (it: ItemView): boolean => it.doneAt != null;
+export const isBinned = (it: ItemView): boolean => it.binnedAt != null;
+/** Visible in a per-list view: not done, not binned. */
+export const isInListView = (it: ItemView): boolean =>
+  !isDone(it) && !isBinned(it);
 
 export interface ListView {
   id: string;
@@ -66,7 +72,11 @@ export interface DocApp {
    *  UI see one update, not N. */
   addItemsAt(listId: string, texts: string[], indexInList: number): string[];
   editItemText(id: string, text: string): void;
-  setStatus(id: string, status: ItemStatus): void;
+  /** Set or clear an item's done flag. Independent of binned. */
+  setDone(id: string, done: boolean): void;
+  /** Set or clear an item's binned flag. Independent of done — binning a
+   *  done item keeps it done; restoring keeps the done state alone. */
+  setBinned(id: string, binned: boolean): void;
   moveItem(id: string, listId: string, indexInList: number): void;
   deleteBinned(id: string): void;
   emptyBin(): number;
@@ -105,7 +115,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           id: ev.id,
           listId: ev.listId ?? "",
           text: ev.text ?? "",
-          status: (ev.status as ItemStatus) ?? "live",
           createdAt: Number(ev.createdAt ?? 0),
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
@@ -155,7 +164,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemStatusChanged": {
         if (state.itemsById[ev.id]) {
           setState("itemsById", ev.id, {
-            status: (ev.status as ItemStatus) ?? "live",
             doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
             binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
           });
@@ -280,10 +288,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       engine.editItemText(id, text);
       flush();
     },
-    setStatus(id, status) {
-      if (status === "live") engine.setItemLive(id);
-      else if (status === "done") engine.setItemDone(id);
-      else engine.binItem(id);
+    setDone(id, done) {
+      engine.setItemDone(id, done);
+      flush();
+    },
+    setBinned(id, binned) {
+      engine.setItemBinned(id, binned);
       flush();
     },
     moveItem(id, listId, indexInList) {

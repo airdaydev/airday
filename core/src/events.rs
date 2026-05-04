@@ -11,8 +11,6 @@
 //! current state (`ListAdded` / `ItemAdded` for everything that exists),
 //! then live deltas. Both flow through the same code path.
 
-use crate::doc::Status;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
     // ---------- items ----------
@@ -24,14 +22,13 @@ pub enum AppEvent {
         id: String,
         list_id: String,
         text: String,
-        status: Status,
         created_at: i64,
         done_at: Option<i64>,
         binned_at: Option<i64>,
         index: usize,
     },
-    /// Item removed from the doc (deleteBinned / emptyBin). Status
-    /// changes to Binned do *not* emit this — they emit
+    /// Item removed from the doc (deleteBinned / emptyBin). Toggling
+    /// `binned_at` does *not* emit this — that emits
     /// `ItemStatusChanged`.
     ItemRemoved {
         id: String,
@@ -47,12 +44,12 @@ pub enum AppEvent {
         id: String,
         text: String,
     },
-    /// Status transitions bundle their timestamp fields. Going to
-    /// `Live` clears both timestamps; `Done` sets `done_at`; `Binned`
-    /// sets `binned_at`.
+    /// Done/binned flags changed. The two are independent — an event is
+    /// emitted whenever either timestamp transitions on/off, and the
+    /// payload carries both current values so consumers can mirror state
+    /// without tracking the previous one.
     ItemStatusChanged {
         id: String,
-        status: Status,
         done_at: Option<i64>,
         binned_at: Option<i64>,
     },

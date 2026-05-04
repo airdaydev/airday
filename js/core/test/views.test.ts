@@ -21,16 +21,16 @@ describe("Doc view helpers", () => {
     expect(doc.binnedItemIds()).toEqual([]);
   });
 
-  test("liveItemIds returns ids in MovableList order, scoped to list and status", async () => {
+  test("liveItemIds returns ids in MovableList order, scoped to list and view", async () => {
     const doc = Doc.create();
     const other = doc.addList("Other");
     const a = doc.addItem(LIST_MAIN, "a");
     const b = doc.addItem(LIST_MAIN, "b");
     const c = doc.addItem(LIST_MAIN, "c");
-    doc.addItem(other, "h"); // must not appear in now's view
-    doc.setItemDone(b);
+    doc.addItem(other, "h"); // must not appear in main's view
+    doc.setItemDone(b, true);
     const d = doc.addItem(LIST_MAIN, "d");
-    doc.binItem(d);
+    doc.setItemBinned(d, true);
 
     expect(doc.liveItemIds(LIST_MAIN)).toEqual([a, c]);
     expect(doc.liveItemIds(other).length).toBe(1);
@@ -41,22 +41,35 @@ describe("Doc view helpers", () => {
     const first = doc.addItem(LIST_MAIN, "first");
     const second = doc.addItem(LIST_MAIN, "second");
     const third = doc.addItem(LIST_MAIN, "third");
-    doc.setItemDone(first);
+    doc.setItemDone(first, true);
     await sleep(2);
-    doc.setItemDone(second);
+    doc.setItemDone(second, true);
     await sleep(2);
-    doc.setItemDone(third);
+    doc.setItemDone(third, true);
 
     expect(doc.doneItemIds()).toEqual([third, second, first]);
+  });
+
+  test("done-and-binned item appears in bin only", async () => {
+    const doc = Doc.create();
+    const a = doc.addItem(LIST_MAIN, "a");
+    doc.setItemDone(a, true);
+    doc.setItemBinned(a, true);
+    expect(doc.doneItemIds()).toEqual([]);
+    expect(doc.binnedItemIds()).toEqual([a]);
+    // Done state survives the bin: the JSON view still has doneAt.
+    const view = JSON.parse(doc.getItemJson(a)!);
+    expect(view.doneAt).toBeDefined();
+    expect(view.binnedAt).toBeDefined();
   });
 
   test("binnedItemIds sorted by binnedAt desc", async () => {
     const doc = Doc.create();
     const a = doc.addItem(LIST_MAIN, "a");
     const b = doc.addItem(LIST_MAIN, "b");
-    doc.binItem(a);
+    doc.setItemBinned(a, true);
     await sleep(2);
-    doc.binItem(b);
+    doc.setItemBinned(b, true);
     expect(doc.binnedItemIds()).toEqual([b, a]);
   });
 
@@ -68,7 +81,8 @@ describe("Doc view helpers", () => {
     expect(item.id).toBe(id);
     expect(item.text).toBe("xyz");
     expect(item.listId).toBe(LIST_MAIN);
-    expect(item.status).toBe("live");
+    expect(item.doneAt).toBeUndefined();
+    expect(item.binnedAt).toBeUndefined();
 
     expect(doc.getItemJson("does-not-exist")).toBeUndefined();
 

@@ -1,4 +1,4 @@
-use airday_core::doc::{Doc, LIST_MAIN, Status};
+use airday_core::doc::{Doc, LIST_MAIN};
 
 #[test]
 fn move_item_to_same_visible_slot_is_noop() {
@@ -33,7 +33,7 @@ fn undo_redo_roundtrips_reorder_with_hidden_items() {
     let b = doc.add_item(LIST_MAIN, "b").unwrap();
     let c = doc.add_item(LIST_MAIN, "c").unwrap();
     let hidden = doc.add_item(&other, "hidden").unwrap();
-    doc.set_item_status(&hidden, Status::Done).unwrap();
+    doc.set_item_done(&hidden, true).unwrap();
 
     doc.move_item(&a, LIST_MAIN, 2).unwrap();
     doc.move_item(&b, &other, 0).unwrap();

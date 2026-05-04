@@ -121,24 +121,13 @@ impl Doc {
     }
 
     #[wasm_bindgen(js_name = setItemDone)]
-    pub fn set_item_done(&self, item_id: &str) -> Result<(), JsError> {
-        self.inner
-            .set_item_status(item_id, airday_core::Status::Done)
-            .map_err(js_err)
+    pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), JsError> {
+        self.inner.set_item_done(item_id, done).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setItemLive)]
-    pub fn set_item_live(&self, item_id: &str) -> Result<(), JsError> {
-        self.inner
-            .set_item_status(item_id, airday_core::Status::Live)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = binItem)]
-    pub fn bin_item(&self, item_id: &str) -> Result<(), JsError> {
-        self.inner
-            .set_item_status(item_id, airday_core::Status::Binned)
-            .map_err(js_err)
+    #[wasm_bindgen(js_name = setItemBinned)]
+    pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), JsError> {
+        self.inner.set_item_binned(item_id, binned).map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = deleteBinned)]
@@ -690,26 +679,18 @@ impl SyncEngine {
     }
 
     #[wasm_bindgen(js_name = setItemDone)]
-    pub fn set_item_done(&self, item_id: &str) -> Result<(), JsError> {
+    pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), JsError> {
         self.inner
             .doc()
-            .set_item_status(item_id, airday_core::Status::Done)
+            .set_item_done(item_id, done)
             .map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setItemLive)]
-    pub fn set_item_live(&self, item_id: &str) -> Result<(), JsError> {
+    #[wasm_bindgen(js_name = setItemBinned)]
+    pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), JsError> {
         self.inner
             .doc()
-            .set_item_status(item_id, airday_core::Status::Live)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = binItem)]
-    pub fn bin_item(&self, item_id: &str) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .set_item_status(item_id, airday_core::Status::Binned)
+            .set_item_binned(item_id, binned)
             .map_err(js_err)
     }
 
@@ -905,11 +886,11 @@ impl From<CoreEvent> for EngineEvent {
 /// every other getter returns `undefined`.
 ///
 /// Variant → fields:
-/// - `itemAdded` — id, listId, text, status, createdAt, doneAt?, binnedAt?, index
+/// - `itemAdded` — id, listId, text, createdAt, doneAt?, binnedAt?, index
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, index
 /// - `itemTextChanged` — id, text
-/// - `itemStatusChanged` — id, status, doneAt?, binnedAt?
+/// - `itemStatusChanged` — id, doneAt?, binnedAt?
 /// - `itemListChanged` — id, listId
 /// - `listAdded` — id, name, createdAt, index
 /// - `listRemoved` — id
@@ -922,7 +903,6 @@ pub struct AppEventJs {
     list_id: Option<String>,
     text: Option<String>,
     name: Option<String>,
-    status: Option<&'static str>,
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
@@ -951,10 +931,6 @@ impl AppEventJs {
     pub fn name(&self) -> Option<String> {
         self.name.clone()
     }
-    #[wasm_bindgen(getter)]
-    pub fn status(&self) -> Option<String> {
-        self.status.map(|s| s.to_string())
-    }
     #[wasm_bindgen(getter, js_name = createdAt)]
     pub fn created_at(&self) -> Option<i64> {
         self.created_at
@@ -981,7 +957,6 @@ impl From<CoreAppEvent> for AppEventJs {
             list_id: None,
             text: None,
             name: None,
-            status: None,
             created_at: None,
             done_at: None,
             binned_at: None,
@@ -992,7 +967,6 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 list_id,
                 text,
-                status,
                 created_at,
                 done_at,
                 binned_at,
@@ -1002,7 +976,6 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 list_id: Some(list_id),
                 text: Some(text),
-                status: Some(status_str(status)),
                 created_at: Some(created_at),
                 done_at,
                 binned_at,
@@ -1028,13 +1001,11 @@ impl From<CoreAppEvent> for AppEventJs {
             },
             CoreAppEvent::ItemStatusChanged {
                 id,
-                status,
                 done_at,
                 binned_at,
             } => AppEventJs {
                 kind: "itemStatusChanged",
                 id,
-                status: Some(status_str(status)),
                 done_at,
                 binned_at,
                 ..blank
@@ -1104,11 +1075,10 @@ fn lists_to_json(lists: &[airday_core::ListView]) -> String {
 
 fn item_to_json(it: &airday_core::ItemView) -> String {
     let mut s = format!(
-        "{{\"id\":{},\"text\":{},\"listId\":{},\"status\":{},\"createdAt\":{}",
+        "{{\"id\":{},\"text\":{},\"listId\":{},\"createdAt\":{}",
         json_string(&it.id),
         json_string(&it.text),
         json_string(&it.list_id),
-        json_string(status_str(it.status)),
         it.created_at,
     );
     if let Some(t) = it.done_at {
@@ -1131,14 +1101,6 @@ fn items_to_json(items: &[airday_core::ItemView]) -> String {
     }
     s.push(']');
     s
-}
-
-fn status_str(s: airday_core::Status) -> &'static str {
-    match s {
-        airday_core::Status::Live => "live",
-        airday_core::Status::Done => "done",
-        airday_core::Status::Binned => "binned",
-    }
 }
 
 fn json_string(s: &str) -> String {
