@@ -639,15 +639,17 @@ function Workspace(props: {
     nextIds.splice(insertAt, 0, ...movedIds);
 
     const currentIds = [...ids];
-    for (const [index, id] of nextIds.entries()) {
-      if (currentIds[index] !== id) {
-        const currentIndex = currentIds.indexOf(id);
-        if (currentIndex < 0) continue;
-        app.moveItem(id, v.id, index);
-        currentIds.splice(currentIndex, 1);
-        currentIds.splice(index, 0, id);
+    app.withActionBatch(() => {
+      for (const [index, id] of nextIds.entries()) {
+        if (currentIds[index] !== id) {
+          const currentIndex = currentIds.indexOf(id);
+          if (currentIndex < 0) continue;
+          app.moveItem(id, v.id, index);
+          currentIds.splice(currentIndex, 1);
+          currentIds.splice(index, 0, id);
+        }
       }
-    }
+    });
   };
 
   // Start a draft row: pseudo-item just below the topmost selected
@@ -954,14 +956,13 @@ function Workspace(props: {
       const it = app.getItem(id);
       return it !== undefined && isBinned(it);
     });
-    // Do not group reorder moves into one undo step. Larger grouped
-    // move bursts currently corrupt redo in core; keep these as
-    // stepwise moves until reorder has a dedicated undo-safe path.
-    if (toUndone.length > 0) app.setDoneMany(toUndone, false);
-    if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
-    for (const [i, id] of idsInOrder.entries()) {
-      app.moveItem(id, target.listId, i);
-    }
+    app.withActionBatch(() => {
+      if (toUndone.length > 0) app.setDoneMany(toUndone, false);
+      if (toUnbin.length > 0) app.setBinnedMany(toUnbin, false);
+      for (const [i, id] of idsInOrder.entries()) {
+        app.moveItem(id, target.listId, i);
+      }
+    });
     // When dragging out of the current list, the rows are no longer
     // visible here — leaving them "selected" means a phantom block
     // anchor lingers. Same-list drops keep selection so the user can

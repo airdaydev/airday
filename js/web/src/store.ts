@@ -99,6 +99,7 @@ export interface DocApp {
   redo(): boolean;
   canUndo(): boolean;
   canRedo(): boolean;
+  withActionBatch<T>(fn: () => T): T;
   /** Bracket a JS-side bulk loop so its N per-call commits collapse
    *  to a single undo step. Returns whatever `fn` returns; closes the
    *  group in `finally` so a thrown mutation doesn't leak an open
@@ -173,7 +174,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   });
   const [version, setVersion] = createSignal(0);
   let undoGroupDepth = 0;
+  let actionBatchDepth = 0;
   let flushDeferred = false;
+  let actionBatchStartVersion = 0;
+  let pendingActionSteps = 0;
+  const undoStack: number[] = [];
+  const redoStack: number[] = [];
 
   const dispatch = (ev: AppEventJs): void => {
     switch (ev.kind) {
@@ -330,7 +336,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
 
   let onFlush: () => void = () => {};
   const flush = (): void => {
-    if (undoGroupDepth > 0) {
+    if (undoGroupDepth > 0 || actionBatchDepth > 0) {
       flushDeferred = true;
       return;
     }
@@ -339,6 +345,26 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     // Local mutations enqueue AppEvents synchronously; pull them so
     // the next Solid tick sees the store update.
     drainEvents();
+  };
+
+  const recordAction = (steps: number): void => {
+    if (steps <= 0) return;
+    undoStack.push(steps);
+    redoStack.length = 0;
+  };
+
+  const mutate = <T>(fn: () => T, assumedSteps = 1): T => {
+    if (actionBatchDepth > 0) {
+      pendingActionSteps += assumedSteps;
+      const result = fn();
+      flush();
+      return result;
+    }
+    const before = version();
+    const result = fn();
+    flush();
+    if (version() !== before) recordAction(assumedSteps);
+    return result;
   };
 
   return {
@@ -353,93 +379,122 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       return state.itemsById[id];
     },
     addItem(listId, text) {
-      const id = engine.addItem(listId, text);
-      flush();
-      return id;
+      return mutate(() => engine.addItem(listId, text));
     },
     addItemAt(listId, text, indexInList) {
-      const id = engine.addItemAt(listId, text, indexInList);
-      flush();
-      return id;
+      return mutate(() => engine.addItemAt(listId, text, indexInList));
     },
     addItemsAt(listId, texts, indexInList) {
-      const ids = engine.addItemsAt(listId, texts, indexInList);
-      flush();
-      return ids;
+      return mutate(() => engine.addItemsAt(listId, texts, indexInList));
     },
     editItemText(id, text) {
-      engine.editItemText(id, text);
-      flush();
+      mutate(() => engine.editItemText(id, text));
     },
     editItemNotes(id, notes) {
-      engine.editItemNotes(id, notes);
-      flush();
+      mutate(() => engine.editItemNotes(id, notes));
     },
     setDone(id, done) {
-      engine.setItemDone(id, done);
-      flush();
+      mutate(() => engine.setItemDone(id, done));
     },
     setDoneMany(ids, done) {
-      engine.setItemsDone(ids, done);
-      flush();
+      mutate(() => engine.setItemsDone(ids, done));
     },
     setBinned(id, binned) {
-      engine.setItemBinned(id, binned);
-      flush();
+      mutate(() => engine.setItemBinned(id, binned));
     },
     setBinnedMany(ids, binned) {
-      engine.setItemsBinned(ids, binned);
-      flush();
+      mutate(() => engine.setItemsBinned(ids, binned));
     },
     moveItem(id, listId, indexInList) {
-      engine.moveItem(id, listId, indexInList);
-      flush();
+      mutate(() => engine.moveItem(id, listId, indexInList));
     },
     deleteBinned(id) {
-      engine.deleteBinned(id);
-      flush();
+      mutate(() => engine.deleteBinned(id));
     },
     deleteBinnedMany(ids) {
-      engine.deleteBinnedItems(ids);
-      flush();
+      mutate(() => engine.deleteBinnedItems(ids));
     },
     emptyBin() {
+      const before = version();
       const removed = engine.emptyBin();
-      if (removed > 0) flush();
+      if (removed > 0) {
+        flush();
+        if (version() !== before) recordAction(1);
+      }
       return removed;
     },
     addList(name) {
-      const id = engine.addList(name);
-      flush();
-      return id;
+      return mutate(() => engine.addList(name));
     },
     renameList(id, name) {
-      engine.renameList(id, name);
-      flush();
+      mutate(() => engine.renameList(id, name));
     },
     moveList(id, index) {
-      engine.moveList(id, index);
-      flush();
+      mutate(() => engine.moveList(id, index));
     },
     deleteList(id) {
-      engine.deleteList(id);
-      flush();
+      mutate(() => engine.deleteList(id));
     },
     undo() {
-      const did = engine.undo();
-      if (did) flush();
-      return did;
+      const steps = undoStack.pop();
+      if (steps == null) return false;
+      let applied = 0;
+      for (let i = 0; i < steps; i++) {
+        if (!engine.undo()) break;
+        applied++;
+      }
+      if (applied === 0) {
+        undoStack.push(steps);
+        return false;
+      }
+      flush();
+      redoStack.push(applied);
+      return true;
     },
     redo() {
-      const did = engine.redo();
-      if (did) flush();
-      return did;
+      const steps = redoStack.pop();
+      if (steps == null) return false;
+      let applied = 0;
+      for (let i = 0; i < steps; i++) {
+        if (!engine.redo()) break;
+        applied++;
+      }
+      if (applied === 0) {
+        redoStack.push(steps);
+        return false;
+      }
+      flush();
+      undoStack.push(applied);
+      return true;
     },
     canUndo() {
-      return engine.canUndo();
+      return undoStack.length > 0;
     },
     canRedo() {
-      return engine.canRedo();
+      return redoStack.length > 0;
+    },
+    withActionBatch(fn) {
+      const outermost = actionBatchDepth === 0;
+      actionBatchDepth++;
+      if (outermost) {
+        actionBatchStartVersion = version();
+        pendingActionSteps = 0;
+      }
+      try {
+        return fn();
+      } finally {
+        actionBatchDepth--;
+        if (outermost) {
+          if (flushDeferred) {
+            flushDeferred = false;
+            flush();
+          }
+          if (version() !== actionBatchStartVersion && pendingActionSteps > 0) {
+            recordAction(pendingActionSteps);
+          }
+          pendingActionSteps = 0;
+        }
+      }
     },
     withUndoGroup(fn) {
       const outermost = undoGroupDepth === 0;

@@ -2340,6 +2340,51 @@ mod tests {
     }
 
     #[test]
+    fn plain_stepwise_undo_redo_round_trips_larger_reorder() {
+        let doc = Doc::new().unwrap();
+        let texts: Vec<String> = (0..20).map(|i| format!("item {i}")).collect();
+        let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let ids = doc.add_items_at(LIST_MAIN, &text_refs, 0).unwrap();
+
+        let moved_ids = vec![ids[5].clone(), ids[6].clone(), ids[7].clone()];
+        let remaining: Vec<String> = ids
+            .iter()
+            .filter(|id| !moved_ids.contains(id))
+            .cloned()
+            .collect();
+        let mut next_ids = remaining;
+        next_ids.splice(10..10, moved_ids.clone());
+        let mut current_ids = ids.clone();
+        let mut steps = 0usize;
+
+        for (index, id) in next_ids.iter().enumerate() {
+            if current_ids[index] != *id {
+                let current_index = current_ids
+                    .iter()
+                    .position(|cur| cur == id)
+                    .expect("moved id must still exist");
+                doc.move_item(id, LIST_MAIN, index).unwrap();
+                current_ids.remove(current_index);
+                current_ids.insert(index, id.clone());
+                steps += 1;
+            }
+        }
+
+        let after_move = doc.live_item_ids(LIST_MAIN);
+        assert_eq!(after_move, next_ids);
+
+        for _ in 0..steps {
+            assert!(doc.undo().unwrap());
+        }
+        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+
+        for _ in 0..steps {
+            assert!(doc.redo().unwrap());
+        }
+        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
+    }
+
+    #[test]
     fn undo_skips_remote_ops() {
         // Remote ops imported via `apply_remote` carry origin "remote"
         // and must not be undoable from the local UndoManager. Local
