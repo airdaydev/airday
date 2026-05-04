@@ -894,6 +894,8 @@ function Workspace(props: {
     }
     app.withUndoGroup(() => {
       for (const [i, id] of idsInOrder.entries()) {
+        const it = app.getItem(id);
+        if (it && it.status !== "live") app.setStatus(id, "live");
         app.moveItem(id, target.listId, i);
       }
     });
