@@ -572,6 +572,7 @@ body {
   cursor: pointer;
   text-align: left;
   font: inherit;
+  color: var(--text);
   padding: 4px;
   width: fit-content;
 }
