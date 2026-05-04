@@ -101,6 +101,18 @@ function statusTimestamp(it: ItemView): number | undefined {
 const DRAFT_ID_PREFIX = "__draft__";
 const isDraftId = (id: string): boolean => id.startsWith(DRAFT_ID_PREFIX);
 
+// Heuristic for "user has a real keyboard + precise pointer" — i.e. the
+// shortcut hints are worth showing. Reactive: an iPad gaining a Magic
+// Keyboard or a laptop docked to a touchscreen will flip live.
+function createKbDeviceSignal(): () => boolean {
+  const mql = window.matchMedia("(hover: hover) and (pointer: fine)");
+  const [matches, setMatches] = createSignal(mql.matches);
+  const onChange = (e: MediaQueryListEvent) => setMatches(e.matches);
+  mql.addEventListener("change", onChange);
+  onCleanup(() => mql.removeEventListener("change", onChange));
+  return matches;
+}
+
 function formatRelative(ts: number, now: number): string {
   const diffMs = now - ts;
   if (diffMs < 60_000) return "just now";
@@ -461,6 +473,7 @@ function Workspace(props: {
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const matchesKbDevice = createKbDeviceSignal();
 
   // Draft state: a transient ItemView injected into dndItems but not into
   // the store. `insertIndex` is captured at draft-start time so collapse
@@ -803,6 +816,22 @@ function Workspace(props: {
   document.addEventListener("keydown", onEnterExpand);
   onCleanup(() => document.removeEventListener("keydown", onEnterExpand));
 
+  // Space: shortcut for the Add button — start a draft below the topmost
+  // selection, same as a click. startDraft already gates on list view and
+  // an open draft, so the handler just guards modifiers and editable focus.
+  const onSpaceAdd = (e: KeyboardEvent) => {
+    if (e.key !== " ") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    if (view().kind !== "list") return;
+    if (draft() !== null) return;
+    e.preventDefault();
+    startDraft();
+  };
+  document.addEventListener("keydown", onSpaceAdd);
+  onCleanup(() => document.removeEventListener("keydown", onSpaceAdd));
+
   // Drag items into a list nav button to move them to that list as the
   // first items. Discriminate from the nav's own list-reorder drag by
   // checking detail.items[0] for an item-shaped record (`listId` is
@@ -954,7 +983,13 @@ function Workspace(props: {
         </header>
         <Show
           when={dndItems().length > 0}
-          fallback={<div class="dnd-host empty">Nothing here yet.</div>}
+          fallback={
+            <div class="dnd-host empty">
+              {view().kind === "list" && matchesKbDevice()
+                ? "Press Space to create a new item"
+                : "Nothing here yet."}
+            </div>
+          }
         >
           <Show keyed when={dndRevision()}>
             <Dnd
