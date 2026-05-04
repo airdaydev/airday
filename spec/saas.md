@@ -55,6 +55,74 @@ The bundle contains the local Loro doc + the wrapped DEK; the new server gets a 
 
 Specifics (bundle format, atomicity, conflict with an existing self-hosted account on the target server) are deferred until SaaS is live and there's a real user asking.
 
+## Regions and data location
+
+SaaS accounts have a single **home region**. The home region is the place where the account's encrypted workspace data lives and where its steady-state sync traffic terminates.
+
+Initial SaaS regions:
+
+- `Sydney, Australia` (`Binary Lane`)
+- `Helsinki, Finland` (`Hetzner`)
+
+User-facing meaning of "home region":
+
+- Encrypted op blobs, snapshots, and steady-state sync for the account live in that region.
+- The region does **not** change automatically when the user travels.
+- A user who permanently moves country may later run an explicit account migration to a different region.
+- Region choice is primarily about data location and legal geography; latency is a secondary benefit.
+
+The signup UI keeps the choice simple ("Choose where your encrypted data lives") and links to a more detailed explanation. That explanation must distinguish:
+
+- home-region workspace storage
+- global account / authentication systems
+- backup provider and backup region policy
+
+Do not hand-wave backup location. If backups are outside the selected home region, say so explicitly. If backups are region-matched, say that explicitly too.
+
+## Control plane vs data plane
+
+SaaS is split into two planes:
+
+- **Control plane** — globally reachable signup, login, account lookup, billing, subscription state, and region discovery
+- **Data plane** — the regional sync/storage service that owns an account's encrypted blobs, snapshots, and device sync traffic
+
+The control plane knows an account's `home_region` and returns region-specific endpoints after signup/login. Steady-state clients talk directly to the regional data plane; the control plane is not on the hot path for every sync operation.
+
+Sketch:
+
+1. Client hits the global SaaS endpoint for signup or login.
+2. Control plane authenticates the user/device and resolves `home_region`.
+3. Response includes region-specific `api_base_url` and `ws_base_url`.
+4. Client stores those endpoints and talks directly to the regional service for steady-state sync.
+
+This keeps account discovery global without turning the sync core into a globally replicated system.
+
+The control plane may be operated from a different region than the account's home region. That is acceptable as long as the split is described honestly in user-facing copy: account/auth metadata may be global, while encrypted workspace data remains pinned to the chosen home region.
+
+## Regional deployment topology
+
+Each account belongs to exactly one region at a time. Within that region, deploy multiple stateless app / WebSocket servers in front of a single regional Postgres cluster.
+
+Per-region shape:
+
+- many stateless HTTP / WS servers
+- one regional Postgres cluster as the source of truth
+- optional in-region pub/sub for fanout between app instances
+
+The data plane is **region-pinned, not server-pinned**. Any app server in the region may accept a device WebSocket. Correctness must not depend on sticky sessions.
+
+The sync system's durable properties come from Postgres, not the pub/sub layer:
+
+- Postgres assigns / stores the monotonic op ids
+- Postgres is the replay source for reconnect / catch-up
+- Postgres owns the durable account state
+
+Inter-server fanout is an in-region acceleration layer only. A thin NATS deployment is acceptable for this, but it is not part of the durable sync model. Missed fanout messages must be harmless because clients can always resume from Postgres via `since_op_id`.
+
+NATS JetStream is unnecessary for the base design. Regional sync already has durability, ordering, and replay from Postgres + monotonic op ids; a durable broker would duplicate responsibilities and complicate retention/ordering semantics.
+
+Multi-region replication of the hot path is out of scope for the initial SaaS architecture. The system is single-region per account, with explicit migration between regions if needed later.
+
 ## SaaS-only server concerns
 
 Out of scope for this spec but worth flagging so they land somewhere when the time comes:
