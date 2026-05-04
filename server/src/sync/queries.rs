@@ -16,24 +16,21 @@ pub const MAX_BYTES_PER_BATCH: usize = 256 * 1024;
 pub async fn insert_ops(
     db: &Db,
     account_id: Uuid,
-    origin_device: Uuid,
     blobs: Vec<EncryptedBlob>,
 ) -> anyhow::Result<Vec<u64>> {
     let acc_bytes = account_id.as_bytes().to_vec();
-    let dev_bytes = origin_device.as_bytes().to_vec();
     let now = now_millis();
     db.call(move |c| {
         let tx = c.transaction()?;
         let mut ids = Vec::with_capacity(blobs.len());
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO ops (account_id, origin_device, payload, payload_nonce, created_at)
-                 VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO ops (account_id, payload, payload_nonce, created_at)
+                 VALUES (?, ?, ?, ?)",
             )?;
             for blob in &blobs {
                 stmt.execute(params![
                     acc_bytes,
-                    dev_bytes,
                     blob.ciphertext,
                     blob.nonce,
                     now,

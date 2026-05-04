@@ -41,7 +41,6 @@ CREATE INDEX devices_token_hash_idx ON devices (auth_token_hash);
 CREATE TABLE ops (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,           -- monotonic per-server
   account_id      BLOB NOT NULL REFERENCES accounts(id),
-  origin_device   BLOB REFERENCES devices(id),
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
   created_at      INTEGER NOT NULL

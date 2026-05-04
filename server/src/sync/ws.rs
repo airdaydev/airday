@@ -242,7 +242,7 @@ async fn push_ops(
     async {
         let blobs_for_broadcast = ops.clone();
         let assigned_ids =
-            queries::insert_ops(&state.db, auth.account_id, auth.device_id, ops).await?;
+            queries::insert_ops(&state.db, auth.account_id, ops).await?;
 
         // Post-commit fan-out, before acking the originator. Both branches
         // are correct (the originator's ack and peer broadcasts are
