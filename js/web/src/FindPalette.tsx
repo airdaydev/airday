@@ -1,39 +1,25 @@
-// Find palette: cmd+f opens an overlay with a search input and a
-// keyboard-navigable result list. Sprint-1 stub — wired against a
-// hard-coded mock list so the shell, kb shortcuts, and styling can be
-// validated independently of the real engine query path.
+// cmd/ctrl+f opens an overlay with a search input and a keyboard-
+// navigable result list. Backed by the local SearchEngine attached to
+// the workspace's DocApp — the palette is a thin view over it. See
+// spec/search.md for index semantics and ranking.
 
 import {
   createEffect,
+  createMemo,
   createSignal,
   onCleanup,
   For,
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
-
-export type FindItem = {
-  id: string;
-  name: string;
-  kind: "item" | "list";
-};
-
-const MOCK_RESULTS: FindItem[] = [
-  { id: "i1", name: "Reply to Alex about the proposal", kind: "item" },
-  { id: "i2", name: "Buy groceries", kind: "item" },
-  { id: "i3", name: "Read Phoenix spec", kind: "item" },
-  { id: "i4", name: "Plan team offsite", kind: "item" },
-  { id: "i5", name: "Review PR #142", kind: "item" },
-  { id: "i6", name: "Draft Q3 roadmap", kind: "item" },
-  { id: "l1", name: "Desk", kind: "list" },
-  { id: "l2", name: "Work", kind: "list" },
-  { id: "l3", name: "Home", kind: "list" },
-];
+import type { DocApp } from "./store.ts";
+import type { SearchResult } from "./search.ts";
 
 export function FindPalette(props: {
+  app: DocApp;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect?: (item: FindItem) => void;
+  onSelect?: (result: SearchResult) => void;
 }) {
   const [searchInput, setSearchInput] = createSignal("");
   const [searchFilter, setSearchFilter] = createSignal("");
@@ -43,27 +29,35 @@ export function FindPalette(props: {
 
   // Global Cmd/Ctrl+F shortcut. preventDefault to suppress the browser's
   // native page-find UI — we own this binding while the app is mounted.
+  // Require exactly one of meta/ctrl and no shift/alt so OS shortcuts
+  // layered on top (e.g. macOS Cmd+Ctrl+F fullscreen) pass through.
   const onGlobalKeyDown = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.code === "KeyF") {
-      if (e.cancelable) e.preventDefault();
-      props.onOpenChange(true);
-    }
+    if (e.code !== "KeyF") return;
+    if (e.shiftKey || e.altKey) return;
+    if (e.metaKey === e.ctrlKey) return;
+    if (e.cancelable) e.preventDefault();
+    props.onOpenChange(true);
   };
   document.addEventListener("keydown", onGlobalKeyDown);
   onCleanup(() => document.removeEventListener("keydown", onGlobalKeyDown));
 
-  // Debounced search.
+  // Debounced search. Sub-frame human latency tolerance — keeps us off
+  // the tokenize/postings hot path on every keystroke without an
+  // observable input lag.
   createEffect(() => {
     const value = searchInput().trim();
     const timer = window.setTimeout(() => setSearchFilter(value), 100);
     onCleanup(() => window.clearTimeout(timer));
   });
 
-  const items = (): FindItem[] => {
-    const q = searchFilter().toLowerCase();
-    if (!q) return MOCK_RESULTS;
-    return MOCK_RESULTS.filter((it) => it.name.toLowerCase().includes(q));
-  };
+  // Re-run on every doc version bump too, so a peer or local mutation
+  // while the palette is open updates the visible result set.
+  const items = createMemo((): SearchResult[] => {
+    const q = searchFilter();
+    if (!q) return [];
+    props.app.version();
+    return props.app.search.query(q, 50);
+  });
 
   // Reset selection whenever the result set changes.
   createEffect(() => {
@@ -136,7 +130,7 @@ export function FindPalette(props: {
     el?.scrollIntoView({ block: "nearest" });
   }
 
-  function selectItem(item: FindItem) {
+  function selectItem(item: SearchResult) {
     props.onSelect?.(item);
     props.onOpenChange(false);
   }
@@ -191,7 +185,7 @@ export function FindPalette(props: {
                   onMouseEnter={() => setSelectedIndex(i())}
                   onClick={() => selectItem(item)}
                 >
-                  <span class="palette__item-name">{item.name}</span>
+                  <span class="palette__item-name">{item.title}</span>
                   <span class="palette__item-badge-label">
                     {item.kind === "list" ? "List" : "Item"}
                   </span>

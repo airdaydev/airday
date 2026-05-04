@@ -39,6 +39,7 @@ import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { FindPalette } from "./FindPalette.tsx";
+import type { SearchResult } from "./search.ts";
 import { AuthForm, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
 import {
@@ -980,6 +981,27 @@ function Workspace(props: {
     document.removeEventListener("primavera-dnd-dragend", onDndDragEnd);
   });
 
+  // Selecting a palette result: jump to the view that contains it and
+  // re-anchor the dnd selection on the row. Lists go straight to that
+  // list. Items pick the view based on their status — binned items live
+  // in the Bin, done-only items in Done, otherwise their list. The
+  // selection bounce is deferred past the view-change effect that
+  // otherwise clears it.
+  const onFindSelect = (r: SearchResult) => {
+    if (r.kind === "list") {
+      setView({ kind: "list", id: r.id });
+      return;
+    }
+    const target: ViewKey =
+      r.status === "binned"
+        ? { kind: "bin" }
+        : r.status === "done"
+          ? { kind: "done" }
+          : { kind: "list", id: r.listId || "main" };
+    setView(target);
+    setTimeout(() => selection.selectOnly(r.id), 0);
+  };
+
   // While a row is expanded: right-click inside it → native browser menu;
   // right-click anywhere else → noop. Capture-phase so we run before
   // Kobalte's ContextMenu trigger sees the event.
@@ -1009,7 +1031,12 @@ function Workspace(props: {
         onOpenSettings={() => setSettingsOpen(true)}
         onSession={props.onSession}
       />
-      <FindPalette open={findOpen()} onOpenChange={setFindOpen} />
+      <FindPalette
+        app={app}
+        open={findOpen()}
+        onOpenChange={setFindOpen}
+        onSelect={(r) => onFindSelect(r)}
+      />
       <Settings
         open={settingsOpen()}
         onOpenChange={setSettingsOpen}

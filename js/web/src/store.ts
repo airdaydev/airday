@@ -10,6 +10,7 @@
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
+import { createSearchEngine, type SearchEngine } from "./search.ts";
 
 /** Done and binned are independent flags — an item can be both. The
  *  presence of the timestamp *is* the flag; there's no separate
@@ -48,6 +49,11 @@ export interface WorkspaceState {
 export interface DocApp {
   engine: SyncEngine;
   state: WorkspaceState;
+  /** Local plaintext search index over items + lists in the active
+   *  account. Built once after initial materialization and maintained
+   *  incrementally from the same AppEvent stream that drives the store.
+   *  See `spec/search.md`. */
+  search: SearchEngine;
   /** Bumps every time at least one event is dispatched (local or
    *  remote). The persistence layer reads this to debounce-save the
    *  doc. The UI doesn't read it — Solid's store gives it granular
@@ -173,6 +179,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     listsById: {},
   });
   const [version, setVersion] = createSignal(0);
+  const search = createSearchEngine();
   let undoGroupDepth = 0;
   let actionBatchDepth = 0;
   let flushDeferred = false;
@@ -321,9 +328,17 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     batch(() => {
       if (coarse) {
         const snapshot = engine.snapshotEvents();
-        setState(reconcile(materializeState(snapshot)));
+        const next = materializeState(snapshot);
+        setState(reconcile(next));
+        // The bulk path skips per-event store dispatch, so let the
+        // search engine do a wholesale rebuild from the fresh state
+        // rather than try to track which events fell into the bucket.
+        search.rebuild(next);
       } else {
-        for (const ev of events) dispatch(ev);
+        for (const ev of events) {
+          dispatch(ev);
+          search.apply(ev);
+        }
       }
       if (events.length > 0) setVersion((v) => v + 1);
     });
@@ -332,7 +347,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   // Materialize current doc state once. Same dispatcher as the live
   // path — no separate "load initial" code, no snapshot/diff.
   const initialSnapshot = engine.snapshotEvents();
-  setState(reconcile(materializeState(initialSnapshot)));
+  const initialState = materializeState(initialSnapshot);
+  setState(reconcile(initialState));
+  search.rebuild(initialState);
 
   let onFlush: () => void = () => {};
   const flush = (): void => {
@@ -371,6 +388,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     engine,
     state,
     version,
+    search,
     drainEvents,
     setOnFlush(cb) {
       onFlush = cb;

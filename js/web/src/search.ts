@@ -1,0 +1,520 @@
+// Local plaintext search index over the active account doc. See
+// spec/search.md — sprint 1 is an in-memory inverted index, AND-across
+// query tokens with the last token treated as prefix. Built once after
+// the doc materializes and maintained incrementally from the same
+// AppEvent stream the store dispatches.
+
+import type { AppEventJs } from "@airday/core/wasm";
+import type { ItemView, ListView, WorkspaceState } from "./store.ts";
+
+export type SearchKind = "item" | "list";
+export type SearchStatus = "live" | "done" | "binned";
+
+export interface SearchResult {
+  id: string;
+  kind: SearchKind;
+  title: string;
+  body?: string;
+  listId?: string;
+  status?: SearchStatus;
+  score: number;
+}
+
+export interface SearchEngine {
+  rebuild(state: WorkspaceState): void;
+  apply(event: AppEventJs): void;
+  query(input: string, limit?: number): SearchResult[];
+}
+
+/** Per-doc indexed view. Token sets are kept around so a field-level
+ *  edit can `removePosting` the old set before inserting the new one. */
+interface SearchDoc {
+  id: string;
+  kind: SearchKind;
+  title: string;
+  body: string;
+  listId?: string;
+  status?: SearchStatus;
+  updatedAt: number;
+  titleTokens: Set<string>;
+  bodyTokens: Set<string>;
+  contextTokens: Set<string>;
+  tokens: Set<string>;
+}
+
+// Split on anything that is not a Unicode letter or number. Mirrors the
+// spec examples ("PR #142" -> ["pr","142"], "Q3 roadmap" -> ["q3",
+// "roadmap"]). NFKC + lowercase first so width / case variants collapse.
+const TOKEN_SPLIT = /[^\p{L}\p{N}]+/u;
+
+export function tokenize(input: string): string[] {
+  if (!input) return [];
+  const normalized = input.normalize("NFKC").toLowerCase().trim();
+  if (!normalized) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of normalized.split(TOKEN_SPLIT)) {
+    if (!part || seen.has(part)) continue;
+    seen.add(part);
+    out.push(part);
+  }
+  return out;
+}
+
+function statusOf(item: ItemView): SearchStatus {
+  if (item.binnedAt != null) return "binned";
+  if (item.doneAt != null) return "done";
+  return "live";
+}
+
+function statusFromAt(
+  doneAt: number | undefined,
+  binnedAt: number | undefined,
+): SearchStatus {
+  if (binnedAt != null) return "binned";
+  if (doneAt != null) return "done";
+  return "live";
+}
+
+function bigToNum(v: bigint | number | undefined | null): number | undefined {
+  if (v == null) return undefined;
+  return typeof v === "bigint" ? Number(v) : v;
+}
+
+export function createSearchEngine(): SearchEngine {
+  // Canonical per-id view of every indexed doc.
+  const docsById = new Map<string, SearchDoc>();
+  // token -> doc ids that contain it (in any field).
+  const postings = new Map<string, Set<string>>();
+  // listId -> item ids in that list. Lets a list rename / remove
+  // re-index just the affected items rather than scanning every doc.
+  const itemsByList = new Map<string, Set<string>>();
+  // listId -> current name. Read when an item is inserted / its listId
+  // changes so we can populate context tokens without holding a ref to
+  // the list doc.
+  const listNames = new Map<string, string>();
+
+  function addPosting(token: string, id: string): void {
+    let set = postings.get(token);
+    if (!set) {
+      set = new Set();
+      postings.set(token, set);
+    }
+    set.add(id);
+  }
+
+  function removePosting(token: string, id: string): void {
+    const set = postings.get(token);
+    if (!set) return;
+    set.delete(id);
+    if (set.size === 0) postings.delete(token);
+  }
+
+  function indexDoc(doc: SearchDoc): void {
+    docsById.set(doc.id, doc);
+    for (const t of doc.tokens) addPosting(t, doc.id);
+    if (doc.kind === "item" && doc.listId) {
+      let s = itemsByList.get(doc.listId);
+      if (!s) {
+        s = new Set();
+        itemsByList.set(doc.listId, s);
+      }
+      s.add(doc.id);
+    }
+  }
+
+  function unindexDoc(id: string): SearchDoc | undefined {
+    const doc = docsById.get(id);
+    if (!doc) return undefined;
+    for (const t of doc.tokens) removePosting(t, id);
+    docsById.delete(id);
+    if (doc.kind === "item" && doc.listId) {
+      const s = itemsByList.get(doc.listId);
+      if (s) {
+        s.delete(id);
+        if (s.size === 0) itemsByList.delete(doc.listId);
+      }
+    }
+    return doc;
+  }
+
+  function makeItemDoc(args: {
+    id: string;
+    text: string;
+    notes: string;
+    listId: string;
+    status: SearchStatus;
+    updatedAt: number;
+  }): SearchDoc {
+    const titleTokens = new Set(tokenize(args.text));
+    const bodyTokens = new Set(tokenize(args.notes));
+    const ctxName = args.listId ? listNames.get(args.listId) ?? "" : "";
+    const contextTokens = new Set(tokenize(ctxName));
+    const tokens = new Set<string>();
+    for (const t of titleTokens) tokens.add(t);
+    for (const t of bodyTokens) tokens.add(t);
+    for (const t of contextTokens) tokens.add(t);
+    return {
+      id: args.id,
+      kind: "item",
+      title: args.text,
+      body: args.notes,
+      listId: args.listId || undefined,
+      status: args.status,
+      updatedAt: args.updatedAt,
+      titleTokens,
+      bodyTokens,
+      contextTokens,
+      tokens,
+    };
+  }
+
+  function makeListDoc(args: {
+    id: string;
+    name: string;
+    updatedAt: number;
+  }): SearchDoc {
+    const titleTokens = new Set(tokenize(args.name));
+    return {
+      id: args.id,
+      kind: "list",
+      title: args.name,
+      body: "",
+      updatedAt: args.updatedAt,
+      titleTokens,
+      bodyTokens: new Set(),
+      contextTokens: new Set(),
+      tokens: new Set(titleTokens),
+    };
+  }
+
+  function reindexItem(args: {
+    id: string;
+    text: string;
+    notes: string;
+    listId: string;
+    status: SearchStatus;
+    updatedAt: number;
+  }): void {
+    unindexDoc(args.id);
+    indexDoc(makeItemDoc(args));
+  }
+
+  function rebuildItemsInList(listId: string): void {
+    // Snapshot the id set: reindex mutates itemsByList while iterating.
+    const items = itemsByList.get(listId);
+    if (!items) return;
+    for (const itemId of Array.from(items)) {
+      const itemDoc = docsById.get(itemId);
+      if (!itemDoc || itemDoc.kind !== "item") continue;
+      reindexItem({
+        id: itemDoc.id,
+        text: itemDoc.title,
+        notes: itemDoc.body,
+        listId: itemDoc.listId ?? "",
+        status: itemDoc.status ?? "live",
+        updatedAt: itemDoc.updatedAt,
+      });
+    }
+  }
+
+  function rebuild(state: WorkspaceState): void {
+    docsById.clear();
+    postings.clear();
+    itemsByList.clear();
+    listNames.clear();
+
+    // Lists first so item docs can read list names for context tokens.
+    for (const id of state.listsOrder) {
+      const list: ListView | undefined = state.listsById[id];
+      if (!list) continue;
+      listNames.set(list.id, list.name);
+      indexDoc(
+        makeListDoc({ id: list.id, name: list.name, updatedAt: list.createdAt }),
+      );
+    }
+
+    for (const id of state.itemsOrder) {
+      const item: ItemView | undefined = state.itemsById[id];
+      if (!item) continue;
+      // Recency signal: latest state-bearing timestamp falls back to
+      // createdAt for never-touched items.
+      const updatedAt = item.binnedAt ?? item.doneAt ?? item.createdAt;
+      indexDoc(
+        makeItemDoc({
+          id: item.id,
+          text: item.text,
+          notes: item.notes,
+          listId: item.listId,
+          status: statusOf(item),
+          updatedAt,
+        }),
+      );
+    }
+  }
+
+  function apply(event: AppEventJs): void {
+    switch (event.kind) {
+      case "itemAdded": {
+        const status = statusFromAt(
+          bigToNum(event.doneAt),
+          bigToNum(event.binnedAt),
+        );
+        const updatedAt = bigToNum(event.createdAt) ?? Date.now();
+        reindexItem({
+          id: event.id,
+          text: event.text ?? "",
+          notes: event.notes ?? "",
+          listId: event.listId ?? "",
+          status,
+          updatedAt,
+        });
+        break;
+      }
+      case "itemRemoved": {
+        unindexDoc(event.id);
+        break;
+      }
+      case "itemTextChanged": {
+        const prev = docsById.get(event.id);
+        if (!prev || prev.kind !== "item") break;
+        reindexItem({
+          id: prev.id,
+          text: event.text ?? "",
+          notes: prev.body,
+          listId: prev.listId ?? "",
+          status: prev.status ?? "live",
+          updatedAt: Date.now(),
+        });
+        break;
+      }
+      case "itemNotesChanged": {
+        const prev = docsById.get(event.id);
+        if (!prev || prev.kind !== "item") break;
+        reindexItem({
+          id: prev.id,
+          text: prev.title,
+          notes: event.notes ?? "",
+          listId: prev.listId ?? "",
+          status: prev.status ?? "live",
+          updatedAt: Date.now(),
+        });
+        break;
+      }
+      case "itemStatusChanged": {
+        const prev = docsById.get(event.id);
+        if (!prev || prev.kind !== "item") break;
+        prev.status = statusFromAt(
+          bigToNum(event.doneAt),
+          bigToNum(event.binnedAt),
+        );
+        prev.updatedAt = Date.now();
+        break;
+      }
+      case "itemListChanged": {
+        const prev = docsById.get(event.id);
+        if (!prev || prev.kind !== "item") break;
+        reindexItem({
+          id: prev.id,
+          text: prev.title,
+          notes: prev.body,
+          listId: event.listId ?? "",
+          status: prev.status ?? "live",
+          updatedAt: Date.now(),
+        });
+        break;
+      }
+      case "listAdded": {
+        listNames.set(event.id, event.name ?? "");
+        unindexDoc(event.id);
+        const updatedAt = bigToNum(event.createdAt) ?? Date.now();
+        indexDoc(
+          makeListDoc({
+            id: event.id,
+            name: event.name ?? "",
+            updatedAt,
+          }),
+        );
+        break;
+      }
+      case "listRemoved": {
+        const items = Array.from(itemsByList.get(event.id) ?? []);
+        unindexDoc(event.id);
+        listNames.delete(event.id);
+        // Any items still in this listId lose their context tokens; they
+        // keep their listId pointer so a UI that resolves lists by id
+        // still has it, but no list name means no context tokens.
+        for (const itemId of items) {
+          const itemDoc = docsById.get(itemId);
+          if (!itemDoc || itemDoc.kind !== "item") continue;
+          reindexItem({
+            id: itemDoc.id,
+            text: itemDoc.title,
+            notes: itemDoc.body,
+            listId: itemDoc.listId ?? "",
+            status: itemDoc.status ?? "live",
+            updatedAt: itemDoc.updatedAt,
+          });
+        }
+        break;
+      }
+      case "listRenamed": {
+        listNames.set(event.id, event.name ?? "");
+        unindexDoc(event.id);
+        indexDoc(
+          makeListDoc({
+            id: event.id,
+            name: event.name ?? "",
+            updatedAt: Date.now(),
+          }),
+        );
+        rebuildItemsInList(event.id);
+        break;
+      }
+      // listMoved / itemMoved are pure ordering — irrelevant to the index.
+    }
+  }
+
+  function anyStartsWith(set: Set<string>, prefix: string): boolean {
+    for (const t of set) if (t.startsWith(prefix)) return true;
+    return false;
+  }
+
+  function prefixCandidates(prefix: string): Set<string> {
+    const out = new Set<string>();
+    // Linear scan over unique tokens — corpus is small enough for sprint
+    // 1; a trie can drop in later if measurement says so.
+    for (const [token, ids] of postings) {
+      if (token === prefix || token.startsWith(prefix)) {
+        for (const id of ids) out.add(id);
+      }
+    }
+    return out;
+  }
+
+  function intersect(
+    a: Set<string> | null,
+    b: Set<string>,
+  ): Set<string> {
+    if (a === null) return new Set(b);
+    const out = new Set<string>();
+    const [smaller, larger] = a.size <= b.size ? [a, b] : [b, a];
+    for (const id of smaller) if (larger.has(id)) out.add(id);
+    return out;
+  }
+
+  interface Scored {
+    doc: SearchDoc;
+    titleExact: number;
+    titlePrefix: number;
+    bodyHits: number;
+    contextHits: number;
+    score: number;
+  }
+
+  function scoreDoc(
+    doc: SearchDoc,
+    exactTokens: readonly string[],
+    finalToken: string,
+  ): Scored | null {
+    let titleExact = 0;
+    let titlePrefix = 0;
+    let bodyHits = 0;
+    let contextHits = 0;
+
+    for (const t of exactTokens) {
+      if (doc.titleTokens.has(t)) titleExact++;
+      else if (doc.bodyTokens.has(t)) bodyHits++;
+      else if (doc.contextTokens.has(t)) contextHits++;
+      else return null;
+    }
+
+    // Final token: exact wins over prefix in title; otherwise fall back
+    // through body then context. The doc must match it somewhere or it
+    // wouldn't have ended up in the candidate set, but recheck so the
+    // bucket assignment is correct.
+    if (doc.titleTokens.has(finalToken)) titleExact++;
+    else if (anyStartsWith(doc.titleTokens, finalToken)) titlePrefix++;
+    else if (
+      doc.bodyTokens.has(finalToken) ||
+      anyStartsWith(doc.bodyTokens, finalToken)
+    )
+      bodyHits++;
+    else if (
+      doc.contextTokens.has(finalToken) ||
+      anyStartsWith(doc.contextTokens, finalToken)
+    )
+      contextHits++;
+    else return null;
+
+    const statusRank =
+      doc.status === "live" ? 2 : doc.status === "done" ? 1 : 0;
+    // Flat numeric score for the public SearchResult.score field. The
+    // sort comparator below uses the bucket counts directly so this
+    // collapse never affects ordering — it's purely a debugging /
+    // display convenience.
+    const score =
+      titleExact * 10000 +
+      titlePrefix * 1000 +
+      bodyHits * 100 +
+      contextHits * 10 +
+      statusRank;
+
+    return { doc, titleExact, titlePrefix, bodyHits, contextHits, score };
+  }
+
+  function statusRank(s: SearchStatus | undefined): number {
+    return s === "live" ? 2 : s === "done" ? 1 : 0;
+  }
+
+  function query(input: string, limit = 50): SearchResult[] {
+    const tokens = tokenize(input);
+    if (tokens.length === 0) return [];
+    const finalToken = tokens[tokens.length - 1];
+    const exactTokens = tokens.slice(0, -1);
+
+    let candidates: Set<string> | null = null;
+    for (const t of exactTokens) {
+      const s = postings.get(t);
+      if (!s) return [];
+      candidates = intersect(candidates, s);
+      if (candidates.size === 0) return [];
+    }
+    const finalSet = prefixCandidates(finalToken);
+    if (finalSet.size === 0) return [];
+    candidates = intersect(candidates, finalSet);
+    if (!candidates || candidates.size === 0) return [];
+
+    const scored: Scored[] = [];
+    for (const id of candidates) {
+      const doc = docsById.get(id);
+      if (!doc) continue;
+      const s = scoreDoc(doc, exactTokens, finalToken);
+      if (s) scored.push(s);
+    }
+    scored.sort((a, b) => {
+      if (a.titleExact !== b.titleExact) return b.titleExact - a.titleExact;
+      if (a.titlePrefix !== b.titlePrefix) return b.titlePrefix - a.titlePrefix;
+      if (a.bodyHits !== b.bodyHits) return b.bodyHits - a.bodyHits;
+      if (a.contextHits !== b.contextHits)
+        return b.contextHits - a.contextHits;
+      const sa = statusRank(a.doc.status);
+      const sb = statusRank(b.doc.status);
+      if (sa !== sb) return sb - sa;
+      if (a.doc.updatedAt !== b.doc.updatedAt)
+        return b.doc.updatedAt - a.doc.updatedAt;
+      return a.doc.id < b.doc.id ? -1 : a.doc.id > b.doc.id ? 1 : 0;
+    });
+    return scored.slice(0, limit).map((s) => ({
+      id: s.doc.id,
+      kind: s.doc.kind,
+      title: s.doc.title,
+      body: s.doc.body || undefined,
+      listId: s.doc.listId,
+      status: s.doc.status,
+      score: s.score,
+    }));
+  }
+
+  return { rebuild, apply, query };
+}

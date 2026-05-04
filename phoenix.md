@@ -51,6 +51,7 @@ In scope for the sprint, not yet green; tracked in `roadmap.md`:
 | [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
+| [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
 | [`spec/saas.md`](spec/saas.md) | Sprint 2+ contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
