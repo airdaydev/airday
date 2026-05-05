@@ -1,8 +1,8 @@
 //! wasm-bindgen facade over `airday-core`.
 //!
 //! Surfaces enough of `airday-core` for a JS host to (a) round-trip a
-//! `Doc` through a storage adapter (slice 1) and (b) drive the sans-IO
-//! `SyncEngine` from a browser-owned `WebSocket` (slice 3). The
+//! `Doc` through a storage adapter and (b) drive the sans-IO
+//! `SyncEngine` from a browser-owned `WebSocket`. The
 //! password-derivation flow still lives behind `airday-core::crypto::derive_*`
 //! and is exposed when the login worker ships.
 
@@ -185,7 +185,7 @@ impl Doc {
         self.inner.delete_list(list_id).map_err(js_err)
     }
 
-    // -- reads (return JSON for slice 1; replace with serde-wasm-bindgen
+    // -- reads (return JSON for now; replace with serde-wasm-bindgen
     //    structured returns once a real consumer needs them) --
 
     #[wasm_bindgen(js_name = itemsInListJson)]

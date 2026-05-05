@@ -1,6 +1,6 @@
 # CLI
 
-Sprint 1's primary client. Also the integration test surface for everything below the GUI.
+Primary CLI client. Also the integration test surface for everything below the GUI.
 
 ## Binary
 
@@ -53,7 +53,7 @@ CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, 
 
 To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
 
-A future TUI (out of sprint 1) holds the WS open while running and surfaces `OpsBroadcast` reactively in the same `airday` binary. The daemon question stays deferred until the TUI exists and proves it needs more than that.
+A future TUI may hold the WS open while running and surface `OpsBroadcast` reactively in the same `airday` binary. The daemon question stays deferred until the TUI exists and proves it needs more than that.
 
 ### Connect behaviour
 
@@ -118,4 +118,3 @@ Done.
 Default output: human-readable. `--json` flag on every read command emits machine-parseable JSON for tests and scripting.
 
 Item and list ids: full uuid v7 hex (32 chars), shown verbatim and required in full when an id is passed in. Built-in list `now` is the one literal id. (Earlier drafts of this spec proposed prefix matching; dropped because it adds parsing complexity for marginal ergonomic gain over shell completion / copy-paste.)
-

@@ -1,8 +1,8 @@
 //! MessagePack request extractor + response wrapper.
 //!
 //! Same role as `axum::Json` but for `application/msgpack`. We don't
-//! enforce the Content-Type header on requests — sprint 1 clients are
-//! all known and the server is single-protocol.
+//! enforce the Content-Type header on requests — clients are known and
+//! the server is single-protocol.
 
 use axum::body::Bytes;
 use axum::extract::{rejection::BytesRejection, FromRequest, Request};

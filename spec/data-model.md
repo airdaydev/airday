@@ -18,7 +18,7 @@ One Loro doc per account.
 | `done_at` | i64? | set when status → Done |
 | `binned_at` | i64? | set when status → Binned |
 
-Item type is implicit (always text in sprint 1). Add an `item_type` field when other kinds appear.
+Item type is implicit (currently always text). Add an `item_type` field when other kinds appear.
 
 There is no separate persisted `status` field. Visibility is derived from the timestamps:
 
@@ -40,7 +40,7 @@ There is no separate persisted `status` field. Visibility is derived from the ti
 
 Airday has one reserved primary capture list plus one seeded ordinary list:
 
-- `main` — rendered as "Desk". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. For sprint 1 its label is client-defined and it is non-renamable, non-movable, and non-deletable.
+- `main` — rendered as "Desk". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable.
 - one seeded user-style list named "Later" with a generated id. It is stored like any other `ListMeta` and can later be renamed, moved, or deleted like any user-created list.
 
 The bin is *not* a list; it's the `Binned` status on items.
@@ -63,4 +63,4 @@ The wire format for ops is whatever Loro emits — opaque bytes from the server'
 
 ## Limits
 
-256 lists × 4096 items × 280 chars ≈ 300 MB English / 900 MB CJK. Treat as soft caps for now; enforcement is out of scope sprint 1.
+256 lists × 4096 items × 280 chars ≈ 300 MB English / 900 MB CJK. Treat as soft caps for now; enforcement is out of scope.

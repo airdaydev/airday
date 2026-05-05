@@ -33,13 +33,13 @@ Forever tokens in both threat models. A compromised CLI host hands the attacker 
 - `DeviceAuth` extractor and the WS upgrade try `Authorization: Bearer` first, fall back to the `airday_device` cookie. CLI is unaffected.
 - `POST /api/account/logout` (authed): revokes the calling device's token server-side and emits `Set-Cookie: airday_device=; Max-Age=0`. `DELETE /api/devices/:id` retains its existing semantics (revoke any device by id) and does not touch cookies.
 - Web bundle and API must share registrable domain (`SameSite=Strict` permits same-site cross-origin, e.g. `app.airday.io` → `api.airday.io`). Self-hosted instances serve their own bundle from their own domain; we do not support one web bundle pointed at arbitrary remote APIs.
-- CSRF mitigation: `SameSite=Strict`. No double-submit token in sprint 2.
+- CSRF mitigation: `SameSite=Strict`. No double-submit token currently.
 
 ## Account model
 
 - One account per email.
 - Password is the master key for E2EE. The server **never** sees it in any form from which the KEK could be derived.
-- **Email verification is not part of sprint 1 / self-hosted.** Email is just an account identifier; self-hosters must be able to run without an SMTP dependency. SaaS (sprint 2+) layers verification on top — the core auth flow stays identical, the SaaS build gates signup/login on a `verified_at` column populated by a verification round-trip.
+- **Email verification is not part of the self-hosted flow.** Email is just an account identifier; self-hosters must be able to run without an SMTP dependency. A future SaaS deployment can layer verification on top — the core auth flow stays identical, with signup/login gated on a `verified_at` column populated by a verification round-trip.
 
 ## Password handling — never sent in plaintext
 

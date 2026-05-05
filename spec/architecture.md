@@ -12,14 +12,14 @@ server/            rust bin — http + ws, sqlite-backed, dumb relay
 cli/               rust bin — depends on core, integration test surface
 ```
 
-Single workspace for sprint 1. Always invoke wasm builds as `wasm-pack build core/` (never bare `cargo build --target wasm32-...` at root, which would try to build server/cli for wasm and choke).
+Single workspace. Always invoke wasm builds as `wasm-pack build core/` (never bare `cargo build --target wasm32-...` at root, which would try to build server/cli for wasm and choke).
 
-**Split plan:** when `crates/protocol/` reaches a stable shape (sprint 3 / v1.0), extract `core/` + `crates/protocol/` into a separate FOSS repo; `server/` consumes via git submodule + path dep. Defer until then — the workspace's atomic cross-crate refactor benefits dominate during high-churn early development.
+**Split plan:** when `crates/protocol/` reaches a stable enough shape, extract `core/` + `crates/protocol/` into a separate FOSS repo; `server/` consumes via git submodule + path dep. Defer until then — the workspace's atomic cross-crate refactor benefits dominate during high-churn early development.
 
 ## Build targets
 
 - `core` builds for: native (linux/mac/windows) and `wasm32-unknown-unknown`.
-- WASM build via `wasm-pack`; web bindings live in `core/web/` (out of scope sprint 1, but layout reserves the place).
+- WASM build via `wasm-pack`; web bindings live in `core/web/`.
 - `server` and `cli` are native-only.
 
 ## Cross-platform client boundary

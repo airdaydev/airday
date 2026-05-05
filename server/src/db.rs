@@ -1,8 +1,8 @@
 //! Sqlite connection + migration runner.
 //!
-//! One connection per server (sprint 1). `tokio-rusqlite` runs queries
-//! on a dedicated background thread, so the runtime is never blocked.
-//! WAL mode means we can promote to a pool later without schema changes.
+//! One connection per server for now. `tokio-rusqlite` runs queries on
+//! a dedicated background thread, so the runtime is never blocked. WAL
+//! mode means we can promote to a pool later without schema changes.
 
 use std::path::Path;
 

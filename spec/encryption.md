@@ -17,13 +17,13 @@
 |---|---|
 | `wrapped_dek` | always (password-KEK wrap) |
 | `recovery_wrapped_dek` | iff user opted into recovery code |
-| `escrowed_dek` | sprint 2+ only (Vault-held key wrap) |
+| `escrowed_dek` | future optional field (Vault-held key wrap) |
 
 ## Recovery tiers
 
 - **Password only** — only `wrapped_dek`. Lose password → lose data. Power-user mode.
 - **Password + recovery code** — both wraps. Lose password → redeem recovery code → unwrap DEK → set new password.
-- **Password + server escrow** — adds Vault-held escrow. Sprint 2+. Out of sprint 1.
+- **Password + server escrow** — adds Vault-held escrow. Future work.
 
 User picks tier at signup; can upgrade later. Default UX presents recovery code as recommended.
 
@@ -63,12 +63,12 @@ User picks tier at signup; can upgrade later. Default UX presents recovery code 
 
 ## Op encryption
 
-Each op blob is independently encrypted with the DEK + a fresh 24-byte random nonce. Nonce stored alongside ciphertext. No additional authenticated data in sprint 1.
+Each op blob is independently encrypted with the DEK + a fresh 24-byte random nonce. Nonce stored alongside ciphertext. No additional authenticated data currently.
 
 ## Local key storage
 
 - CLI: DEK in memory only by default; OS keychain (macOS Keychain, libsecret on linux) for "stay logged in." Recovery code never persisted by client.
-- Web: TBD — sprint 2+.
+- Web: in-memory only today; a persisted wrapped-key story can come later.
 
 ## KDF parameters
 
@@ -81,4 +81,3 @@ Default Argon2id: **`m = 64 MiB, t = 3, p = 1`**. Used for both `master` (passwo
 **Per-user, server-stored, upgradable.** `kdf_params` lives alongside `master_salt` on the account row and is returned by `/prelogin`. New accounts use the server's current default; existing accounts keep their original params until next password change. This means raising the floor later doesn't break older accounts.
 
 **Password change upgrades params** to the current server default. Re-derivation happens on a path the user already pays for; no extra prompt.
-

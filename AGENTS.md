@@ -9,10 +9,10 @@ Workflow: a reserved primary capture list ("Desk", id `main`), any number of use
 - **Rust core** (`core/`) — Loro CRDT, E2EE, sync engine. Compiles to native (CLI, server) and WASM (web) via `core/web/`.
 - **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration.
 - **CLI** (`cli/`) — Airday CLI
-- **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — second sprint-1 client; multi-device proof spans CLI ↔ web.
-- **iOS / Android / native macOS** — out of this print
+- **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — browser client; multi-device proof spans CLI ↔ web.
+- **iOS / Android / native macOS** — future clients
 
-E2EE: password-derived KEK wraps a randomly-generated DEK. DEK encrypts every op blob. Server has no key. Recovery via a user-held recovery code (independent wrap of DEK) is in scope for sprint 1; server-assisted escrow (Vault-backed, opt-in) is sprint 2+.
+E2EE: password-derived KEK wraps a randomly-generated DEK. DEK encrypts every op blob. Server has no key. Recovery via a user-held recovery code (independent wrap of DEK) is implemented; server-assisted escrow (Vault-backed, opt-in) is future work.
 
 Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs with server-assigned monotonic ids. Each device tracks its `last_acked_op_id`; the minimum across active devices is the compaction horizon. Snapshots are produced by the most-acked active client on server request.
 
@@ -36,11 +36,11 @@ Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
-| [`spec/saas.md`](spec/saas.md) | Sprint 2+ contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
+| [`spec/saas.md`](spec/saas.md) | Future SaaS contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 
-Next sprints: postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
+Future work: postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
 
-**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, MCP, native app deployment. These live in `roadmap.md` for later sprints.
+**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, MCP, native app deployment. These live in `roadmap.md`.
 
 ## Build & run
 

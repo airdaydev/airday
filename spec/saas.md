@@ -1,6 +1,6 @@
 # SaaS
 
-**Status:** sprint 2+. Not implemented in sprint 1; this spec exists to pin the contracts that the sprint-1 server / CLI must not paint themselves out of.
+**Status:** future work. This spec exists to pin the contracts that the current server / clients must not paint themselves out of.
 
 Self-hosted is the default mode. SaaS is a deployment that layers payment, email verification, and tenant policy on top of the same core auth + sync flows. Where SaaS diverges, that divergence is captured here — the rest of the specs assume self-hosted.
 
@@ -127,9 +127,9 @@ Multi-region replication of the hot path is out of scope for the initial SaaS ar
 
 Out of scope for this spec but worth flagging so they land somewhere when the time comes:
 
-- Multi-tenant postgres backend (sprint 1 server is single-tenant sqlite).
+- Multi-tenant postgres backend (the current server is sqlite-backed).
 - Stripe webhook handling, subscription state machine, dunning.
 - Email verification: signup gated on `verified_at` populated by a verification round-trip. Self-hosted skips this entirely (see `auth.md` → Account model).
 - Per-account storage caps + op-rate limits.
 - Abuse / ToS enforcement on accounts whose contents the operator cannot read.
-- Per-account size quota — out of scope sprint 1 but worth noting for SaaS.
+- Per-account size quota — still out of scope, but worth noting for SaaS.

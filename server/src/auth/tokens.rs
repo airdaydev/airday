@@ -4,7 +4,7 @@
 //! hex. The server stores `SHA-256(raw_bytes)`. SHA-256 is sufficient
 //! because the input already has 256 bits of entropy — no rainbow-table
 //! risk, and constant-time hash is fast enough at any traffic level we
-//! reach in sprint 1.
+//! expect here.
 
 use rand::RngCore;
 use sha2::{Digest, Sha256};

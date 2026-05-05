@@ -1642,8 +1642,9 @@ mod tests {
 
         let item_a = a.add_item(LIST_MAIN, "from A").unwrap();
 
-        // Replica B starts empty (sprint-1 device-2 path uses snapshot,
-        // but the convergence guarantee is what we're testing).
+        // Replica B starts empty. Real device-2 bootstrap typically
+        // uses snapshot, but the convergence guarantee is what we're
+        // testing.
         let mut b = Doc::empty();
         b.apply_remote(&dek, &a_initial_blob).unwrap();
 

@@ -2,8 +2,8 @@
 //!
 //! `device.json` carries the public-ish state (account id, server URL,
 //! device id, last_acked_op_id). `secrets.json` holds the device token
-//! and DEK in cleartext. The keychain story is sprint-1 deferred — when
-//! it lands, `secrets.json` becomes a fallback for non-keychain hosts.
+//! and DEK in cleartext. When keychain-backed storage lands,
+//! `secrets.json` becomes a fallback for non-keychain hosts.
 
 use std::path::{Path, PathBuf};
 
@@ -48,7 +48,7 @@ pub struct DeviceConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Secrets {
     pub device_token: String,
-    /// Hex-encoded DEK. Plain-file storage is the sprint-1 stopgap; see
+    /// Hex-encoded DEK. Plain-file storage is the current stopgap; see
     /// module docs.
     pub dek_hex: String,
 }

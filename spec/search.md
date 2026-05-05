@@ -1,13 +1,13 @@
 # Search
 
-Sprint 1 search is a **local, client-side, plaintext index** over the already-decrypted account doc. Its first consumer is the web command palette (`cmd/ctrl+f`). The server does not participate.
+Current search is a **local, client-side, plaintext index** over the already-decrypted account doc. Its first consumer is the web command palette (`cmd/ctrl+f`). The server does not participate.
 
 ## Goals
 
 - Instant search over items and lists in the active account.
 - Works offline.
 - Updates incrementally from the same domain event stream that drives UI state.
-- Small and simple enough to ship in sprint 1 without introducing a storage engine or external dependency.
+- Small and simple enough to ship without introducing a storage engine or external dependency.
 
 ## Non-goals
 
@@ -16,7 +16,7 @@ Sprint 1 search is a **local, client-side, plaintext index** over the already-de
 - Full-text ranking sophistication.
 - Typo-tolerant / fuzzy search.
 - Substring search over arbitrary middles of words.
-- Shared persisted index format across web / CLI in sprint 1.
+- Shared persisted index format across web / CLI.
 
 ## Placement
 
@@ -55,7 +55,7 @@ Do **not** index:
 - encrypted blobs
 - op payloads
 - timestamps as searchable text
-- ids as searchable text in sprint 1
+- ids as searchable text
 
 ## Indexed document shape
 
@@ -89,7 +89,7 @@ Notes:
 
 ## Normalization
 
-Sprint 1 normalization rules:
+Normalization rules:
 
 - Unicode normalize (`NFKC` if available in the host)
 - lowercase
@@ -98,7 +98,7 @@ Sprint 1 normalization rules:
 - drop empty tokens
 - de-duplicate tokens within a single doc
 
-Do not stem, lemmatize, or remove stop words in sprint 1.
+Do not stem, lemmatize, or remove stop words.
 
 Examples:
 
@@ -131,7 +131,7 @@ Document inclusion rule:
 
 ## Ranking
 
-Sprint 1 ranking is heuristic and local. Keep it deterministic and simple.
+Ranking is heuristic and local. Keep it deterministic and simple.
 
 Suggested precedence:
 
@@ -177,13 +177,13 @@ Do not rebuild the entire index after every mutation. The event stream already g
 
 ## Persistence
 
-Sprint 1 default: **do not persist a separate search index**.
+Default: **do not persist a separate search index**.
 
 Reasons:
 
 - the local doc is already persisted
 - corpus size is small
-- index rebuild on startup is acceptable at sprint-1 scale
+- index rebuild on startup is acceptable at the current scale
 - avoiding a second local artifact keeps migration / invalidation logic out of scope
 
 If startup cost later becomes measurable, a client may add a persisted sidecar index. If so:
@@ -204,7 +204,7 @@ This is not a new trust boundary; any client capable of rendering the decrypted 
 
 ## Performance envelope
 
-Sprint 1 data limits from `spec/data-model.md` are small enough for an in-memory inverted index.
+Current data limits from `spec/data-model.md` are small enough for an in-memory inverted index.
 
 Acceptable characteristics:
 
@@ -250,7 +250,7 @@ The exact API may differ by client, but the separation is load-bearing:
 
 ## Testing
 
-Minimum test coverage for sprint 1:
+Minimum test coverage:
 
 1. tokenization / normalization examples
 2. add -> query returns result
@@ -266,6 +266,6 @@ Where feasible, use the same event stream the app uses rather than bespoke test-
 
 ## Open questions
 
-- Whether item `notes` should appear in the palette result preview in sprint 1, or only participate in matching.
+- Whether item `notes` should appear in the palette result preview, or only participate in matching.
 - Whether built-in list labels should be indexed by their rendered names even when one is not represented as a normal `ListMeta` row.
-- Whether CLI should expose `airday find <query>` in sprint 1 or defer search to the web UI first.
+- Whether CLI should expose `airday find <query>` or defer search to the web UI first.

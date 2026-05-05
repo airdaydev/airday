@@ -1,6 +1,6 @@
 # Testing
 
-Sqlite-only for sprint 1. No mocked database. No mocked server. The test pyramid skews heavy on E2E because the server-is-dumb thesis means there isn't much logic to unit-test in isolation — convergence and protocol behavior are emergent from the whole system.
+Sqlite-only for now. No mocked database. No mocked server. The test pyramid skews heavy on E2E because the server-is-dumb thesis means there isn't much logic to unit-test in isolation — convergence and protocol behavior are emergent from the whole system.
 
 ## Layers
 
@@ -17,7 +17,7 @@ Sqlite-only for sprint 1. No mocked database. No mocked server. The test pyramid
    - Drives CLI via stdin and `--json` stdout
    - Asserts state convergence across devices
 
-E2E is the load-bearing surface. Required matrix for sprint 1:
+E2E is the load-bearing surface. Required matrix:
 
 - signup → add items → exit → re-login → items still there
 - two clients live → mutations on A appear on B within bounded time
@@ -38,7 +38,7 @@ E2E is the load-bearing surface. Required matrix for sprint 1:
 
 Use the fingerprint for E2E and property-test convergence checks instead of comparing snapshot bytes. Snapshot bytes are **not** required to be stable across replicas — Loro's serialization carries per-replica metadata (peer-ids, internal ordering) that legitimately differs even at logical equality, and per-snapshot encryption nonces would mask byte-stability anyway. Logical-state fingerprinting is the right granularity for "did we converge."
 
-**Future:** a merkle chain/tree over the encrypted op stream is a separate, complementary primitive — commits to *causal history* rather than logical state, enabling O(log n) sync-diff and tamper-evident audit of the server's op log. Out of sprint 1.
+**Future:** a merkle chain/tree over the encrypted op stream is a separate, complementary primitive — commits to *causal history* rather than logical state, enabling O(log n) sync-diff and tamper-evident audit of the server's op log. Out of scope for now.
 
 ## Determinism
 

@@ -119,6 +119,6 @@ Layered roles:
 
 - **AES-GCM** — would work, but XChaCha20-Poly1305 is faster in pure software and tolerates random nonces better at scale. We pick one and stick with it.
 - **bcrypt / scrypt / PBKDF2** — superseded by Argon2id for password-based KDFs.
-- **RSA / ECDSA / Ed25519 / Curve25519** — no asymmetric crypto in sprint 1. No public-key encryption, signatures, or key exchange. Auth is symmetric (`auth_secret` over TLS). If we add device-to-device handshakes or signed ops in the future, those would land here.
-- **Ratchets (Double Ratchet, Signal-style)** — no per-message key rotation. Single long-lived DEK per account. CRDT semantics don't benefit from ratcheting and the protocol complexity isn't worth it for sprint 1.
+- **RSA / ECDSA / Ed25519 / Curve25519** — no asymmetric crypto currently. No public-key encryption, signatures, or key exchange. Auth is symmetric (`auth_secret` over TLS). If we add device-to-device handshakes or signed ops in the future, those would land here.
+- **Ratchets (Double Ratchet, Signal-style)** — no per-message key rotation. Single long-lived DEK per account. CRDT semantics don't benefit from ratcheting and the protocol complexity isn't worth it right now.
 - **Argon2 server-side** — see SHA-256 reasoning above.

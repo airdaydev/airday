@@ -1,6 +1,6 @@
 # Storage
 
-Sqlite for sprint 1. One database file per server instance. Single-tenant (one account per server) is *not* assumed — the schema is multi-account from day one because the SaaS Postgres path will reuse the same shape.
+Sqlite for now. One database file per server instance. Single-tenant (one account per server) is *not* assumed — the schema is multi-account from day one because the SaaS Postgres path will reuse the same shape.
 
 ## Schema (`migrations/001_init.sql`)
 
@@ -77,8 +77,8 @@ Run on a timer, not synchronous with snapshot upload.
 
 ## Migrations
 
-Single `001_init.sql` for sprint 1. Greenfield — until v1.0, we reset the DB rather than migrate.
+Single `001_init.sql` for now. Greenfield — until v1.0, we reset the DB rather than migrate.
 
 ## Open questions
 
-- Backup story for self-hosted (online backup via `VACUUM INTO`? out of scope for sprint 1).
+- Backup story for self-hosted (online backup via `VACUUM INTO`? out of scope for now).

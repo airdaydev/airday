@@ -1,6 +1,6 @@
-/* Sprint-1 styling: enough structure to validate layout & dnd, no
- * design polish. The primavera-dnd custom element brings its own
- * positioning; everything outside is plain flex/grid. */
+/* Base layout and interaction styling. The primavera-dnd custom
+ * element brings its own positioning; everything outside is plain
+ * flex/grid. */
 
 :root {
   --bg: #ffffff;

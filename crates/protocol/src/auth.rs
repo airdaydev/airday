@@ -24,7 +24,7 @@ pub struct KdfParams {
 }
 
 impl KdfParams {
-    /// Sprint 1 default: 64 MiB / 3 iters / parallelism 1.
+    /// Current default: 64 MiB / 3 iters / parallelism 1.
     pub const DEFAULT: KdfParams = KdfParams {
         m_kib: 64 * 1024,
         t: 3,

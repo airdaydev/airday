@@ -1,8 +1,8 @@
 // Local plaintext search index over the active account doc. See
-// spec/search.md — sprint 1 is an in-memory inverted index, AND-across
-// query tokens with the last token treated as prefix. Built once after
-// the doc materializes and maintained incrementally from the same
-// AppEvent stream the store dispatches.
+// spec/search.md — an in-memory inverted index, AND-across query
+// tokens with the last token treated as prefix. Built once after the
+// doc materializes and maintained incrementally from the same AppEvent
+// stream the store dispatches.
 
 import type { AppEventJs } from "@airday/core/wasm";
 import type { ItemView, ListView, WorkspaceState } from "./store.ts";
@@ -382,8 +382,8 @@ export function createSearchEngine(): SearchEngine {
 
   function prefixCandidates(prefix: string): Set<string> {
     const out = new Set<string>();
-    // Linear scan over unique tokens — corpus is small enough for sprint
-    // 1; a trie can drop in later if measurement says so.
+    // Linear scan over unique tokens — corpus is small enough today; a
+    // trie can drop in later if measurement says so.
     for (const [token, ids] of postings) {
       if (token === prefix || token.startsWith(prefix)) {
         for (const id of ids) out.add(id);

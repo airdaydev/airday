@@ -1,4 +1,4 @@
--- Airday sprint 1 schema. Sqlite-only. Multi-account from day one so the
+-- Airday initial schema. Sqlite-only for now. Multi-account from day one so the
 -- SaaS Postgres path can reuse the shape.
 
 CREATE TABLE accounts (

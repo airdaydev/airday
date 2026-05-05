@@ -7,9 +7,9 @@
 //
 // The shape mirrors the CLI's on-disk layout (`device.json` +
 // `loro.bin`) but consciously *omits* the secrets file. DEK lifetime
-// in the browser is in-memory only; the Bun adapter is a sprint-1
-// development convenience and persists the DEK out-of-band the same
-// way the CLI does.
+// in the browser is in-memory only; the Bun adapter is a development
+// convenience and persists the DEK out-of-band the same way the CLI
+// does.
 
 export interface DeviceConfig {
   accountId: string;
