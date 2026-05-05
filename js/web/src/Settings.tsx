@@ -3,10 +3,10 @@ import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { api, type Device } from "./api.ts";
 import type { Session } from "./Login.tsx";
-import { APP_LOCALE, useAppI18n } from "./i18n.tsx";
+import { useAppI18n } from "./i18n.tsx";
 import type { ThemePreference } from "./theme.ts";
 
-type Section = "appearance" | "account" | "devices";
+type Section = "general" | "account" | "devices";
 
 export function Settings(props: {
   open: boolean;
@@ -16,8 +16,8 @@ export function Settings(props: {
   session: Session;
   logout: () => void;
 }) {
-  const { m } = useAppI18n();
-  const [section, setSection] = createSignal<Section>("appearance");
+  const { m, language, setLanguage, locale } = useAppI18n();
+  const [section, setSection] = createSignal<Section>("general");
   const [devices, setDevices] = createSignal<Device[] | null>(null);
   const [devicesError, setDevicesError] = createSignal<string | null>(null);
   const [devicesLoading, setDevicesLoading] = createSignal(false);
@@ -31,7 +31,7 @@ export function Settings(props: {
       setDevices((prev) => (prev ? prev.filter((d) => d.id !== id) : prev));
     } catch (e) {
       setDevicesError(
-        e instanceof Error ? e.message : m.settings.failedToRevokeDevice,
+        e instanceof Error ? e.message : m().settings.failedToRevokeDevice,
       );
     } finally {
       setRevoking((prev) => {
@@ -50,7 +50,7 @@ export function Settings(props: {
       setDevices(res.devices);
     } catch (e) {
       setDevicesError(
-        e instanceof Error ? e.message : m.settings.failedToLoadDevices,
+        e instanceof Error ? e.message : m().settings.failedToLoadDevices,
       );
     } finally {
       setDevicesLoading(false);
@@ -79,10 +79,10 @@ export function Settings(props: {
               <button
                 type="button"
                 class="settings-nav-item"
-                data-active={section() === "appearance" ? "" : undefined}
-                onClick={() => setSection("appearance")}
+                data-active={section() === "general" ? "" : undefined}
+                onClick={() => setSection("general")}
               >
-                {m.settings.appearance}
+                {m().settings.general}
               </button>
               <button
                 type="button"
@@ -90,7 +90,7 @@ export function Settings(props: {
                 data-active={section() === "account" ? "" : undefined}
                 onClick={() => setSection("account")}
               >
-                {m.settings.account}
+                {m().settings.account}
               </button>
               <button
                 type="button"
@@ -98,20 +98,47 @@ export function Settings(props: {
                 data-active={section() === "devices" ? "" : undefined}
                 onClick={() => setSection("devices")}
               >
-                {m.settings.devices}
+                {m().settings.devices}
               </button>
             </aside>
             <section class="settings-content">
-              <Dialog.CloseButton class="settings-close" aria-label={m.common.close}>
+              <Dialog.CloseButton class="settings-close" aria-label={m().common.close}>
                 <CloseIcon />
               </Dialog.CloseButton>
-              <Show when={section() === "appearance"}>
-                <h2 class="settings-section-title">{m.settings.appearance}</h2>
+              <Show when={section() === "general"}>
+                <h2 class="settings-section-title">{m().settings.general}</h2>
                 <div class="settings-row">
-                  <div class="settings-row-label">{m.settings.theme}</div>
+                  <div class="settings-row-label">{m().settings.language}</div>
                   <SegmentedControl
                     class="theme-segmented"
-                    aria-label={m.settings.theme}
+                    aria-label={m().settings.language}
+                    value={language()}
+                    onChange={(value) => setLanguage(value as "es" | "en")}
+                  >
+                    <SegmentedControl.Indicator class="theme-segment-indicator" />
+                    <SegmentedControl.Item value="es" class="theme-segment">
+                      <SegmentedControl.ItemInput />
+                      <SegmentedControl.ItemControl class="theme-segment-control">
+                        <SegmentedControl.ItemLabel>
+                          {m().settings.languageSpanish}
+                        </SegmentedControl.ItemLabel>
+                      </SegmentedControl.ItemControl>
+                    </SegmentedControl.Item>
+                    <SegmentedControl.Item value="en" class="theme-segment">
+                      <SegmentedControl.ItemInput />
+                      <SegmentedControl.ItemControl class="theme-segment-control">
+                        <SegmentedControl.ItemLabel>
+                          {m().settings.languageEnglish}
+                        </SegmentedControl.ItemLabel>
+                      </SegmentedControl.ItemControl>
+                    </SegmentedControl.Item>
+                  </SegmentedControl>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">{m().settings.theme}</div>
+                  <SegmentedControl
+                    class="theme-segmented"
+                    aria-label={m().settings.theme}
                     value={props.themePref}
                     onChange={(value) =>
                       props.onThemeChange(value as ThemePreference)
@@ -122,7 +149,7 @@ export function Settings(props: {
                       <SegmentedControl.ItemInput />
                       <SegmentedControl.ItemControl class="theme-segment-control">
                         <SegmentedControl.ItemLabel>
-                          {m.settings.auto}
+                          {m().settings.auto}
                         </SegmentedControl.ItemLabel>
                       </SegmentedControl.ItemControl>
                     </SegmentedControl.Item>
@@ -130,7 +157,7 @@ export function Settings(props: {
                       <SegmentedControl.ItemInput />
                       <SegmentedControl.ItemControl
                         class="theme-segment-control"
-                        aria-label={m.settings.light}
+                        aria-label={m().settings.light}
                       >
                         <SunIcon />
                       </SegmentedControl.ItemControl>
@@ -139,7 +166,7 @@ export function Settings(props: {
                       <SegmentedControl.ItemInput />
                       <SegmentedControl.ItemControl
                         class="theme-segment-control"
-                        aria-label={m.settings.dark}
+                        aria-label={m().settings.dark}
                       >
                         <MoonIcon />
                       </SegmentedControl.ItemControl>
@@ -148,13 +175,13 @@ export function Settings(props: {
                 </div>
               </Show>
               <Show when={section() === "account"}>
-                <h2 class="settings-section-title">{m.settings.account}</h2>
+                <h2 class="settings-section-title">{m().settings.account}</h2>
                 <Show
                   when={props.session.anonymous}
                   fallback={
                     <>
                       <div class="settings-row">
-                        <div class="settings-row-label">{m.settings.email}</div>
+                        <div class="settings-row-label">{m().settings.email}</div>
                         <div class="settings-row-value">
                           {props.session.email}
                         </div>
@@ -165,30 +192,30 @@ export function Settings(props: {
                           class="settings-logout"
                           onClick={() => props.logout()}
                         >
-                          {m.nav.logOut}
+                          {m().nav.logOut}
                         </button>
                       </div>
                     </>
                   }
                 >
                   <div class="settings-row">
-                    <div class="settings-row-value">{m.settings.localOnlyAccount}</div>
+                    <div class="settings-row-value">{m().settings.localOnlyAccount}</div>
                   </div>
                 </Show>
               </Show>
               <Show when={section() === "devices"}>
-                <h2 class="settings-section-title">{m.settings.devices}</h2>
+                <h2 class="settings-section-title">{m().settings.devices}</h2>
                 <Show
                   when={!props.session.anonymous}
                   fallback={
                     <div class="settings-row">
-                      <div class="settings-row-value">{m.settings.loginToSeeDevices}</div>
+                      <div class="settings-row-value">{m().settings.loginToSeeDevices}</div>
                     </div>
                   }
                 >
                   <Show when={devicesLoading() && devices() === null}>
                     <div class="settings-row">
-                      <div class="settings-row-value">{m.common.loading}</div>
+                      <div class="settings-row-value">{m().common.loading}</div>
                     </div>
                   </Show>
                   <Show when={devicesError()}>
@@ -206,12 +233,12 @@ export function Settings(props: {
                                 {d.name}
                                 <Show when={d.id === props.session.deviceId}>
                                   <span class="device-current-tag">
-                                    {m.settings.thisDevice}
+                                    {m().settings.thisDevice}
                                   </span>
                                 </Show>
                               </div>
                               <div class="device-meta">
-                                {m.settings.lastSeen} {formatRelative(d.last_seen_at)}
+                                {m().settings.lastSeen} {formatRelative(d.last_seen_at, locale())}
                               </div>
                             </div>
                             <Show when={d.id !== props.session.deviceId}>
@@ -222,8 +249,8 @@ export function Settings(props: {
                                 onClick={() => void revokeDevice(d.id)}
                               >
                                 {revoking().has(d.id)
-                                  ? m.settings.revoking
-                                  : m.settings.revoke}
+                                  ? m().settings.revoking
+                                  : m().settings.revoke}
                               </button>
                             </Show>
                           </li>
@@ -278,8 +305,13 @@ function MoonIcon() {
   );
 }
 
-function formatRelative(ms: number): string {
+function formatRelative(ms: number, locale: string): string {
   const diffSec = Math.round((Date.now() - ms) / 1000);
+  if (locale.startsWith("es")) return formatRelativeEs(ms, diffSec, locale);
+  return formatRelativeEn(ms, diffSec, locale);
+}
+
+function formatRelativeEs(ms: number, diffSec: number, locale: string): string {
   if (diffSec < 60) return "ahora mismo";
   if (diffSec < 3600) {
     const m = Math.floor(diffSec / 60);
@@ -293,7 +325,24 @@ function formatRelative(ms: number): string {
     const d = Math.floor(diffSec / 86400);
     return `hace ${d} día${d === 1 ? "" : "s"}`;
   }
-  return new Date(ms).toLocaleDateString(APP_LOCALE);
+  return new Date(ms).toLocaleDateString(locale);
+}
+
+function formatRelativeEn(ms: number, diffSec: number, locale: string): string {
+  if (diffSec < 60) return "just now";
+  if (diffSec < 3600) {
+    const m = Math.floor(diffSec / 60);
+    return `${m} minute${m === 1 ? "" : "s"} ago`;
+  }
+  if (diffSec < 86400) {
+    const h = Math.floor(diffSec / 3600);
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
+  if (diffSec < 86400 * 7) {
+    const d = Math.floor(diffSec / 86400);
+    return `${d} day${d === 1 ? "" : "s"} ago`;
+  }
+  return new Date(ms).toLocaleDateString(locale);
 }
 
 function CloseIcon() {

@@ -74,10 +74,10 @@ export function AuthForm(props: {
   return (
     <form class="auth-form" onSubmit={submit}>
       <h3 class="auth-popover-title">
-        {mode() === "login" ? m.auth.signIn : m.auth.signUp}
+        {mode() === "login" ? m().auth.signIn : m().auth.signUp}
       </h3>
       <label>
-        {m.auth.email}
+        {m().auth.email}
         <input
           type="email"
           required
@@ -88,7 +88,7 @@ export function AuthForm(props: {
         />
       </label>
       <label>
-        {m.auth.password}
+        {m().auth.password}
         <input
           type="password"
           required
@@ -102,10 +102,10 @@ export function AuthForm(props: {
       <input type="hidden" value={deviceName()} />
       <button type="submit" disabled={busy()}>
         {busy()
-          ? m.auth.derivingKeys
+          ? m().auth.derivingKeys
           : mode() === "login"
-            ? m.auth.signIn
-            : m.auth.signUp}
+            ? m().auth.signIn
+            : m().auth.signUp}
       </button>
       <button
         type="button"
@@ -114,8 +114,8 @@ export function AuthForm(props: {
         onClick={() => setMode(mode() === "login" ? "signup" : "login")}
       >
         {mode() === "login"
-          ? m.auth.noAccount
-          : m.auth.haveAccount}
+          ? m().auth.noAccount
+          : m().auth.haveAccount}
       </button>
       <Show when={error()}>
         <div class="error">{error()}</div>
@@ -143,7 +143,7 @@ async function doLogin(
     device_name: deviceName,
   });
   if (!resp.device) {
-    throw new Error("el servidor no devolvió una credencial de dispositivo");
+    throw new Error(missingDeviceCredentialMessage());
   }
   const dek = unwrapDek(derived.kek, resp.wrapped_dek, resp.wrapped_dek_nonce);
   const session: Session = {
@@ -156,6 +156,10 @@ async function doLogin(
   };
   await persistVault(session);
   return session;
+}
+
+function missingDeviceCredentialMessage(): string {
+  return "server did not return a device credential";
 }
 
 async function doSignup(

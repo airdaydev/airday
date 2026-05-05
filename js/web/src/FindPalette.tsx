@@ -155,7 +155,7 @@ export function FindPalette(props: {
                 inputRef = el;
               }}
               type="text"
-              placeholder={m.find.placeholder}
+              placeholder={m().find.placeholder}
               value={searchInput()}
               onInput={(e) => setSearchInput(e.currentTarget.value)}
               aria-autocomplete="list"
@@ -189,14 +189,14 @@ export function FindPalette(props: {
                 >
                   <span class="palette__item-name">{item.title}</span>
                   <span class="palette__item-badge-label">
-                    {item.kind === "list" ? m.find.listBadge : m.find.itemBadge}
+                    {item.kind === "list" ? m().find.listBadge : m().find.itemBadge}
                   </span>
                 </div>
               )}
             </For>
             <Show when={items().length === 0}>
               <div class="palette__empty">
-                {searchFilter() ? m.find.noMatches : m.find.typeToFind}
+                {searchFilter() ? m().find.noMatches : m().find.typeToFind}
               </div>
             </Show>
           </div>
