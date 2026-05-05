@@ -1152,6 +1152,46 @@ function CloudOffIcon() {
   );
 }
 
+function ExternalIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.25"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="external-icon"
+      aria-hidden="true"
+    >
+      <line x1="7" y1="17" x2="17" y2="7" />
+      <polyline points="7 7 17 7 17 17" />
+    </svg>
+  );
+}
+
+function CloudIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+    </svg>
+  );
+}
+
 function viewTitle(v: ViewKey, lists: { id: string; name: string }[]): string {
   if (v.kind === "list") {
     if (v.id === "main") return "Desk";
@@ -1350,16 +1390,13 @@ function Nav(props: {
           </Popover>
         </Show>
         <Show when={!props.session.anonymous}>
-          <span class="pro-badge">
-            Pro
-            <Show when={!props.online}>
-              <span
-                class="offline-indicator"
-                title="Disconnected"
-                aria-label="Disconnected"
-              >
-                <CloudOffIcon />
-              </span>
+          <span
+            class="connection-indicator"
+            title={props.online ? "Connected" : "Disconnected"}
+            aria-label={props.online ? "Connected" : "Disconnected"}
+          >
+            <Show when={props.online} fallback={<CloudOffIcon />}>
+              <CloudIcon />
             </Show>
           </span>
         </Show>
@@ -1406,6 +1443,7 @@ function Nav(props: {
                 rel="noopener noreferrer"
               >
                 Airday website
+                <ExternalIcon />
               </DropdownMenu.Item>
               <Show when={!props.session.anonymous}>
                 <DropdownMenu.Item

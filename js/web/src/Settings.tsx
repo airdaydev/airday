@@ -33,13 +33,12 @@ export function Settings(props: {
     }
   }
 
-  // Lazy-load when entering the Devices section while authenticated.
+  // Refetch every time the Devices section is entered while authenticated.
   createEffect(() => {
     if (
       props.open &&
       section() === "devices" &&
       !props.session.anonymous &&
-      devices() === null &&
       !devicesLoading()
     ) {
       void loadDevices();

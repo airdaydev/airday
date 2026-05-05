@@ -417,7 +417,7 @@ body {
   color: var(--text-empty);
 }
 
-.offline-indicator {
+.connection-indicator {
   display: inline-flex;
   align-items: center;
   color: var(--text-muted);
@@ -673,6 +673,17 @@ body {
 
 .dropdown-menu-item[data-disabled] .menu-shortcut {
   color: var(--text-faint);
+}
+
+.external-icon {
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.dropdown-menu-item:hover .external-icon,
+.dropdown-menu-item[data-highlighted] .external-icon,
+.dropdown-menu-item:focus .external-icon {
+  transform: translateX(2px) translateY(-2px);
 }
 
 .dropdown-menu-separator {
