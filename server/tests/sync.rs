@@ -11,6 +11,7 @@ use airday_protocol::{
     HelloRejected, KdfParams, ServerFrame, SignupRequest, SignupResponse, StoredOp,
     PROTOCOL_VERSION,
 };
+use airday_server::auth::{queries as auth_queries, tokens};
 use airday_server::sync::queries;
 use airday_server::{router, AppState};
 use futures_util::{SinkExt, StreamExt};
@@ -19,6 +20,7 @@ use reqwest::header::CONTENT_TYPE;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::sync::OnceLock;
+use std::time::Duration;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
@@ -42,7 +44,14 @@ struct TestServer {
 
 impl TestServer {
     async fn start() -> Self {
-        let state = AppState::open_in_memory().await.unwrap();
+        Self::start_with_snapshot_timeout(Duration::from_secs(5 * 60)).await
+    }
+
+    async fn start_with_snapshot_timeout(timeout: Duration) -> Self {
+        let state = AppState::open_in_memory()
+            .await
+            .unwrap()
+            .with_snapshot_timeout(timeout);
         let app = router(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -124,7 +133,11 @@ async fn register_second_device(acc: &Account, name: &str) -> ExtraDevice {
 }
 
 async fn signup_account() -> Account {
-    let server = TestServer::start().await;
+    signup_account_with_snapshot_timeout(Duration::from_secs(5 * 60)).await
+}
+
+async fn signup_account_with_snapshot_timeout(timeout: Duration) -> Account {
+    let server = TestServer::start_with_snapshot_timeout(timeout).await;
     let email = format!("user-{}@example.com", Uuid::now_v7());
     let kdf_params = weak_params();
     let master_salt: [u8; 16] = random_bytes();
@@ -493,39 +506,42 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
 
 #[tokio::test]
 async fn snapshot_request_round_trips_to_persistence() {
-    // Server-pushed `SnapshotRequest` reaches the client; client's
-    // `PushSnapshot` reply lands as a row in the snapshots table. No
-    // engine here — fake blob is fine because the server treats it
-    // as opaque, and the engine producer is covered separately in
-    // `core/sync.rs` tests.
+    // Real orchestration path: once the account crosses the snapshot
+    // threshold, the connected producer gets `SnapshotRequest`, its
+    // `PushSnapshot` reply lands in the snapshots table.
     let acc = signup_account().await;
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
     wait_for_subscribers(&acc, 1).await;
 
-    let sub_ids = acc
-        .server
-        .state
-        .sync_sessions
-        .subscriber_ids(acc.account_id);
-    assert_eq!(sub_ids.len(), 1);
-    let delivered = acc
-        .server
-        .state
-        .sync_sessions
-        .request_snapshot(acc.account_id, sub_ids[0], 42);
-    assert!(delivered, "request_snapshot reported no delivery");
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0x55)],
+        },
+    )
+    .await;
+    let first_id = recv_ops_ack(&mut ws).await[0];
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: first_id,
+        },
+    )
+    .await;
+    wait_for_acked(&acc, first_id).await;
 
-    match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::SnapshotRequest { up_to_op_id } => assert_eq!(up_to_op_id, 42),
-        other => panic!("expected SnapshotRequest, got {other:?}"),
-    }
+    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: big_push }).await;
+    let assigned_ids = recv_ops_ack(&mut ws).await;
+    let snapshot_up_to = *assigned_ids.last().unwrap();
+    assert_eq!(recv_snapshot_request(&mut ws).await, first_id);
 
     let blob = fake_blob(123);
     send_msgpack(
         &mut ws,
         &ClientFrame::PushSnapshot {
-            up_to_op_id: 42,
+            up_to_op_id: snapshot_up_to,
             blob: blob.clone(),
         },
     )
@@ -533,8 +549,8 @@ async fn snapshot_request_round_trips_to_persistence() {
 
     // PushSnapshot is fire-and-forget — give the server a moment to
     // commit the row, then read it back.
-    let snap = wait_for_snapshot(&acc, 42).await;
-    assert_eq!(snap.up_to_op_id, 42);
+    let snap = wait_for_snapshot(&acc, snapshot_up_to).await;
+    assert_eq!(snap.up_to_op_id, snapshot_up_to);
     assert_eq!(snap.blob, blob);
 }
 
@@ -550,6 +566,157 @@ async fn request_snapshot_to_unknown_subscriber_reports_undelivered() {
         .sync_sessions
         .request_snapshot(acc.account_id, 9999, 7);
     assert!(!delivered);
+}
+
+#[tokio::test]
+async fn snapshot_threshold_targets_highest_acked_connected_device() {
+    let acc = signup_account().await;
+    let device_b = register_second_device(&acc, "device-b").await;
+
+    let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws_a).await;
+    let mut ws_b = connect_ws(&acc.server, &device_b.device_token).await;
+    handshake(&mut ws_b).await;
+    wait_for_subscribers(&acc, 2).await;
+
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0xB1)],
+        },
+    )
+    .await;
+    let b_first_id = recv_ops_ack(&mut ws_b).await[0];
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::Ack {
+            last_acked_op_id: b_first_id,
+        },
+    )
+    .await;
+    wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
+
+    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
+    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
+
+    let nothing = tokio::time::timeout(Duration::from_millis(200), ws_a.next()).await;
+    assert!(nothing.is_err(), "A unexpectedly received: {nothing:?}");
+}
+
+#[tokio::test]
+async fn snapshot_request_retries_when_assigned_device_disconnects() {
+    let acc = signup_account().await;
+    let device_b = register_second_device(&acc, "device-b").await;
+
+    let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws_a).await;
+    let mut ws_b = connect_ws(&acc.server, &device_b.device_token).await;
+    handshake(&mut ws_b).await;
+    wait_for_subscribers(&acc, 2).await;
+
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0xA1)],
+        },
+    )
+    .await;
+    let a_first_id = recv_ops_ack(&mut ws_a).await[0];
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::Ack {
+            last_acked_op_id: a_first_id,
+        },
+    )
+    .await;
+    wait_for_acked(&acc, a_first_id).await;
+
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0xB2)],
+        },
+    )
+    .await;
+    let b_first_id = recv_ops_ack(&mut ws_b).await[0];
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::Ack {
+            last_acked_op_id: b_first_id,
+        },
+    )
+    .await;
+    wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
+
+    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
+    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
+
+    drop(ws_b);
+    wait_for_subscribers(&acc, 1).await;
+
+    assert_eq!(
+        recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
+        a_first_id
+    );
+}
+
+#[tokio::test]
+async fn snapshot_request_retries_after_timeout() {
+    let acc = signup_account_with_snapshot_timeout(Duration::from_millis(50)).await;
+    let device_b = register_second_device(&acc, "device-b").await;
+
+    let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws_a).await;
+    let mut ws_b = connect_ws(&acc.server, &device_b.device_token).await;
+    handshake(&mut ws_b).await;
+    wait_for_subscribers(&acc, 2).await;
+
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0xA2)],
+        },
+    )
+    .await;
+    let a_first_id = recv_ops_ack(&mut ws_a).await[0];
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::Ack {
+            last_acked_op_id: a_first_id,
+        },
+    )
+    .await;
+    wait_for_acked(&acc, a_first_id).await;
+
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::PushOps {
+            ops: vec![fake_blob(0xB3)],
+        },
+    )
+    .await;
+    let b_first_id = recv_ops_ack(&mut ws_b).await[0];
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::Ack {
+            last_acked_op_id: b_first_id,
+        },
+    )
+    .await;
+    wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
+
+    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
+    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
+    assert_eq!(
+        recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
+        a_first_id
+    );
 }
 
 async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot {
@@ -578,6 +745,32 @@ async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {
         }
         other => panic!("expected OpsBatch, got {other:?}"),
     }
+}
+
+async fn recv_ops_ack(ws: &mut WsStream) -> Vec<u64> {
+    loop {
+        match recv_msgpack::<ServerFrame>(ws).await {
+            ServerFrame::OpsAck { assigned_ids } => return assigned_ids,
+            ServerFrame::OpsBroadcast { .. } => continue,
+            other => panic!("expected OpsAck, got {other:?}"),
+        }
+    }
+}
+
+async fn recv_snapshot_request(ws: &mut WsStream) -> u64 {
+    loop {
+        match recv_msgpack::<ServerFrame>(ws).await {
+            ServerFrame::SnapshotRequest { up_to_op_id } => return up_to_op_id,
+            ServerFrame::OpsBroadcast { .. } => continue,
+            other => panic!("expected SnapshotRequest, got {other:?}"),
+        }
+    }
+}
+
+async fn recv_snapshot_request_timeout(ws: &mut WsStream, timeout: Duration) -> u64 {
+    tokio::time::timeout(timeout, recv_snapshot_request(ws))
+        .await
+        .expect("timed out waiting for SnapshotRequest")
 }
 
 /// Poll until the hub holds at least `target` subscribers for the
@@ -609,6 +802,28 @@ async fn wait_for_acked(acc: &Account, target: u64) -> u64 {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
         let stored = queries::get_last_acked_op_id(&acc.server.state.db, acc.device_id)
+            .await
+            .unwrap();
+        if stored >= target {
+            return stored;
+        }
+        if std::time::Instant::now() > deadline {
+            panic!("ack never reached {target} (stuck at {stored})");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+}
+
+async fn wait_for_acked_token(state: &AppState, device_token: &str, target: u64) -> u64 {
+    let raw = tokens::decode_token(device_token).unwrap();
+    let hash = tokens::sha256(&raw).to_vec();
+    let lookup = auth_queries::find_device_by_token_hash(&state.db, hash)
+        .await
+        .unwrap()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        let stored = queries::get_last_acked_op_id(&state.db, lookup.device_id)
             .await
             .unwrap();
         if stored >= target {

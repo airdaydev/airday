@@ -5,9 +5,6 @@
 //! HTTP routes — token validation runs *before* the upgrade response
 //! goes out, so an unauthorized client never gets a socket.
 //!
-//! Snapshot frames are part of the wire types but intentionally not
-//! handled here yet.
-
 use airday_protocol::{
     ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, ServerFrame, StoredOp,
     PROTOCOL_VERSION,
@@ -164,16 +161,18 @@ async fn run_session(
     // Subscribe *after* a successful handshake so we never deliver
     // peer broadcasts to a session that hasn't agreed on the protocol
     // version. Subscription is RAII — dropping deregisters.
-    let mut sub = state.sync_sessions.subscribe(auth.account_id);
+    let mut sub = state
+        .sync_sessions
+        .subscribe(auth.account_id, auth.device_id);
 
     let sub_id = sub.sub_id();
-    loop {
+    let result = loop {
         tokio::select! {
             client_frame = recv_msgpack::<ClientFrame>(&mut socket) => {
                 match client_frame {
                     Ok(frame) => handle_frame(&mut socket, &state, &auth, sub_id, frame).await?,
-                    Err(SessionError::Closed) => return Ok(()),
-                    Err(e) => return Err(e),
+                    Err(SessionError::Closed) => break Ok(()),
+                    Err(e) => break Err(e),
                 }
             }
             broadcast = sub.rx.recv() => {
@@ -186,7 +185,13 @@ async fn run_session(
                 tracing::debug!(parent: &broadcast_span, "ws broadcast delivered");
             }
         }
-    }
+    };
+    drop(sub);
+    state
+        .snapshot_coordinator
+        .on_disconnect(state.clone(), auth.account_id, auth.device_id)
+        .await;
+    result
 }
 
 async fn handle_frame(
@@ -259,6 +264,13 @@ async fn push_ops(
             last_assigned_op_id = assigned_ids.last().copied(),
             "ws push_ops persisted"
         );
+
+        if let Some(latest_op_id) = assigned_ids.last().copied() {
+            state
+                .snapshot_coordinator
+                .on_ops_appended(state.clone(), auth.account_id, latest_op_id)
+                .await;
+        }
 
         send_msgpack(socket, &ServerFrame::OpsAck { assigned_ids }).await
     }
@@ -341,8 +353,20 @@ async fn push_snapshot(
         blob_bytes = blob.ciphertext.len(),
     );
     async {
+        if !state.snapshot_coordinator.permits_snapshot(
+            auth.account_id,
+            auth.device_id,
+            up_to_op_id,
+        ) {
+            tracing::warn!("ignoring unsolicited or stale PushSnapshot");
+            return Ok(());
+        }
         let row_id =
             queries::insert_snapshot(&state.db, auth.account_id, up_to_op_id, blob).await?;
+        state
+            .snapshot_coordinator
+            .on_snapshot_persisted(state.clone(), auth.account_id, auth.device_id, up_to_op_id)
+            .await;
         tracing::info!(snapshot_row_id = row_id, "ws push_snapshot persisted");
         // Fire-and-forget per spec — no `OpsAck`-style reply. The
         // orchestrator (when wired) tracks completion via the row

@@ -39,7 +39,14 @@ struct Inner {
 
 struct Subscriber {
     sub_id: u64,
+    device_id: Uuid,
     tx: mpsc::Sender<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConnectedSubscriber {
+    pub sub_id: u64,
+    pub device_id: Uuid,
 }
 
 /// RAII subscription handle. Dropping deregisters the subscriber.
@@ -70,7 +77,7 @@ impl SyncSessions {
         Self::default()
     }
 
-    pub fn subscribe(&self, account_id: Uuid) -> Subscription {
+    pub fn subscribe(&self, account_id: Uuid, device_id: Uuid) -> Subscription {
         let (tx, rx) = mpsc::channel(CHANNEL_CAPACITY);
         let sub_id = next_sub_id();
         let mut inner = self.inner.lock().unwrap();
@@ -78,7 +85,11 @@ impl SyncSessions {
             .accounts
             .entry(account_id)
             .or_default()
-            .push(Subscriber { sub_id, tx });
+            .push(Subscriber {
+                sub_id,
+                device_id,
+                tx,
+            });
         Subscription {
             sessions: self.clone(),
             account_id,
@@ -201,6 +212,22 @@ impl SyncSessions {
             .get(&account_id)
             .map(|s| s.len())
             .unwrap_or(0)
+    }
+
+    pub fn connected_subscribers(&self, account_id: Uuid) -> Vec<ConnectedSubscriber> {
+        let inner = self.inner.lock().unwrap();
+        inner
+            .accounts
+            .get(&account_id)
+            .map(|subs| {
+                subs.iter()
+                    .map(|sub| ConnectedSubscriber {
+                        sub_id: sub.sub_id,
+                        device_id: sub.device_id,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 

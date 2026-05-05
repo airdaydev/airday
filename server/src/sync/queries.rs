@@ -6,6 +6,8 @@ use uuid::Uuid;
 
 use crate::db::{now_millis, Db};
 
+use super::sessions::ConnectedSubscriber;
+
 /// Hard caps per `OpsBatch` frame from `spec/sync-protocol.md`. The
 /// byte cap is the safety net; the count cap is the common one.
 pub const MAX_OPS_PER_BATCH: usize = 500;
@@ -221,4 +223,88 @@ pub async fn get_last_acked_op_id(db: &Db, device_id: Uuid) -> anyhow::Result<u6
     })
     .await
     .map(|v| v as u64)
+}
+
+pub async fn latest_account_op_id(db: &Db, account_id: Uuid) -> anyhow::Result<u64> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    db.call(move |c| {
+        let row = c
+            .query_row(
+                "SELECT id
+                 FROM ops
+                 WHERE account_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [acc_bytes],
+                |r| r.get::<_, i64>(0),
+            )
+            .optional()?;
+        Ok(row.unwrap_or(0) as u64)
+    })
+    .await
+}
+
+pub(crate) async fn snapshot_candidate(
+    db: &Db,
+    account_id: Uuid,
+    connected: &[ConnectedSubscriber],
+    tried_devices: &std::collections::HashSet<Uuid>,
+    snapshot_floor: u64,
+) -> anyhow::Result<Option<super::snapshot::Candidate>> {
+    if connected.is_empty() {
+        return Ok(None);
+    }
+    let acc_bytes = account_id.as_bytes().to_vec();
+    let rows: Vec<(Uuid, u64)> = db
+        .call(move |c| {
+            let mut stmt = c.prepare(
+                "SELECT id, last_acked_op_id
+                 FROM devices
+                 WHERE account_id = ?",
+            )?;
+            let mapped = stmt.query_map([acc_bytes], |r| {
+                let id_blob: Vec<u8> = r.get(0)?;
+                let last_acked = r.get::<_, i64>(1)? as u64;
+                Ok((id_blob, last_acked))
+            })?;
+            let mut out = Vec::new();
+            for row in mapped {
+                let (id_blob, last_acked) = row?;
+                out.push((
+                    Uuid::from_slice(&id_blob).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            16,
+                            rusqlite::types::Type::Blob,
+                            Box::new(e),
+                        )
+                    })?,
+                    last_acked,
+                ));
+            }
+            Ok(out)
+        })
+        .await?;
+
+    let live_by_device: std::collections::HashMap<Uuid, u64> = connected
+        .iter()
+        .map(|sub| (sub.device_id, sub.sub_id))
+        .collect();
+
+    Ok(rows
+        .into_iter()
+        .filter(|(device_id, last_acked)| {
+            live_by_device.contains_key(device_id)
+                && !tried_devices.contains(device_id)
+                && *last_acked > snapshot_floor
+        })
+        .max_by(|(left_id, left_acked), (right_id, right_acked)| {
+            left_acked
+                .cmp(right_acked)
+                .then_with(|| left_id.as_bytes().cmp(right_id.as_bytes()))
+        })
+        .map(|(device_id, last_acked_op_id)| super::snapshot::Candidate {
+            device_id,
+            sub_id: live_by_device[&device_id],
+            last_acked_op_id,
+        }))
 }
