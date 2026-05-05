@@ -40,6 +40,10 @@ Single binary `airday`. Subcommands:
 ### Status
 - `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_op_id`, pending-push op count. Read-only against local state; never opens a WS.
 
+### Cache
+- `airday cache status` — profile directory and `loro.bin` size. Read-only; never opens a WS.
+- `airday cache clear [--force]` — delete `loro.bin` and reset `last_acked_op_id` to 0; the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
+
 ### Sync
 - `airday sync` — pull peer ops, push any pending local ops, then exit. Connect failure is a hard error.
 

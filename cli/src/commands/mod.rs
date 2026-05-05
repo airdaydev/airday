@@ -4,6 +4,7 @@ use dialoguer::Password;
 pub const MIN_PASSWORD_LEN: usize = 10;
 
 pub mod bin;
+pub mod cache;
 pub mod items;
 pub mod lists;
 mod login;
@@ -64,6 +65,8 @@ enum Cmd {
     Edit(items::EditArgs),
     /// Manage lists.
     Lists(lists::ListsArgs),
+    /// Inspect the local cache.
+    Cache(cache::CacheArgs),
     /// Show local sync state.
     Status(status::StatusArgs),
     /// Pull peer ops and push any pending local ops, then exit.
@@ -87,6 +90,7 @@ impl Cli {
             Cmd::Mv(a) => items::mv(a, sync).await,
             Cmd::Edit(a) => items::edit(a, sync).await,
             Cmd::Lists(a) => lists::run(a, sync).await,
+            Cmd::Cache(a) => cache::run(a).await,
             Cmd::Status(a) => status::run(a).await,
             Cmd::Sync => sync::run().await,
         }
