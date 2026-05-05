@@ -18,8 +18,7 @@ Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs
 
 ## Source of truth
 
-- `phoenix.md` — sprint 1 thesis, scope, deliverable. Read this first.
-- `spec/*.md` — the contract for what's being built. **Before implementing anything, read the relevant spec.** Specs supersede `phoenix.md` where they disagree (specs are more recent).
+- `spec/*.md` — the contract for what's being built. **Before implementing anything, read the relevant spec.**
   - `architecture.md`, `auth.md`, `cli.md`, `data-model.md`, `encryption.md`, `storage.md`, `sync-protocol.md`, `testing.md`
 - `../cooee` — sibling repo on similar but stronger foundations. Useful reference for patterns.
 
