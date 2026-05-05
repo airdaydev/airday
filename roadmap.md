@@ -1,5 +1,7 @@
 # Roadmap
 
+- we should probably disconnect the relevant ws connection when we revoke a device.
+
 Pending work scooped from `plans/wasm-plan.md`, `plans/sync-engine.md`,
 and `plans/sync-engine-slice-4.md`. Source docs keep the rationale;
 this is the index.
