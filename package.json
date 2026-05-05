@@ -5,7 +5,8 @@
   "scripts": {
     "config": "bun js/config/gen-config.ts",
     "server": "cargo run -p airday-server --",
-    "cli": "cargo run -p airday --",
+    "cli": "cargo run --release -p airday --",
+    "cli:dev": "cargo run -p airday --",
     "build": "cargo build",
     "build:wasm": "wasm-pack build core/web --target nodejs --out-dir ../../js/core/wasm --out-name airday_core_web",
     "build:wasm:web": "wasm-pack build core/web --target bundler --out-dir ../../js/core/wasm-web --out-name airday_core_web",
