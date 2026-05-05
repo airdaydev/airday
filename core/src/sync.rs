@@ -534,10 +534,8 @@ mod tests {
         }
     }
 
-    /// Engine over a fresh seeded doc — `has_pending_ops` starts true
-    /// (the seed is unpushed), so pull-complete will auto-push the
-    /// seed. Used only by tests that explicitly exercise the seed
-    /// auto-push behavior; everything else uses `fresh_engine_clean`.
+    /// Engine over a fresh doc. With no persisted seeded ops, a
+    /// pull-complete on an untouched engine leaves it idle.
     fn fresh_engine() -> SyncEngine {
         SyncEngine::new(Doc::new().unwrap(), Dek::generate(), 0, opts())
     }
@@ -642,11 +640,9 @@ mod tests {
     }
 
     #[test]
-    fn pull_complete_auto_pushes_pending_seed() {
-        // `fresh_engine` retains the unpushed seed: the seed lists
-        // (`Current`, `Holding`) need to ship to the server before
-        // peers can write into them. On pull-complete, the engine
-        // detects pending ops and self-triggers a push.
+    fn pull_complete_on_fresh_doc_stays_idle() {
+        // A fresh doc has no seeded persisted ops, so an empty initial
+        // pull completes without queuing a follow-up push.
         let mut eng = fresh_engine();
         eng.handle_connected();
         let _hello = eng.pop_outbox().unwrap();
@@ -659,10 +655,8 @@ mod tests {
             ops: vec![],
             complete: true,
         }));
-        let push: ClientFrame = dec(&eng.pop_outbox().expect("seed PushOps"));
-        assert!(matches!(push, ClientFrame::PushOps { .. }));
-        // Engine is now Pushing, not Idle, until the ack arrives.
-        assert!(!eng.is_idle());
+        assert!(eng.pop_outbox().is_none(), "no follow-up push for untouched fresh doc");
+        assert!(eng.is_idle());
     }
 
     #[test]

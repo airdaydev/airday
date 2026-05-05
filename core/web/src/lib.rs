@@ -35,7 +35,7 @@ pub struct Doc {
 
 #[wasm_bindgen]
 impl Doc {
-    /// Fresh doc with built-in lists seeded.
+    /// Fresh doc with built-in state initialised.
     #[wasm_bindgen(js_name = create)]
     pub fn create() -> Result<Doc, JsError> {
         Ok(Doc {
@@ -289,16 +289,6 @@ impl Doc {
     #[wasm_bindgen(js_name = canRedo)]
     pub fn can_redo(&self) -> bool {
         self.inner.can_redo()
-    }
-
-    #[wasm_bindgen(js_name = beginUndoGroup)]
-    pub fn begin_undo_group(&self) -> Result<(), JsError> {
-        self.inner.begin_undo_group().map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = endUndoGroup)]
-    pub fn end_undo_group(&self) {
-        self.inner.end_undo_group();
     }
 }
 
@@ -799,16 +789,6 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = canRedo)]
     pub fn can_redo(&self) -> bool {
         self.inner.doc().can_redo()
-    }
-
-    #[wasm_bindgen(js_name = beginUndoGroup)]
-    pub fn begin_undo_group(&self) -> Result<(), JsError> {
-        self.inner.doc().begin_undo_group().map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = endUndoGroup)]
-    pub fn end_undo_group(&self) {
-        self.inner.doc().end_undo_group();
     }
 
     // -- reads --

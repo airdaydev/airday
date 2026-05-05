@@ -106,11 +106,6 @@ export interface DocApp {
   canUndo(): boolean;
   canRedo(): boolean;
   withActionBatch<T>(fn: () => T): T;
-  /** Bracket a JS-side bulk loop so its N per-call commits collapse
-   *  to a single undo step. Returns whatever `fn` returns; closes the
-   *  group in `finally` so a thrown mutation doesn't leak an open
-   *  group. Do not nest — Loro errors if a group is opened twice. */
-  withUndoGroup<T>(fn: () => T): T;
 }
 
 const COARSE_BATCH_THRESHOLD = 64;
@@ -180,7 +175,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   });
   const [version, setVersion] = createSignal(0);
   const search = createSearchEngine();
-  let undoGroupDepth = 0;
   let actionBatchDepth = 0;
   let flushDeferred = false;
   let actionBatchStartVersion = 0;
@@ -353,7 +347,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
 
   let onFlush: () => void = () => {};
   const flush = (): void => {
-    if (undoGroupDepth > 0 || actionBatchDepth > 0) {
+    if (actionBatchDepth > 0) {
       flushDeferred = true;
       return;
     }
@@ -511,26 +505,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
             recordAction(pendingActionSteps);
           }
           pendingActionSteps = 0;
-        }
-      }
-    },
-    withUndoGroup(fn) {
-      const outermost = undoGroupDepth === 0;
-      undoGroupDepth++;
-      if (outermost) {
-        flushDeferred = false;
-        engine.beginUndoGroup();
-      }
-      try {
-        return fn();
-      } finally {
-        undoGroupDepth--;
-        if (outermost) {
-          engine.endUndoGroup();
-          if (flushDeferred) {
-            flushDeferred = false;
-            flush();
-          }
         }
       }
     },

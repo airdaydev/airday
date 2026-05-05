@@ -237,7 +237,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
     let dek = Dek::generate();
     let signup = signup_via_http(&server, &dek).await;
 
-    // Device A: full profile, seeded doc.
+    // Device A: full profile, fresh doc.
     let tmp_a = tempfile::tempdir().unwrap();
     let profile_a = materialize_profile(tmp_a.path(), &server.base, &signup, &dek, true);
 

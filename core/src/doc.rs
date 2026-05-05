@@ -15,9 +15,7 @@
 //! It has **no MovableList entry** — items reference it by string id
 //! and clients render it with a hardcoded label ("Desk"). A future
 //! meta-CRDT will hold things like the user's chosen label for it; for
-//! now main is non-renamable and non-movable. A "Later" list is seeded
-//! as a real MovableList entry so the doc isn't empty on first open;
-//! it behaves like any user-created list.
+//! now main is non-renamable and non-movable.
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
 //! "what's new since the last server interaction" as a single sealed
@@ -152,14 +150,15 @@ fn make_undo_manager(inner: &LoroDoc) -> UndoManager {
 }
 
 impl Doc {
-    /// New doc with built-in lists seeded. The seed is *not* marked as
-    /// pushed — the first `pending_export` includes it, so peers
-    /// joining via the op stream see the built-ins. Device-2 bootstrap
-    /// via snapshot bypasses this path entirely.
+    /// New doc with built-in state initialised. There are no persisted
+    /// user-list seeds; only the virtual built-in `main` exists at
+    /// first open. Device-2 bootstrap via snapshot bypasses this path
+    /// entirely.
     pub fn new() -> Result<Self, DocError> {
         let inner = LoroDoc::new();
-        seed_builtins(&inner)?;
-        inner.commit();
+        if seed_builtins(&inner)? {
+            inner.commit();
+        }
         let undo = Mutex::new(make_undo_manager(&inner));
         Ok(Self {
             inner,
@@ -854,25 +853,6 @@ impl Doc {
         self.undo.lock().map(|um| um.can_redo()).unwrap_or(false)
     }
 
-    /// Open a manual group: every commit between this and
-    /// `end_undo_group` collapses to a single undo step. Use for
-    /// JS-side bulk loops (multi-row delete, drag-drop of N items)
-    /// where the per-call `commit()` boundary would otherwise produce
-    /// N undo steps. Conflicting remote imports auto-close the group;
-    /// non-conflicting ones stay outside it. Re-opening before
-    /// `end_undo_group` is an error (Loro contract).
-    pub fn begin_undo_group(&self) -> Result<(), DocError> {
-        let mut um = self.undo.lock().expect("undo mutex poisoned");
-        um.group_start().map_err(DocError::from)
-    }
-
-    /// Close the active manual group. Safe to call after the group was
-    /// auto-closed by a conflicting remote import (becomes a no-op).
-    pub fn end_undo_group(&self) {
-        let mut um = self.undo.lock().expect("undo mutex poisoned");
-        um.group_end();
-    }
-
     fn apply_undo_op<F>(&self, op: F) -> Result<bool, DocError>
     where
         F: FnOnce(&mut UndoManager) -> loro::LoroResult<bool>,
@@ -1169,20 +1149,15 @@ fn assert_unique_item_ids(item_ids: &[&str]) -> Result<(), DocError> {
     Ok(())
 }
 
-fn seed_builtins(doc: &LoroDoc) -> Result<(), DocError> {
+fn seed_builtins(doc: &LoroDoc) -> Result<bool, DocError> {
     // `LIST_MAIN` is a *reserved id*, not a MovableList entry — items
     // reference it as the string "main" and clients render its label
     // client-side (until we add a meta CRDT for things like a custom
-    // name). "Later" is a regular user list, seeded so the doc has
-    // something to show on first open.
-    let lists = doc.get_movable_list(ROOT_LISTS);
-    let now_ts = now_millis();
-    let later_id = new_id();
-    let map = lists.push_container(LoroMap::new())?;
-    map.insert(KEY_ID, later_id.as_str())?;
-    map.insert(KEY_NAME, "Later")?;
-    map.insert(KEY_CREATED_AT, now_ts)?;
-    Ok(())
+    // name). There are no persisted user-list seeds, but we still
+    // materialise the user-list root container so fresh docs keep the
+    // same top-level shape.
+    let _ = doc.get_movable_list(ROOT_LISTS);
+    Ok(false)
 }
 
 fn item_map_at(items: &LoroMovableList, idx: usize) -> Option<LoroMap> {
@@ -1468,14 +1443,12 @@ mod tests {
     use crate::crypto::Dek;
 
     #[test]
-    fn new_doc_has_seeded_later_only() {
-        // Main is a reserved id with no MovableList entry; the only
-        // seeded list is "Later".
+    fn new_doc_has_no_persisted_lists() {
+        // Main is a reserved id with no MovableList entry, and there
+        // are no seeded user lists.
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
-        assert_eq!(lists.len(), 1);
-        assert_eq!(lists[0].name, "Later");
-        assert_ne!(lists[0].id, LIST_MAIN);
+        assert!(lists.is_empty());
         assert!(!lists.iter().any(|l| l.id == LIST_MAIN));
     }
 
@@ -1632,23 +1605,14 @@ mod tests {
     fn two_replicas_converge_via_op_exchange() {
         let dek = Dek::generate();
 
-        // Replica A is the originator: seeded built-ins, plus one item.
+        // Replica A is the originator and creates the first item.
         let mut a = Doc::new().unwrap();
-        let a_initial_blob = a
-            .pending_export(&dek)
-            .unwrap()
-            .expect("seed counts as pending until first push");
-        a.mark_pushed();
-
         let item_a = a.add_item(LIST_MAIN, "from A").unwrap();
 
         // Replica B starts empty. Real device-2 bootstrap typically
         // uses snapshot, but the convergence guarantee is what we're
         // testing.
         let mut b = Doc::empty();
-        b.apply_remote(&dek, &a_initial_blob).unwrap();
-
-        // Now both have the same lists. Push A's first real op to B.
         let blob_a1 = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         b.apply_remote(&dek, &blob_a1).unwrap();
@@ -1781,10 +1745,6 @@ mod tests {
         // Main has no MovableList entry, so no metadata in the doc —
         // clients render its label themselves.
         assert!(doc.get_list_meta(LIST_MAIN).is_none());
-        // Seeded "Later" list does have metadata.
-        let later = &doc.all_lists()[0];
-        let v = doc.get_list_meta(&later.id).unwrap();
-        assert_eq!(v.name, "Later");
         assert!(doc.get_list_meta("nope").is_none());
     }
 
@@ -1930,14 +1890,8 @@ mod tests {
         b.apply_remote(&dek, &blob).unwrap();
         let evs = b.drain_events();
 
-        // Should include ListAdded for the seeded "Later" list and
-        // ItemAdded for the peer item. Main has no MovableList entry,
-        // so no ListAdded is emitted for it.
-        assert!(
-            evs.iter()
-                .any(|e| matches!(e, AppEvent::ListAdded { name, .. } if name == "Later")),
-            "expected ListAdded for `Later`: {evs:?}"
-        );
+        // Should include ItemAdded for the peer item. Main has no
+        // MovableList entry, so no ListAdded is emitted for it.
         assert!(
             !evs.iter()
                 .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_MAIN)),
@@ -2253,152 +2207,6 @@ mod tests {
     }
 
     #[test]
-    fn undo_group_collapses_loop_to_single_step() {
-        // Each per-iteration mutation method commits independently, so
-        // a JS-side bulk loop would produce N undo steps. Wrapping in
-        // begin/end_undo_group must collapse them into one.
-        let doc = Doc::new().unwrap();
-        let ids: Vec<String> = (0..3)
-            .map(|i| doc.add_item(LIST_MAIN, &format!("item {i}")).unwrap())
-            .collect();
-
-        doc.begin_undo_group().unwrap();
-        for id in &ids {
-            doc.set_item_done(id, true).unwrap();
-        }
-        doc.end_undo_group();
-
-        for id in &ids {
-            assert!(doc.get_item(id).unwrap().is_done());
-        }
-
-        assert!(doc.undo().unwrap());
-        for id in &ids {
-            assert!(
-                !doc.get_item(id).unwrap().is_done(),
-                "the whole bulk transition should reverse in one undo"
-            );
-        }
-        // The three add_item commits are still individually undoable;
-        // grouping only affected the bulk-status block.
-        assert!(doc.can_undo());
-    }
-
-    #[test]
-    fn reorder_loop_downward_block_keeps_order() {
-        let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let second = doc.add_item(LIST_MAIN, "second").unwrap();
-        let third = doc.add_item(LIST_MAIN, "third").unwrap();
-        let fourth = doc.add_item(LIST_MAIN, "fourth").unwrap();
-
-        let ids = vec![first.clone(), second.clone(), third.clone(), fourth.clone()];
-        let moved_ids = vec![second.clone(), third.clone()];
-        let remaining = vec![first.clone(), fourth.clone()];
-        let mut next_ids = remaining;
-        next_ids.splice(2..2, moved_ids.clone());
-        let mut current_ids = ids;
-
-        doc.begin_undo_group().unwrap();
-        for (index, id) in next_ids.iter().enumerate() {
-            if current_ids[index] != *id {
-                let current_index = current_ids
-                    .iter()
-                    .position(|cur| cur == id)
-                    .expect("moved id must still exist");
-                doc.move_item(id, LIST_MAIN, index).unwrap();
-                current_ids.remove(current_index);
-                current_ids.insert(index, id.clone());
-            }
-        }
-        doc.end_undo_group();
-
-        assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
-            vec![first, fourth, second, third]
-        );
-    }
-
-    #[test]
-    fn reorder_loop_undo_redo_round_trips_small_block() {
-        let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let second = doc.add_item(LIST_MAIN, "second").unwrap();
-        let third = doc.add_item(LIST_MAIN, "third").unwrap();
-        let fourth = doc.add_item(LIST_MAIN, "fourth").unwrap();
-        let ids = vec![first.clone(), second.clone(), third.clone(), fourth.clone()];
-        let moved_ids = vec![second.clone(), third.clone()];
-        let remaining = vec![first.clone(), fourth.clone()];
-        let mut next_ids = remaining;
-        next_ids.splice(2..2, moved_ids.clone());
-        let mut current_ids = ids.clone();
-
-        doc.begin_undo_group().unwrap();
-        for (index, id) in next_ids.iter().enumerate() {
-            if current_ids[index] != *id {
-                let current_index = current_ids
-                    .iter()
-                    .position(|cur| cur == id)
-                    .expect("moved id must still exist");
-                doc.move_item(id, LIST_MAIN, index).unwrap();
-                current_ids.remove(current_index);
-                current_ids.insert(index, id.clone());
-            }
-        }
-        doc.end_undo_group();
-
-        let after_move = doc.live_item_ids(LIST_MAIN);
-        assert_eq!(after_move, next_ids);
-
-        assert!(doc.undo().unwrap());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
-
-        assert!(doc.redo().unwrap());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
-    }
-
-    #[test]
-    fn reorder_loop_undo_redo_round_trips_larger_block() {
-        let doc = Doc::new().unwrap();
-        let texts: Vec<String> = (0..20).map(|i| format!("item {i}")).collect();
-        let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
-        let ids = doc.add_items_at(LIST_MAIN, &text_refs, 0).unwrap();
-
-        let moved_ids = vec![ids[5].clone(), ids[6].clone(), ids[7].clone()];
-        let remaining: Vec<String> = ids
-            .iter()
-            .filter(|id| !moved_ids.contains(id))
-            .cloned()
-            .collect();
-        let mut next_ids = remaining;
-        next_ids.splice(10..10, moved_ids.clone());
-        let mut current_ids = ids.clone();
-
-        doc.begin_undo_group().unwrap();
-        for (index, id) in next_ids.iter().enumerate() {
-            if current_ids[index] != *id {
-                let current_index = current_ids
-                    .iter()
-                    .position(|cur| cur == id)
-                    .expect("moved id must still exist");
-                doc.move_item(id, LIST_MAIN, index).unwrap();
-                current_ids.remove(current_index);
-                current_ids.insert(index, id.clone());
-            }
-        }
-        doc.end_undo_group();
-
-        let after_move = doc.live_item_ids(LIST_MAIN);
-        assert_eq!(after_move, next_ids);
-
-        assert!(doc.undo().unwrap());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
-
-        assert!(doc.redo().unwrap());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
-    }
-
-    #[test]
     fn plain_stepwise_undo_redo_round_trips_larger_reorder() {
         let doc = Doc::new().unwrap();
         let texts: Vec<String> = (0..20).map(|i| format!("item {i}")).collect();
@@ -2451,16 +2259,13 @@ mod tests {
         let dek = Dek::generate();
 
         let mut a = Doc::new().unwrap();
-        let seed_blob = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
         let remote_id = a.add_item(LIST_MAIN, "from A").unwrap();
         let remote_blob = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
 
         let mut b = Doc::empty();
-        b.apply_remote(&dek, &seed_blob).unwrap();
         b.apply_remote(&dek, &remote_blob).unwrap();
-        // Two remote imports landed but b has made no local commits.
+        // One remote import landed but b has made no local commits.
         assert!(!b.can_undo(), "remote-only ops must not be undoable");
 
         let local_id = b.add_item(LIST_MAIN, "local on top").unwrap();

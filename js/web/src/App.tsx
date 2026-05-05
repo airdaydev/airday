@@ -270,8 +270,8 @@ async function createAnonymousSession(): Promise<Session> {
     email: null,
     deviceId: null,
     dek,
-    // Seed the doc on first run — Doc.create() includes the built-in
-    // "Later" list. On reload we read OPFS instead.
+    // Seed the doc on first run via Doc.create(). On reload we read
+    // OPFS instead.
     freshSignup: true,
   };
   try {
@@ -302,7 +302,7 @@ function BootGate(props: {
 }) {
   const { m } = useAppI18n();
   // Try to restore a doc + frontier from OPFS. On signup we always
-  // start with a seeded Doc.create(); on login we prefer OPFS if the
+  // start with a fresh Doc.create(); on login we prefer OPFS if the
   // cached snapshot decrypts cleanly with the DEK we just unwrapped.
   // Failures fall through to an empty doc — sync will catch us up.
   // Kick the async load on mount; the resulting `setBoot` flips the

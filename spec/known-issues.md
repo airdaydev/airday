@@ -11,7 +11,7 @@ Grouped movable-list reorder undo is unsafe in the current core/Loro path.
 
 ### Current workaround
 
-For launch, reorder does **not** use core undo grouping.
+For launch, reorder does **not** use core undo grouping. The grouped-undo API was removed from `airday-core` rather than left around as an attractive footgun.
 
 - Reorder still executes as plain per-item `move_item(...)` mutations.
 - The web app keeps a thin app-level action-batch stack that records how many plain core undo steps belong to one visible reorder action.
