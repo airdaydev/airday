@@ -11,7 +11,8 @@ This is the private repo currently containing everything. We will extract most o
 📁 monorepo
 ├── 📂 cli  → CLI app
 ├── 📂 ios          → iOS app placeholder
-├── 📂 js           → JavaScript packages
+├── 📂 js           → JavaScript packages and web app
+├── 📂 core         → Rust shared core
 ├── 📂 crates         → Rust packages
 ├── 📂 server       → Server
 ├── 📂 sqlite       → Sqlite migration & notes
@@ -22,22 +23,13 @@ This is the private repo currently containing everything. We will extract most o
 - Rust
 - Bun
 - sqlx-cli: (`cargo install sqlx-cli`)
-- flatbuffers (flatc cli)
 
 ## Development Setup (MacOS & Arch Linux)
 ```bash
-sudo systemctl start docker # if not started
-bun run jaeger # to get tracing (system tests rely on this currently)
-./prep.sh # sets up database, config, downloads js deps, etc
-bun run test # runs ALL tests aka ./test.sh
-bun run test-core # runs front-end + e2e tests against server (playwright)
-bun run test-server # runs server tests (cargo test)
-bun run serverd # start a bg server
-bun run kill-serverd # kill background server
+bun install
+bun run config
+process-compose up
 ```
 
----
-
-Airday Core is AGPL-3.0 licensed software.
-
-Airday is designed to be a secure product. E2EE fields should not be compromised and user data should not be leaked. If you believe you have found a security issue, please disclose responsibility at support@air.day.
+- This repo will remain private
+- Airday core will be BSL-licensed with some MIT-licensed components
