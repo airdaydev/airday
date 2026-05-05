@@ -1,9 +1,9 @@
 // WebSocket pump bridging a `SyncEngine` to a browser `WebSocket`.
-// The engine is sans-IO; this file is the thin transport adapter
-// described in `sync-engine.md`. Reconnect is fixed-delay (no
-// backoff). Auth is the `airday_device` cookie — sent automatically
-// by the browser on the WS upgrade — so this module never sees the
-// device token.
+// The engine is sans-IO; this file is the thin browser transport
+// adapter described by `spec/architecture.md`. Reconnect is
+// fixed-delay (no backoff). Auth is the `airday_device` cookie — sent
+// automatically by the browser on the WS upgrade — so this module
+// never sees the device token.
 
 import type { SyncEngine } from "@airday/core/wasm";
 import { api, ApiError } from "./api.ts";

@@ -1,6 +1,6 @@
 # @airday/web
 
-Solid + Vite + TS web client. Sprint-1 sync-engine slice 4 deliverable.
+Solid + Vite + TS web client.
 
 ## Prerequisites
 

@@ -16,7 +16,7 @@ use crate::sync::ws_handler;
 pub const MSGPACK_CONTENT_TYPE: &str = "application/msgpack";
 
 pub fn router(state: AppState) -> Router {
-    // Permissive CORS for slice 4: the dev web client runs on
+    // Permissive CORS for local development: the web client runs on
     // localhost:5173 and talks to localhost:8000. Tighten when we add
     // a hosted deployment.
     let cors = CorsLayer::new()

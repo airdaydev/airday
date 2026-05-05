@@ -6,8 +6,9 @@
 // encryption layer is one of the e2ee primitives the wasm `Dek`
 // already exposes (`seal` / `open`).
 //
-// Async, main-thread API (no sync access handles, no worker). The
-// parent doc tracks worker move as out-of-scope for slice 4.
+// Async, main-thread API (no sync access handles, no worker). If this
+// ever becomes a measurable problem, move the heavy path behind a
+// worker without changing the storage contract here.
 
 import type { Dek, EncryptedBlob } from "../../wasm/airday_core_web.js";
 import type { DeviceConfig, StorageAdapter } from "./adapter.ts";

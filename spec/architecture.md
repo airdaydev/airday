@@ -22,6 +22,32 @@ Single workspace for sprint 1. Always invoke wasm builds as `wasm-pack build cor
 - WASM build via `wasm-pack`; web bindings live in `core/web/` (out of scope sprint 1, but layout reserves the place).
 - `server` and `cli` are native-only.
 
+## Cross-platform client boundary
+
+Airday's sync protocol state machine lives in shared Rust, not reimplemented per client. The shared `core::sync::SyncEngine` is **sans-IO**:
+
+- it owns protocol state, doc application, encryption framing, and push/pull/ack sequencing
+- it does **not** own the socket, timers, reconnect policy, auth transport, or debounce policy
+- callers feed transport events in (`handle_connected`, inbound frame bytes, disconnects, timeouts) and drain outbound frame bytes / engine events out
+
+This keeps Loro + crypto + protocol behavior identical across clients while letting each host platform own transport policy:
+
+- CLI: native Rust + `tokio-tungstenite`
+- Web: wasm-bindgen surface over the same engine, browser `WebSocket` owned by JS
+- Future native clients: the same `core` crate exposed over UniFFI to Swift / Kotlin transport shells
+
+Two boundary rules matter:
+
+- **No push pipelining.** The engine serializes pushes. If local mutations happen while a push is in flight, the engine marks itself dirty and re-exports only after the server ack arrives. This avoids duplicate export windows and keeps host adapters simple.
+- **Auth stays outside the engine.** The engine starts from "socket is authenticated and usable". Whether that came from a bearer header, cookie-backed browser session, or future ticket exchange is a client / transport concern documented in `auth.md`.
+
+Platform policy stays outside `core`:
+
+- reconnect/backoff
+- online/offline and visibility hooks
+- mutation flush debounce
+- worker placement for expensive client-side KDF work
+
 ## Server-is-dumb thesis
 
 The server **cannot**:
@@ -48,4 +74,3 @@ All HTTP bodies and all WebSocket frames are **MessagePack** (`rmp-serde`). Sing
 `Content-Type: application/msgpack` on HTTP. WS frames are binary.
 
 A `cargo run -p airday -- decode <file>` debug subcommand pretty-prints any captured frame as JSON for inspection (and, given the DEK, can decrypt op blobs in the same pass).
-

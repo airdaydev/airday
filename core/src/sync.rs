@@ -6,8 +6,8 @@
 //! ready-to-send frame bytes via `pop_outbox()` and engine events via
 //! `pop_event()`.
 //!
-//! See `sync-engine.md` for the design rationale and the state diagram
-//! reproduced below:
+//! See `spec/architecture.md` for the client-boundary rationale. The
+//! state diagram is reproduced below:
 //!
 //! ```text
 //!                          flush w/ pending

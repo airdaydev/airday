@@ -1,8 +1,8 @@
-// Auth form (login + signup). Argon2id runs on the main thread per the
-// parent doc; show a "deriving keys…" spinner during the ~hundreds-of-ms
-// hit. The API origin is the page's origin (vite proxies /api/* in dev)
-// — no runtime server picker; self-hosters serve their own bundle from
-// their own domain.
+// Auth form (login + signup). Argon2id currently runs on the main
+// thread, so show a "deriving keys…" spinner during the
+// ~hundreds-of-ms hit. The API origin is the page's origin (vite
+// proxies /api/* in dev) — no runtime server picker; self-hosters
+// serve their own bundle from their own domain.
 
 import { createSignal, Show } from "solid-js";
 import {

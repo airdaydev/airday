@@ -1,7 +1,7 @@
-// Stage 2 of slice 4: the four view-id helpers (live / done / binned)
-// plus get_item / get_list_meta as JS-side primitives. Rust unit tests
-// cover correctness; this file pins the wasm-bindgen surface so a
-// rename or signature drift is caught before the web client breaks.
+// The four view-id helpers (live / done / binned) plus get_item /
+// get_list_meta as JS-side primitives. Rust unit tests cover
+// correctness; this file pins the wasm-bindgen surface so a rename or
+// signature drift is caught before the web client breaks.
 
 import { describe, expect, test } from "bun:test";
 

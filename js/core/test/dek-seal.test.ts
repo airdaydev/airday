@@ -1,7 +1,7 @@
-// Stage 5 of slice 4: the wasm `Dek.seal/open` symmetry that the
-// browser OPFS adapter relies on for encrypt-at-rest. The full OPFS
-// adapter only runs in a browser; this file validates the underlying
-// crypto primitive in Bun without standing up `navigator.storage`.
+// The wasm `Dek.seal/open` symmetry that the browser OPFS adapter
+// relies on for encrypt-at-rest. The full OPFS adapter only runs in a
+// browser; this file validates the underlying crypto primitive in Bun
+// without standing up `navigator.storage`.
 
 import { describe, expect, test } from "bun:test";
 

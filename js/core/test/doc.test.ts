@@ -1,8 +1,6 @@
-// Headless smoke for the wasm Doc surface plus the in-memory adapter.
-//
-// First-commit target from `wasm-plan.md`: build a doc, mutate it, run
-// it through the storage adapter, reload, and prove the logical
-// fingerprint survives the round trip.
+// Headless smoke for the wasm Doc surface plus the in-memory adapter:
+// build a doc, mutate it, run it through the storage adapter, reload,
+// and prove the logical fingerprint survives the round trip.
 
 import { describe, expect, test } from "bun:test";
 

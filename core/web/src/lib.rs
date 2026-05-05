@@ -204,8 +204,8 @@ impl Doc {
         lists_to_json(&self.inner.all_lists())
     }
 
-    // -- view-id helpers (Stage 2 of slice 4): order-stable id arrays
-    //    that the JS store turns into per-view DnD sources --
+    // -- view-id helpers: order-stable id arrays that the JS store
+    //    turns into per-view DnD sources --
 
     /// Ids of `Live` items in `list_id`, in MovableList order.
     #[wasm_bindgen(js_name = liveItemIds)]
