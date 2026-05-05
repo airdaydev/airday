@@ -27,7 +27,7 @@ Single binary `airday`. Subcommands:
 - `airday edit <item_id> <text>`
 
 ### Lists
-- `airday lists`
+- `airday lists ls`
 - `airday lists add <name>`
 - `airday lists rename <list> <name>`
 - `airday lists rm <list>`
@@ -45,7 +45,7 @@ Single binary `airday`. Subcommands:
 
 ## Sync lifecycle
 
-CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to `loro.bin` and ship on the next sync.
+CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists ls`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to `loro.bin` and ship on the next sync.
 
 To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
 

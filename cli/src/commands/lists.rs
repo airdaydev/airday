@@ -9,15 +9,19 @@ use crate::sync::Session;
 use super::items::print_json;
 
 #[derive(Parser, Debug)]
+#[command(subcommand_required = true, arg_required_else_help = true)]
 pub struct ListsArgs {
     #[command(subcommand)]
-    pub cmd: Option<ListsCmd>,
-    #[arg(long, global = true)]
-    pub json: bool,
+    pub cmd: ListsCmd,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum ListsCmd {
+    /// Show all lists.
+    Ls {
+        #[arg(long)]
+        json: bool,
+    },
     /// Add a new list.
     Add { name: String },
     /// Rename a user-created list. The reserved `main` list is not
@@ -30,10 +34,10 @@ pub enum ListsCmd {
 
 pub async fn run(args: ListsArgs, sync: bool) -> anyhow::Result<()> {
     match args.cmd {
-        None => show(args.json, sync).await,
-        Some(ListsCmd::Add { name }) => add(&name, sync).await,
-        Some(ListsCmd::Rename { list, name }) => rename(&list, &name, sync).await,
-        Some(ListsCmd::Rm { list }) => rm(&list, sync).await,
+        ListsCmd::Ls { json } => show(json, sync).await,
+        ListsCmd::Add { name } => add(&name, sync).await,
+        ListsCmd::Rename { list, name } => rename(&list, &name, sync).await,
+        ListsCmd::Rm { list } => rm(&list, sync).await,
     }
 }
 
