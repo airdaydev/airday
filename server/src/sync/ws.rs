@@ -206,12 +206,8 @@ async fn handle_frame(
             Ok(())
         }
         ClientFrame::PullSnapshot => pull_snapshot(socket, state, auth).await,
-        // PushSnapshot is reserved for snapshot orchestration — log and
-        // continue rather than tearing down the session, so a client
-        // that probes the frame doesn't lose its push/pull progress.
-        ClientFrame::PushSnapshot { .. } => {
-            tracing::warn!("PushSnapshot not yet implemented; ignoring");
-            Ok(())
+        ClientFrame::PushSnapshot { up_to_op_id, blob } => {
+            push_snapshot(state, auth, up_to_op_id, blob).await
         }
     }
 }
@@ -330,6 +326,30 @@ async fn pull_ops(
         }
     }
     .instrument(pull_span)
+    .await
+}
+
+async fn push_snapshot(
+    state: &AppState,
+    auth: &DeviceAuth,
+    up_to_op_id: u64,
+    blob: EncryptedBlob,
+) -> Result<(), SessionError> {
+    let span = tracing::info_span!(
+        "ws.push_snapshot",
+        up_to_op_id = up_to_op_id,
+        blob_bytes = blob.ciphertext.len(),
+    );
+    async {
+        let row_id =
+            queries::insert_snapshot(&state.db, auth.account_id, up_to_op_id, blob).await?;
+        tracing::info!(snapshot_row_id = row_id, "ws push_snapshot persisted");
+        // Fire-and-forget per spec — no `OpsAck`-style reply. The
+        // orchestrator (when wired) tracks completion via the row
+        // landing in the snapshots table, not via a wire ack.
+        Ok(())
+    }
+    .instrument(span)
     .await
 }
 

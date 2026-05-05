@@ -402,11 +402,30 @@ impl SyncEngine {
                     self.go_disconnected();
                 }
             }
-            ServerFrame::SnapshotRequest { .. } => {
-                // Snapshot orchestration (server asking us to produce a
-                // snapshot) is out of scope for this slice. Ignore
-                // rather than error so a probing server doesn't break
-                // us.
+            ServerFrame::SnapshotRequest { up_to_op_id: _ } => {
+                // Server picked us as the snapshot producer. We produce
+                // at the doc's current frontier and tag with our true
+                // `highest_seen_op_id`, which is ≥ the requested value
+                // (server's candidate selector picks devices whose
+                // frontier is at-or-past the request). Producing in any
+                // active state is fine — snapshots are state-of-doc, not
+                // a state-machine transition.
+                let blob = match self.doc.snapshot_blob(&self.dek) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        self.events
+                            .push_back(Event::Error(format!("snapshot_blob: {e}")));
+                        return;
+                    }
+                };
+                let frame = ClientFrame::PushSnapshot {
+                    up_to_op_id: self.highest_seen_op_id,
+                    blob,
+                };
+                if let Err(e) = self.encode_into_outbox(&frame) {
+                    self.events
+                        .push_back(Event::Error(format!("encode PushSnapshot: {e}")));
+                }
             }
         }
     }
@@ -1030,17 +1049,53 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_request_ignored_without_error() {
-        // `SnapshotRequest` (server asking us to *produce* a snapshot)
-        // is part of orchestration that hasn't landed; the engine
-        // ignores rather than errors so a probing server doesn't
-        // tear us down.
+    fn snapshot_request_produces_pushsnapshot_with_current_frontier() {
+        // Server picks us as snapshot producer. We tag with our true
+        // `highest_seen_op_id` (≥ requested up_to_op_id), and the blob
+        // must round-trip through `apply_remote` into a peer doc to
+        // the same logical state — that's the property that makes the
+        // snapshot useful for bootstrap.
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest { up_to_op_id: 99 }));
-        assert!(drain_events(&mut eng).is_empty());
-        assert!(eng.pop_outbox().is_none());
+        let _ = drain_outbox(&mut eng);
+
+        // Make our doc non-trivial and bump our frontier above the
+        // requested value so the tag-with-true-frontier behavior is
+        // visible.
+        eng.doc_mut().add_item(LIST_MAIN, "alpha").unwrap();
+        eng.doc_mut().add_item(LIST_MAIN, "beta").unwrap();
+        // Simulate our last server-acked frontier sitting at 50.
+        // (We can't easily mutate via public API; mimic via a
+        // broadcast that advances `highest_seen_op_id` to 50.)
+        let dek = eng.dek.clone();
+        let bump_blob = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "from-peer").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
+            ops: vec![StoredOp {
+                id: 50,
+                blob: bump_blob,
+            }],
+        }));
+        let _ = drain_outbox(&mut eng); // drop the auto-Ack
+
+        // Server requests a snapshot up to 30 (below our current 50).
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest { up_to_op_id: 30 }));
+        let push: ClientFrame = dec(&eng.pop_outbox().expect("PushSnapshot"));
+        let (tagged_up_to, blob) = match push {
+            ClientFrame::PushSnapshot { up_to_op_id, blob } => (up_to_op_id, blob),
+            other => panic!("expected PushSnapshot, got {other:?}"),
+        };
+        // Tagged with our actual frontier, not the requested value.
+        assert_eq!(tagged_up_to, 50);
+
+        // Round-trip: apply the blob to a peer doc and verify
+        // fingerprints match — the producer/consumer round trip
+        // converges to identical logical state.
+        let mut peer = Doc::empty();
+        peer.apply_remote(&dek, &blob).unwrap();
+        assert_eq!(peer.fingerprint(), eng.doc().fingerprint());
     }
 
     #[test]
@@ -1155,6 +1210,172 @@ mod tests {
             "broadcast applied during Bootstrapping",
         );
         assert_eq!(eng.highest_seen_op_id(), 0, "frontier must not advance");
+    }
+
+    #[test]
+    fn produce_then_bootstrap_round_trip() {
+        // Full producer/consumer loop with a fake server in between:
+        //   A pushes ops; server stores them.
+        //   Server asks A for a snapshot; A produces PushSnapshot.
+        //   B (fresh) connects with since=0; below the snapshot
+        //   floor, so server replies SnapshotRequired -> Snapshot.
+        //   B applies, pulls past-the-snapshot ops, reaches Idle.
+        //   Fingerprints converge.
+        let dek = Dek::generate();
+        let mut a = SyncEngine::new(Doc::new().unwrap(), dek.clone(), 0, opts());
+        let mut b = {
+            let mut doc = Doc::empty();
+            doc.mark_pushed();
+            SyncEngine::new(doc, dek.clone(), 0, opts())
+        };
+
+        // Fake server state.
+        let mut next_id: u64 = 0;
+        let mut ops_log: Vec<StoredOp> = Vec::new();
+
+        // -- A connects, pushes its seed --
+        a.handle_connected();
+        let _ = a.pop_outbox().unwrap();
+        a.handle_server_bytes(&enc(&HelloAck {
+            server_version: "s".into(),
+            protocol_version: PROTOCOL_VERSION,
+        }));
+        let _ = a.pop_outbox().unwrap();
+        a.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
+            ops: vec![],
+            complete: true,
+        }));
+        // Drain A's seed push and any subsequent pushes; ack each.
+        while let Some(bytes) = a.pop_outbox() {
+            if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
+                let assigned: Vec<u64> = ops
+                    .into_iter()
+                    .map(|blob| {
+                        next_id += 1;
+                        ops_log.push(StoredOp { id: next_id, blob });
+                        next_id
+                    })
+                    .collect();
+                a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
+                    assigned_ids: assigned,
+                }));
+            }
+        }
+
+        // -- A makes a real-content change --
+        let item_id = a.doc_mut().add_item(LIST_MAIN, "snapshotted").unwrap();
+        a.flush();
+        if let Some(bytes) = a.pop_outbox() {
+            if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
+                let assigned: Vec<u64> = ops
+                    .into_iter()
+                    .map(|blob| {
+                        next_id += 1;
+                        ops_log.push(StoredOp { id: next_id, blob });
+                        next_id
+                    })
+                    .collect();
+                a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
+                    assigned_ids: assigned,
+                }));
+            }
+        }
+        let _ = drain_outbox(&mut a);
+        assert_eq!(a.highest_seen_op_id(), next_id);
+
+        // -- Server requests a snapshot from A --
+        a.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
+            up_to_op_id: next_id,
+        }));
+        let push: ClientFrame = dec(&a.pop_outbox().expect("PushSnapshot"));
+        let (snapshot_up_to, snapshot_blob) = match push {
+            ClientFrame::PushSnapshot { up_to_op_id, blob } => (up_to_op_id, blob),
+            other => panic!("expected PushSnapshot, got {other:?}"),
+        };
+        assert_eq!(snapshot_up_to, next_id);
+
+        // -- A keeps mutating after the snapshot was taken, so B's
+        //    bootstrap exercises both the snapshot apply *and* the
+        //    post-snapshot catch-up via OpsBatch. --
+        let post_snap_id = a.doc_mut().add_item(LIST_MAIN, "post-snap").unwrap();
+        a.flush();
+        let mut post_snap_ops: Vec<StoredOp> = Vec::new();
+        if let Some(bytes) = a.pop_outbox() {
+            if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
+                let mut assigned = Vec::new();
+                for blob in ops {
+                    next_id += 1;
+                    post_snap_ops.push(StoredOp {
+                        id: next_id,
+                        blob: blob.clone(),
+                    });
+                    ops_log.push(StoredOp { id: next_id, blob });
+                    assigned.push(next_id);
+                }
+                a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
+                    assigned_ids: assigned,
+                }));
+            }
+        }
+        let _ = drain_outbox(&mut a);
+        assert!(
+            !post_snap_ops.is_empty(),
+            "expected at least one post-snapshot op"
+        );
+
+        // -- B connects fresh, since=0 < snapshot floor --
+        b.handle_connected();
+        let _ = b.pop_outbox().unwrap();
+        b.handle_server_bytes(&enc(&HelloAck {
+            server_version: "s".into(),
+            protocol_version: PROTOCOL_VERSION,
+        }));
+        let pull: ClientFrame = dec(&b.pop_outbox().unwrap());
+        assert!(matches!(pull, ClientFrame::PullOps { since_op_id: 0 }));
+
+        // Fake server: since (0) < snapshot.up_to_op_id, reply SnapshotRequired.
+        b.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired {
+            up_to_op_id: snapshot_up_to,
+        }));
+        let pull_snap: ClientFrame = dec(&b.pop_outbox().expect("PullSnapshot"));
+        assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
+
+        // Fake server: hand back the stored snapshot.
+        b.handle_server_bytes(&enc(&ServerFrame::Snapshot {
+            up_to_op_id: snapshot_up_to,
+            blob: snapshot_blob,
+        }));
+
+        // B should re-issue PullOps from the snapshot's up_to.
+        let mut saw_resume_pull = false;
+        while let Some(bytes) = b.pop_outbox() {
+            if let Ok(frame) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
+                if matches!(frame, ClientFrame::PullOps { since_op_id } if since_op_id == snapshot_up_to)
+                {
+                    saw_resume_pull = true;
+                }
+            }
+        }
+        assert!(saw_resume_pull, "B must PullOps from snapshot.up_to");
+
+        // Catch-up batch carries the post-snapshot op that A pushed
+        // after the snapshot was taken.
+        b.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
+            ops: post_snap_ops,
+            complete: true,
+        }));
+        assert!(b.is_idle());
+
+        // Both pre-snapshot and post-snapshot items land on B.
+        assert!(
+            b.doc().get_item(&item_id).is_some(),
+            "snapshot item missing"
+        );
+        assert!(
+            b.doc().get_item(&post_snap_id).is_some(),
+            "post-snapshot item missing",
+        );
+        assert_eq!(a.doc().fingerprint(), b.doc().fingerprint());
     }
 
     #[test]

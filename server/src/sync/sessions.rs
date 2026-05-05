@@ -141,6 +141,56 @@ impl SyncSessions {
         delivered
     }
 
+    /// Send a `SnapshotRequest` to a specific subscriber. Returns
+    /// `true` if the frame was queued. The orchestrator (when it
+    /// lands) picks the candidate and calls this; tests use it to
+    /// drive the producer path without a live orchestrator.
+    ///
+    /// Targeted by `sub_id` rather than account-wide: the spec picks
+    /// at most one device to produce, and even if multiple sessions
+    /// share a device (multi-tab) we only want one to do the work.
+    pub fn request_snapshot(&self, account_id: Uuid, sub_id: u64, up_to_op_id: u64) -> bool {
+        let bytes = match rmp_serde::to_vec_named(&ServerFrame::SnapshotRequest { up_to_op_id }) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::error!(error = %e, "failed to encode SnapshotRequest");
+                return false;
+            }
+        };
+        let mut inner = self.inner.lock().unwrap();
+        let Some(subs) = inner.accounts.get_mut(&account_id) else {
+            return false;
+        };
+        let mut delivered = false;
+        subs.retain(|s| {
+            if s.sub_id != sub_id {
+                return true;
+            }
+            match s.tx.try_send(bytes.clone()) {
+                Ok(()) => {
+                    delivered = true;
+                    true
+                }
+                // Same drop-and-deregister policy as `broadcast`.
+                Err(_) => false,
+            }
+        });
+        delivered
+    }
+
+    /// Snapshot the current subscriber ids for an account. Used by
+    /// tests (and the future orchestrator) as input to candidate
+    /// selection. Order is not stable — caller must apply its own
+    /// ordering policy.
+    pub fn subscriber_ids(&self, account_id: Uuid) -> Vec<u64> {
+        let inner = self.inner.lock().unwrap();
+        inner
+            .accounts
+            .get(&account_id)
+            .map(|s| s.iter().map(|sub| sub.sub_id).collect())
+            .unwrap_or_default()
+    }
+
     /// Live subscriber count for an account. Used by integration tests
     /// to wait until a freshly-connected peer is registered before
     /// pushing into the broadcast path.

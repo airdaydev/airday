@@ -749,6 +749,20 @@ impl Doc {
 
     // ---------- op stream ----------
 
+    /// Encrypted full-state snapshot at the doc's current frontier.
+    /// Used by the sync engine to satisfy a server `SnapshotRequest`.
+    /// Independent of `last_pushed_vv` — the snapshot covers the whole
+    /// doc, not a delta — so this does not advance any push-state
+    /// bookkeeping; producing a snapshot is side-effect-free locally.
+    pub fn snapshot_blob(&self, dek: &Dek) -> Result<EncryptedBlob, DocError> {
+        let plaintext = self.inner.export(ExportMode::Snapshot)?;
+        let (ciphertext, nonce) = dek.seal(&plaintext)?;
+        Ok(EncryptedBlob {
+            nonce: nonce.to_vec(),
+            ciphertext,
+        })
+    }
+
     /// Encrypted blob containing every commit since `last_pushed_vv`.
     /// Returns `None` if there's nothing new to ship.
     pub fn pending_export(&self, dek: &Dek) -> Result<Option<EncryptedBlob>, DocError> {

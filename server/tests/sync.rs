@@ -491,6 +491,85 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     assert!(pulled.is_empty());
 }
 
+#[tokio::test]
+async fn snapshot_request_round_trips_to_persistence() {
+    // Server-pushed `SnapshotRequest` reaches the client; client's
+    // `PushSnapshot` reply lands as a row in the snapshots table. No
+    // engine here — fake blob is fine because the server treats it
+    // as opaque, and the engine producer is covered separately in
+    // `core/sync.rs` tests.
+    let acc = signup_account().await;
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+    wait_for_subscribers(&acc, 1).await;
+
+    let sub_ids = acc
+        .server
+        .state
+        .sync_sessions
+        .subscriber_ids(acc.account_id);
+    assert_eq!(sub_ids.len(), 1);
+    let delivered = acc
+        .server
+        .state
+        .sync_sessions
+        .request_snapshot(acc.account_id, sub_ids[0], 42);
+    assert!(delivered, "request_snapshot reported no delivery");
+
+    match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::SnapshotRequest { up_to_op_id } => assert_eq!(up_to_op_id, 42),
+        other => panic!("expected SnapshotRequest, got {other:?}"),
+    }
+
+    let blob = fake_blob(123);
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::PushSnapshot {
+            up_to_op_id: 42,
+            blob: blob.clone(),
+        },
+    )
+    .await;
+
+    // PushSnapshot is fire-and-forget — give the server a moment to
+    // commit the row, then read it back.
+    let snap = wait_for_snapshot(&acc, 42).await;
+    assert_eq!(snap.up_to_op_id, 42);
+    assert_eq!(snap.blob, blob);
+}
+
+#[tokio::test]
+async fn request_snapshot_to_unknown_subscriber_reports_undelivered() {
+    let acc = signup_account().await;
+    let _ws = connect_ws(&acc.server, &acc.device_token).await;
+    // No handshake → no subscribe; even with a session, sub_id 9999
+    // doesn't exist.
+    let delivered = acc
+        .server
+        .state
+        .sync_sessions
+        .request_snapshot(acc.account_id, 9999, 7);
+    assert!(!delivered);
+}
+
+async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        if let Some(snap) = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
+            .await
+            .unwrap()
+        {
+            if snap.up_to_op_id == up_to {
+                return snap;
+            }
+        }
+        if std::time::Instant::now() > deadline {
+            panic!("snapshot up_to={up_to} never landed");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+}
+
 async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {
     match recv_msgpack(ws).await {
         ServerFrame::OpsBatch { ops, complete } => {
