@@ -809,35 +809,24 @@ impl Doc {
     /// changes into a UI store with surgical writes — without having
     /// to walk Loro's per-container diff tree.
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
-        if blob.nonce.len() != AEAD_NONCE_LEN {
-            return Err(DocError::Invalid(format!(
-                "expected {AEAD_NONCE_LEN}-byte nonce, got {}",
-                blob.nonce.len()
-            )));
-        }
+        self.apply_remote_batch(dek, std::iter::once(blob))
+    }
+
+    /// Batch variant of [`Doc::apply_remote`]. Imports all blobs first,
+    /// then diffs once so catch-up batches don't pay whole-doc
+    /// snapshot/diff cost per op.
+    pub fn apply_remote_batch<'a, I>(&mut self, dek: &Dek, blobs: I) -> Result<(), DocError>
+    where
+        I: IntoIterator<Item = &'a EncryptedBlob>,
+    {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
-        let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
-        let status = self.inner.import_with(&plaintext, "remote")?;
-        // VersionRange is `(start, end)` per peer — `end` is the
-        // exclusive upper bound, which matches `VersionVector`'s
-        // counter semantics (cf. loro `VersionRange::from_vv`).
-        let mut imported_vv = VersionVector::new();
-        for (peer, (_, end)) in status.success.iter() {
-            imported_vv.insert(*peer, *end);
+
+        for blob in blobs {
+            self.import_remote_blob(dek, blob)?;
         }
-        self.last_pushed_vv.merge(&imported_vv);
-        let post_items: Vec<ItemView> = self.iter_items().collect();
-        let post_lists: Vec<ListView> = self.all_lists();
-        let mut emitted = Vec::new();
-        diff_lists(&pre_lists, &post_lists, &mut emitted);
-        diff_items(&pre_items, &post_items, &mut emitted);
-        if !emitted.is_empty() {
-            let mut q = self.events.lock().expect("events mutex poisoned");
-            for ev in emitted {
-                q.push_back(ev);
-            }
-        }
+
+        self.emit_state_diff(&pre_items, &pre_lists);
         Ok(())
     }
 
@@ -895,17 +884,7 @@ impl Doc {
             op(&mut um)?
         };
         if did {
-            let post_items: Vec<ItemView> = self.iter_items().collect();
-            let post_lists: Vec<ListView> = self.all_lists();
-            let mut emitted = Vec::new();
-            diff_lists(&pre_lists, &post_lists, &mut emitted);
-            diff_items(&pre_items, &post_items, &mut emitted);
-            if !emitted.is_empty() {
-                let mut q = self.events.lock().expect("events mutex poisoned");
-                for ev in emitted {
-                    q.push_back(ev);
-                }
-            }
+            self.emit_state_diff(&pre_items, &pre_lists);
         }
         Ok(did)
     }
@@ -1127,6 +1106,40 @@ impl Doc {
     fn emit_item_diffs(&self, pre_items: &[ItemView]) {
         let post_items: Vec<ItemView> = self.iter_items().collect();
         let mut emitted = Vec::new();
+        diff_items(pre_items, &post_items, &mut emitted);
+        if !emitted.is_empty() {
+            let mut q = self.events.lock().expect("events mutex poisoned");
+            for ev in emitted {
+                q.push_back(ev);
+            }
+        }
+    }
+
+    fn import_remote_blob(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
+        if blob.nonce.len() != AEAD_NONCE_LEN {
+            return Err(DocError::Invalid(format!(
+                "expected {AEAD_NONCE_LEN}-byte nonce, got {}",
+                blob.nonce.len()
+            )));
+        }
+        let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
+        let status = self.inner.import_with(&plaintext, "remote")?;
+        // VersionRange is `(start, end)` per peer — `end` is the
+        // exclusive upper bound, which matches `VersionVector`'s
+        // counter semantics (cf. loro `VersionRange::from_vv`).
+        let mut imported_vv = VersionVector::new();
+        for (peer, (_, end)) in status.success.iter() {
+            imported_vv.insert(*peer, *end);
+        }
+        self.last_pushed_vv.merge(&imported_vv);
+        Ok(())
+    }
+
+    fn emit_state_diff(&self, pre_items: &[ItemView], pre_lists: &[ListView]) {
+        let post_items: Vec<ItemView> = self.iter_items().collect();
+        let post_lists: Vec<ListView> = self.all_lists();
+        let mut emitted = Vec::new();
+        diff_lists(pre_lists, &post_lists, &mut emitted);
         diff_items(pre_items, &post_items, &mut emitted);
         if !emitted.is_empty() {
             let mut q = self.events.lock().expect("events mutex poisoned");
@@ -1957,6 +1970,37 @@ mod tests {
                 .any(|e| matches!(e, AppEvent::ItemTextChanged { id: eid, text } if eid == &id && text == "new")),
             "expected ItemTextChanged in {evs:?}"
         );
+    }
+
+    #[test]
+    fn apply_remote_batch_emits_final_state_once_for_multi_blob_catchup() {
+        let dek = Dek::generate();
+        let mut src = Doc::new().unwrap();
+        let id = src.add_item(LIST_MAIN, "old").unwrap();
+        let setup_blob = src.pending_export(&dek).unwrap().unwrap();
+        src.mark_pushed();
+
+        src.edit_item_text(&id, "new").unwrap();
+        let edit_blob = src.pending_export(&dek).unwrap().unwrap();
+
+        let mut dst = Doc::empty();
+        let _ = dst.drain_events();
+        dst.apply_remote_batch(&dek, [&setup_blob, &edit_blob])
+            .unwrap();
+        let evs = dst.drain_events();
+
+        assert!(
+            evs.iter().any(
+                |e| matches!(e, AppEvent::ItemAdded { id: eid, text, .. } if eid == &id && text == "new")
+            ),
+            "expected final ItemAdded for {id} in {evs:?}"
+        );
+        assert!(
+            !evs.iter()
+                .any(|e| matches!(e, AppEvent::ItemTextChanged { id: eid, .. } if eid == &id)),
+            "batch catch-up should emit final-state delta, not intermediate edit churn: {evs:?}"
+        );
+        assert_eq!(dst.fingerprint(), src.fingerprint());
     }
 
     #[test]

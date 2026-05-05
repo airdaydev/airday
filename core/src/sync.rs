@@ -434,20 +434,29 @@ impl SyncEngine {
         if ops.is_empty() {
             return;
         }
-        for op in ops {
-            match self.doc.apply_remote(&self.dek, &op.blob) {
-                Ok(()) => {
-                    if op.id > self.highest_seen_op_id {
-                        self.highest_seen_op_id = op.id;
-                        self.events.push_back(Event::FrontierAdvanced { id: op.id });
-                    }
-                }
-                Err(e) => {
-                    self.events
-                        .push_back(Event::Error(format!("apply remote op {}: {e}", op.id)));
-                    return;
-                }
-            }
+
+        let top = ops
+            .iter()
+            .map(|op| op.id)
+            .max()
+            .unwrap_or(self.highest_seen_op_id);
+        if let Err(e) = self
+            .doc
+            .apply_remote_batch(&self.dek, ops.iter().map(|op| &op.blob))
+        {
+            let failed_id = ops
+                .iter()
+                .find(|op| op.id > self.highest_seen_op_id)
+                .map(|op| op.id)
+                .unwrap_or(top);
+            self.events
+                .push_back(Event::Error(format!("apply remote op {failed_id}: {e}")));
+            return;
+        }
+
+        if top > self.highest_seen_op_id {
+            self.highest_seen_op_id = top;
+            self.events.push_back(Event::FrontierAdvanced { id: top });
         }
         // Domain-level deltas (`AppEvent`) flow through `Doc`'s own
         // queue — drained by the host alongside this protocol event
@@ -879,6 +888,64 @@ mod tests {
             .map(|i| i.text)
             .collect();
         assert!(names.iter().any(|t| t == "from peer"));
+    }
+
+    #[test]
+    fn ops_batch_applies_multiple_remote_ops_before_ack() {
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        let mut remote = Doc::new().unwrap();
+        let id = remote.add_item(LIST_MAIN, "old").unwrap();
+        let setup_blob = remote.pending_export(&dek).unwrap().unwrap();
+        remote.mark_pushed();
+        remote.edit_item_text(&id, "new").unwrap();
+        let edit_blob = remote.pending_export(&dek).unwrap().unwrap();
+
+        drive_to_idle(&mut eng);
+        let _ = drain_events(&mut eng);
+        let _ = drain_outbox(&mut eng);
+
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
+            ops: vec![
+                StoredOp {
+                    id: 7,
+                    blob: setup_blob,
+                },
+                StoredOp {
+                    id: 8,
+                    blob: edit_blob,
+                },
+            ],
+            complete: false,
+        }));
+
+        let events = drain_events(&mut eng);
+        assert_eq!(events, vec![Event::FrontierAdvanced { id: 8 }]);
+
+        let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
+        assert!(
+            app_evs.iter().any(|e| matches!(
+                e,
+                crate::events::AppEvent::ItemAdded { id: eid, text, .. } if eid == &id && text == "new"
+            )),
+            "expected final ItemAdded for {id} in {app_evs:?}"
+        );
+        assert!(
+            !app_evs.iter().any(|e| matches!(
+                e,
+                crate::events::AppEvent::ItemTextChanged { id: eid, .. } if eid == &id
+            )),
+            "batch apply should not emit intermediate ItemTextChanged churn: {app_evs:?}"
+        );
+
+        let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
+        assert!(matches!(
+            ack,
+            ClientFrame::Ack {
+                last_acked_op_id: 8
+            }
+        ));
+        assert_eq!(eng.highest_seen_op_id(), 8);
     }
 
     #[test]
