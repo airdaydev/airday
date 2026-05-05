@@ -393,6 +393,7 @@ function MainApp(props: {
         if (kind === "offline") props.setOnline(false);
       },
       onAppEvents: () => app.drainEvents(),
+      onAuthFailed: () => void props.logout(),
     });
     const b = bridge;
     app.setOnFlush(() => b.pumpOutbox());

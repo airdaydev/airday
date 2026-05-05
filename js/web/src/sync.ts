@@ -6,6 +6,7 @@
 // device token.
 
 import type { SyncEngine } from "@airday/core/wasm";
+import { api, ApiError } from "./api.ts";
 
 export interface SyncBridgeOpts {
   engine: SyncEngine;
@@ -15,6 +16,12 @@ export interface SyncBridgeOpts {
   /** Called after every server frame so the host can drain the
    *  doc's `AppEvent` queue and dispatch into its UI store. */
   onAppEvents: () => void;
+  /** Server rejected the device cookie (revoked, password reset
+   *  elsewhere, etc.). Bridge has stopped reconnecting; host should
+   *  tear down the session. Browsers don't surface the upgrade's HTTP
+   *  status to JS, so we detect this via an HTTP probe after a
+   *  pre-open close — see `probeAndReconnect`. */
+  onAuthFailed: () => void;
 }
 
 const RECONNECT_DELAY_MS = 1500;
@@ -60,8 +67,10 @@ export class SyncBridge {
     const ws = new WebSocket(wsUrl());
     ws.binaryType = "arraybuffer";
     this.ws = ws;
+    let opened = false;
 
     ws.onopen = () => {
+      opened = true;
       // eslint-disable-next-line no-console
       console.debug("ws open");
       this.opts.engine.handleConnected();
@@ -88,13 +97,36 @@ export class SyncBridge {
       this.opts.engine.handleDisconnected();
       this.opts.onChange("offline");
       this.ws = null;
-      if (!this.stopped) {
+      if (this.stopped) return;
+      if (!opened) {
+        // Pre-open close: the upgrade itself may have been rejected
+        // (e.g. revoked device token). Probe to disambiguate from a
+        // plain network drop before scheduling the next attempt.
+        void this.probeAndReconnect();
+      } else {
         this.timer = setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
       }
     };
     ws.onerror = () => {
       // onclose runs after onerror; let onclose handle reconnect.
     };
+  }
+
+  private async probeAndReconnect(): Promise<void> {
+    try {
+      await api.listDevices();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        // Server says we're not authed. Stop reconnecting and let
+        // the host tear down the session.
+        this.stopped = true;
+        this.opts.onAuthFailed();
+        return;
+      }
+      // Network failure or unrelated error — fall through to reconnect.
+    }
+    if (this.stopped) return;
+    this.timer = setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
   }
 
   private drainEngineEvents(): void {
