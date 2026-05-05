@@ -1,6 +1,20 @@
-## Operation Phoenix
+## Product Thesis
 
-Greenfield rebuild of Airday. The repo has been gutted: every prior tree (`server/`, `js/`, `flatbuffers/`, `web/`, `ios/`, root `Cargo.toml`, `package.json`) has been renamed to `*-legacy/` or `*.legacy`. Sprint 1 is being built from scratch.
+Airday is the lowest-friction, FOSS, single-human-user, E2EE, multi-device intent/capture/log tool. Capture is the entire point — anything that gets in the way of capturing or sorting is wrong.
+
+Workflow: a reserved primary capture list ("Desk", id `main`), any number of user-created lists (a "Later" list is seeded on signup), and a bin. Items move between lists, can be done, binned, restored, and deleted.
+
+## Architecture
+
+- **Rust core** (`core/`) — Loro CRDT, E2EE, sync engine. Compiles to native (CLI, server) and WASM (web) via `core/web/`.
+- **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration.
+- **CLI** (`cli/`) — sprint 1's reference integration test surface.
+- **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — second sprint-1 client; multi-device proof spans CLI ↔ web.
+- **iOS / Android / native macOS** — out of sprint 1.
+
+E2EE: password-derived KEK wraps a randomly-generated DEK. DEK encrypts every op blob. Server has no key. Recovery via a user-held recovery code (independent wrap of DEK) is in scope for sprint 1; server-assisted escrow (Vault-backed, opt-in) is sprint 2+.
+
+Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs with server-assigned monotonic ids. Each device tracks its `last_acked_op_id`; the minimum across active devices is the compaction horizon. Snapshots are produced by the most-acked active client on server request.
 
 ## Source of truth
 
@@ -9,15 +23,25 @@ Greenfield rebuild of Airday. The repo has been gutted: every prior tree (`serve
   - `architecture.md`, `auth.md`, `cli.md`, `data-model.md`, `encryption.md`, `storage.md`, `sync-protocol.md`, `testing.md`
 - `../cooee` — sibling repo on similar but stronger foundations. Useful reference for patterns.
 
-## Legacy rule
+## Specs
 
-Anything under `*-legacy/` or named `*.legacy` is **reference-only**. Read it to crib patterns or recall prior decisions; do not edit it, do not grep it for current behaviour, do not import from it. The current implementation is whatever lives in (eventually) `core/`, `server/`, `cli/`, `crates/protocol/` — see `spec/architecture.md`.
+| File | Concern |
+|---|---|
+| [`spec/architecture.md`](spec/architecture.md) | Workspace layout, crate graph, server-is-dumb thesis |
+| [`spec/encryption.md`](spec/encryption.md) | DEK / KEK / recovery code, wrap-states, password change |
+| [`spec/crypto.md`](spec/crypto.md) | Cryptographic primitive inventory; companion to `encryption.md` |
+| [`spec/auth.md`](spec/auth.md) | HTTP signup / login / recover, device register / revoke, token model |
+| [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
+| [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
+| [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
+| [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
+| [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
+| [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
+| [`spec/saas.md`](spec/saas.md) | Sprint 2+ contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 
-## Sprint 1 scope
+Out of scope for sprint 1 (live in `roadmap.md`): postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
 
-**In:** Rust workspace — `core/` (Loro CRDT + E2EE + sync engine, native + wasm targets), `server/` (sqlite-backed dumb relay + auth + WS), `cli/` (first client + integration test surface), `crates/protocol/` (shared wire types). MessagePack on the wire everywhere (HTTP + WS). E2EE with password-derived KEK wrapping a DEK; recovery code in scope, server-assisted escrow deferred.
-
-**Out:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, flatbuffers, MCP, native app deployment. These live in `roadmap.md` for later sprints.
+**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, MCP, native app deployment. These live in `roadmap.md` for later sprints.
 
 ## Build & run
 

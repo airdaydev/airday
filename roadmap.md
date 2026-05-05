@@ -1,6 +1,12 @@
 # Roadmap
 
+  - Bug 1: snapshot orchestration can get stuck waiting forever.
+  - Bug 2: snapshots can leak unpushed local state into the shared bootstrap path.
 - we should probably disconnect the relevant ws connection when we revoke a device.
+
+**E2E coverage gaps from `spec/testing.md`** — offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold→fresh-device bootstrap, recovery-flow round-trip.
+
+- **Web reconnect backoff** (currently fixed-delay) and
 
 Pending work scooped from `plans/wasm-plan.md`, `plans/sync-engine.md`,
 and `plans/sync-engine-slice-4.md`. Source docs keep the rationale;
@@ -125,6 +131,3 @@ this is the index.
 - **Conditional exports vs. two packages.** `airday-core-web` +
   `airday-core-node` instead of conditional exports on one package.
   Conditional exports is simpler now; splitting is cheap later.
-- **Solid store granularity.** Single `createStore` keyed by id vs.
-  per-item signals via `Map<id, signal>`. Defaulted to single store;
-  revisit if reactivity costs surface.
