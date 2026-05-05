@@ -22,7 +22,8 @@ Plan
   - email
   - deviceId
   - live dek
-  - maybe freshSignup
+  - explicit boot policy if needed (prefer a worker-facing flag like seedIfEmpty over
+    leaking UI-ish freshSignup semantics)
 
   Do not move vault persistence into the worker.
 
@@ -40,13 +41,31 @@ Plan
   - connection is account-bound at bootstrap
   - no per-message accountId
 
+  Tighten before implementation:
+
+  - separate attach from bootstrap
+  - attach is per-port/tab; bootstrap creates or replaces the worker runtime
+  - every runtime gets a monotonically changing runtimeId/session generation
+  - every port attach gets either:
+    - needsBootstrap
+    - or attached { runtimeId, full projected snapshot, status }
+  - bootstrapped also returns { runtimeId, full projected snapshot, status }
+  - runtime replacement invalidates older ports until they re-attach against the new runtime
+
+  Keep the first pass simple:
+
+  - on attach/re-attach, send a full projected snapshot rather than inventing catch-up deltas
+  - incremental replication is only for already-attached ports during steady state
+  - if a port falls behind or runtimeId changes, resnapshot that port
+
   3. Add a page-side worker client
   Create something like js/web/src/host/client.ts.
 
   Responsibilities:
 
   - construct SharedWorker
-  - send bootstrap exactly once per page session
+  - attach every page session/port
+  - bootstrap only when worker replies needsBootstrap
   - expose sendIntent(...)
   - expose subscriptions for events/status
   - handle reconnect/re-attach to an already-live worker
@@ -97,6 +116,14 @@ Plan
 
   - Solid reactivity over mirrored projected state
   - ephemeral UI state only
+
+  Tighten before implementation:
+
+  - host-side projector should be expressible as a pure AppEventJs[] -> projected state path
+  - page-side mirror should only apply snapshots/events into Solid state; it should not own
+    canonical undo/search/projection rules
+  - if this split feels awkward during extraction, treat that as a design smell and fix the
+    boundary before adding more worker protocol
 
   6. Use AppEventJs[] as the replication format
   Do not invent changed-id patch formats first.
@@ -206,7 +233,7 @@ Plan
   On login/signup:
 
   - page writes vault
-  - page sends new bootstrap to worker or requests worker reset
+  - page requests runtime replacement, then bootstraps the new session
   - worker tears down old runtime and starts new one
 
   On logout:
@@ -217,8 +244,19 @@ Plan
 
   Since web is single-account, runtime replacement is fine.
 
+  Tighten before implementation:
+
+  - define whether reset and bootstrap are two messages or one resetAndBootstrap transition
+  - teardown must stop websocket, cancel timers, drop in-memory doc/search/undo state, and
+    prevent stale ports from sending intents against the old runtime
+  - authFailed should be treated as a runtime-invalidating event for all attached tabs
+
   14. Add a fallback seam, not fallback implementation
-  Create a transport abstraction now:
+  Do not over-abstract this first pass. If a tiny transport seam falls out naturally, keep it.
+  Otherwise ship the SharedWorker path first and add fallback seams after the attach/bootstrap/
+  reset lifecycle is proven in code.
+
+  If still useful, a later transport abstraction can expose:
 
   - connect
   - disconnect
