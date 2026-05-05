@@ -34,18 +34,18 @@ pub enum BinSub {
     Item(Vec<String>),
 }
 
-pub async fn run(args: BinArgs, offline: bool) -> anyhow::Result<()> {
+pub async fn run(args: BinArgs, sync: bool) -> anyhow::Result<()> {
     match args.sub {
-        BinSub::Show => show(args.json, offline).await,
-        BinSub::Empty => empty(offline).await,
-        BinSub::Rm(id) => rm(&id.item_id, offline).await,
+        BinSub::Show => show(args.json, sync).await,
+        BinSub::Empty => empty(sync).await,
+        BinSub::Rm(id) => rm(&id.item_id, sync).await,
         BinSub::Item(tokens) => match tokens.as_slice() {
             [id] => {
                 super::items::bin(
                     IdArg {
                         item_id: id.clone(),
                     },
-                    offline,
+                    sync,
                 )
                 .await
             }
@@ -55,8 +55,8 @@ pub async fn run(args: BinArgs, offline: bool) -> anyhow::Result<()> {
     }
 }
 
-async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn show(json: bool, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let items = session.doc().binned_items();
     if json {
         let v: Vec<BinnedJson> = items
@@ -78,16 +78,16 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn empty(offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn empty(sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let removed = session.doc().empty_bin()?;
     session.flush().await?;
     println!("removed {removed}");
     Ok(())
 }
 
-async fn rm(item_id: &str, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn rm(item_id: &str, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().delete_binned(item_id)?;
     session.flush().await?;
     println!("{item_id}");

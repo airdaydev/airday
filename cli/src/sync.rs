@@ -2,16 +2,17 @@
 //! drives the sans-IO `airday_core::SyncEngine`.
 //!
 //! `Session` is the per-invocation handle: open at command start, mutate
-//! the local Loro doc via `session.doc()`, `flush()` at end. Open does
-//! the WS handshake and initial pull through the engine; flush saves
-//! `loro.bin`, asks the engine to push pending ops, advances the
-//! device's `last_acked_op_id`.
+//! the local Loro doc via `session.doc()`, `flush()` at end. With sync
+//! requested, open does the WS handshake and initial pull through the
+//! engine; flush saves `loro.bin`, asks the engine to push pending ops,
+//! advances the device's `last_acked_op_id`.
 //!
-//! Offline behavior matches `spec/cli.md`:
-//! - Default: 2s connect timeout. Failure → local-only with a stderr
-//!   warning. Pending ops live in `loro.bin` and ship on the next
-//!   online invocation.
-//! - `--offline` / `AIRDAY_OFFLINE=1` skip the connect attempt entirely.
+//! Offline-by-default per `spec/cli.md`:
+//! - Default: no network. Mutations append to `loro.bin` and ship on
+//!   the next sync invocation.
+//! - `--sync` / `-s` / `AIRDAY_SYNC=1`: attempt WS connect with a 2s
+//!   timeout. Failure → local-only with a stderr warning. The dedicated
+//!   `airday sync` command treats connect failure as a hard error.
 
 use std::time::Duration;
 
@@ -59,18 +60,18 @@ pub struct Session {
 }
 
 impl Session {
-    /// Load profile + secrets + doc, optionally connect and run the
-    /// initial pull. Falls back to offline (with a stderr warning) if
-    /// the connect attempt fails or times out.
-    pub async fn open(offline: bool) -> Result<Self, SyncError> {
+    /// Load profile + secrets + doc; if `sync` is true, connect and
+    /// run the initial pull. Falls back to local-only (with a stderr
+    /// warning) when the connect attempt fails or times out.
+    pub async fn open(sync: bool) -> Result<Self, SyncError> {
         let profile = Profile::require_active()?;
-        Self::open_with_profile(profile, offline).await
+        Self::open_with_profile(profile, sync).await
     }
 
     /// As `open`, but takes an explicit profile. Used by tests that
     /// need to point the runtime at a tempdir without mutating
     /// process-global state (env vars, the `active` symlink).
-    pub async fn open_with_profile(profile: Profile, offline: bool) -> Result<Self, SyncError> {
+    pub async fn open_with_profile(profile: Profile, sync: bool) -> Result<Self, SyncError> {
         let device = profile.read_device()?;
         let secrets = profile.read_secrets()?;
         let dek = dek_from_hex(&secrets.dek_hex)?;
@@ -103,7 +104,7 @@ impl Session {
             ws: None,
         };
 
-        if offline_requested(offline) {
+        if !sync_requested(sync) {
             return Ok(session);
         }
 
@@ -226,8 +227,8 @@ fn drain_events(engine: &mut SyncEngine) -> Vec<Event> {
     out
 }
 
-fn offline_requested(flag: bool) -> bool {
-    flag || std::env::var("AIRDAY_OFFLINE")
+fn sync_requested(flag: bool) -> bool {
+    flag || std::env::var("AIRDAY_SYNC")
         .map(|v| v != "0" && !v.is_empty())
         .unwrap_or(false)
 }
@@ -289,15 +290,15 @@ mod tests {
     }
 
     #[test]
-    fn offline_env_var_honoured() {
+    fn sync_env_var_honoured() {
         // SAFETY: tests run single-threaded under #[test] within this
-        // module; no other test reads/writes AIRDAY_OFFLINE.
-        std::env::set_var("AIRDAY_OFFLINE", "1");
-        assert!(offline_requested(false));
-        std::env::set_var("AIRDAY_OFFLINE", "0");
-        assert!(!offline_requested(false));
-        std::env::remove_var("AIRDAY_OFFLINE");
-        assert!(!offline_requested(false));
-        assert!(offline_requested(true));
+        // module; no other test reads/writes AIRDAY_SYNC.
+        std::env::set_var("AIRDAY_SYNC", "1");
+        assert!(sync_requested(false));
+        std::env::set_var("AIRDAY_SYNC", "0");
+        assert!(!sync_requested(false));
+        std::env::remove_var("AIRDAY_SYNC");
+        assert!(!sync_requested(false));
+        assert!(sync_requested(true));
     }
 }

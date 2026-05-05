@@ -1,9 +1,9 @@
 //! Item commands: add / ls / done / bin (verb) / restore / mv / edit.
 //!
-//! Every action goes through `Session`, which runs the full sync
-//! lifecycle (open → mutate → flush). Reads (`ls`) still open a
-//! session because pulling peer ops first is what makes the listing
-//! reflect everyone's view, not just our local doc.
+//! Every action goes through `Session` (open → mutate → flush). The
+//! session reads from and writes to the local Loro doc; it only talks
+//! to the server when `-s/--sync` is passed (or `airday sync` is run
+//! separately).
 
 use std::io::{BufRead, IsTerminal};
 
@@ -24,8 +24,8 @@ pub struct AddArgs {
     pub list: String,
 }
 
-pub async fn add(args: AddArgs, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn add(args: AddArgs, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let texts = collect_texts(&args.text)?;
     if texts.is_empty() {
         anyhow::bail!("no item text provided");
@@ -78,8 +78,8 @@ pub struct LsArgs {
     pub json: bool,
 }
 
-pub async fn ls(args: LsArgs, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn ls(args: LsArgs, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let mut items = session.doc().items_in_list(&args.list, false);
     if !args.done {
         items.retain(|i| !i.is_done());
@@ -148,16 +148,16 @@ pub struct IdArg {
     pub item_id: String,
 }
 
-pub async fn done(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn done(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().set_item_done(&args.item_id, true)?;
     session.flush().await?;
     println!("{}", args.item_id);
     Ok(())
 }
 
-pub async fn bin(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn bin(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().set_item_binned(&args.item_id, true)?;
     session.flush().await?;
     println!("{}", args.item_id);
@@ -167,8 +167,8 @@ pub async fn bin(args: IdArg, offline: bool) -> anyhow::Result<()> {
 /// Restore from the bin. Done state is preserved — a done-then-binned
 /// item pops back into the Done view, a plain binned item back into
 /// its list. Use a follow-up command to toggle done off if needed.
-pub async fn restore(args: IdArg, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn restore(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().set_item_binned(&args.item_id, false)?;
     session.flush().await?;
     println!("{}", args.item_id);
@@ -183,8 +183,8 @@ pub struct MvArgs {
     pub list: String,
 }
 
-pub async fn mv(args: MvArgs, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn mv(args: MvArgs, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     // Append at the end of the target list (target_index = current
     // length). `move_item` clamps to the existing range, so passing a
     // huge index is safe — but the explicit count here is clearer.
@@ -205,8 +205,8 @@ pub struct EditArgs {
     pub text: String,
 }
 
-pub async fn edit(args: EditArgs, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+pub async fn edit(args: EditArgs, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().edit_item_text(&args.item_id, &args.text)?;
     session.flush().await?;
     println!("{}", args.item_id);

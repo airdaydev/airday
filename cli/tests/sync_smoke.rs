@@ -161,7 +161,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     // First open: connect, handshake, pull (empty). The seed counts
     // as pending so the engine auto-pushes it during open; the
     // user's add_item then ships on flush. Two blobs land server-side.
-    let session = Session::open_with_profile(profile, false).await.unwrap();
+    let session = Session::open_with_profile(profile, true).await.unwrap();
     assert!(session.is_online(), "expected to connect to local server");
     let item_id = session.doc().add_item(LIST_MAIN, "hello world").unwrap();
     session.flush().await.unwrap();
@@ -181,7 +181,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     // Re-open. last_acked_op_id is persisted, so the pull is empty,
     // and `pending_export` should be `None`.
     let profile2 = reopen_profile(tmp.path());
-    let session2 = Session::open_with_profile(profile2, false).await.unwrap();
+    let session2 = Session::open_with_profile(profile2, true).await.unwrap();
     assert!(session2.is_online());
     assert!(
         session2.doc().get_item(&item_id).is_some(),
@@ -198,7 +198,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
 }
 
 #[tokio::test]
-async fn offline_flag_short_circuits_connect() {
+async fn default_open_skips_connect() {
     let tmp = tempfile::tempdir().unwrap();
     let profile = Profile {
         dir: tmp.path().to_path_buf(),
@@ -223,9 +223,9 @@ async fn offline_flag_short_circuits_connect() {
         .unwrap();
     profile.write_doc(&Doc::new().unwrap()).unwrap();
 
-    // With --offline the open call is fast — no 2s timeout penalty.
+    // Without --sync the open call is fast — no 2s timeout penalty.
     let started = std::time::Instant::now();
-    let session = Session::open_with_profile(profile, true).await.unwrap();
+    let session = Session::open_with_profile(profile, false).await.unwrap();
     assert!(started.elapsed() < Duration::from_millis(500));
     assert!(!session.is_online());
     session.flush().await.unwrap();
@@ -268,13 +268,13 @@ async fn second_device_observes_first_devices_items_via_pull() {
     profile_b.write_doc(&Doc::empty()).unwrap();
 
     // A pushes a new item.
-    let session_a = Session::open_with_profile(profile_a, false).await.unwrap();
+    let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a.doc().add_item(LIST_MAIN, "from-A").unwrap();
     session_a.flush().await.unwrap();
 
     // B opens a session — its pull should ingest A's seed + add_item
     // blob and surface the item.
-    let session_b = Session::open_with_profile(profile_b, false).await.unwrap();
+    let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
     assert!(session_b.is_online());
     let view = session_b.doc().get_item(&item_id).unwrap();
     assert_eq!(view.text, "from-A");

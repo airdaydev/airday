@@ -1,25 +1,22 @@
-# Airday Core
+# Airday
 
-[Airday](https://air.day/) calendar & tasks app monorepo. Powers both SaaS & self-hosted versions.*
-
-*Airday SaaS hosted at air.day front-end uses this repo exactly, but uses a modified server to deal with delivery.
+[Airday](https://air.day/) is an e2ee, realtime, tasks app i.e. todo list with conflict resolution backed by Loro.
 
 ⚠️ ATTN: Airday is undergoing extensive and frequent changes, it is not ready to use.
 
+## Saas vs Self-hosted
+This is the private repo currently containing everything. We will extract most of this repo into a public repo prior to release.
+
 ```
 📁 monorepo
-├── 📂 flatbuffers  → Protocol definitions and code gen
+├── 📂 cli  → CLI app
 ├── 📂 ios          → iOS app placeholder
 ├── 📂 js           → JavaScript packages
-├── 📂 rust         → Rust packages
-├── 📂 server       → Rust based server
+├── 📂 crates         → Rust packages
+├── 📂 server       → Server
 ├── 📂 sqlite       → Sqlite migration & notes
-├── 📂 telemetry    → Jaeger & OTLP collector for dev envs
-└── 📂 web          → Web based application
+└── 📂 telemetry    → Jaeger & OTLP collector for dev envs (may upgrade to clickstack)
 ```
-
-## Self-hosting
-Coming 2026
 
 ## Development Requirements
 - Rust

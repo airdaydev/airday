@@ -12,25 +12,27 @@ mod password;
 mod recover;
 mod signup;
 pub mod status;
+mod sync;
 
 const DEFAULT_SERVER: &str = "http://127.0.0.1:8000";
 
 #[derive(Parser, Debug)]
 #[command(name = "airday", version, about = "Airday CLI")]
 pub struct Cli {
-    /// Skip the WS connect attempt; mutate locally only. Pending ops
-    /// flush on the next online invocation. Equivalent to setting
-    /// `AIRDAY_OFFLINE=1`.
-    #[arg(long, global = true)]
-    offline: bool,
+    /// Connect to the server before running this command: pull peer
+    /// ops first, then push any pending local ops on exit. Without
+    /// this flag, commands operate against the local doc only.
+    /// Equivalent to setting `AIRDAY_SYNC=1`.
+    #[arg(long, short = 's', global = true)]
+    sync: bool,
 
     #[command(subcommand)]
     cmd: Cmd,
 }
 
 impl Cli {
-    pub fn offline(&self) -> bool {
-        self.offline
+    pub fn sync(&self) -> bool {
+        self.sync
     }
 }
 
@@ -64,26 +66,29 @@ enum Cmd {
     Lists(lists::ListsArgs),
     /// Show local sync state.
     Status(status::StatusArgs),
+    /// Pull peer ops and push any pending local ops, then exit.
+    Sync,
 }
 
 impl Cli {
     pub async fn run(self) -> anyhow::Result<()> {
-        let offline = self.offline();
+        let sync = self.sync();
         match self.cmd {
             Cmd::Signup(a) => signup::run(a).await,
             Cmd::Login(a) => login::run(a).await,
             Cmd::Logout => logout::run().await,
             Cmd::Recover(a) => recover::run(a).await,
             Cmd::Password => password::run().await,
-            Cmd::Add(a) => items::add(a, offline).await,
-            Cmd::Ls(a) => items::ls(a, offline).await,
-            Cmd::Done(a) => items::done(a, offline).await,
-            Cmd::Bin(a) => bin::run(a, offline).await,
-            Cmd::Restore(a) => items::restore(a, offline).await,
-            Cmd::Mv(a) => items::mv(a, offline).await,
-            Cmd::Edit(a) => items::edit(a, offline).await,
-            Cmd::Lists(a) => lists::run(a, offline).await,
+            Cmd::Add(a) => items::add(a, sync).await,
+            Cmd::Ls(a) => items::ls(a, sync).await,
+            Cmd::Done(a) => items::done(a, sync).await,
+            Cmd::Bin(a) => bin::run(a, sync).await,
+            Cmd::Restore(a) => items::restore(a, sync).await,
+            Cmd::Mv(a) => items::mv(a, sync).await,
+            Cmd::Edit(a) => items::edit(a, sync).await,
+            Cmd::Lists(a) => lists::run(a, sync).await,
             Cmd::Status(a) => status::run(a).await,
+            Cmd::Sync => sync::run().await,
         }
     }
 }

@@ -22,7 +22,6 @@ struct StatusJson<'a> {
     last_sync_at: Option<i64>,
     last_acked_op_id: u64,
     pending_changes: bool,
-    offline_mode: bool,
 }
 
 pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
@@ -31,9 +30,6 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let doc = profile.read_doc()?;
 
     let pending = doc.has_pending_ops();
-    let offline = std::env::var("AIRDAY_OFFLINE")
-        .map(|v| v != "0" && !v.is_empty())
-        .unwrap_or(false);
 
     if args.json {
         print_json(&StatusJson {
@@ -44,7 +40,6 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
             last_sync_at: device.last_sync_at,
             last_acked_op_id: device.last_acked_op_id,
             pending_changes: pending,
-            offline_mode: offline,
         })?;
     } else {
         println!("Account: {} ({})", device.email, device.account_id);
@@ -59,11 +54,6 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
         );
         println!("Last acked op id: {}", device.last_acked_op_id);
         println!("Pending changes: {}", if pending { "yes" } else { "no" });
-        if offline {
-            println!("Mode: offline (AIRDAY_OFFLINE)");
-        } else {
-            println!("Mode: online");
-        }
     }
     Ok(())
 }

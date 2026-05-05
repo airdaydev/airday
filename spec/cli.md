@@ -38,21 +38,26 @@ Single binary `airday`. Subcommands:
 - `airday bin rm <item_id>`
 
 ### Status
-- `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_op_id`, pending-push op count, current offline mode. Read-only against local state; never opens a WS.
+- `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_op_id`, pending-push op count. Read-only against local state; never opens a WS.
+
+### Sync
+- `airday sync` — pull peer ops, push any pending local ops, then exit. Connect failure is a hard error.
 
 ## Sync lifecycle
 
-CLI subcommands are one-shot. Each invocation: open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command (mutating or not) → `PushOps` if anything changed → `Ack` → close. No background daemon in sprint 1.
+CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to `loro.bin` and ship on the next sync.
+
+To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
 
 A future TUI (out of sprint 1) holds the WS open while running and surfaces `OpsBroadcast` reactively in the same `airday` binary. The daemon question stays deferred until the TUI exists and proves it needs more than that.
 
-Local Loro doc is always authoritative for reads. `airday ls` and friends never block on or fail because of sync state — they read local and exit. Sync exists to ingest other devices' ops and ship local ones, not to gate reads.
-
 ### Connect behaviour
 
-- Default: attempt WS connect with a ~2s timeout. On failure (no network, captive portal, server down), fall back to local-only and print a one-line stderr warning: `offline — N ops pending push`.
-- `--offline` flag or `AIRDAY_OFFLINE=1`: skip the network attempt entirely, no warning. Mutations append to the local doc; the queue flushes on the next online invocation.
-- Pending local ops live in `loro.bin` alongside the rest of the doc state; the next online invocation pushes them as part of its normal `PushOps`.
+- Default: no network attempt. Local doc is authoritative. Mutations queue in `loro.bin`.
+- `-s` / `--sync` / `AIRDAY_SYNC=1`: attempt WS connect with a ~2s timeout. On failure (no network, captive portal, server down), fall back to local-only and print a one-line stderr warning: `offline — sync deferred (<reason>)`. The command still runs against the local doc.
+- `airday sync`: same connect attempt, but failure exits non-zero — there's no local work to fall back to.
+- `airday login` and `airday recover` always attempt an initial sync after writing the profile; failure is a soft warning (they've already provisioned the account, the user can `airday sync` later).
+- Pending local ops live in `loro.bin`; the next sync pushes them as part of `PushOps`.
 
 ## Local state
 

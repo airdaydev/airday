@@ -28,17 +28,17 @@ pub enum ListsCmd {
     Rm { list: String },
 }
 
-pub async fn run(args: ListsArgs, offline: bool) -> anyhow::Result<()> {
+pub async fn run(args: ListsArgs, sync: bool) -> anyhow::Result<()> {
     match args.cmd {
-        None => show(args.json, offline).await,
-        Some(ListsCmd::Add { name }) => add(&name, offline).await,
-        Some(ListsCmd::Rename { list, name }) => rename(&list, &name, offline).await,
-        Some(ListsCmd::Rm { list }) => rm(&list, offline).await,
+        None => show(args.json, sync).await,
+        Some(ListsCmd::Add { name }) => add(&name, sync).await,
+        Some(ListsCmd::Rename { list, name }) => rename(&list, &name, sync).await,
+        Some(ListsCmd::Rm { list }) => rm(&list, sync).await,
     }
 }
 
-async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn show(json: bool, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let lists = session.doc().all_lists();
     if json {
         print_json(&lists.iter().map(list_json).collect::<Vec<_>>())?;
@@ -51,24 +51,24 @@ async fn show(json: bool, offline: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn add(name: &str, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn add(name: &str, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     let id = session.doc().add_list(name)?;
     session.flush().await?;
     println!("{id}");
     Ok(())
 }
 
-async fn rename(list_id: &str, name: &str, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn rename(list_id: &str, name: &str, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().rename_list(list_id, name)?;
     session.flush().await?;
     println!("{list_id}");
     Ok(())
 }
 
-async fn rm(list_id: &str, offline: bool) -> anyhow::Result<()> {
-    let session = Session::open(offline).await?;
+async fn rm(list_id: &str, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
     session.doc().delete_list(list_id)?;
     session.flush().await?;
     println!("{list_id}");

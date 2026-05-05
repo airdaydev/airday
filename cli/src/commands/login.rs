@@ -8,6 +8,7 @@ use dialoguer::{Input, Password};
 use crate::config::{DeviceConfig, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
 use crate::net::Client;
+use crate::sync::Session;
 
 use super::{default_device_name, default_server};
 
@@ -94,9 +95,13 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: device.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    // Empty doc; the next subcommand's Session::open pulls from op
-    // id 0, applies device-1's seed + history, and we converge.
+    // Empty doc; the initial sync below pulls from op id 0, applies
+    // device-1's seed + history, and we converge.
     profile.write_doc(&Doc::empty())?;
+
+    println!("Syncing…");
+    let session = Session::open(true).await?;
+    session.flush().await?;
 
     println!("Logged in to account {}", resp.account_id);
     if !resp.recovery_present {

@@ -9,6 +9,7 @@ use dialoguer::Input;
 use crate::config::{DeviceConfig, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
 use crate::net::Client;
+use crate::sync::Session;
 
 use super::{default_device_name, default_server, prompt_new_password};
 
@@ -124,6 +125,10 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         dek_hex: dek_to_hex(&dek),
     })?;
     profile.write_doc(&Doc::empty())?;
+
+    println!("Syncing…");
+    let session = Session::open(true).await?;
+    session.flush().await?;
 
     println!("Recovery complete. Account {}.", recovered.account_id);
     Ok(())
