@@ -8,9 +8,9 @@ Workflow: a reserved primary capture list ("Desk", id `main`), any number of use
 
 - **Rust core** (`core/`) — Loro CRDT, E2EE, sync engine. Compiles to native (CLI, server) and WASM (web) via `core/web/`.
 - **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration.
-- **CLI** (`cli/`) — sprint 1's reference integration test surface.
+- **CLI** (`cli/`) — Airday CLI
 - **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — second sprint-1 client; multi-device proof spans CLI ↔ web.
-- **iOS / Android / native macOS** — out of sprint 1.
+- **iOS / Android / native macOS** — out of this print
 
 E2EE: password-derived KEK wraps a randomly-generated DEK. DEK encrypts every op blob. Server has no key. Recovery via a user-held recovery code (independent wrap of DEK) is in scope for sprint 1; server-assisted escrow (Vault-backed, opt-in) is sprint 2+.
 
@@ -38,7 +38,7 @@ Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
 | [`spec/saas.md`](spec/saas.md) | Sprint 2+ contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 
-Out of scope for sprint 1 (live in `roadmap.md`): postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
+Next sprints: postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
 
 **Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, MCP, native app deployment. These live in `roadmap.md` for later sprints.
 
