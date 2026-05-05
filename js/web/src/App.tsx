@@ -821,6 +821,37 @@ function Workspace(props: {
     });
   };
 
+  // Copy items to the clipboard as a markdown-ish checklist (one line
+  // each, in visible order, with `[*]` marking done items) so the block
+  // round-trips back as items if the user pastes into Airday. A single
+  // source additionally appends its notes on the following line when
+  // present, since notes only matter when one item is in focus.
+  const copyBlock = (sourceIds: readonly string[]): void => {
+    const visible = items().map((it) => it.id);
+    const sourceSet = new Set(sourceIds);
+    const inOrder: ItemView[] = [];
+    visible.forEach((id) => {
+      if (!sourceSet.has(id)) return;
+      const it = app.getItem(id);
+      if (it) inOrder.push(it);
+    });
+    if (inOrder.length === 0) {
+      for (const id of sourceIds) {
+        const it = app.getItem(id);
+        if (it) inOrder.push(it);
+      }
+    }
+    if (inOrder.length === 0) return;
+    const lines = inOrder.map(
+      (it) => `- [${isDone(it) ? "*" : " "}] ${it.text}`,
+    );
+    let text = lines.join("\n");
+    if (inOrder.length === 1 && inOrder[0].notes) {
+      text = `${text}\n${inOrder[0].notes}`;
+    }
+    void navigator.clipboard.writeText(text);
+  };
+
   // Cmd/Ctrl+D: duplicate the current selection.
   const onDuplicateKey = (e: KeyboardEvent) => {
     if (e.key !== "d" && e.key !== "D") return;
@@ -835,6 +866,27 @@ function Workspace(props: {
   };
   document.addEventListener("keydown", onDuplicateKey);
   onCleanup(() => document.removeEventListener("keydown", onDuplicateKey));
+
+  // Cmd/Ctrl+C: copy the current selection through copyBlock. Skipped
+  // when focus is in an editable surface so the browser's native copy
+  // still grabs the user's text fragment, and skipped when there's a
+  // non-collapsed window selection (the user is copying highlighted
+  // text, not rows).
+  const onCopyKey = (e: KeyboardEvent) => {
+    if (e.key !== "c" && e.key !== "C") return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.shiftKey || e.altKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
+    const ids = selection.getSelectedKeys().map(String);
+    if (ids.length === 0) return;
+    e.preventDefault();
+    copyBlock(ids);
+  };
+  document.addEventListener("keydown", onCopyKey);
+  onCleanup(() => document.removeEventListener("keydown", onCopyKey));
 
   // Cmd/Ctrl+Z (undo) and Cmd/Ctrl+Shift+Z (redo). Skipped when focus
   // is in an editable surface so the browser's native text-undo handles
@@ -1122,6 +1174,7 @@ function Workspace(props: {
                   app={app}
                   selection={selection}
                   duplicateBlock={duplicateBlock}
+                  copyBlock={copyBlock}
                   onDraftSettle={settleDraft}
                 />
               )}
@@ -1609,6 +1662,7 @@ function Row(props: {
   app: DocApp;
   selection: DndSelection;
   duplicateBlock: (sourceIds: readonly string[]) => void;
+  copyBlock: (sourceIds: readonly string[]) => void;
   /** Called by a draft row from its collapse effect with the trimmed
    *  edit text. Empty text means drop the draft; non-empty means the
    *  workspace should commit it as a real item. */
@@ -1773,6 +1827,9 @@ function Row(props: {
   const onDuplicate = () => {
     props.duplicateBlock(targetIds());
   };
+  const onCopy = () => {
+    props.copyBlock(targetIds());
+  };
   const onOpenChange = (open: boolean) => {
     if (!open) return;
     const id = props.item().id;
@@ -1875,6 +1932,9 @@ function Row(props: {
               Mark as not done
             </ContextMenu.Item>
           </Show>
+          <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
+            Copy
+          </ContextMenu.Item>
           <Show when={isInListView(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
               Duplicate
