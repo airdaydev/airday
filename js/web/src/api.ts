@@ -111,6 +111,10 @@ export const api = {
   async listDevices(): Promise<DevicesListResponse> {
     return get("/api/devices");
   },
+
+  async deleteDevice(deviceId: string): Promise<void> {
+    await del<unknown>(`/api/devices/${encodeURIComponent(deviceId)}`);
+  },
 };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -119,6 +123,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 async function get<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET" });
+}
+
+async function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE" });
 }
 
 async function request<T>(

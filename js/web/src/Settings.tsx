@@ -1,6 +1,6 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { api, type Device } from "./api.ts";
 import type { Session } from "./Login.tsx";
 import type { ThemePreference } from "./theme.ts";
@@ -19,6 +19,24 @@ export function Settings(props: {
   const [devices, setDevices] = createSignal<Device[] | null>(null);
   const [devicesError, setDevicesError] = createSignal<string | null>(null);
   const [devicesLoading, setDevicesLoading] = createSignal(false);
+  const [revoking, setRevoking] = createSignal<ReadonlySet<string>>(new Set());
+
+  async function revokeDevice(id: string) {
+    setDevicesError(null);
+    setRevoking((prev) => new Set(prev).add(id));
+    try {
+      await api.deleteDevice(id);
+      setDevices((prev) => (prev ? prev.filter((d) => d.id !== id) : prev));
+    } catch (e) {
+      setDevicesError(e instanceof Error ? e.message : "Failed to revoke device");
+    } finally {
+      setRevoking((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   async function loadDevices() {
     setDevicesError(null);
@@ -34,14 +52,14 @@ export function Settings(props: {
   }
 
   // Refetch every time the Devices section is entered while authenticated.
+  // `devicesLoading` is read untracked — it's a guard against stomping an
+  // in-flight fetch, not a trigger; tracking it would self-loop when
+  // loadDevices flips it back to false.
   createEffect(() => {
-    if (
-      props.open &&
-      section() === "devices" &&
-      !props.session.anonymous &&
-      !devicesLoading()
-    ) {
-      void loadDevices();
+    if (props.open && section() === "devices" && !props.session.anonymous) {
+      if (!untrack(devicesLoading)) {
+        void loadDevices();
+      }
     }
   });
 
@@ -196,6 +214,16 @@ export function Settings(props: {
                                 Last seen {formatRelative(d.last_seen_at)}
                               </div>
                             </div>
+                            <Show when={d.id !== props.session.deviceId}>
+                              <button
+                                type="button"
+                                class="device-revoke"
+                                disabled={revoking().has(d.id)}
+                                onClick={() => void revokeDevice(d.id)}
+                              >
+                                {revoking().has(d.id) ? "Revoking…" : "Revoke"}
+                              </button>
+                            </Show>
                           </li>
                         )}
                       </For>
