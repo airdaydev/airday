@@ -1,7 +1,7 @@
 //! Sqlite reads/writes for the op stream and per-device frontier.
 
 use airday_protocol::{EncryptedBlob, StoredOp};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
 use crate::db::{now_millis, Db};
@@ -120,6 +120,92 @@ pub async fn advance_last_acked_op_id(
     })
     .await?;
     Ok(())
+}
+
+/// Latest snapshot for an account (highest `id`, which monotonically
+/// tracks `up_to_op_id` since snapshots are append-only). Returns
+/// `None` when no snapshot exists yet — the bootstrap path is dormant
+/// in that case and `pull_ops` falls through to op streaming.
+pub struct LatestSnapshot {
+    pub up_to_op_id: u64,
+    pub blob: EncryptedBlob,
+}
+
+/// Insert a snapshot row. Used by snapshot orchestration once
+/// `PushSnapshot` is wired through; until then, integration tests
+/// call this directly to simulate a server with snapshot state.
+pub async fn insert_snapshot(
+    db: &Db,
+    account_id: Uuid,
+    up_to_op_id: u64,
+    blob: EncryptedBlob,
+) -> anyhow::Result<u64> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    let now = now_millis();
+    db.call(move |c| {
+        c.execute(
+            "INSERT INTO snapshots (account_id, up_to_op_id, payload, payload_nonce, created_at)
+             VALUES (?, ?, ?, ?, ?)",
+            params![
+                acc_bytes,
+                up_to_op_id as i64,
+                blob.ciphertext,
+                blob.nonce,
+                now,
+            ],
+        )?;
+        Ok(c.last_insert_rowid() as u64)
+    })
+    .await
+}
+
+pub async fn latest_snapshot(db: &Db, account_id: Uuid) -> anyhow::Result<Option<LatestSnapshot>> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    db.call(move |c| {
+        let row = c
+            .query_row(
+                "SELECT up_to_op_id, payload, payload_nonce
+                 FROM snapshots
+                 WHERE account_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [acc_bytes],
+                |r| {
+                    Ok((
+                        r.get::<_, i64>(0)? as u64,
+                        r.get::<_, Vec<u8>>(1)?,
+                        r.get::<_, Vec<u8>>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        Ok(row.map(|(up_to_op_id, ciphertext, nonce)| LatestSnapshot {
+            up_to_op_id,
+            blob: EncryptedBlob { nonce, ciphertext },
+        }))
+    })
+    .await
+}
+
+/// Just the floor — `up_to_op_id` of the latest snapshot, or `None`.
+/// Hot path for `PullOps` so we don't read the blob just to compare.
+pub async fn latest_snapshot_floor(db: &Db, account_id: Uuid) -> anyhow::Result<Option<u64>> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    db.call(move |c| {
+        let row = c
+            .query_row(
+                "SELECT up_to_op_id
+                 FROM snapshots
+                 WHERE account_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [acc_bytes],
+                |r| r.get::<_, i64>(0),
+            )
+            .optional()?;
+        Ok(row.map(|v| v as u64))
+    })
+    .await
 }
 
 /// Read a device's recorded frontier. Used by tests; production paths

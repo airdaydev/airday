@@ -205,11 +205,12 @@ async fn handle_frame(
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
-        // Snapshot frames are reserved — log and continue rather than
-        // tearing down the session, so a client that probes them
-        // doesn't lose its push/pull progress.
-        ClientFrame::PushSnapshot { .. } | ClientFrame::PullSnapshot => {
-            tracing::warn!("snapshot frames not yet implemented; ignoring");
+        ClientFrame::PullSnapshot => pull_snapshot(socket, state, auth).await,
+        // PushSnapshot is reserved for snapshot orchestration — log and
+        // continue rather than tearing down the session, so a client
+        // that probes the frame doesn't lose its push/pull progress.
+        ClientFrame::PushSnapshot { .. } => {
+            tracing::warn!("PushSnapshot not yet implemented; ignoring");
             Ok(())
         }
     }
@@ -276,11 +277,28 @@ async fn pull_ops(
     since_op_id: u64,
 ) -> Result<(), SessionError> {
     let pull_span = tracing::info_span!("ws.pull_ops", since_op_id = since_op_id);
-    // Drain in sub-batches until exhaustion. The final batch — including
-    // the trivially-empty case — carries `complete = true` so the client
-    // can deterministically end its pull regardless of how many chunks
-    // it took.
+    // Bootstrap-from-snapshot precondition: if the latest snapshot's
+    // `up_to_op_id` is ahead of the client's cursor, the client cannot
+    // resume from ops alone (compacted ops below the floor are gone,
+    // and even when they aren't, replaying every op since 0 wastes
+    // round trips). Hand back `SnapshotRequired` and let the client
+    // drive the bootstrap exchange.
     async {
+        if let Some(floor) = queries::latest_snapshot_floor(&state.db, auth.account_id).await? {
+            if since_op_id < floor {
+                tracing::info!(
+                    snapshot_floor = floor,
+                    "ws pull_ops below snapshot floor; sending SnapshotRequired"
+                );
+                send_msgpack(
+                    socket,
+                    &ServerFrame::SnapshotRequired { up_to_op_id: floor },
+                )
+                .await?;
+                return Ok(());
+            }
+        }
+
         let mut cursor = since_op_id;
         let mut batch_count = 0u64;
         let mut total_ops = 0usize;
@@ -312,6 +330,41 @@ async fn pull_ops(
         }
     }
     .instrument(pull_span)
+    .await
+}
+
+async fn pull_snapshot(
+    socket: &mut WebSocket,
+    state: &AppState,
+    auth: &DeviceAuth,
+) -> Result<(), SessionError> {
+    let span = tracing::info_span!("ws.pull_snapshot");
+    async {
+        match queries::latest_snapshot(&state.db, auth.account_id).await? {
+            Some(snap) => {
+                tracing::info!(up_to_op_id = snap.up_to_op_id, "ws pull_snapshot served");
+                send_msgpack(
+                    socket,
+                    &ServerFrame::Snapshot {
+                        up_to_op_id: snap.up_to_op_id,
+                        blob: snap.blob,
+                    },
+                )
+                .await
+            }
+            None => {
+                // A well-behaved client only sends `PullSnapshot` after
+                // receiving `SnapshotRequired`, which is only emitted
+                // when a snapshot exists. If we get here, either the
+                // snapshot was deleted out from under us or the client
+                // is misbehaving — log and drop the request rather
+                // than tearing down the session.
+                tracing::warn!("PullSnapshot but no snapshot exists; ignoring");
+                Ok(())
+            }
+        }
+    }
+    .instrument(span)
     .await
 }
 

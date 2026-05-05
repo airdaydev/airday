@@ -97,4 +97,11 @@ pub enum ServerFrame {
         up_to_op_id: u64,
         blob: EncryptedBlob,
     },
+    /// Sent in lieu of `OpsBatch` when the client's `since_op_id` is
+    /// below the latest snapshot's `up_to_op_id` — the device cannot
+    /// resume from ops alone (it would either be missing compacted ops
+    /// or wastefully replay every op since 0). The client must
+    /// `PullSnapshot`, apply the returned `Snapshot`, then re-issue
+    /// `PullOps { since_op_id: up_to_op_id }`.
+    SnapshotRequired { up_to_op_id: u64 },
 }

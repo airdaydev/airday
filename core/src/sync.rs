@@ -71,6 +71,11 @@ enum ConnState {
     Disconnected,
     Hello,
     Pulling,
+    /// Snapshot bootstrap path: we've received `SnapshotRequired`,
+    /// emitted `PullSnapshot`, and are waiting for the `Snapshot`
+    /// frame. Cold path — only entered when the server has compacted
+    /// past our cursor (or we're a fresh device after compaction).
+    Bootstrapping,
     Idle,
     Pushing,
     PushingDirty,
@@ -217,9 +222,11 @@ impl SyncEngine {
                 ));
             }
             ConnState::Hello => self.handle_hello_response(bytes),
-            ConnState::Pulling | ConnState::Idle | ConnState::Pushing | ConnState::PushingDirty => {
-                self.handle_server_frame(bytes)
-            }
+            ConnState::Pulling
+            | ConnState::Bootstrapping
+            | ConnState::Idle
+            | ConnState::Pushing
+            | ConnState::PushingDirty => self.handle_server_frame(bytes),
         }
     }
 
@@ -234,6 +241,7 @@ impl SyncEngine {
             ConnState::Pushing => self.state = ConnState::PushingDirty,
             ConnState::PushingDirty
             | ConnState::Pulling
+            | ConnState::Bootstrapping
             | ConnState::Hello
             | ConnState::Disconnected => {
                 // Nothing to send right now — the next Idle transition
@@ -291,6 +299,12 @@ impl SyncEngine {
         };
         match frame {
             ServerFrame::OpsBatch { ops, complete } => {
+                if matches!(self.state, ConnState::Bootstrapping) {
+                    self.events.push_back(Event::Error(
+                        "OpsBatch received during Bootstrapping".into(),
+                    ));
+                    return;
+                }
                 self.apply_remote_ops(ops);
                 self.queue_ack_if_advanced();
                 if complete && matches!(self.state, ConnState::Pulling) {
@@ -301,6 +315,13 @@ impl SyncEngine {
                 }
             }
             ServerFrame::OpsBroadcast { ops } => {
+                if matches!(self.state, ConnState::Bootstrapping) {
+                    // Broadcasts during bootstrap would either re-fire
+                    // AppEvents on next pull or land before the snapshot
+                    // baseline. Drop them — the post-bootstrap PullOps
+                    // re-delivers anything past `up_to_op_id`.
+                    return;
+                }
                 self.apply_remote_ops(ops);
                 self.queue_ack_if_advanced();
             }
@@ -331,10 +352,61 @@ impl SyncEngine {
                     self.try_start_push();
                 }
             }
-            ServerFrame::SnapshotRequest { .. } | ServerFrame::Snapshot { .. } => {
-                // Snapshot orchestration is out of scope for this slice
-                // (see sync-engine.md "Out of scope"). Ignore rather
-                // than error so a probing server doesn't break us.
+            ServerFrame::SnapshotRequired { up_to_op_id: _ } => {
+                if !matches!(self.state, ConnState::Pulling) {
+                    self.events.push_back(Event::Error(format!(
+                        "SnapshotRequired received in unexpected state {:?}",
+                        self.state
+                    )));
+                    return;
+                }
+                // `up_to_op_id` is informational — the authoritative
+                // value is the one returned in the `Snapshot` frame.
+                self.state = ConnState::Bootstrapping;
+                let frame = ClientFrame::PullSnapshot;
+                if let Err(e) = self.encode_into_outbox(&frame) {
+                    self.events
+                        .push_back(Event::Error(format!("encode PullSnapshot: {e}")));
+                    self.go_disconnected();
+                }
+            }
+            ServerFrame::Snapshot { up_to_op_id, blob } => {
+                if !matches!(self.state, ConnState::Bootstrapping) {
+                    self.events.push_back(Event::Error(format!(
+                        "Snapshot received in unexpected state {:?}",
+                        self.state
+                    )));
+                    return;
+                }
+                if let Err(e) = self.doc.apply_remote(&self.dek, &blob) {
+                    self.events
+                        .push_back(Event::Error(format!("apply snapshot: {e}")));
+                    self.go_disconnected();
+                    return;
+                }
+                if up_to_op_id > self.highest_seen_op_id {
+                    self.highest_seen_op_id = up_to_op_id;
+                    self.events
+                        .push_back(Event::FrontierAdvanced { id: up_to_op_id });
+                }
+                self.queue_ack_if_advanced();
+                // Resume the catch-up: pull any ops written after the
+                // snapshot was taken.
+                self.state = ConnState::Pulling;
+                let frame = ClientFrame::PullOps {
+                    since_op_id: self.highest_seen_op_id,
+                };
+                if let Err(e) = self.encode_into_outbox(&frame) {
+                    self.events
+                        .push_back(Event::Error(format!("encode PullOps: {e}")));
+                    self.go_disconnected();
+                }
+            }
+            ServerFrame::SnapshotRequest { .. } => {
+                // Snapshot orchestration (server asking us to produce a
+                // snapshot) is out of scope for this slice. Ignore
+                // rather than error so a probing server doesn't break
+                // us.
             }
         }
     }
@@ -958,13 +1030,141 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_frames_ignored_without_error() {
+    fn snapshot_request_ignored_without_error() {
+        // `SnapshotRequest` (server asking us to *produce* a snapshot)
+        // is part of orchestration that hasn't landed; the engine
+        // ignores rather than errors so a probing server doesn't
+        // tear us down.
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest { up_to_op_id: 99 }));
         assert!(drain_events(&mut eng).is_empty());
         assert!(eng.pop_outbox().is_none());
+    }
+
+    #[test]
+    fn unsolicited_snapshot_in_idle_is_an_error() {
+        let mut eng = fresh_engine_clean();
+        drive_to_idle(&mut eng);
+        let _ = drain_events(&mut eng);
+        eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
+            up_to_op_id: 99,
+            blob: EncryptedBlob {
+                nonce: vec![0; 24],
+                ciphertext: vec![],
+            },
+        }));
+        let evs = drain_events(&mut eng);
+        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("Snapshot")));
+    }
+
+    #[test]
+    fn snapshot_required_in_pulling_drives_bootstrap() {
+        // Wire:  HelloAck -> PullOps(since=0) -> SnapshotRequired
+        //   ->   PullSnapshot -> Snapshot -> PullOps(since=up_to)
+        //   ->   OpsBatch{complete} -> Idle
+        let dek = Dek::generate();
+        let mut eng = SyncEngine::new(Doc::empty(), dek.clone(), 0, opts());
+        eng.handle_connected();
+        let _ = eng.pop_outbox().unwrap();
+        eng.handle_server_bytes(&enc(&HelloAck {
+            server_version: "s".into(),
+            protocol_version: PROTOCOL_VERSION,
+        }));
+        let _ = eng.pop_outbox().unwrap(); // PullOps
+
+        // Server says cursor is below the floor.
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_op_id: 42 }));
+        let pull_snap: ClientFrame = dec(&eng.pop_outbox().expect("PullSnapshot"));
+        assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
+        // Engine is now in Bootstrapping (not idle, not pulling).
+        assert!(!eng.is_idle());
+
+        // Build a snapshot blob from a parallel doc — same DEK, with a
+        // peer item we expect to land in the bootstrapped state.
+        let snapshot_blob = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "from-snapshot").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
+            up_to_op_id: 42,
+            blob: snapshot_blob,
+        }));
+
+        // Engine should have advanced its frontier and re-issued PullOps.
+        assert_eq!(eng.highest_seen_op_id(), 42);
+        let mut frames: Vec<ClientFrame> = Vec::new();
+        while let Some(b) = eng.pop_outbox() {
+            frames.push(dec(&b));
+        }
+        // Order: Ack(42) (frontier advance), PullOps(since=42).
+        assert!(frames.iter().any(|f| matches!(
+            f,
+            ClientFrame::Ack {
+                last_acked_op_id: 42
+            }
+        )));
+        assert!(frames
+            .iter()
+            .any(|f| matches!(f, ClientFrame::PullOps { since_op_id: 42 })));
+
+        // Bootstrapped item is in the doc.
+        assert!(eng
+            .doc()
+            .items_in_list(LIST_MAIN, false)
+            .iter()
+            .any(|i| i.text == "from-snapshot"));
+
+        // Finish the catch-up pull.
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
+            ops: vec![],
+            complete: true,
+        }));
+        assert!(eng.is_idle());
+    }
+
+    #[test]
+    fn opsbroadcast_during_bootstrap_is_dropped() {
+        let dek = Dek::generate();
+        let mut eng = SyncEngine::new(Doc::empty(), dek.clone(), 0, opts());
+        eng.handle_connected();
+        let _ = eng.pop_outbox().unwrap();
+        eng.handle_server_bytes(&enc(&HelloAck {
+            server_version: "s".into(),
+            protocol_version: PROTOCOL_VERSION,
+        }));
+        let _ = eng.pop_outbox().unwrap(); // PullOps
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_op_id: 10 }));
+        let _ = eng.pop_outbox().unwrap(); // PullSnapshot
+
+        // Broadcast while bootstrapping — must be ignored entirely.
+        let stray = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "should-not-appear").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
+            ops: vec![StoredOp {
+                id: 11,
+                blob: stray,
+            }],
+        }));
+        assert!(
+            !eng.doc()
+                .items_in_list(LIST_MAIN, false)
+                .iter()
+                .any(|i| i.text == "should-not-appear"),
+            "broadcast applied during Bootstrapping",
+        );
+        assert_eq!(eng.highest_seen_op_id(), 0, "frontier must not advance");
+    }
+
+    #[test]
+    fn snapshot_required_outside_pulling_is_an_error() {
+        let mut eng = fresh_engine_clean();
+        drive_to_idle(&mut eng);
+        let _ = drain_events(&mut eng);
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_op_id: 1 }));
+        let evs = drain_events(&mut eng);
+        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("SnapshotRequired")));
     }
 
     #[test]

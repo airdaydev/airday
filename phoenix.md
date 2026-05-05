@@ -36,8 +36,8 @@ End-to-end integration tests prove this with a real server + multiple CLI client
 
 In scope for the sprint, not yet green; tracked in `roadmap.md`:
 
-- **Snapshot orchestration end-to-end.** Wire types exist; the server's WS handler currently logs and ignores `PushSnapshot` / `PullSnapshot` / `SnapshotRequest`. Need server-side threshold check, client serialize+seal+upload, and the compaction job.
-- **E2E coverage gaps from `spec/testing.md`** — offline-mutate-then-sync, both-offline-then-converge, snapshot-bootstrap-fresh-device, recovery-flow round-trip.
+- **Snapshot orchestration end-to-end.** Bootstrap-from-snapshot is wired (`SnapshotRequired` / `PullSnapshot` / `Snapshot`), but snapshot *production* is still incomplete: `PushSnapshot` / `SnapshotRequest`, server-side threshold selection, candidate timeout/failover, and the compaction job remain.
+- **E2E coverage gaps from `spec/testing.md`** — offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold→fresh-device bootstrap, recovery-flow round-trip.
 - **Web reconnect backoff** (currently fixed-delay) and **Argon2id in a worker** so login doesn't block the main thread.
 
 ## Specs

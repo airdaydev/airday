@@ -6,15 +6,18 @@ this is the index.
 
 ## Sync engine
 
-- **Snapshot orchestration.** Wire types exist
-  (`PushSnapshot`/`PullSnapshot`/`SnapshotRequest`/`Snapshot`); the WS
-  handler currently ignores them with a warning. Need: server-side
-  threshold check (`latest_op_id − latest_snapshot.up_to_op_id > 10_000`),
-  client serialize+seal+upload, server-side compaction job. Required
-  before the dataset gets old.
-- **Snapshot bootstrap on fresh device.** Currently op-replay only;
-  acceptable while accounts are tiny. Pulled forward when freshness
-  or device-N onboarding force it.
+- Server reports incoming catchup volume (snapshot bytes + tail-op count/bytes since
+  snapshot) in HelloAck, so clients can show progress and we have observability into how
+  heavy a sync is.
+
+- **Snapshot orchestration.** Bootstrap is in: if `PullOps.since_op_id`
+  is below the latest snapshot floor, server returns
+  `SnapshotRequired`, client `PullSnapshot`s, applies the snapshot,
+  acks `up_to_op_id`, then resumes `PullOps` from there. Remaining
+  work: server-side threshold check
+  (`latest_op_id − latest_snapshot.up_to_op_id > 10_000`), candidate
+  selection / timeout failover for `SnapshotRequest`, client
+  serialize+seal+`PushSnapshot`, and the server-side compaction job.
 - **Reconnect policy.** Browser is fixed-delay retry only; CLI has a
   2s connect timeout + offline fallback. Need real backoff +
   online/offline detection + visibility-event hooks. Per-platform.
@@ -109,8 +112,10 @@ this is the index.
 
 - **E2E matrix gaps from `spec/testing.md`.** Currently covered:
   signup→add→re-login→items intact (two-device test); two clients live
-  convergence (broadcast test). Missing: offline-mutate-then-sync,
-  both-offline-then-converge, snapshot-bootstrap-fresh-device,
+  convergence (broadcast test); server/bootstrap seam for
+  snapshot-required→pull-snapshot→pull-tail in server integration.
+  Missing at E2E level: offline-mutate-then-sync,
+  both-offline-then-converge, snapshot-threshold→fresh-device bootstrap,
   recovery-flow round-trip.
 
 ## Open questions (not tasks)

@@ -430,6 +430,67 @@ async fn subscriber_unregisters_on_disconnect() {
     wait_for_subscribers(&acc, 0).await;
 }
 
+#[tokio::test]
+async fn pull_below_snapshot_floor_returns_snapshot_required() {
+    // Stage a snapshot row directly so the bootstrap seam fires
+    // without needing PushSnapshot wired through. Once orchestration
+    // lands, the path through the real `PushSnapshot` should hit the
+    // same surface.
+    let acc = signup_account().await;
+    let snapshot_blob = fake_blob(99);
+    queries::insert_snapshot(
+        &acc.server.state.db,
+        acc.account_id,
+        100,
+        snapshot_blob.clone(),
+    )
+    .await
+    .unwrap();
+
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+
+    // since_op_id < snapshot.up_to_op_id → SnapshotRequired in lieu of OpsBatch.
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 0 }).await;
+    match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::SnapshotRequired { up_to_op_id } => assert_eq!(up_to_op_id, 100),
+        other => panic!("expected SnapshotRequired, got {other:?}"),
+    }
+
+    // Client follows up with PullSnapshot; server returns the blob.
+    send_msgpack(&mut ws, &ClientFrame::PullSnapshot).await;
+    match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::Snapshot { up_to_op_id, blob } => {
+            assert_eq!(up_to_op_id, 100);
+            assert_eq!(blob, snapshot_blob);
+        }
+        other => panic!("expected Snapshot, got {other:?}"),
+    }
+
+    // After "applying" the snapshot, a PullOps from up_to_op_id is
+    // a normal empty-complete path (no ops past the snapshot point).
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 100 }).await;
+    let pulled = expect_complete_batch(&mut ws).await;
+    assert!(pulled.is_empty());
+}
+
+#[tokio::test]
+async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
+    // A device whose cursor is already >= the snapshot floor stays
+    // on the steady-state op-streaming path — no SnapshotRequired.
+    let acc = signup_account().await;
+    queries::insert_snapshot(&acc.server.state.db, acc.account_id, 50, fake_blob(0xAA))
+        .await
+        .unwrap();
+
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 50 }).await;
+    let pulled = expect_complete_batch(&mut ws).await;
+    assert!(pulled.is_empty());
+}
+
 async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {
     match recv_msgpack(ws).await {
         ServerFrame::OpsBatch { ops, complete } => {
