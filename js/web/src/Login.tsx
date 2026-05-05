@@ -13,6 +13,7 @@ import {
 } from "@airday/core/wasm";
 import { api, ApiError, type LoginResponse } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
+import { useAppI18n } from "./i18n.tsx";
 
 export interface Session {
   /** Local-only session with no server account behind it. The web client
@@ -43,6 +44,7 @@ export function AuthForm(props: {
   initialMode?: "login" | "signup";
   onSession: (s: Session) => void;
 }) {
+  const { m } = useAppI18n();
   const [mode, setMode] = createSignal<"login" | "signup">(
     props.initialMode ?? "login",
   );
@@ -72,10 +74,10 @@ export function AuthForm(props: {
   return (
     <form class="auth-form" onSubmit={submit}>
       <h3 class="auth-popover-title">
-        {mode() === "login" ? "Sign in" : "Sign up"}
+        {mode() === "login" ? m.auth.signIn : m.auth.signUp}
       </h3>
       <label>
-        Email
+        {m.auth.email}
         <input
           type="email"
           required
@@ -86,7 +88,7 @@ export function AuthForm(props: {
         />
       </label>
       <label>
-        Password
+        {m.auth.password}
         <input
           type="password"
           required
@@ -100,10 +102,10 @@ export function AuthForm(props: {
       <input type="hidden" value={deviceName()} />
       <button type="submit" disabled={busy()}>
         {busy()
-          ? "Deriving keys…"
+          ? m.auth.derivingKeys
           : mode() === "login"
-            ? "Sign in"
-            : "Sign up"}
+            ? m.auth.signIn
+            : m.auth.signUp}
       </button>
       <button
         type="button"
@@ -112,8 +114,8 @@ export function AuthForm(props: {
         onClick={() => setMode(mode() === "login" ? "signup" : "login")}
       >
         {mode() === "login"
-          ? "Don't have an account? Sign up"
-          : "Have an account? Sign in"}
+          ? m.auth.noAccount
+          : m.auth.haveAccount}
       </button>
       <Show when={error()}>
         <div class="error">{error()}</div>
@@ -141,7 +143,7 @@ async function doLogin(
     device_name: deviceName,
   });
   if (!resp.device) {
-    throw new Error("server did not return a device credential");
+    throw new Error("el servidor no devolvió una credencial de dispositivo");
   }
   const dek = unwrapDek(derived.kek, resp.wrapped_dek, resp.wrapped_dek_nonce);
   const session: Session = {

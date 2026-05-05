@@ -14,6 +14,7 @@ import {
 import { Portal } from "solid-js/web";
 import type { DocApp } from "./store.ts";
 import type { SearchResult } from "./search.ts";
+import { useAppI18n } from "./i18n.tsx";
 
 export function FindPalette(props: {
   app: DocApp;
@@ -21,6 +22,7 @@ export function FindPalette(props: {
   onOpenChange: (open: boolean) => void;
   onSelect?: (result: SearchResult) => void;
 }) {
+  const { m } = useAppI18n();
   const [searchInput, setSearchInput] = createSignal("");
   const [searchFilter, setSearchFilter] = createSignal("");
   const [selectedIndex, setSelectedIndex] = createSignal(0);
@@ -153,7 +155,7 @@ export function FindPalette(props: {
                 inputRef = el;
               }}
               type="text"
-              placeholder="Find"
+              placeholder={m.find.placeholder}
               value={searchInput()}
               onInput={(e) => setSearchInput(e.currentTarget.value)}
               aria-autocomplete="list"
@@ -187,14 +189,14 @@ export function FindPalette(props: {
                 >
                   <span class="palette__item-name">{item.title}</span>
                   <span class="palette__item-badge-label">
-                    {item.kind === "list" ? "List" : "Item"}
+                    {item.kind === "list" ? m.find.listBadge : m.find.itemBadge}
                   </span>
                 </div>
               )}
             </For>
             <Show when={items().length === 0}>
               <div class="palette__empty">
-                {searchFilter() ? "No matches" : "Type to find"}
+                {searchFilter() ? m.find.noMatches : m.find.typeToFind}
               </div>
             </Show>
           </div>

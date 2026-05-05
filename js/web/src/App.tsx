@@ -39,6 +39,7 @@ import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { FindPalette } from "./FindPalette.tsx";
+import { APP_LOCALE, appMessages, useAppI18n } from "./i18n.tsx";
 import type { SearchResult } from "./search.ts";
 import { AuthForm, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
@@ -78,16 +79,16 @@ const theme = createTheme();
 const [nowMs, setNowMs] = createSignal(Date.now());
 setInterval(() => setNowMs(Date.now()), 60_000);
 
-const timeFmt = new Intl.DateTimeFormat(undefined, {
+const timeFmt = new Intl.DateTimeFormat(APP_LOCALE, {
   hour: "numeric",
   minute: "2-digit",
 });
-const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const monthDayFmt = new Intl.DateTimeFormat(undefined, {
+const weekdayFmt = new Intl.DateTimeFormat(APP_LOCALE, { weekday: "short" });
+const monthDayFmt = new Intl.DateTimeFormat(APP_LOCALE, {
   month: "short",
   day: "numeric",
 });
-const monthDayYearFmt = new Intl.DateTimeFormat(undefined, {
+const monthDayYearFmt = new Intl.DateTimeFormat(APP_LOCALE, {
   month: "short",
   day: "numeric",
   year: "numeric",
@@ -128,19 +129,20 @@ function createKbDeviceSignal(): () => boolean {
 
 function formatRelative(ts: number, now: number): string {
   const diffMs = now - ts;
-  if (diffMs < 60_000) return "just now";
-  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
-  if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)}h ago`;
+  if (diffMs < 60_000) return appMessages.relative.justNow;
+  if (diffMs < 3_600_000) return appMessages.relative.minutesAgo(Math.floor(diffMs / 60_000));
+  if (diffMs < 86_400_000) return appMessages.relative.hoursAgo(Math.floor(diffMs / 3_600_000));
   const tsDate = new Date(ts);
   const nowDate = new Date(now);
   const days = calendarDayDiff(nowDate, tsDate);
-  if (days === 1) return `Yesterday ${timeFmt.format(tsDate)}`;
+  if (days === 1) return appMessages.relative.yesterdayAt(timeFmt.format(tsDate));
   if (days < 7) return `${weekdayFmt.format(tsDate)} ${timeFmt.format(tsDate)}`;
   if (tsDate.getFullYear() === nowDate.getFullYear()) return monthDayFmt.format(tsDate);
   return monthDayYearFmt.format(tsDate);
 }
 
 export function App() {
+  const { m, locale, direction } = useAppI18n();
   // `undefined` = vault probe still in flight; once it resolves we
   // either restore the persisted session or auto-mint a fresh
   // anonymous one — `session()` is never null after that point.
@@ -217,27 +219,29 @@ export function App() {
   };
 
   return (
-    <Show
-      when={session() !== undefined && opfsOk() !== null}
-      fallback={<div class="empty">Loading…</div>}
-    >
-      <Show keyed when={session()}>
-        {(s) => (
-          <BootGate
-            session={s}
-            boot={boot()}
-            bootError={bootError()}
-            setBoot={setBoot}
-            setBootError={setBootError}
-            online={online()}
-            setOnline={setOnline}
-            logout={logout}
-            onSession={onAuthenticated}
-            opfsOk={opfsOk() ?? false}
-          />
-        )}
+    <div lang={locale()} dir={direction()}>
+      <Show
+        when={session() !== undefined && opfsOk() !== null}
+        fallback={<div class="empty">{m.common.loading}</div>}
+      >
+        <Show keyed when={session()}>
+          {(s) => (
+            <BootGate
+              session={s}
+              boot={boot()}
+              bootError={bootError()}
+              setBoot={setBoot}
+              setBootError={setBootError}
+              online={online()}
+              setOnline={setOnline}
+              logout={logout}
+              onSession={onAuthenticated}
+              opfsOk={opfsOk() ?? false}
+            />
+          )}
+        </Show>
       </Show>
-    </Show>
+    </div>
   );
 }
 
@@ -280,6 +284,7 @@ function BootGate(props: {
   onSession: (s: Session) => void;
   opfsOk: boolean;
 }) {
+  const { m } = useAppI18n();
   // Try to restore a doc + frontier from OPFS. On signup we always
   // start with a seeded Doc.create(); on login we prefer OPFS if the
   // cached snapshot decrypts cleanly with the DEK we just unwrapped.
@@ -318,7 +323,7 @@ function BootGate(props: {
   })();
 
   return (
-    <Show when={props.boot} fallback={<div class="empty">Loading…</div>}>
+    <Show when={props.boot} fallback={<div class="empty">{m.common.loading}</div>}>
       {(b) => (
         <MainApp
           session={props.session}
@@ -481,6 +486,7 @@ function Workspace(props: {
   logout: () => void;
   onSession: (s: Session) => void;
 }) {
+  const { m } = useAppI18n();
   const app = props.app;
   const state = app.state;
   const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "main" });
@@ -1103,7 +1109,7 @@ function Workspace(props: {
       />
       <main class="main">
         <header class="main-header">
-          <h1>{viewTitle(view(), lists())}</h1>
+          <h1>{viewTitle(view(), lists(), m)}</h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <Show
               when={
@@ -1112,7 +1118,7 @@ function Workspace(props: {
               }
             >
               <button type="button" onClick={() => app.emptyBin()}>
-                Empty bin
+                {m.workspace.emptyBin}
               </button>
             </Show>
             <Show when={view().kind === "list"}>
@@ -1132,7 +1138,7 @@ function Workspace(props: {
                   startDraft();
                 }}
                 disabled={draft() !== null}
-                aria-label="Add"
+                aria-label={m.common.add}
                 innerHTML={plusSvg}
               />
             </Show>
@@ -1143,8 +1149,8 @@ function Workspace(props: {
           fallback={
             <div class="dnd-host empty">
               {view().kind === "list" && matchesKbDevice()
-                ? "Press Space to create a new item"
-                : "Nothing here yet."}
+                ? m.workspace.createWithSpace
+                : m.workspace.emptyState}
             </div>
           }
         >
@@ -1246,13 +1252,17 @@ function CloudIcon() {
   );
 }
 
-function viewTitle(v: ViewKey, lists: { id: string; name: string }[]): string {
+function viewTitle(
+  v: ViewKey,
+  lists: { id: string; name: string }[],
+  m: ReturnType<typeof useAppI18n>["m"],
+): string {
   if (v.kind === "list") {
-    if (v.id === "main") return "Desk";
+    if (v.id === "main") return m.nav.desk;
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
-  if (v.kind === "done") return "Done";
-  return "Bin";
+  if (v.kind === "done") return m.nav.done;
+  return m.nav.bin;
 }
 
 function Nav(props: {
@@ -1266,6 +1276,7 @@ function Nav(props: {
   onOpenSettings: () => void;
   onSession: (s: Session) => void;
 }) {
+  const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
   const [authOpen, setAuthOpen] = createSignal(false);
   const handleSession = (s: Session) => {
@@ -1341,7 +1352,7 @@ function Nav(props: {
           data-drop-list-id="main"
           onClick={() => props.setView({ kind: "list", id: "main" })}
         >
-          Desk
+          {m.nav.desk}
         </button>
         <button
           type="button"
@@ -1349,7 +1360,7 @@ function Nav(props: {
           data-active={props.view.kind === "done" ? "" : undefined}
           onClick={() => props.setView({ kind: "done" })}
         >
-          Done
+          {m.nav.done}
         </button>
         <button
           type="button"
@@ -1358,7 +1369,7 @@ function Nav(props: {
           data-drop-bin=""
           onClick={() => props.setView({ kind: "bin" })}
         >
-          Bin
+          {m.nav.bin}
         </button>
       </div>
       <div class="nav-group">
@@ -1408,7 +1419,7 @@ function Nav(props: {
                         props.app.deleteList(id);
                       }}
                     >
-                      Delete
+                      {m.nav.deleteList}
                     </ContextMenu.Item>
                   </ContextMenu.Content>
                 </ContextMenu.Portal>
@@ -1420,7 +1431,7 @@ function Nav(props: {
           when={adding()}
           fallback={
             <button type="button" class="nav-item" onClick={() => setAdding(true)}>
-              + New list
+              {m.nav.newList}
             </button>
           }
         >
@@ -1435,7 +1446,7 @@ function Nav(props: {
       <div class="nav-footer">
         <Show when={props.session.anonymous}>
           <Popover open={authOpen()} onOpenChange={setAuthOpen}>
-            <Popover.Trigger class="signin-button">Sign in</Popover.Trigger>
+            <Popover.Trigger class="signin-button">{m.auth.signIn}</Popover.Trigger>
             <Popover.Portal>
               <Popover.Content class="auth-popover">
                 <AuthForm onSession={handleSession} />
@@ -1446,8 +1457,8 @@ function Nav(props: {
         <Show when={!props.session.anonymous}>
           <span
             class="connection-indicator"
-            title={props.online ? "Connected" : "Disconnected"}
-            aria-label={props.online ? "Connected" : "Disconnected"}
+            title={props.online ? m.nav.connected : m.nav.disconnected}
+            aria-label={props.online ? m.nav.connected : m.nav.disconnected}
           >
             <Show when={props.online} fallback={<CloudOffIcon />}>
               <CloudIcon />
@@ -1457,7 +1468,7 @@ function Nav(props: {
         <DropdownMenu>
           <DropdownMenu.Trigger
             class="nav-menu-trigger"
-            aria-label="Menu"
+            aria-label={m.common.menu}
             innerHTML={dotsVerticalSvg}
           />
           <DropdownMenu.Portal>
@@ -1469,7 +1480,7 @@ function Nav(props: {
                   props.app.undo();
                 }}
               >
-                <span>Undo</span>
+                <span>{m.nav.undo}</span>
                 <kbd class="menu-shortcut">⌘Z</kbd>
               </DropdownMenu.Item>
               <DropdownMenu.Item
@@ -1479,7 +1490,7 @@ function Nav(props: {
                   props.app.redo();
                 }}
               >
-                <span>Redo</span>
+                <span>{m.nav.redo}</span>
                 <kbd class="menu-shortcut">⌘⇧Z</kbd>
               </DropdownMenu.Item>
               <DropdownMenu.Separator class="dropdown-menu-separator" />
@@ -1487,7 +1498,7 @@ function Nav(props: {
                 class="dropdown-menu-item"
                 onSelect={() => props.onOpenSettings()}
               >
-                Settings
+                {m.nav.settings}
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 class="dropdown-menu-item"
@@ -1496,7 +1507,7 @@ function Nav(props: {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Airday website
+                {m.nav.website}
                 <ExternalIcon />
               </DropdownMenu.Item>
               <Show when={!props.session.anonymous}>
@@ -1504,7 +1515,7 @@ function Nav(props: {
                   class="dropdown-menu-item"
                   onSelect={() => props.logout()}
                 >
-                  Log out
+                  {m.nav.logOut}
                 </DropdownMenu.Item>
               </Show>
             </DropdownMenu.Content>
@@ -1521,6 +1532,7 @@ function NewListForm(props: {
   onSubmit: (e: Event) => void;
   onDismiss: () => void;
 }) {
+  const { m } = useAppI18n();
   let inputRef!: HTMLInputElement;
   onMount(() => inputRef.focus());
   return (
@@ -1529,7 +1541,7 @@ function NewListForm(props: {
         ref={inputRef}
         class="nav-item nav-item-input"
         type="text"
-        placeholder="+ New list"
+        placeholder={m.nav.newList}
         value={props.name}
         onInput={(e) => props.setName(e.currentTarget.value)}
         onBlur={() => {
@@ -1617,6 +1629,7 @@ function EditableNavLabel(props: {
 // contenteditable div) so newline round-trips are byte-faithful and we
 // don't have to fight browser-inserted <div>/<br> markup.
 function NotesField(props: { item: () => ItemView; app: DocApp }) {
+  const { m } = useAppI18n();
   let ref!: HTMLTextAreaElement;
   const initial = props.item().notes;
   // Match content height so the field grows with the note instead of
@@ -1640,7 +1653,7 @@ function NotesField(props: { item: () => ItemView; app: DocApp }) {
     <textarea
       ref={ref}
       class="row-notes"
-      placeholder="Notes"
+      placeholder={m.workspace.notes}
       rows={1}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
@@ -1668,6 +1681,7 @@ function Row(props: {
    *  workspace should commit it as a real item. */
   onDraftSettle?: (text: string) => void;
 }) {
+  const { m } = useAppI18n();
   let textRef!: HTMLSpanElement;
   // Captured by dblclick before the row expands so we can place the caret
   // where the user pointed instead of selecting all. Captured pre-expand
@@ -1914,7 +1928,7 @@ function Row(props: {
         </div>
         <Show when={statusTimestamp(props.item())}>
           {(ts) => (
-            <span class="row-timestamp" title={new Date(ts()).toLocaleString()}>
+            <span class="row-timestamp" title={new Date(ts()).toLocaleString(APP_LOCALE)}>
               {formatRelative(ts(), nowMs())}
             </span>
           )}
@@ -1924,33 +1938,33 @@ function Row(props: {
         <ContextMenu.Content class="context-menu-content">
           <Show when={!isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
-              Mark as done
+              {m.workspace.markDone}
             </ContextMenu.Item>
           </Show>
           <Show when={isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
-              Mark as not done
+              {m.workspace.markNotDone}
             </ContextMenu.Item>
           </Show>
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
-            Copy
+            {m.common.copy}
           </ContextMenu.Item>
           <Show when={isInListView(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
-              Duplicate
+              {m.workspace.duplicate}
             </ContextMenu.Item>
           </Show>
           <Show when={!isBinned(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onBin}>
-              Move to bin
+              {m.workspace.moveToBin}
             </ContextMenu.Item>
           </Show>
           <Show when={isBinned(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onRestore}>
-              Restore
+              {m.common.restore}
             </ContextMenu.Item>
             <ContextMenu.Item class="context-menu-item" onSelect={onDelete}>
-              Delete
+              {m.common.delete}
             </ContextMenu.Item>
           </Show>
         </ContextMenu.Content>
