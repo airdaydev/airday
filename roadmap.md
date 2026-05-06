@@ -16,7 +16,7 @@
 
 ## Web app
 
-- Multi-tab single-engine sharing via `BroadcastChannel` to avoid duplicate WS sessions per account on one origin.
+- Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.
 - Browser automation harness. Manual smoke is still doing the job, but Playwright becomes worthwhile once the UI stops moving around.
 
@@ -28,5 +28,4 @@
 ## Testing
 
 - E2E gaps vs. `spec/testing.md`: offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold to fresh-device bootstrap, and recovery-flow round-trip.
-
 - hardening pass
