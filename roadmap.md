@@ -2,6 +2,7 @@
 
 - list deleting - orphan handling?
 - list deleting - binned first?
+- import/export
 
 ## Correctness
 
