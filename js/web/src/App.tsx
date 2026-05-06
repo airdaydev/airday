@@ -826,6 +826,13 @@ function Workspace(props: {
     return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
   });
 
+  // Id of the currently-viewed list iff it can be renamed. The reserved
+  // "main" (Desk) list and the done/bin views are not editable.
+  const editableListId = createMemo(() => {
+    const v = view();
+    return v.kind === "list" && v.id !== "main" ? v.id : null;
+  });
+
   createEffect(() => {
     const next = items();
     const d = draft();
@@ -1320,7 +1327,21 @@ function Workspace(props: {
       />
       <main class="main">
         <header class="main-header">
-          <h1>{viewTitle(view(), lists(), m())}</h1>
+          <h1>
+            <Show
+              keyed
+              when={editableListId()}
+              fallback={viewTitle(view(), lists(), m())}
+            >
+              {(listId) => (
+                <EditableNavLabel
+                  class="editable-title"
+                  name={lists().find((l) => l.id === listId)?.name ?? listId}
+                  onSave={(name) => app.renameList(listId, name)}
+                />
+              )}
+            </Show>
+          </h1>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <Show
               when={
@@ -1766,6 +1787,7 @@ function NewListForm(props: {
 function EditableNavLabel(props: {
   name: string;
   onSave: (name: string) => void;
+  class?: string;
 }) {
   let ref!: HTMLSpanElement;
   const [editing, setEditing] = createSignal(false);
@@ -1809,7 +1831,7 @@ function EditableNavLabel(props: {
   return (
     <span
       ref={ref}
-      class="nav-item-label"
+      class={props.class ?? "nav-item-label"}
       contentEditable={editing()}
       onDblClick={startEdit}
       onKeyDown={(e) => {

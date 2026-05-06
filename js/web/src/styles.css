@@ -233,6 +233,14 @@ body {
   font-weight: 500;
 }
 
+.editable-title {
+  outline: none;
+}
+
+.editable-title[contenteditable="true"] {
+  cursor: text;
+}
+
 .add-button {
   display: inline-flex;
   align-items: center;
