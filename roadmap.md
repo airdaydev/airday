@@ -1,5 +1,8 @@
 # Roadmap
 
+- list deleting - orphan handling?
+- list deleting - binned first?
+
 ## Correctness
 
 - Snapshot orchestration can get stuck waiting forever.
