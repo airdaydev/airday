@@ -47,9 +47,9 @@ Per account:
 
 - OPFS:
   - `loro.bin` — the latest committed full snapshot
-  - `meta.json` — committed local snapshot metadata
 - IndexedDB:
   - `ops` store — durable WAL records
+  - `snapshot_meta` store — committed snapshot metadata
 
 ## OPFS Snapshot
 
@@ -85,6 +85,8 @@ IndexedDB database layout:
 - object store: `ops`
 - primary key: `["account_id", "wal_seq"]`
 - index: `"by_account_seq"` on `["account_id", "wal_seq"]`
+- object store: `snapshot_meta`
+- primary key: `account_id`
 
 No additional indexes are required in the first implementation.
 
@@ -102,7 +104,7 @@ The encrypted payload must decrypt to canonical op bytes or equivalent replayabl
 
 ## Metadata
 
-Committed snapshot metadata lives in `meta.json` in the same OPFS account directory.
+Committed snapshot metadata lives in the IndexedDB `snapshot_meta` store.
 
 At minimum:
 
@@ -127,7 +129,7 @@ These extra fields exist for corruption detection and recovery sanity checks. Th
 
 Boot or restore works as follows:
 
-1. read committed `meta.json`
+1. read committed snapshot metadata from `snapshot_meta`
 2. load `snapshot_file`
 3. read IndexedDB WAL records with `wal_seq > snapshot_wal_seq`
 4. replay them in `wal_seq` order
@@ -139,7 +141,7 @@ If that does not reproduce the same document state that existed before shutdown,
 A fresh account may start with:
 
 - no snapshot
-- no `meta.json`
+- no snapshot metadata
 - empty WAL
 
 Before the first snapshot exists, restore is pure WAL replay.
@@ -166,7 +168,7 @@ Snapshot algorithm:
 3. close the temporary file successfully
 4. delete any stale prior temporary file for this account
 5. replace the committed snapshot file by moving the temporary file into the committed path if supported; otherwise keep the committed file path unchanged and point metadata at the newly written snapshot file
-6. atomically commit new `meta.json` with the new `snapshot_wal_seq`, `snapshot_file`, `snapshot_bytes`, and `snapshot_sha256`
+6. atomically commit new snapshot metadata in `snapshot_meta` with the new `snapshot_wal_seq`, `snapshot_file`, `snapshot_bytes`, and `snapshot_sha256`
 
 The first implementation does **not** require deleting old WAL records.
 
@@ -182,7 +184,7 @@ So the commit order is:
 
 Any future WAL cleanup must happen strictly after step 3 and is not part of this spec.
 
-`meta.json` is the authoritative commit point. A snapshot file that exists on disk but is not referenced by committed metadata is uncommitted and must be ignored on boot.
+The `snapshot_meta` record is the authoritative commit point. A snapshot file that exists on disk but is not referenced by committed metadata is uncommitted and must be ignored on boot.
 
 ## WAL Retention
 
