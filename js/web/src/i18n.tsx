@@ -68,6 +68,9 @@ type Messages = {
     settings: string;
     website: string;
     logOut: string;
+    export: string;
+    exportBackup: string;
+    exportFailed: string;
   };
   workspace: {
     emptyBin: string;
@@ -150,6 +153,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       settings: "Ajustes",
       website: "Sitio web de Airday",
       logOut: "Cerrar sesión",
+      export: "Exportar",
+      exportBackup: "Copia de seguridad (.bin)",
+      exportFailed: "No se pudo exportar la copia de seguridad",
     },
     workspace: {
       emptyBin: "Vaciar papelera",
@@ -231,6 +237,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       settings: "Settings",
       website: "Airday website",
       logOut: "Log out",
+      export: "Export",
+      exportBackup: "Backup (.bin)",
+      exportFailed: "Could not export backup",
     },
     workspace: {
       emptyBin: "Empty bin",

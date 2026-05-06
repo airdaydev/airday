@@ -1573,6 +1573,36 @@ function Nav(props: {
     return props.app.canRedo();
   };
 
+  // "Export → Backup": full plaintext Loro snapshot. Same bytes the
+  // engine would seal for the server, but unencrypted — anyone holding
+  // the file can replay the whole doc into a fresh `Doc::load`-style
+  // import. Date-stamped filename so repeat exports don't collide in
+  // the Downloads folder.
+  const downloadBackup = (): void => {
+    try {
+      const bytes = props.app.engine.exportSnapshot();
+      // Copy into a fresh ArrayBuffer — wasm-bindgen returns a view
+      // over the wasm linear memory, and Blob can capture-by-reference
+      // in some engines, leaving the download with a stale pointer
+      // once wasm reuses the bytes.
+      const buf = new Uint8Array(bytes.byteLength);
+      buf.set(bytes);
+      const blob = new Blob([buf], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `airday-${stamp}.bin`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("export backup failed:", err);
+      alert(m().nav.exportFailed);
+    }
+  };
+
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
     const ids = props.lists.map((l) => l.id);
@@ -1753,6 +1783,24 @@ function Nav(props: {
                 <kbd class="menu-shortcut">⌘⇧Z</kbd>
               </DropdownMenu.Item>
               <DropdownMenu.Separator class="dropdown-menu-separator" />
+              <DropdownMenu.Sub overlap gutter={4} shift={-4}>
+                <DropdownMenu.SubTrigger class="dropdown-menu-item dropdown-menu-subtrigger">
+                  <span>{m().nav.export}</span>
+                  <span class="dropdown-menu-chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.SubContent class="dropdown-menu-content">
+                    <DropdownMenu.Item
+                      class="dropdown-menu-item"
+                      onSelect={() => downloadBackup()}
+                    >
+                      {m().nav.exportBackup}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Sub>
               <DropdownMenu.Item
                 class="dropdown-menu-item"
                 onSelect={() => props.onOpenSettings()}

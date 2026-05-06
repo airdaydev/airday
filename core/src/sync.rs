@@ -655,7 +655,10 @@ mod tests {
             ops: vec![],
             complete: true,
         }));
-        assert!(eng.pop_outbox().is_none(), "no follow-up push for untouched fresh doc");
+        assert!(
+            eng.pop_outbox().is_none(),
+            "no follow-up push for untouched fresh doc"
+        );
         assert!(eng.is_idle());
     }
 

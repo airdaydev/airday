@@ -40,6 +40,7 @@ use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
 pub const LIST_MAIN: &str = "main";
+pub const LIST_MAIN_NAME: &str = "Desk";
 
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";
@@ -123,6 +124,34 @@ pub struct ListView {
     pub id: String,
     pub name: String,
     pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JsonExport {
+    pub version: u32,
+    pub lists: Vec<ExportList>,
+    pub items: Vec<ExportItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportList {
+    pub id: String,
+    pub name: String,
+    pub created_at: Option<i64>,
+    pub builtin: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportItem {
+    pub id: String,
+    pub text: String,
+    pub notes: String,
+    pub list_id: String,
+    pub created_at: i64,
+    pub done_at: Option<i64>,
+    pub binned_at: Option<i64>,
 }
 
 pub struct Doc {
@@ -688,6 +717,43 @@ impl Doc {
         out
     }
 
+    /// Semantic full-account export. This is intentionally a compact,
+    /// human-readable data dump rather than a CRDT/state backup.
+    pub fn export_json(&self) -> JsonExport {
+        let mut lists = Vec::with_capacity(self.lists().len() + 1);
+        lists.push(ExportList {
+            id: LIST_MAIN.to_string(),
+            name: LIST_MAIN_NAME.to_string(),
+            created_at: None,
+            builtin: true,
+        });
+        lists.extend(self.all_lists().into_iter().map(|list| ExportList {
+            id: list.id,
+            name: list.name,
+            created_at: Some(list.created_at),
+            builtin: false,
+        }));
+
+        let items = self
+            .iter_items()
+            .map(|item| ExportItem {
+                id: item.id,
+                text: item.text,
+                notes: item.notes,
+                list_id: item.list_id,
+                created_at: item.created_at,
+                done_at: item.done_at,
+                binned_at: item.binned_at,
+            })
+            .collect();
+
+        JsonExport {
+            version: 1,
+            lists,
+            items,
+        }
+    }
+
     pub fn get_item(&self, item_id: &str) -> Option<ItemView> {
         let (_, map) = self.find_item(item_id).ok()?;
         item_view(&map)
@@ -754,12 +820,20 @@ impl Doc {
     /// doc, not a delta — so this does not advance any push-state
     /// bookkeeping; producing a snapshot is side-effect-free locally.
     pub fn snapshot_blob(&self, dek: &Dek) -> Result<EncryptedBlob, DocError> {
-        let plaintext = self.inner.export(ExportMode::Snapshot)?;
+        let plaintext = self.export_snapshot_bytes()?;
         let (ciphertext, nonce) = dek.seal(&plaintext)?;
         Ok(EncryptedBlob {
             nonce: nonce.to_vec(),
             ciphertext,
         })
+    }
+
+    /// Plaintext full-state Loro snapshot. Same bytes that
+    /// `snapshot_blob` seals for the server, but unencrypted — for
+    /// user-driven backup / interop. Loro's import on a fresh doc
+    /// reconstructs identical state from this blob.
+    pub fn export_snapshot_bytes(&self) -> Result<Vec<u8>, DocError> {
+        Ok(self.inner.export(ExportMode::Snapshot)?)
     }
 
     /// Encrypted blob containing every commit since `last_pushed_vv`.
@@ -1767,6 +1841,47 @@ mod tests {
     }
 
     #[test]
+    fn json_export_includes_builtin_and_user_lists() {
+        let doc = Doc::new().unwrap();
+        let errands = doc.add_list("Errands").unwrap();
+
+        let export = doc.export_json();
+
+        assert_eq!(export.version, 1);
+        assert_eq!(
+            export.lists[0],
+            ExportList {
+                id: LIST_MAIN.to_string(),
+                name: LIST_MAIN_NAME.to_string(),
+                created_at: None,
+                builtin: true,
+            }
+        );
+        assert_eq!(export.lists[1].id, errands);
+        assert_eq!(export.lists[1].name, "Errands");
+        assert_eq!(export.lists[1].builtin, false);
+        assert!(export.lists[1].created_at.is_some());
+    }
+
+    #[test]
+    fn json_export_includes_notes_and_status_timestamps() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
+        doc.edit_item_notes(&id, "whole milk").unwrap();
+        doc.set_item_done(&id, true).unwrap();
+        doc.set_item_binned(&id, true).unwrap();
+
+        let export = doc.export_json();
+        let item = export.items.iter().find(|item| item.id == id).unwrap();
+
+        assert_eq!(item.text, "buy milk");
+        assert_eq!(item.notes, "whole milk");
+        assert_eq!(item.list_id, LIST_MAIN);
+        assert!(item.done_at.is_some());
+        assert!(item.binned_at.is_some());
+    }
+
+    #[test]
     fn move_live_item_uses_visible_target_index() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
@@ -2205,6 +2320,39 @@ mod tests {
         assert!(lists.contains(&other.as_str()));
         assert!(items.contains(&a.as_str()));
         assert!(items.contains(&b.as_str()));
+    }
+
+    #[test]
+    fn export_snapshot_bytes_roundtrips_through_loro_import() {
+        // Backup story: bytes from `export_snapshot_bytes` reconstruct
+        // the same logical state when imported into a fresh Loro doc.
+        // (`Doc::load` takes the full msgpack envelope; the user-facing
+        // backup is just the snapshot half, so we go through `LoroDoc`
+        // directly here — same path a fresh client would take to ingest
+        // an `airday-*.bin`.)
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _ = doc.add_item(&other, "b").unwrap();
+        doc.set_item_done(&a, true).unwrap();
+
+        let bytes = doc.export_snapshot_bytes().unwrap();
+        assert!(!bytes.is_empty());
+
+        let restored_inner = LoroDoc::new();
+        restored_inner.import(&bytes).unwrap();
+        let undo = Mutex::new(make_undo_manager(&restored_inner));
+        let restored = Doc {
+            inner: restored_inner,
+            last_pushed_vv: VersionVector::default(),
+            events: Mutex::new(VecDeque::new()),
+            undo,
+        };
+
+        // Fingerprint is the canonical "logical-equality" hash used
+        // throughout the test suite to assert convergence — same hash
+        // ⇒ same doc.
+        assert_eq!(doc.fingerprint(), restored.fingerprint());
     }
 
     #[test]

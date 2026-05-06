@@ -701,6 +701,19 @@ body {
   border: none;
 }
 
+/* SubTrigger reuses .dropdown-menu-item; the chevron tells the user a
+   nested menu opens to the side. Kobalte sets data-expanded on the
+   trigger when the sub is open. */
+.dropdown-menu-subtrigger[data-expanded] {
+  background: var(--bg-active);
+}
+
+.dropdown-menu-chevron {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
 .dialog-overlay {
   position: fixed;
   inset: 0;

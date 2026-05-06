@@ -297,6 +297,14 @@ impl Doc {
             .map_err(js_err)
     }
 
+    /// Plaintext full-state Loro snapshot — for user-driven backup
+    /// (`airday.bin`). Loro's `Doc::load`-equivalent reconstructs
+    /// identical state from this blob.
+    #[wasm_bindgen(js_name = exportSnapshot)]
+    pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
+        self.inner.export_snapshot_bytes().map_err(js_err)
+    }
+
     /// Replay one WAL row. Caller has already decrypted; we just feed
     /// it back through the Loro doc tagged so the per-session undo
     /// stack stays clean.
@@ -689,6 +697,14 @@ impl SyncEngine {
             .doc()
             .export_updates_after_bytes(from_vv)
             .map_err(js_err)
+    }
+
+    /// Plaintext full-state Loro snapshot — backs the web client's
+    /// "Export → Backup" menu item. Side-effect-free; doesn't touch
+    /// `last_pushed_vv` or the WAL frontier.
+    #[wasm_bindgen(js_name = exportSnapshot)]
+    pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
+        self.inner.doc().export_snapshot_bytes().map_err(js_err)
     }
 
     // -- mutations: items --

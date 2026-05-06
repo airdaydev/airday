@@ -13,6 +13,7 @@
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use airday_cli::commands::export::write_export;
 use airday_cli::config::{DeviceConfig, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
 use airday_cli::sync::Session;
@@ -229,6 +230,25 @@ async fn default_open_skips_connect() {
     assert!(started.elapsed() < Duration::from_millis(500));
     assert!(!session.is_online());
     session.flush().await.unwrap();
+}
+
+#[tokio::test]
+async fn export_json_writes_semantic_account_dump() {
+    let tmp = tempfile::tempdir().unwrap();
+    let doc = Doc::new().unwrap();
+    let errands = doc.add_list("Errands").unwrap();
+    let item_id = doc.add_item(&errands, "buy milk").unwrap();
+    doc.edit_item_notes(&item_id, "whole milk").unwrap();
+
+    let out = tmp.path().join("export.json");
+    write_export(&doc.export_json(), Some(&out)).unwrap();
+
+    let value: serde_json::Value = serde_json::from_slice(&std::fs::read(out).unwrap()).unwrap();
+    assert_eq!(value["version"], 1);
+    assert_eq!(value["lists"][0]["id"], LIST_MAIN);
+    assert_eq!(value["lists"][0]["name"], "Desk");
+    assert_eq!(value["items"][0]["id"], item_id);
+    assert_eq!(value["items"][0]["notes"], "whole milk");
 }
 
 #[tokio::test]

@@ -44,6 +44,9 @@ Single binary `airday`. Subcommands:
 - `airday cache status` — profile directory and `loro.bin` size. Read-only; never opens a WS.
 - `airday cache clear [--force]` — delete `loro.bin` and reset `last_acked_op_id` to 0; the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
 
+### Export
+- `airday export-json [--out PATH]` — semantic account export: built-in/user lists plus items/status/timestamps as regular JSON. Defaults to stdout; `--out` writes a file. This is a portability dump, not a CRDT backup/restore format.
+
 ### Sync
 - `airday sync` — pull peer ops, push any pending local ops, then exit. Connect failure is a hard error.
 

@@ -5,6 +5,7 @@ pub const MIN_PASSWORD_LEN: usize = 10;
 
 pub mod bin;
 pub mod cache;
+pub mod export;
 pub mod items;
 pub mod lists;
 mod login;
@@ -67,6 +68,8 @@ enum Cmd {
     Lists(lists::ListsArgs),
     /// Inspect the local cache.
     Cache(cache::CacheArgs),
+    /// Export the current account as semantic JSON.
+    ExportJson(export::ExportArgs),
     /// Show local sync state.
     Status(status::StatusArgs),
     /// Pull peer ops and push any pending local ops, then exit.
@@ -91,6 +94,7 @@ impl Cli {
             Cmd::Edit(a) => items::edit(a, sync).await,
             Cmd::Lists(a) => lists::run(a, sync).await,
             Cmd::Cache(a) => cache::run(a).await,
+            Cmd::ExportJson(a) => export::run(a, sync).await,
             Cmd::Status(a) => status::run(a).await,
             Cmd::Sync => sync::run().await,
         }
