@@ -70,6 +70,7 @@ type Messages = {
     logOut: string;
     export: string;
     exportBackup: string;
+    exportJson: string;
     exportFailed: string;
   };
   workspace: {
@@ -155,6 +156,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       logOut: "Cerrar sesión",
       export: "Exportar",
       exportBackup: "Copia de seguridad (.bin)",
+      exportJson: "JSON (.json)",
       exportFailed: "No se pudo exportar la copia de seguridad",
     },
     workspace: {
@@ -239,6 +241,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       logOut: "Log out",
       export: "Export",
       exportBackup: "Backup (.bin)",
+      exportJson: "JSON (.json)",
       exportFailed: "Could not export backup",
     },
     workspace: {

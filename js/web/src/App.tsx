@@ -1573,6 +1573,20 @@ function Nav(props: {
     return props.app.canRedo();
   };
 
+  // Trigger a browser download for an in-memory blob. Anchor + revoke
+  // is the only cross-browser path; FileSystem Access API isn't on
+  // Safari yet.
+  const triggerDownload = (blob: Blob, filename: string): void => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   // "Export → Backup": full plaintext Loro snapshot. Same bytes the
   // engine would seal for the server, but unencrypted — anyone holding
   // the file can replay the whole doc into a fresh `Doc::load`-style
@@ -1588,17 +1602,25 @@ function Nav(props: {
       const buf = new Uint8Array(bytes.byteLength);
       buf.set(bytes);
       const blob = new Blob([buf], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const stamp = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `airday-${stamp}.bin`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      triggerDownload(blob, `airday-${stamp}.bin`);
     } catch (err) {
       console.error("export backup failed:", err);
+      alert(m().nav.exportFailed);
+    }
+  };
+
+  // "Export → JSON": pretty-printed semantic dump (lists + items).
+  // Companion to the binary backup — readable in any editor, but lossy:
+  // CRDT history, ordering metadata, and undo-stack info aren't here.
+  const downloadJson = (): void => {
+    try {
+      const json = props.app.engine.exportJson();
+      const blob = new Blob([json], { type: "application/json" });
+      const stamp = new Date().toISOString().slice(0, 10);
+      triggerDownload(blob, `airday-${stamp}.json`);
+    } catch (err) {
+      console.error("export json failed:", err);
       alert(m().nav.exportFailed);
     }
   };
@@ -1797,6 +1819,12 @@ function Nav(props: {
                       onSelect={() => downloadBackup()}
                     >
                       {m().nav.exportBackup}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="dropdown-menu-item"
+                      onSelect={() => downloadJson()}
+                    >
+                      {m().nav.exportJson}
                     </DropdownMenu.Item>
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Portal>

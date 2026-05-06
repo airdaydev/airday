@@ -305,6 +305,14 @@ impl Doc {
         self.inner.export_snapshot_bytes().map_err(js_err)
     }
 
+    /// Pretty-printed JSON dump of every list + item — semantic
+    /// (human-readable) export, paired with the binary `exportSnapshot`
+    /// CRDT-state export.
+    #[wasm_bindgen(js_name = exportJson)]
+    pub fn export_json(&self) -> String {
+        self.inner.export_json_string()
+    }
+
     /// Replay one WAL row. Caller has already decrypted; we just feed
     /// it back through the Loro doc tagged so the per-session undo
     /// stack stays clean.
@@ -705,6 +713,13 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = exportSnapshot)]
     pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
         self.inner.doc().export_snapshot_bytes().map_err(js_err)
+    }
+
+    /// Pretty-printed JSON dump — companion to `exportSnapshot`,
+    /// powers the "Export → JSON" menu item.
+    #[wasm_bindgen(js_name = exportJson)]
+    pub fn export_json(&self) -> String {
+        self.inner.doc().export_json_string()
     }
 
     // -- mutations: items --

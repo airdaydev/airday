@@ -11,6 +11,7 @@ path = "src/lib.rs"
 airday-protocol = { path = "../crates/protocol" }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
+serde_json = { workspace = true }
 rmp-serde = { workspace = true }
 argon2 = { workspace = true }
 chacha20poly1305 = { workspace = true }

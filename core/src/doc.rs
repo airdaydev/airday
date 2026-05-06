@@ -754,6 +754,17 @@ impl Doc {
         }
     }
 
+    /// Pretty-printed JSON dump of `export_json` — what the web client
+    /// hands the user as `airday-*.json`. Pretty by default because the
+    /// file is meant to be opened in a text editor; consumers wanting a
+    /// compact form can re-serialize. Serialization of `JsonExport` is
+    /// statically infallible (only strings, ints, bools, vecs, options),
+    /// so the `expect` is a structural invariant, not user-reachable.
+    pub fn export_json_string(&self) -> String {
+        serde_json::to_string_pretty(&self.export_json())
+            .expect("JsonExport contains only primitives — serialization is infallible")
+    }
+
     pub fn get_item(&self, item_id: &str) -> Option<ItemView> {
         let (_, map) = self.find_item(item_id).ok()?;
         item_view(&map)
@@ -2320,6 +2331,22 @@ mod tests {
         assert!(lists.contains(&other.as_str()));
         assert!(items.contains(&a.as_str()));
         assert!(items.contains(&b.as_str()));
+    }
+
+    #[test]
+    fn export_json_string_is_valid_pretty_json() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let _ = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _ = doc.add_item(&other, "b").unwrap();
+
+        let s = doc.export_json_string();
+        // Pretty form has at least one newline; validates that the
+        // method went through `to_string_pretty`, not a compact dump.
+        assert!(s.contains('\n'));
+        // Round-trips through serde_json into the same struct.
+        let parsed: JsonExport = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed, doc.export_json());
     }
 
     #[test]
