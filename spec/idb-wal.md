@@ -81,7 +81,7 @@ Initial implementation choice:
 
 IndexedDB database layout:
 
-- database name: `airday-local`
+- database name: `airday-web`
 - object store: `ops`
 - primary key: `["account_id", "wal_seq"]`
 - index: `"by_account_seq"` on `["account_id", "wal_seq"]`
@@ -89,6 +89,8 @@ IndexedDB database layout:
 - primary key: `account_id`
 
 No additional indexes are required in the first implementation.
+
+The `airday-web` database is shared with other web-client at-rest stores (e.g. the wrapped-DEK vault, per-account device config). This spec only governs the `ops` and `snapshot_meta` stores; the shared database exists so a single `onupgradeneeded` path owns schema evolution across web-client modules rather than racing handlers across multiple databases.
 
 At minimum, every WAL record contains:
 
