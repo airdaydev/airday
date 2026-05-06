@@ -18,8 +18,9 @@ import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
 const LIST_MAIN = "main";
 
 function newEngine(): SyncEngine {
-  // Use create() so the seeded built-ins are present — exercises
-  // hasPendingOps()=true through the engine.
+  // Doc.create() builds a fresh doc with no commits (no seeded user
+  // lists). Mutations through the engine are what put it in a
+  // pending state.
   return new SyncEngine(Doc.create(), Dek.generate(), 0n, "test", "0.0.0");
 }
 
@@ -103,22 +104,23 @@ describe("doc passthrough", () => {
     expect(items[0].text).toBe("buy milk");
   });
 
-  test("seeded built-in lists are reachable through the engine", () => {
+  test("allListsJson on a fresh engine is empty; main is not a ListMeta", () => {
     const eng = newEngine();
     const lists = JSON.parse(eng.allListsJson()) as Array<{
       id: string;
       name: string;
     }>;
-    // `main` is a reserved id, not a MovableList entry — only "Later"
-    // is seeded as a real list.
+    // Per spec/data-model.md: `main` is a reserved id, not a
+    // MovableList entry, and there are no seeded user lists.
+    expect(lists).toHaveLength(0);
     expect(lists.some((l) => l.id === LIST_MAIN)).toBe(false);
-    expect(lists.map((l) => l.name)).toContain("Later");
   });
 
   test("hasPendingOps reflects unpushed mutations", () => {
     const eng = newEngine();
-    // Built-in seed ships as the first op stream — pending from the
-    // moment the doc is created.
+    // Fresh doc has no commits → nothing pending.
+    expect(eng.hasPendingOps()).toBe(false);
+    eng.addItem(LIST_MAIN, "later");
     expect(eng.hasPendingOps()).toBe(true);
   });
 

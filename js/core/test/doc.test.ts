@@ -63,16 +63,16 @@ describe("Doc + MemStorage", () => {
     expect(await storage.getDevice()).toBeNull();
   });
 
-  test("seeded built-in lists are present after create", () => {
+  test("fresh doc has no user lists; main is not a ListMeta", () => {
     const doc = Doc.create();
     const lists = JSON.parse(doc.allListsJson()) as Array<{
       id: string;
       name: string;
     }>;
-    // `main` is a reserved id, not a MovableList entry — only "Later"
-    // is seeded as a real list.
+    // Per spec/data-model.md: `main` is a reserved id, not a MovableList
+    // entry, and there are no seeded user lists.
+    expect(lists).toHaveLength(0);
     expect(lists.some((l) => l.id === LIST_MAIN)).toBe(false);
-    expect(lists.map((l) => l.name)).toContain("Later");
   });
 });
 
@@ -90,20 +90,18 @@ describe("Op stream round trip via two replicas", () => {
   test("replica B converges to A's fingerprint after applying A's blob", () => {
     const dek = Dek.generate();
 
+    // A fresh doc has no commits (no seeded user lists), so
+    // pendingExport is None until a real mutation lands.
     const a = Doc.create();
-    // Built-in seeds count as pending until we mark them pushed.
-    const seedBlob = a.pendingExport(dek);
-    expect(seedBlob).toBeDefined();
-    a.markPushed();
+    expect(a.pendingExport(dek)).toBeUndefined();
 
     const itemId = a.addItem(LIST_MAIN, "from A");
     const opBlob = a.pendingExport(dek);
     expect(opBlob).toBeDefined();
     a.markPushed();
 
-    // B starts empty and replays everything.
+    // B starts empty and replays the single op stream.
     const b = Doc.empty();
-    b.applyRemote(dek, seedBlob!);
     b.applyRemote(dek, opBlob!);
 
     expect(bytesEqual(a.fingerprint(), b.fingerprint())).toBe(true);
