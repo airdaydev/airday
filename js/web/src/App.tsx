@@ -1834,14 +1834,28 @@ function EditableNavLabel(props: {
       class={props.class ?? "nav-item-label"}
       contentEditable={editing()}
       onDblClick={startEdit}
-      onKeyDown={(e) => {
+      on:keydown={(e) => {
+        // Native (non-delegated) so the bubble order is span → nav dnd
+        // listbox; Solid's delegated `onKeyDown` would fire at document
+        // level *after* the listbox's bubble handler, so Cmd+A would hit
+        // the dnd's select-all before we could stop it. Same pattern as
+        // the row-text editor below.
+        if (!editing()) return;
         if (e.key === "Enter") {
           e.preventDefault();
+          e.stopPropagation();
           save();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancel();
+          return;
         }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          cancel();
+          return;
+        }
+        // Don't let the dnd intercept keys the contenteditable owns
+        // (Cmd+A select-all, arrow caret movement, etc).
+        e.stopPropagation();
       }}
       onBlur={save}
       onClick={(e) => {
