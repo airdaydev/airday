@@ -50,6 +50,12 @@ interface SnapshotMetaRow {
   version: number;
   account_id: string;
   snapshot_file: string;
+  /** Monotonic per-account generation counter. Drives the filename so
+   *  consecutive commits at the same `snapshot_wal_seq` (visibility-
+   *  hidden flushes, signup seeding) write to distinct paths and never
+   *  overwrite a currently-committed file in place. Absent on rows
+   *  written by older builds; treat missing as 0. */
+  snapshot_gen?: number;
   snapshot_wal_seq: number;
   snapshot_bytes: number;
   snapshot_sha256: Uint8Array;
@@ -70,7 +76,7 @@ interface DeviceRow {
  * tabs. Wal_seq ordering is enforced by IDB primary-key constraints
  * — concurrent appends from a peer tab would collide and one would
  * fail rather than silently interleave. Cross-tab ownership is the
- * shared-worker spec's problem (`spec/leader-follower.md`).
+ * shared-worker spec's problem (`spec/shared-worker.md`).
  */
 export class IdbWalStorage implements WalStorage {
   private nextWalSeq = 1;
@@ -238,20 +244,27 @@ export class IdbWalStorage implements WalStorage {
     cipher.set(sealed.nonce, 0);
     cipher.set(sealed.ciphertext, sealed.nonce.length);
 
-    // Versioned filename: a prior file remains authoritative until the
-    // metadata flip below. The first snapshot lands at `loro.bin` to
-    // match the spec's "initially loro.bin" wording for compatibility.
-    const fileName =
-      snapshotWalSeq === 0 ? "loro.bin" : `loro-${snapshotWalSeq}.bin`;
-    await writeOpfsFile(this.accountId, fileName, cipher);
-
     const sha = new Uint8Array(await sha256(cipher));
     const db = await this.openDb();
     const previous = await this.getMeta(db);
+
+    // Filename is derived from a monotonic `snapshot_gen`, never from
+    // `snapshot_wal_seq`. Two commits at the same seq (visibility-
+    // hidden re-fires, signup seeding) must land on distinct files so
+    // the previously-committed file stays intact until the metadata
+    // flip — see `spec/idb-wal.md` "Atomicity Rule". The `snap-`
+    // namespace is fresh; any leftover `loro.bin` / `loro-N.bin` from
+    // pre-`snapshot_gen` builds is reaped by the cleanup below on the
+    // first commit after upgrade.
+    const gen = (previous?.snapshot_gen ?? 0) + 1;
+    const fileName = `snap-${gen}.bin`;
+    await writeOpfsFile(this.accountId, fileName, cipher);
+
     const next: SnapshotMetaRow = {
       version: META_VERSION,
       account_id: this.accountId,
       snapshot_file: fileName,
+      snapshot_gen: gen,
       snapshot_wal_seq: snapshotWalSeq,
       snapshot_bytes: cipher.byteLength,
       snapshot_sha256: sha,

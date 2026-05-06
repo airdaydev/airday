@@ -804,7 +804,16 @@ impl Doc {
     /// freshly committed local op needs to land in the WAL before it's
     /// considered durable, regardless of whether the server has it.
     pub fn export_updates_after_bytes(&self, from_vv_bytes: &[u8]) -> Result<Vec<u8>, DocError> {
-        let vv = VersionVector::decode(from_vv_bytes).map_err(|e| DocError::Loro(e.to_string()))?;
+        // Empty input means "from genesis" — convenient cursor for the
+        // first WAL append on a fresh-signup boot, before any
+        // `oplog_vv_bytes()` has been captured. (Loro's wire encoding of
+        // an empty VV is one byte `[0]`; an empty slice would otherwise
+        // fail decode.)
+        let vv = if from_vv_bytes.is_empty() {
+            VersionVector::default()
+        } else {
+            VersionVector::decode(from_vv_bytes).map_err(|e| DocError::Loro(e.to_string()))?
+        };
         Ok(self.inner.export(ExportMode::updates(&vv))?)
     }
 

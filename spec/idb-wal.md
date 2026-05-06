@@ -188,6 +188,8 @@ Any future WAL cleanup must happen strictly after step 3 and is not part of this
 
 The `snapshot_meta` record is the authoritative commit point. A snapshot file that exists on disk but is not referenced by committed metadata is uncommitted and must be ignored on boot.
 
+Each commit must write to a filename that the currently-committed metadata does not reference, so step 1 cannot truncate or partially overwrite the file step 2 still depends on. The implementation derives the filename from a monotonic `snapshot_gen` counter on `snapshot_meta`, incremented inside the same metadata write that commits it. `snapshot_wal_seq` alone is insufficient because legitimate caller patterns (visibility-hidden flushes, signup seeding) can re-fire at the same seq.
+
 ## WAL Retention
 
 WAL records are retained conservatively in the initial implementation.

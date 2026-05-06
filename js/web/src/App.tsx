@@ -445,7 +445,19 @@ function MainApp(props: {
   // next chunk is strictly the new ops. Remote-applied ops also flow
   // through here — including them is wasteful but harmless on replay
   // (CRDT updates are idempotent).
-  let walVvCursor: Uint8Array | null = wal ? engine.oplogVvBytes() : null;
+  //
+  // Fresh-signup seeding: `Doc.create()` happens in the boot path before
+  // this listener is wired, so the seeded built-ins are already in the
+  // engine. Start the cursor at empty so the very first capture emits
+  // them as `wal_seq = 1` — that gives reload pure-WAL replay (per
+  // spec/idb-wal.md "Fresh Account") without needing a special
+  // snapshot-at-signup that would otherwise commit a `seq = 0` snapshot
+  // and conflict with the visibility-hidden snapshot path.
+  let walVvCursor: Uint8Array | null = wal
+    ? props.session.freshSignup
+      ? new Uint8Array(0)
+      : engine.oplogVvBytes()
+    : null;
   let walAppendChain: Promise<void> = Promise.resolve();
   const captureAndAppend = (): void => {
     if (!wal || !walVvCursor) return;
@@ -566,11 +578,17 @@ function MainApp(props: {
     saveDeviceSoon();
   });
 
-  // Fresh signup (or any session that has never written a snapshot)
-  // — seed the OPFS snapshot once so the built-ins survive a reload
-  // even if the user closes the tab before doing anything else.
+  // Fresh signup: capture the seeded built-ins as the first WAL row so
+  // a reload before any user mutation has something to replay. Cursor
+  // is initialised to empty above, so this single call exports
+  // everything in the doc since genesis. Snapshots are then triggered
+  // strictly by the WAL-threshold path — no special-case OPFS write at
+  // signup, which keeps `commitSnapshot` from ever being called twice
+  // with the same `snapshotWalSeq` (the same-seq case would overwrite a
+  // currently-committed snapshot file in place; see spec/idb-wal.md
+  // "Atomicity Rule").
   if (wal && props.session.freshSignup) {
-    scheduleSnapshot();
+    captureAndAppend();
   }
 
   const onVisibility = () => {
