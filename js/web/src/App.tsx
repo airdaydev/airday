@@ -57,6 +57,7 @@ type ViewKey =
 
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
+const SINGLE_TAB_LOCK_NAME = "airday-single-tab";
 
 // Done items linger in their live list this long after being marked
 // done, so the user sees the strike-through before the row drops out.
@@ -151,6 +152,60 @@ const relativeEn = {
 };
 
 export function App() {
+  const { m } = useAppI18n();
+  const [gate, setGate] = createSignal<"checking" | "allowed" | "blocked">(
+    "checking",
+  );
+
+  onMount(() => {
+    if (!shouldEnforceSingleTab()) {
+      setGate("allowed");
+      return;
+    }
+    if (!("locks" in navigator) || !navigator.locks) {
+      console.warn("navigator.locks unavailable; single-tab gate disabled");
+      setGate("allowed");
+      return;
+    }
+
+    let release: (() => void) | null = null;
+    void navigator.locks.request(
+      SINGLE_TAB_LOCK_NAME,
+      { ifAvailable: true },
+      async (lock) => {
+        if (!lock) {
+          setGate("blocked");
+          return;
+        }
+        setGate("allowed");
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      },
+    );
+
+    onCleanup(() => {
+      release?.();
+    });
+  });
+
+  return (
+    <Show when={gate() !== "checking"} fallback={<div class="empty">{m().common.loading}</div>}>
+      <Show
+        when={gate() === "allowed"}
+        fallback={
+          <div class="empty">
+            Airday is already open in another tab.
+          </div>
+        }
+      >
+        <AppBody />
+      </Show>
+    </Show>
+  );
+}
+
+function AppBody() {
   const { m, locale, direction } = useAppI18n();
   createEffect(() => {
     document.documentElement.lang = locale();
@@ -256,6 +311,19 @@ export function App() {
       </Show>
     </Show>
   );
+}
+
+function shouldEnforceSingleTab(): boolean {
+  const flag = (import.meta.env as Record<string, string | boolean | undefined>)[
+    "VITE_ENFORCE_SINGLE_TAB"
+  ];
+  if (flag === "0") return false;
+  if (flag === "1") return true;
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("multiTab") === "1") return false;
+
+  return !import.meta.env.DEV;
 }
 
 async function createAnonymousSession(): Promise<Session> {
