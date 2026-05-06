@@ -271,6 +271,40 @@ impl Doc {
             .map_err(js_err)
     }
 
+    // -- WAL primitives --
+    //
+    // These three methods back the browser local-snapshot + WAL
+    // adapter (`spec/idb-wal.md`). The JS host:
+    //   1. captures `oplogVvBytes()` after each commit,
+    //   2. asks for `exportUpdatesAfter(prev_vv)` to get the delta,
+    //   3. encrypts + appends it to IndexedDB,
+    //   4. on boot, walks the WAL and feeds each plaintext blob back
+    //      via `importWalUpdates`.
+
+    /// Encoded current oplog VersionVector.
+    #[wasm_bindgen(js_name = oplogVvBytes)]
+    pub fn oplog_vv_bytes(&self) -> Vec<u8> {
+        self.inner.oplog_vv_bytes()
+    }
+
+    /// Plaintext Loro update bytes for everything committed strictly
+    /// after `from_vv`. JS encrypts the result before writing it to
+    /// IndexedDB.
+    #[wasm_bindgen(js_name = exportUpdatesAfter)]
+    pub fn export_updates_after(&self, from_vv: &[u8]) -> Result<Vec<u8>, JsError> {
+        self.inner
+            .export_updates_after_bytes(from_vv)
+            .map_err(js_err)
+    }
+
+    /// Replay one WAL row. Caller has already decrypted; we just feed
+    /// it back through the Loro doc tagged so the per-session undo
+    /// stack stays clean.
+    #[wasm_bindgen(js_name = importWalUpdates)]
+    pub fn import_wal_updates(&mut self, plaintext: &[u8]) -> Result<(), JsError> {
+        self.inner.import_wal_updates(plaintext).map_err(js_err)
+    }
+
     // -- undo / redo --
 
     pub fn undo(&self) -> Result<bool, JsError> {
@@ -634,6 +668,27 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = hasPendingOps)]
     pub fn has_pending_ops(&self) -> bool {
         self.inner.doc().has_pending_ops()
+    }
+
+    // -- WAL passthrough --
+    //
+    // After each local mutation the browser host captures the oplog
+    // VV, asks for the delta since the previous capture, and pushes
+    // that into the IndexedDB WAL. Replay (`importWalUpdates`) runs
+    // on the bare `Doc` before the engine is constructed, so it lives
+    // on `Doc` only.
+
+    #[wasm_bindgen(js_name = oplogVvBytes)]
+    pub fn oplog_vv_bytes(&self) -> Vec<u8> {
+        self.inner.doc().oplog_vv_bytes()
+    }
+
+    #[wasm_bindgen(js_name = exportUpdatesAfter)]
+    pub fn export_updates_after(&self, from_vv: &[u8]) -> Result<Vec<u8>, JsError> {
+        self.inner
+            .doc()
+            .export_updates_after_bytes(from_vv)
+            .map_err(js_err)
     }
 
     // -- mutations: items --

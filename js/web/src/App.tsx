@@ -18,12 +18,7 @@ import {
   Show,
 } from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import {
-  NullStorage,
-  OpfsStorage,
-  probeOpfs,
-  type StorageAdapter,
-} from "@airday/core";
+import { IdbWalStorage, probeOpfs } from "@airday/core";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
@@ -166,9 +161,11 @@ export function App() {
   // anonymous one — `session()` is never null after that point.
   const [session, setSession] = createSignal<Session | undefined>(undefined);
   const [online, setOnline] = createSignal(false);
-  const [boot, setBoot] = createSignal<{ doc: Doc; lastAcked: bigint } | null>(
-    null,
-  );
+  const [boot, setBoot] = createSignal<{
+    doc: Doc;
+    lastAcked: bigint;
+    wal: IdbWalStorage | null;
+  } | null>(null);
   const [bootError, setBootError] = createSignal<string | null>(null);
   const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
 
@@ -290,9 +287,11 @@ async function createAnonymousSession(): Promise<Session> {
 
 function BootGate(props: {
   session: Session;
-  boot: { doc: Doc; lastAcked: bigint } | null;
+  boot: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null } | null;
   bootError: string | null;
-  setBoot: (b: { doc: Doc; lastAcked: bigint } | null) => void;
+  setBoot: (
+    b: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null } | null,
+  ) => void;
   setBootError: (m: string | null) => void;
   online: boolean;
   setOnline: (b: boolean) => void;
@@ -301,40 +300,66 @@ function BootGate(props: {
   opfsOk: boolean;
 }) {
   const { m } = useAppI18n();
-  // Try to restore a doc + frontier from OPFS. On signup we always
-  // start with a fresh Doc.create(); on login we prefer OPFS if the
-  // cached snapshot decrypts cleanly with the DEK we just unwrapped.
-  // Failures fall through to an empty doc — sync will catch us up.
-  // Kick the async load on mount; the resulting `setBoot` flips the
-  // <Show> below so MainApp mounts once.
+  // Restore the doc per `spec/idb-wal.md`: load the committed OPFS
+  // snapshot, then replay every IndexedDB WAL row strictly after
+  // `snapshot_wal_seq`. On signup we still start with a fresh
+  // `Doc.create()` so the seeded built-ins land. Without OPFS we
+  // can't snapshot (and IDB-only would orphan the WAL on reload), so
+  // fall through to an empty doc that sync catches up.
   void (async () => {
+    const t0 = performance.now();
+    const tap = (label: string, t: number) => {
+      // eslint-disable-next-line no-console
+      console.debug(`[boot] ${label.padEnd(28)} ${(t - t0).toFixed(1)}ms`);
+    };
     try {
       if (props.session.freshSignup) {
-        props.setBoot({ doc: Doc.create(), lastAcked: 0n });
+        const wal = await tryInitWal(props.session, props.opfsOk);
+        tap("freshSignup wal init", performance.now());
+        props.setBoot({ doc: Doc.create(), lastAcked: 0n, wal });
         return;
       }
       if (!props.opfsOk) {
-        props.setBoot({ doc: Doc.empty(), lastAcked: 0n });
+        props.setBoot({ doc: Doc.empty(), lastAcked: 0n, wal: null });
         return;
       }
-      const storage = new OpfsStorage(
+      const wal = new IdbWalStorage(
         props.session.accountId,
         props.session.dek.clone(),
         EncryptedBlob,
       );
-      const docBytes = await storage.getDoc();
-      const device = await storage.getDevice();
-      if (docBytes) {
-        props.setBoot({
-          doc: Doc.load(docBytes),
-          lastAcked: BigInt(device?.lastAckedOpId ?? 0),
-        });
-      } else {
-        props.setBoot({ doc: Doc.empty(), lastAcked: 0n });
+      const replay = await wal.loadForReplay();
+      tap(
+        `loadForReplay (${replay.walEntries.length} wal)`,
+        performance.now(),
+      );
+      // `loadForReplay` already pulled the device row in the same
+      // tx; only fall back to a separate get if an implementation
+      // skipped it.
+      const device =
+        replay.device !== undefined ? replay.device : await wal.getDevice();
+      const doc = replay.snapshot ? Doc.load(replay.snapshot) : Doc.empty();
+      tap("Doc.load(snapshot)", performance.now());
+      // The replay path tags WAL imports as "remote" so the rebuilt
+      // UndoManager skips them; replay order is wal_seq ascending,
+      // matching the order they were committed locally.
+      for (const entry of replay.walEntries) {
+        try {
+          doc.importWalUpdates(entry.plaintext);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn(`wal replay failed at seq ${entry.walSeq}:`, e);
+        }
       }
+      tap("WAL replay done", performance.now());
+      props.setBoot({
+        doc,
+        lastAcked: BigInt(device?.lastAckedOpId ?? 0),
+        wal,
+      });
     } catch (e) {
       props.setBootError(e instanceof Error ? e.message : String(e));
-      props.setBoot({ doc: Doc.empty(), lastAcked: 0n });
+      props.setBoot({ doc: Doc.empty(), lastAcked: 0n, wal: null });
     }
   })();
 
@@ -356,9 +381,25 @@ function BootGate(props: {
   );
 }
 
+/** Initialise an empty WAL store for a freshly-signed-up session so
+ *  the first commits land in IDB even before the first snapshot. */
+async function tryInitWal(
+  session: Session,
+  opfsOk: boolean,
+): Promise<IdbWalStorage | null> {
+  if (!opfsOk) return null;
+  const wal = new IdbWalStorage(
+    session.accountId,
+    session.dek.clone(),
+    EncryptedBlob,
+  );
+  await wal.loadForReplay();
+  return wal;
+}
+
 function MainApp(props: {
   session: Session;
-  boot: { doc: Doc; lastAcked: bigint };
+  boot: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null };
   bootError: string | null;
   online: boolean;
   setOnline: (b: boolean) => void;
@@ -373,7 +414,7 @@ function MainApp(props: {
     "lastAcked=",
     String(props.boot.lastAcked),
   );
-  // Both SyncEngine and OpfsStorage consume their Dek argument, and
+  // Both SyncEngine and the WAL store consume their Dek argument, and
   // the session-level Dek must stay valid across MainApp remounts
   // (anonymous → authed swap remounts this whole tree on the Session
   // key). So clone for each consumer; the original on
@@ -394,17 +435,38 @@ function MainApp(props: {
     });
   }
 
-  const storage: StorageAdapter = props.opfsOk
-    ? new OpfsStorage(
-        props.session.accountId,
-        props.session.dek.clone(),
-        EncryptedBlob,
-      )
-    : new NullStorage();
+  const wal = props.boot.wal;
+
+  // ---------- WAL: hot path, per commit ----------
+  //
+  // After every mutation (local or remote) we capture a Loro update
+  // covering everything since the previous WAL append, encrypt it, and
+  // append a row to IndexedDB. `walVvCursor` advances each time so the
+  // next chunk is strictly the new ops. Remote-applied ops also flow
+  // through here — including them is wasteful but harmless on replay
+  // (CRDT updates are idempotent).
+  let walVvCursor: Uint8Array | null = wal ? engine.oplogVvBytes() : null;
+  let walAppendChain: Promise<void> = Promise.resolve();
+  const captureAndAppend = (): void => {
+    if (!wal || !walVvCursor) return;
+    const updates = engine.exportUpdatesAfter(walVvCursor);
+    if (updates.length === 0) return;
+    walVvCursor = engine.oplogVvBytes();
+    const w = wal;
+    walAppendChain = walAppendChain
+      .then(() => w.appendWal(updates))
+      .then(() => {
+        if (w.shouldSnapshot()) scheduleSnapshot();
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("wal append failed:", e);
+      });
+  };
 
   // Anonymous sessions are local-only by definition — no account on
   // the server to authenticate to. Skip the WebSocket pump entirely;
-  // local mutations still flow through the engine for OPFS persist.
+  // local mutations still flow through the engine for WAL persist.
   let bridge: SyncBridge | null = null;
   if (!props.session.anonymous) {
     bridge = new SyncBridge({
@@ -413,75 +475,122 @@ function MainApp(props: {
         if (kind === "online") props.setOnline(true);
         if (kind === "offline") props.setOnline(false);
       },
-      onAppEvents: () => app.drainEvents(),
+      onAppEvents: () => {
+        app.drainEvents();
+        // Server frame applied → capture remote-imported ops too. Cheap
+        // when nothing changed (export returns 0 bytes).
+        captureAndAppend();
+      },
       onAuthFailed: () => void props.logout(),
     });
     const b = bridge;
-    app.setOnFlush(() => b.pumpOutbox());
+    app.setOnFlush(() => {
+      captureAndAppend();
+      b.pumpOutbox();
+    });
     bridge.start();
     onCleanup(() => b.stop());
+  } else {
+    // Anonymous: still capture local commits for WAL durability.
+    app.setOnFlush(() => captureAndAppend());
   }
 
-  // Debounced persistence. Every doc change (local mutation or
-  // remote apply) bumps `app.version()`; we coalesce a window of
-  // 500ms and write a fresh snapshot. The visibility-hidden listener
-  // is the belt-and-suspenders save for tab-close.
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  const saveNow = async () => {
-    saveTimer = null;
+  // ---------- Snapshot: cold path ----------
+  //
+  // Triggered when the WAL has accumulated `SNAPSHOT_THRESHOLD` rows
+  // since the last committed snapshot, or by a visibility-hidden flush
+  // on tab close. We wait for the in-flight WAL chain so the new
+  // `snapshot_wal_seq` we record actually covers every appended row.
+  let snapshotChain: Promise<void> = Promise.resolve();
+  let snapshotPending = false;
+  const snapshotNow = async (): Promise<void> => {
+    if (!wal) return;
+    snapshotPending = false;
     try {
+      await walAppendChain;
       const bytes = engine.save();
-      // Anonymous sessions skip the device record — its DeviceConfig
-      // shape requires email + deviceId, neither of which exist
-      // before signup, and lastAckedOpId / lastSyncAt are meaningless
-      // without a server peer. The doc snapshot still rides through
-      // putDoc so reload restores local data.
-      if (props.session.anonymous) {
-        await storage.putDoc(bytes);
-      } else {
-        const lastAcked = engine.highestSeenOpId();
-        await Promise.all([
-          storage.putDoc(bytes),
-          storage.putDevice({
-            accountId: props.session.accountId,
-            email: props.session.email!,
-            // Bundle is served from the same origin as the API; record
-            // that origin for completeness even though the cookie is the
-            // load-bearing piece of "which server am I talking to".
-            serverUrl: window.location.origin,
-            deviceId: props.session.deviceId!,
-            lastAckedOpId: Number(lastAcked),
-            lastSyncAt: Date.now(),
-          }),
-        ]);
+      const snapshotSeq = wal.highestWalSeq();
+      await wal.commitSnapshot(bytes, snapshotSeq);
+      if (!props.session.anonymous) {
+        await wal.putDevice({
+          accountId: props.session.accountId,
+          email: props.session.email!,
+          // Bundle is served from the same origin as the API; record
+          // that origin for completeness even though the cookie is the
+          // load-bearing piece of "which server am I talking to".
+          serverUrl: window.location.origin,
+          deviceId: props.session.deviceId!,
+          lastAckedOpId: Number(engine.highestSeenOpId()),
+          lastSyncAt: Date.now(),
+        });
       }
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error("opfs save failed:", e);
+      console.error("snapshot failed:", e);
     }
   };
-  const scheduleSave = () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveNow, 500);
+  const scheduleSnapshot = (): void => {
+    if (snapshotPending) return;
+    snapshotPending = true;
+    snapshotChain = snapshotChain.then(snapshotNow);
+  };
+
+  // ---------- Device config: light writes on each frontier change ----------
+  //
+  // `lastAckedOpId` advances independently of mutations. Persist it on
+  // a coarse debounce so reload picks up the right resume point even
+  // if no snapshot lands in between.
+  let deviceTimer: ReturnType<typeof setTimeout> | null = null;
+  const saveDeviceSoon = (): void => {
+    if (!wal || props.session.anonymous) return;
+    if (deviceTimer) clearTimeout(deviceTimer);
+    deviceTimer = setTimeout(() => {
+      deviceTimer = null;
+      void wal
+        .putDevice({
+          accountId: props.session.accountId,
+          email: props.session.email!,
+          serverUrl: window.location.origin,
+          deviceId: props.session.deviceId!,
+          lastAckedOpId: Number(engine.highestSeenOpId()),
+          lastSyncAt: Date.now(),
+        })
+        .catch((e) => {
+          // eslint-disable-next-line no-console
+          console.error("device save failed:", e);
+        });
+    }, 500);
   };
   createEffect(() => {
     app.version();
-    scheduleSave();
+    saveDeviceSoon();
   });
+
+  // Fresh signup (or any session that has never written a snapshot)
+  // — seed the OPFS snapshot once so the built-ins survive a reload
+  // even if the user closes the tab before doing anything else.
+  if (wal && props.session.freshSignup) {
+    scheduleSnapshot();
+  }
+
   const onVisibility = () => {
     if (document.visibilityState === "hidden") {
-      if (saveTimer) clearTimeout(saveTimer);
-      void saveNow();
+      // Drain WAL appends in flight, then commit a snapshot so the
+      // next boot has a fresh base. Best-effort — IDB writes already
+      // queued behind `walAppendChain` will land regardless of whether
+      // the snapshot fires before the page goes away.
+      if (deviceTimer) clearTimeout(deviceTimer);
+      void snapshotNow();
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
   onCleanup(() => {
     document.removeEventListener("visibilitychange", onVisibility);
-    if (saveTimer) clearTimeout(saveTimer);
+    if (deviceTimer) clearTimeout(deviceTimer);
   });
 
   if (typeof window !== "undefined") {
-    (window as any).__airday = { app, engine, bridge, storage };
+    (window as any).__airday = { app, engine, bridge, wal };
   }
 
   return (

@@ -789,6 +789,38 @@ impl Doc {
         self.last_pushed_vv.merge(&vv);
     }
 
+    /// Encoded current oplog VersionVector. The browser WAL adapter
+    /// (`spec/idb-wal.md`) keeps the VV captured after the previous
+    /// commit and asks for everything strictly after it on the next
+    /// commit — that delta is what the WAL row stores.
+    pub fn oplog_vv_bytes(&self) -> Vec<u8> {
+        self.inner.oplog_vv().encode()
+    }
+
+    /// Export Loro updates strictly after `from_vv_bytes`. Returns the
+    /// raw plaintext update blob (the JS layer encrypts it before
+    /// writing to IndexedDB). Decoupled from `pending_export` because
+    /// the WAL frontier is independent of the sync push frontier — a
+    /// freshly committed local op needs to land in the WAL before it's
+    /// considered durable, regardless of whether the server has it.
+    pub fn export_updates_after_bytes(&self, from_vv_bytes: &[u8]) -> Result<Vec<u8>, DocError> {
+        let vv = VersionVector::decode(from_vv_bytes).map_err(|e| DocError::Loro(e.to_string()))?;
+        Ok(self.inner.export(ExportMode::updates(&vv))?)
+    }
+
+    /// Apply WAL replay bytes during boot. Tagged `"remote"` so the
+    /// freshly-rebuilt UndoManager (constructed by `Doc::load`) skips
+    /// them — undo state is per-session anyway, and reloading a tab
+    /// shouldn't resurrect undoable steps.
+    ///
+    /// Does *not* advance `last_pushed_vv`. Whether the original local
+    /// commit reached the server before the crash is unknowable from
+    /// disk; the next push retries, and Loro / the server dedupe.
+    pub fn import_wal_updates(&mut self, plaintext: &[u8]) -> Result<(), DocError> {
+        self.inner.import_with(plaintext, "remote")?;
+        Ok(())
+    }
+
     /// Merge `vv` into `last_pushed_vv`. Pair with `oplog_vv()` captured
     /// at the moment of `pending_export` — on the server's ack, this
     /// advances only past the ops that were actually on the wire,

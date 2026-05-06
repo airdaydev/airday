@@ -13,13 +13,16 @@
 // tradeoff.
 //
 // One record per origin keyed at `'current'`. Web is a single-account
-// surface; logging in as a different account overwrites.
+// surface; logging in as a different account overwrites. The vault
+// shares the `airday-web` IndexedDB database with the WAL store
+// (`@airday/core/storage/idb-wal`); the schema is owned by
+// `@airday/core/storage/web-db` so neither module's open path
+// surprises the other with a missing object store.
 
 import { Dek } from "@airday/core/wasm";
+import { STORE_VAULT, openAirdayDb } from "@airday/core/storage/web-db";
 
-const DB_NAME = "airday-web";
-const DB_VERSION = 1;
-const STORE = "vault";
+const STORE = STORE_VAULT;
 const KEY = "current";
 
 export interface VaultedSession {
@@ -46,7 +49,8 @@ export const dekVault = {
   async load(): Promise<VaultedSession | null> {
     let rec: VaultRecord | undefined;
     try {
-      rec = await idb((db) => idbGet<VaultRecord>(db, STORE, KEY));
+      const db = await openAirdayDb();
+      rec = await idbGet<VaultRecord>(db, STORE, KEY);
     } catch (e) {
       console.warn("dekVault.load: idb open/read failed:", e);
       return null;
@@ -103,12 +107,14 @@ export const dekVault = {
       iv,
       wrappedDek,
     };
-    await idb((db) => idbPut(db, STORE, KEY, rec));
+    const db = await openAirdayDb();
+    await idbPut(db, STORE, KEY, rec);
   },
 
   async clear(): Promise<void> {
     try {
-      await idb((db) => idbDelete(db, STORE, KEY));
+      const db = await openAirdayDb();
+      await idbDelete(db, STORE, KEY);
     } catch (e) {
       console.warn("dekVault.clear: idb delete failed:", e);
     }
@@ -116,30 +122,6 @@ export const dekVault = {
 };
 
 // ---------- IndexedDB helpers ----------
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE);
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error("indexedDB open blocked"));
-  });
-}
-
-async function idb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
-  const db = await openDb();
-  try {
-    return await fn(db);
-  } finally {
-    db.close();
-  }
-}
 
 function idbGet<T>(db: IDBDatabase, store: string, key: string): Promise<T | undefined> {
   return new Promise((resolve, reject) => {

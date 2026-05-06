@@ -12,7 +12,11 @@
     },
     "./storage/adapter": "./src/storage/adapter.ts",
     "./storage/mem": "./src/storage/mem.ts",
-    "./storage/file": "./src/storage/file.ts"
+    "./storage/file": "./src/storage/file.ts",
+    "./storage/idb-wal": "./src/storage/idb-wal.ts",
+    "./storage/mem-wal": "./src/storage/mem-wal.ts",
+    "./storage/wal-adapter": "./src/storage/wal-adapter.ts",
+    "./storage/web-db": "./src/storage/web-db.ts"
   },
   "scripts": {
     "test": "bun test",
