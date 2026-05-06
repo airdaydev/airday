@@ -137,6 +137,32 @@ function formatRelative(ts: number, now: number, locale: string): string {
   return monthDayYearFmt.format(tsDate);
 }
 
+// Done-view stamp: same calendar day as `now` → time of day; otherwise
+// the date. Strips the "X minutes ago" / "Yesterday HH:MM" / "Mon HH:MM"
+// noise the relative format produces, since once a Done row ages past
+// today the exact moment it got ticked off isn't useful — the date is.
+function formatDoneStamp(ts: number, now: number, locale: string): string {
+  const tsDate = new Date(ts);
+  const nowDate = new Date(now);
+  if (calendarDayDiff(nowDate, tsDate) === 0) {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(tsDate);
+  }
+  if (tsDate.getFullYear() === nowDate.getFullYear()) {
+    return new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "numeric",
+    }).format(tsDate);
+  }
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(tsDate);
+}
+
 const relativeEs = {
   justNow: "ahora mismo",
   minutesAgo: (n: number) => `hace ${n} min`,
@@ -1411,6 +1437,7 @@ function Workspace(props: {
                   expanded={expanded}
                   app={app}
                   selection={selection}
+                  viewKind={view().kind}
                   duplicateBlock={duplicateBlock}
                   copyBlock={copyBlock}
                   onDraftSettle={settleDraft}
@@ -1921,6 +1948,7 @@ function Row(props: {
   expanded: () => boolean;
   app: DocApp;
   selection: DndSelection;
+  viewKind: ViewKey["kind"];
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Called by a draft row from its collapse effect with the trimmed
@@ -2176,7 +2204,9 @@ function Row(props: {
         <Show when={statusTimestamp(props.item())}>
           {(ts) => (
             <span class="row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
-              {formatRelative(ts(), nowMs(), locale())}
+              {props.viewKind === "done"
+                ? formatDoneStamp(ts(), nowMs(), locale())
+                : formatRelative(ts(), nowMs(), locale())}
             </span>
           )}
         </Show>
