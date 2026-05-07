@@ -30,6 +30,7 @@ import {
 } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -1321,13 +1322,193 @@ function Workspace(props: {
   document.addEventListener("contextmenu", onContextMenu, true);
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
+  // Mobile drawer: at narrow viewports the nav becomes an off-canvas
+  // drawer over the main pane. `navOpen` drives the resting state;
+  // `navDragDx` is the live finger-follow offset during a swipe (null
+  // when not dragging). The CSS reads `--nav-drag-dx` and `data-nav-*`
+  // attributes off `.app` to render both states with one transform.
+  const NAV_WIDTH_PX = 280;
+  const mobileMq = window.matchMedia("(max-width: 768px)");
+  const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
+  const onMqChange = (e: MediaQueryListEvent) => {
+    setIsMobile(e.matches);
+    // Leaving mobile width while open would leave the drawer stuck
+    // open behind the now-static layout. Reset on every transition.
+    if (!e.matches) setNavOpen(false);
+  };
+  mobileMq.addEventListener("change", onMqChange);
+  onCleanup(() => mobileMq.removeEventListener("change", onMqChange));
+
+  const [navOpen, setNavOpen] = createSignal(false);
+  const [navDragDx, setNavDragDx] = createSignal<number | null>(null);
+
+  // Escape closes the open drawer. Scoped to navOpen=true so we don't
+  // contend with FindPalette / Settings / row-expansion escape handlers
+  // when the drawer isn't even visible.
+  createEffect(() => {
+    if (!navOpen()) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setNavOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    onCleanup(() => document.removeEventListener("keydown", onKey, true));
+  });
+
+  // Anywhere-swipe gesture handler. Pointer events (not touch) so we
+  // get unified handling and `setPointerCapture`. Arbitration vs. the
+  // dnd controller relies on the dnd's own 150ms hold + 3px buffer
+  // (see dnd/spec.md): a fast horizontal swipe completes our 10px
+  // intent threshold before the dnd would even consider it a drag,
+  // and a slow press-and-hold loses our directional/ratio test so we
+  // bail and let the dnd take over. Inputs / contenteditable / any
+  // expanded row are excluded outright — those are text-selection
+  // territory.
+  onMount(() => {
+    const INTENT_THRESHOLD_PX = 10;
+    const INTENT_RATIO = 1.5;
+    const COMMIT_FRACTION = 0.4; // commit if past 40% of nav width
+    const COMMIT_VELOCITY_PX_MS = 0.5; // … or flicked faster than this
+
+    let active = false;
+    let claimed = false;
+    let pointerId = -1;
+    let startX = 0;
+    let startY = 0;
+    let startTs = 0;
+    let lastX = 0;
+    let lastTs = 0;
+    let openAtStart = false;
+
+    const isInteractiveTarget = (el: Element | null): boolean => {
+      if (!el) return false;
+      return !!el.closest(
+        'input, textarea, [contenteditable="true"], [data-expanded]',
+      );
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      if (!mobileMq.matches) return;
+      if (isInteractiveTarget(e.target as Element)) return;
+      active = true;
+      claimed = false;
+      pointerId = e.pointerId;
+      startX = lastX = e.clientX;
+      startY = e.clientY;
+      startTs = lastTs = e.timeStamp;
+      openAtStart = navOpen();
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!active || e.pointerId !== pointerId) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!claimed) {
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
+        // Wrong direction = abandon. Closed drawer expects rightward
+        // motion to open, open drawer expects leftward to close.
+        const wrongDirection = openAtStart ? dx > 0 : dx < 0;
+        if (adx < INTENT_THRESHOLD_PX) {
+          // Vertical clearly winning — let scroll / dnd-hold proceed.
+          if (ady > INTENT_THRESHOLD_PX * INTENT_RATIO) active = false;
+          return;
+        }
+        if (adx < ady * INTENT_RATIO || wrongDirection) {
+          active = false;
+          return;
+        }
+        claimed = true;
+        try {
+          (e.target as Element).setPointerCapture?.(pointerId);
+        } catch {
+          // setPointerCapture can throw if the target is detached
+          // mid-gesture; capture is best-effort, the state machine
+          // doesn't depend on it.
+        }
+      }
+      e.preventDefault();
+      // Clamp to [0, NAV_WIDTH] (open) or [-NAV_WIDTH, 0] (close).
+      const offset = openAtStart
+        ? Math.min(0, Math.max(-NAV_WIDTH_PX, dx))
+        : Math.max(0, Math.min(NAV_WIDTH_PX, dx));
+      setNavDragDx(offset);
+      lastX = e.clientX;
+      lastTs = e.timeStamp;
+    };
+
+    const onPointerEnd = (e: PointerEvent) => {
+      if (!active || e.pointerId !== pointerId) return;
+      const wasClaimed = claimed;
+      active = false;
+      claimed = false;
+      if (!wasClaimed) {
+        setNavDragDx(null);
+        return;
+      }
+      // Velocity: compare the last frame's speed to the gesture
+      // average and pick whichever is larger. The recent reading
+      // catches a flick at the very end; the average catches a
+      // steady-pace drag. Either kind of intent commits.
+      const dx = e.clientX - startX;
+      const recentDt = Math.max(1, e.timeStamp - lastTs);
+      const totalDt = Math.max(1, e.timeStamp - startTs);
+      const recentV = (e.clientX - lastX) / recentDt;
+      const totalV = dx / totalDt;
+      const v =
+        Math.abs(recentV) > Math.abs(totalV) ? recentV : totalV;
+      const commitDistance = NAV_WIDTH_PX * COMMIT_FRACTION;
+      setNavDragDx(null);
+      if (openAtStart) {
+        const past = -dx > commitDistance;
+        const flick = v < -COMMIT_VELOCITY_PX_MS;
+        setNavOpen(!(past || flick));
+      } else {
+        const past = dx > commitDistance;
+        const flick = v > COMMIT_VELOCITY_PX_MS;
+        setNavOpen(past || flick);
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown, { passive: true });
+    document.addEventListener("pointermove", onPointerMove, { passive: false });
+    document.addEventListener("pointerup", onPointerEnd, { passive: true });
+    document.addEventListener("pointercancel", onPointerEnd, { passive: true });
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerEnd);
+      document.removeEventListener("pointercancel", onPointerEnd);
+    });
+  });
+
   return (
-    <div class="app">
+    <div
+      class="app"
+      classList={{
+        "nav-open": navOpen(),
+        "nav-dragging": navDragDx() !== null,
+      }}
+      style={
+        navDragDx() !== null
+          ? { "--nav-drag-dx": `${navDragDx()}px` }
+          : undefined
+      }
+    >
       <Nav
         app={app}
         lists={lists()}
         view={view()}
-        setView={setView}
+        setView={(v) => {
+          setView(v);
+          // Tapping a nav item navigates and dismisses the drawer in
+          // one motion — desktop layout ignores navOpen so this is a
+          // no-op there.
+          if (isMobile()) setNavOpen(false);
+        }}
         session={props.session}
         online={props.online}
         logout={props.logout}
@@ -1351,9 +1532,31 @@ function Workspace(props: {
         session={props.session}
         logout={props.logout}
       />
+      {/* Backdrop sits between the drawer and the main pane on
+          mobile; tap to dismiss. Pointer-events are gated by CSS so
+          it doesn't intercept clicks when the drawer is closed. */}
+      <div
+        class="nav-backdrop"
+        aria-hidden="true"
+        onClick={() => setNavOpen(false)}
+      />
       <main class="main">
         <header class="main-header">
-          <h1>
+          {/* Title group: hamburger sits flush against the title so
+              both move as a unit at the left edge of the header. The
+              .main-header flex container's space-between then keeps
+              the action buttons on the right regardless of group
+              width. */}
+          <div class="main-header-title">
+            <button
+              type="button"
+              class="nav-toggle"
+              aria-label={m().common.menu}
+              aria-expanded={navOpen()}
+              onClick={() => setNavOpen((o) => !o)}
+              innerHTML={menuSvg}
+            />
+            <h1>
             <Show
               keyed
               when={editableListId()}
@@ -1368,6 +1571,7 @@ function Workspace(props: {
               )}
             </Show>
           </h1>
+          </div>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <Show
               when={

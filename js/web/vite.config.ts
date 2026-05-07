@@ -9,6 +9,7 @@
     },
     server: {
       port: 5176,
+      allowedHosts: [".mesh.yokoso.golf", ".ts.net"],
       proxy: {
         "/api": {
           target: process.env.VITE_API_TARGET ?? "http://localhost:8000",

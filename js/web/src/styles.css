@@ -97,6 +97,9 @@ body {
   display: grid;
   grid-template-columns: 220px 1fr;
   height: 100%;
+  /* Live drag offset in px, written by App.tsx during a swipe and
+     read by the .nav transform on mobile. Unset on desktop / at rest;
+     `var(--nav-drag-dx, 0px)` collapses to 0 in that case. */
 }
 
 .nav {
@@ -105,6 +108,96 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Hamburger lives in the main header, hidden on desktop. The
+   .nav-backdrop sibling sits behind the drawer to catch dismiss-taps;
+   it's pointer-events:none until the drawer opens so it never
+   intercepts clicks on the desktop layout. */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nav-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.nav-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  /* Off-canvas drawer. The transform combines the resting state
+     (translateX(-100%) closed, translateX(0) open) with --nav-drag-dx,
+     a px offset written by the swipe handler during a live drag so the
+     drawer follows the finger 1:1. The transition is suppressed during
+     the drag (.nav-dragging) so the follow doesn't feel rubbery. */
+  .nav {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 100;
+    transform: translateX(calc(-100% + var(--nav-drag-dx, 0px)));
+    transition: transform 0.2s ease;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .app.nav-open .nav {
+    transform: translateX(var(--nav-drag-dx, 0px));
+  }
+
+  .app.nav-dragging .nav {
+    transition: none;
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .app.nav-open .nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .app.nav-dragging .nav-backdrop {
+    transition: none;
+  }
 }
 
 .nav-group {
@@ -231,6 +324,12 @@ body {
   margin: 0;
   font-size: inherit;
   font-weight: 500;
+}
+
+.main-header-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .editable-title {
