@@ -107,6 +107,63 @@ body {
   flex-direction: column;
 }
 
+/* Hamburger lives in the main header, hidden on desktop. */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nav-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+@media (max-width: 768px) {
+  /* Bump the inherited base size on phones; chrome elements with
+     explicit px sizes (section labels, chips) keep theirs. ≥16px also
+     suppresses iOS Safari's auto-zoom on input focus. */
+  #root {
+    font-size: 18px;
+  }
+
+  /* Push-style drawer: nav and main both fill the viewport and slide
+     together as one unit. .app is 200vw with two 100vw columns; a
+     transform on .app exposes either column.
+       Closed → translateX(-100vw) shows the main column.
+       Open   → translateX(0)      shows the nav column. */
+  .app {
+    grid-template-columns: 100vw 100vw;
+    width: 200vw;
+    transform: translateX(-100vw);
+    transition: transform 0.2s ease;
+    will-change: transform;
+  }
+
+  .app.nav-open {
+    transform: translateX(0);
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+}
+
 .nav-group {
   margin-bottom: 8px;
 }
@@ -233,6 +290,12 @@ body {
   font-weight: 500;
 }
 
+.main-header-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .editable-title {
   outline: none;
 }
@@ -261,6 +324,82 @@ body {
 .add-button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Mobile-only floating action buttons. Position-fixed inside .main,
+   but .app's mobile transform creates a containing block — so:
+     right: 16px → right edge of the main column
+     left: calc(100vw + 16px) → left edge of the main column
+   The buttons therefore "ride with" main when the drawer opens.
+   Liquid-glass: translucent fill + heavy backdrop blur + thin border +
+   inset top highlight for the wet/specular feel. */
+.fab {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  color: var(--text);
+  cursor: pointer;
+  z-index: 50;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
+
+.fab:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+.fab-back {
+  /* 100vw skips past the nav column inside the 200vw .app grid. */
+  left: calc(100vw + 16px);
+}
+
+.fab-add {
+  right: 16px;
+}
+
+[data-theme="dark"] .fab {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(30, 30, 32, 0.55);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .fab {
+    display: inline-flex;
+  }
+
+  /* The FABs replace these controls on mobile — keeping both would
+     double up the same actions. */
+  .nav-toggle,
+  .main-header .add-button {
+    display: none;
+  }
 }
 
 .dnd-host {

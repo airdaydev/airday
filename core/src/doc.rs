@@ -13,7 +13,7 @@
 //! The bin is *not* a list — binned items keep their `list_id`. One
 //! well-known list id is *reserved*: [`LIST_MAIN`].
 //! It has **no MovableList entry** — items reference it by string id
-//! and clients render it with a hardcoded label ("Desk"). A future
+//! and clients render it with a hardcoded label ("Home"). A future
 //! meta-CRDT will hold things like the user's chosen label for it; for
 //! now main is non-renamable and non-movable.
 //!
@@ -40,7 +40,7 @@ use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
 pub const LIST_MAIN: &str = "main";
-pub const LIST_MAIN_NAME: &str = "Desk";
+pub const LIST_MAIN_NAME: &str = "Home";
 
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";

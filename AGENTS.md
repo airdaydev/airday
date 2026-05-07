@@ -2,7 +2,7 @@
 
 Airday is the lowest-friction, FOSS, single-human-user, E2EE, multi-device intent/capture/log tool. Capture is the entire point — anything that gets in the way of capturing or sorting is wrong.
 
-Workflow: a reserved primary capture list ("Desk", id `main`), any number of user-created lists (a "Later" list is seeded on signup), and a bin. Items move between lists, can be done, binned, restored, and deleted.
+Workflow: a reserved primary capture list ("Home", id `main`), any number of user-created lists (a "Later" list is seeded on signup), and a bin. Items move between lists, can be done, binned, restored, and deleted.
 
 ## Architecture
 

@@ -56,7 +56,7 @@ type Messages = {
     serverMissingDeviceCredential: string;
   };
   nav: {
-    desk: string;
+    home: string;
     done: string;
     bin: string;
     deleteList: string;
@@ -142,7 +142,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "el servidor no devolvió una credencial de dispositivo",
     },
     nav: {
-      desk: "Escritorio",
+      home: "Inicio",
       done: "Hecho",
       bin: "Papelera",
       deleteList: "Eliminar",
@@ -227,7 +227,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "server did not return a device credential",
     },
     nav: {
-      desk: "Desk",
+      home: "Home",
       done: "Done",
       bin: "Bin",
       deleteList: "Delete",

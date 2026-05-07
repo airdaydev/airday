@@ -40,7 +40,7 @@ There is no separate persisted `status` field. Visibility is derived from the ti
 
 Airday has one reserved primary capture list:
 
-- `main` — rendered as "Desk". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable.
+- `main` — rendered as "Home". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable.
 
 The bin is *not* a list; it's the `Binned` status on items.
 

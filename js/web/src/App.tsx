@@ -29,7 +29,9 @@ import {
   type DndOp,
 } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
+import caretLeftSvg from "./icons/caret-left.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
@@ -853,7 +855,7 @@ function Workspace(props: {
   });
 
   // Id of the currently-viewed list iff it can be renamed. The reserved
-  // "main" (Desk) list and the done/bin views are not editable.
+  // "main" (Home) list and the done/bin views are not editable.
   const editableListId = createMemo(() => {
     const v = view();
     return v.kind === "list" && v.id !== "main" ? v.id : null;
@@ -1321,13 +1323,56 @@ function Workspace(props: {
   document.addEventListener("contextmenu", onContextMenu, true);
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
+  // Mobile drawer: at narrow viewports the nav and main panes both
+  // fill the viewport and slide together as one unit (push layout —
+  // see styles.css). `navOpen` is the only state; the FAB caret opens
+  // it, tapping a list / Escape closes it.
+  const mobileMq = window.matchMedia("(max-width: 768px)");
+  const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
+  const onMqChange = (e: MediaQueryListEvent) => {
+    setIsMobile(e.matches);
+    // Leaving mobile width while open would leave the drawer stuck
+    // open behind the now-static layout. Reset on every transition.
+    if (!e.matches) setNavOpen(false);
+  };
+  mobileMq.addEventListener("change", onMqChange);
+  onCleanup(() => mobileMq.removeEventListener("change", onMqChange));
+
+  const [navOpen, setNavOpen] = createSignal(false);
+
+  // Escape closes the open drawer. Scoped to navOpen=true so we don't
+  // contend with FindPalette / Settings / row-expansion escape handlers
+  // when the drawer isn't even visible.
+  createEffect(() => {
+    if (!navOpen()) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setNavOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    onCleanup(() => document.removeEventListener("keydown", onKey, true));
+  });
+
   return (
-    <div class="app">
+    <div
+      class="app"
+      classList={{
+        "nav-open": navOpen(),
+      }}
+    >
       <Nav
         app={app}
         lists={lists()}
         view={view()}
-        setView={setView}
+        setView={(v) => {
+          setView(v);
+          // Tapping a nav item navigates and dismisses the drawer in
+          // one motion — desktop layout ignores navOpen so this is a
+          // no-op there.
+          if (isMobile()) setNavOpen(false);
+        }}
         session={props.session}
         online={props.online}
         logout={props.logout}
@@ -1353,7 +1398,21 @@ function Workspace(props: {
       />
       <main class="main">
         <header class="main-header">
-          <h1>
+          {/* Title group: hamburger sits flush against the title so
+              both move as a unit at the left edge of the header. The
+              .main-header flex container's space-between then keeps
+              the action buttons on the right regardless of group
+              width. */}
+          <div class="main-header-title">
+            <button
+              type="button"
+              class="nav-toggle"
+              aria-label={m().common.menu}
+              aria-expanded={navOpen()}
+              onClick={() => setNavOpen((o) => !o)}
+              innerHTML={menuSvg}
+            />
+            <h1>
             <Show
               keyed
               when={editableListId()}
@@ -1368,6 +1427,7 @@ function Workspace(props: {
               )}
             </Show>
           </h1>
+          </div>
           <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
             <Show
               when={
@@ -1446,6 +1506,34 @@ function Workspace(props: {
             </Dnd>
           </Show>
         </Show>
+        {/* Mobile-only floating action buttons. Position-fixed inside
+            .main, but .app's mobile transform reparents the containing
+            block onto .app — so right:16px anchors to the main column's
+            right edge and left:calc(100vw + 16px) to its left edge.
+            That binding also makes the FABs slide off with main when
+            the drawer opens, which is exactly the visual we want. */}
+        <button
+          type="button"
+          class="fab fab-back"
+          aria-label={m().common.menu}
+          onClick={() => setNavOpen(true)}
+          innerHTML={caretLeftSvg}
+        />
+        <Show when={view().kind === "list"}>
+          <button
+            type="button"
+            class="fab fab-add"
+            aria-label={m().common.add}
+            disabled={draft() !== null}
+            onClick={(e) => {
+              // See header Add button: stop the dnd's document-level
+              // collapse handler from immediately closing the new draft.
+              e.stopImmediatePropagation();
+              startDraft();
+            }}
+            innerHTML={plusSvg}
+          />
+        </Show>
       </main>
     </div>
   );
@@ -1517,7 +1605,7 @@ function viewTitle(
   m: ReturnType<typeof useAppI18n>["m"] extends () => infer T ? T : never,
 ): string {
   if (v.kind === "list") {
-    if (v.id === "main") return m.nav.desk;
+    if (v.id === "main") return m.nav.home;
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
   if (v.kind === "done") return m.nav.done;
@@ -1663,7 +1751,7 @@ function Nav(props: {
           data-drop-list-id="main"
           onClick={() => props.setView({ kind: "list", id: "main" })}
         >
-          {m().nav.desk}
+          {m().nav.home}
         </button>
         <button
           type="button"
