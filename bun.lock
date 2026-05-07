@@ -40,7 +40,6 @@
         "@airday/core": "workspace:*",
         "@kobalte/core": "^0.13.11",
         "@msgpack/msgpack": "^3.0.0",
-        "@primavera-ui/components": "link:@primavera-ui/components",
         "solid-js": "^1.9.3",
       },
       "devDependencies": {
@@ -176,8 +175,6 @@
     "@kobalte/utils": ["@kobalte/utils@0.9.1", "", { "dependencies": { "@solid-primitives/event-listener": "^2.2.14", "@solid-primitives/keyed": "^1.2.0", "@solid-primitives/map": "^0.4.7", "@solid-primitives/media": "^2.2.4", "@solid-primitives/props": "^3.1.8", "@solid-primitives/refs": "^1.0.5", "@solid-primitives/utils": "^6.2.1" }, "peerDependencies": { "solid-js": "^1.8.8" } }, "sha512-eeU60A3kprIiBDAfv9gUJX1tXGLuZiKMajUfSQURAF2pk4ZoMYiqIzmrMBvzcxP39xnYttgTyQEVLwiTZnrV4w=="],
 
     "@msgpack/msgpack": ["@msgpack/msgpack@3.1.3", "", {}, "sha512-47XIizs9XZXvuJgoaJUIE2lFoID8ugvc0jzSHP+Ptfk8nTbnR8g788wv48N03Kx0UkAv559HWRQ3yzOgzlRNUA=="],
-
-    "@primavera-ui/components": ["@primavera-ui/components@link:@primavera-ui/components", {}],
 
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.60.2", "", { "os": "android", "cpu": "arm" }, "sha512-dnlp69efPPg6Uaw2dVqzWRfAWRnYVb1XJ8CyyhIbZeaq4CA5/mLeZ1IEt9QqQxmbdvagjLIm2ZL8BxXv5lH4Yw=="],
 

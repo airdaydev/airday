@@ -27,8 +27,8 @@ import {
   DndSelection,
   type DndImperative,
   type DndOp,
-} from "@primavera-ui/components/dnd/solid";
-import type { DndDragEventDetail } from "@primavera-ui/components/dnd";
+} from "./dnd/solid";
+import type { DndDragEventDetail } from "./dnd";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { api } from "./api.ts";
