@@ -749,6 +749,16 @@ function Workspace(props: {
   } | null>(null);
   const [expandedKey, setExpandedKey] = createSignal<string | null>(null);
 
+  // Touch viewports get taller rows so each item's a comfortable tap
+  // target (the 28px desktop default is too tight for a thumb). Dnd's
+  // cfg() reads itemHeight reactively via setConfig, so flipping this
+  // signal on rotation / resize live-updates the controller.
+  const itemsMobileMq = window.matchMedia("(max-width: 768px)");
+  const [itemsIsMobile, setItemsIsMobile] = createSignal(itemsMobileMq.matches);
+  const onItemsMqChange = (e: MediaQueryListEvent) => setItemsIsMobile(e.matches);
+  itemsMobileMq.addEventListener("change", onItemsMqChange);
+  onCleanup(() => itemsMobileMq.removeEventListener("change", onItemsMqChange));
+
   // One selection model per Workspace instance — the Dnd component is
   // re-keyed on view change (so it remounts), but we re-use the selection
   // object so consumers always read from the same handle. Stale block
@@ -1484,7 +1494,7 @@ function Workspace(props: {
               onExpandedChange={(k) =>
                 setExpandedKey(k == null ? null : String(k))
               }
-              itemHeight={28}
+              itemHeight={itemsIsMobile() ? 40 : 28}
               expandable
               clearOnClickOutside
               fillHeight
@@ -2333,6 +2343,34 @@ function Row(props: {
               if (textRef.textContent === "" && textRef.firstChild) {
                 textRef.replaceChildren();
               }
+            }}
+            on:blur={(e) => {
+              // iOS Safari's form-assistant bar (the prev/next/Done strip
+              // above the keyboard) blurs the contenteditable on Done
+              // without firing a keydown — the row would otherwise stay
+              // expanded with the keyboard gone. Treat focus leaving the
+              // row entirely as a commit, mirroring the Enter path. Skip
+              // when focus is moving to another element inside the same
+              // row (e.g. tapping into the notes textarea) so the user can
+              // still hop fields without collapsing.
+              if (!props.expanded()) return;
+              const next = e.relatedTarget as Node | null;
+              const row = (e.currentTarget as HTMLElement).closest(".row");
+              if (next && row?.contains(next)) return;
+              // First Escape: dnd is expanded → collapse. Second Escape:
+              // dnd is now collapsed → clears selection. Without the
+              // second one the row's pre-expand selection chrome flashes
+              // visible on desktop until the next click selects another
+              // row on mouseup; the dnd bails on mousedown while expanded
+              // so selection only updates on the click. The Enter path
+              // doesn't hit this because there's no follow-up click.
+              const target = e.currentTarget as HTMLElement;
+              target.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+              );
+              target.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+              );
             }}
             on:keydown={(e) => {
               // Native (non-delegated) so the bubble order is span → dnd
