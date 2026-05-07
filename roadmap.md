@@ -1,5 +1,6 @@
 # Roadmap
 
+- show sign up on first launch!!
 - find needs to center scroll on where item is
 - should be able to click to add first item
 - list deleting - orphan handling?
