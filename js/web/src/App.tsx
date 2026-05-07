@@ -1466,9 +1466,10 @@ function Workspace(props: {
                   startDraft();
                 }}
                 disabled={draft() !== null}
-                aria-label={m().common.add}
-                innerHTML={plusSvg}
-              />
+              >
+                <span class="add-button-icon" innerHTML={plusSvg} />
+                <span>{m().common.addItem}</span>
+              </button>
             </Show>
           </div>
         </header>
@@ -1657,6 +1658,14 @@ function Nav(props: {
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
   createEffect(() => setDndLists(props.lists));
 
+  // Match the items list's mobile bump so the drawer's tap targets feel
+  // consistent with the main view.
+  const navMobileMq = window.matchMedia("(max-width: 768px)");
+  const [navIsMobile, setNavIsMobile] = createSignal(navMobileMq.matches);
+  const onNavMqChange = (e: MediaQueryListEvent) => setNavIsMobile(e.matches);
+  navMobileMq.addEventListener("change", onNavMqChange);
+  onCleanup(() => navMobileMq.removeEventListener("change", onNavMqChange));
+
   const navSelection = new DndSelection();
 
   // Reactive read-throughs of the engine's undo state. `app.version`
@@ -1787,7 +1796,7 @@ function Nav(props: {
             items={dndLists()}
             setItems={setDndLists}
             getKey={(l) => l.id}
-            itemHeight={28}
+            itemHeight={navIsMobile() ? 40 : 28}
             multi={false}
             clearOnClickOutside
             selection={navSelection}

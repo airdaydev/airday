@@ -39,6 +39,7 @@ type Messages = {
   common: {
     loading: string;
     add: string;
+    addItem: string;
     close: string;
     menu: string;
     copy: string;
@@ -125,6 +126,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     common: {
       loading: "Cargando…",
       add: "Añadir",
+      addItem: "Añadir elemento",
       close: "Cerrar",
       menu: "Menú",
       copy: "Copiar",
@@ -210,6 +212,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     common: {
       loading: "Loading…",
       add: "Add",
+      addItem: "Add item",
       close: "Close",
       menu: "Menu",
       copy: "Copy",

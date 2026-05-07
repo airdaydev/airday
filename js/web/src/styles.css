@@ -308,13 +308,18 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 6px;
+  gap: 4px;
+  padding: 4px 8px;
   border: none;
   background: var(--bg-active);
   color: var(--text);
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
+}
+
+.add-button-icon {
+  display: inline-flex;
 }
 
 .add-button svg {
