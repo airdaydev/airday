@@ -110,4 +110,4 @@ somewhere off-box. Not wired up yet — single-human-user product, so
 
 - Optional Cloudflare DNS-01 if we ever want a wildcard or no public 80/443.
 - TLS-cert renewal monitoring (Caddy logs are fine for now).
-- Per-host config split if we end up running staging + prod from one repo.
+- Per-host config split if we end up running alpha + prod from one repo.
