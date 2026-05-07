@@ -39,3 +39,14 @@ processes:
         path: /
       initial_delay_seconds: 2
       period_seconds: 2
+
+  # Reverse proxies https://{{ env "DEV_PROXY_HOSTNAME" }} to the Vite dev
+  # server. Reads CLOUDFLARE_API_TOKEN from the shell that invoked
+  # process-compose; if unset Caddy will fail the LE DNS-01 challenge.
+  caddy:
+    command: caddy run --config local/Caddyfile
+    depends_on:
+      web:
+        condition: process_healthy
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}

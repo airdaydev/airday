@@ -23,6 +23,13 @@ This is the private repo currently containing everything. We will extract most o
 - Rust
 - Bun
 - sqlx-cli: (`cargo install sqlx-cli`)
+- caddy with cloudflare plugin:
+```
+go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+export PATH="$PATH:$(go env GOPATH)/bin" >> .zshenv
+xcaddy build --with github.com/caddy-dns/cloudflare
+mv caddy /usr/local/bin
+```
 
 ## Development Setup (MacOS & Arch Linux)
 ```bash

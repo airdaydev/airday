@@ -28,6 +28,7 @@ const profiles: Record<ProfileName, Profile> = {
     files: [
       { template: "server.dev.toml.tpl", output: "local/server.toml" },
       { template: "process-compose.dev.yaml.tpl", output: "local/process-compose.yaml" },
+      { template: "Caddyfile.dev.tpl", output: "local/Caddyfile" },
     ],
     buildEnv: buildDevEnv,
   },
@@ -146,6 +147,17 @@ function buildDevEnv(secrets: Record<string, string>) {
   // hardcoded, repo-scoped target. Resolved relative to the server's
   // cwd, which is the repo root under `bun run server`.
   env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "local/airday.sqlite";
+  // Dev TLS reverse proxy. WebCrypto needs a secure context, so the dev
+  // stack runs behind Caddy by default. Override DEV_PROXY_HOSTNAME in
+  // js/config/.env to point at your own mesh A record.
+  env.DEV_PROXY_HOSTNAME = env.DEV_PROXY_HOSTNAME || "macbook.yokoso.golf";
+  // Wildcard cert domain. Naive parent-strip — won't do the right thing
+  // for multi-label public-suffix TLDs (e.g. `.co.uk`); set explicitly
+  // in those cases.
+  if (!env.DEV_PROXY_DOMAIN) {
+    const dot = env.DEV_PROXY_HOSTNAME.indexOf(".");
+    if (dot > 0) env.DEV_PROXY_DOMAIN = env.DEV_PROXY_HOSTNAME.slice(dot + 1);
+  }
   return env;
 }
 

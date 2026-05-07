@@ -9,6 +9,7 @@
     },
     server: {
       port: 5176,
+      allowedHosts: ["macbook.yokoso.golf"],
       proxy: {
         "/api": {
           target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
