@@ -77,7 +77,7 @@ install -Dm755 \
   "$RELEASE_DIR/target/release/airday-server"
 
 echo "==> Installing rendered server config to $ETC_DIR"
-sudo install -m 0640 -o root -g airday \
+install -m 0640 -o root -g airday \
   "$RELEASE_DIR/deploy/rendered/server.toml" "$ETC_DIR/server.toml"
 
 echo "==> Flipping current symlink"
