@@ -1,0 +1,20 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: alpha
+    steps:
+      - name: Deploy via SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          ssh -o StrictHostKeyChecking=accept-new -i /tmp/deploy_key airday@$DEPLOY_HOST \
+            "cd /opt/airday/source && git fetch origin && git reset --hard origin/main && ./deploy/ci.sh"
+          rm /tmp/deploy_key
