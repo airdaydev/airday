@@ -1,16 +1,22 @@
 # Config generation
 
 Renders Airday's runtime config files from templates in `templates/`. Mirrors
-the `cooee/js/config` pattern, simplified to a single `dev` profile for now.
+the `cooee/js/config` pattern. Two profiles: `dev` (local artifacts under
+`local/`) and `deploy` (renders to `deploy/rendered/` on the production box —
+see `deploy/README.md`).
 
 ## Usage
 
 ```bash
-cp js/config/.env.dev.example js/config/.env  # optional — every key has a default
-bun js/config/gen-config.ts                    # or: cd js/config && bun run config
+# dev — every key has a default, .env is optional
+cp js/config/.env.dev.example js/config/.env
+bun run config
+
+# deploy — runs on the box during ci.sh, reads /opt/airday/.env
+bun run config:deploy
 ```
 
-Outputs:
+Dev outputs:
 
 - `local/server.toml` — server config, picked up by `airday-server`'s default
   `--config` path.
@@ -18,8 +24,14 @@ Outputs:
   server + web dev stack together. Run from the repo root:
   `process-compose -f local/process-compose.yaml`.
 
-The whole `local/` dir is gitignored and used for any other generated dev
-artifacts as they show up.
+Deploy outputs:
+
+- `deploy/rendered/server.toml` — installed at `/etc/airday/server.toml`
+  by `deploy/ci.sh`.
+- `deploy/rendered/Caddyfile` — referenced directly by `caddy.service`
+  via the `/opt/airday/current` symlink.
+
+The whole `local/` and `deploy/rendered/` dirs are gitignored.
 
 ## Template syntax
 
@@ -38,9 +50,10 @@ just speaks the same syntax so templates stay portable.
 2. Reference it from the relevant template under `templates/`.
 3. Document it in `.env.dev.example` if operators may want to override it.
 
-## Adding a profile (e.g. `deploy`)
+## Adding a profile
 
-Add a new entry under `profiles` in `gen-config.ts`, write a `buildDeployEnv`
+Add a new entry under `profiles` in `gen-config.ts`, write a `buildXEnv`
 that validates the required keys via `mustEnv`, and add `.tpl` files that
-render to the deploy artifact paths. See `cooee/js/config/gen-config.ts` for
-the full shape.
+render to the artifact paths for that profile. The existing `deploy`
+profile is the worked example; `cooee/js/config/gen-config.ts` is a
+larger reference.

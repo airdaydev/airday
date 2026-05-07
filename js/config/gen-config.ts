@@ -9,7 +9,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = dirname(dirname(configDir));
 const templatesDir = join(configDir, "templates");
 
-type ProfileName = "dev";
+type ProfileName = "dev" | "deploy";
 
 interface RenderFile {
   template: string;
@@ -30,6 +30,14 @@ const profiles: Record<ProfileName, Profile> = {
       { template: "process-compose.dev.yaml.tpl", output: "local/process-compose.yaml" },
     ],
     buildEnv: buildDevEnv,
+  },
+  deploy: {
+    defaultSecretsFile: ".env",
+    files: [
+      { template: "Caddyfile.deploy.tpl", output: "deploy/rendered/Caddyfile" },
+      { template: "server.deploy.toml.tpl", output: "deploy/rendered/server.toml" },
+    ],
+    buildEnv: buildDeployEnv,
   },
 };
 
@@ -97,7 +105,9 @@ async function parseEnvFile(path: string): Promise<Record<string, string>> {
   try {
     raw = await Bun.file(path).text();
   } catch {
-    // Missing .env is fine for dev — every key has a default in buildDevEnv.
+    // Missing .env is fine for dev — every key has a default in
+    // buildDevEnv. Deploy validates required keys via mustEnv and will
+    // throw later if anything is missing.
     return {};
   }
 
@@ -136,5 +146,21 @@ function buildDevEnv(secrets: Record<string, string>) {
   // hardcoded, repo-scoped target. Resolved relative to the server's
   // cwd, which is the repo root under `bun run server`.
   env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "local/airday.sqlite";
+  return env;
+}
+
+function buildDeployEnv(secrets: Record<string, string>) {
+  const env: Record<string, string | undefined> = { ...Bun.env, ...secrets };
+
+  // Loopback only — Caddy reverse-proxies the public hostname.
+  env.AIRDAY_BIND = env.AIRDAY_BIND || "127.0.0.1:8000";
+  env.AIRDAY_DB_PATH = env.AIRDAY_DB_PATH || "/var/lib/airday/airday.sqlite";
+  env.AIRDAY_LOG_LEVEL = env.AIRDAY_LOG_LEVEL || "info";
+  env.AIRDAY_SECURE_COOKIES = env.AIRDAY_SECURE_COOKIES || "true";
+
+  for (const key of ["AIRDAY_HOST", "CADDY_EMAIL"]) {
+    if (!env[key]) throw new Error(`Missing required variable: ${key}`);
+  }
+
   return env;
 }

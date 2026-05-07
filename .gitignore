@@ -19,5 +19,8 @@ Cargo.lock.legacy
 # Generated dev artifacts (see js/config/gen-config.ts)
 local/
 
+# Generated deploy artifacts (see js/config/gen-config.ts deploy profile)
+deploy/rendered/
+
 # wasm-pack output for js/core (built via `bun run build:wasm`)
 js/core/wasm/

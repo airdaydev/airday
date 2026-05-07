@@ -1,0 +1,25 @@
+[Unit]
+Description=Airday server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=airday
+Group=airday
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/opt/airday/current
+ExecStart=/opt/airday/current/target/release/airday-server --config /etc/airday/server.toml
+Restart=always
+RestartSec=5
+
+# Sandboxing — sqlite db lives in /var/lib/airday so that's the only
+# writable path the unit needs.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/airday
+
+[Install]
+WantedBy=multi-user.target

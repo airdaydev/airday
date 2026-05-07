@@ -6,6 +6,7 @@
   ],
   "scripts": {
     "config": "bun js/config/gen-config.ts",
+    "config:deploy": "bun js/config/gen-config.ts deploy",
     "server": "cargo run -p airday-server --",
     "cli": "cargo run --release -p airday --",
     "cli:dev": "cargo run -p airday --",
