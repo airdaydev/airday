@@ -1,5 +1,6 @@
 # Roadmap
 
+- should be able to click to add first item
 - list deleting - orphan handling?
 - list deleting - binned first?
 - import/export

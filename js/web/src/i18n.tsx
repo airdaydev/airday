@@ -10,7 +10,7 @@ import {
 
 export type AppLanguage = "es" | "en";
 
-const DEFAULT_LANGUAGE: AppLanguage = "es";
+const DEFAULT_LANGUAGE: AppLanguage = "en";
 const COOKIE_NAME = "locale";
 const MAX_AGE = 31536000;
 
