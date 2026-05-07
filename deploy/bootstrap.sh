@@ -29,6 +29,9 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 . "$HOME/.cargo/env"
 
+# Install Rustwasm
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
 echo "==> Installing Caddy (xcaddy build, no DNS-challenge plugins needed)"
 if ! command -v caddy >/dev/null 2>&1; then
   apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
