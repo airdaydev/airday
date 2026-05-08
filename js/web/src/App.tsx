@@ -1774,7 +1774,11 @@ function Nav(props: {
 }) {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
-  const [authOpen, setAuthOpen] = createSignal(false);
+  // Auto-prompt anonymous users on first mount; closing dismisses for
+  // the rest of the session. Becoming authed unmounts the trigger via
+  // the <Show> below, so a later logout (which mints a fresh anonymous
+  // session) will re-open it on the next mount.
+  const [authOpen, setAuthOpen] = createSignal(props.session.anonymous);
   const handleSession = (s: Session) => {
     setAuthOpen(false);
     props.onSession(s);
