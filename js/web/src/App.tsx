@@ -986,12 +986,17 @@ function Workspace(props: {
   // Called by the draft Row from its collapse effect. Empty text → drop;
   // non-empty → real item via addItemAt at the captured slot, then
   // re-anchor selection so the user lands on what they just created.
-  const settleDraft = (text: string) => {
+  const settleDraft = (text: string, notes: string) => {
     const d = draft();
     if (!d) return;
     setDraft(null);
     if (!text) return;
     const newId = app.addItemAt(d.listId, text, d.insertIndex);
+    // Notes are persisted as a follow-up edit because the draft has no
+    // engine record while the user is typing — `editItemNotes` on a
+    // draft id would no-op. Skip the call for empty notes (the new
+    // item starts with `notes: ""` already).
+    if (notes) app.editItemNotes(newId, notes);
     // The store dispatch that adds the new item runs before this
     // microtask, so by then `selection.updateOrder` has already seen
     // the new id and the selection anchor is valid.
@@ -1951,16 +1956,35 @@ function Nav(props: {
           {m().nav.done}
         </button>
         <Show when={props.binCount > 0}>
-          <button
-            type="button"
-            class="nav-item"
-            data-active={props.view.kind === "bin" ? "" : undefined}
-            data-drop-bin=""
-            onClick={() => props.setView({ kind: "bin" })}
-          >
-            {m().nav.bin}
-            <span class="nav-item-count">{props.binCount}</span>
-          </button>
+          <ContextMenu>
+            <ContextMenu.Trigger
+              as="button"
+              type="button"
+              class="nav-item"
+              data-active={props.view.kind === "bin" ? "" : undefined}
+              data-drop-bin=""
+              onClick={() => props.setView({ kind: "bin" })}
+            >
+              {m().nav.bin}
+              <span class="nav-item-count">{props.binCount}</span>
+            </ContextMenu.Trigger>
+            <ContextMenu.Portal>
+              <ContextMenu.Content class="context-menu-content">
+                <ContextMenu.Item
+                  class="context-menu-item"
+                  onSelect={() => {
+                    // Mirror the header button's destructive-action gate
+                    // (App.tsx:1503) — same confirm string, same call.
+                    if (window.confirm(m().workspace.emptyBinConfirm)) {
+                      props.app.emptyBin();
+                    }
+                  }}
+                >
+                  {m().workspace.emptyBin}
+                </ContextMenu.Item>
+              </ContextMenu.Content>
+            </ContextMenu.Portal>
+          </ContextMenu>
         </Show>
       </div>
       <div class="nav-group">
@@ -2288,7 +2312,14 @@ function EditableNavLabel(props: {
 // row-text editor behaves while expanded. A textarea (rather than a
 // contenteditable div) so newline round-trips are byte-faithful and we
 // don't have to fight browser-inserted <div>/<br> markup.
-function NotesField(props: { item: () => ItemView; app: DocApp }) {
+function NotesField(props: {
+  item: () => ItemView;
+  app: DocApp;
+  /** Optional holder used only on the draft path: NotesField stashes
+   *  its textarea value here on unmount so the Row's collapse effect
+   *  can read it after the <Show> has already torn the textarea down. */
+  draftNotesRef?: { current: string };
+}) {
   const { m } = useAppI18n();
   let ref!: HTMLTextAreaElement;
   const initial = props.item().notes;
@@ -2304,6 +2335,13 @@ function NotesField(props: { item: () => ItemView; app: DocApp }) {
     autosize();
   });
   onCleanup(() => {
+    // Drafts have no engine record yet; stash the value in the holder
+    // so the Row's collapse effect can hand it to `settleDraft`, which
+    // applies it via `editItemNotes` on the freshly created item id.
+    if (isDraftId(props.item().id)) {
+      if (props.draftNotesRef) props.draftNotesRef.current = ref.value;
+      return;
+    }
     const next = ref.value;
     if (next !== props.item().notes) {
       props.app.editItemNotes(props.item().id, next);
@@ -2338,12 +2376,18 @@ function Row(props: {
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Called by a draft row from its collapse effect with the trimmed
-   *  edit text. Empty text means drop the draft; non-empty means the
-   *  workspace should commit it as a real item. */
-  onDraftSettle?: (text: string) => void;
+   *  edit text and the notes textarea contents. Empty text means drop
+   *  the draft; non-empty means the workspace should commit it as a
+   *  real item (and apply notes as a follow-up). */
+  onDraftSettle?: (text: string, notes: string) => void;
 }) {
   const { m, locale } = useAppI18n();
   let textRef!: HTMLSpanElement;
+  // Holder for the draft path: NotesField writes its textarea value
+  // here on unmount, while the textarea still exists in the DOM. The
+  // collapse effect below reads it after Solid has torn down the Show
+  // (so a `querySelector(".row-notes")` would already return null).
+  const draftNotesRef = { current: "" };
   // Captured by dblclick before the row expands so we can place the caret
   // where the user pointed instead of selecting all. Captured pre-expand
   // because layout may shift once the row becomes editable.
@@ -2387,7 +2431,11 @@ function Row(props: {
           // workspace, which decides commit (addItemAt) vs drop. Skip the
           // editItemText path — there's no item to edit.
           if (isDraftId(props.item().id)) {
-            props.onDraftSettle?.(next);
+            // NotesField has already unmounted by the time this effect
+            // runs (the <Show> wrapping it tears down synchronously);
+            // read the value it stashed in draftNotesRef during its
+            // onCleanup instead of querying the now-detached textarea.
+            props.onDraftSettle?.(next, draftNotesRef.current);
             const listbox = textRef.closest<HTMLElement>('[role="listbox"]');
             listbox?.focus();
             return;
@@ -2611,8 +2659,12 @@ function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          <Show when={props.expanded() && !isDraftId(props.item().id)}>
-            <NotesField item={props.item} app={props.app} />
+          <Show when={props.expanded()}>
+            <NotesField
+              item={props.item}
+              app={props.app}
+              draftNotesRef={draftNotesRef}
+            />
           </Show>
         </div>
         <Show when={statusTimestamp(props.item())}>
