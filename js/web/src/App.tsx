@@ -1300,8 +1300,9 @@ function Workspace(props: {
   // re-anchor the dnd selection on the row. Lists go straight to that
   // list. Items pick the view based on their status — binned items live
   // in the Bin, done-only items in Done, otherwise their list. The
-  // selection bounce is deferred past the view-change effect that
-  // otherwise clears it.
+  // selection + scroll bounce is deferred past the view-change effect
+  // (which clears selection) and past the keyed Dnd remount, so the
+  // new controller's source has the row's index when scrollToKey lands.
   const onFindSelect = (r: SearchResult) => {
     if (r.kind === "list") {
       setView({ kind: "list", id: r.id });
@@ -1314,7 +1315,10 @@ function Workspace(props: {
           ? { kind: "done" }
           : { kind: "list", id: r.listId || "main" };
     setView(target);
-    setTimeout(() => selection.selectOnly(r.id), 0);
+    setTimeout(() => {
+      selection.selectOnly(r.id);
+      dndHandle?.scrollToKey(r.id);
+    }, 0);
   };
 
   // While a row is expanded: right-click inside it → native browser menu;
@@ -1802,47 +1806,67 @@ function Nav(props: {
             selection={navSelection}
             onReorder={onReorder}
           >
-            {(l) => (
-              <ContextMenu
-                onOpenChange={(open) => {
-                  if (open) navSelection.selectOnly(l().id);
-                }}
-              >
-                <ContextMenu.Trigger
-                  as="button"
-                  type="button"
-                  class="nav-item"
-                  data-active={
-                    props.view.kind === "list" && props.view.id === l().id
-                      ? ""
-                      : undefined
-                  }
-                  data-drop-list-id={l().id}
-                  onClick={() => props.setView({ kind: "list", id: l().id })}
+            {(l) => {
+              // Captured by the Rename ContextMenu.Item below. The
+              // EditableNavLabel hands us its startEdit on mount so the
+              // context menu can drive rename mode the same way a
+              // double-click does.
+              let startRename: (() => void) | undefined;
+              return (
+                <ContextMenu
+                  onOpenChange={(open) => {
+                    if (open) navSelection.selectOnly(l().id);
+                  }}
                 >
-                  <EditableNavLabel
-                    name={l().name}
-                    onSave={(name) => props.app.renameList(l().id, name)}
-                  />
-                </ContextMenu.Trigger>
-                <ContextMenu.Portal>
-                  <ContextMenu.Content class="context-menu-content">
-                    <ContextMenu.Item
-                      class="context-menu-item"
-                      onSelect={() => {
-                        const id = l().id;
-                        if (props.view.kind === "list" && props.view.id === id) {
-                          props.setView({ kind: "list", id: "main" });
-                        }
-                        props.app.deleteList(id);
-                      }}
-                    >
-                      {m().nav.deleteList}
-                    </ContextMenu.Item>
-                  </ContextMenu.Content>
-                </ContextMenu.Portal>
-              </ContextMenu>
-            )}
+                  <ContextMenu.Trigger
+                    as="button"
+                    type="button"
+                    class="nav-item"
+                    data-active={
+                      props.view.kind === "list" && props.view.id === l().id
+                        ? ""
+                        : undefined
+                    }
+                    data-drop-list-id={l().id}
+                    onClick={() => props.setView({ kind: "list", id: l().id })}
+                  >
+                    <EditableNavLabel
+                      name={l().name}
+                      onSave={(name) => props.app.renameList(l().id, name)}
+                      registerStart={(fn) => (startRename = fn)}
+                    />
+                  </ContextMenu.Trigger>
+                  <ContextMenu.Portal>
+                    <ContextMenu.Content class="context-menu-content">
+                      <ContextMenu.Item
+                        class="context-menu-item"
+                        onSelect={() => {
+                          // Defer past the menu's close + focus-restore
+                          // (Kobalte returns focus to the trigger on
+                          // dismiss); rAF ensures our caret-placement
+                          // microtask wins the race.
+                          requestAnimationFrame(() => startRename?.());
+                        }}
+                      >
+                        {m().nav.renameList}
+                      </ContextMenu.Item>
+                      <ContextMenu.Item
+                        class="context-menu-item"
+                        onSelect={() => {
+                          const id = l().id;
+                          if (props.view.kind === "list" && props.view.id === id) {
+                            props.setView({ kind: "list", id: "main" });
+                          }
+                          props.app.deleteList(id);
+                        }}
+                      >
+                        {m().nav.deleteList}
+                      </ContextMenu.Item>
+                    </ContextMenu.Content>
+                  </ContextMenu.Portal>
+                </ContextMenu>
+              );
+            }}
           </Dnd>
         </Show>
         <Show
@@ -1998,6 +2022,9 @@ function EditableNavLabel(props: {
   name: string;
   onSave: (name: string) => void;
   class?: string;
+  /** Called once on mount with a function the parent can invoke to enter
+   *  rename mode (e.g. from a context-menu item). */
+  registerStart?: (fn: () => void) => void;
 }) {
   let ref!: HTMLSpanElement;
   const [editing, setEditing] = createSignal(false);
@@ -2009,11 +2036,11 @@ function EditableNavLabel(props: {
     if (!editing()) ref.textContent = props.name;
   });
 
-  const startEdit = (e: MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (editing()) return;
-    setEditing(true);
+  // Focus + select-all whenever editing flips on, regardless of whether
+  // the trigger was a double-click or an external caller (context menu).
+  // Microtask defers until contentEditable=true has been applied.
+  createEffect(() => {
+    if (!editing()) return;
     queueMicrotask(() => {
       ref.focus();
       const sel = window.getSelection();
@@ -2022,7 +2049,18 @@ function EditableNavLabel(props: {
       sel?.removeAllRanges();
       sel?.addRange(range);
     });
+  });
+
+  const startEdit = (e?: Event) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (editing()) return;
+    setEditing(true);
   };
+
+  onMount(() => {
+    props.registerStart?.(() => startEdit());
+  });
 
   const save = () => {
     if (!editing()) return;

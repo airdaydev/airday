@@ -24,6 +24,7 @@ export interface DndImperative {
   setExpanded(key: Key | null): void;
   getExpanded(): Key | null;
   getSelection(): { blocks: any[]; active: any | null };
+  scrollToKey(key: Key): void;
 }
 
 export interface DndProps<T> {
@@ -203,6 +204,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       setExpanded: (k) => controller!.setExpanded(k),
       getExpanded: () => controller!.getExpanded(),
       getSelection: () => controller!.getSelection(),
+      scrollToKey: (k) => controller!.scrollToKey(k),
     });
 
     setVersion((v) => v + 1);
