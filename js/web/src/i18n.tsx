@@ -62,6 +62,8 @@ type Messages = {
     bin: string;
     deleteList: string;
     renameList: string;
+    showCount: string;
+    hideCount: string;
     newList: string;
     connected: string;
     disconnected: string;
@@ -157,6 +159,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Papelera",
       deleteList: "Eliminar",
       renameList: "Renombrar",
+      showCount: "Mostrar contador",
+      hideCount: "Ocultar contador",
       newList: "+ Nueva lista",
       connected: "Conectado",
       disconnected: "Desconectado",
@@ -252,6 +256,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Bin",
       deleteList: "Delete",
       renameList: "Rename",
+      showCount: "Show count",
+      hideCount: "Hide count",
       newList: "+ New list",
       connected: "Connected",
       disconnected: "Disconnected",

@@ -53,6 +53,10 @@ const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
+/// Per-list nav-count visibility flag. Absent ≡ false — written only
+/// when toggled on (and removed when toggled back off) so docs that
+/// pre-date the field round-trip with no extra ops.
+const KEY_SHOW_COUNT_NAV: &str = "show_count_nav";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -124,6 +128,9 @@ pub struct ListView {
     pub id: String,
     pub name: String,
     pub created_at: i64,
+    /// When true, clients render the live-item count next to this list
+    /// in the nav. False (the default) keeps the nav unadorned.
+    pub show_count_nav: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -615,9 +622,42 @@ impl Doc {
             id: id.clone(),
             name: name.to_string(),
             created_at: now,
+            // Off by default — see `KEY_SHOW_COUNT_NAV`. We don't write
+            // the key on creation; the toggle path is the only writer.
+            show_count_nav: false,
             index,
         });
         Ok(id)
+    }
+
+    /// Toggle the per-list nav-count visibility flag. Refuses for `main`
+    /// (it isn't a `ListMeta` row — Home's equivalent toggle will live
+    /// on a future workspace settings map). No-op when the new value
+    /// matches the current value, so flicking the menu twice doesn't
+    /// emit phantom events or undo steps.
+    pub fn set_list_show_count_nav(
+        &self,
+        list_id: &str,
+        show: bool,
+    ) -> Result<(), DocError> {
+        let (_, map) = self.find_list(list_id)?;
+        let current = read_bool(&map, KEY_SHOW_COUNT_NAV).unwrap_or(false);
+        if current == show {
+            return Ok(());
+        }
+        if show {
+            map.insert(KEY_SHOW_COUNT_NAV, true)?;
+        } else {
+            // Drop the key entirely on the off path so an opt-out leaves
+            // no trace — on-disk state matches a never-toggled list.
+            map.delete(KEY_SHOW_COUNT_NAV)?;
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::ListShowCountNavChanged {
+            id: list_id.to_string(),
+            show_count_nav: show,
+        });
+        Ok(())
     }
 
     pub fn rename_list(&self, list_id: &str, name: &str) -> Result<(), DocError> {
@@ -1023,6 +1063,7 @@ impl Doc {
                 id: list.id,
                 name: list.name,
                 created_at: list.created_at,
+                show_count_nav: list.show_count_nav,
                 index: idx,
             });
         }
@@ -1094,6 +1135,7 @@ impl Doc {
             hash_str(&mut hasher, &l.id);
             hash_str(&mut hasher, &l.name);
             hasher.update(l.created_at.to_be_bytes());
+            hasher.update([l.show_count_nav as u8]);
         }
         // Items: walk by MovableList order for the same reason.
         let items: Vec<ItemView> = self.iter_items().collect();
@@ -1312,6 +1354,12 @@ fn read_i64(map: &LoroMap, key: &str) -> Option<i64> {
     value.into_i64().ok()
 }
 
+fn read_bool(map: &LoroMap, key: &str) -> Option<bool> {
+    let v = map.get(key)?;
+    let value = v.as_value()?.clone();
+    value.into_bool().ok()
+}
+
 fn item_view(map: &LoroMap) -> Option<ItemView> {
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
@@ -1332,6 +1380,9 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
         id: read_string(map, KEY_ID)?,
         name: read_string(map, KEY_NAME)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
+        // Optional, additive field — old docs predate the key entirely
+        // (see `KEY_SHOW_COUNT_NAV`); absence reads as `false`.
+        show_count_nav: read_bool(map, KEY_SHOW_COUNT_NAV).unwrap_or(false),
     })
 }
 
@@ -1542,6 +1593,7 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     id: post_l.id.clone(),
                     name: post_l.name.clone(),
                     created_at: post_l.created_at,
+                    show_count_nav: post_l.show_count_nav,
                     index: post_idx,
                 });
             }
@@ -1550,6 +1602,12 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ListRenamed {
                         id: post_l.id.clone(),
                         name: post_l.name.clone(),
+                    });
+                }
+                if pre_l.show_count_nav != post_l.show_count_nav {
+                    out.push(AppEvent::ListShowCountNavChanged {
+                        id: post_l.id.clone(),
+                        show_count_nav: post_l.show_count_nav,
                     });
                 }
                 if pre_idx != post_idx {
@@ -1707,6 +1765,63 @@ mod tests {
         assert!(matches!(
             doc.delete_list(LIST_MAIN).unwrap_err(),
             DocError::CannotDeleteBuiltin(_)
+        ));
+    }
+
+    #[test]
+    fn new_list_has_show_count_nav_off() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_list("Errands").unwrap();
+        assert!(!doc.get_list_meta(&id).unwrap().show_count_nav);
+    }
+
+    #[test]
+    fn show_count_nav_round_trips() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_list("Errands").unwrap();
+        doc.set_list_show_count_nav(&id, true).unwrap();
+        assert!(doc.get_list_meta(&id).unwrap().show_count_nav);
+        // Save/load preserves it through the on-disk envelope.
+        let bytes = doc.save().unwrap();
+        let restored = Doc::load(&bytes).unwrap();
+        assert!(restored.get_list_meta(&id).unwrap().show_count_nav);
+        // Toggling off drops the key — verify the round-trip back to false.
+        doc.set_list_show_count_nav(&id, false).unwrap();
+        assert!(!doc.get_list_meta(&id).unwrap().show_count_nav);
+    }
+
+    #[test]
+    fn show_count_nav_idempotent() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_list("Errands").unwrap();
+        let _ = doc.drain_events();
+        doc.set_list_show_count_nav(&id, false).unwrap();
+        assert!(
+            doc.drain_events().is_empty(),
+            "no-op toggle must not emit events"
+        );
+        doc.set_list_show_count_nav(&id, true).unwrap();
+        let evs = doc.drain_events();
+        assert!(matches!(
+            evs.as_slice(),
+            [AppEvent::ListShowCountNavChanged { show_count_nav: true, .. }]
+        ));
+        doc.set_list_show_count_nav(&id, true).unwrap();
+        assert!(
+            doc.drain_events().is_empty(),
+            "second toggle to same value must not re-emit"
+        );
+    }
+
+    #[test]
+    fn show_count_nav_refuses_main() {
+        let doc = Doc::new().unwrap();
+        // Main has no `ListMeta` row, so the lookup fails before we get
+        // to the toggle. Home's equivalent will live on a future
+        // workspace settings map (see `data-model.md`).
+        assert!(matches!(
+            doc.set_list_show_count_nav(LIST_MAIN, true).unwrap_err(),
+            DocError::ListNotFound(_)
         ));
     }
 

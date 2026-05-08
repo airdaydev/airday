@@ -895,6 +895,22 @@ function Workspace(props: {
     return n;
   });
 
+  // Per-list live-item counts for the nav badge. Single pass over the
+  // global items array so adding lists doesn't multiply the work; the
+  // memo invalidates whenever any item moves/changes status, which is
+  // the same trigger as `items()`. Lists with the toggle off still
+  // appear in the map — the Nav row reads `showCountNav` to decide
+  // whether to render the badge.
+  const liveCountsByList = createMemo((): Record<string, number> => {
+    const counts: Record<string, number> = {};
+    for (const id of state.itemsOrder) {
+      const it = state.itemsById[id];
+      if (!it || !isInListView(it)) continue;
+      counts[it.listId] = (counts[it.listId] ?? 0) + 1;
+    }
+    return counts;
+  });
+
   const dndRevision = createMemo(() => {
     const v = view();
     return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
@@ -990,7 +1006,22 @@ function Workspace(props: {
     const d = draft();
     if (!d) return;
     setDraft(null);
-    if (!text) return;
+    if (!text) {
+      // Cancel path. The dnd's applyExpanded(draftId) replaced selection
+      // with the draft id; once setDraft(null) drops it from the order,
+      // the leftover block's anchor stops resolving and the selection
+      // chrome snaps to the first item. Re-anchor on the row immediately
+      // above the captured slot (or the slot itself when nothing is above)
+      // so cancel lands the user back near where they were.
+      const rest = items();
+      if (rest.length === 0) {
+        selection.clear();
+        return;
+      }
+      const target = rest[Math.max(0, d.insertIndex - 1)];
+      selection.selectOnly(target.id);
+      return;
+    }
     const newId = app.addItemAt(d.listId, text, d.insertIndex);
     // Notes are persisted as a follow-up edit because the draft has no
     // engine record while the user is typing — `editItemNotes` on a
@@ -1421,6 +1452,7 @@ function Workspace(props: {
         app={app}
         lists={lists()}
         binCount={binCount()}
+        liveCountsByList={liveCountsByList()}
         view={view()}
         setView={(v) => {
           setView(v);
@@ -1794,8 +1826,12 @@ function viewTitle(
 
 function Nav(props: {
   app: DocApp;
-  lists: { id: string; name: string }[];
+  lists: { id: string; name: string; showCountNav: boolean }[];
   binCount: number;
+  /** Live-item count per list id. Lists without a count entry have
+   *  zero; the nav row still consults `showCountNav` to decide
+   *  whether to render the badge at all. */
+  liveCountsByList: Record<string, number>;
   view: ViewKey;
   setView: (v: ViewKey) => void;
   session: Session;
@@ -1829,7 +1865,7 @@ function Nav(props: {
   // `main` is a reserved id with no MovableList entry — clients
   // render it as a static nav button, so the dnd source is just
   // `props.lists` directly.
-  type NavList = { id: string; name: string };
+  type NavList = { id: string; name: string; showCountNav: boolean };
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
   createEffect(() => setDndLists(props.lists));
 
@@ -2028,6 +2064,16 @@ function Nav(props: {
                       onSave={(name) => props.app.renameList(l().id, name)}
                       registerStart={(fn) => (startRename = fn)}
                     />
+                    <Show
+                      when={
+                        l().showCountNav &&
+                        (props.liveCountsByList[l().id] ?? 0) > 0
+                      }
+                    >
+                      <span class="nav-item-count">
+                        {props.liveCountsByList[l().id]}
+                      </span>
+                    </Show>
                   </ContextMenu.Trigger>
                   <ContextMenu.Portal>
                     <ContextMenu.Content class="context-menu-content">
@@ -2042,6 +2088,19 @@ function Nav(props: {
                         }}
                       >
                         {m().nav.renameList}
+                      </ContextMenu.Item>
+                      <ContextMenu.Item
+                        class="context-menu-item"
+                        onSelect={() => {
+                          props.app.setListShowCountNav(
+                            l().id,
+                            !l().showCountNav,
+                          );
+                        }}
+                      >
+                        {l().showCountNav
+                          ? m().nav.hideCount
+                          : m().nav.showCount}
                       </ContextMenu.Item>
                       <ContextMenu.Item
                         class="context-menu-item"

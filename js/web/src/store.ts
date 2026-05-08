@@ -35,6 +35,10 @@ export interface ListView {
   id: string;
   name: string;
   createdAt: number;
+  /** When true, the nav renders this list's live-item count beside its
+   *  name. Default false; toggled per-list from the nav context menu.
+   *  Synced across devices. */
+  showCountNav: boolean;
 }
 
 export interface WorkspaceState {
@@ -97,6 +101,10 @@ export interface DocApp {
   renameList(id: string, name: string): void;
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
+  /** Toggle the nav-count badge for `id`. Refused for the reserved
+   *  `main` (Home) list — that one will get its own toggle via a future
+   *  workspace settings map. */
+  setListShowCountNav(id: string, show: boolean): void;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -142,6 +150,7 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
           id: ev.id,
           name: ev.name ?? "",
           createdAt: Number(ev.createdAt ?? 0),
+          showCountNav: ev.showCountNav ?? false,
         };
         listsOrder.push(ev.id);
         break;
@@ -262,6 +271,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           id: ev.id,
           name: ev.name ?? "",
           createdAt: Number(ev.createdAt ?? 0),
+          showCountNav: ev.showCountNav ?? false,
         });
         const targetIndex = ev.index ?? state.listsOrder.length;
         setState(
@@ -301,6 +311,17 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "listRenamed": {
         if (state.listsById[ev.id]) {
           setState("listsById", ev.id, "name", ev.name ?? "");
+        }
+        break;
+      }
+      case "listShowCountNavChanged": {
+        if (state.listsById[ev.id]) {
+          setState(
+            "listsById",
+            ev.id,
+            "showCountNav",
+            ev.showCountNav ?? false,
+          );
         }
         break;
       }
@@ -446,6 +467,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     deleteList(id) {
       mutate(() => engine.deleteList(id));
+    },
+    setListShowCountNav(id, show) {
+      mutate(() => engine.setListShowCountNav(id, show));
     },
     undo() {
       const steps = undoStack.pop();

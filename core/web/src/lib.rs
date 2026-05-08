@@ -185,6 +185,13 @@ impl Doc {
         self.inner.delete_list(list_id).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setListShowCountNav)]
+    pub fn set_list_show_count_nav(&self, list_id: &str, show: bool) -> Result<(), JsError> {
+        self.inner
+            .set_list_show_count_nav(list_id, show)
+            .map_err(js_err)
+    }
+
     // -- reads (return JSON for now; replace with serde-wasm-bindgen
     //    structured returns once a real consumer needs them) --
 
@@ -857,6 +864,14 @@ impl SyncEngine {
         self.inner.doc().delete_list(list_id).map_err(js_err)
     }
 
+    #[wasm_bindgen(js_name = setListShowCountNav)]
+    pub fn set_list_show_count_nav(&self, list_id: &str, show: bool) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_list_show_count_nav(list_id, show)
+            .map_err(js_err)
+    }
+
     // -- undo / redo --
 
     pub fn undo(&self) -> Result<bool, JsError> {
@@ -1011,10 +1026,11 @@ impl From<CoreEvent> for EngineEvent {
 /// - `itemNotesChanged` — id, notes
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?
 /// - `itemListChanged` — id, listId
-/// - `listAdded` — id, name, createdAt, index
+/// - `listAdded` — id, name, createdAt, showCountNav, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
+/// - `listShowCountNavChanged` — id, showCountNav
 #[wasm_bindgen]
 pub struct AppEventJs {
     kind: &'static str,
@@ -1026,6 +1042,7 @@ pub struct AppEventJs {
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
+    show_count_nav: Option<bool>,
     index: Option<usize>,
 }
 
@@ -1071,6 +1088,10 @@ impl AppEventJs {
     pub fn index(&self) -> Option<usize> {
         self.index
     }
+    #[wasm_bindgen(getter, js_name = showCountNav)]
+    pub fn show_count_nav(&self) -> Option<bool> {
+        self.show_count_nav
+    }
 }
 
 impl From<CoreAppEvent> for AppEventJs {
@@ -1085,6 +1106,7 @@ impl From<CoreAppEvent> for AppEventJs {
             created_at: None,
             done_at: None,
             binned_at: None,
+            show_count_nav: None,
             index: None,
         };
         match e {
@@ -1153,12 +1175,14 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 name,
                 created_at,
+                show_count_nav,
                 index,
             } => AppEventJs {
                 kind: "listAdded",
                 id,
                 name: Some(name),
                 created_at: Some(created_at),
+                show_count_nav: Some(show_count_nav),
                 index: Some(index),
                 ..blank
             },
@@ -1179,6 +1203,15 @@ impl From<CoreAppEvent> for AppEventJs {
                 name: Some(name),
                 ..blank
             },
+            CoreAppEvent::ListShowCountNavChanged {
+                id,
+                show_count_nav,
+            } => AppEventJs {
+                kind: "listShowCountNavChanged",
+                id,
+                show_count_nav: Some(show_count_nav),
+                ..blank
+            },
         }
     }
 }
@@ -1187,10 +1220,11 @@ impl From<CoreAppEvent> for AppEventJs {
 
 fn list_to_json(l: &airday_core::ListView) -> String {
     format!(
-        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
+        "{{\"id\":{},\"name\":{},\"createdAt\":{},\"showCountNav\":{}}}",
         json_string(&l.id),
         json_string(&l.name),
-        l.created_at
+        l.created_at,
+        l.show_count_nav,
     )
 }
 

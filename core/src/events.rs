@@ -71,6 +71,12 @@ pub enum AppEvent {
         id: String,
         name: String,
         created_at: i64,
+        /// Whether the client should render this list's live-item count
+        /// in the nav. Per-list, synced across devices. Defaults to false
+        /// — the field is absent on disk for lists that have never had
+        /// the toggle flipped (and for any list created before this
+        /// flag existed).
+        show_count_nav: bool,
         index: usize,
     },
     ListRemoved {
@@ -83,5 +89,11 @@ pub enum AppEvent {
     ListRenamed {
         id: String,
         name: String,
+    },
+    /// Per-list nav-count visibility toggled. Independent of name/order
+    /// changes — emitted only when the boolean transitions.
+    ListShowCountNavChanged {
+        id: String,
+        show_count_nav: bool,
     },
 }

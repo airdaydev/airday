@@ -35,6 +35,7 @@ There is no separate persisted `status` field. Visibility is derived from the ti
 | `id` | string | uuid v7 hex; stable, used in `Item.list_id` |
 | `name` | string | display name |
 | `created_at` | i64 | unix millis |
+| `show_count_nav` | bool? | when true, clients render the live-item count next to the list in the nav. Absent ≡ false; default for new lists is hidden. Per-list, synced across devices. The reserved `main` (Home) list will get an equivalent toggle via a future doc-level workspace settings map (it isn't stored in `lists`).
 
 ## Built-in lists
 
@@ -54,6 +55,7 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `edit_item_text(item_id, text)`
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
+- `set_list_show_count_nav(list_id, show)` — toggles the per-list nav-count visibility flag. Refuses for `main` (no `ListMeta` row).
 - `delete_list(list_id)` — refuses for `main`; items in the deleted list are reassigned to `main`.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.
