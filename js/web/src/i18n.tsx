@@ -65,6 +65,11 @@ type Messages = {
     newList: string;
     connected: string;
     disconnected: string;
+    allSynced: string;
+    pendingChanges: string;
+    lastSynced: (rel: string) => string;
+    opLabel: (n: string) => string;
+    itemsListsCount: (items: number, lists: number) => string;
     undo: string;
     redo: string;
     settings: string;
@@ -115,6 +120,7 @@ type Messages = {
   };
   relative: {
     justNow: string;
+    secondsAgo: (n: number) => string;
     minutesAgo: (n: number) => string;
     hoursAgo: (n: number) => string;
     yesterdayAt: (time: string) => string;
@@ -153,6 +159,12 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       newList: "+ Nueva lista",
       connected: "Conectado",
       disconnected: "Desconectado",
+      allSynced: "Todo sincronizado",
+      pendingChanges: "Cambios pendientes",
+      lastSynced: (rel) => `Sincronizado ${rel}`,
+      opLabel: (n) => `op #${n}`,
+      itemsListsCount: (items, lists) =>
+        `${items} elemento${items === 1 ? "" : "s"}, ${lists} lista${lists === 1 ? "" : "s"}`,
       undo: "Deshacer",
       redo: "Rehacer",
       settings: "Ajustes",
@@ -204,6 +216,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     relative: {
       justNow: "ahora mismo",
+      secondsAgo: (n) => `hace ${n} s`,
       minutesAgo: (n) => `hace ${n} min`,
       hoursAgo: (n) => `hace ${n} h`,
       yesterdayAt: (time) => `Ayer ${time}`,
@@ -240,6 +253,12 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       newList: "+ New list",
       connected: "Connected",
       disconnected: "Disconnected",
+      allSynced: "All synced",
+      pendingChanges: "Pending changes",
+      lastSynced: (rel) => `Synced ${rel}`,
+      opLabel: (n) => `op #${n}`,
+      itemsListsCount: (items, lists) =>
+        `${items} item${items === 1 ? "" : "s"}, ${lists} list${lists === 1 ? "" : "s"}`,
       undo: "Undo",
       redo: "Redo",
       settings: "Settings",
@@ -291,6 +310,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     relative: {
       justNow: "just now",
+      secondsAgo: (n) => `${n}s ago`,
       minutesAgo: (n) => `${n}m ago`,
       hoursAgo: (n) => `${n}h ago`,
       yesterdayAt: (time) => `Yesterday ${time}`,

@@ -244,6 +244,10 @@ function AppBody() {
   // anonymous one — `session()` is never null after that point.
   const [session, setSession] = createSignal<Session | undefined>(undefined);
   const [online, setOnline] = createSignal(false);
+  // Wall-clock timestamp of the last successful server frame (recv or
+  // outbox flush). Reset on logout/session-swap so the new account
+  // doesn't inherit the previous device's last-synced time.
+  const [lastSyncAt, setLastSyncAt] = createSignal<number | null>(null);
   const [boot, setBoot] = createSignal<{
     doc: Doc;
     lastAcked: bigint;
@@ -303,6 +307,7 @@ function AppBody() {
     setBoot(null);
     setBootError(null);
     setOnline(false);
+    setLastSyncAt(null);
     setSession(await createAnonymousSession());
   };
 
@@ -313,6 +318,7 @@ function AppBody() {
     setBoot(null);
     setBootError(null);
     setOnline(false);
+    setLastSyncAt(null);
     setSession(s);
   };
 
@@ -331,6 +337,8 @@ function AppBody() {
             setBootError={setBootError}
             online={online()}
             setOnline={setOnline}
+            lastSyncAt={lastSyncAt()}
+            setLastSyncAt={setLastSyncAt}
             logout={logout}
             onSession={onAuthenticated}
             opfsOk={opfsOk() ?? false}
@@ -391,6 +399,8 @@ function BootGate(props: {
   setBootError: (m: string | null) => void;
   online: boolean;
   setOnline: (b: boolean) => void;
+  lastSyncAt: number | null;
+  setLastSyncAt: (ts: number | null) => void;
   logout: () => void;
   onSession: (s: Session) => void;
   opfsOk: boolean;
@@ -468,6 +478,8 @@ function BootGate(props: {
           bootError={props.bootError}
           setOnline={props.setOnline}
           online={props.online}
+          lastSyncAt={props.lastSyncAt}
+          setLastSyncAt={props.setLastSyncAt}
           logout={props.logout}
           onSession={props.onSession}
           opfsOk={props.opfsOk}
@@ -499,6 +511,8 @@ function MainApp(props: {
   bootError: string | null;
   online: boolean;
   setOnline: (b: boolean) => void;
+  lastSyncAt: number | null;
+  setLastSyncAt: (ts: number | null) => void;
   logout: () => void;
   onSession: (s: Session) => void;
   opfsOk: boolean;
@@ -580,8 +594,15 @@ function MainApp(props: {
     bridge = new SyncBridge({
       engine,
       onChange: (kind) => {
-        if (kind === "online") props.setOnline(true);
+        if (kind === "online") {
+          props.setOnline(true);
+          props.setLastSyncAt(Date.now());
+        }
         if (kind === "offline") props.setOnline(false);
+        // `drain` fires after every recv-frame pump and every outbox
+        // flush, so it's the natural pulse for "we just round-tripped
+        // with the server" — even when no app events were produced.
+        if (kind === "drain") props.setLastSyncAt(Date.now());
       },
       onAppEvents: () => {
         app.drainEvents();
@@ -712,6 +733,7 @@ function MainApp(props: {
       app={app}
       session={props.session}
       online={props.online}
+      lastSyncAt={props.lastSyncAt}
       logout={props.logout}
       onSession={props.onSession}
     />
@@ -722,6 +744,7 @@ function Workspace(props: {
   app: DocApp;
   session: Session;
   online: boolean;
+  lastSyncAt: number | null;
   logout: () => void;
   onSession: (s: Session) => void;
 }) {
@@ -1389,6 +1412,7 @@ function Workspace(props: {
         }}
         session={props.session}
         online={props.online}
+        lastSyncAt={props.lastSyncAt}
         logout={props.logout}
         onOpenSettings={() => setSettingsOpen(true)}
         onSession={props.onSession}
@@ -1614,6 +1638,115 @@ function CloudIcon() {
   );
 }
 
+/** Click-to-open popover anchored to the cloud icon. Shows rolled-up
+ *  connection/sync status, last-synced relative time, op id,
+ *  fingerprint, and items+lists counts. Periodic ticker only runs
+ *  while the popover is open. */
+function ConnectionStatusPopover(props: {
+  app: DocApp;
+  online: boolean;
+  lastSyncAt: number | null;
+}) {
+  const { m, locale } = useAppI18n();
+  const [open, setOpen] = createSignal(false);
+  // Local seconds-resolution clock — only ticks while the popover is
+  // visible so we don't spend a 5s interval forever just to drive a
+  // string the user can't see. Falls back to a one-shot read when
+  // closed (the sub-minute values won't refresh, but the popover
+  // re-opens with fresh values anyway).
+  const [tickNow, setTickNow] = createSignal(Date.now());
+  createEffect(() => {
+    if (!open()) return;
+    setTickNow(Date.now());
+    const id = setInterval(() => setTickNow(Date.now()), 5_000);
+    onCleanup(() => clearInterval(id));
+  });
+
+  // Engine-derived state. `app.version()` bumps on every dispatched
+  // event, so reading it here re-runs these computations exactly when
+  // the underlying numbers can change. Cheap reads — engine just
+  // forwards into the doc.
+  const pending = (): boolean => {
+    props.app.version();
+    return props.app.engine.hasPendingOps();
+  };
+  const opIdLabel = (): string => {
+    props.app.version();
+    return String(props.app.engine.highestSeenOpId());
+  };
+  const fingerprintHex = (): string => {
+    props.app.version();
+    const buf = props.app.engine.fingerprint();
+    // Full 64-char hex; the popover row CSS-truncates with
+    // text-overflow so the visible width tracks the popover, while
+    // copy-paste yields the entire hash.
+    let s = "";
+    for (let i = 0; i < buf.length; i++) {
+      s += buf[i].toString(16).padStart(2, "0");
+    }
+    return s;
+  };
+  const itemsCount = (): number => props.app.state.itemsOrder.length;
+  const listsCount = (): number => props.app.state.listsOrder.length;
+
+  const sinceLabel = (): string | null => {
+    const ts = props.lastSyncAt;
+    if (!ts) return null;
+    const now = tickNow();
+    const diff = now - ts;
+    const r = m().relative;
+    if (diff < 5_000) return m().nav.lastSynced(r.justNow);
+    if (diff < 60_000) {
+      return m().nav.lastSynced(r.secondsAgo(Math.floor(diff / 1000)));
+    }
+    // ≥ 1 min: defer to the shared formatter for minutes/hours/days.
+    return m().nav.lastSynced(formatRelative(ts, now, locale()));
+  };
+
+  return (
+    <Popover open={open()} onOpenChange={setOpen} placement="top-start" gutter={6}>
+      <Popover.Trigger
+        class="connection-indicator"
+        aria-label={props.online ? m().nav.connected : m().nav.disconnected}
+      >
+        <Show when={props.online} fallback={<CloudOffIcon />}>
+          <CloudIcon />
+        </Show>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content class="status-popover">
+          <div class="status-line">
+            <span
+              class="status-dot"
+              data-state={
+                !props.online ? "offline" : pending() ? "pending" : "synced"
+              }
+              aria-hidden="true"
+            />
+            <span>
+              {!props.online
+                ? m().nav.disconnected
+                : pending()
+                  ? m().nav.pendingChanges
+                  : m().nav.allSynced}
+            </span>
+          </div>
+          <Show when={sinceLabel()}>
+            {(label) => <div class="status-line status-muted">{label()}</div>}
+          </Show>
+          <div class="status-line status-muted">{m().nav.opLabel(opIdLabel())}</div>
+          <div class="status-fingerprint status-muted status-mono">
+            {fingerprintHex()}
+          </div>
+          <div class="status-line status-muted">
+            {m().nav.itemsListsCount(itemsCount(), listsCount())}
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover>
+  );
+}
+
 function viewTitle(
   v: ViewKey,
   lists: { id: string; name: string }[],
@@ -1634,6 +1767,7 @@ function Nav(props: {
   setView: (v: ViewKey) => void;
   session: Session;
   online: boolean;
+  lastSyncAt: number | null;
   logout: () => void;
   onOpenSettings: () => void;
   onSession: (s: Session) => void;
@@ -1897,15 +2031,11 @@ function Nav(props: {
           </Popover>
         </Show>
         <Show when={!props.session.anonymous}>
-          <span
-            class="connection-indicator"
-            title={props.online ? m().nav.connected : m().nav.disconnected}
-            aria-label={props.online ? m().nav.connected : m().nav.disconnected}
-          >
-            <Show when={props.online} fallback={<CloudOffIcon />}>
-              <CloudIcon />
-            </Show>
-          </span>
+          <ConnectionStatusPopover
+            app={props.app}
+            online={props.online}
+            lastSyncAt={props.lastSyncAt}
+          />
         </Show>
         <DropdownMenu>
           <DropdownMenu.Trigger

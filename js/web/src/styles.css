@@ -588,8 +588,92 @@ body {
 .connection-indicator {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  padding: 4px;
+  margin: -4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  line-height: 0;
+}
+
+.connection-indicator:hover,
+.connection-indicator[data-expanded] {
+  color: var(--text);
+}
+
+.status-popover {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 200px;
+  /* Caps the natural-width growth so .status-fingerprint's width:100%
+     has a finite container to truncate against. 90vw still applies as
+     a safety on tiny viewports. */
+  max-width: min(260px, 90vw);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  outline: none;
+  z-index: 60;
+  font-size: 13px;
+  color: var(--text);
+  /* The global #root rule kills text selection app-wide; this is a
+     read-only debug surface where copy-paste of op id / fingerprint
+     is the whole point. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.status-fingerprint {
+  width: 100%;
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.status-muted {
   color: var(--text-muted);
 }
+
+.status-mono {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 12px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.status-dot[data-state="synced"] {
+  background: #22c55e;
+}
+
+.status-dot[data-state="pending"] {
+  background: #f59e0b;
+}
+
+.status-dot[data-state="offline"] {
+  background: #9ca3af;
+}
+
 
 .theme-segmented {
   position: relative;
