@@ -273,6 +273,7 @@ body {
   margin-left: auto;
   padding-left: 8px;
   color: var(--text-subtle);
+  font-size: 0.9em;
   font-variant-numeric: tabular-nums;
 }
 
