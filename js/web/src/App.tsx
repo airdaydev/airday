@@ -1921,6 +1921,15 @@ function Nav(props: {
   onCleanup(() => navMobileMq.removeEventListener("change", onNavMqChange));
 
   const navSelection = new DndSelection();
+  const onNavItemClick = (e: MouseEvent, id: string) => {
+    const modKey = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+      ? e.metaKey
+      : e.ctrlKey;
+    if (e.shiftKey || modKey) return;
+    props.setView({ kind: "list", id });
+  };
+  const selectedNavIds = (id: string): string[] =>
+    navSelection.isSelected(id) ? navSelection.getSelectedKeys().map(String) : [id];
 
   // Reactive read-throughs of the engine's undo state. `app.version`
   // bumps on every dispatched event (local mutation, undo/redo, remote
@@ -2121,7 +2130,7 @@ function Nav(props: {
             setItems={setDndLists}
             getKey={(l) => l.id}
             itemHeight={navIsMobile() ? 40 : 28}
-            multi={false}
+            multi
             clearOnClickOutside
             selection={navSelection}
             onReorder={onReorder}
@@ -2132,10 +2141,24 @@ function Nav(props: {
               // context menu can drive rename mode the same way a
               // double-click does.
               let startRename: (() => void) | undefined;
+              const selectedIds = (): string[] => selectedNavIds(l().id);
+              const isMultiMenu = (): boolean => selectedIds().length > 1;
+              const shouldShowCount = (): boolean =>
+                selectedIds().some(
+                  (id) => props.lists.find((list) => list.id === id)?.showCountNav !== true,
+                );
+              const applyShowCount = (): void => {
+                const show = shouldShowCount();
+                for (const id of selectedIds()) {
+                  props.app.setListShowCountNav(id, show);
+                }
+              };
               return (
                 <ContextMenu
                   onOpenChange={(open) => {
-                    if (open) navSelection.selectOnly(l().id);
+                    if (open && !navSelection.isSelected(l().id)) {
+                      navSelection.selectOnly(l().id);
+                    }
                   }}
                 >
                   <ContextMenu.Trigger
@@ -2148,7 +2171,7 @@ function Nav(props: {
                         : undefined
                     }
                     data-drop-list-id={l().id}
-                    onClick={() => props.setView({ kind: "list", id: l().id })}
+                    onClick={(e) => onNavItemClick(e, l().id)}
                   >
                     <EditableNavLabel
                       name={l().name}
@@ -2168,43 +2191,52 @@ function Nav(props: {
                   </ContextMenu.Trigger>
                   <ContextMenu.Portal>
                     <ContextMenu.Content class="context-menu-content">
-                      <ContextMenu.Item
-                        class="context-menu-item"
-                        onSelect={() => {
-                          // Defer past the menu's close + focus-restore
-                          // (Kobalte returns focus to the trigger on
-                          // dismiss); rAF ensures our caret-placement
-                          // microtask wins the race.
-                          requestAnimationFrame(() => startRename?.());
-                        }}
+                      <Show
+                        when={!isMultiMenu()}
+                        fallback={
+                          <ContextMenu.Item
+                            class="context-menu-item"
+                            onSelect={applyShowCount}
+                          >
+                            {shouldShowCount()
+                              ? m().nav.showCount
+                              : m().nav.hideCount}
+                          </ContextMenu.Item>
+                        }
                       >
-                        {m().nav.renameList}
-                      </ContextMenu.Item>
-                      <ContextMenu.Item
-                        class="context-menu-item"
-                        onSelect={() => {
-                          props.app.setListShowCountNav(
-                            l().id,
-                            !l().showCountNav,
-                          );
-                        }}
-                      >
-                        {l().showCountNav
-                          ? m().nav.hideCount
-                          : m().nav.showCount}
-                      </ContextMenu.Item>
-                      <ContextMenu.Item
-                        class="context-menu-item"
-                        onSelect={() => {
-                          const id = l().id;
-                          if (props.view.kind === "list" && props.view.id === id) {
-                            props.setView({ kind: "list", id: "main" });
-                          }
-                          props.app.deleteList(id);
-                        }}
-                      >
-                        {m().nav.deleteList}
-                      </ContextMenu.Item>
+                        <ContextMenu.Item
+                          class="context-menu-item"
+                          onSelect={() => {
+                            // Defer past the menu's close + focus-restore
+                            // (Kobalte returns focus to the trigger on
+                            // dismiss); rAF ensures our caret-placement
+                            // microtask wins the race.
+                            requestAnimationFrame(() => startRename?.());
+                          }}
+                        >
+                          {m().nav.renameList}
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          class="context-menu-item"
+                          onSelect={applyShowCount}
+                        >
+                          {shouldShowCount()
+                            ? m().nav.showCount
+                            : m().nav.hideCount}
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          class="context-menu-item"
+                          onSelect={() => {
+                            const id = l().id;
+                            if (props.view.kind === "list" && props.view.id === id) {
+                              props.setView({ kind: "list", id: "main" });
+                            }
+                            props.app.deleteList(id);
+                          }}
+                        >
+                          {m().nav.deleteList}
+                        </ContextMenu.Item>
+                      </Show>
                     </ContextMenu.Content>
                   </ContextMenu.Portal>
                 </ContextMenu>

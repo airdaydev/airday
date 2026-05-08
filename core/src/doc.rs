@@ -2017,10 +2017,7 @@ mod tests {
         // Save/load preserves the override across the on-disk envelope.
         let bytes = doc.save().unwrap();
         let restored = Doc::load(&bytes).unwrap();
-        assert_eq!(
-            restored.get_settings().main_name.as_deref(),
-            Some("Today")
-        );
+        assert_eq!(restored.get_settings().main_name.as_deref(), Some("Today"));
         // Whitespace is trimmed; surrounding spaces collapse, internal
         // spaces survive verbatim.
         doc.set_main_name("  My Day  ").unwrap();
@@ -2044,7 +2041,10 @@ mod tests {
         let evs = doc.drain_events();
         assert!(matches!(
             evs.as_slice(),
-            [AppEvent::SettingsChanged { main_name: Some(_), .. }]
+            [AppEvent::SettingsChanged {
+                main_name: Some(_),
+                ..
+            }]
         ));
         // Setting the same value (after trim) is also a no-op.
         doc.set_main_name("  Today  ").unwrap();
