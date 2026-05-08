@@ -1012,7 +1012,11 @@ function Workspace(props: {
   // Called by the draft Row from its collapse effect. Empty text → drop;
   // non-empty → real item via addItemAt at the captured slot, then
   // re-anchor selection so the user lands on what they just created.
-  const settleDraft = (text: string, notes: string) => {
+  // `chain` is true when the user pressed Enter; on a successful save
+  // we open a fresh draft below the new item so capture continues. An
+  // empty Enter still ends the chain (it falls through to the cancel
+  // path below).
+  const settleDraft = (text: string, notes: string, chain: boolean) => {
     const d = draft();
     if (!d) return;
     setDraft(null);
@@ -1040,8 +1044,14 @@ function Workspace(props: {
     if (notes) app.editItemNotes(newId, notes);
     // The store dispatch that adds the new item runs before this
     // microtask, so by then `selection.updateOrder` has already seen
-    // the new id and the selection anchor is valid.
-    queueMicrotask(() => selection.selectOnly(newId));
+    // the new id and the selection anchor is valid. When chaining,
+    // startDraft reads the topmost selection to pick the insert slot,
+    // so the selectOnly above must land first — same microtask, same
+    // ordering.
+    queueMicrotask(() => {
+      selection.selectOnly(newId);
+      if (chain) startDraft();
+    });
   };
 
   // Paste anywhere in a list view drops the clipboard contents in as items,
@@ -2518,8 +2528,10 @@ function Row(props: {
   /** Called by a draft row from its collapse effect with the trimmed
    *  edit text and the notes textarea contents. Empty text means drop
    *  the draft; non-empty means the workspace should commit it as a
-   *  real item (and apply notes as a follow-up). */
-  onDraftSettle?: (text: string, notes: string) => void;
+   *  real item (and apply notes as a follow-up). `chain` is true when
+   *  the collapse was driven by Enter — the workspace re-opens a fresh
+   *  draft so capture continues until Escape / blur / empty-Enter. */
+  onDraftSettle?: (text: string, notes: string, chain: boolean) => void;
 }) {
   const { m, locale } = useAppI18n();
   let textRef!: HTMLSpanElement;
@@ -2532,6 +2544,11 @@ function Row(props: {
   // where the user pointed instead of selecting all. Captured pre-expand
   // because layout may shift once the row becomes editable.
   let dblClickCaret: { node: Node; offset: number } | null = null;
+  // Set by the Enter keydown handler before it dispatches the synthetic
+  // Escape that drives collapse. The collapse effect reads (and resets)
+  // it so the workspace can tell Enter-commit from Escape/blur and chain
+  // a fresh draft only on Enter.
+  let chainOnSettle = false;
 
   // Order matters: this effect must run *before* the model-mirror effect
   // below. On collapse, both fire in the same tick — if the mirror runs
@@ -2565,6 +2582,8 @@ function Row(props: {
         }
         if (prev && !now) {
           dblClickCaret = null;
+          const chain = chainOnSettle;
+          chainOnSettle = false;
           const next = (textRef.textContent ?? "").trim();
           // Draft path: the row is a transient pseudo-item that has no
           // engine-side record yet. Hand the trimmed text back to the
@@ -2575,9 +2594,15 @@ function Row(props: {
             // runs (the <Show> wrapping it tears down synchronously);
             // read the value it stashed in draftNotesRef during its
             // onCleanup instead of querying the now-detached textarea.
-            props.onDraftSettle?.(next, draftNotesRef.current);
-            const listbox = textRef.closest<HTMLElement>('[role="listbox"]');
-            listbox?.focus();
+            props.onDraftSettle?.(next, draftNotesRef.current, chain);
+            // When chaining, the workspace will open a fresh draft and
+            // its expand effect will steal focus to the new row's
+            // contentEditable; bouncing focus to the listbox here would
+            // race that. Skip the listbox refocus on the chain path.
+            if (!chain) {
+              const listbox = textRef.closest<HTMLElement>('[role="listbox"]');
+              listbox?.focus();
+            }
             return;
           }
           const current = props.item().text;
@@ -2790,6 +2815,11 @@ function Row(props: {
                 // it would re-expand the row.
                 e.preventDefault();
                 e.stopPropagation();
+                // Mark this as the Enter-commit path so the collapse
+                // effect tells the workspace to chain another draft.
+                // Escape and blur reach the same collapse without setting
+                // this flag, so they end the chain.
+                chainOnSettle = true;
                 (e.currentTarget as HTMLElement).dispatchEvent(
                   new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
                 );
