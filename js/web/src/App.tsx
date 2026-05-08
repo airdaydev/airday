@@ -916,11 +916,21 @@ function Workspace(props: {
     return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
   });
 
-  // Id of the currently-viewed list iff it can be renamed. The reserved
-  // "main" (Home) list and the done/bin views are not editable.
+  // Id of the currently-viewed list iff it can be renamed. Both `main`
+  // (Home, via the doc-level settings override) and any user-created
+  // list qualify; only the done/bin cross-cutting views opt out.
   const editableListId = createMemo(() => {
     const v = view();
-    return v.kind === "list" && v.id !== "main" ? v.id : null;
+    return v.kind === "list" ? v.id : null;
+  });
+
+  // Resolved display label for the reserved `main` (Home) list:
+  // user override from doc-level settings if present, otherwise the
+  // localized built-in label. Centralised here so the nav row, the
+  // workspace header, and `viewTitle` agree.
+  const homeName = createMemo((): string => {
+    const override = state.settings.mainName;
+    return override && override.length > 0 ? override : m().nav.home;
   });
 
   createEffect(() => {
@@ -1453,6 +1463,8 @@ function Workspace(props: {
         lists={lists()}
         binCount={binCount()}
         liveCountsByList={liveCountsByList()}
+        homeName={homeName()}
+        mainShowCountNav={state.settings.mainShowCountNav}
         view={view()}
         setView={(v) => {
           setView(v);
@@ -1505,13 +1517,24 @@ function Workspace(props: {
             <Show
               keyed
               when={editableListId()}
-              fallback={viewTitle(view(), lists(), m())}
+              fallback={viewTitle(view(), lists(), homeName(), m())}
             >
               {(listId) => (
                 <EditableNavLabel
                   class="editable-title"
-                  name={lists().find((l) => l.id === listId)?.name ?? listId}
-                  onSave={(name) => app.renameList(listId, name)}
+                  name={
+                    listId === "main"
+                      ? homeName()
+                      : (lists().find((l) => l.id === listId)?.name ?? listId)
+                  }
+                  onSave={(name) => {
+                    // Home's name lives on the doc-level settings map,
+                    // not as a `ListMeta` row — route to the right
+                    // mutation so the override survives sync. Empty
+                    // input clears the override (falls back to default).
+                    if (listId === "main") app.setMainName(name);
+                    else app.renameList(listId, name);
+                  }}
                 />
               )}
             </Show>
@@ -1814,10 +1837,13 @@ function ConnectionStatusPopover(props: {
 function viewTitle(
   v: ViewKey,
   lists: { id: string; name: string }[],
+  homeName: string,
   m: ReturnType<typeof useAppI18n>["m"] extends () => infer T ? T : never,
 ): string {
   if (v.kind === "list") {
-    if (v.id === "main") return m.nav.home;
+    // `homeName` already resolves the user override → localized default
+    // chain (see `App.homeName`); pass through verbatim.
+    if (v.id === "main") return homeName;
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
   if (v.kind === "done") return m.nav.done;
@@ -1832,6 +1858,13 @@ function Nav(props: {
    *  zero; the nav row still consults `showCountNav` to decide
    *  whether to render the badge at all. */
   liveCountsByList: Record<string, number>;
+  /** Resolved Home label — user override from doc-level settings if
+   *  present, otherwise the localized built-in label. */
+  homeName: string;
+  /** Doc-level settings flag; when true, render the live-item count
+   *  beside Home in the nav (subject to the > 0 gate the rest of the
+   *  list rows use). */
+  mainShowCountNav: boolean;
   view: ViewKey;
   setView: (v: ViewKey) => void;
   session: Session;
@@ -1969,20 +2002,68 @@ function Nav(props: {
       }
     }
   };
+  // Captured by the Home ContextMenu's Rename item — same trick as the
+  // user-list rows further down so the menu can drive rename mode the
+  // same way a double-click on the label does.
+  let startHomeRename: (() => void) | undefined;
   return (
     <nav class="nav">
       <div class="nav-group">
-        <button
-          type="button"
-          class="nav-item"
-          data-active={
-            props.view.kind === "list" && props.view.id === "main" ? "" : undefined
-          }
-          data-drop-list-id="main"
-          onClick={() => props.setView({ kind: "list", id: "main" })}
-        >
-          {m().nav.home}
-        </button>
+        <ContextMenu>
+          <ContextMenu.Trigger
+            as="button"
+            type="button"
+            class="nav-item"
+            data-active={
+              props.view.kind === "list" && props.view.id === "main"
+                ? ""
+                : undefined
+            }
+            data-drop-list-id="main"
+            onClick={() => props.setView({ kind: "list", id: "main" })}
+          >
+            <EditableNavLabel
+              name={props.homeName}
+              onSave={(name) => props.app.setMainName(name)}
+              registerStart={(fn) => (startHomeRename = fn)}
+            />
+            <Show
+              when={
+                props.mainShowCountNav &&
+                (props.liveCountsByList["main"] ?? 0) > 0
+              }
+            >
+              <span class="nav-item-count">
+                {props.liveCountsByList["main"]}
+              </span>
+            </Show>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content class="context-menu-content">
+              <ContextMenu.Item
+                class="context-menu-item"
+                onSelect={() => {
+                  // Defer past the menu close + focus-restore (Kobalte
+                  // returns focus to the trigger on dismiss), matching
+                  // the user-list Rename pathway.
+                  requestAnimationFrame(() => startHomeRename?.());
+                }}
+              >
+                {m().nav.renameList}
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                class="context-menu-item"
+                onSelect={() => {
+                  props.app.setMainShowCountNav(!props.mainShowCountNav);
+                }}
+              >
+                {props.mainShowCountNav
+                  ? m().nav.hideCount
+                  : m().nav.showCount}
+              </ContextMenu.Item>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu>
         <button
           type="button"
           class="nav-item"

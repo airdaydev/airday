@@ -96,4 +96,15 @@ pub enum AppEvent {
         id: String,
         show_count_nav: bool,
     },
+
+    // ---------- workspace settings ----------
+    /// Doc-level synced settings changed. The payload carries the
+    /// current known value for each surfaced field so consumers can
+    /// mirror a small settings object with a single write.
+    SettingsChanged {
+        main_show_count_nav: bool,
+        /// `None` when the user hasn't overridden Home's display name;
+        /// clients should fall back to the localized built-in label.
+        main_name: Option<String>,
+    },
 }

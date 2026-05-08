@@ -48,6 +48,18 @@ export interface WorkspaceState {
   itemsById: Record<string, ItemView>;
   listsOrder: string[];
   listsById: Record<string, ListView>;
+  settings: SettingsView;
+}
+
+export interface SettingsView {
+  /** When true, the nav renders the live-item count beside the
+   *  reserved `main` (Home) list. Default false; synced across
+   *  devices via the doc-level settings map. */
+  mainShowCountNav: boolean;
+  /** User-chosen display-name override for the reserved `main` (Home)
+   *  list. `null` when no override is set — clients fall back to the
+   *  localized built-in label. Synced via the doc-level settings map. */
+  mainName: string | null;
 }
 
 export interface DocApp {
@@ -102,9 +114,13 @@ export interface DocApp {
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
   /** Toggle the nav-count badge for `id`. Refused for the reserved
-   *  `main` (Home) list — that one will get its own toggle via a future
-   *  workspace settings map. */
+   *  `main` (Home) list — that one has its own doc-level settings
+   *  toggle. */
   setListShowCountNav(id: string, show: boolean): void;
+  setMainShowCountNav(show: boolean): void;
+  /** Set or clear the user-chosen display name for the reserved
+   *  `main` (Home) list. Passing `""` clears the override. */
+  setMainName(name: string): void;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -129,9 +145,18 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
   const itemsById: Record<string, ItemView> = {};
   const listsOrder: string[] = [];
   const listsById: Record<string, ListView> = {};
+  const settings: SettingsView = {
+    mainShowCountNav: false,
+    mainName: null,
+  };
 
   for (const ev of events) {
     switch (ev.kind) {
+      case "settingsChanged": {
+        settings.mainShowCountNav = ev.mainShowCountNav ?? false;
+        settings.mainName = ev.mainName ?? null;
+        break;
+      }
       case "itemAdded": {
         itemsById[ev.id] = {
           id: ev.id,
@@ -163,6 +188,7 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
     itemsById,
     listsOrder,
     listsById,
+    settings,
   };
 }
 
@@ -181,6 +207,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     itemsById: {},
     listsOrder: [],
     listsById: {},
+    settings: {
+      mainShowCountNav: false,
+      mainName: null,
+    },
   });
   const [version, setVersion] = createSignal(0);
   const search = createSearchEngine();
@@ -323,6 +353,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
             ev.showCountNav ?? false,
           );
         }
+        break;
+      }
+      case "settingsChanged": {
+        // Mirror the whole event payload — settings are tiny and the
+        // wire format always sends the full known shape, so a single
+        // setState keeps the store in lockstep with the doc.
+        setState("settings", {
+          mainShowCountNav: ev.mainShowCountNav ?? false,
+          mainName: ev.mainName ?? null,
+        });
         break;
       }
     }
@@ -470,6 +510,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setListShowCountNav(id, show) {
       mutate(() => engine.setListShowCountNav(id, show));
+    },
+    setMainShowCountNav(show) {
+      mutate(() => engine.setMainShowCountNav(show));
+    },
+    setMainName(name) {
+      mutate(() => engine.setMainName(name));
     },
     undo() {
       const steps = undoStack.pop();

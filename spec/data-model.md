@@ -6,6 +6,7 @@ One Loro doc per account.
 
 - `doc.get_movable_list("items")` — `LoroMovableList<LoroMap>` where each map is one Item.
 - `doc.get_movable_list("lists")` — `LoroMovableList<LoroMap>` where each map is one ListMeta.
+- `doc.get_map("settings")` — `LoroMap` for account-wide synced workspace settings.
 
 ## Item
 
@@ -41,9 +42,18 @@ There is no separate persisted `status` field. Visibility is derived from the ti
 
 Airday has one reserved primary capture list:
 
-- `main` — rendered as "Home". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable.
+- `main` — rendered as "Home". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable. Doc-level settings for it live in `settings`.
 
 The bin is *not* a list; it's the `Binned` status on items.
+
+## WorkspaceSettings
+
+Doc-level synced settings that are not owned by any specific `ListMeta`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `main_show_count_nav` | bool? | when true, clients render the live-item count next to the reserved `main` (Home) list in the nav. Absent ≡ false. Stored in `settings` because `main` has no `ListMeta` row. |
+| `main_name` | string? | user-chosen display-name override for the reserved `main` (Home) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. |
 
 ## Mutations (rust core API surface)
 
@@ -56,6 +66,8 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
 - `set_list_show_count_nav(list_id, show)` — toggles the per-list nav-count visibility flag. Refuses for `main` (no `ListMeta` row).
+- `set_main_show_count_nav(show)` — toggles the reserved `main` (Home) list's nav-count visibility flag in the doc-level `settings` map.
+- `set_main_name(name)` — sets or clears the reserved `main` (Home) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
 - `delete_list(list_id)` — refuses for `main`; items in the deleted list are reassigned to `main`.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.

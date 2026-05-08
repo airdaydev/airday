@@ -9,12 +9,14 @@
 //!   the flag — there's no separate boolean.
 //! - root container `lists` (`LoroMovableList`) — each entry is a
 //!   `LoroMap` with `id`, `name`, `created_at`.
+//! - root container `settings` (`LoroMap`) — account-wide synced
+//!   workspace settings not owned by a specific list row.
 //!
 //! The bin is *not* a list — binned items keep their `list_id`. One
 //! well-known list id is *reserved*: [`LIST_MAIN`].
 //! It has **no MovableList entry** — items reference it by string id
-//! and clients render it with a hardcoded label ("Home"). A future
-//! meta-CRDT will hold things like the user's chosen label for it; for
+//! and clients render it with a hardcoded label ("Home"). The doc-level
+//! settings map holds synced metadata like its nav-count toggle; for
 //! now main is non-renamable and non-movable.
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
@@ -44,6 +46,7 @@ pub const LIST_MAIN_NAME: &str = "Home";
 
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";
+const ROOT_SETTINGS: &str = "settings";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
@@ -57,6 +60,13 @@ const KEY_BINNED_AT: &str = "binned_at";
 /// when toggled on (and removed when toggled back off) so docs that
 /// pre-date the field round-trip with no extra ops.
 const KEY_SHOW_COUNT_NAV: &str = "show_count_nav";
+/// Reserved `main` (Home) list's nav-count visibility flag. Stored in
+/// the doc-level settings map because `main` has no `ListMeta` row.
+const KEY_MAIN_SHOW_COUNT_NAV: &str = "main_show_count_nav";
+/// Optional user-chosen display name override for the reserved `main`
+/// (Home) list. Absent ≡ no override; clients render the localized
+/// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
+const KEY_MAIN_NAME: &str = "main_name";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -133,11 +143,34 @@ pub struct ListView {
     pub show_count_nav: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettingsView {
+    /// When true, clients render the live-item count beside the
+    /// reserved `main` (Home) list in the nav. Default false.
+    pub main_show_count_nav: bool,
+    /// User-chosen override for the reserved `main` (Home) list's
+    /// display name. `None` (or absent in storage) means clients render
+    /// the localized built-in label.
+    pub main_name: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JsonExport {
     pub version: u32,
+    pub settings: ExportSettings,
     pub lists: Vec<ExportList>,
     pub items: Vec<ExportItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSettings {
+    pub main_show_count_nav: bool,
+    /// `None` when the user hasn't overridden Home's display name.
+    /// Skipped when serializing to keep the JSON dump minimal for the
+    /// default case.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub main_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -635,11 +668,7 @@ impl Doc {
     /// on a future workspace settings map). No-op when the new value
     /// matches the current value, so flicking the menu twice doesn't
     /// emit phantom events or undo steps.
-    pub fn set_list_show_count_nav(
-        &self,
-        list_id: &str,
-        show: bool,
-    ) -> Result<(), DocError> {
+    pub fn set_list_show_count_nav(&self, list_id: &str, show: bool) -> Result<(), DocError> {
         let (_, map) = self.find_list(list_id)?;
         let current = read_bool(&map, KEY_SHOW_COUNT_NAV).unwrap_or(false);
         if current == show {
@@ -656,6 +685,59 @@ impl Doc {
         self.push_event(AppEvent::ListShowCountNavChanged {
             id: list_id.to_string(),
             show_count_nav: show,
+        });
+        Ok(())
+    }
+
+    /// Toggle the reserved `main` (Home) list's nav-count visibility
+    /// flag. Stored on the doc-level settings map because `main` has no
+    /// `ListMeta` row. No-op when the value is unchanged.
+    pub fn set_main_show_count_nav(&self, show: bool) -> Result<(), DocError> {
+        let settings = self.settings_map();
+        let current = read_bool(&settings, KEY_MAIN_SHOW_COUNT_NAV).unwrap_or(false);
+        if current == show {
+            return Ok(());
+        }
+        if show {
+            settings.insert(KEY_MAIN_SHOW_COUNT_NAV, true)?;
+        } else {
+            settings.delete(KEY_MAIN_SHOW_COUNT_NAV)?;
+        }
+        self.inner.commit();
+        let post = settings_view(&settings);
+        self.push_event(AppEvent::SettingsChanged {
+            main_show_count_nav: post.main_show_count_nav,
+            main_name: post.main_name,
+        });
+        Ok(())
+    }
+
+    /// Set or clear the reserved `main` (Home) list's display-name
+    /// override. Trims `name`; an empty trimmed string clears the
+    /// override (so clients fall back to the localized built-in label).
+    /// No-op when the resulting value matches the current value, so
+    /// repeat saves of the same name don't emit phantom events.
+    pub fn set_main_name(&self, name: &str) -> Result<(), DocError> {
+        let settings = self.settings_map();
+        let trimmed = name.trim();
+        let next: Option<String> = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+        let current = read_string(&settings, KEY_MAIN_NAME);
+        if current.as_deref() == next.as_deref() {
+            return Ok(());
+        }
+        match &next {
+            Some(s) => settings.insert(KEY_MAIN_NAME, s.as_str())?,
+            None => settings.delete(KEY_MAIN_NAME)?,
+        }
+        self.inner.commit();
+        let post = settings_view(&settings);
+        self.push_event(AppEvent::SettingsChanged {
+            main_show_count_nav: post.main_show_count_nav,
+            main_name: post.main_name,
         });
         Ok(())
     }
@@ -757,6 +839,10 @@ impl Doc {
         out
     }
 
+    pub fn get_settings(&self) -> SettingsView {
+        settings_view(&self.settings_map())
+    }
+
     /// Semantic full-account export. This is intentionally a compact,
     /// human-readable data dump rather than a CRDT/state backup.
     pub fn export_json(&self) -> JsonExport {
@@ -787,8 +873,13 @@ impl Doc {
             })
             .collect();
 
+        let s = self.get_settings();
         JsonExport {
             version: 1,
+            settings: ExportSettings {
+                main_show_count_nav: s.main_show_count_nav,
+                main_name: s.main_name,
+            },
             lists,
             items,
         }
@@ -986,12 +1077,13 @@ impl Doc {
     {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
+        let pre_settings = self.get_settings();
 
         for blob in blobs {
             self.import_remote_blob(dek, blob)?;
         }
 
-        self.emit_state_diff(&pre_items, &pre_lists);
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         Ok(())
     }
 
@@ -1025,12 +1117,13 @@ impl Doc {
     {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
+        let pre_settings = self.get_settings();
         let did = {
             let mut um = self.undo.lock().expect("undo mutex poisoned");
             op(&mut um)?
         };
         if did {
-            self.emit_state_diff(&pre_items, &pre_lists);
+            self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         }
         Ok(did)
     }
@@ -1058,6 +1151,11 @@ impl Doc {
     /// code path.
     pub fn snapshot_events(&self) -> Vec<AppEvent> {
         let mut out = Vec::new();
+        let s = self.get_settings();
+        out.push(AppEvent::SettingsChanged {
+            main_show_count_nav: s.main_show_count_nav,
+            main_name: s.main_name,
+        });
         for (idx, list) in self.all_lists().into_iter().enumerate() {
             out.push(AppEvent::ListAdded {
                 id: list.id,
@@ -1126,6 +1224,19 @@ impl Doc {
     /// canonical serialization of the visible item / list state.
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
+        let settings = self.get_settings();
+        hasher.update(b"S");
+        hasher.update([settings.main_show_count_nav as u8]);
+        // `main_name` is `Option<String>`; hash a presence byte so an
+        // empty string and `None` (which the reader collapses anyway)
+        // can't collide with a non-empty value of the same bytes.
+        match &settings.main_name {
+            Some(n) => {
+                hasher.update([1u8]);
+                hash_str(&mut hasher, n);
+            }
+            None => hasher.update([0u8]),
+        }
         // Lists: walk by stored order because ordering is part of the
         // logical state surfaced to users.
         let lists = self.all_lists();
@@ -1161,6 +1272,10 @@ impl Doc {
 
     fn lists(&self) -> LoroMovableList {
         self.inner.get_movable_list(ROOT_LISTS)
+    }
+
+    fn settings_map(&self) -> LoroMap {
+        self.inner.get_map(ROOT_SETTINGS)
     }
 
     fn find_item(&self, item_id: &str) -> Result<(usize, LoroMap), DocError> {
@@ -1283,10 +1398,17 @@ impl Doc {
         Ok(())
     }
 
-    fn emit_state_diff(&self, pre_items: &[ItemView], pre_lists: &[ListView]) {
+    fn emit_state_diff(
+        &self,
+        pre_items: &[ItemView],
+        pre_lists: &[ListView],
+        pre_settings: &SettingsView,
+    ) {
         let post_items: Vec<ItemView> = self.iter_items().collect();
         let post_lists: Vec<ListView> = self.all_lists();
+        let post_settings = self.get_settings();
         let mut emitted = Vec::new();
+        diff_settings(pre_settings, &post_settings, &mut emitted);
         diff_lists(pre_lists, &post_lists, &mut emitted);
         diff_items(pre_items, &post_items, &mut emitted);
         if !emitted.is_empty() {
@@ -1323,8 +1445,9 @@ fn seed_builtins(doc: &LoroDoc) -> Result<bool, DocError> {
     // client-side (until we add a meta CRDT for things like a custom
     // name). There are no persisted user-list seeds, but we still
     // materialise the user-list root container so fresh docs keep the
-    // same top-level shape.
+    // same top-level shape. Do the same for doc-level settings.
     let _ = doc.get_movable_list(ROOT_LISTS);
+    let _ = doc.get_map(ROOT_SETTINGS);
     Ok(false)
 }
 
@@ -1358,6 +1481,17 @@ fn read_bool(map: &LoroMap, key: &str) -> Option<bool> {
     let v = map.get(key)?;
     let value = v.as_value()?.clone();
     value.into_bool().ok()
+}
+
+fn settings_view(map: &LoroMap) -> SettingsView {
+    SettingsView {
+        main_show_count_nav: read_bool(map, KEY_MAIN_SHOW_COUNT_NAV).unwrap_or(false),
+        // Read-side defaults to `None` when absent. Any persisted empty
+        // string is treated the same — the mutation deletes the key on
+        // empty input, but a caller that bypassed it shouldn't surface
+        // a confusing blank label.
+        main_name: read_string(map, KEY_MAIN_NAME).filter(|s| !s.is_empty()),
+    }
 }
 
 fn item_view(map: &LoroMap) -> Option<ItemView> {
@@ -1621,6 +1755,15 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
     }
 }
 
+fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent>) {
+    if pre != post {
+        out.push(AppEvent::SettingsChanged {
+            main_show_count_nav: post.main_show_count_nav,
+            main_name: post.main_name.clone(),
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1804,7 +1947,10 @@ mod tests {
         let evs = doc.drain_events();
         assert!(matches!(
             evs.as_slice(),
-            [AppEvent::ListShowCountNavChanged { show_count_nav: true, .. }]
+            [AppEvent::ListShowCountNavChanged {
+                show_count_nav: true,
+                ..
+            }]
         ));
         doc.set_list_show_count_nav(&id, true).unwrap();
         assert!(
@@ -1817,12 +1963,92 @@ mod tests {
     fn show_count_nav_refuses_main() {
         let doc = Doc::new().unwrap();
         // Main has no `ListMeta` row, so the lookup fails before we get
-        // to the toggle. Home's equivalent will live on a future
-        // workspace settings map (see `data-model.md`).
+        // to the toggle. Home's equivalent lives on the doc-level
+        // settings map instead (see `data-model.md`).
         assert!(matches!(
             doc.set_list_show_count_nav(LIST_MAIN, true).unwrap_err(),
             DocError::ListNotFound(_)
         ));
+    }
+
+    #[test]
+    fn new_doc_has_main_show_count_nav_off() {
+        let doc = Doc::new().unwrap();
+        assert!(!doc.get_settings().main_show_count_nav);
+    }
+
+    #[test]
+    fn main_show_count_nav_round_trips() {
+        let doc = Doc::new().unwrap();
+        doc.set_main_show_count_nav(true).unwrap();
+        assert!(doc.get_settings().main_show_count_nav);
+        let bytes = doc.save().unwrap();
+        let restored = Doc::load(&bytes).unwrap();
+        assert!(restored.get_settings().main_show_count_nav);
+        doc.set_main_show_count_nav(false).unwrap();
+        assert!(!doc.get_settings().main_show_count_nav);
+    }
+
+    #[test]
+    fn main_show_count_nav_idempotent() {
+        let doc = Doc::new().unwrap();
+        let _ = doc.drain_events();
+        doc.set_main_show_count_nav(false).unwrap();
+        assert!(doc.drain_events().is_empty());
+        doc.set_main_show_count_nav(true).unwrap();
+        let evs = doc.drain_events();
+        assert!(matches!(
+            evs.as_slice(),
+            [AppEvent::SettingsChanged {
+                main_show_count_nav: true,
+                ..
+            }]
+        ));
+        doc.set_main_show_count_nav(true).unwrap();
+        assert!(doc.drain_events().is_empty());
+    }
+
+    #[test]
+    fn main_name_round_trips() {
+        let doc = Doc::new().unwrap();
+        assert_eq!(doc.get_settings().main_name, None);
+        doc.set_main_name("Today").unwrap();
+        assert_eq!(doc.get_settings().main_name.as_deref(), Some("Today"));
+        // Save/load preserves the override across the on-disk envelope.
+        let bytes = doc.save().unwrap();
+        let restored = Doc::load(&bytes).unwrap();
+        assert_eq!(
+            restored.get_settings().main_name.as_deref(),
+            Some("Today")
+        );
+        // Whitespace is trimmed; surrounding spaces collapse, internal
+        // spaces survive verbatim.
+        doc.set_main_name("  My Day  ").unwrap();
+        assert_eq!(doc.get_settings().main_name.as_deref(), Some("My Day"));
+        // Empty input clears the override entirely — clients fall back
+        // to the localized built-in label.
+        doc.set_main_name("").unwrap();
+        assert_eq!(doc.get_settings().main_name, None);
+        doc.set_main_name("  ").unwrap();
+        assert_eq!(doc.get_settings().main_name, None);
+    }
+
+    #[test]
+    fn main_name_idempotent() {
+        let doc = Doc::new().unwrap();
+        let _ = doc.drain_events();
+        // Setting empty when already empty is a no-op.
+        doc.set_main_name("").unwrap();
+        assert!(doc.drain_events().is_empty());
+        doc.set_main_name("Today").unwrap();
+        let evs = doc.drain_events();
+        assert!(matches!(
+            evs.as_slice(),
+            [AppEvent::SettingsChanged { main_name: Some(_), .. }]
+        ));
+        // Setting the same value (after trim) is also a no-op.
+        doc.set_main_name("  Today  ").unwrap();
+        assert!(doc.drain_events().is_empty());
     }
 
     #[test]
@@ -1970,10 +2196,12 @@ mod tests {
     fn json_export_includes_builtin_and_user_lists() {
         let doc = Doc::new().unwrap();
         let errands = doc.add_list("Errands").unwrap();
+        doc.set_main_show_count_nav(true).unwrap();
 
         let export = doc.export_json();
 
         assert_eq!(export.version, 1);
+        assert!(export.settings.main_show_count_nav);
         assert_eq!(
             export.lists[0],
             ExportList {
@@ -2423,9 +2651,17 @@ mod tests {
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item(&other, "b").unwrap();
+        doc.set_main_show_count_nav(true).unwrap();
         let _ = doc.drain_events();
 
         let snap = doc.snapshot_events();
+        assert!(snap.iter().any(|e| matches!(
+            e,
+            AppEvent::SettingsChanged {
+                main_show_count_nav: true,
+                ..
+            }
+        )));
         // ListAdded events come first, then ItemAdded events.
         let lists: Vec<&str> = snap
             .iter()
@@ -2462,6 +2698,27 @@ mod tests {
         // Round-trips through serde_json into the same struct.
         let parsed: JsonExport = serde_json::from_str(&s).unwrap();
         assert_eq!(parsed, doc.export_json());
+    }
+
+    #[test]
+    fn apply_remote_emits_settings_changed_for_peer_toggle() {
+        let dek = Dek::generate();
+        let a = Doc::new().unwrap();
+        let mut b = Doc::new().unwrap();
+
+        a.set_main_show_count_nav(true).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+
+        b.apply_remote(&dek, &blob).unwrap();
+
+        assert!(b.get_settings().main_show_count_nav);
+        assert!(matches!(
+            b.drain_events().as_slice(),
+            [AppEvent::SettingsChanged {
+                main_show_count_nav: true,
+                ..
+            }]
+        ));
     }
 
     #[test]
