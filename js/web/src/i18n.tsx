@@ -82,6 +82,7 @@ type Messages = {
   };
   workspace: {
     emptyBin: string;
+    emptyBinConfirm: string;
     createWithSpace: string;
     emptyState: string;
     notes: string;
@@ -177,6 +178,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     workspace: {
       emptyBin: "Vaciar papelera",
+      emptyBinConfirm: "¿Vaciar la papelera permanentemente?",
       createWithSpace: "Pulsa Espacio para crear un elemento nuevo",
       emptyState: "Todavía no hay nada.",
       notes: "Notas",
@@ -271,6 +273,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     workspace: {
       emptyBin: "Empty bin",
+      emptyBinConfirm: "Permanently empty the bin?",
       createWithSpace: "Press Space to create a new item",
       emptyState: "Nothing here yet.",
       notes: "Notes",

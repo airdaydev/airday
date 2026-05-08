@@ -33,6 +33,7 @@ import caretLeftSvg from "./icons/caret-left.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
+import trashSvg from "./icons/trash.svg?raw";
 import { api } from "./api.ts";
 import { dekVault } from "./dekVault.ts";
 import { FindPalette } from "./FindPalette.tsx";
@@ -882,6 +883,18 @@ function Workspace(props: {
       .filter((l): l is ListView => l !== undefined),
   );
 
+  // Bin badge / visibility in the nav. Independent of `items()` so the
+  // count stays accurate while viewing any list — and so an empty Bin
+  // can hide the button without disturbing the active-view memo.
+  const binCount = createMemo((): number => {
+    let n = 0;
+    for (const id of state.itemsOrder) {
+      const it = state.itemsById[id];
+      if (it && isBinned(it)) n++;
+    }
+    return n;
+  });
+
   const dndRevision = createMemo(() => {
     const v = view();
     return `${v.kind}:${v.kind === "list" ? v.id : "-"}`;
@@ -1402,6 +1415,7 @@ function Workspace(props: {
       <Nav
         app={app}
         lists={lists()}
+        binCount={binCount()}
         view={view()}
         setView={(v) => {
           setView(v);
@@ -1473,8 +1487,21 @@ function Workspace(props: {
                 items().length > 0
               }
             >
-              <button type="button" onClick={() => app.emptyBin()}>
-                {m().workspace.emptyBin}
+              <button
+                type="button"
+                class="add-button"
+                onClick={() => {
+                  // Native confirm() is the cheapest "are you sure?" we
+                  // can offer; emptying the bin is destructive (items
+                  // are unrecoverable after this) so a y/n gate is
+                  // worth the dialog. No custom modal needed.
+                  if (window.confirm(m().workspace.emptyBinConfirm)) {
+                    app.emptyBin();
+                  }
+                }}
+              >
+                <span class="add-button-icon" innerHTML={trashSvg} />
+                <span>{m().workspace.emptyBin}</span>
               </button>
             </Show>
             <Show when={view().kind === "list"}>
@@ -1763,6 +1790,7 @@ function viewTitle(
 function Nav(props: {
   app: DocApp;
   lists: { id: string; name: string }[];
+  binCount: number;
   view: ViewKey;
   setView: (v: ViewKey) => void;
   session: Session;
@@ -1922,15 +1950,18 @@ function Nav(props: {
         >
           {m().nav.done}
         </button>
-        <button
-          type="button"
-          class="nav-item"
-          data-active={props.view.kind === "bin" ? "" : undefined}
-          data-drop-bin=""
-          onClick={() => props.setView({ kind: "bin" })}
-        >
-          {m().nav.bin}
-        </button>
+        <Show when={props.binCount > 0}>
+          <button
+            type="button"
+            class="nav-item"
+            data-active={props.view.kind === "bin" ? "" : undefined}
+            data-drop-bin=""
+            onClick={() => props.setView({ kind: "bin" })}
+          >
+            {m().nav.bin}
+            <span class="nav-item-count">{props.binCount}</span>
+          </button>
+        </Show>
       </div>
       <div class="nav-group">
         <Show when={props.lists.length > 0}>

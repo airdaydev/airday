@@ -263,6 +263,16 @@ body {
   outline: none;
 }
 
+.nav-item-count {
+  /* Push to the row's trailing edge — same effect as
+     `justify-content: space-between` on the row, but scoped to items
+     that opt in by rendering a count. */
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 .nav-item-input {
   border: 0;
   outline: none;
