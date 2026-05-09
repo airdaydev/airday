@@ -123,6 +123,7 @@ struct Account {
 }
 
 struct ExtraDevice {
+    device_id: Uuid,
     device_token: String,
 }
 
@@ -134,6 +135,7 @@ async fn register_second_device(acc: &Account, name: &str) -> ExtraDevice {
     )
     .await;
     ExtraDevice {
+        device_id: Uuid::parse_str(&resp.device_id).unwrap(),
         device_token: resp.device_token,
     }
 }
@@ -224,7 +226,7 @@ fn fake_blob(seed: u8) -> EncryptedBlob {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ack_does_not_move_backwards() {
     let acc = signup_account().await;
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
@@ -268,7 +270,7 @@ async fn ack_does_not_move_backwards() {
     assert_eq!(stored, id);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn handshake_rejected_when_no_shared_protocol_version() {
     let acc = signup_account().await;
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
@@ -286,7 +288,7 @@ async fn handshake_rejected_when_no_shared_protocol_version() {
     assert!(rejected.reason.contains("no shared protocol version"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ws_upgrade_without_token_is_rejected() {
     let server = TestServer::start().await;
     let url = format!("{}/api/sync", server.ws_base);
@@ -299,7 +301,7 @@ async fn ws_upgrade_without_token_is_rejected() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn push_on_a_broadcasts_to_b_not_a() {
     let acc = signup_account().await;
     let device_b = register_second_device(&acc, "device-b").await;
@@ -343,7 +345,7 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     assert!(nothing.is_err(), "A unexpectedly received: {nothing:?}");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
     // Multi-tab on the same device: two WS connections share the
     // device cookie. Broadcast must exclude only the originating
@@ -380,7 +382,7 @@ async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
     assert_eq!(broadcast, want);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn subscriber_unregisters_on_disconnect() {
     let acc = signup_account().await;
     let _device_b = register_second_device(&acc, "device-b").await;
@@ -392,7 +394,7 @@ async fn subscriber_unregisters_on_disconnect() {
     wait_for_subscribers(&acc, 0).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     // A device whose cursor is already >= the snapshot floor stays
     // on the steady-state op-streaming path — no SnapshotRequired.
@@ -409,7 +411,7 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     assert!(pulled.is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn request_snapshot_to_unknown_subscriber_reports_undelivered() {
     let acc = signup_account().await;
     let _ws = connect_ws(&acc.server, &acc.device_token).await;
@@ -423,7 +425,7 @@ async fn request_snapshot_to_unknown_subscriber_reports_undelivered() {
     assert!(!delivered);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn snapshot_threshold_targets_highest_acked_connected_device() {
     let acc = signup_account().await;
     let device_b = register_second_device(&acc, "device-b").await;
@@ -459,16 +461,20 @@ async fn snapshot_threshold_targets_highest_acked_connected_device() {
         recv_ops_ack(&mut ws_a).await.len() as u64,
         TEST_SNAPSHOT_THRESHOLD_OPS + 1
     );
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_b, Duration::from_secs(1)).await,
-        b_first_id
-    );
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        device_b.device_id,
+        acc.device_id,
+        b_first_id,
+    )
+    .await;
 
     let nothing = tokio::time::timeout(Duration::from_millis(200), ws_a.next()).await;
     assert!(nothing.is_err(), "A unexpectedly received: {nothing:?}");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn snapshot_request_starts_when_ack_makes_existing_connection_eligible() {
     let acc = signup_account().await;
     let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
@@ -498,10 +504,17 @@ async fn snapshot_request_starts_when_ack_makes_existing_connection_eligible() {
     )
     .await;
     wait_for_acked(&acc, highest).await;
-    assert_eq!(recv_snapshot_request(&mut ws_a).await, highest);
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        acc.device_id,
+        Uuid::nil(),
+        highest,
+    )
+    .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn snapshot_request_retries_when_assigned_device_disconnects() {
     let acc = signup_account().await;
     let device_b = register_second_device(&acc, "device-b").await;
@@ -554,21 +567,29 @@ async fn snapshot_request_retries_when_assigned_device_disconnects() {
         recv_ops_ack(&mut ws_a).await.len() as u64,
         TEST_SNAPSHOT_THRESHOLD_OPS + 1
     );
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_b, Duration::from_secs(1)).await,
-        b_first_id
-    );
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        device_b.device_id,
+        acc.device_id,
+        b_first_id,
+    )
+    .await;
 
     drop(ws_b);
     wait_for_subscribers(&acc, 1).await;
 
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
-        a_first_id
-    );
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        acc.device_id,
+        device_b.device_id,
+        a_first_id,
+    )
+    .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn snapshot_request_retries_after_timeout() {
     let acc = signup_account_with_snapshot_timeout(Duration::from_millis(50)).await;
     let device_b = register_second_device(&acc, "device-b").await;
@@ -621,17 +642,25 @@ async fn snapshot_request_retries_after_timeout() {
         recv_ops_ack(&mut ws_a).await.len() as u64,
         TEST_SNAPSHOT_THRESHOLD_OPS + 1
     );
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_b, Duration::from_secs(1)).await,
-        b_first_id
-    );
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
-        a_first_id
-    );
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        device_b.device_id,
+        acc.device_id,
+        b_first_id,
+    )
+    .await;
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        acc.device_id,
+        device_b.device_id,
+        a_first_id,
+    )
+    .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stale_snapshot_from_timed_out_assignee_is_ignored() {
     let acc = signup_account_with_snapshot_timeout(Duration::from_millis(100)).await;
     let device_b = register_second_device(&acc, "device-b").await;
@@ -683,14 +712,14 @@ async fn stale_snapshot_from_timed_out_assignee_is_ignored() {
     let assigned_ids = recv_ops_ack(&mut ws_a).await;
     let latest_id = *assigned_ids.last().unwrap();
 
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_b, Duration::from_secs(1)).await,
-        b_first_id
-    );
-    assert_eq!(
-        recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
-        a_first_id
-    );
+    wait_for_snapshot_assignee(
+        &acc.server.state,
+        acc.account_id,
+        acc.device_id,
+        device_b.device_id,
+        latest_id,
+    )
+    .await;
 
     send_msgpack(
         &mut ws_b,
@@ -760,20 +789,36 @@ async fn recv_ops_ack(ws: &mut WsStream) -> Vec<u64> {
     }
 }
 
-async fn recv_snapshot_request(ws: &mut WsStream) -> u64 {
+async fn wait_for_snapshot_assignee(
+    state: &AppState,
+    account_id: Uuid,
+    expected_device_id: Uuid,
+    rejected_device_id: Uuid,
+    up_to_op_id: u64,
+) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        match recv_msgpack::<ServerFrame>(ws).await {
-            ServerFrame::SnapshotRequest { up_to_op_id } => return up_to_op_id,
-            ServerFrame::OpsBroadcast { .. } => continue,
-            other => panic!("expected SnapshotRequest, got {other:?}"),
+        let expected_allowed = state.snapshot_coordinator.permits_snapshot(
+            account_id,
+            expected_device_id,
+            up_to_op_id,
+        );
+        let rejected_allowed = rejected_device_id != Uuid::nil()
+            && state.snapshot_coordinator.permits_snapshot(
+                account_id,
+                rejected_device_id,
+                up_to_op_id,
+            );
+        if expected_allowed && !rejected_allowed {
+            return;
         }
+        if std::time::Instant::now() > deadline {
+            panic!(
+                "snapshot assignee did not switch to {expected_device_id} (expected_allowed={expected_allowed}, rejected_allowed={rejected_allowed})"
+            );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
-}
-
-async fn recv_snapshot_request_timeout(ws: &mut WsStream, timeout: Duration) -> u64 {
-    tokio::time::timeout(timeout, recv_snapshot_request(ws))
-        .await
-        .expect("timed out waiting for SnapshotRequest")
 }
 
 /// Poll until the hub holds at least `target` subscribers for the
