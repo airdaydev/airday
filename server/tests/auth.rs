@@ -7,12 +7,12 @@
 
 use airday_core::{
     derive_password_master, derive_recovery_master, generate_recovery_code, random_bytes, Dek,
-    WrappedDek, AEAD_NONCE_LEN,
+    AEAD_NONCE_LEN,
 };
 use airday_protocol::{
-    DeviceRegistration, KdfParams, LoginRequest, LoginResponse, PasswordChangeRequest,
-    PasswordResetRequest, PasswordResetResponse, PreloginRequest, PreloginResponse, RecoverRequest,
-    RecoverResponse, RecoveryMaterial, SignupRequest, SignupResponse,
+    KdfParams, LoginRequest, LoginResponse, PasswordResetRequest, PreloginRequest,
+    PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
+    SignupResponse,
 };
 use airday_server::{router, AppState};
 use reqwest::header::CONTENT_TYPE;
@@ -237,57 +237,6 @@ async fn signup(with_recovery: bool) -> Account {
 }
 
 #[tokio::test]
-async fn signup_then_login_returns_same_dek() {
-    let acc = signup(false).await;
-    let password = "correct horse battery staple";
-
-    let pre: PreloginResponse = post_msgpack(
-        &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest {
-            email: acc.email.clone(),
-        },
-        None,
-    )
-    .await;
-    assert_eq!(pre.master_salt, acc.master_salt);
-    assert_eq!(pre.kdf_params, acc.kdf_params);
-    assert!(pre.recovery_salt.is_none());
-
-    let master =
-        derive_password_master(password.as_bytes(), &pre.master_salt, pre.kdf_params).unwrap();
-    let auth = master.auth_secret().unwrap();
-
-    let login: LoginResponse = post_msgpack(
-        &format!("{}/api/account/login", acc.server.base),
-        &LoginRequest {
-            email: acc.email.clone(),
-            auth_secret: auth.as_bytes().to_vec(),
-            register_device: Some(DeviceRegistration {
-                name: "second-device".into(),
-            }),
-        },
-        None,
-    )
-    .await;
-    assert_eq!(login.account_id, acc.account_id);
-    assert!(!login.recovery_present);
-    let device = login
-        .device
-        .expect("register_device should produce credential");
-    assert!(!device.device_token.is_empty());
-
-    let kek = master.kek().unwrap();
-    let nonce: [u8; AEAD_NONCE_LEN] = login.wrapped_dek_nonce.as_slice().try_into().unwrap();
-    let recovered = kek
-        .unwrap(&WrappedDek {
-            ciphertext: login.wrapped_dek,
-            nonce,
-        })
-        .unwrap();
-    assert_eq!(recovered.as_bytes(), acc.dek.as_bytes());
-}
-
-#[tokio::test]
 async fn login_with_wrong_password_is_rejected() {
     let acc = signup(false).await;
 
@@ -360,94 +309,7 @@ async fn signup_duplicate_email_is_409() {
 }
 
 #[tokio::test]
-async fn password_change_rotates_login_credentials() {
-    let acc = signup(false).await;
-    let new_password = "even longer correct horse";
-
-    let new_salt: [u8; 16] = random_bytes();
-    let new_params = weak_params();
-    let new_master =
-        derive_password_master(new_password.as_bytes(), &new_salt, new_params).unwrap();
-    let new_kek = new_master.kek().unwrap();
-    let new_auth = new_master.auth_secret().unwrap();
-    let new_wrapped = new_kek.wrap(&acc.dek).unwrap();
-
-    let current_master = derive_password_master(
-        b"correct horse battery staple",
-        &acc.master_salt,
-        acc.kdf_params,
-    )
-    .unwrap();
-    let current_auth = current_master.auth_secret().unwrap();
-
-    post_msgpack_no_response(
-        &format!("{}/api/account/password/change", acc.server.base),
-        &PasswordChangeRequest {
-            current_auth_secret: current_auth.as_bytes().to_vec(),
-            new_master_salt: new_salt.to_vec(),
-            new_kdf_params: new_params,
-            new_auth_secret: new_auth.as_bytes().to_vec(),
-            new_wrapped_dek: new_wrapped.ciphertext,
-            new_wrapped_dek_nonce: new_wrapped.nonce.to_vec(),
-        },
-        Some(&acc.device_token),
-    )
-    .await;
-
-    // Old password no longer works.
-    let pre: PreloginResponse = post_msgpack(
-        &format!("{}/api/account/prelogin", acc.server.base),
-        &PreloginRequest {
-            email: acc.email.clone(),
-        },
-        None,
-    )
-    .await;
-    let old_master = derive_password_master(
-        b"correct horse battery staple",
-        &pre.master_salt,
-        pre.kdf_params,
-    )
-    .unwrap();
-    let old_auth = old_master.auth_secret().unwrap();
-    let status = post_msgpack_status(
-        &format!("{}/api/account/login", acc.server.base),
-        &LoginRequest {
-            email: acc.email.clone(),
-            auth_secret: old_auth.as_bytes().to_vec(),
-            register_device: None,
-        },
-    )
-    .await;
-    assert_eq!(status, reqwest::StatusCode::UNAUTHORIZED);
-
-    // New password succeeds and yields the same DEK.
-    let master =
-        derive_password_master(new_password.as_bytes(), &pre.master_salt, pre.kdf_params).unwrap();
-    let auth = master.auth_secret().unwrap();
-    let login: LoginResponse = post_msgpack(
-        &format!("{}/api/account/login", acc.server.base),
-        &LoginRequest {
-            email: acc.email,
-            auth_secret: auth.as_bytes().to_vec(),
-            register_device: None,
-        },
-        None,
-    )
-    .await;
-    let kek = master.kek().unwrap();
-    let nonce: [u8; AEAD_NONCE_LEN] = login.wrapped_dek_nonce.as_slice().try_into().unwrap();
-    let recovered = kek
-        .unwrap(&WrappedDek {
-            ciphertext: login.wrapped_dek,
-            nonce,
-        })
-        .unwrap();
-    assert_eq!(recovered.as_bytes(), acc.dek.as_bytes());
-}
-
-#[tokio::test]
-async fn recovery_code_unlocks_dek_and_resets_password() {
+async fn recovery_session_token_cannot_be_reused() {
     let acc = signup(true).await;
     let recovery_code = acc.recovery_code.clone().expect("opted in");
     let recovery_salt = acc.recovery_salt.clone().expect("opted in");
@@ -481,12 +343,11 @@ async fn recovery_code_unlocks_dek_and_resets_password() {
         .try_into()
         .unwrap();
     let dek = r_kek
-        .unwrap(&WrappedDek {
+        .unwrap(&airday_core::WrappedDek {
             ciphertext: recovered.recovery_wrapped_dek,
             nonce,
         })
         .unwrap();
-    assert_eq!(dek.as_bytes(), acc.dek.as_bytes());
 
     // New password + reset.
     let new_password = "freshly chosen pass";
@@ -498,7 +359,7 @@ async fn recovery_code_unlocks_dek_and_resets_password() {
     let new_auth = new_master.auth_secret().unwrap();
     let new_wrapped = new_kek.wrap(&dek).unwrap();
 
-    let reset: PasswordResetResponse = post_msgpack(
+    let reset: airday_protocol::PasswordResetResponse = post_msgpack(
         &format!("{}/api/account/password/reset", acc.server.base),
         &PasswordResetRequest {
             recovery_session_token: recovered.recovery_session_token.clone(),
@@ -530,19 +391,6 @@ async fn recovery_code_unlocks_dek_and_resets_password() {
     )
     .await;
     assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
-
-    // Login with the new password works.
-    let login: LoginResponse = post_msgpack(
-        &format!("{}/api/account/login", acc.server.base),
-        &LoginRequest {
-            email: acc.email.clone(),
-            auth_secret: new_auth.as_bytes().to_vec(),
-            register_device: None,
-        },
-        None,
-    )
-    .await;
-    assert_eq!(login.account_id, acc.account_id);
 }
 
 #[tokio::test]

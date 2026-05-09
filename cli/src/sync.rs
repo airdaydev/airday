@@ -129,26 +129,47 @@ impl Session {
         self.engine.doc()
     }
 
+    /// Drive any inbound frames already waiting on the live socket,
+    /// then return once the connection has been quiet for `quiet_for`.
+    /// Useful for long-lived tests that need to keep servicing
+    /// broadcasts or `SnapshotRequest`s between local mutations.
+    pub async fn pump_until_quiet(&mut self, quiet_for: Duration) -> Result<usize, SyncError> {
+        let Some(mut ws) = self.ws.take() else {
+            return Ok(0);
+        };
+        let result = async {
+            let mut processed = 0usize;
+            loop {
+                let bytes = match recv_bytes_timeout(&mut ws, quiet_for).await? {
+                    Some(bytes) => bytes,
+                    None => break,
+                };
+                processed += 1;
+                self.engine.handle_server_bytes(&bytes);
+                send_outbox(&mut ws, &mut self.engine).await?;
+                drain_engine_errors(&mut self.engine)?;
+                if !self.engine.is_online() {
+                    return Err(SyncError::Engine("engine disconnected mid-pump".into()));
+                }
+            }
+            self.persist_engine_state()?;
+            Ok(processed)
+        }
+        .await;
+        self.ws = Some(ws);
+        result
+    }
+
     /// Persist the doc, push any pending ops, ack the frontier, close
     /// the socket. Local persistence runs first so a network failure
     /// after a mutation can't silently drop the change.
     pub async fn flush(mut self) -> Result<(), SyncError> {
-        self.profile.write_doc(self.engine.doc())?;
+        self.persist_engine_state()?;
 
         if let Some(mut ws) = self.ws.take() {
             self.engine.flush();
             drive_until_idle(&mut ws, &mut self.engine).await?;
-
-            // Re-save with the advanced `last_pushed_vv` so a crash
-            // between push and ack doesn't re-export the same ops.
-            self.profile.write_doc(self.engine.doc())?;
-
-            let acked = self.engine.highest_seen_op_id();
-            if acked > self.device.last_acked_op_id {
-                self.device.last_acked_op_id = acked;
-            }
-            self.device.last_sync_at = Some(now_millis());
-            self.profile.write_device(&self.device)?;
+            self.persist_engine_state()?;
 
             // Best-effort close — server will disconnect on its own
             // if the close frame is lost.
@@ -182,6 +203,17 @@ impl Session {
         let (ws, _) = tokio_tungstenite::connect_async(req).await?;
         Ok(ws)
     }
+
+    fn persist_engine_state(&mut self) -> Result<(), SyncError> {
+        self.profile.write_doc(self.engine.doc())?;
+        let acked = self.engine.highest_seen_op_id();
+        if acked > self.device.last_acked_op_id {
+            self.device.last_acked_op_id = acked;
+        }
+        self.device.last_sync_at = Some(now_millis());
+        self.profile.write_device(&self.device)?;
+        Ok(())
+    }
 }
 
 /// Shuffle bytes between the WS and the engine until the engine
@@ -193,11 +225,7 @@ impl Session {
 async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<(), SyncError> {
     loop {
         send_outbox(ws, engine).await?;
-        for event in drain_events(engine) {
-            if let Event::Error(msg) = event {
-                return Err(SyncError::Engine(msg));
-            }
-        }
+        drain_engine_errors(engine)?;
         if !engine.is_online() {
             return Err(SyncError::Engine("engine disconnected mid-drive".into()));
         }
@@ -215,6 +243,15 @@ async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<
 async fn send_outbox(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<(), SyncError> {
     while let Some(bytes) = engine.pop_outbox() {
         ws.send(Message::Binary(bytes)).await?;
+    }
+    Ok(())
+}
+
+fn drain_engine_errors(engine: &mut SyncEngine) -> Result<(), SyncError> {
+    for event in drain_events(engine) {
+        if let Event::Error(msg) = event {
+            return Err(SyncError::Engine(msg));
+        }
     }
     Ok(())
 }
@@ -252,19 +289,32 @@ fn ws_url(server_url: &str) -> String {
     format!("{base}/api/sync")
 }
 
-async fn recv_bytes(ws: &mut WsStream) -> Result<Vec<u8>, SyncError> {
+async fn recv_bytes_timeout(
+    ws: &mut WsStream,
+    timeout: Duration,
+) -> Result<Option<Vec<u8>>, SyncError> {
     loop {
-        let msg = ws
-            .next()
-            .await
-            .ok_or_else(|| SyncError::Ws("stream closed".into()))??;
-        match msg {
-            Message::Binary(bytes) => return Ok(bytes.to_vec()),
+        let next = tokio::time::timeout(timeout, ws.next()).await;
+        let Some(msg) = (match next {
+            Ok(msg) => msg,
+            Err(_) => return Ok(None),
+        }) else {
+            return Err(SyncError::Ws("stream closed".into()));
+        };
+        match msg? {
+            Message::Binary(bytes) => return Ok(Some(bytes.to_vec())),
             Message::Ping(_) | Message::Pong(_) => continue,
             Message::Close(_) => return Err(SyncError::Ws("server closed".into())),
-            other => {
-                return Err(SyncError::Ws(format!("unexpected ws frame: {other:?}")));
-            }
+            other => return Err(SyncError::Ws(format!("unexpected ws frame: {other:?}"))),
+        }
+    }
+}
+
+async fn recv_bytes(ws: &mut WsStream) -> Result<Vec<u8>, SyncError> {
+    loop {
+        if let Some(bytes) = recv_bytes_timeout(ws, Duration::from_secs(365 * 24 * 60 * 60)).await?
+        {
+            return Ok(bytes);
         }
     }
 }

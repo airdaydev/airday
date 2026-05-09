@@ -1,0 +1,461 @@
+use std::sync::OnceLock;
+
+use airday_cli::config::{DeviceConfig, Profile, Secrets};
+use airday_cli::keystore::{dek_to_hex, derive_master};
+use airday_cli::net::Client;
+use airday_core::{
+    derive_password_master, derive_recovery_master, generate_recovery_code, random_bytes, Dek, Doc,
+    WrappedDek, AEAD_NONCE_LEN,
+};
+use airday_protocol::{
+    DeviceCredential, DeviceRegistration, KdfParams, LoginRequest, LoginResponse,
+    PasswordChangeRequest, PasswordResetRequest, PasswordResetResponse, PreloginRequest,
+    PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
+    SignupResponse,
+};
+use airday_server::{router, AppState};
+use reqwest::header::CONTENT_TYPE;
+use uuid::Uuid;
+
+const MSGPACK: &str = "application/msgpack";
+pub const TEST_PASSWORD: &str = "correct horse battery staple";
+
+pub struct SignedUpAccount {
+    pub email: String,
+    pub account_id: String,
+    pub device_id: String,
+    pub device_token: String,
+    pub dek: Dek,
+    pub master_salt: Vec<u8>,
+    pub kdf_params: KdfParams,
+    pub recovery_code: Option<String>,
+    pub recovery_salt: Option<Vec<u8>>,
+}
+
+pub struct LoggedInDevice {
+    pub account_id: String,
+    pub device_id: String,
+    pub device_token: String,
+    pub dek: Dek,
+    pub recovery_present: bool,
+}
+
+pub struct RecoveredDevice {
+    pub account_id: String,
+    pub device_id: String,
+    pub device_token: String,
+    pub dek: Dek,
+}
+
+pub fn weak_params() -> KdfParams {
+    KdfParams {
+        m_kib: 8,
+        t: 1,
+        p: 1,
+    }
+}
+
+pub struct TestServer {
+    pub base: String,
+    pub state: AppState,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+impl TestServer {
+    pub async fn start() -> Self {
+        Self::start_with_state(AppState::open_in_memory().await.unwrap()).await
+    }
+
+    pub async fn start_with_state(state: AppState) -> Self {
+        let app = router(state.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let base = format!("http://{}", addr);
+        let handle = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        Self {
+            base,
+            state,
+            handle,
+        }
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
+}
+
+pub fn http() -> &'static reqwest::Client {
+    static C: OnceLock<reqwest::Client> = OnceLock::new();
+    C.get_or_init(reqwest::Client::new)
+}
+
+pub async fn signup_account(
+    server: &TestServer,
+    device_name: &str,
+    with_recovery: bool,
+) -> SignedUpAccount {
+    let email = format!("user-{}@example.com", Uuid::now_v7());
+    let dek = Dek::generate();
+    let kdf_params = weak_params();
+    let master_salt: [u8; 16] = random_bytes();
+    let master =
+        derive_password_master(TEST_PASSWORD.as_bytes(), &master_salt, kdf_params).unwrap();
+    let kek = master.kek().unwrap();
+    let auth_secret = master.auth_secret().unwrap();
+    let wrapped = kek.wrap(&dek).unwrap();
+
+    let mut recovery_code = None;
+    let mut recovery_salt = None;
+    let recovery = if with_recovery {
+        let code = generate_recovery_code().unwrap();
+        let salt: [u8; 16] = random_bytes();
+        let recovery_master = derive_recovery_master(code.as_str(), &salt, kdf_params).unwrap();
+        let recovery_kek = recovery_master.kek().unwrap();
+        let recovery_auth = recovery_master.auth_secret().unwrap();
+        let recovery_wrapped = recovery_kek.wrap(&dek).unwrap();
+        recovery_code = Some(code.as_str().to_string());
+        recovery_salt = Some(salt.to_vec());
+        Some(RecoveryMaterial {
+            recovery_salt: salt.to_vec(),
+            recovery_auth_secret: recovery_auth.as_bytes().to_vec(),
+            recovery_wrapped_dek: recovery_wrapped.ciphertext,
+            recovery_wrapped_dek_nonce: recovery_wrapped.nonce.to_vec(),
+        })
+    } else {
+        None
+    };
+
+    let req = SignupRequest {
+        email: email.clone(),
+        master_salt: master_salt.to_vec(),
+        kdf_params,
+        auth_secret: auth_secret.as_bytes().to_vec(),
+        wrapped_dek: wrapped.ciphertext,
+        wrapped_dek_nonce: wrapped.nonce.to_vec(),
+        recovery,
+        device_name: device_name.into(),
+    };
+    let bytes = rmp_serde::to_vec_named(&req).unwrap();
+    let resp = http()
+        .post(format!("{}/api/account/signup", server.base))
+        .header(CONTENT_TYPE, MSGPACK)
+        .body(bytes)
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "signup failed: {}",
+        resp.status()
+    );
+    let signup: SignupResponse = rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap();
+
+    SignedUpAccount {
+        email,
+        account_id: signup.account_id,
+        device_id: signup.device_id,
+        device_token: signup.device_token,
+        dek,
+        master_salt: master_salt.to_vec(),
+        kdf_params,
+        recovery_code,
+        recovery_salt,
+    }
+}
+
+pub async fn signup_via_http(server: &TestServer, dek: &Dek, device_name: &str) -> SignupResponse {
+    let kdf_params = weak_params();
+    let master_salt: [u8; 16] = random_bytes();
+    let master =
+        derive_password_master(TEST_PASSWORD.as_bytes(), &master_salt, kdf_params).unwrap();
+    let kek = master.kek().unwrap();
+    let auth_secret = master.auth_secret().unwrap();
+    let wrapped = kek.wrap(dek).unwrap();
+    let req = SignupRequest {
+        email: format!("user-{}@example.com", Uuid::now_v7()),
+        master_salt: master_salt.to_vec(),
+        kdf_params,
+        auth_secret: auth_secret.as_bytes().to_vec(),
+        wrapped_dek: wrapped.ciphertext,
+        wrapped_dek_nonce: wrapped.nonce.to_vec(),
+        recovery: None,
+        device_name: device_name.into(),
+    };
+    let bytes = rmp_serde::to_vec_named(&req).unwrap();
+    let resp = http()
+        .post(format!("{}/api/account/signup", server.base))
+        .header(CONTENT_TYPE, MSGPACK)
+        .body(bytes)
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "signup failed: {}",
+        resp.status()
+    );
+    rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
+}
+
+pub async fn login_device(
+    server_url: &str,
+    email: &str,
+    password: &str,
+    device_name: &str,
+) -> anyhow::Result<LoggedInDevice> {
+    let client = Client::new(server_url);
+    let pre: PreloginResponse = client
+        .post(
+            "/api/account/prelogin",
+            &PreloginRequest {
+                email: email.into(),
+            },
+        )
+        .await?;
+    let master = derive_master(password, &pre.master_salt, pre.kdf_params)?;
+    let kek = master.kek()?;
+    let auth_secret = master.auth_secret()?;
+
+    let resp: LoginResponse = client
+        .post(
+            "/api/account/login",
+            &LoginRequest {
+                email: email.into(),
+                auth_secret: auth_secret.as_bytes().to_vec(),
+                register_device: Some(DeviceRegistration {
+                    name: device_name.into(),
+                }),
+            },
+        )
+        .await?;
+    let device = resp
+        .device
+        .ok_or_else(|| anyhow::anyhow!("login did not mint a device credential"))?;
+    let nonce: [u8; AEAD_NONCE_LEN] = resp
+        .wrapped_dek_nonce
+        .as_slice()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("server returned wrapped_dek_nonce of wrong length"))?;
+    let dek = kek.unwrap(&WrappedDek {
+        ciphertext: resp.wrapped_dek,
+        nonce,
+    })?;
+
+    Ok(LoggedInDevice {
+        account_id: resp.account_id,
+        device_id: device.device_id,
+        device_token: device.device_token,
+        dek,
+        recovery_present: resp.recovery_present,
+    })
+}
+
+pub async fn change_password(
+    server_url: &str,
+    email: &str,
+    device_token: &str,
+    dek: &Dek,
+    current_password: &str,
+    new_password: &str,
+) -> anyhow::Result<()> {
+    let client = Client::new(server_url);
+    let pre: PreloginResponse = client
+        .post(
+            "/api/account/prelogin",
+            &PreloginRequest {
+                email: email.into(),
+            },
+        )
+        .await?;
+    let current_master = derive_master(current_password, &pre.master_salt, pre.kdf_params)?;
+    let current_auth = current_master.auth_secret()?;
+
+    let new_master_salt: [u8; 16] = random_bytes();
+    let new_kdf_params = weak_params();
+    let new_master = derive_master(new_password, &new_master_salt, new_kdf_params)?;
+    let new_kek = new_master.kek()?;
+    let new_auth = new_master.auth_secret()?;
+    let new_wrapped = new_kek.wrap(dek)?;
+
+    client
+        .post_authed_no_response(
+            "/api/account/password/change",
+            device_token,
+            &PasswordChangeRequest {
+                current_auth_secret: current_auth.as_bytes().to_vec(),
+                new_master_salt: new_master_salt.to_vec(),
+                new_kdf_params,
+                new_auth_secret: new_auth.as_bytes().to_vec(),
+                new_wrapped_dek: new_wrapped.ciphertext,
+                new_wrapped_dek_nonce: new_wrapped.nonce.to_vec(),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn recover_device(
+    server_url: &str,
+    email: &str,
+    recovery_code: &str,
+    new_password: &str,
+    device_name: &str,
+) -> anyhow::Result<RecoveredDevice> {
+    let client = Client::new(server_url);
+    let pre: PreloginResponse = client
+        .post(
+            "/api/account/prelogin",
+            &PreloginRequest {
+                email: email.into(),
+            },
+        )
+        .await?;
+    let recovery_salt = pre
+        .recovery_salt
+        .ok_or_else(|| anyhow::anyhow!("account has no recovery code"))?;
+    let recovery_master = derive_recovery_master(recovery_code, &recovery_salt, pre.kdf_params)?;
+    let recovery_kek = recovery_master.kek()?;
+    let recovery_auth = recovery_master.auth_secret()?;
+
+    let recovered: RecoverResponse = client
+        .post(
+            "/api/account/recover",
+            &RecoverRequest {
+                email: email.into(),
+                recovery_auth_secret: recovery_auth.as_bytes().to_vec(),
+            },
+        )
+        .await?;
+    let recovery_nonce: [u8; AEAD_NONCE_LEN] = recovered
+        .recovery_wrapped_dek_nonce
+        .as_slice()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("server returned recovery wrap nonce of wrong length"))?;
+    let dek = recovery_kek.unwrap(&WrappedDek {
+        ciphertext: recovered.recovery_wrapped_dek,
+        nonce: recovery_nonce,
+    })?;
+
+    let new_master_salt: [u8; 16] = random_bytes();
+    let new_kdf_params = weak_params();
+    let new_master = derive_master(new_password, &new_master_salt, new_kdf_params)?;
+    let new_kek = new_master.kek()?;
+    let new_auth = new_master.auth_secret()?;
+    let new_wrapped = new_kek.wrap(&dek)?;
+
+    let reset: PasswordResetResponse = client
+        .post(
+            "/api/account/password/reset",
+            &PasswordResetRequest {
+                recovery_session_token: recovered.recovery_session_token,
+                new_master_salt: new_master_salt.to_vec(),
+                new_kdf_params,
+                new_auth_secret: new_auth.as_bytes().to_vec(),
+                new_wrapped_dek: new_wrapped.ciphertext,
+                new_wrapped_dek_nonce: new_wrapped.nonce.to_vec(),
+                device_name: device_name.into(),
+            },
+        )
+        .await?;
+
+    Ok(RecoveredDevice {
+        account_id: recovered.account_id,
+        device_id: reset.device_id,
+        device_token: reset.device_token,
+        dek,
+    })
+}
+
+pub async fn register_device(
+    server: &TestServer,
+    owner_token: &str,
+    name: &str,
+) -> DeviceCredential {
+    let bytes = rmp_serde::to_vec_named(&DeviceRegistration { name: name.into() }).unwrap();
+    let resp = http()
+        .post(format!("{}/api/devices", server.base))
+        .header(CONTENT_TYPE, MSGPACK)
+        .bearer_auth(owner_token)
+        .body(bytes)
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "register_device failed: {}",
+        resp.status()
+    );
+    rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
+}
+
+/// Stand up the on-disk profile a real `airday signup` would have
+/// written. Constructed directly under `data_dir` so each test owns
+/// its profile and parallel runs don't race on `AIRDAY_DATA_DIR`.
+pub fn materialize_profile(
+    data_dir: &std::path::Path,
+    server_url: &str,
+    account_id: &str,
+    device_id: &str,
+    device_token: &str,
+    dek: &Dek,
+    email: &str,
+    seed_doc: bool,
+) -> Profile {
+    std::fs::create_dir_all(data_dir).unwrap();
+    let profile = Profile {
+        dir: data_dir.to_path_buf(),
+    };
+    profile
+        .write_device(&DeviceConfig {
+            account_id: account_id.into(),
+            email: email.into(),
+            server_url: server_url.into(),
+            device_id: device_id.into(),
+            last_acked_op_id: 0,
+            last_sync_at: None,
+        })
+        .unwrap();
+    profile
+        .write_secrets(&Secrets {
+            device_token: device_token.into(),
+            dek_hex: dek_to_hex(dek),
+        })
+        .unwrap();
+    let doc = if seed_doc {
+        Doc::new().unwrap()
+    } else {
+        Doc::empty()
+    };
+    profile.write_doc(&doc).unwrap();
+    profile
+}
+
+pub fn materialize_signup_profile(
+    data_dir: &std::path::Path,
+    server_url: &str,
+    signup: &SignupResponse,
+    dek: &Dek,
+    email: &str,
+    seed_doc: bool,
+) -> Profile {
+    materialize_profile(
+        data_dir,
+        server_url,
+        &signup.account_id,
+        &signup.device_id,
+        &signup.device_token,
+        dek,
+        email,
+        seed_doc,
+    )
+}
+
+pub fn reopen_profile(data_dir: &std::path::Path) -> Profile {
+    Profile {
+        dir: data_dir.to_path_buf(),
+    }
+}

@@ -8,14 +8,29 @@ Sqlite-only for now. No mocked database. No mocked server. The test pyramid skew
    - Encryption primitives (KEK derivation, wrap/unwrap, AEAD round-trip)
    - Loro mutation helpers
    - ID generation, prefix-matching
-2. **Server integration tests** (`server/tests/`)
+2. **CLI/system tests** (`cli/tests/`)
+   - Primary home for happy-path end-to-end coverage
+   - Real server + real sqlite + real `airday_cli` Rust client path (`net`, auth flows, `sync::Session`)
+   - Covers account bootstrap and the normal multi-device lifecycle:
+     - signup/login/recovery/password-change success paths
+     - two-device sync and convergence
+     - offline edits followed by catch-up
+     - snapshot upload / snapshot bootstrap success paths
+   - Reuse `cli/tests/support/mod.rs` as the shared harness for server startup, profile materialization, auth helpers, and bounded polling
+   - Prefer long-lived `airday_cli::sync::Session` tests for snapshot/sync happy paths instead of ad hoc websocket clients
+3. **Server integration tests** (`server/tests/`)
    - Real server, real sqlite (temp file or `:memory:`)
-   - Drives HTTP + WS via reqwest + tungstenite
-   - Asserts protocol behavior (op_id assignment, ack tracking, snapshot triggering)
-3. **End-to-end tests** (`e2e/` at workspace root)
-   - Real server + N CLI subprocesses
-   - Drives CLI via stdin and `--json` stdout
-   - Asserts state convergence across devices
+   - Drives HTTP + WS via thin ad hoc clients only where that is the point of the test
+   - Narrowed to low-level server contract and adversarial/weird-client scenarios:
+     - malformed or unexpected frames
+     - auth rejection / unauthorized upgrade
+     - handshake/version rejection
+     - stale ack behavior
+     - disconnect / timeout retry paths
+     - direct broadcast / subscriber registry edge cases
+     - exact wire-level protocol seams that are awkward to observe via `Session`
+
+`core/tests/` stays focused on shared engine correctness and sans-IO sync behavior. Do not move whole-system server/CLI ownership questions into `core/tests/`.
 
 E2E is the load-bearing surface. Required matrix:
 
@@ -26,10 +41,12 @@ E2E is the load-bearing surface. Required matrix:
 - snapshot threshold reached → snapshot taken → fresh device joins → pulls snapshot + tail successfully
 - recovery code flow → new password works → DEK preserved → items intact
 
+Avoid duplicate happy-path coverage across `server/tests/` and `cli/tests/` unless the server-side test is proving a narrower wire-contract detail that the CLI-system test does not cover.
+
 ## Helpers
 
 - `TestServer` — RAII handle, starts a server on a random port with a temp sqlite, exposes URL, kills on drop.
-- `TestCli` — spawns `airday` subprocess with isolated `XDG_DATA_HOME` and a stub keychain backend, exposes typed methods that wrap `--json`.
+- `cli/tests/support/mod.rs` — shared CLI-system harness for server startup, profile materialization, auth helpers, device registration, and bounded polling.
 - `wait_for(predicate, timeout)` — bounded polling helper. **Avoid raw `sleep`s in tests.**
 
 ## Convergence assertions

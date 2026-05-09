@@ -10,166 +10,49 @@
 //! sqlite the server uses (via `airday-server`'s public queries
 //! module).
 
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use airday_cli::commands::export::write_export;
 use airday_cli::config::{DeviceConfig, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
 use airday_cli::sync::Session;
-use airday_core::{derive_password_master, random_bytes, Dek, Doc, LIST_MAIN};
-use airday_protocol::{
-    DeviceCredential, DeviceRegistration, KdfParams, SignupRequest, SignupResponse,
-};
+use airday_core::{Dek, Doc, LIST_MAIN};
 use airday_server::sync::queries;
-use airday_server::{router, AppState};
-use reqwest::header::CONTENT_TYPE;
 use uuid::Uuid;
 
-const MSGPACK: &str = "application/msgpack";
+mod support;
 
-fn weak_params() -> KdfParams {
-    KdfParams {
-        m_kib: 8,
-        t: 1,
-        p: 1,
-    }
-}
-
-struct TestServer {
-    base: String,
-    state: AppState,
-    handle: tokio::task::JoinHandle<()>,
-}
-
-impl TestServer {
-    async fn start() -> Self {
-        let state = AppState::open_in_memory().await.unwrap();
-        let app = router(state.clone());
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let base = format!("http://{}", addr);
-        let handle = tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
-        });
-        Self {
-            base,
-            state,
-            handle,
-        }
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.handle.abort();
-    }
-}
-
-fn http() -> &'static reqwest::Client {
-    static C: OnceLock<reqwest::Client> = OnceLock::new();
-    C.get_or_init(reqwest::Client::new)
-}
-
-async fn signup_via_http(server: &TestServer, dek: &Dek) -> SignupResponse {
-    let kdf_params = weak_params();
-    let master_salt: [u8; 16] = random_bytes();
-    let master =
-        derive_password_master(b"correct horse battery staple", &master_salt, kdf_params).unwrap();
-    let kek = master.kek().unwrap();
-    let auth_secret = master.auth_secret().unwrap();
-    let wrapped = kek.wrap(dek).unwrap();
-    let req = SignupRequest {
-        email: format!("user-{}@example.com", Uuid::now_v7()),
-        master_salt: master_salt.to_vec(),
-        kdf_params,
-        auth_secret: auth_secret.as_bytes().to_vec(),
-        wrapped_dek: wrapped.ciphertext,
-        wrapped_dek_nonce: wrapped.nonce.to_vec(),
-        recovery: None,
-        device_name: "smoke-test".into(),
-    };
-    let bytes = rmp_serde::to_vec_named(&req).unwrap();
-    let resp = http()
-        .post(format!("{}/api/account/signup", server.base))
-        .header(CONTENT_TYPE, MSGPACK)
-        .body(bytes)
-        .send()
-        .await
-        .unwrap();
-    assert!(
-        resp.status().is_success(),
-        "signup failed: {}",
-        resp.status()
-    );
-    rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
-}
-
-/// Stand up the on-disk profile a real `airday signup` would have
-/// written. Constructed directly under `data_dir` so each test owns
-/// its profile and parallel runs don't race on `AIRDAY_DATA_DIR`.
-fn materialize_profile(
-    data_dir: &std::path::Path,
-    server_url: &str,
-    resp: &SignupResponse,
-    dek: &Dek,
-    seed_doc: bool,
-) -> Profile {
-    std::fs::create_dir_all(data_dir).unwrap();
-    let profile = Profile {
-        dir: data_dir.to_path_buf(),
-    };
-    profile
-        .write_device(&DeviceConfig {
-            account_id: resp.account_id.clone(),
-            email: "smoke-test@example.com".into(),
-            server_url: server_url.into(),
-            device_id: resp.device_id.clone(),
-            last_acked_op_id: 0,
-            last_sync_at: None,
-        })
-        .unwrap();
-    profile
-        .write_secrets(&Secrets {
-            device_token: resp.device_token.clone(),
-            dek_hex: dek_to_hex(dek),
-        })
-        .unwrap();
-    let doc = if seed_doc {
-        Doc::new().unwrap()
-    } else {
-        Doc::empty()
-    };
-    profile.write_doc(&doc).unwrap();
-    profile
-}
-
-fn reopen_profile(data_dir: &std::path::Path) -> Profile {
-    Profile {
-        dir: data_dir.to_path_buf(),
-    }
-}
+use support::{
+    materialize_signup_profile, register_device, reopen_profile, signup_via_http, TestServer,
+};
 
 #[tokio::test]
 async fn session_pushes_and_acks_then_reopen_is_clean() {
     let server = TestServer::start().await;
     let dek = Dek::generate();
-    let signup = signup_via_http(&server, &dek).await;
+    let signup = signup_via_http(&server, &dek, "smoke-test").await;
 
     let tmp = tempfile::tempdir().unwrap();
-    let profile = materialize_profile(tmp.path(), &server.base, &signup, &dek, true);
+    let profile = materialize_signup_profile(
+        tmp.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "smoke-test@example.com",
+        true,
+    );
 
-    // First open: connect, handshake, pull (empty). The seed counts
-    // as pending so the engine auto-pushes it during open; the
-    // user's add_item then ships on flush. Two blobs land server-side.
+    // First open: connect, handshake, pull (empty). The seeded doc is
+    // already persisted locally; only the user's new mutation should
+    // ship on flush.
     let session = Session::open_with_profile(profile, true).await.unwrap();
     assert!(session.is_online(), "expected to connect to local server");
     let item_id = session.doc().add_item(LIST_MAIN, "hello world").unwrap();
     session.flush().await.unwrap();
 
     let account_id = Uuid::parse_str(&signup.account_id).unwrap();
-    let batch = wait_for_ops(&server, account_id, 2).await;
-    assert_eq!(batch.ops.len(), 2, "seed-push + add-item-push");
+    let batch = wait_for_ops(&server, account_id, 1).await;
+    assert_eq!(batch.ops.len(), 1, "only the add-item mutation should push");
     let highest_assigned = batch.ops.iter().map(|o| o.id).max().unwrap();
 
     // Device's frontier should have advanced to the highest assigned id.
@@ -195,7 +78,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     let after = queries::fetch_ops_batch(&server.state.db, account_id, 0)
         .await
         .unwrap();
-    assert_eq!(after.ops.len(), 2, "second flush must not re-push");
+    assert_eq!(after.ops.len(), 1, "second flush must not re-push");
 }
 
 #[tokio::test]
@@ -255,16 +138,23 @@ async fn export_json_writes_semantic_account_dump() {
 async fn second_device_observes_first_devices_items_via_pull() {
     let server = TestServer::start().await;
     let dek = Dek::generate();
-    let signup = signup_via_http(&server, &dek).await;
+    let signup = signup_via_http(&server, &dek, "smoke-test").await;
 
     // Device A: full profile, fresh doc.
     let tmp_a = tempfile::tempdir().unwrap();
-    let profile_a = materialize_profile(tmp_a.path(), &server.base, &signup, &dek, true);
+    let profile_a = materialize_signup_profile(
+        tmp_a.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "smoke-test@example.com",
+        true,
+    );
 
     // Device B: register a second device on the same account, share
     // the DEK (paranthesis: the real device-2 path derives the DEK
     // from password+wrap; here we cheat because we already have it).
-    let device_b = register_device_b(&server, &signup.device_token).await;
+    let device_b = register_device(&server, &signup.device_token, "device-b").await;
     let tmp_b = tempfile::tempdir().unwrap();
     let profile_b = Profile {
         dir: tmp_b.path().to_path_buf(),
@@ -300,23 +190,6 @@ async fn second_device_observes_first_devices_items_via_pull() {
     assert_eq!(view.text, "from-A");
     assert_eq!(view.list_id, LIST_MAIN);
     session_b.flush().await.unwrap();
-}
-
-async fn register_device_b(server: &TestServer, owner_token: &str) -> DeviceCredential {
-    let bytes = rmp_serde::to_vec_named(&DeviceRegistration {
-        name: "device-b".into(),
-    })
-    .unwrap();
-    let resp = http()
-        .post(format!("{}/api/devices", server.base))
-        .header(CONTENT_TYPE, MSGPACK)
-        .bearer_auth(owner_token)
-        .body(bytes)
-        .send()
-        .await
-        .unwrap();
-    assert!(resp.status().is_success());
-    rmp_serde::from_slice(&resp.bytes().await.unwrap()).unwrap()
 }
 
 async fn wait_for_ops(

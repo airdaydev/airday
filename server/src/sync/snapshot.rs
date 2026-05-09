@@ -15,6 +15,7 @@ const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 pub struct SnapshotCoordinator {
     inner: Arc<Mutex<Inner>>,
     timeout: Duration,
+    threshold_ops: u64,
 }
 
 #[derive(Default)]
@@ -51,13 +52,22 @@ pub(crate) struct Candidate {
 
 impl SnapshotCoordinator {
     pub fn new() -> Self {
-        Self::with_timeout(SNAPSHOT_TIMEOUT)
+        Self::with_settings(SNAPSHOT_TIMEOUT, SNAPSHOT_THRESHOLD_OPS)
     }
 
     pub fn with_timeout(timeout: Duration) -> Self {
+        Self::with_settings(timeout, SNAPSHOT_THRESHOLD_OPS)
+    }
+
+    pub fn with_threshold(threshold_ops: u64) -> Self {
+        Self::with_settings(SNAPSHOT_TIMEOUT, threshold_ops)
+    }
+
+    pub fn with_settings(timeout: Duration, threshold_ops: u64) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Inner::default())),
             timeout,
+            threshold_ops,
         }
     }
 
@@ -266,7 +276,7 @@ impl SnapshotCoordinator {
         if reservation
             .trigger_op_id
             .saturating_sub(latest_snapshot_floor)
-            <= SNAPSHOT_THRESHOLD_OPS
+            <= self.threshold_ops
         {
             self.clear_selection_if_current(account_id, reservation.attempt_id);
             return;

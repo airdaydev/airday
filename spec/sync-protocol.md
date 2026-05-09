@@ -63,12 +63,49 @@ The `complete: bool` on `OpsBatch` signals "no more chunks for this `PullOps`" �
 
 ## Snapshot orchestration
 
-- Threshold: when `(latest_op_id − latest_snapshot.up_to_op_id) > 10_000`, server picks a candidate.
-- Candidate = active device with highest `last_acked_op_id`.
-- Server sends `SnapshotRequest`. Client serializes Loro shallow snapshot, encrypts with DEK, uploads via `PushSnapshot`.
-- Timeout: if no `PushSnapshot` within e.g. 5 minutes, server picks next candidate.
-- Server tracks at most one in-flight snapshot request per account.
-- After snapshot is durable, compaction job may delete ops with `id ≤ min(horizon, snapshot.up_to_op_id)`.
+Snapshotting is **server-orchestrated, best-effort, and must never wedge sync**. It exists to bound bootstrap / compaction cost, not to gate normal operation.
+
+- Threshold: when `(latest_op_id − latest_snapshot.up_to_op_id) > 10_000`, snapshotting becomes eligible for that account.
+- Candidate: a **currently connected** active device for that account, chosen by highest `last_acked_op_id`. Ties may break arbitrarily.
+- Production: server sends `SnapshotRequest { up_to_op_id }`. Client serializes a Loro shallow snapshot at or beyond that point, encrypts with DEK, uploads via `PushSnapshot`.
+- Compaction: after a snapshot is durable, compaction may delete ops with `id ≤ min(horizon, snapshot.up_to_op_id)`.
+
+Server keeps **at most one in-flight snapshot request per account**:
+
+- State:
+  - `Idle`
+  - `Requested { device_id, up_to_op_id, deadline }`
+- Transition to `Requested` only when no request is already in flight.
+- Snapshot orchestration is per-account; one stuck or slow account must not block others.
+
+Request lifecycle:
+
+- When threshold is crossed and the account is `Idle`, server picks the best currently connected candidate and sends `SnapshotRequest`.
+- If no eligible connected candidate exists, server stays `Idle`. Snapshotting is deferred until a later account event (connect, ack advance, new op, explicit retry tick, etc.) gives the server a reason to try again.
+- While `Requested`, server does **not** open a second concurrent request for that account.
+- On successful `PushSnapshot`, server durably stores the snapshot, clears the in-flight request, then re-evaluates whether the account is still above threshold.
+
+Failure handling:
+
+- If the assigned connection disconnects before a matching `PushSnapshot` arrives, server clears that in-flight request immediately and tries the next-best currently connected candidate, if any.
+- If the request deadline expires (start with a coarse fixed timeout such as 5 minutes), server clears that in-flight request and tries the next-best currently connected candidate, if any.
+- If no replacement candidate exists after disconnect/timeout, server returns to `Idle`. Sync continues normally; snapshotting waits for a later retry opportunity.
+- Snapshotting is therefore **retryable but not blocking**: inability to get a snapshot may delay compaction, but must not break push/pull/ack.
+
+Correctness / acceptance rules:
+
+- `PushSnapshot` is accepted only if it matches the **current** in-flight request for that account/device.
+- Late snapshots from a timed-out, disconnected, or superseded assignee are ignored.
+- Unsolicited snapshots (no in-flight request) are ignored.
+- Server stores only the latest durable snapshot; no multi-snapshot chain is required.
+- The uploaded `up_to_op_id` must be **at least** the requested `up_to_op_id`. Older snapshots are ignored.
+- A newer snapshot may replace an older one atomically once durable.
+
+Operational notes:
+
+- Keep the policy coarse. One candidate at a time, one deadline, one retry decision per failure is enough.
+- Large accounts increase snapshot upload/download cost, but do **not** change the orchestration model.
+- Server should log: request issued, request timed out, assignee disconnected, snapshot accepted, snapshot ignored as stale/mismatched, and retry abandoned for lack of candidates.
 
 ## Active device definition
 

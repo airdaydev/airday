@@ -46,6 +46,16 @@ impl AppState {
         self.snapshot_coordinator = SnapshotCoordinator::with_timeout(timeout);
         self
     }
+
+    pub fn with_snapshot_threshold(mut self, threshold_ops: u64) -> Self {
+        self.snapshot_coordinator = SnapshotCoordinator::with_threshold(threshold_ops);
+        self
+    }
+
+    pub fn with_snapshot_settings(mut self, timeout: Duration, threshold_ops: u64) -> Self {
+        self.snapshot_coordinator = SnapshotCoordinator::with_settings(timeout, threshold_ops);
+        self
+    }
 }
 
 /// Indirection so tests can fast-forward time without sleeping (used

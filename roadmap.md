@@ -11,6 +11,9 @@
 - Snapshot upload can leak unpushed local state into the shared bootstrap path.
 - Revoking a device should probably also disconnect that device's live WebSocket session.
 
+## CLI
+- Sqlite storage
+
 ## Sync & persistence
 
 - Server-side compaction after durable snapshots still needs to land.

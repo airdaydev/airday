@@ -26,6 +26,7 @@ use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
 
 const MSGPACK: &str = "application/msgpack";
+const TEST_SNAPSHOT_THRESHOLD_OPS: u64 = 10;
 
 fn weak_params() -> KdfParams {
     KdfParams {
@@ -44,14 +45,19 @@ struct TestServer {
 
 impl TestServer {
     async fn start() -> Self {
-        Self::start_with_snapshot_timeout(Duration::from_secs(5 * 60)).await
+        Self::start_with_snapshot_settings(Duration::from_secs(5 * 60), TEST_SNAPSHOT_THRESHOLD_OPS)
+            .await
     }
 
     async fn start_with_snapshot_timeout(timeout: Duration) -> Self {
+        Self::start_with_snapshot_settings(timeout, TEST_SNAPSHOT_THRESHOLD_OPS).await
+    }
+
+    async fn start_with_snapshot_settings(timeout: Duration, threshold_ops: u64) -> Self {
         let state = AppState::open_in_memory()
             .await
             .unwrap()
-            .with_snapshot_timeout(timeout);
+            .with_snapshot_settings(timeout, threshold_ops);
         let app = router(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -216,63 +222,6 @@ fn fake_blob(seed: u8) -> EncryptedBlob {
         nonce: vec![seed; 24],
         ciphertext: vec![seed; 64],
     }
-}
-
-#[tokio::test]
-async fn handshake_then_push_pull_ack_round_trips() {
-    let acc = signup_account().await;
-    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
-
-    let ack = handshake(&mut ws).await;
-    assert_eq!(ack.protocol_version, PROTOCOL_VERSION);
-
-    // Push three ops.
-    let blobs = vec![fake_blob(1), fake_blob(2), fake_blob(3)];
-    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs.clone() }).await;
-    let resp: ServerFrame = recv_msgpack(&mut ws).await;
-    let assigned_ids = match resp {
-        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
-        other => panic!("expected OpsAck, got {other:?}"),
-    };
-    assert_eq!(assigned_ids.len(), 3);
-    // Strictly monotonic across the push.
-    assert!(assigned_ids.windows(2).all(|w| w[0] < w[1]));
-
-    // Pull from 0 — single batch with complete=true.
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 0 }).await;
-    let pulled = expect_complete_batch(&mut ws).await;
-    let want: Vec<StoredOp> = assigned_ids
-        .iter()
-        .copied()
-        .zip(blobs.iter().cloned())
-        .map(|(id, blob)| StoredOp { id, blob })
-        .collect();
-    assert_eq!(pulled, want);
-
-    // Ack the last id and verify it persisted.
-    let last = *assigned_ids.last().unwrap();
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::Ack {
-            last_acked_op_id: last,
-        },
-    )
-    .await;
-    // Ack is fire-and-forget — give the server a tick to commit, then
-    // read the row directly.
-    let stored = wait_for_acked(&acc, last).await;
-    assert_eq!(stored, last);
-}
-
-#[tokio::test]
-async fn pull_with_no_ops_returns_empty_complete_batch() {
-    let acc = signup_account().await;
-    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
-    handshake(&mut ws).await;
-
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 0 }).await;
-    let pulled = expect_complete_batch(&mut ws).await;
-    assert!(pulled.is_empty());
 }
 
 #[tokio::test]
@@ -444,50 +393,6 @@ async fn subscriber_unregisters_on_disconnect() {
 }
 
 #[tokio::test]
-async fn pull_below_snapshot_floor_returns_snapshot_required() {
-    // Stage a snapshot row directly so the bootstrap seam fires
-    // without needing PushSnapshot wired through. Once orchestration
-    // lands, the path through the real `PushSnapshot` should hit the
-    // same surface.
-    let acc = signup_account().await;
-    let snapshot_blob = fake_blob(99);
-    queries::insert_snapshot(
-        &acc.server.state.db,
-        acc.account_id,
-        100,
-        snapshot_blob.clone(),
-    )
-    .await
-    .unwrap();
-
-    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
-    handshake(&mut ws).await;
-
-    // since_op_id < snapshot.up_to_op_id → SnapshotRequired in lieu of OpsBatch.
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 0 }).await;
-    match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::SnapshotRequired { up_to_op_id } => assert_eq!(up_to_op_id, 100),
-        other => panic!("expected SnapshotRequired, got {other:?}"),
-    }
-
-    // Client follows up with PullSnapshot; server returns the blob.
-    send_msgpack(&mut ws, &ClientFrame::PullSnapshot).await;
-    match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::Snapshot { up_to_op_id, blob } => {
-            assert_eq!(up_to_op_id, 100);
-            assert_eq!(blob, snapshot_blob);
-        }
-        other => panic!("expected Snapshot, got {other:?}"),
-    }
-
-    // After "applying" the snapshot, a PullOps from up_to_op_id is
-    // a normal empty-complete path (no ops past the snapshot point).
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 100 }).await;
-    let pulled = expect_complete_batch(&mut ws).await;
-    assert!(pulled.is_empty());
-}
-
-#[tokio::test]
 async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     // A device whose cursor is already >= the snapshot floor stays
     // on the steady-state op-streaming path — no SnapshotRequired.
@@ -502,56 +407,6 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 50 }).await;
     let pulled = expect_complete_batch(&mut ws).await;
     assert!(pulled.is_empty());
-}
-
-#[tokio::test]
-async fn snapshot_request_round_trips_to_persistence() {
-    // Real orchestration path: once the account crosses the snapshot
-    // threshold, the connected producer gets `SnapshotRequest`, its
-    // `PushSnapshot` reply lands in the snapshots table.
-    let acc = signup_account().await;
-    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
-    handshake(&mut ws).await;
-    wait_for_subscribers(&acc, 1).await;
-
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::PushOps {
-            ops: vec![fake_blob(0x55)],
-        },
-    )
-    .await;
-    let first_id = recv_ops_ack(&mut ws).await[0];
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::Ack {
-            last_acked_op_id: first_id,
-        },
-    )
-    .await;
-    wait_for_acked(&acc, first_id).await;
-
-    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
-    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: big_push }).await;
-    let assigned_ids = recv_ops_ack(&mut ws).await;
-    let snapshot_up_to = *assigned_ids.last().unwrap();
-    assert_eq!(recv_snapshot_request(&mut ws).await, first_id);
-
-    let blob = fake_blob(123);
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::PushSnapshot {
-            up_to_op_id: snapshot_up_to,
-            blob: blob.clone(),
-        },
-    )
-    .await;
-
-    // PushSnapshot is fire-and-forget — give the server a moment to
-    // commit the row, then read it back.
-    let snap = wait_for_snapshot(&acc, snapshot_up_to).await;
-    assert_eq!(snap.up_to_op_id, snapshot_up_to);
-    assert_eq!(snap.blob, blob);
 }
 
 #[tokio::test]
@@ -596,9 +451,14 @@ async fn snapshot_threshold_targets_highest_acked_connected_device() {
     .await;
     wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
 
-    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    let big_push: Vec<EncryptedBlob> = (0..=TEST_SNAPSHOT_THRESHOLD_OPS)
+        .map(|i| fake_blob((i % 251) as u8))
+        .collect();
     send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
-    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(
+        recv_ops_ack(&mut ws_a).await.len() as u64,
+        TEST_SNAPSHOT_THRESHOLD_OPS + 1
+    );
     assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
 
     let nothing = tokio::time::timeout(Duration::from_millis(200), ws_a.next()).await;
@@ -650,9 +510,14 @@ async fn snapshot_request_retries_when_assigned_device_disconnects() {
     .await;
     wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
 
-    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    let big_push: Vec<EncryptedBlob> = (0..=TEST_SNAPSHOT_THRESHOLD_OPS)
+        .map(|i| fake_blob((i % 251) as u8))
+        .collect();
     send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
-    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(
+        recv_ops_ack(&mut ws_a).await.len() as u64,
+        TEST_SNAPSHOT_THRESHOLD_OPS + 1
+    );
     assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
 
     drop(ws_b);
@@ -709,32 +574,19 @@ async fn snapshot_request_retries_after_timeout() {
     .await;
     wait_for_acked_token(&acc.server.state, &device_b.device_token, b_first_id).await;
 
-    let big_push: Vec<EncryptedBlob> = (0..10_001).map(|i| fake_blob((i % 251) as u8)).collect();
+    let big_push: Vec<EncryptedBlob> = (0..=TEST_SNAPSHOT_THRESHOLD_OPS)
+        .map(|i| fake_blob((i % 251) as u8))
+        .collect();
     send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: big_push }).await;
-    assert_eq!(recv_ops_ack(&mut ws_a).await.len(), 10_001);
+    assert_eq!(
+        recv_ops_ack(&mut ws_a).await.len() as u64,
+        TEST_SNAPSHOT_THRESHOLD_OPS + 1
+    );
     assert_eq!(recv_snapshot_request(&mut ws_b).await, b_first_id);
     assert_eq!(
         recv_snapshot_request_timeout(&mut ws_a, Duration::from_secs(1)).await,
         a_first_id
     );
-}
-
-async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    loop {
-        if let Some(snap) = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
-            .await
-            .unwrap()
-        {
-            if snap.up_to_op_id == up_to {
-                return snap;
-            }
-        }
-        if std::time::Instant::now() > deadline {
-            panic!("snapshot up_to={up_to} never landed");
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    }
 }
 
 async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {
