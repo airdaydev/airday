@@ -37,3 +37,6 @@
 
 - E2E gaps vs. `spec/testing.md`: offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold to fresh-device bootstrap, and recovery-flow round-trip.
 - hardening pass
+
+## Postgresql translation
+- ensure single snapshot per account across replicas

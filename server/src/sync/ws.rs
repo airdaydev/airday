@@ -164,6 +164,10 @@ async fn run_session(
     let mut sub = state
         .sync_sessions
         .subscribe(auth.account_id, auth.device_id);
+    state
+        .snapshot_coordinator
+        .on_candidate_progress(state.clone(), auth.account_id)
+        .await;
 
     let sub_id = sub.sub_id();
     let result = loop {
@@ -207,6 +211,10 @@ async fn handle_frame(
         ClientFrame::Ack { last_acked_op_id } => {
             let ack_span = tracing::info_span!("ws.ack", last_acked_op_id = last_acked_op_id);
             queries::advance_last_acked_op_id(&state.db, auth.device_id, last_acked_op_id).await?;
+            state
+                .snapshot_coordinator
+                .on_candidate_progress(state.clone(), auth.account_id)
+                .await;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }

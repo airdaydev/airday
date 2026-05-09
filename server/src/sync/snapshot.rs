@@ -77,6 +77,16 @@ impl SnapshotCoordinator {
         }
     }
 
+    pub async fn on_candidate_progress(&self, state: AppState, account_id: Uuid) {
+        let Ok(latest_op_id) = queries::latest_account_op_id(&state.db, account_id).await else {
+            return;
+        };
+        if latest_op_id == 0 {
+            return;
+        }
+        self.on_ops_appended(state, account_id, latest_op_id).await;
+    }
+
     pub fn permits_snapshot(&self, account_id: Uuid, device_id: Uuid, up_to_op_id: u64) -> bool {
         let inner = self.inner.lock().unwrap();
         matches!(
@@ -282,52 +292,61 @@ impl SnapshotCoordinator {
             return;
         }
 
+        let trigger_op_id = reservation.trigger_op_id;
         let connected = state.sync_sessions.connected_subscribers(account_id);
-        let candidate = match queries::snapshot_candidate(
-            &state.db,
-            account_id,
-            &connected,
-            &reservation.tried_devices,
-            latest_snapshot_floor,
-        )
-        .await
-        {
-            Ok(candidate) => candidate,
-            Err(error) => {
-                tracing::warn!(%account_id, error = %error, "snapshot lease selection failed reading candidates");
+        let mut tried_devices = reservation.tried_devices;
+        loop {
+            let candidate = match queries::snapshot_candidate(
+                &state.db,
+                account_id,
+                &connected,
+                &tried_devices,
+                latest_snapshot_floor,
+            )
+            .await
+            {
+                Ok(candidate) => candidate,
+                Err(error) => {
+                    tracing::warn!(%account_id, error = %error, "snapshot lease selection failed reading candidates");
+                    self.clear_selection_if_current(account_id, reservation.attempt_id);
+                    return;
+                }
+            };
+
+            let Some(candidate) = candidate else {
                 self.clear_selection_if_current(account_id, reservation.attempt_id);
                 return;
+            };
+
+            if !state.sync_sessions.request_snapshot(
+                account_id,
+                candidate.sub_id,
+                candidate.last_acked_op_id,
+            ) {
+                tracing::info!(
+                    %account_id,
+                    device_id = %candidate.device_id,
+                    sub_id = candidate.sub_id,
+                    "snapshot request target disappeared before delivery; retrying selection"
+                );
+                tried_devices.insert(candidate.device_id);
+                continue;
             }
-        };
 
-        let Some(candidate) = candidate else {
-            self.clear_selection_if_current(account_id, reservation.attempt_id);
-            return;
-        };
+            tried_devices.insert(candidate.device_id);
+            if !self.install_in_flight_lease(
+                account_id,
+                reservation.attempt_id,
+                trigger_op_id,
+                &candidate,
+                tried_devices,
+            ) {
+                return;
+            }
 
-        if !state.sync_sessions.request_snapshot(
-            account_id,
-            candidate.sub_id,
-            candidate.last_acked_op_id,
-        ) {
-            self.clear_selection_if_current(account_id, reservation.attempt_id);
-            return;
-        }
-
-        let trigger_op_id = reservation.trigger_op_id;
-        let mut tried_devices = reservation.tried_devices;
-        tried_devices.insert(candidate.device_id);
-        if !self.install_in_flight_lease(
-            account_id,
-            reservation.attempt_id,
-            trigger_op_id,
-            &candidate,
-            tried_devices,
-        ) {
+            self.spawn_timeout_task(state, account_id, reservation.attempt_id);
             return;
         }
-
-        self.spawn_timeout_task(state, account_id, reservation.attempt_id);
     }
 
     fn spawn_timeout_task(&self, state: AppState, account_id: Uuid, attempt_id: u64) {
