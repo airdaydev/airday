@@ -1563,7 +1563,25 @@ function Workspace(props: {
           // Enter-to-expand / Space-to-add, mouse users get the same
           // priming so a follow-up arrow key Just Works. rAF defers past
           // the <Show keyed> remount when the view's container changes.
-          requestAnimationFrame(() => dndHandle?.focus());
+          //
+          // Skip the steal if the user has by now started editing
+          // something — a double-click on a nav label fires two clicks
+          // (queueing two rAFs) *then* dblclick → startEdit, which
+          // focuses the contenteditable via a microtask. Microtasks
+          // drain before the next rAF, so without this guard the
+          // pending rAF would yank focus right back out of rename mode.
+          requestAnimationFrame(() => {
+            const ae = document.activeElement;
+            if (
+              ae instanceof HTMLElement &&
+              (ae.isContentEditable ||
+                ae.tagName === "INPUT" ||
+                ae.tagName === "TEXTAREA")
+            ) {
+              return;
+            }
+            dndHandle?.focus();
+          });
         }}
         session={props.session}
         online={props.online}
