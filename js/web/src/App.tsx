@@ -1696,7 +1696,7 @@ function Workspace(props: {
                 disabled={draft() !== null}
               >
                 <span class="add-button-icon" innerHTML={plusSvg} />
-                <span>{m().common.addItem}</span>
+                <span>{m().common.add}</span>
               </button>
             </Show>
           </div>
