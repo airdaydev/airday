@@ -504,12 +504,15 @@ body {
 }
 
 .row input[type="checkbox"]:checked {
-  background-color: var(--link);
-  border-color: var(--link);
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-color: transparent;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat;
   background-position: center;
   background-size: 100% 100%;
+}
+
+[data-theme="dark"] .row input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
 }
 
 .row input[type="checkbox"]:focus-visible {
