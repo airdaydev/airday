@@ -1265,20 +1265,53 @@ body {
   background: var(--dnd-select-bg);
 }
 
+/* Non-interactive indicator mirroring the row checkbox in .row so the
+   palette displays an item's done state without owning behaviour — the
+   row is the source of truth for toggling. Kept as a span (not <input>)
+   to avoid focus / a11y noise inside the listbox option. */
+.palette__item-check {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.palette__item-check[data-kind="item"] {
+  border: 1px solid var(--border-input);
+}
+
+.palette__item-check[data-checked] {
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+[data-theme="dark"] .palette__item-check[data-checked] {
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+.palette__item--selected .palette__item-check[data-kind="item"] {
+  border-color: #00000030;
+}
+
+[data-theme="dark"] .palette__item--selected .palette__item-check[data-kind="item"] {
+  border-color: #ffffff30;
+}
+
+.palette__item--binned .palette__item-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
 .palette__item-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.palette__item-badge-label {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .palette__empty {

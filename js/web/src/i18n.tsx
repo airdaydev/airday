@@ -95,8 +95,6 @@ type Messages = {
   };
   find: {
     placeholder: string;
-    listBadge: string;
-    itemBadge: string;
     noMatches: string;
     typeToFind: string;
   };
@@ -193,8 +191,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     find: {
       placeholder: "Buscar",
-      listBadge: "Lista",
-      itemBadge: "Elemento",
       noMatches: "Sin resultados",
       typeToFind: "Escribe para buscar",
     },
@@ -290,8 +286,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     find: {
       placeholder: "Find",
-      listBadge: "List",
-      itemBadge: "Item",
       noMatches: "No matches",
       typeToFind: "Type to find",
     },

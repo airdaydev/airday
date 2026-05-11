@@ -183,14 +183,20 @@ export function FindPalette(props: {
                   class="palette__item"
                   classList={{
                     "palette__item--selected": i() === selectedIndex(),
+                    "palette__item--binned": item.status === "binned",
                   }}
                   onMouseEnter={() => setSelectedIndex(i())}
                   onClick={() => selectItem(item)}
                 >
+                  {/* Slot is always rendered (even for lists) so titles
+                      stay aligned across mixed result kinds. */}
+                  <span
+                    class="palette__item-check"
+                    data-kind={item.kind}
+                    data-checked={item.status === "done" ? "" : undefined}
+                    aria-hidden="true"
+                  />
                   <span class="palette__item-name">{item.title}</span>
-                  <span class="palette__item-badge-label">
-                    {item.kind === "list" ? m().find.listBadge : m().find.itemBadge}
-                  </span>
                 </div>
               )}
             </For>
