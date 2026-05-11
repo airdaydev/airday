@@ -39,4 +39,4 @@ process-compose up
 ```
 
 - This repo will remain private
-- Airday core will be BSL-licensed with some MIT-licensed components
+- Airday core will be MIT-licensed
