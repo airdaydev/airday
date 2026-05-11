@@ -35,6 +35,12 @@ import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { api } from "./api.ts";
+import {
+  caretXIfOnLastLine,
+  focusEditableLastLineAtX,
+  focusTextareaFirstLineAtX,
+  textareaCaretXIfOnFirstLine,
+} from "./caretBridge.ts";
 import { dekVault } from "./dekVault.ts";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
@@ -2527,6 +2533,28 @@ function NotesField(props: {
         // listbox; otherwise the listbox would intercept arrows / Cmd+A
         // before we see them. Escape stays uncaught so it can collapse
         // the row through the dnd's handler.
+        if (
+          e.key === "ArrowUp" &&
+          !e.shiftKey &&
+          !e.altKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.isComposing
+        ) {
+          const ta = e.currentTarget as HTMLTextAreaElement;
+          const x = textareaCaretXIfOnFirstLine(ta);
+          if (x !== null) {
+            const editable = ta
+              .closest(".row")
+              ?.querySelector<HTMLElement>(".row-text");
+            if (editable) {
+              e.preventDefault();
+              e.stopPropagation();
+              focusEditableLastLineAtX(editable, x);
+              return;
+            }
+          }
+        }
         if (e.key !== "Escape") e.stopPropagation();
       }}
     />
@@ -2840,6 +2868,32 @@ function Row(props: {
                   new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
                 );
                 return;
+              }
+              // ArrowDown on the last visual line jumps to the notes
+              // textarea below, landing at the matching X. On any other
+              // line, fall through to the browser's default (caret moves
+              // down within the editable).
+              if (
+                e.key === "ArrowDown" &&
+                !e.shiftKey &&
+                !e.altKey &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.isComposing
+              ) {
+                const editable = e.currentTarget as HTMLElement;
+                const x = caretXIfOnLastLine(editable);
+                if (x !== null) {
+                  const notes = editable
+                    .closest(".row")
+                    ?.querySelector<HTMLTextAreaElement>(".row-notes");
+                  if (notes) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    focusTextareaFirstLineAtX(notes, x);
+                    return;
+                  }
+                }
               }
               // Don't let the dnd intercept keys the contenteditable owns.
               if (e.key !== "Escape") e.stopPropagation();
