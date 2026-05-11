@@ -220,6 +220,7 @@ body {
 .nav-item {
   display: flex;
   align-items: center;
+  gap: 8px;
   width: 100%;
   height: 28px;
   text-align: left;
@@ -230,6 +231,21 @@ body {
   cursor: pointer;
   font: inherit;
   color: inherit;
+}
+
+.nav-item-icon {
+  /* Leading glyph for built-in nav rows (Queue / Done / Bin). Sized to
+     match the row's cap height; color inherits via currentColor on the
+     SVG paths. flex-shrink:0 keeps it pinned while the label flexes. */
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.nav-item-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 @media (max-width: 768px) {

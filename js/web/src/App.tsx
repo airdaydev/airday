@@ -30,7 +30,10 @@ import {
   type DndOp,
 } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
+import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
+import checkSvg from "./icons/check.svg?raw";
+import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
@@ -2157,6 +2160,7 @@ function Nav(props: {
             data-drop-list-id="main"
             onClick={() => props.setView({ kind: "list", id: "main" })}
           >
+            <span class="nav-item-icon" innerHTML={arrowRightSvg} />
             <EditableNavLabel
               name={props.homeName}
               onSave={(name) => props.app.setMainName(name)}
@@ -2200,6 +2204,7 @@ function Nav(props: {
           data-active={props.view.kind === "done" ? "" : undefined}
           onClick={() => props.setView({ kind: "done" })}
         >
+          <span class="nav-item-icon" innerHTML={checkSvg} />
           {m().nav.done}
         </button>
         <Show when={props.binCount > 0}>
@@ -2212,6 +2217,7 @@ function Nav(props: {
               data-drop-bin=""
               onClick={() => props.setView({ kind: "bin" })}
             >
+              <span class="nav-item-icon" innerHTML={crumpledPaperSvg} />
               {m().nav.bin}
               <span class="nav-item-count">{props.binCount}</span>
             </ContextMenu.Trigger>
