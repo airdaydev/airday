@@ -24,6 +24,11 @@ export interface DndControllerConfig {
   nudge: boolean;
   reorder: boolean;
   multi: boolean;
+  /** When false, plain Arrow keys are ignored. Shift/Cmd/Alt+Arrow still
+   *  drive extend/move/jump — they don't depend on plain navigation. Use
+   *  this for listboxes (e.g. the sidebar) where row "selection" via plain
+   *  arrows has no visible state and would just be confusing. */
+  arrowNavigate: boolean;
   clearOnClickOutside: boolean;
   fillHeight: boolean;
 }
@@ -535,6 +540,10 @@ export class DndController {
 
     const action = mapDndKeyEvent(e);
     if (action.type === "ignore") return;
+    // Sidebar uses arrowNavigate:false to suppress plain-arrow selection —
+    // the only visible "active" state there is the current view, not a
+    // selection ring, so silent selection moves were misleading.
+    if (action.type === "navigate" && !this.cfg.arrowNavigate) return;
     e.preventDefault();
     const order = this.source.getOrder();
 

@@ -25,6 +25,8 @@ export interface DndImperative {
   getExpanded(): Key | null;
   getSelection(): { blocks: any[]; active: any | null };
   scrollToKey(key: Key): void;
+  /** Move keyboard focus to the listbox so arrow/Enter/Space act on it. */
+  focus(): void;
 }
 
 export interface DndProps<T> {
@@ -53,6 +55,9 @@ export interface DndProps<T> {
   autofocus?: boolean;
   /** When false, shift/cmd-click and shift+arrow keys collapse to single-select. */
   multi?: boolean;
+  /** When false, plain Arrow keys do nothing. Modifier-key combos (Shift,
+   *  Cmd/Ctrl, Alt) keep working for extend/move/jump. Default true. */
+  arrowNavigate?: boolean;
   /** When true, a click anywhere outside the Dnd element clears selection. */
   clearOnClickOutside?: boolean;
   /** When true, host fills its parent's height. */
@@ -115,6 +120,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     nudge: props.nudge ?? true,
     reorder: props.reorder !== false,
     multi: props.multi !== false,
+    arrowNavigate: props.arrowNavigate !== false,
     clearOnClickOutside: props.clearOnClickOutside ?? false,
     fillHeight: props.fillHeight ?? false,
   });
@@ -205,6 +211,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       getExpanded: () => controller!.getExpanded(),
       getSelection: () => controller!.getSelection(),
       scrollToKey: (k) => controller!.scrollToKey(k),
+      focus: () => listboxEl.focus(),
     });
 
     setVersion((v) => v + 1);

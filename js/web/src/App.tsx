@@ -19,6 +19,7 @@ import {
 } from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { IdbWalStorage, probeOpfs } from "@airday/core";
+import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
@@ -58,11 +59,6 @@ import {
 } from "./store.ts";
 import { SyncBridge } from "./sync.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
-
-type ViewKey =
-  | { kind: "list"; id: string }
-  | { kind: "done" }
-  | { kind: "bin" };
 
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
@@ -255,11 +251,7 @@ function AppBody() {
   // outbox flush). Reset on logout/session-swap so the new account
   // doesn't inherit the previous device's last-synced time.
   const [lastSyncAt, setLastSyncAt] = createSignal<number | null>(null);
-  const [boot, setBoot] = createSignal<{
-    doc: Doc;
-    lastAcked: bigint;
-    wal: IdbWalStorage | null;
-  } | null>(null);
+  const [boot, setBoot] = createSignal<BootInfo | null>(null);
   const [bootError, setBootError] = createSignal<string | null>(null);
   const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
 
@@ -396,13 +388,21 @@ async function createAnonymousSession(): Promise<Session> {
   return session;
 }
 
+type BootInfo = {
+  doc: Doc;
+  lastAcked: bigint;
+  wal: IdbWalStorage | null;
+  /** Whatever was in the `prefs` store for this account at boot. Null
+   *  if the row was missing (first run for this account on this
+   *  device). `MainApp` consumes the fields it cares about. */
+  prefs: Prefs | null;
+};
+
 function BootGate(props: {
   session: Session;
-  boot: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null } | null;
+  boot: BootInfo | null;
   bootError: string | null;
-  setBoot: (
-    b: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null } | null,
-  ) => void;
+  setBoot: (b: BootInfo | null) => void;
   setBootError: (m: string | null) => void;
   online: boolean;
   setOnline: (b: boolean) => void;
@@ -426,14 +426,30 @@ function BootGate(props: {
       console.debug(`[boot] ${label.padEnd(28)} ${(t - t0).toFixed(1)}ms`);
     };
     try {
+      // Prefs are independent of the WAL replay — fire in parallel
+      // so they don't add a serial roundtrip to first paint. Both are
+      // small keyed IDB reads against the same DB. A miss (first run
+      // for this account on this device) resolves null and `MainApp`
+      // falls back to defaults.
+      const prefsPromise = loadPrefs(props.session.accountId).catch(() => null);
       if (props.session.freshSignup) {
         const wal = await tryInitWal(props.session, props.opfsOk);
         tap("freshSignup wal init", performance.now());
-        props.setBoot({ doc: Doc.create(), lastAcked: 0n, wal });
+        props.setBoot({
+          doc: Doc.create(),
+          lastAcked: 0n,
+          wal,
+          prefs: await prefsPromise,
+        });
         return;
       }
       if (!props.opfsOk) {
-        props.setBoot({ doc: Doc.empty(), lastAcked: 0n, wal: null });
+        props.setBoot({
+          doc: Doc.empty(),
+          lastAcked: 0n,
+          wal: null,
+          prefs: await prefsPromise,
+        });
         return;
       }
       const wal = new IdbWalStorage(
@@ -469,10 +485,16 @@ function BootGate(props: {
         doc,
         lastAcked: BigInt(device?.lastAckedOpId ?? 0),
         wal,
+        prefs: await prefsPromise,
       });
     } catch (e) {
       props.setBootError(e instanceof Error ? e.message : String(e));
-      props.setBoot({ doc: Doc.empty(), lastAcked: 0n, wal: null });
+      props.setBoot({
+        doc: Doc.empty(),
+        lastAcked: 0n,
+        wal: null,
+        prefs: null,
+      });
     }
   })();
 
@@ -514,7 +536,7 @@ async function tryInitWal(
 
 function MainApp(props: {
   session: Session;
-  boot: { doc: Doc; lastAcked: bigint; wal: IdbWalStorage | null };
+  boot: BootInfo;
   bootError: string | null;
   online: boolean;
   setOnline: (b: boolean) => void;
@@ -551,6 +573,21 @@ function MainApp(props: {
       delete (window as unknown as { __app?: typeof app }).__app;
     });
   }
+
+  // Workspace view lives at this level so the prefs-save effect
+  // below can persist it independently of the device-frontier write.
+  // Seed from the prefs row; a `kind:"list"` pointing at a
+  // since-deleted list falls back to Home silently. `done`/`bin` are
+  // global views and always resolvable.
+  const initialView: ViewKey = (() => {
+    const v = props.boot.prefs?.currentView;
+    if (!v) return { kind: "list", id: "main" };
+    if (v.kind === "list" && !app.state.listsById[v.id]) {
+      return { kind: "list", id: "main" };
+    }
+    return v;
+  })();
+  const [view, setView] = createSignal<ViewKey>(initialView);
 
   const wal = props.boot.wal;
 
@@ -702,6 +739,32 @@ function MainApp(props: {
     saveDeviceSoon();
   });
 
+  // ---------- Prefs: separate store, write-through ----------
+  //
+  // View state ("which list / Done / Bin am I on?") lives in its own
+  // IDB store keyed per account. Decoupled from `device` so a burst
+  // of typing doesn't rewrite the view, and switching lists doesn't
+  // rewrite the sync frontier. Anonymous sessions persist too — the
+  // device row gate above is about identity, not local-only UI state.
+  //
+  // No debounce: view changes are user-initiated (click / keyboard
+  // nav) and rare on the timescale of an IDB write. Coalescing them
+  // would only buy us dropped saves when the tab closes mid-window.
+  createEffect(
+    on(
+      view,
+      () => {
+        void savePrefs(props.session.accountId, {
+          currentView: view(),
+        }).catch((e) => {
+          // eslint-disable-next-line no-console
+          console.error("prefs save failed:", e);
+        });
+      },
+      { defer: true },
+    ),
+  );
+
   // Fresh signup: capture the seeded built-ins as the first WAL row so
   // a reload before any user mutation has something to replay. Cursor
   // is initialised to empty above, so this single call exports
@@ -743,6 +806,8 @@ function MainApp(props: {
       lastSyncAt={props.lastSyncAt}
       logout={props.logout}
       onSession={props.onSession}
+      view={view}
+      setView={setView}
     />
   );
 }
@@ -754,11 +819,17 @@ function Workspace(props: {
   lastSyncAt: number | null;
   logout: () => void;
   onSession: (s: Session) => void;
+  // View lives in `MainApp` so device writes can persist it alongside
+  // the sync frontier in one debounced put. See `currentView` on
+  // `DeviceConfig`.
+  view: () => ViewKey;
+  setView: (v: ViewKey) => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
   const state = app.state;
-  const [view, setView] = createSignal<ViewKey>({ kind: "list", id: "main" });
+  const view = props.view;
+  const setView = props.setView;
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const [settingsOpen, setSettingsOpen] = createSignal(false);
@@ -1487,6 +1558,12 @@ function Workspace(props: {
           // one motion — desktop layout ignores navOpen so this is a
           // no-op there.
           if (isMobile()) setNavOpen(false);
+          // Move keyboard focus to the items listbox once Solid has
+          // settled the new view — keyboard users land ready to arrow /
+          // Enter-to-expand / Space-to-add, mouse users get the same
+          // priming so a follow-up arrow key Just Works. rAF defers past
+          // the <Show keyed> remount when the view's container changes.
+          requestAnimationFrame(() => dndHandle?.focus());
         }}
         session={props.session}
         online={props.online}
@@ -1933,6 +2010,22 @@ function Nav(props: {
     if (e.shiftKey || modKey) return;
     props.setView({ kind: "list", id });
   };
+  // Enter on a keyboard-focused user list opens it. The Dnd listbox owns
+  // arrow-key navigation and updates navSelection's top key as the user
+  // moves; we just translate that into a setView. stopPropagation keeps the
+  // document-level onEnterExpand (App.tsx:1273) from also firing and
+  // expanding whatever's selected in the main list.
+  const onNavKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const top = navSelection.getSelectionTop();
+    if (top === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    props.setView({ kind: "list", id: String(top) });
+  };
   const selectedNavIds = (id: string): string[] =>
     navSelection.isSelected(id) ? navSelection.getSelectedKeys().map(String) : [id];
 
@@ -2031,7 +2124,7 @@ function Nav(props: {
   // same way a double-click on the label does.
   let startHomeRename: (() => void) | undefined;
   return (
-    <nav class="nav">
+    <nav class="nav" onKeyDown={onNavKeyDown}>
       <div class="nav-group">
         <ContextMenu>
           <ContextMenu.Trigger
@@ -2131,6 +2224,7 @@ function Nav(props: {
             getKey={(l) => l.id}
             itemHeight={navIsMobile() ? 40 : 28}
             multi
+            arrowNavigate={false}
             clearOnClickOutside
             selection={navSelection}
             onReorder={onReorder}

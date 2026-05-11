@@ -1,12 +1,13 @@
 // Shared IndexedDB schema for the web client.
 //
 // All persistent-at-rest browser state for airday lives in the
-// `airday-web` database. Two modules write to it:
+// `airday-web` database. Three modules write to it:
 //
 //   - `dekVault` (in `@airday/web`)  — `vault`         store: wrapped DEK
 //   - `IdbWalStorage` (here)         — `ops`           store: WAL rows
 //                                    — `snapshot_meta` store: snapshot pointer
-//                                    — `device`        store: device config
+//                                    — `device`        store: device identity + sync frontier
+//   - `prefs`    (in `@airday/web`)  — `prefs`         store: per-account UI preferences
 //
 // Splitting across multiple databases would mean racing
 // `onupgradeneeded` handlers any time we evolve either schema, and
@@ -16,12 +17,19 @@
 // declared once.
 
 const DB_NAME = "airday-web";
-const DB_VERSION = 3;
+// v5 = re-fire the v4 upgrade so any browser that opened the DB
+// between the version-bump edit and the prefs-branch edit (and is
+// therefore stuck at v4 *without* the prefs store) picks up the
+// missing store. The upgrade body is fully idempotent — each
+// `createObjectStore` is gated on `!contains(...)` — so re-running it
+// at v5 only creates what's missing.
+const DB_VERSION = 5;
 
 export const STORE_VAULT = "vault";
 export const STORE_OPS = "ops";
 export const STORE_SNAPSHOT_META = "snapshot_meta";
 export const STORE_DEVICE = "device";
+export const STORE_PREFS = "prefs";
 export const INDEX_OPS_BY_ACCOUNT_SEQ = "by_account_seq";
 
 let cached: Promise<IDBDatabase> | null = null;
@@ -51,10 +59,12 @@ function openOnce(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      // v1: vault. v2: ops + snapshot_meta. v3: device. Upgrades are
-      // additive and idempotent — newly-installed clients hit every
-      // block in one open; existing clients gain the missing stores
-      // without touching pre-existing rows.
+      // v1: vault. v2: ops + snapshot_meta. v3: device. v4: prefs
+      // (initial). v5: re-fire to repair v4 DBs created before the
+      // prefs upgrade branch existed.
+      // Upgrades are additive and idempotent — newly-installed
+      // clients hit every block in one open; existing clients gain
+      // the missing stores without touching pre-existing rows.
       if (!db.objectStoreNames.contains(STORE_VAULT)) {
         db.createObjectStore(STORE_VAULT);
       }
@@ -76,6 +86,12 @@ function openOnce(): Promise<IDBDatabase> {
         // Device config keyed per account so multi-account web (if it
         // ever lands) doesn't collide; matches the snapshot_meta shape.
         db.createObjectStore(STORE_DEVICE, { keyPath: "account_id" });
+      }
+      if (!db.objectStoreNames.contains(STORE_PREFS)) {
+        // UI preferences keyed per account, deliberately separate from
+        // `device` so view-change writes don't churn the sync-frontier
+        // row and vice versa.
+        db.createObjectStore(STORE_PREFS, { keyPath: "account_id" });
       }
     };
     req.onsuccess = () => resolve(req.result);

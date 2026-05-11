@@ -146,6 +146,7 @@ export class PrimaveraDnd extends HTMLElement {
       nudge: this.nudge,
       reorder: this.reorder,
       multi: this.multi,
+      arrowNavigate: true,
       clearOnClickOutside: this.clearOnClickOutside,
       fillHeight: this.fillHeight,
     };
