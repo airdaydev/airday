@@ -520,6 +520,14 @@ body {
   outline-offset: 1px;
 }
 
+[aria-selected="true"] input[type="checkbox"] {
+  border-color: #00000030;
+}
+
+[data-theme="dark"] [aria-selected="true"] input[type="checkbox"] {
+  border-color: #ffffff30;
+}
+
 .row-body {
   flex: 1;
   min-width: 0;
