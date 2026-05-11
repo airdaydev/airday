@@ -36,13 +36,14 @@ There is no separate persisted `status` field. Visibility is derived from the ti
 | `id` | string | uuid v7 hex; stable, used in `Item.list_id` |
 | `name` | string | display name |
 | `created_at` | i64 | unix millis |
-| `show_count_nav` | bool? | when true, clients render the live-item count next to the list in the nav. Absent ≡ false; default for new lists is hidden. Per-list, synced across devices. The reserved `main` (Home) list will get an equivalent toggle via a future doc-level workspace settings map (it isn't stored in `lists`).
+
+Whether the nav shows a live-item count beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Queue's count is always shown regardless.
 
 ## Built-in lists
 
 Airday has one reserved primary capture list:
 
-- `main` — rendered as "Home". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable. Doc-level settings for it live in `settings`.
+- `main` — rendered as "Queue". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable. Doc-level settings for it live in `settings`.
 
 The bin is *not* a list; it's the `Binned` status on items.
 
@@ -52,8 +53,8 @@ Doc-level synced settings that are not owned by any specific `ListMeta`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `main_show_count_nav` | bool? | when true, clients render the live-item count next to the reserved `main` (Home) list in the nav. Absent ≡ false. Stored in `settings` because `main` has no `ListMeta` row. |
-| `main_name` | string? | user-chosen display-name override for the reserved `main` (Home) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. |
+| `show_list_counts` | bool? | when true, clients render each non-Queue list's live-item count in the nav (subject to a `count > 0` gate). Queue's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
+| `main_name` | string? | user-chosen display-name override for the reserved `main` (Queue) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. |
 
 ## Mutations (rust core API surface)
 
@@ -65,9 +66,8 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `edit_item_text(item_id, text)`
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
-- `set_list_show_count_nav(list_id, show)` — toggles the per-list nav-count visibility flag. Refuses for `main` (no `ListMeta` row).
-- `set_main_show_count_nav(show)` — toggles the reserved `main` (Home) list's nav-count visibility flag in the doc-level `settings` map.
-- `set_main_name(name)` — sets or clears the reserved `main` (Home) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
+- `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Queue lists" flag. Queue's count is always visible (subject to count > 0) and is not gated by this.
+- `set_main_name(name)` — sets or clears the reserved `main` (Queue) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
 - `delete_list(list_id)` — refuses for `main`; items in the deleted list are reassigned to `main`.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.

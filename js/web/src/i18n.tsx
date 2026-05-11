@@ -62,8 +62,8 @@ type Messages = {
     bin: string;
     deleteList: string;
     renameList: string;
-    showCount: string;
-    hideCount: string;
+    showListCounts: string;
+    hideListCounts: string;
     newList: string;
     connected: string;
     disconnected: string;
@@ -154,13 +154,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "el servidor no devolvió una credencial de dispositivo",
     },
     nav: {
-      home: "Inicio",
+      home: "Cola",
       done: "Hecho",
       bin: "Papelera",
       deleteList: "Eliminar",
       renameList: "Renombrar",
-      showCount: "Mostrar contador",
-      hideCount: "Ocultar contador",
+      showListCounts: "Mostrar contadores",
+      hideListCounts: "Ocultar contadores",
       newList: "+ Nueva lista",
       connected: "Conectado",
       disconnected: "Desconectado",
@@ -251,13 +251,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "server did not return a device credential",
     },
     nav: {
-      home: "Home",
+      home: "Queue",
       done: "Done",
       bin: "Bin",
       deleteList: "Delete",
       renameList: "Rename",
-      showCount: "Show count",
-      hideCount: "Hide count",
+      showListCounts: "Show list counts",
+      hideListCounts: "Hide list counts",
       newList: "+ New list",
       connected: "Connected",
       disconnected: "Disconnected",

@@ -129,7 +129,7 @@ async fn export_json_writes_semantic_account_dump() {
     let value: serde_json::Value = serde_json::from_slice(&std::fs::read(out).unwrap()).unwrap();
     assert_eq!(value["version"], 1);
     assert_eq!(value["lists"][0]["id"], LIST_MAIN);
-    assert_eq!(value["lists"][0]["name"], "Home");
+    assert_eq!(value["lists"][0]["name"], "Queue");
     assert_eq!(value["items"][0]["id"], item_id);
     assert_eq!(value["items"][0]["notes"], "whole milk");
 }

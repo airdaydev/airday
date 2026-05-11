@@ -71,12 +71,6 @@ pub enum AppEvent {
         id: String,
         name: String,
         created_at: i64,
-        /// Whether the client should render this list's live-item count
-        /// in the nav. Per-list, synced across devices. Defaults to false
-        /// — the field is absent on disk for lists that have never had
-        /// the toggle flipped (and for any list created before this
-        /// flag existed).
-        show_count_nav: bool,
         index: usize,
     },
     ListRemoved {
@@ -90,20 +84,18 @@ pub enum AppEvent {
         id: String,
         name: String,
     },
-    /// Per-list nav-count visibility toggled. Independent of name/order
-    /// changes — emitted only when the boolean transitions.
-    ListShowCountNavChanged {
-        id: String,
-        show_count_nav: bool,
-    },
 
     // ---------- workspace settings ----------
     /// Doc-level synced settings changed. The payload carries the
     /// current known value for each surfaced field so consumers can
     /// mirror a small settings object with a single write.
     SettingsChanged {
-        main_show_count_nav: bool,
-        /// `None` when the user hasn't overridden Home's display name;
+        /// When true, clients render each non-Queue list's live-item
+        /// count in the nav (subject to the count > 0 gate). Queue
+        /// always shows its count regardless. Single global flag —
+        /// there is no per-list override.
+        show_list_counts: bool,
+        /// `None` when the user hasn't overridden Queue's display name;
         /// clients should fall back to the localized built-in label.
         main_name: Option<String>,
     },

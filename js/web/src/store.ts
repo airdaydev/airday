@@ -35,10 +35,6 @@ export interface ListView {
   id: string;
   name: string;
   createdAt: number;
-  /** When true, the nav renders this list's live-item count beside its
-   *  name. Default false; toggled per-list from the nav context menu.
-   *  Synced across devices. */
-  showCountNav: boolean;
 }
 
 export interface WorkspaceState {
@@ -52,11 +48,12 @@ export interface WorkspaceState {
 }
 
 export interface SettingsView {
-  /** When true, the nav renders the live-item count beside the
-   *  reserved `main` (Home) list. Default false; synced across
-   *  devices via the doc-level settings map. */
-  mainShowCountNav: boolean;
-  /** User-chosen display-name override for the reserved `main` (Home)
+  /** When true, the nav renders the live-item count beside each
+   *  non-Queue list (subject to the count > 0 gate). Queue's count is
+   *  always shown regardless. Single global flag; default false. Synced
+   *  via the doc-level settings map. */
+  showListCounts: boolean;
+  /** User-chosen display-name override for the reserved `main` (Queue)
    *  list. `null` when no override is set — clients fall back to the
    *  localized built-in label. Synced via the doc-level settings map. */
   mainName: string | null;
@@ -113,13 +110,12 @@ export interface DocApp {
   renameList(id: string, name: string): void;
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
-  /** Toggle the nav-count badge for `id`. Refused for the reserved
-   *  `main` (Home) list — that one has its own doc-level settings
-   *  toggle. */
-  setListShowCountNav(id: string, show: boolean): void;
-  setMainShowCountNav(show: boolean): void;
+  /** Toggle the global "show counts on non-Queue lists" setting.
+   *  Queue's own count is always visible (subject to count > 0) and is
+   *  not gated by this flag. */
+  setShowListCounts(show: boolean): void;
   /** Set or clear the user-chosen display name for the reserved
-   *  `main` (Home) list. Passing `""` clears the override. */
+   *  `main` (Queue) list. Passing `""` clears the override. */
   setMainName(name: string): void;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
@@ -146,14 +142,14 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
   const listsOrder: string[] = [];
   const listsById: Record<string, ListView> = {};
   const settings: SettingsView = {
-    mainShowCountNav: false,
+    showListCounts: false,
     mainName: null,
   };
 
   for (const ev of events) {
     switch (ev.kind) {
       case "settingsChanged": {
-        settings.mainShowCountNav = ev.mainShowCountNav ?? false;
+        settings.showListCounts = ev.showListCounts ?? false;
         settings.mainName = ev.mainName ?? null;
         break;
       }
@@ -175,7 +171,6 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
           id: ev.id,
           name: ev.name ?? "",
           createdAt: Number(ev.createdAt ?? 0),
-          showCountNav: ev.showCountNav ?? false,
         };
         listsOrder.push(ev.id);
         break;
@@ -208,7 +203,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     listsOrder: [],
     listsById: {},
     settings: {
-      mainShowCountNav: false,
+      showListCounts: false,
       mainName: null,
     },
   });
@@ -301,7 +296,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           id: ev.id,
           name: ev.name ?? "",
           createdAt: Number(ev.createdAt ?? 0),
-          showCountNav: ev.showCountNav ?? false,
         });
         const targetIndex = ev.index ?? state.listsOrder.length;
         setState(
@@ -344,23 +338,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         }
         break;
       }
-      case "listShowCountNavChanged": {
-        if (state.listsById[ev.id]) {
-          setState(
-            "listsById",
-            ev.id,
-            "showCountNav",
-            ev.showCountNav ?? false,
-          );
-        }
-        break;
-      }
       case "settingsChanged": {
         // Mirror the whole event payload — settings are tiny and the
         // wire format always sends the full known shape, so a single
         // setState keeps the store in lockstep with the doc.
         setState("settings", {
-          mainShowCountNav: ev.mainShowCountNav ?? false,
+          showListCounts: ev.showListCounts ?? false,
           mainName: ev.mainName ?? null,
         });
         break;
@@ -508,11 +491,8 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     deleteList(id) {
       mutate(() => engine.deleteList(id));
     },
-    setListShowCountNav(id, show) {
-      mutate(() => engine.setListShowCountNav(id, show));
-    },
-    setMainShowCountNav(show) {
-      mutate(() => engine.setMainShowCountNav(show));
+    setShowListCounts(show) {
+      mutate(() => engine.setShowListCounts(show));
     },
     setMainName(name) {
       mutate(() => engine.setMainName(name));

@@ -185,16 +185,9 @@ impl Doc {
         self.inner.delete_list(list_id).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setListShowCountNav)]
-    pub fn set_list_show_count_nav(&self, list_id: &str, show: bool) -> Result<(), JsError> {
-        self.inner
-            .set_list_show_count_nav(list_id, show)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setMainShowCountNav)]
-    pub fn set_main_show_count_nav(&self, show: bool) -> Result<(), JsError> {
-        self.inner.set_main_show_count_nav(show).map_err(js_err)
+    #[wasm_bindgen(js_name = setShowListCounts)]
+    pub fn set_show_list_counts(&self, show: bool) -> Result<(), JsError> {
+        self.inner.set_show_list_counts(show).map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = setMainName)]
@@ -879,20 +872,9 @@ impl SyncEngine {
         self.inner.doc().delete_list(list_id).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setListShowCountNav)]
-    pub fn set_list_show_count_nav(&self, list_id: &str, show: bool) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .set_list_show_count_nav(list_id, show)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setMainShowCountNav)]
-    pub fn set_main_show_count_nav(&self, show: bool) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .set_main_show_count_nav(show)
-            .map_err(js_err)
+    #[wasm_bindgen(js_name = setShowListCounts)]
+    pub fn set_show_list_counts(&self, show: bool) -> Result<(), JsError> {
+        self.inner.doc().set_show_list_counts(show).map_err(js_err)
     }
 
     #[wasm_bindgen(js_name = setMainName)]
@@ -1059,12 +1041,11 @@ impl From<CoreEvent> for EngineEvent {
 /// - `itemNotesChanged` — id, notes
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?
 /// - `itemListChanged` — id, listId
-/// - `listAdded` — id, name, createdAt, showCountNav, index
+/// - `listAdded` — id, name, createdAt, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
-/// - `listShowCountNavChanged` — id, showCountNav
-/// - `settingsChanged` — mainShowCountNav, mainName?
+/// - `settingsChanged` — showListCounts, mainName?
 #[wasm_bindgen]
 pub struct AppEventJs {
     kind: &'static str,
@@ -1076,9 +1057,8 @@ pub struct AppEventJs {
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
-    show_count_nav: Option<bool>,
-    main_show_count_nav: Option<bool>,
-    /// Settings: `Some(name)` when the user has overridden Home's
+    show_list_counts: Option<bool>,
+    /// Settings: `Some(name)` when the user has overridden Queue's
     /// label; `None` (or absent on non-`settingsChanged` events) means
     /// fall back to the localized built-in label.
     main_name: Option<String>,
@@ -1127,13 +1107,9 @@ impl AppEventJs {
     pub fn index(&self) -> Option<usize> {
         self.index
     }
-    #[wasm_bindgen(getter, js_name = showCountNav)]
-    pub fn show_count_nav(&self) -> Option<bool> {
-        self.show_count_nav
-    }
-    #[wasm_bindgen(getter, js_name = mainShowCountNav)]
-    pub fn main_show_count_nav(&self) -> Option<bool> {
-        self.main_show_count_nav
+    #[wasm_bindgen(getter, js_name = showListCounts)]
+    pub fn show_list_counts(&self) -> Option<bool> {
+        self.show_list_counts
     }
     #[wasm_bindgen(getter, js_name = mainName)]
     pub fn main_name(&self) -> Option<String> {
@@ -1153,8 +1129,7 @@ impl From<CoreAppEvent> for AppEventJs {
             created_at: None,
             done_at: None,
             binned_at: None,
-            show_count_nav: None,
-            main_show_count_nav: None,
+            show_list_counts: None,
             main_name: None,
             index: None,
         };
@@ -1224,14 +1199,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 name,
                 created_at,
-                show_count_nav,
                 index,
             } => AppEventJs {
                 kind: "listAdded",
                 id,
                 name: Some(name),
                 created_at: Some(created_at),
-                show_count_nav: Some(show_count_nav),
                 index: Some(index),
                 ..blank
             },
@@ -1252,18 +1225,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 name: Some(name),
                 ..blank
             },
-            CoreAppEvent::ListShowCountNavChanged { id, show_count_nav } => AppEventJs {
-                kind: "listShowCountNavChanged",
-                id,
-                show_count_nav: Some(show_count_nav),
-                ..blank
-            },
             CoreAppEvent::SettingsChanged {
-                main_show_count_nav,
+                show_list_counts,
                 main_name,
             } => AppEventJs {
                 kind: "settingsChanged",
-                main_show_count_nav: Some(main_show_count_nav),
+                show_list_counts: Some(show_list_counts),
                 main_name,
                 ..blank
             },
@@ -1275,16 +1242,15 @@ impl From<CoreAppEvent> for AppEventJs {
 
 fn list_to_json(l: &airday_core::ListView) -> String {
     format!(
-        "{{\"id\":{},\"name\":{},\"createdAt\":{},\"showCountNav\":{}}}",
+        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
         json_string(&l.id),
         json_string(&l.name),
         l.created_at,
-        l.show_count_nav,
     )
 }
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
-    let mut out = format!("{{\"mainShowCountNav\":{}", s.main_show_count_nav);
+    let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(n) = &s.main_name {
         out.push_str(",\"mainName\":");
         out.push_str(&json_string(n));

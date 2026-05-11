@@ -898,9 +898,8 @@ function Workspace(props: {
   // Per-list live-item counts for the nav badge. Single pass over the
   // global items array so adding lists doesn't multiply the work; the
   // memo invalidates whenever any item moves/changes status, which is
-  // the same trigger as `items()`. Lists with the toggle off still
-  // appear in the map — the Nav row reads `showCountNav` to decide
-  // whether to render the badge.
+  // the same trigger as `items()`. Queue's count always renders;
+  // non-Queue lists are gated by the doc-level `showListCounts` flag.
   const liveCountsByList = createMemo((): Record<string, number> => {
     const counts: Record<string, number> = {};
     for (const id of state.itemsOrder) {
@@ -1474,7 +1473,7 @@ function Workspace(props: {
         binCount={binCount()}
         liveCountsByList={liveCountsByList()}
         homeName={homeName()}
-        mainShowCountNav={state.settings.mainShowCountNav}
+        showListCounts={state.settings.showListCounts}
         view={view()}
         setView={(v) => {
           setView(v);
@@ -1862,19 +1861,19 @@ function viewTitle(
 
 function Nav(props: {
   app: DocApp;
-  lists: { id: string; name: string; showCountNav: boolean }[];
+  lists: { id: string; name: string }[];
   binCount: number;
-  /** Live-item count per list id. Lists without a count entry have
-   *  zero; the nav row still consults `showCountNav` to decide
-   *  whether to render the badge at all. */
+  /** Live-item count per list id. Queue's row always renders a badge
+   *  (showing "-" when zero); non-Queue rows render theirs only when
+   *  `showListCounts` is true, again with "-" for zero. */
   liveCountsByList: Record<string, number>;
-  /** Resolved Home label — user override from doc-level settings if
+  /** Resolved Queue label — user override from doc-level settings if
    *  present, otherwise the localized built-in label. */
   homeName: string;
   /** Doc-level settings flag; when true, render the live-item count
-   *  beside Home in the nav (subject to the > 0 gate the rest of the
-   *  list rows use). */
-  mainShowCountNav: boolean;
+   *  badge beside each non-Queue list in the nav (showing "-" when the
+   *  list is empty). Queue's badge is always shown regardless. */
+  showListCounts: boolean;
   view: ViewKey;
   setView: (v: ViewKey) => void;
   session: Session;
@@ -1908,7 +1907,7 @@ function Nav(props: {
   // `main` is a reserved id with no MovableList entry — clients
   // render it as a static nav button, so the dnd source is just
   // `props.lists` directly.
-  type NavList = { id: string; name: string; showCountNav: boolean };
+  type NavList = { id: string; name: string };
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
   createEffect(() => setDndLists(props.lists));
 
@@ -2046,16 +2045,11 @@ function Nav(props: {
               onSave={(name) => props.app.setMainName(name)}
               registerStart={(fn) => (startHomeRename = fn)}
             />
-            <Show
-              when={
-                props.mainShowCountNav &&
-                (props.liveCountsByList["main"] ?? 0) > 0
-              }
-            >
-              <span class="nav-item-count">
-                {props.liveCountsByList["main"]}
-              </span>
-            </Show>
+            <span class="nav-item-count">
+              {(props.liveCountsByList["main"] ?? 0) > 0
+                ? props.liveCountsByList["main"]
+                : "-"}
+            </span>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="context-menu-content">
@@ -2073,12 +2067,12 @@ function Nav(props: {
               <ContextMenu.Item
                 class="context-menu-item"
                 onSelect={() => {
-                  props.app.setMainShowCountNav(!props.mainShowCountNav);
+                  props.app.setShowListCounts(!props.showListCounts);
                 }}
               >
-                {props.mainShowCountNav
-                  ? m().nav.hideCount
-                  : m().nav.showCount}
+                {props.showListCounts
+                  ? m().nav.hideListCounts
+                  : m().nav.showListCounts}
               </ContextMenu.Item>
             </ContextMenu.Content>
           </ContextMenu.Portal>
@@ -2143,15 +2137,8 @@ function Nav(props: {
               let startRename: (() => void) | undefined;
               const selectedIds = (): string[] => selectedNavIds(l().id);
               const isMultiMenu = (): boolean => selectedIds().length > 1;
-              const shouldShowCount = (): boolean =>
-                selectedIds().some(
-                  (id) => props.lists.find((list) => list.id === id)?.showCountNav !== true,
-                );
-              const applyShowCount = (): void => {
-                const show = shouldShowCount();
-                for (const id of selectedIds()) {
-                  props.app.setListShowCountNav(id, show);
-                }
+              const toggleShowListCounts = (): void => {
+                props.app.setShowListCounts(!props.showListCounts);
               };
               return (
                 <ContextMenu
@@ -2178,14 +2165,11 @@ function Nav(props: {
                       onSave={(name) => props.app.renameList(l().id, name)}
                       registerStart={(fn) => (startRename = fn)}
                     />
-                    <Show
-                      when={
-                        l().showCountNav &&
-                        (props.liveCountsByList[l().id] ?? 0) > 0
-                      }
-                    >
+                    <Show when={props.showListCounts}>
                       <span class="nav-item-count">
-                        {props.liveCountsByList[l().id]}
+                        {(props.liveCountsByList[l().id] ?? 0) > 0
+                          ? props.liveCountsByList[l().id]
+                          : "-"}
                       </span>
                     </Show>
                   </ContextMenu.Trigger>
@@ -2196,11 +2180,11 @@ function Nav(props: {
                         fallback={
                           <ContextMenu.Item
                             class="context-menu-item"
-                            onSelect={applyShowCount}
+                            onSelect={toggleShowListCounts}
                           >
-                            {shouldShowCount()
-                              ? m().nav.showCount
-                              : m().nav.hideCount}
+                            {props.showListCounts
+                              ? m().nav.hideListCounts
+                              : m().nav.showListCounts}
                           </ContextMenu.Item>
                         }
                       >
@@ -2218,11 +2202,11 @@ function Nav(props: {
                         </ContextMenu.Item>
                         <ContextMenu.Item
                           class="context-menu-item"
-                          onSelect={applyShowCount}
+                          onSelect={toggleShowListCounts}
                         >
-                          {shouldShowCount()
-                            ? m().nav.showCount
-                            : m().nav.hideCount}
+                          {props.showListCounts
+                            ? m().nav.hideListCounts
+                            : m().nav.showListCounts}
                         </ContextMenu.Item>
                         <ContextMenu.Item
                           class="context-menu-item"
