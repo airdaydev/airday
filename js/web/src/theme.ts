@@ -1,8 +1,7 @@
 // Theme preference manager. Stores "auto" | "light" | "dark" in a
 // cookie so the inline pre-render script in index.html can pick it up
 // before Solid mounts (no FOUC). Single-origin cookie — airday's
-// bundle is served from the API origin (see memory), so we don't need
-// the cross-subdomain `domain=` dance cooee's version does.
+// bundle is served from the API origin
 
 export type ThemePreference = "auto" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";

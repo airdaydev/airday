@@ -5,10 +5,6 @@ Single-VPS, Debian 13 + systemd + Caddy. One Rust binary
 the same hostname so SameSite=Strict cookies work end-to-end (see
 `memory: bundle origin = API origin`).
 
-Modeled on `cooee/infra/deploy` — same `/opt/<app>/{source,releases,
-current,cargo-target}` layout, same template-rendered config flow, just
-trimmed: no postgres, no SaaS, no SSR, no wildcard DNS challenge.
-
 ## Layout on the box
 
 ```

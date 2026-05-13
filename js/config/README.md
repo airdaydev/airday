@@ -1,7 +1,6 @@
 # Config generation
 
-Renders Airday's runtime config files from templates in `templates/`. Mirrors
-the `cooee/js/config` pattern. Two profiles: `dev` (local artifacts under
+Renders Airday's runtime config files from templates in `templates/`. Two profiles: `dev` (local artifacts under
 `local/`) and `deploy` (renders to `deploy/rendered/` on the production box —
 see `deploy/README.md`).
 
@@ -35,7 +34,7 @@ The whole `local/` and `deploy/rendered/` dirs are gitignored.
 
 ## Template syntax
 
-A small built-in renderer supports the consul-template subset that cooee uses:
+A small built-in renderer supporting consul-template subset:
 
 - `{{ env "KEY" }}` — substitute, empty string if missing
 - `{{ mustEnv "KEY" }}` — substitute, throw if missing
@@ -55,5 +54,4 @@ just speaks the same syntax so templates stay portable.
 Add a new entry under `profiles` in `gen-config.ts`, write a `buildXEnv`
 that validates the required keys via `mustEnv`, and add `.tpl` files that
 render to the artifact paths for that profile. The existing `deploy`
-profile is the worked example; `cooee/js/config/gen-config.ts` is a
-larger reference.
+profile is the worked example.
