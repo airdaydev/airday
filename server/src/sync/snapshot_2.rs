@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use uuid::Uuid;
@@ -7,25 +8,27 @@ use uuid::Uuid;
 // Timeout after 5 minutes
 const SNAPSHOT_THRESHOLD_OPS: u64 = 10_000;
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const SNAPSHOT_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 
-pub struct ActiveLease {
-    lease_id: u64, // increasing by 1?
+struct ActiveLease {
+    lease_id: u64,
     device_id: Uuid,
     request_up_to_op_id: u64,
     expires_at: Instant,
 }
 
-pub enum LeaseState {
+enum LeaseState {
     Idle { cooldown_until: Option<Instant> },
     Active(ActiveLease),
 }
 
+#[derive(Clone)]
 pub struct SnapshotCoordinator2 {
     timeout: Duration,  // Maximum time to allow device to return a snapshot
     cooldown: Duration, // Time between snapshot attempts
     threshold_ops: u64,
-    leases: Mutex<HashMap<Uuid, LeaseState>>,
-    next_lease_id: AtomicU64,
+    leases: Arc<Mutex<HashMap<Uuid, LeaseState>>>,
+    next_lease_id: Arc<AtomicU64>,
 }
 
 pub enum Decision {
@@ -41,10 +44,10 @@ impl SnapshotCoordinator2 {
     pub fn new() -> Self {
         Self {
             timeout: SNAPSHOT_TIMEOUT,
-            cooldown: SNAPSHOT_TIMEOUT,
+            cooldown: SNAPSHOT_COOLDOWN,
             threshold_ops: SNAPSHOT_THRESHOLD_OPS,
-            leases: Mutex::new(HashMap::new()),
-            next_lease_id: AtomicU64::new(1),
+            leases: Arc::new(Mutex::new(HashMap::new())),
+            next_lease_id: Arc::new(AtomicU64::new(1)),
         }
     }
     pub fn evaluate(
@@ -80,7 +83,7 @@ impl SnapshotCoordinator2 {
         if expired {
             // Prevent attempt for 5 minutes
             *lease_state = LeaseState::Idle {
-                cooldown_until: Some(now + self.timeout),
+                cooldown_until: Some(now + self.cooldown),
             };
             return Decision::Skip;
         }
@@ -114,9 +117,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ensure_snapshot_attempt_when_threshold_exceeded() {
-        let coordinator = SnapshotCoordinator2::new();
-        coordinator.evaluate(Uuid::new())
+    fn issues_when_threshold_exceeded_and_caught_up() {
+        let coord = SnapshotCoordinator2::new();
+        let account = Uuid::now_v7();
+        let device = Uuid::now_v7();
+        let now = Instant::now();
+
+        let decision = coord.evaluate(account, 0, 12_000, 12_000, device, now);
+
+        assert!(matches!(
+            decision,
+            Decision::Issue {
+                up_to_op_id: 12_000,
+                ..
+            }
+        ));
     }
 
     // TODO: Race these
