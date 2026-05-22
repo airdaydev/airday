@@ -24,3 +24,6 @@ deploy/rendered/
 
 # wasm-pack output for js/core (built via `bun run build:wasm`)
 js/core/wasm/
+
+# vim
+*.swp
