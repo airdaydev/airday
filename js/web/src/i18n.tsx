@@ -271,7 +271,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       exportFailed: "Could not export backup",
     },
     workspace: {
-      emptyBin: "Empty bin",
+      emptyBin: "Empty",
       emptyBinConfirm: "Permanently empty the bin?",
       createWithSpace: "Press Space to create a new item",
       emptyState: "Nothing here yet.",
