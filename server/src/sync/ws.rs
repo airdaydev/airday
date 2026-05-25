@@ -5,6 +5,8 @@
 //! HTTP routes — token validation runs *before* the upgrade response
 //! goes out, so an unauthorized client never gets a socket.
 //!
+use std::time::Instant;
+
 use airday_protocol::{
     ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, ServerFrame, StoredOp,
     PROTOCOL_VERSION,
@@ -25,6 +27,7 @@ use crate::auth::DeviceAuth;
 use crate::error::ApiError;
 use crate::http::request_id::RequestId;
 use crate::state::AppState;
+use crate::sync::snapshot::{Decision, ReleaseResult};
 
 use super::queries;
 
@@ -173,7 +176,7 @@ async fn run_session(
 
     let sub_id = sub.sub_id();
 
-    let ws_session = WSSession {
+    let mut ws_session = WSSession {
         auth,
         sub_id,
         snapshot_lease: None,
@@ -183,7 +186,7 @@ async fn run_session(
         tokio::select! {
             client_frame = recv_msgpack::<ClientFrame>(&mut socket) => {
                 match client_frame {
-                    Ok(frame) => handle_frame(&mut socket, &state, &ws_session, frame).await?,
+                    Ok(frame) => handle_frame(&mut socket, &state, &mut ws_session, frame).await?,
                     Err(SessionError::Closed) => break Ok(()),
                     Err(e) => break Err(e),
                 }
@@ -210,7 +213,7 @@ async fn run_session(
 async fn handle_frame(
     socket: &mut WebSocket,
     state: &AppState,
-    ws_session: &WSSession,
+    ws_session: &mut WSSession,
     frame: ClientFrame,
 ) -> Result<(), SessionError> {
     match frame {
@@ -226,16 +229,12 @@ async fn handle_frame(
                 last_acked_op_id,
             )
             .await?;
-            state
-                .snapshot_coordinator
-                .on_candidate_progress(state.clone(), ws_session.auth.account_id)
-                .await;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
         ClientFrame::PullSnapshot => pull_snapshot(socket, state, &ws_session.auth).await,
         ClientFrame::PushSnapshot { up_to_op_id, blob } => {
-            push_snapshot(state, &ws_session.auth, up_to_op_id, blob).await
+            push_snapshot(state, ws_session, up_to_op_id, blob).await
         }
     }
 }
@@ -288,10 +287,20 @@ async fn push_ops(
         );
 
         if let Some(latest_op_id) = assigned_ids.last().copied() {
-            state
-                .snapshot_coordinator
-                .on_ops_appended(state.clone(), ws_session.auth.account_id, latest_op_id)
-                .await;
+            let decision = state.snapshot_coordinator_2.evaluate(
+                ws_session.auth.account_id,
+                0, // TODO: Where we get this from?
+                0, // TODO: Where we get this from?
+                latest_op_id,
+                Instant::now(),
+            );
+            if let Decision::Issue {
+                lease_id,
+                up_to_op_id,
+            } = decision
+            {
+                // TODO: Push snapshot req message out
+            };
         }
 
         send_msgpack(socket, &ServerFrame::OpsAck { assigned_ids }).await
@@ -365,7 +374,7 @@ async fn pull_ops(
 
 async fn push_snapshot(
     state: &AppState,
-    auth: &DeviceAuth,
+    ws_session: &mut WSSession,
     up_to_op_id: u64,
     blob: EncryptedBlob,
 ) -> Result<(), SessionError> {
@@ -375,20 +384,22 @@ async fn push_snapshot(
         blob_bytes = blob.ciphertext.len(),
     );
     async {
-        if !state.snapshot_coordinator.permits_snapshot(
-            auth.account_id,
-            auth.device_id,
-            up_to_op_id,
-        ) {
+        let Some(snapshot_lease) = ws_session.snapshot_lease else {
+            tracing::warn!("no snapshot lease found");
+            return Ok(());
+        };
+        let result = state
+            .snapshot_coordinator_2
+            .release(ws_session.auth.account_id, snapshot_lease);
+        if let ReleaseResult::Stale = result {
             tracing::warn!("ignoring unsolicited or stale PushSnapshot");
             return Ok(());
         }
+        ws_session.snapshot_lease = None;
+        // TODO: While this is inserting, an entire other snapshot could feasibly go through..
         let row_id =
-            queries::insert_snapshot(&state.db, auth.account_id, up_to_op_id, blob).await?;
-        state
-            .snapshot_coordinator
-            .on_snapshot_persisted(state.clone(), auth.account_id, auth.device_id, up_to_op_id)
-            .await;
+            queries::insert_snapshot(&state.db, ws_session.auth.account_id, up_to_op_id, blob)
+                .await?;
         tracing::info!(snapshot_row_id = row_id, "ws push_snapshot persisted");
         // Fire-and-forget per spec — no `OpsAck`-style reply. The
         // orchestrator (when wired) tracks completion via the row

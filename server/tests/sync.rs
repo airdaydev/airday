@@ -26,7 +26,6 @@ use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
 
 const MSGPACK: &str = "application/msgpack";
-const TEST_SNAPSHOT_THRESHOLD_OPS: u64 = 10;
 
 fn weak_params() -> KdfParams {
     KdfParams {
@@ -41,38 +40,6 @@ struct TestServer {
     ws_base: String,
     state: AppState,
     handle: tokio::task::JoinHandle<()>,
-}
-
-impl TestServer {
-    async fn start() -> Self {
-        Self::start_with_snapshot_settings(Duration::from_secs(5 * 60), TEST_SNAPSHOT_THRESHOLD_OPS)
-            .await
-    }
-
-    async fn start_with_snapshot_timeout(timeout: Duration) -> Self {
-        Self::start_with_snapshot_settings(timeout, TEST_SNAPSHOT_THRESHOLD_OPS).await
-    }
-
-    async fn start_with_snapshot_settings(timeout: Duration, threshold_ops: u64) -> Self {
-        let state = AppState::open_in_memory()
-            .await
-            .unwrap()
-            .with_snapshot_settings(timeout, threshold_ops);
-        let app = router(state.clone());
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let base = format!("http://{}", addr);
-        let ws_base = format!("ws://{}", addr);
-        let handle = tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
-        });
-        Self {
-            base,
-            ws_base,
-            state,
-            handle,
-        }
-    }
 }
 
 impl Drop for TestServer {
@@ -786,38 +753,6 @@ async fn recv_ops_ack(ws: &mut WsStream) -> Vec<u64> {
             ServerFrame::OpsBroadcast { .. } => continue,
             other => panic!("expected OpsAck, got {other:?}"),
         }
-    }
-}
-
-async fn wait_for_snapshot_assignee(
-    state: &AppState,
-    account_id: Uuid,
-    expected_device_id: Uuid,
-    rejected_device_id: Uuid,
-    up_to_op_id: u64,
-) {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    loop {
-        let expected_allowed = state.snapshot_coordinator.permits_snapshot(
-            account_id,
-            expected_device_id,
-            up_to_op_id,
-        );
-        let rejected_allowed = rejected_device_id != Uuid::nil()
-            && state.snapshot_coordinator.permits_snapshot(
-                account_id,
-                rejected_device_id,
-                up_to_op_id,
-            );
-        if expected_allowed && !rejected_allowed {
-            return;
-        }
-        if std::time::Instant::now() > deadline {
-            panic!(
-                "snapshot assignee did not switch to {expected_device_id} (expected_allowed={expected_allowed}, rejected_allowed={rejected_allowed})"
-            );
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
 }
 
