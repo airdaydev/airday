@@ -498,6 +498,32 @@ async fn push_snapshot(
         )
         .await?;
         tracing::info!(snapshot_row_id = row_id, "ws push_snapshot persisted");
+
+        // Opportunistic compaction: a snapshot just landed, so the
+        // floor moved (or stayed put, in which case the delete is a
+        // no-op). Spawned so the WS task keeps reading frames; the
+        // compaction itself is one tx, so a second snapshot landing
+        // before this runs just shifts the floor we'll read.
+        let db = state.db.clone();
+        let account_id = ws_session.auth.account_id;
+        let compact_span = tracing::info_span!(
+            "ws.push_snapshot.compact",
+            account_id = %account_id,
+        );
+        tokio::spawn(
+            async move {
+                match queries::compact_account(&db, account_id, queries::KEEP_SNAPSHOTS).await {
+                    Ok(stats) => tracing::info!(
+                        ops_deleted = stats.ops_deleted,
+                        snapshots_deleted = stats.snapshots_deleted,
+                        "compaction completed"
+                    ),
+                    Err(e) => tracing::warn!(error = %e, "compaction failed"),
+                }
+            }
+            .instrument(compact_span),
+        );
+
         // Fire-and-forget per spec — no `OpsAck`-style reply. The
         // orchestrator (when wired) tracks completion via the row
         // landing in the snapshots table, not via a wire ack.

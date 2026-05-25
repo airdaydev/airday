@@ -570,6 +570,129 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
+    // Insert 10 ops + a snapshot pinning shallow_start at 6 (so ids
+    // 1..=6 are below the floor, 7..=10 are above). Run compaction:
+    // ops below should be gone, ops above intact. Then insert two more
+    // snapshots; with KEEP=2, only the newest two should survive.
+    let acc = signup_account().await;
+    let db = &acc.server.state.db;
+    let blobs: Vec<EncryptedBlob> = (0..10).map(fake_blob).collect();
+    let ids = queries::insert_ops(db, acc.account_id, blobs).await.unwrap();
+    assert_eq!(ids, (1..=10).collect::<Vec<_>>());
+
+    let snap1 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA1))
+        .await
+        .unwrap();
+
+    let stats = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+        .await
+        .unwrap();
+    assert_eq!(stats.ops_deleted, 6);
+    assert_eq!(stats.snapshots_deleted, 0);
+
+    // Surviving ops are exactly 7..=10.
+    let batch = queries::fetch_ops_batch(db, acc.account_id, 0).await.unwrap();
+    let surviving_ids: Vec<u64> = batch.ops.iter().map(|o| o.id).collect();
+    assert_eq!(surviving_ids, vec![7, 8, 9, 10]);
+
+    // Idempotent — second run finds no new floor movement.
+    let stats2 = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+        .await
+        .unwrap();
+    assert_eq!(stats2.ops_deleted, 0);
+    assert_eq!(stats2.snapshots_deleted, 0);
+
+    // Pile on two more snapshots — KEEP=2 leaves only the latest pair.
+    let _snap2 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA2))
+        .await
+        .unwrap();
+    let snap3 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA3))
+        .await
+        .unwrap();
+    let stats3 = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+        .await
+        .unwrap();
+    assert_eq!(stats3.snapshots_deleted, 1, "snap1 should be pruned");
+    assert!(snap1 < snap3);
+
+    // Bootstrap path still works: a fresh device pulling from 0 gets
+    // SnapshotRequired (its cursor is below the compaction floor),
+    // not an OpsBatch with holes.
+    let fresh_device = register_second_device(&acc, "device-fresh").await;
+    let mut ws = connect_ws(&acc.server, &fresh_device.device_token).await;
+    handshake(&mut ws).await;
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_op_id: 0 }).await;
+    match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::SnapshotRequired { up_to_op_id } => assert_eq!(up_to_op_id, 10),
+        other => panic!("expected SnapshotRequired, got {other:?}"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compact_account_with_no_snapshot_is_noop() {
+    let acc = signup_account().await;
+    let db = &acc.server.state.db;
+    queries::insert_ops(db, acc.account_id, vec![fake_blob(1), fake_blob(2)])
+        .await
+        .unwrap();
+    let stats = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+        .await
+        .unwrap();
+    assert_eq!(stats.ops_deleted, 0);
+    assert_eq!(stats.snapshots_deleted, 0);
+    // Ops untouched.
+    let batch = queries::fetch_ops_batch(db, acc.account_id, 0).await.unwrap();
+    assert_eq!(batch.ops.len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn push_snapshot_opportunistically_compacts_ops_below_floor() {
+    // End-to-end: a real PushSnapshot through the WS handler should
+    // trigger the spawned compaction. With threshold=5, pushing 5 ops
+    // and acking lands a snapshot at shallow_start=5, after which ids
+    // 1..=5 should disappear from the ops table.
+    let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+
+    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
+    let (up_to_op_id, shallow_start_op_id) = expect_snapshot_request(&mut ws).await;
+    assert_eq!(shallow_start_op_id, 5);
+
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::PushSnapshot {
+            up_to_op_id,
+            shallow_start_op_id,
+            blob: fake_blob(0xCC),
+        },
+    )
+    .await;
+    wait_for_snapshot(&acc, up_to_op_id).await;
+
+    // Compaction is spawned, not awaited inline — poll until the ops
+    // disappear (or the deadline trips).
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        let batch = queries::fetch_ops_batch(&acc.server.state.db, acc.account_id, 0)
+            .await
+            .unwrap();
+        if batch.ops.is_empty() {
+            break;
+        }
+        if std::time::Instant::now() > deadline {
+            panic!(
+                "ops below floor not compacted (still {} present)",
+                batch.ops.len()
+            );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+}
+
 async fn expect_snapshot_request(ws: &mut WsStream) -> (u64, u64) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {

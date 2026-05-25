@@ -277,6 +277,72 @@ pub async fn account_horizon(
     .await
 }
 
+/// Max snapshots retained per account after compaction (see
+/// `spec/storage.md` §"Compaction"). Older snapshots are deleted.
+pub const KEEP_SNAPSHOTS: u64 = 2;
+
+pub struct CompactionStats {
+    pub ops_deleted: u64,
+    pub snapshots_deleted: u64,
+}
+
+/// Delete ops at or below the latest snapshot's `shallow_start_op_id`
+/// and prune snapshots older than the `keep_snapshots` newest. The
+/// snapshot read + both deletes run in one transaction so a concurrent
+/// `insert_snapshot` can't shift the floor mid-deletion. Returns 0/0
+/// when no snapshot exists yet.
+pub async fn compact_account(
+    db: &Db,
+    account_id: Uuid,
+    keep_snapshots: u64,
+) -> anyhow::Result<CompactionStats> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    db.call(move |c| {
+        let tx = c.transaction()?;
+        let floor: Option<i64> = tx
+            .query_row(
+                "SELECT shallow_start_op_id
+                 FROM snapshots
+                 WHERE account_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [&acc_bytes],
+                |r| r.get::<_, i64>(0),
+            )
+            .optional()?;
+        let Some(floor) = floor else {
+            tx.commit()?;
+            return Ok(CompactionStats {
+                ops_deleted: 0,
+                snapshots_deleted: 0,
+            });
+        };
+        let ops_deleted = tx.execute(
+            "DELETE FROM ops WHERE account_id = ? AND id <= ?",
+            params![acc_bytes, floor],
+        )? as u64;
+        // Subquery returns NULL when fewer than keep_snapshots+1 rows
+        // exist, so `id <= NULL` evaluates false and nothing is pruned.
+        let snapshots_deleted = tx.execute(
+            "DELETE FROM snapshots
+             WHERE account_id = ?
+               AND id <= (
+                 SELECT id FROM snapshots
+                 WHERE account_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1 OFFSET ?
+               )",
+            params![acc_bytes, acc_bytes, keep_snapshots as i64],
+        )? as u64;
+        tx.commit()?;
+        Ok(CompactionStats {
+            ops_deleted,
+            snapshots_deleted,
+        })
+    })
+    .await
+}
+
 pub async fn latest_account_op_id(db: &Db, account_id: Uuid) -> anyhow::Result<u64> {
     let acc_bytes = account_id.as_bytes().to_vec();
     db.call(move |c| {
