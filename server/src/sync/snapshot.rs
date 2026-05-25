@@ -69,15 +69,11 @@ impl SnapshotCoordinator2 {
             .lock()
             .expect("snapshot coordinator mutex poisoned");
         let lease_state = leases.entry(account).or_insert_with(|| LeaseState::Idle);
-        let expired = match lease_state {
+        match lease_state {
             LeaseState::Active(lease) if now >= lease.expires_at => true, // Expired lease
             LeaseState::Active(_) => return Decision::Skip,               // In-flight lease
             LeaseState::Idle { .. } => false, // Could be idle, but not expired lease
         };
-        if expired {
-            // Lease has expired, continue
-            *lease_state = LeaseState::Idle;
-        }
         // Ok we're ready
         let lease_id = self.next_lease_id.fetch_add(1, Ordering::Relaxed);
         *lease_state = LeaseState::Active(ActiveLease {

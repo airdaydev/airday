@@ -203,10 +203,11 @@ async fn run_session(
         }
     };
     drop(sub);
-    // state
-    //     .snapshot_coordinator_2
-    //     .release(state.clone(), auth.account_id, auth.device_id)
-    //     .await;
+    if let Some(lease_id) = ws_session.snapshot_lease.take() {
+        state
+            .snapshot_coordinator_2
+            .release(ws_session.auth.account_id, lease_id);
+    }
     result
 }
 
@@ -287,9 +288,13 @@ async fn push_ops(
         );
 
         if let Some(latest_op_id) = assigned_ids.last().copied() {
+            let server_snapshot_op_id =
+                queries::latest_snapshot_floor(&state.db, ws_session.auth.account_id)
+                    .await?
+                    .unwrap_or(0);
             let decision = state.snapshot_coordinator_2.evaluate(
                 ws_session.auth.account_id,
-                0, // TODO: Where we get this from?
+                server_snapshot_op_id,
                 0, // TODO: Where we get this from?
                 latest_op_id,
                 Instant::now(),
