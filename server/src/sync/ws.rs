@@ -164,10 +164,6 @@ async fn run_session(
     let mut sub = state
         .sync_sessions
         .subscribe(auth.account_id, auth.device_id);
-    state
-        .snapshot_coordinator
-        .on_candidate_progress(state.clone(), auth.account_id)
-        .await;
 
     let sub_id = sub.sub_id();
     let result = loop {
@@ -191,10 +187,10 @@ async fn run_session(
         }
     };
     drop(sub);
-    state
-        .snapshot_coordinator
-        .on_disconnect(state.clone(), auth.account_id, auth.device_id)
-        .await;
+    // state
+    //     .snapshot_coordinator_2
+    //     .release(state.clone(), auth.account_id, auth.device_id)
+    //     .await;
     result
 }
 
