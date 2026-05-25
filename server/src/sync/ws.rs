@@ -41,6 +41,12 @@ pub struct WsAuthQuery {
     token: Option<String>,
 }
 
+struct WSSession {
+    auth: DeviceAuth,
+    sub_id: u64,
+    snapshot_lease: Option<u64>,
+}
+
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
@@ -166,11 +172,18 @@ async fn run_session(
         .subscribe(auth.account_id, auth.device_id);
 
     let sub_id = sub.sub_id();
+
+    let ws_session = WSSession {
+        auth,
+        sub_id,
+        snapshot_lease: None,
+    };
+
     let result = loop {
         tokio::select! {
             client_frame = recv_msgpack::<ClientFrame>(&mut socket) => {
                 match client_frame {
-                    Ok(frame) => handle_frame(&mut socket, &state, &auth, sub_id, frame).await?,
+                    Ok(frame) => handle_frame(&mut socket, &state, &ws_session, frame).await?,
                     Err(SessionError::Closed) => break Ok(()),
                     Err(e) => break Err(e),
                 }
@@ -197,26 +210,32 @@ async fn run_session(
 async fn handle_frame(
     socket: &mut WebSocket,
     state: &AppState,
-    auth: &DeviceAuth,
-    sub_id: u64,
+    ws_session: &WSSession,
     frame: ClientFrame,
 ) -> Result<(), SessionError> {
     match frame {
-        ClientFrame::PushOps { ops } => push_ops(socket, state, auth, sub_id, ops).await,
-        ClientFrame::PullOps { since_op_id } => pull_ops(socket, state, auth, since_op_id).await,
+        ClientFrame::PushOps { ops } => push_ops(socket, state, &ws_session, ops).await,
+        ClientFrame::PullOps { since_op_id } => {
+            pull_ops(socket, state, &ws_session.auth, since_op_id).await
+        }
         ClientFrame::Ack { last_acked_op_id } => {
             let ack_span = tracing::info_span!("ws.ack", last_acked_op_id = last_acked_op_id);
-            queries::advance_last_acked_op_id(&state.db, auth.device_id, last_acked_op_id).await?;
+            queries::advance_last_acked_op_id(
+                &state.db,
+                ws_session.auth.device_id,
+                last_acked_op_id,
+            )
+            .await?;
             state
                 .snapshot_coordinator
-                .on_candidate_progress(state.clone(), auth.account_id)
+                .on_candidate_progress(state.clone(), ws_session.auth.account_id)
                 .await;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
-        ClientFrame::PullSnapshot => pull_snapshot(socket, state, auth).await,
+        ClientFrame::PullSnapshot => pull_snapshot(socket, state, &ws_session.auth).await,
         ClientFrame::PushSnapshot { up_to_op_id, blob } => {
-            push_snapshot(state, auth, up_to_op_id, blob).await
+            push_snapshot(state, &ws_session.auth, up_to_op_id, blob).await
         }
     }
 }
@@ -224,8 +243,7 @@ async fn handle_frame(
 async fn push_ops(
     socket: &mut WebSocket,
     state: &AppState,
-    auth: &DeviceAuth,
-    sub_id: u64,
+    ws_session: &WSSession,
     ops: Vec<EncryptedBlob>,
 ) -> Result<(), SessionError> {
     let push_span = tracing::info_span!("ws.push_ops", op_count = ops.len());
@@ -246,7 +264,7 @@ async fn push_ops(
 
     async {
         let blobs_for_broadcast = ops.clone();
-        let assigned_ids = queries::insert_ops(&state.db, auth.account_id, ops).await?;
+        let assigned_ids = queries::insert_ops(&state.db, ws_session.auth.account_id, ops).await?;
 
         // Post-commit fan-out, before acking the originator. Both branches
         // are correct (the originator's ack and peer broadcasts are
@@ -260,7 +278,7 @@ async fn push_ops(
             .collect();
         state
             .sync_sessions
-            .broadcast(auth.account_id, sub_id, stored);
+            .broadcast(ws_session.auth.account_id, ws_session.sub_id, stored);
 
         tracing::info!(
             assigned_id_count = assigned_ids.len(),
@@ -272,7 +290,7 @@ async fn push_ops(
         if let Some(latest_op_id) = assigned_ids.last().copied() {
             state
                 .snapshot_coordinator
-                .on_ops_appended(state.clone(), auth.account_id, latest_op_id)
+                .on_ops_appended(state.clone(), ws_session.auth.account_id, latest_op_id)
                 .await;
         }
 
