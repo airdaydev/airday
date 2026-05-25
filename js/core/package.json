@@ -16,7 +16,8 @@
     "./storage/idb-wal": "./src/storage/idb-wal.ts",
     "./storage/mem-wal": "./src/storage/mem-wal.ts",
     "./storage/wal-adapter": "./src/storage/wal-adapter.ts",
-    "./storage/web-db": "./src/storage/web-db.ts"
+    "./storage/web-db": "./src/storage/web-db.ts",
+    "./sync-bridge": "./src/sync-bridge.ts"
   },
   "scripts": {
     "test": "bun test",

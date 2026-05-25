@@ -26,6 +26,7 @@ import {
   SyncEngine,
   wrapDek,
 } from "../wasm/airday_core_web.js";
+import { SyncBridge } from "../src/sync-bridge.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const SERVER_BIN = join(REPO_ROOT, "target/debug/airday-server");
@@ -197,67 +198,36 @@ async function registerDevice(
   return decoded.device_token;
 }
 
-interface Attachment {
-  ws: WebSocket;
-  pump: () => void;
-  close: () => Promise<void>;
-}
-
+// Construct a bridge with a bearer-header socket factory and resolve
+// once it's seen "online" at least once. Tests then drive mutations
+// and let the bridge's own onmessage pump push outbox bytes; explicit
+// `pumpOutbox()` calls cover the case where local mutations happen
+// between server frames.
 function attachEngine(
   s: ServerHandle,
   token: string,
   engine: SyncEngine,
-): Promise<Attachment> {
-  return new Promise((resolveOk, rejectOk) => {
-    // Bun extends `new WebSocket` with an options object that supports
-    // `headers`; the stdlib type sig only knows about subprotocols.
-    const ws = new WebSocket(`${s.wsUrl}/api/sync`, {
-      headers: { Authorization: `Bearer ${token}` },
-    } as unknown as string[]);
-    ws.binaryType = "arraybuffer";
-
-    const pump = () => {
-      if (ws.readyState !== WebSocket.OPEN) return;
-      while (true) {
-        const frame = engine.popOutbox();
-        if (!frame) break;
-        ws.send(frame);
-      }
-    };
-
-    let settled = false;
-    ws.onopen = () => {
-      engine.handleConnected();
-      pump();
-      if (!settled) {
-        settled = true;
-        resolveOk({
-          ws,
-          pump,
-          close: async () => {
-            ws.close();
-            engine.handleDisconnected();
-          },
-        });
-      }
-    };
-    ws.onmessage = (ev) => {
-      const data =
-        ev.data instanceof ArrayBuffer
-          ? new Uint8Array(ev.data)
-          : new Uint8Array((ev.data as ArrayBufferView).buffer);
-      engine.handleServerBytes(data);
-      pump();
-    };
-    ws.onerror = () => {
-      if (!settled) {
-        settled = true;
-        rejectOk(new Error("ws error before open"));
-      }
-    };
-    ws.onclose = () => {
-      engine.handleDisconnected();
-    };
+): Promise<SyncBridge> {
+  return new Promise((resolveOk) => {
+    let resolved = false;
+    const bridge = new SyncBridge({
+      engine,
+      // Bun extends `new WebSocket` with an options object that
+      // supports `headers`; the stdlib type sig only knows about
+      // subprotocols.
+      socketFactory: () =>
+        new WebSocket(`${s.wsUrl}/api/sync`, {
+          headers: { Authorization: `Bearer ${token}` },
+        } as unknown as string[]),
+      onChange: (kind) => {
+        if (kind === "online" && !resolved) {
+          resolved = true;
+          resolveOk(bridge);
+        }
+      },
+      reconnectDelayMs: 50,
+    });
+    bridge.start();
   });
 }
 
@@ -313,7 +283,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
       "device-a",
       "0.0.0",
     );
-    const attA = await attachEngine(server, account.deviceToken, engineA);
+    const bridgeA = await attachEngine(server, account.deviceToken, engineA);
 
     // Cross the threshold (5) by a margin so we get a SnapshotRequest
     // without ambiguity about off-by-one in the eligibility check.
@@ -325,7 +295,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
     for (let i = 0; i < ITEMS; i++) {
       engineA.addItem(LIST_MAIN, `item ${i}`);
       engineA.flush();
-      attA.pump();
+      bridgeA.pumpOutbox();
       await waitFor(
         () => engineA.highestSeenOpId() >= BigInt(i + 1),
         `op ${i + 1} acked by server`,
@@ -349,7 +319,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
       "device-b",
       "0.0.0",
     );
-    const attB = await attachEngine(server, tokenB, engineB);
+    const bridgeB = await attachEngine(server, tokenB, engineB);
 
     await waitFor(
       () => hex(engineA.fingerprint()) === hex(engineB.fingerprint()),
@@ -366,7 +336,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
       Array.from({ length: ITEMS }, (_, i) => `item ${i}`).sort(),
     );
 
-    await attA.close();
-    await attB.close();
+    bridgeA.stop();
+    bridgeB.stop();
   }, 30_000);
 });

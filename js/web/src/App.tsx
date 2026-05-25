@@ -60,7 +60,7 @@ import {
   type ItemView,
   type ListView,
 } from "./store.ts";
-import { SyncBridge } from "./sync.ts";
+import { createSyncBridge, SyncBridge } from "./sync.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
 
 const CLIENT_NAME = "airday-web";
@@ -638,7 +638,7 @@ function MainApp(props: {
   // local mutations still flow through the engine for WAL persist.
   let bridge: SyncBridge | null = null;
   if (!props.session.anonymous) {
-    bridge = new SyncBridge({
+    bridge = createSyncBridge({
       engine,
       onChange: (kind) => {
         if (kind === "online") {
@@ -651,7 +651,7 @@ function MainApp(props: {
         // with the server" — even when no app events were produced.
         if (kind === "drain") props.setLastSyncAt(Date.now());
       },
-      onAppEvents: () => {
+      onServerFrame: () => {
         app.drainEvents();
         // Server frame applied → capture remote-imported ops too. Cheap
         // when nothing changed (export returns 0 bytes).

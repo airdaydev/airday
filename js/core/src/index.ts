@@ -19,3 +19,8 @@ export {
   type WalEntry,
   type WalStorage,
 } from "./storage/wal-adapter.ts";
+export {
+  SyncBridge,
+  type ConnectionEvent,
+  type SyncBridgeOpts,
+} from "./sync-bridge.ts";
