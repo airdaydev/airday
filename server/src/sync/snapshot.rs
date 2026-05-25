@@ -33,7 +33,16 @@ pub struct SnapshotCoordinator {
 }
 
 pub enum Decision {
-    Issue { lease_id: u64, up_to_op_id: u64 },
+    Issue {
+        lease_id: u64,
+        /// State frontier the snapshot will be encoded at (= producer's
+        /// `last_acked_op_id`, = `server_last_op_id` since producer
+        /// must be caught up).
+        up_to_op_id: u64,
+        /// Retained-history boundary (= horizon). Doubles as the
+        /// compaction floor once the snapshot lands.
+        shallow_start_op_id: u64,
+    },
     Skip,
 }
 
@@ -59,23 +68,43 @@ impl SnapshotCoordinator {
             next_lease_id: Arc::new(AtomicU64::new(1)),
         }
     }
+    /// Trigger (see `spec/sync-protocol.md` §"Snapshot orchestration"):
+    ///
+    /// 1. `server_last_op_id − latest snapshot's up_to_op_id > threshold`
+    ///    — enough new content for a new snapshot to materially cut
+    ///    bootstrap cost (smaller `PullOps` catch-up after import).
+    /// 2. The triggering device is caught up
+    ///    (`device_last_acked_op_id == server_last_op_id`) — that
+    ///    value is what we hand back as `up_to_op_id`. Lagging
+    ///    connections are skipped as producers (still contribute to
+    ///    horizon).
+    ///
+    /// Horizon is **not** a trigger condition — a new snapshot at an
+    /// unchanged `shallow_start_op_id` still pays off for bootstrap
+    /// even when no further compaction is possible.
+    ///
+    /// `shallow_start_op_id = max(horizon, prev_snap_shallow)`. The
+    /// `max` enforces monotonicity: if a new device's join drops
+    /// horizon below the existing floor, we can't undo prior
+    /// compaction, so the floor stays put.
     pub fn evaluate(
         &self,
         account: Uuid,
-        server_snapshot_op_id: u64,   // last snapshot's op id on server
-        server_last_op_id: u64,       // latest op on server
-        device_last_acked_op_id: u64, // last acked op on device
+        server_snapshot_up_to_op_id: u64, // latest snapshot's state frontier
+        server_snapshot_shallow_op_id: u64, // latest snapshot's shallow start
+        server_last_op_id: u64,           // latest op id on server
+        horizon_op_id: u64,               // min(last_acked) across devices
+        device_last_acked_op_id: u64,     // triggering device's frontier
         now: Instant,
     ) -> Decision {
-        // No need to snapshot yet
-        if server_last_op_id.saturating_sub(server_snapshot_op_id) < self.threshold_blobs {
+        // Not enough new content to bother.
+        if server_last_op_id.saturating_sub(server_snapshot_up_to_op_id) < self.threshold_blobs {
             return Decision::Skip;
         }
-        // Client is not yet up to date with server
-        if server_last_op_id != device_last_acked_op_id {
+        // Triggering device isn't caught up — can't be producer.
+        if device_last_acked_op_id != server_last_op_id {
             return Decision::Skip;
         }
-        // Ok we are snapshot viable
         let mut leases = self
             .leases
             .lock()
@@ -86,7 +115,6 @@ impl SnapshotCoordinator {
                 return Decision::Skip;
             }
         }
-        // Ok we're ready
         let lease_id = self.next_lease_id.fetch_add(1, Ordering::Relaxed);
         *lease_state = LeaseState::Active(ActiveLease {
             lease_id,
@@ -95,6 +123,7 @@ impl SnapshotCoordinator {
         Decision::Issue {
             lease_id,
             up_to_op_id: device_last_acked_op_id,
+            shallow_start_op_id: horizon_op_id.max(server_snapshot_shallow_op_id),
         }
     }
     pub fn release(&self, account: Uuid, incoming_lease_id: u64) -> ReleaseResult {
@@ -123,30 +152,31 @@ impl SnapshotCoordinator {
 mod tests {
     use super::*;
 
+    // Signature reminder:
+    //   evaluate(account, snap_up_to, snap_shallow, server_last,
+    //            horizon, device_last_acked, now)
+
     #[test]
-    fn issues_when_threshold_exceeded_and_caught_up() {
+    fn issues_when_threshold_exceeded_horizon_advances_and_producer_caught_up() {
         let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
         let now = Instant::now();
 
-        let decision = coord.evaluate(account, 5000, 12_000, 12_000, now);
-        assert!(
-            matches!(decision, Decision::Skip),
-            "Fails within default threshold ops (10k)"
-        );
+        // Within default threshold (10k) — skip.
+        let decision = coord.evaluate(account, 5_000, 5_000, 12_000, 12_000, 12_000, now);
+        assert!(matches!(decision, Decision::Skip));
 
-        let decision = coord.evaluate(account, 0, 12_000, 11_999, now);
-        assert!(
-            matches!(decision, Decision::Skip),
-            "Fails if client is behind server"
-        );
+        // Producer not caught up — skip.
+        let decision = coord.evaluate(account, 0, 0, 12_000, 11_999, 11_999, now);
+        assert!(matches!(decision, Decision::Skip));
 
-        let decision = coord.evaluate(account, 0, 12_000, 12_000, now);
-
+        // All preconditions met — issue.
+        let decision = coord.evaluate(account, 0, 0, 12_000, 12_000, 12_000, now);
         assert!(matches!(
             decision,
             Decision::Issue {
                 up_to_op_id: 12_000,
+                shallow_start_op_id: 12_000,
                 ..
             }
         ));
@@ -154,46 +184,101 @@ mod tests {
             panic!("should issue")
         };
 
-        let decision = coord.evaluate(account, 0, 22_000, 22_000, now);
-        assert!(
-            matches!(decision, Decision::Skip),
-            "In-flight request; should fail"
-        );
+        // In-flight — skip second request.
+        let decision = coord.evaluate(account, 0, 0, 22_000, 22_000, 22_000, now);
+        assert!(matches!(decision, Decision::Skip));
 
         let result = coord.release(account, lease_id);
         assert!(matches!(result, ReleaseResult::Accepted));
 
-        // TODO: Issues after expiry?
+        // After release, issues again.
+        let decision_2 = coord.evaluate(account, 0, 0, 22_000, 22_000, 22_000, now);
+        assert!(matches!(
+            decision_2,
+            Decision::Issue {
+                up_to_op_id: 22_000,
+                shallow_start_op_id: 22_000,
+                ..
+            }
+        ));
 
-        let decision_2 = coord.evaluate(account, 0, 22_000, 22_000, now);
-        assert!(
-            matches!(
-                decision_2,
-                Decision::Issue {
-                    up_to_op_id: 22_000,
-                    ..
-                }
-            ),
-            "Issues instantly after completion again"
-        );
-
+        // Expired lease — issues again.
         let decision = coord.evaluate(
             account,
             0,
+            0,
+            12_000,
             12_000,
             12_000,
             now + coord.timeout + Duration::from_secs(300),
         );
-        assert!(
-            matches!(
-                decision,
-                Decision::Issue {
-                    up_to_op_id: 12_000,
-                    ..
-                }
-            ),
-            "Expired req, should issue"
-        );
+        assert!(matches!(
+            decision,
+            Decision::Issue {
+                up_to_op_id: 12_000,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn issues_with_unchanged_shallow_when_horizon_pinned() {
+        // Lagger pins horizon at the existing shallow_start. New
+        // snapshot still issued for bootstrap perf (state frontier
+        // advances), but shallow_start stays put — no new compaction.
+        let coord = SnapshotCoordinator::new();
+        let account = Uuid::now_v7();
+        let now = Instant::now();
+
+        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 10_000, 22_000, now);
+        assert!(matches!(
+            decision,
+            Decision::Issue {
+                up_to_op_id: 22_000,
+                shallow_start_op_id: 10_000,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn shallow_start_never_regresses() {
+        // Horizon dipped below the existing shallow_start (e.g., a new
+        // device joined with last_acked=0). Compaction can't unwind,
+        // so the new snapshot's shallow_start is clamped up to the
+        // existing floor.
+        let coord = SnapshotCoordinator::new();
+        let account = Uuid::now_v7();
+        let now = Instant::now();
+
+        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 0, 22_000, now);
+        assert!(matches!(
+            decision,
+            Decision::Issue {
+                up_to_op_id: 22_000,
+                shallow_start_op_id: 10_000,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn issues_with_advancing_shallow_when_horizon_moves() {
+        // Horizon advances past the existing shallow_start — new
+        // shallow_start tracks horizon, advancing the compaction floor.
+        let coord = SnapshotCoordinator::new();
+        let account = Uuid::now_v7();
+        let now = Instant::now();
+
+        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 15_000, 22_000, now);
+        assert!(matches!(
+            decision,
+            Decision::Issue {
+                up_to_op_id: 22_000,
+                shallow_start_op_id: 15_000,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -208,7 +293,7 @@ mod tests {
             "Stale result if coordinator does not track any snapshot"
         );
 
-        coord.evaluate(account, 0, 12_000, 12_000, now);
+        coord.evaluate(account, 0, 0, 12_000, 12_000, 12_000, now);
         let result_2 = coord.release(account, 100);
         assert!(
             matches!(result_2, ReleaseResult::Stale),

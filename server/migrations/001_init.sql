@@ -48,11 +48,12 @@ CREATE TABLE ops (
 CREATE INDEX ops_account_id_idx ON ops (account_id, id);
 
 CREATE TABLE snapshots (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  account_id      BLOB NOT NULL REFERENCES accounts(id),
-  up_to_op_id     INTEGER NOT NULL,
-  payload         BLOB NOT NULL,
-  payload_nonce   BLOB NOT NULL,
-  created_at      INTEGER NOT NULL
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id            BLOB NOT NULL REFERENCES accounts(id),
+  up_to_op_id           INTEGER NOT NULL,                        -- encoded state frontier
+  shallow_start_op_id   INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
+  payload               BLOB NOT NULL,
+  payload_nonce         BLOB NOT NULL,
+  created_at            INTEGER NOT NULL
 );
 CREATE INDEX snapshots_account_id_idx ON snapshots (account_id, id DESC);

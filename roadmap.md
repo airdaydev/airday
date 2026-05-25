@@ -5,7 +5,6 @@
 
 ## Sync & persistence
 - Server-side compaction after durable snapshots still needs to land.
-- Byte-based snapshot eligibility + compaction. Today `snapshot_threshold_blobs` counts encrypted op blobs (see `spec/sync-protocol.md` §"Terminology"); a client that pushes one fat blob never triggers a snapshot even if the blob is huge, and compaction can only drop whole blobs. Track `sum(length(payload))` since last snapshot and use MiB as the primary eligibility metric; blob count becomes a coarse safety net or goes away.
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
@@ -23,7 +22,7 @@
 - E2E gaps vs. `spec/testing.md`: offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold to fresh-device bootstrap, and recovery-flow round-trip.
 - hardening pass
 
-## Postgresql translation
+## Postgresql version
 - ensure single snapshot per account across replicas
 
 ## Feedback

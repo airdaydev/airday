@@ -48,12 +48,13 @@ CREATE TABLE ops (
 CREATE INDEX ops_account_id_idx ON ops (account_id, id);
 
 CREATE TABLE snapshots (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  account_id      BLOB NOT NULL REFERENCES accounts(id),
-  up_to_op_id     INTEGER NOT NULL,
-  payload         BLOB NOT NULL,
-  payload_nonce   BLOB NOT NULL,
-  created_at      INTEGER NOT NULL
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id            BLOB NOT NULL REFERENCES accounts(id),
+  up_to_op_id           INTEGER NOT NULL,    -- snapshot's encoded state frontier
+  shallow_start_op_id   INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
+  payload               BLOB NOT NULL,
+  payload_nonce         BLOB NOT NULL,
+  created_at            INTEGER NOT NULL
 );
 CREATE INDEX snapshots_account_id_idx ON snapshots (account_id, id DESC);
 ```
@@ -62,8 +63,8 @@ Note: `ops.id` is global-monotonic, not per-account. Per-account ordering is `(a
 
 ## Compaction
 
-After a snapshot at `up_to_op_id = N` lands, a background job may:
-1. Delete `ops` rows where `account_id = X AND id ≤ N`. (N is set to the horizon at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so no separate horizon clamp is needed here.)
+After a snapshot lands, a background job may:
+1. Delete `ops` rows where `account_id = X AND id ≤ snapshot.shallow_start_op_id`. (`shallow_start_op_id` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
 2. Keep at most M=2 snapshots per account; delete older.
 
 Run on a timer, not synchronous with snapshot upload.

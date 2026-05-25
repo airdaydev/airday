@@ -61,9 +61,9 @@ The server **can**:
 - assign monotonic op ids
 - track per-device `last_acked_op_id`
 - compute horizon = min(`last_acked_op_id`) across all non-revoked devices
-- decide when a snapshot is due (op-count threshold past last snapshot AND horizon ahead of snapshot floor)
-- ask any connected client to produce the snapshot at the horizon
-- replace prior snapshots and prune ops up to the snapshot's `up_to_op_id`
+- decide when a snapshot is due (op-count threshold past last snapshot, triggering device caught up)
+- ask any caught-up connected client to produce the snapshot (state frontier = `server_last_op_id`, shallow-history start = `max(horizon, prev snapshot's shallow_start)`)
+- replace prior snapshots and prune ops up to the snapshot's `shallow_start_op_id`
 
 This thesis is load-bearing for everything in `sync-protocol.md`.
 

@@ -403,7 +403,9 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     // A device whose cursor is already >= the snapshot floor stays
     // on the steady-state op-streaming path — no SnapshotRequired.
     let acc = signup_account().await;
-    queries::insert_snapshot(&acc.server.state.db, acc.account_id, 50, fake_blob(0xAA))
+    // shallow_start = up_to here means cursor=50 is *at* the floor, not
+    // below — pull_ops should still stream normally without bootstrap.
+    queries::insert_snapshot(&acc.server.state.db, acc.account_id, 50, 50, fake_blob(0xAA))
         .await
         .unwrap();
 
@@ -451,20 +453,24 @@ async fn push_path_triggers_snapshot_request_and_persists() {
 
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
     send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
-    let up_to_op_id = expect_snapshot_request(&mut ws).await;
+    let (up_to_op_id, shallow_start_op_id) = expect_snapshot_request(&mut ws).await;
     assert_eq!(up_to_op_id, 5);
+    // Single device, just pushed-and-acked: horizon = 5 = up_to.
+    assert_eq!(shallow_start_op_id, 5);
 
     let snapshot_blob = fake_blob(0xCC);
     send_msgpack(
         &mut ws,
         &ClientFrame::PushSnapshot {
             up_to_op_id,
+            shallow_start_op_id,
             blob: snapshot_blob.clone(),
         },
     )
     .await;
     let snap = wait_for_snapshot(&acc, up_to_op_id).await;
     assert_eq!(snap.blob, snapshot_blob);
+    assert_eq!(snap.shallow_start_op_id, shallow_start_op_id);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -489,16 +495,16 @@ async fn ack_path_triggers_snapshot_request() {
         },
     )
     .await;
-    let up_to_op_id = expect_snapshot_request(&mut ws).await;
+    let (up_to_op_id, _shallow_start_op_id) = expect_snapshot_request(&mut ws).await;
     assert_eq!(up_to_op_id, last_id);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stale_snapshot_after_lease_expiry_rejected() {
-    // Short timeout. A gets lease 1, never replies, lease expires.
-    // B acks → fresh lease 2. A then pushes a snapshot for lease 1;
-    // the coordinator's release returns Stale, so the snapshot is
-    // dropped instead of persisting under A's blob.
+    // Short timeout. A's push triggers lease 1 (issued to A). A never
+    // replies; lease expires. B then acks → fresh lease 2 (on its own
+    // WS session). A's late `PushSnapshot` for lease 1 must be rejected
+    // — `release` returns Stale against ws_a's stored lease id.
     let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_millis(100)).await;
     let device_b = register_second_device(&acc, "device-b").await;
 
@@ -506,10 +512,24 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     handshake(&mut ws_a).await;
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
     send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs }).await;
-    let up_to_op_id = expect_snapshot_request(&mut ws_a).await;
+    let (up_to_op_id, shallow_start_op_id) = expect_snapshot_request(&mut ws_a).await;
     assert_eq!(up_to_op_id, 5);
+    // B has never acked, so horizon == 0 — first snapshot has no
+    // compaction floor, just bootstrap state.
+    assert_eq!(shallow_start_op_id, 0);
 
-    // Wait past timeout so the lease is expired in the coordinator.
+    // A acks (a real client would, off the back of OpsAck) so its DB
+    // row advances. Otherwise B's later ack eval still sees horizon=0.
+    // Lease 1 stays active — this eval skips on lease-in-flight.
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::Ack {
+            last_acked_op_id: up_to_op_id,
+        },
+    )
+    .await;
+
+    // Wait past timeout so A's lease is expired in the coordinator.
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // B acks at the same frontier — coordinator sees A's lease as
@@ -523,16 +543,20 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
         },
     )
     .await;
-    let b_up_to = expect_snapshot_request(&mut ws_b).await;
+    let (b_up_to, b_shallow) = expect_snapshot_request(&mut ws_b).await;
     assert_eq!(b_up_to, up_to_op_id);
+    // Both devices now caught up → horizon advances to 5; B's lease's
+    // shallow_start tracks horizon.
+    assert_eq!(b_shallow, 5);
 
-    // A's late snapshot — must be dropped (release returns Stale).
-    let stale_blob = fake_blob(0xAA);
+    // A's late snapshot for lease 1 — must be dropped. ws_a's stored
+    // lease id is 1; coordinator's current lease is 2 → Stale.
     send_msgpack(
         &mut ws_a,
         &ClientFrame::PushSnapshot {
             up_to_op_id,
-            blob: stale_blob,
+            shallow_start_op_id,
+            blob: fake_blob(0xAA),
         },
     )
     .await;
@@ -546,7 +570,7 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     );
 }
 
-async fn expect_snapshot_request(ws: &mut WsStream) -> u64 {
+async fn expect_snapshot_request(ws: &mut WsStream) -> (u64, u64) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
@@ -555,7 +579,10 @@ async fn expect_snapshot_request(ws: &mut WsStream) -> u64 {
             Err(_) => panic!("no SnapshotRequest within deadline"),
         };
         match frame {
-            ServerFrame::SnapshotRequest { up_to_op_id } => return up_to_op_id,
+            ServerFrame::SnapshotRequest {
+                up_to_op_id,
+                shallow_start_op_id,
+            } => return (up_to_op_id, shallow_start_op_id),
             ServerFrame::OpsAck { .. } | ServerFrame::OpsBroadcast { .. } => continue,
             other => panic!("unexpected frame while waiting for SnapshotRequest: {other:?}"),
         }
@@ -571,8 +598,13 @@ async fn assert_no_snapshot_request(ws: &mut WsStream, window: std::time::Durati
         }
         match tokio::time::timeout(remaining, recv_msgpack::<ServerFrame>(ws)).await {
             Ok(ServerFrame::OpsAck { .. }) | Ok(ServerFrame::OpsBroadcast { .. }) => continue,
-            Ok(ServerFrame::SnapshotRequest { up_to_op_id }) => {
-                panic!("unexpected SnapshotRequest up_to_op_id={up_to_op_id}");
+            Ok(ServerFrame::SnapshotRequest {
+                up_to_op_id,
+                shallow_start_op_id,
+            }) => {
+                panic!(
+                    "unexpected SnapshotRequest up_to_op_id={up_to_op_id} shallow_start_op_id={shallow_start_op_id}"
+                );
             }
             Ok(other) => panic!("unexpected frame: {other:?}"),
             Err(_) => return,

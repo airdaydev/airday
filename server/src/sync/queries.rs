@@ -130,27 +130,37 @@ pub async fn advance_last_acked_op_id(
 /// in that case and `pull_ops` falls through to op streaming.
 pub struct LatestSnapshot {
     pub up_to_op_id: u64,
+    pub shallow_start_op_id: u64,
     pub blob: EncryptedBlob,
 }
 
-/// Insert a snapshot row. Used by snapshot orchestration once
-/// `PushSnapshot` is wired through; until then, integration tests
-/// call this directly to simulate a server with snapshot state.
+/// Just the two op-id columns of the latest snapshot, without the
+/// payload. Hot path for `pull_ops` (compaction-floor check) and the
+/// snapshot coordinator (trigger eval). `None` if no snapshot exists.
+pub struct LatestSnapshotMeta {
+    pub up_to_op_id: u64,
+    pub shallow_start_op_id: u64,
+}
+
+/// Insert a snapshot row. Used by snapshot orchestration; integration
+/// tests also call this directly to seed snapshot state.
 pub async fn insert_snapshot(
     db: &Db,
     account_id: Uuid,
     up_to_op_id: u64,
+    shallow_start_op_id: u64,
     blob: EncryptedBlob,
 ) -> anyhow::Result<u64> {
     let acc_bytes = account_id.as_bytes().to_vec();
     let now = now_millis();
     db.call(move |c| {
         c.execute(
-            "INSERT INTO snapshots (account_id, up_to_op_id, payload, payload_nonce, created_at)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO snapshots (account_id, up_to_op_id, shallow_start_op_id, payload, payload_nonce, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
             params![
                 acc_bytes,
                 up_to_op_id as i64,
+                shallow_start_op_id as i64,
                 blob.ciphertext,
                 blob.nonce,
                 now,
@@ -166,7 +176,7 @@ pub async fn latest_snapshot(db: &Db, account_id: Uuid) -> anyhow::Result<Option
     db.call(move |c| {
         let row = c
             .query_row(
-                "SELECT up_to_op_id, payload, payload_nonce
+                "SELECT up_to_op_id, shallow_start_op_id, payload, payload_nonce
                  FROM snapshots
                  WHERE account_id = ?
                  ORDER BY id DESC
@@ -175,37 +185,47 @@ pub async fn latest_snapshot(db: &Db, account_id: Uuid) -> anyhow::Result<Option
                 |r| {
                     Ok((
                         r.get::<_, i64>(0)? as u64,
-                        r.get::<_, Vec<u8>>(1)?,
+                        r.get::<_, i64>(1)? as u64,
                         r.get::<_, Vec<u8>>(2)?,
+                        r.get::<_, Vec<u8>>(3)?,
                     ))
                 },
             )
             .optional()?;
-        Ok(row.map(|(up_to_op_id, ciphertext, nonce)| LatestSnapshot {
-            up_to_op_id,
-            blob: EncryptedBlob { nonce, ciphertext },
-        }))
+        Ok(
+            row.map(
+                |(up_to_op_id, shallow_start_op_id, ciphertext, nonce)| LatestSnapshot {
+                    up_to_op_id,
+                    shallow_start_op_id,
+                    blob: EncryptedBlob { nonce, ciphertext },
+                },
+            ),
+        )
     })
     .await
 }
 
-/// Just the floor — `up_to_op_id` of the latest snapshot, or `None`.
-/// Hot path for `PullOps` so we don't read the blob just to compare.
-pub async fn latest_snapshot_floor(db: &Db, account_id: Uuid) -> anyhow::Result<Option<u64>> {
+pub async fn latest_snapshot_meta(
+    db: &Db,
+    account_id: Uuid,
+) -> anyhow::Result<Option<LatestSnapshotMeta>> {
     let acc_bytes = account_id.as_bytes().to_vec();
     db.call(move |c| {
         let row = c
             .query_row(
-                "SELECT up_to_op_id
+                "SELECT up_to_op_id, shallow_start_op_id
                  FROM snapshots
                  WHERE account_id = ?
                  ORDER BY id DESC
                  LIMIT 1",
                 [acc_bytes],
-                |r| r.get::<_, i64>(0),
+                |r| Ok((r.get::<_, i64>(0)? as u64, r.get::<_, i64>(1)? as u64)),
             )
             .optional()?;
-        Ok(row.map(|v| v as u64))
+        Ok(row.map(|(up_to_op_id, shallow_start_op_id)| LatestSnapshotMeta {
+            up_to_op_id,
+            shallow_start_op_id,
+        }))
     })
     .await
 }
@@ -223,6 +243,38 @@ pub async fn get_last_acked_op_id(db: &Db, device_id: Uuid) -> anyhow::Result<u6
     })
     .await
     .map(|v| v as u64)
+}
+
+/// Horizon: `min(last_acked_op_id)` across all of an account's
+/// devices, with `override_device_id`'s row replaced by
+/// `override_value`. Used as the shallow-snapshot start frontier
+/// (see `spec/sync-protocol.md` §"Snapshot orchestration") and
+/// computed from the calling device's optimistic frontier:
+/// during a push, the device has the just-assigned op ids locally
+/// but hasn't sent the `Ack` yet, so its DB row would drag horizon
+/// down artificially. Substituting the optimistic value reflects
+/// the device's true frontier.
+///
+/// Returns 0 when the account has no devices — caller treats that
+/// as "no compaction possible" via the trigger's horizon guard.
+pub async fn account_horizon(
+    db: &Db,
+    account_id: Uuid,
+    override_device_id: Uuid,
+    override_value: u64,
+) -> anyhow::Result<u64> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    let dev_bytes = override_device_id.as_bytes().to_vec();
+    db.call(move |c| {
+        let v: Option<i64> = c.query_row(
+            "SELECT MIN(CASE WHEN id = ? THEN ? ELSE last_acked_op_id END)
+             FROM devices WHERE account_id = ?",
+            params![dev_bytes, override_value as i64, acc_bytes],
+            |r| r.get::<_, Option<i64>>(0),
+        )?;
+        Ok(v.unwrap_or(0) as u64)
+    })
+    .await
 }
 
 pub async fn latest_account_op_id(db: &Db, account_id: Uuid) -> anyhow::Result<u64> {

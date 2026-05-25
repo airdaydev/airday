@@ -402,14 +402,24 @@ impl SyncEngine {
                     self.go_disconnected();
                 }
             }
-            ServerFrame::SnapshotRequest { up_to_op_id: _ } => {
+            ServerFrame::SnapshotRequest {
+                up_to_op_id: _,
+                shallow_start_op_id,
+            } => {
                 // Server picked us as the snapshot producer. We produce
                 // at the doc's current frontier and tag with our true
                 // `highest_seen_op_id`, which is ≥ the requested value
-                // (server's candidate selector picks devices whose
-                // frontier is at-or-past the request). Producing in any
-                // active state is fine — snapshots are state-of-doc, not
-                // a state-machine transition.
+                // (server only asks caught-up producers). Producing in
+                // any active state is fine — snapshots are state-of-doc,
+                // not a state-machine transition.
+                //
+                // TODO: `snapshot_blob` currently produces a full Loro
+                // snapshot, not a shallow one — `shallow_start_op_id`
+                // is echoed back verbatim so the server's bookkeeping
+                // (compaction floor) is correct, but no history is
+                // actually trimmed yet. Switch to
+                // `ExportMode::shallow_snapshot(frontier)` when the
+                // op_id → Loro frontier mapping is wired through.
                 let blob = match self.doc.snapshot_blob(&self.dek) {
                     Ok(b) => b,
                     Err(e) => {
@@ -420,6 +430,7 @@ impl SyncEngine {
                 };
                 let frame = ClientFrame::PushSnapshot {
                     up_to_op_id: self.highest_seen_op_id,
+                    shallow_start_op_id,
                     blob,
                 };
                 if let Err(e) = self.encode_into_outbox(&frame) {
@@ -1144,15 +1155,25 @@ mod tests {
         }));
         let _ = drain_outbox(&mut eng); // drop the auto-Ack
 
-        // Server requests a snapshot up to 30 (below our current 50).
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest { up_to_op_id: 30 }));
+        // Server requests a snapshot up to 30 (below our current 50)
+        // with shallow_start at 20.
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
+            up_to_op_id: 30,
+            shallow_start_op_id: 20,
+        }));
         let push: ClientFrame = dec(&eng.pop_outbox().expect("PushSnapshot"));
-        let (tagged_up_to, blob) = match push {
-            ClientFrame::PushSnapshot { up_to_op_id, blob } => (up_to_op_id, blob),
+        let (tagged_up_to, tagged_shallow, blob) = match push {
+            ClientFrame::PushSnapshot {
+                up_to_op_id,
+                shallow_start_op_id,
+                blob,
+            } => (up_to_op_id, shallow_start_op_id, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         // Tagged with our actual frontier, not the requested value.
         assert_eq!(tagged_up_to, 50);
+        // Shallow start echoes the server's requested value verbatim.
+        assert_eq!(tagged_shallow, 20);
 
         // Round-trip: apply the blob to a peer doc and verify
         // fingerprints match — the producer/consumer round trip
@@ -1347,16 +1368,23 @@ mod tests {
         let _ = drain_outbox(&mut a);
         assert_eq!(a.highest_seen_op_id(), next_id);
 
-        // -- Server requests a snapshot from A --
+        // -- Server requests a snapshot from A. Single-device account,
+        //    so horizon == next_id; shallow_start equals up_to. --
         a.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
             up_to_op_id: next_id,
+            shallow_start_op_id: next_id,
         }));
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushSnapshot"));
-        let (snapshot_up_to, snapshot_blob) = match push {
-            ClientFrame::PushSnapshot { up_to_op_id, blob } => (up_to_op_id, blob),
+        let (snapshot_up_to, snapshot_shallow, snapshot_blob) = match push {
+            ClientFrame::PushSnapshot {
+                up_to_op_id,
+                shallow_start_op_id,
+                blob,
+            } => (up_to_op_id, shallow_start_op_id, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         assert_eq!(snapshot_up_to, next_id);
+        assert_eq!(snapshot_shallow, next_id);
 
         // -- A keeps mutating after the snapshot was taken, so B's
         //    bootstrap exercises both the snapshot apply *and* the

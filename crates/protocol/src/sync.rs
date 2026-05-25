@@ -67,9 +67,13 @@ pub enum ClientFrame {
     /// Advance this device's frontier. Sent after Loro accepts the ops
     /// locally — never on raw byte receipt.
     Ack { last_acked_op_id: u64 },
-    /// Response to a `SnapshotRequest`. Reserved for the snapshot work.
+    /// Response to a `SnapshotRequest`. `up_to_op_id` is the encoded
+    /// state frontier; `shallow_start_op_id` is where the snapshot's
+    /// retained history starts (Loro shallow-snapshot boundary, doubles
+    /// as the server's compaction floor for ops below it).
     PushSnapshot {
         up_to_op_id: u64,
+        shallow_start_op_id: u64,
         blob: EncryptedBlob,
     },
     /// Request the latest snapshot blob. Reserved for the snapshot work.
@@ -89,19 +93,30 @@ pub enum ServerFrame {
     /// Pushed when another device on the same account commits ops.
     /// Reserved for the broadcast work.
     OpsBroadcast { ops: Vec<StoredOp> },
-    /// Server asks the most-acked active client to produce a snapshot.
-    /// Reserved for the snapshot work.
-    SnapshotRequest { up_to_op_id: u64 },
-    /// Response to `PullSnapshot`. Reserved for the snapshot work.
+    /// Server asks a connected, caught-up client to produce a snapshot.
+    /// `up_to_op_id` is the requested state frontier (= server's idea
+    /// of the producer's `last_acked_op_id`); `shallow_start_op_id` is
+    /// the retained-history boundary (= horizon). The client encodes a
+    /// Loro shallow snapshot with these two frontiers.
+    SnapshotRequest {
+        up_to_op_id: u64,
+        shallow_start_op_id: u64,
+    },
+    /// Response to `PullSnapshot`. `up_to_op_id` is the snapshot's
+    /// encoded state frontier; the bootstrapping client uses it as
+    /// its next `since_op_id` for `PullOps`.
     Snapshot {
         up_to_op_id: u64,
         blob: EncryptedBlob,
     },
     /// Sent in lieu of `OpsBatch` when the client's `since_op_id` is
-    /// below the latest snapshot's `up_to_op_id` — the device cannot
-    /// resume from ops alone (it would either be missing compacted ops
-    /// or wastefully replay every op since 0). The client must
-    /// `PullSnapshot`, apply the returned `Snapshot`, then re-issue
-    /// `PullOps { since_op_id: up_to_op_id }`.
+    /// below the latest snapshot's `shallow_start_op_id` — the ops it
+    /// needs have been compacted, so it can't resume from ops alone.
+    /// (Devices between `shallow_start_op_id` and `up_to_op_id` can
+    /// still delta-pull — horizon-bounded compaction preserves those.)
+    /// The client must `PullSnapshot`, apply the returned `Snapshot`,
+    /// then re-issue `PullOps` from the snapshot's state frontier.
+    /// `up_to_op_id` here is informational; the authoritative value is
+    /// the one in the `Snapshot` frame.
     SnapshotRequired { up_to_op_id: u64 },
 }
