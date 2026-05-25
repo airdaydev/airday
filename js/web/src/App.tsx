@@ -2679,6 +2679,62 @@ function NotesField(props: {
   );
 }
 
+// Render `text` into `el`, replacing existing children, with http(s) URLs
+// wrapped in <a target="_blank"> anchors. Trailing punctuation that isn't
+// part of the URL (.,;:!?)]}'") is left as plain text. Used by Row only
+// while the row is expanded so URLs become clickable in edit mode;
+// el.textContent still returns the plain string for save-back.
+const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
+const URL_TRAIL_RE = /[.,;:!?)\]}'"]+$/;
+function setLinkifiedText(el: HTMLElement, text: string) {
+  el.replaceChildren();
+  if (!text) return;
+  URL_RE.lastIndex = 0;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = URL_RE.exec(text)) !== null) {
+    let url = match[0];
+    const trail = url.match(URL_TRAIL_RE);
+    if (trail) url = url.slice(0, url.length - trail[0].length);
+    if (!url) continue;
+    if (match.index > lastIndex) {
+      el.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = url;
+    el.appendChild(a);
+    lastIndex = match.index + url.length;
+  }
+  if (lastIndex < text.length) {
+    el.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+// Translate an absolute character offset within el's plain text into a
+// (node, offset) pair that can be fed to Range.setStart, walking through
+// linkified anchors. Used after swapping plain text for linkified content
+// to preserve the dblclick caret position the user pointed at.
+function locateOffsetInLinkified(
+  el: HTMLElement,
+  charOffset: number,
+): { node: Node; offset: number } {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let remaining = charOffset;
+  let last: Text | null = null;
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    if (remaining <= t.data.length) return { node: t, offset: remaining };
+    remaining -= t.data.length;
+    last = t;
+  }
+  if (last) return { node: last, offset: last.data.length };
+  return { node: el, offset: el.childNodes.length };
+}
+
 function Row(props: {
   item: () => ItemView;
   expanded: () => boolean;
@@ -2723,12 +2779,29 @@ function Row(props: {
         if (!prev && now) {
           const caret = dblClickCaret;
           dblClickCaret = null;
+          // Resolve the dblclick caret to an absolute char offset *before*
+          // linkifying, since the captured text node is about to be
+          // detached. Pre-linkify the row has a single text node, so its
+          // offset is already the absolute char position.
+          let charOffset: number | null = null;
+          if (caret) {
+            if (caret.node === textRef) {
+              charOffset = textRef.textContent?.length ?? 0;
+            } else if (textRef.contains(caret.node)) {
+              charOffset = caret.offset;
+            }
+          }
+          // Swap plain text for linkified anchors so URLs become clickable
+          // while the row is editable. The collapse path & mirror effect
+          // restore plain text, so anchors only exist in expanded rows.
+          setLinkifiedText(textRef, props.item().text);
           queueMicrotask(() => {
             textRef.focus();
             const sel = window.getSelection();
             const range = document.createRange();
-            if (caret && textRef.contains(caret.node)) {
-              range.setStart(caret.node, caret.offset);
+            if (charOffset !== null) {
+              const pos = locateOffsetInLinkified(textRef, charOffset);
+              range.setStart(pos.node, pos.offset);
               range.collapse(true);
             } else {
               // No dblclick caret (e.g. expanded via Enter): drop the cursor
@@ -2819,7 +2892,8 @@ function Row(props: {
 
   // Mirror the model into the DOM while not expanded. While expanded
   // we leave the DOM alone so live edits aren't clobbered by reactive
-  // updates from peer text changes.
+  // updates from peer text changes. Plain text only — the expand path
+  // swaps in linkified anchors so URLs are only clickable while editing.
   createEffect(() => {
     if (!props.expanded()) textRef.textContent = props.item().text;
   });
@@ -2917,7 +2991,27 @@ function Row(props: {
             class="row-text"
             contentEditable={props.expanded()}
             onClick={(e) => {
-              if (props.expanded()) e.stopPropagation();
+              if (!props.expanded()) return;
+              // Anchors inside contenteditable don't navigate by default —
+              // clicks place the caret. Intercept plain (no-modifier) clicks
+              // on links so they open in a new tab; modifier-clicks fall
+              // through to native behavior so the user can still place the
+              // caret inside a link to edit it.
+              const link = (e.target as HTMLElement | null)?.closest("a");
+              if (
+                link instanceof HTMLAnchorElement &&
+                textRef.contains(link) &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.shiftKey &&
+                !e.altKey
+              ) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(link.href, "_blank", "noopener,noreferrer");
+                return;
+              }
+              e.stopPropagation();
             }}
             onPointerDown={(e) => {
               if (props.expanded()) e.stopPropagation();

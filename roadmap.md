@@ -4,7 +4,6 @@
 - import/export
 
 ## Sync & persistence
-- Server-side compaction after durable snapshots still needs to land.
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
@@ -21,7 +20,7 @@ One latent thing remains, but it was already scoped out in your handoff:
 ## Web app
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.
-- Browser automation harness. Manual smoke is still doing the job, but Playwright becomes worthwhile once the UI stops moving around.
+- Browser automation harness. Manual smoke is still doing the job, but Playwright becomes worthwhile as a sanity check.
 
 ## Native clients
 - UniFFI bridge for iOS / Android over the existing `core` crate.
@@ -33,6 +32,10 @@ One latent thing remains, but it was already scoped out in your handoff:
 
 ## Postgresql version
 - ensure single snapshot per account across replicas
+- migration strategy
+
+## CI
+- sqlite migrations
 
 ## CLI
 - Sqlite storage

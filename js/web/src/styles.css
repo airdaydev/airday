@@ -561,6 +561,12 @@ body {
   line-height: 1.3em;
 }
 
+.row[data-expanded] .row-text a {
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .row-description {
   color: var(--text-empty);
 }
