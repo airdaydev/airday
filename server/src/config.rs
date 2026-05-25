@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::sync::snapshot::SNAPSHOT_THRESHOLD_OPS;
+use crate::sync::snapshot::SNAPSHOT_THRESHOLD_BLOBS;
 
 const DEFAULT_CONFIG_PATH: &str = "local/server.toml";
 
@@ -36,11 +36,13 @@ pub struct Config {
     /// and don't care).
     #[serde(default = "default_secure_cookies")]
     pub secure_cookies: bool,
-    /// Ops accumulated since the last snapshot before the server starts
-    /// asking clients to snapshot. Lower in tests to exercise the path
-    /// without churning out 10k ops.
-    #[serde(default = "default_snapshot_threshold_ops")]
-    pub snapshot_threshold_ops: u64,
+    /// Encrypted op blobs accumulated since the last snapshot before
+    /// the server starts asking clients to snapshot. One blob = one
+    /// `PushOps` push (see `spec/sync-protocol.md` §"Terminology"), so
+    /// this counts pushes, not user actions. Lower in tests to exercise
+    /// the path without churning out 10k pushes.
+    #[serde(default = "default_snapshot_threshold_blobs")]
+    pub snapshot_threshold_blobs: u64,
 }
 
 impl Default for Config {
@@ -50,7 +52,7 @@ impl Default for Config {
             db: default_db(),
             log_level: default_log_level(),
             secure_cookies: default_secure_cookies(),
-            snapshot_threshold_ops: default_snapshot_threshold_ops(),
+            snapshot_threshold_blobs: default_snapshot_threshold_blobs(),
         }
     }
 }
@@ -84,8 +86,8 @@ fn default_secure_cookies() -> bool {
     true
 }
 
-fn default_snapshot_threshold_ops() -> u64 {
-    SNAPSHOT_THRESHOLD_OPS
+fn default_snapshot_threshold_blobs() -> u64 {
+    SNAPSHOT_THRESHOLD_BLOBS
 }
 
 impl Config {
@@ -118,9 +120,9 @@ impl Config {
         if let Ok(v) = std::env::var("AIRDAY_SECURE_COOKIES") {
             config.secure_cookies = matches!(v.as_str(), "1" | "true" | "TRUE");
         }
-        if let Ok(v) = std::env::var("AIRDAY_SNAPSHOT_THRESHOLD_OPS") {
-            config.snapshot_threshold_ops = v.parse().unwrap_or_else(|e| {
-                panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_OPS={v:?}: {e}")
+        if let Ok(v) = std::env::var("AIRDAY_SNAPSHOT_THRESHOLD_BLOBS") {
+            config.snapshot_threshold_blobs = v.parse().unwrap_or_else(|e| {
+                panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}")
             });
         }
 

@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@msgpack/msgpack": "^3.0.0",
     "@types/bun": "latest"
   },
   "peerDependencies": {

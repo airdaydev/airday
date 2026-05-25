@@ -45,9 +45,9 @@ impl TestServer {
         Self::start_inner(None).await
     }
 
-    async fn start_with_snapshot_config(threshold_ops: u64, timeout: std::time::Duration) -> Self {
+    async fn start_with_snapshot_config(threshold_blobs: u64, timeout: std::time::Duration) -> Self {
         Self::start_inner(Some(SnapshotCoordinator::with_config(
-            threshold_ops,
+            threshold_blobs,
             timeout,
         )))
         .await
@@ -143,10 +143,10 @@ async fn signup_account() -> Account {
 }
 
 async fn signup_account_with_snapshot_config(
-    threshold_ops: u64,
+    threshold_blobs: u64,
     timeout: std::time::Duration,
 ) -> Account {
-    signup_into(TestServer::start_with_snapshot_config(threshold_ops, timeout).await).await
+    signup_into(TestServer::start_with_snapshot_config(threshold_blobs, timeout).await).await
 }
 
 async fn signup_into(server: TestServer) -> Account {

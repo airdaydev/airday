@@ -42,8 +42,8 @@ impl AppState {
         self
     }
 
-    pub fn with_snapshot_threshold_ops(mut self, threshold_ops: u64) -> Self {
-        self.snapshot_coordinator = SnapshotCoordinator::with_threshold_ops(threshold_ops);
+    pub fn with_snapshot_threshold_blobs(mut self, threshold_blobs: u64) -> Self {
+        self.snapshot_coordinator = SnapshotCoordinator::with_threshold_blobs(threshold_blobs);
         self
     }
 }

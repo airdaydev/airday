@@ -4,12 +4,14 @@ use std::time::Instant;
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use uuid::Uuid;
 
-// Default threshold: 10k ops since the last snapshot makes an account
-// eligible. Operators override via `snapshot_threshold_ops` in the server
-// config (or `AIRDAY_SNAPSHOT_THRESHOLD_OPS`); JS e2e tests drop it to a
-// handful so the snapshot path runs in seconds.
+// Default threshold: 10k *op blobs* (each is one encrypted PushOps push;
+// see `spec/sync-protocol.md` §"Terminology") since the last snapshot
+// makes an account eligible. Operators override via
+// `snapshot_threshold_blobs` in the server config (or
+// `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`); JS e2e tests drop it to a handful
+// so the snapshot path runs in seconds.
 // Timeout after 5 minutes
-pub const SNAPSHOT_THRESHOLD_OPS: u64 = 10_000;
+pub const SNAPSHOT_THRESHOLD_BLOBS: u64 = 10_000;
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 struct ActiveLease {
@@ -25,7 +27,7 @@ enum LeaseState {
 #[derive(Clone)]
 pub struct SnapshotCoordinator {
     timeout: Duration, // Maximum time to allow device to return a snapshot
-    threshold_ops: u64,
+    threshold_blobs: u64,
     leases: Arc<Mutex<HashMap<Uuid, LeaseState>>>,
     next_lease_id: Arc<AtomicU64>,
 }
@@ -42,17 +44,17 @@ pub enum ReleaseResult {
 
 impl SnapshotCoordinator {
     pub fn new() -> Self {
-        Self::with_config(SNAPSHOT_THRESHOLD_OPS, SNAPSHOT_TIMEOUT)
+        Self::with_config(SNAPSHOT_THRESHOLD_BLOBS, SNAPSHOT_TIMEOUT)
     }
 
-    pub fn with_threshold_ops(threshold_ops: u64) -> Self {
-        Self::with_config(threshold_ops, SNAPSHOT_TIMEOUT)
+    pub fn with_threshold_blobs(threshold_blobs: u64) -> Self {
+        Self::with_config(threshold_blobs, SNAPSHOT_TIMEOUT)
     }
 
-    pub fn with_config(threshold_ops: u64, timeout: Duration) -> Self {
+    pub fn with_config(threshold_blobs: u64, timeout: Duration) -> Self {
         Self {
             timeout,
-            threshold_ops,
+            threshold_blobs,
             leases: Arc::new(Mutex::new(HashMap::new())),
             next_lease_id: Arc::new(AtomicU64::new(1)),
         }
@@ -66,7 +68,7 @@ impl SnapshotCoordinator {
         now: Instant,
     ) -> Decision {
         // No need to snapshot yet
-        if server_last_op_id.saturating_sub(server_snapshot_op_id) < self.threshold_ops {
+        if server_last_op_id.saturating_sub(server_snapshot_op_id) < self.threshold_blobs {
             return Decision::Skip;
         }
         // Client is not yet up to date with server
