@@ -33,7 +33,7 @@ pub enum Decision {
     Skip,
 }
 
-pub enum CompleteResult {
+pub enum ReleaseResult {
     Accepted,
     Stale, // covers both "wrong lease_id" and "no active lease"
 }
@@ -90,25 +90,25 @@ impl SnapshotCoordinator2 {
             up_to_op_id: device_last_acked_op_id,
         }
     }
-    pub fn complete(&self, account: Uuid, incoming_lease_id: u64, now: Instant) -> CompleteResult {
+    pub fn release(&self, account: Uuid, incoming_lease_id: u64) -> ReleaseResult {
         let mut leases = self
             .leases
             .lock()
             .expect("snapshot coordinator mutex poisoned");
         if let Some(lease_state) = leases.get_mut(&account) {
             return match lease_state {
-                LeaseState::Idle => CompleteResult::Stale,
+                LeaseState::Idle => ReleaseResult::Stale,
                 LeaseState::Active(server_lease) => {
                     if server_lease.lease_id == incoming_lease_id {
                         *lease_state = LeaseState::Idle;
-                        CompleteResult::Accepted
+                        ReleaseResult::Accepted
                     } else {
-                        CompleteResult::Stale
+                        ReleaseResult::Stale
                     }
                 }
             };
         }
-        CompleteResult::Stale
+        ReleaseResult::Stale
     }
 }
 
@@ -144,10 +144,17 @@ mod tests {
             }
         ));
         let Decision::Issue { lease_id, .. } = decision else {
-            panic!("never hit")
+            panic!("should issue")
         };
-        let result = coord.complete(account, lease_id, now);
-        assert!(matches!(result, CompleteResult::Accepted));
+
+        let decision = coord.evaluate(account, 0, 22_000, 22_000, now);
+        assert!(
+            matches!(decision, Decision::Skip),
+            "In-flight request; should fail"
+        );
+
+        let result = coord.release(account, lease_id);
+        assert!(matches!(result, ReleaseResult::Accepted));
 
         // TODO: Issues after expiry?
 
@@ -160,7 +167,25 @@ mod tests {
                     ..
                 }
             ),
-            "Issues after completion again"
+            "Issues instantly after completion again"
+        );
+
+        let decision = coord.evaluate(
+            account,
+            0,
+            12_000,
+            12_000,
+            now + coord.timeout + Duration::from_secs(300),
+        );
+        assert!(
+            matches!(
+                decision,
+                Decision::Issue {
+                    up_to_op_id: 12_000,
+                    ..
+                }
+            ),
+            "Expired req, should issue"
         );
     }
 
@@ -170,16 +195,16 @@ mod tests {
         let account = Uuid::now_v7();
         let now = Instant::now();
 
-        let result = coord.complete(account, 100, now);
+        let result = coord.release(account, 100);
         assert!(
-            matches!(result, CompleteResult::Stale),
+            matches!(result, ReleaseResult::Stale),
             "Stale result if coordinator does not track any snapshot"
         );
 
         coord.evaluate(account, 0, 12_000, 12_000, now);
-        let result_2 = coord.complete(account, 100, now);
+        let result_2 = coord.release(account, 100);
         assert!(
-            matches!(result_2, CompleteResult::Stale),
+            matches!(result_2, ReleaseResult::Stale),
             "Stale result if coordinator snapshot mismatch with client"
         );
     }
