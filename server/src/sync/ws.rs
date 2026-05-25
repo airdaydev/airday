@@ -230,6 +230,14 @@ async fn handle_frame(
                 last_acked_op_id,
             )
             .await?;
+            let decision = evaluate_snapshot(state, ws_session, last_acked_op_id).await?;
+            if let Decision::Issue {
+                lease_id,
+                up_to_op_id,
+            } = decision
+            {
+                // Send it off
+            }
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
@@ -238,6 +246,25 @@ async fn handle_frame(
             push_snapshot(state, ws_session, up_to_op_id, blob).await
         }
     }
+}
+
+async fn evaluate_snapshot(
+    state: &AppState,
+    ws_session: &WSSession,
+    latest_op_id: u64,
+) -> Result<Decision, SessionError> {
+    let server_snapshot_op_id =
+        queries::latest_snapshot_floor(&state.db, ws_session.auth.account_id)
+            .await?
+            .unwrap_or(0);
+    let decision = state.snapshot_coordinator_2.evaluate(
+        ws_session.auth.account_id,
+        server_snapshot_op_id,
+        0, // TODO: Where we get this from?
+        latest_op_id,
+        Instant::now(),
+    );
+    Ok(decision)
 }
 
 async fn push_ops(
@@ -288,24 +315,14 @@ async fn push_ops(
         );
 
         if let Some(latest_op_id) = assigned_ids.last().copied() {
-            let server_snapshot_op_id =
-                queries::latest_snapshot_floor(&state.db, ws_session.auth.account_id)
-                    .await?
-                    .unwrap_or(0);
-            let decision = state.snapshot_coordinator_2.evaluate(
-                ws_session.auth.account_id,
-                server_snapshot_op_id,
-                0, // TODO: Where we get this from?
-                latest_op_id,
-                Instant::now(),
-            );
+            let decision = evaluate_snapshot(state, ws_session, latest_op_id).await?;
             if let Decision::Issue {
                 lease_id,
                 up_to_op_id,
             } = decision
             {
-                // TODO: Push snapshot req message out
-            };
+                // Send it off
+            }
         }
 
         send_msgpack(socket, &ServerFrame::OpsAck { assigned_ids }).await
