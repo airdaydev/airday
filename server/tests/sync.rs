@@ -11,7 +11,7 @@ use airday_protocol::{
     HelloRejected, KdfParams, ServerFrame, SignupRequest, SignupResponse, StoredOp,
     PROTOCOL_VERSION,
 };
-use airday_server::sync::queries;
+use airday_server::sync::{queries, SnapshotCoordinator2};
 use airday_server::{router, AppState};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
@@ -42,7 +42,22 @@ struct TestServer {
 
 impl TestServer {
     async fn start() -> Self {
-        let state = AppState::open_in_memory().await.unwrap();
+        Self::start_inner(None).await
+    }
+
+    async fn start_with_snapshot_config(threshold_ops: u64, timeout: std::time::Duration) -> Self {
+        Self::start_inner(Some(SnapshotCoordinator2::with_config(
+            threshold_ops,
+            timeout,
+        )))
+        .await
+    }
+
+    async fn start_inner(snapshot_coord: Option<SnapshotCoordinator2>) -> Self {
+        let mut state = AppState::open_in_memory().await.unwrap();
+        if let Some(coord) = snapshot_coord {
+            state.snapshot_coordinator_2 = coord;
+        }
         let app = router(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -124,7 +139,17 @@ async fn register_second_device(acc: &Account, name: &str) -> ExtraDevice {
 }
 
 async fn signup_account() -> Account {
-    let server = TestServer::start().await;
+    signup_into(TestServer::start().await).await
+}
+
+async fn signup_account_with_snapshot_config(
+    threshold_ops: u64,
+    timeout: std::time::Duration,
+) -> Account {
+    signup_into(TestServer::start_with_snapshot_config(threshold_ops, timeout).await).await
+}
+
+async fn signup_into(server: TestServer) -> Account {
     let email = format!("user-{}@example.com", Uuid::now_v7());
     let kdf_params = weak_params();
     let master_salt: [u8; 16] = random_bytes();
@@ -391,17 +416,186 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn request_snapshot_to_unknown_subscriber_reports_undelivered() {
-    let acc = signup_account().await;
-    let _ws = connect_ws(&acc.server, &acc.device_token).await;
-    // No handshake → no subscribe; even with a session, sub_id 9999
-    // doesn't exist.
-    let delivered = acc
-        .server
-        .state
-        .sync_sessions
-        .request_snapshot(acc.account_id, 9999, 7);
-    assert!(!delivered);
+async fn no_snapshot_request_below_threshold() {
+    // Threshold=5; push 3 ops (well under) and ack them. The server
+    // must never emit a SnapshotRequest.
+    let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+
+    let blobs: Vec<EncryptedBlob> = (0..3).map(fake_blob).collect();
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
+    let assigned_ids = match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
+        other => panic!("expected OpsAck, got {other:?}"),
+    };
+    let last_id = *assigned_ids.last().unwrap();
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: last_id,
+        },
+    )
+    .await;
+    assert_no_snapshot_request(&mut ws, std::time::Duration::from_millis(200)).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn push_path_triggers_snapshot_request_and_persists() {
+    // Single device crosses threshold on push. Server emits a
+    // SnapshotRequest before the OpsAck; client responds with a
+    // PushSnapshot; row lands in the snapshots table.
+    let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+
+    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
+    send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
+    let up_to_op_id = expect_snapshot_request(&mut ws).await;
+    assert_eq!(up_to_op_id, 5);
+
+    let snapshot_blob = fake_blob(0xCC);
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::PushSnapshot {
+            up_to_op_id,
+            blob: snapshot_blob.clone(),
+        },
+    )
+    .await;
+    let snap = wait_for_snapshot(&acc, up_to_op_id).await;
+    assert_eq!(snap.blob, snapshot_blob);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ack_path_triggers_snapshot_request() {
+    // Inject ops directly via the query layer so the push-path
+    // doesn't fire eligibility for the connecting device. Once the
+    // device acks the latest op id, the Ack handler must drive
+    // evaluate and emit a SnapshotRequest.
+    let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
+    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
+    let assigned_ids = queries::insert_ops(&acc.server.state.db, acc.account_id, blobs)
+        .await
+        .unwrap();
+    let last_id = *assigned_ids.last().unwrap();
+
+    let mut ws = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws).await;
+    send_msgpack(
+        &mut ws,
+        &ClientFrame::Ack {
+            last_acked_op_id: last_id,
+        },
+    )
+    .await;
+    let up_to_op_id = expect_snapshot_request(&mut ws).await;
+    assert_eq!(up_to_op_id, last_id);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn stale_snapshot_after_lease_expiry_rejected() {
+    // Short timeout. A gets lease 1, never replies, lease expires.
+    // B acks → fresh lease 2. A then pushes a snapshot for lease 1;
+    // the coordinator's release returns Stale, so the snapshot is
+    // dropped instead of persisting under A's blob.
+    let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_millis(100)).await;
+    let device_b = register_second_device(&acc, "device-b").await;
+
+    let mut ws_a = connect_ws(&acc.server, &acc.device_token).await;
+    handshake(&mut ws_a).await;
+    let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
+    send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs }).await;
+    let up_to_op_id = expect_snapshot_request(&mut ws_a).await;
+    assert_eq!(up_to_op_id, 5);
+
+    // Wait past timeout so the lease is expired in the coordinator.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // B acks at the same frontier — coordinator sees A's lease as
+    // expired, issues a fresh one to B.
+    let mut ws_b = connect_ws(&acc.server, &device_b.device_token).await;
+    handshake(&mut ws_b).await;
+    send_msgpack(
+        &mut ws_b,
+        &ClientFrame::Ack {
+            last_acked_op_id: up_to_op_id,
+        },
+    )
+    .await;
+    let b_up_to = expect_snapshot_request(&mut ws_b).await;
+    assert_eq!(b_up_to, up_to_op_id);
+
+    // A's late snapshot — must be dropped (release returns Stale).
+    let stale_blob = fake_blob(0xAA);
+    send_msgpack(
+        &mut ws_a,
+        &ClientFrame::PushSnapshot {
+            up_to_op_id,
+            blob: stale_blob,
+        },
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    let snap = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
+        .await
+        .unwrap();
+    assert!(
+        snap.is_none(),
+        "stale snapshot from expired lease must not persist"
+    );
+}
+
+async fn expect_snapshot_request(ws: &mut WsStream) -> u64 {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        let frame = match tokio::time::timeout(remaining, recv_msgpack::<ServerFrame>(ws)).await {
+            Ok(f) => f,
+            Err(_) => panic!("no SnapshotRequest within deadline"),
+        };
+        match frame {
+            ServerFrame::SnapshotRequest { up_to_op_id } => return up_to_op_id,
+            ServerFrame::OpsAck { .. } | ServerFrame::OpsBroadcast { .. } => continue,
+            other => panic!("unexpected frame while waiting for SnapshotRequest: {other:?}"),
+        }
+    }
+}
+
+async fn assert_no_snapshot_request(ws: &mut WsStream, window: std::time::Duration) {
+    let deadline = std::time::Instant::now() + window;
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return;
+        }
+        match tokio::time::timeout(remaining, recv_msgpack::<ServerFrame>(ws)).await {
+            Ok(ServerFrame::OpsAck { .. }) | Ok(ServerFrame::OpsBroadcast { .. }) => continue,
+            Ok(ServerFrame::SnapshotRequest { up_to_op_id }) => {
+                panic!("unexpected SnapshotRequest up_to_op_id={up_to_op_id}");
+            }
+            Ok(other) => panic!("unexpected frame: {other:?}"),
+            Err(_) => return,
+        }
+    }
+}
+
+async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        if let Some(snap) = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
+            .await
+            .unwrap()
+        {
+            if snap.up_to_op_id == up_to {
+                return snap;
+            }
+        }
+        if std::time::Instant::now() > deadline {
+            panic!("snapshot up_to={up_to} never landed");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
 }
 
 async fn expect_complete_batch(ws: &mut WsStream) -> Vec<StoredOp> {

@@ -218,7 +218,7 @@ async fn handle_frame(
     frame: ClientFrame,
 ) -> Result<(), SessionError> {
     match frame {
-        ClientFrame::PushOps { ops } => push_ops(socket, state, &ws_session, ops).await,
+        ClientFrame::PushOps { ops } => push_ops(socket, state, ws_session, ops).await,
         ClientFrame::PullOps { since_op_id } => {
             pull_ops(socket, state, &ws_session.auth, since_op_id).await
         }
@@ -230,14 +230,7 @@ async fn handle_frame(
                 last_acked_op_id,
             )
             .await?;
-            let decision = evaluate_snapshot(state, ws_session, last_acked_op_id).await?;
-            if let Decision::Issue {
-                lease_id,
-                up_to_op_id,
-            } = decision
-            {
-                // Send it off
-            }
+            evaluate_snapshot(socket, state, ws_session, last_acked_op_id).await?;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
@@ -249,28 +242,41 @@ async fn handle_frame(
 }
 
 async fn evaluate_snapshot(
+    socket: &mut WebSocket,
     state: &AppState,
-    ws_session: &WSSession,
+    ws_session: &mut WSSession,
     latest_op_id: u64,
-) -> Result<Decision, SessionError> {
+) -> Result<(), SessionError> {
     let server_snapshot_op_id =
         queries::latest_snapshot_floor(&state.db, ws_session.auth.account_id)
             .await?
             .unwrap_or(0);
+    let server_last_op_id =
+        queries::latest_account_op_id(&state.db, ws_session.auth.account_id).await?;
     let decision = state.snapshot_coordinator_2.evaluate(
         ws_session.auth.account_id,
         server_snapshot_op_id,
-        0, // TODO: Where we get this from?
+        server_last_op_id,
         latest_op_id,
         Instant::now(),
     );
-    Ok(decision)
+    if let Decision::Issue {
+        lease_id,
+        up_to_op_id,
+    } = decision
+    {
+        ws_session.snapshot_lease = Some(lease_id);
+        send_msgpack(socket, &ServerFrame::SnapshotRequest { up_to_op_id }).await?;
+        tracing::info!(lease_id, up_to_op_id, "ws snapshot requested");
+        return Ok(());
+    }
+    Ok(())
 }
 
 async fn push_ops(
     socket: &mut WebSocket,
     state: &AppState,
-    ws_session: &WSSession,
+    ws_session: &mut WSSession,
     ops: Vec<EncryptedBlob>,
 ) -> Result<(), SessionError> {
     let push_span = tracing::info_span!("ws.push_ops", op_count = ops.len());
@@ -315,14 +321,7 @@ async fn push_ops(
         );
 
         if let Some(latest_op_id) = assigned_ids.last().copied() {
-            let decision = evaluate_snapshot(state, ws_session, latest_op_id).await?;
-            if let Decision::Issue {
-                lease_id,
-                up_to_op_id,
-            } = decision
-            {
-                // Send it off
-            }
+            evaluate_snapshot(socket, state, ws_session, latest_op_id).await?;
         }
 
         send_msgpack(socket, &ServerFrame::OpsAck { assigned_ids }).await

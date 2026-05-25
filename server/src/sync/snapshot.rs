@@ -11,7 +11,6 @@ const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 struct ActiveLease {
     lease_id: u64,
-    request_up_to_op_id: u64,
     expires_at: Instant,
 }
 
@@ -40,9 +39,13 @@ pub enum ReleaseResult {
 
 impl SnapshotCoordinator2 {
     pub fn new() -> Self {
+        Self::with_config(SNAPSHOT_THRESHOLD_OPS, SNAPSHOT_TIMEOUT)
+    }
+
+    pub fn with_config(threshold_ops: u64, timeout: Duration) -> Self {
         Self {
-            timeout: SNAPSHOT_TIMEOUT,
-            threshold_ops: SNAPSHOT_THRESHOLD_OPS,
+            timeout,
+            threshold_ops,
             leases: Arc::new(Mutex::new(HashMap::new())),
             next_lease_id: Arc::new(AtomicU64::new(1)),
         }
@@ -69,16 +72,15 @@ impl SnapshotCoordinator2 {
             .lock()
             .expect("snapshot coordinator mutex poisoned");
         let lease_state = leases.entry(account).or_insert_with(|| LeaseState::Idle);
-        match lease_state {
-            LeaseState::Active(lease) if now >= lease.expires_at => true, // Expired lease
-            LeaseState::Active(_) => return Decision::Skip,               // In-flight lease
-            LeaseState::Idle { .. } => false, // Could be idle, but not expired lease
-        };
+        if let LeaseState::Active(lease) = lease_state {
+            if now < lease.expires_at {
+                return Decision::Skip;
+            }
+        }
         // Ok we're ready
         let lease_id = self.next_lease_id.fetch_add(1, Ordering::Relaxed);
         *lease_state = LeaseState::Active(ActiveLease {
             lease_id,
-            request_up_to_op_id: device_last_acked_op_id,
             expires_at: now + self.timeout,
         });
         Decision::Issue {
