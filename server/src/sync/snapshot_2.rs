@@ -12,13 +12,12 @@ const SNAPSHOT_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 
 struct ActiveLease {
     lease_id: u64,
-    device_id: Uuid,
     request_up_to_op_id: u64,
     expires_at: Instant,
 }
 
 enum LeaseState {
-    Idle { cooldown_until: Option<Instant> },
+    Idle,
     Active(ActiveLease),
 }
 
@@ -32,12 +31,13 @@ pub struct SnapshotCoordinator2 {
 }
 
 pub enum Decision {
-    Issue {
-        device_id: Uuid,
-        lease_id: u64,
-        up_to_op_id: u64,
-    },
+    Issue { lease_id: u64, up_to_op_id: u64 },
     Skip,
+}
+
+pub enum CompleteResult {
+    Accepted,
+    Stale, // covers both "wrong lease_id" and "no active lease"
 }
 
 impl SnapshotCoordinator2 {
@@ -72,43 +72,47 @@ impl SnapshotCoordinator2 {
             .leases
             .lock()
             .expect("snapshot coordinator mutex poisoned");
-        let lease_state = leases.entry(account).or_insert_with(|| LeaseState::Idle {
-            cooldown_until: None,
-        });
+        let lease_state = leases.entry(account).or_insert_with(|| LeaseState::Idle);
         let expired = match lease_state {
             LeaseState::Active(lease) if now >= lease.expires_at => true, // Expired lease
             LeaseState::Active(_) => return Decision::Skip,               // In-flight lease
             LeaseState::Idle { .. } => false, // Could be idle, but not expired lease
         };
         if expired {
-            // Prevent attempt for 5 minutes
-            *lease_state = LeaseState::Idle {
-                cooldown_until: Some(now + self.cooldown),
-            };
-            return Decision::Skip;
-        }
-        if let LeaseState::Idle { cooldown_until } = lease_state {
-            let in_cooldown = match cooldown_until {
-                None => false,
-                Some(cooldown) => now < *cooldown,
-            };
-            if in_cooldown {
-                return Decision::Skip;
-            }
+            // Lease has expired, continue
+            *lease_state = LeaseState::Idle;
         }
         // Ok we're ready
         let lease_id = self.next_lease_id.fetch_add(1, Ordering::Relaxed);
         *lease_state = LeaseState::Active(ActiveLease {
             lease_id,
-            device_id,
             request_up_to_op_id: device_last_acked_op_id,
             expires_at: now + self.timeout,
         });
         Decision::Issue {
-            device_id,
             lease_id,
             up_to_op_id: device_last_acked_op_id,
         }
+    }
+    pub fn complete(&self, account: Uuid, incoming_lease_id: u64, now: Instant) -> CompleteResult {
+        let mut leases = self
+            .leases
+            .lock()
+            .expect("snapshot coordinator mutex poisoned");
+        if let Some(lease_state) = leases.get_mut(&account) {
+            return match lease_state {
+                LeaseState::Idle => CompleteResult::Stale,
+                LeaseState::Active(server_lease) => {
+                    if server_lease.lease_id == incoming_lease_id {
+                        *lease_state = LeaseState::Idle;
+                        CompleteResult::Accepted
+                    } else {
+                        CompleteResult::Stale
+                    }
+                }
+            };
+        }
+        CompleteResult::Stale
     }
 }
 
@@ -123,6 +127,18 @@ mod tests {
         let device = Uuid::now_v7();
         let now = Instant::now();
 
+        let decision = coord.evaluate(account, 5000, 12_000, 12_000, device, now);
+        assert!(
+            matches!(decision, Decision::Skip),
+            "Fails within default threshold ops (10k)"
+        );
+
+        let decision = coord.evaluate(account, 0, 12_000, 11_999, device, now);
+        assert!(
+            matches!(decision, Decision::Skip),
+            "Fails if client is behind server"
+        );
+
         let decision = coord.evaluate(account, 0, 12_000, 12_000, device, now);
 
         assert!(matches!(
@@ -132,7 +148,43 @@ mod tests {
                 ..
             }
         ));
+        let Decision::Issue { lease_id, .. } = decision else {
+            panic!("never hit")
+        };
+        let result = coord.complete(account, lease_id, now);
+        assert!(matches!(result, CompleteResult::Accepted));
+
+        let decision_2 = coord.evaluate(account, 0, 22_000, 22_000, device, now + coord.cooldown);
+        assert!(
+            matches!(
+                decision_2,
+                Decision::Issue {
+                    up_to_op_id: 22_000,
+                    ..
+                }
+            ),
+            "Passes after cooldown period exceeded"
+        );
     }
 
-    // TODO: Race these
+    #[test]
+    fn stale_completions_ignored() {
+        let coord = SnapshotCoordinator2::new();
+        let account = Uuid::now_v7();
+        let device = Uuid::now_v7();
+        let now = Instant::now();
+
+        let result = coord.complete(account, 100, now);
+        assert!(
+            matches!(result, CompleteResult::Stale),
+            "Stale result if coordinator does not track any snapshot"
+        );
+
+        coord.evaluate(account, 0, 12_000, 12_000, device, now);
+        let result_2 = coord.complete(account, 100, now);
+        assert!(
+            matches!(result_2, CompleteResult::Stale),
+            "Stale result if coordinator snapshot mismatch with client"
+        );
+    }
 }
