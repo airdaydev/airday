@@ -251,7 +251,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       renameList: "Rename",
       showListCounts: "Show list counts",
       hideListCounts: "Hide list counts",
-      newList: "+ New list",
+      newList: "+ Add list",
       connected: "Connected",
       disconnected: "Disconnected",
       allSynced: "All synced",

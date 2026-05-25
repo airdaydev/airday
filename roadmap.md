@@ -9,6 +9,15 @@
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
 
+## Compaction
+One latent thing remains, but it was already scoped out in your handoff:
+  core/src/doc.rs::snapshot_blob still calls ExportMode::Snapshot (full), so the
+  snapshot payload doesn't trim Loro's internal history even though the ops table does.
+  That means bootstrap downloads are bigger than they need to be, but the ops-table
+  storage win is fully realized. Switching to ExportMode::shallow_snapshot(frontier)
+  needs the op_id → Loro frontier mapping that doesn't exist client-side yet — separate
+  task whenever you want to chase it.
+
 ## Web app
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.
@@ -24,9 +33,6 @@
 
 ## Postgresql version
 - ensure single snapshot per account across replicas
-
-## Feedback
-- Maddy: should be able to click to add first item
 
 ## CLI
 - Sqlite storage
