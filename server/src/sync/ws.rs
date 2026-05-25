@@ -205,7 +205,7 @@ async fn run_session(
     drop(sub);
     if let Some(lease_id) = ws_session.snapshot_lease.take() {
         state
-            .snapshot_coordinator_2
+            .snapshot_coordinator
             .release(ws_session.auth.account_id, lease_id);
     }
     result
@@ -253,7 +253,7 @@ async fn evaluate_snapshot(
             .unwrap_or(0);
     let server_last_op_id =
         queries::latest_account_op_id(&state.db, ws_session.auth.account_id).await?;
-    let decision = state.snapshot_coordinator_2.evaluate(
+    let decision = state.snapshot_coordinator.evaluate(
         ws_session.auth.account_id,
         server_snapshot_op_id,
         server_last_op_id,
@@ -410,7 +410,7 @@ async fn push_snapshot(
             return Ok(());
         };
         let result = state
-            .snapshot_coordinator_2
+            .snapshot_coordinator
             .release(ws_session.auth.account_id, snapshot_lease);
         if let ReleaseResult::Stale = result {
             tracing::warn!("ignoring unsolicited or stale PushSnapshot");

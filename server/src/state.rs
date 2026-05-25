@@ -3,14 +3,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::db::Db;
-use crate::sync::{SnapshotCoordinator2, SyncSessions};
+use crate::sync::{SnapshotCoordinator, SyncSessions};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
     pub clock: Arc<dyn Clock>,
     pub sync_sessions: SyncSessions,
-    pub snapshot_coordinator_2: SnapshotCoordinator2,
+    pub snapshot_coordinator: SnapshotCoordinator,
     /// Mirror of `Config::secure_cookies`. Lives on state because the
     /// cookie helpers run from request handlers, not at startup.
     pub secure_cookies: bool,
@@ -22,7 +22,7 @@ impl AppState {
             db: Db::open(path).await?,
             clock: Arc::new(SystemClock),
             sync_sessions: SyncSessions::new(),
-            snapshot_coordinator_2: SnapshotCoordinator2::new(),
+            snapshot_coordinator: SnapshotCoordinator::new(),
             secure_cookies: true,
         })
     }
@@ -32,7 +32,7 @@ impl AppState {
             db: Db::open_in_memory().await?,
             clock: Arc::new(SystemClock),
             sync_sessions: SyncSessions::new(),
-            snapshot_coordinator_2: SnapshotCoordinator2::new(),
+            snapshot_coordinator: SnapshotCoordinator::new(),
             secure_cookies: true,
         })
     }

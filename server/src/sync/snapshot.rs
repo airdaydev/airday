@@ -20,7 +20,7 @@ enum LeaseState {
 }
 
 #[derive(Clone)]
-pub struct SnapshotCoordinator2 {
+pub struct SnapshotCoordinator {
     timeout: Duration, // Maximum time to allow device to return a snapshot
     threshold_ops: u64,
     leases: Arc<Mutex<HashMap<Uuid, LeaseState>>>,
@@ -37,7 +37,7 @@ pub enum ReleaseResult {
     Stale, // covers both "wrong lease_id" and "no active lease"
 }
 
-impl SnapshotCoordinator2 {
+impl SnapshotCoordinator {
     pub fn new() -> Self {
         Self::with_config(SNAPSHOT_THRESHOLD_OPS, SNAPSHOT_TIMEOUT)
     }
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn issues_when_threshold_exceeded_and_caught_up() {
-        let coord = SnapshotCoordinator2::new();
+        let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
         let now = Instant::now();
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn stale_completions_ignored() {
-        let coord = SnapshotCoordinator2::new();
+        let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
         let now = Instant::now();
 

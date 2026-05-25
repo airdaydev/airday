@@ -11,7 +11,7 @@ use airday_protocol::{
     HelloRejected, KdfParams, ServerFrame, SignupRequest, SignupResponse, StoredOp,
     PROTOCOL_VERSION,
 };
-use airday_server::sync::{queries, SnapshotCoordinator2};
+use airday_server::sync::{queries, SnapshotCoordinator};
 use airday_server::{router, AppState};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
@@ -46,17 +46,17 @@ impl TestServer {
     }
 
     async fn start_with_snapshot_config(threshold_ops: u64, timeout: std::time::Duration) -> Self {
-        Self::start_inner(Some(SnapshotCoordinator2::with_config(
+        Self::start_inner(Some(SnapshotCoordinator::with_config(
             threshold_ops,
             timeout,
         )))
         .await
     }
 
-    async fn start_inner(snapshot_coord: Option<SnapshotCoordinator2>) -> Self {
+    async fn start_inner(snapshot_coord: Option<SnapshotCoordinator>) -> Self {
         let mut state = AppState::open_in_memory().await.unwrap();
         if let Some(coord) = snapshot_coord {
-            state.snapshot_coordinator_2 = coord;
+            state.snapshot_coordinator = coord;
         }
         let app = router(state.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

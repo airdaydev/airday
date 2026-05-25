@@ -3,14 +3,6 @@
 - list deleting - binned first?
 - import/export
 
-## Correctness
-- Snapshot orchestration can get stuck waiting forever.
-- Snapshot upload can leak unpushed local state into the shared bootstrap path.
-- Revoking a device should probably also disconnect that device's live WebSocket session.
-
-## CLI
-- Sqlite storage
-
 ## Sync & persistence
 - Server-side compaction after durable snapshots still needs to land.
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.
@@ -36,3 +28,6 @@
 
 ## Feedback
 - Maddy: should be able to click to add first item
+
+## CLI
+- Sqlite storage
