@@ -60,10 +60,10 @@ The server **can**:
 - authenticate accounts and devices
 - assign monotonic op ids
 - track per-device `last_acked_op_id`
-- compute horizon = min(`last_acked_op_id`) across active devices
-- decide when a snapshot is due (op-count threshold past last snapshot)
-- pick the most-acked active client to produce the snapshot
-- replace prior snapshots and prune ops below the horizon
+- compute horizon = min(`last_acked_op_id`) across all non-revoked devices
+- decide when a snapshot is due (op-count threshold past last snapshot AND horizon ahead of snapshot floor)
+- ask any connected client to produce the snapshot at the horizon
+- replace prior snapshots and prune ops up to the snapshot's `up_to_op_id`
 
 This thesis is load-bearing for everything in `sync-protocol.md`.
 

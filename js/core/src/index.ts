@@ -22,5 +22,6 @@ export {
 export {
   SyncBridge,
   type ConnectionEvent,
+  type ReconnectBackoff,
   type SyncBridgeOpts,
 } from "./sync-bridge.ts";

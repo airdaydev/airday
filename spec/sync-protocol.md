@@ -41,7 +41,7 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 | `OpsAck` | `{ assigned_ids: [u64] }` | Response to `PushOps`. |
 | `OpsBatch` | `{ ops: [(u64, EncryptedBlob)], complete: bool }` | Response to `PullOps`; may chunk. |
 | `OpsBroadcast` | `{ ops: [(u64, EncryptedBlob)] }` | Pushed when another device sends ops. |
-| `SnapshotRequest` | `{ up_to_op_id: u64 }` | Server asks the most-acked active client to produce a snapshot. |
+| `SnapshotRequest` | `{ up_to_op_id: u64 }` | Server asks a connected client to produce a snapshot at the horizon. |
 | `Snapshot` | `{ up_to_op_id: u64, blob: EncryptedBlob }` | Response to `PullSnapshot`. |
 | `SnapshotRequired` | `{ up_to_op_id: u64 }` | Sent in lieu of `OpsBatch` when the client's `since_op_id` is below the latest snapshot's `up_to_op_id`; client must bootstrap from snapshot before resuming ops. |
 
@@ -52,7 +52,7 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 - Server orders ops by server-assigned `id` of arrival. Per-account FIFO.
 - Client decrypts ops and applies via Loro; Loro handles real causal ordering.
 - Client sends `Ack { last_acked_op_id }` after applying. Server stores in `devices.last_acked_op_id`.
-- **Horizon** = `min(last_acked_op_id)` across active devices. Equivalent to the meet of all device VVs at that point — the server doesn't need to see Loro VVs because every active device by definition has every op up to the horizon.
+- **Horizon** = `min(last_acked_op_id)` across all non-revoked devices for the account. Equivalent to the meet of all device VVs at that point — the server doesn't need to see Loro VVs because every device by definition has every op up to the horizon. Time-based eviction is deliberately *not* used to advance the horizon: a Loro shallow snapshot taken past a device's frontier produces ops the stale device can't merge back when it eventually reconnects (Loro rejects updates concurrent to the shallow start frontier; they sit in `ImportStatus.pending` forever). The user-facing escape hatch is explicit revoke via `DELETE /api/devices/:id` — revoking a stale device immediately drops it from the horizon calc, unblocking compaction.
 - **`OpsBroadcast` is post-commit only.** Server fans out to other devices only after the originating `PushOps` is durable in storage. Otherwise a crash between broadcast and fsync could leave peers holding ops the sender will re-push (under new ids) on reconnect.
 
 ## Commit origin tagging
@@ -78,10 +78,11 @@ The `complete: bool` on `OpsBatch` signals "no more chunks for this `PullOps`" �
 
 Snapshotting is **server-orchestrated, best-effort, and must never wedge sync**. It exists to bound bootstrap / compaction cost, not to gate normal operation.
 
-- Threshold: when `(latest_op_id − latest_snapshot.up_to_op_id) > snapshot_threshold_blobs` (default `10_000`, configurable via `snapshot_threshold_blobs` in the server config or `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`), snapshotting becomes eligible for that account. Counts blobs, not user actions or bytes — see §"Terminology" for why that matters.
-- Candidate: a **currently connected** active device for that account, chosen by highest `last_acked_op_id`. Ties may break arbitrarily.
-- Production: server sends `SnapshotRequest { up_to_op_id }`. Client serializes a Loro shallow snapshot at or beyond that point, encrypts with DEK, uploads via `PushSnapshot`.
-- Compaction: after a snapshot is durable, compaction may delete ops with `id ≤ min(horizon, snapshot.up_to_op_id)`.
+- Trigger: when `(latest_op_id − latest_snapshot.up_to_op_id) > snapshot_threshold_blobs` (default `10_000`, configurable via `snapshot_threshold_blobs` in the server config or `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`) **AND** `horizon > latest_snapshot.up_to_op_id`. First clause: enough has accumulated to justify a snapshot for bootstrap-perf reasons. Second clause: the frontier will actually advance — if a lagging device pins horizon at the existing snapshot floor, a new snapshot would have identical bytes and zero compaction benefit, so we skip. Counts blobs, not user actions or bytes — see §"Terminology" for why that matters.
+- `up_to_op_id` = **horizon**. The shallow snapshot's start frontier must not exceed the horizon, or any offline-made commits on a slower device will be concurrent with the snapshot frontier when pushed and unmergeable on peers that bootstrap from it (Loro shallow-snapshot constraint — see §"Ordering & ack flow" horizon note).
+- Candidate: any currently connected device. Every connected device has `last_acked_op_id ≥ horizon` by definition, so any of them can produce a snapshot at the requested frontier. In practice the server uses whichever connection's push/ack triggered the eval; no candidate-picking logic needed.
+- Production: server sends `SnapshotRequest { up_to_op_id }`. Client serializes a Loro shallow snapshot at the requested frontier, encrypts with DEK, uploads via `PushSnapshot`.
+- Compaction: after a snapshot is durable, compaction may delete ops with `id ≤ snapshot.up_to_op_id`. (Equal to horizon at snapshot time by construction; no separate min needed.)
 
 Server keeps **at most one in-flight snapshot request per account**:
 
@@ -119,10 +120,6 @@ Operational notes:
 - Keep the policy coarse. One candidate at a time, one deadline, one retry decision per failure is enough.
 - Large accounts increase snapshot upload/download cost, but do **not** change the orchestration model.
 - Server should log: request issued, request timed out, assignee disconnected, snapshot accepted, snapshot ignored as stale/mismatched, and retry abandoned for lack of candidates.
-
-## Active device definition
-
-A device is active if `last_seen_at > now − 30 days`. Stale devices do not block the horizon. Explicit revoke via `DELETE /api/devices/:id` (see `auth.md`) drops the device immediately — no need to wait out the 30-day window.
 
 ## Bootstrap from snapshot
 

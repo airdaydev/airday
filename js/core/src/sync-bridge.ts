@@ -14,12 +14,25 @@
 // file is what makes the IO testable from Bun instead of only from
 // a browser.
 //
-// Reconnect is fixed-delay (no backoff). That's the same policy web
-// has shipped with — revisit when we see hot-loop reconnect storms.
+// Reconnect uses exponential backoff with jitter, capped at `maxMs`.
+// The attempt counter resets on a successful `onopen`. Hosts can
+// short-circuit the backoff timer with `reconnectNow()` — that's the
+// hook platform layers wire to visibility/online events.
 
 import type { EngineEvent, SyncEngine } from "../wasm/airday_core_web.js";
 
 export type ConnectionEvent = "online" | "offline" | "drain";
+
+export interface ReconnectBackoff {
+  /** Delay before the first retry. Subsequent retries double until
+   *  capped at `maxMs`. Default 500ms. */
+  baseMs?: number;
+  /** Cap on the exponentially-grown delay. Default 30_000ms. */
+  maxMs?: number;
+  /** Jitter as a fraction of the computed delay; 0.2 = ±20%.
+   *  Default 0.2. Set to 0 for deterministic tests. */
+  jitter?: number;
+}
 
 export interface SyncBridgeOpts {
   engine: SyncEngine;
@@ -51,20 +64,29 @@ export interface SyncBridgeOpts {
    *  drained (so the engine queue can't grow unbounded) but
    *  discarded. */
   onEngineEvent?: (ev: EngineEvent) => void;
-  /** Default 1500ms. Tests typically pass something tiny. */
-  reconnectDelayMs?: number;
+  /** Exponential-backoff parameters. Defaults: base 500ms, cap 30s,
+   *  ±20% jitter. */
+  reconnectBackoff?: ReconnectBackoff;
 }
 
-const DEFAULT_RECONNECT_DELAY_MS = 1500;
+const DEFAULT_BASE_MS = 500;
+const DEFAULT_MAX_MS = 30_000;
+const DEFAULT_JITTER = 0.2;
 
 export class SyncBridge {
   private ws: WebSocket | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
-  private readonly reconnectDelayMs: number;
+  private attempt = 0;
+  private readonly baseMs: number;
+  private readonly maxMs: number;
+  private readonly jitter: number;
 
   constructor(private readonly opts: SyncBridgeOpts) {
-    this.reconnectDelayMs = opts.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS;
+    const b = opts.reconnectBackoff;
+    this.baseMs = b?.baseMs ?? DEFAULT_BASE_MS;
+    this.maxMs = b?.maxMs ?? DEFAULT_MAX_MS;
+    this.jitter = b?.jitter ?? DEFAULT_JITTER;
   }
 
   start(): void {
@@ -84,6 +106,22 @@ export class SyncBridge {
     }
     // Best-effort engine notification; if already Disconnected this is a no-op.
     this.opts.engine.handleDisconnected();
+  }
+
+  /** Cancel any pending backoff timer and reconnect immediately.
+   *  Hosts wire this to platform wake-ups (browser `online` /
+   *  `visibilitychange`, native push). Cheap no-op if already
+   *  connecting or stopped; the attempt counter is unchanged so
+   *  repeated failed wake-ups still back off — only a successful
+   *  `onopen` resets it. */
+  reconnectNow(): void {
+    if (this.stopped) return;
+    if (this.ws) return;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.connect();
   }
 
   /** Caller signal: local mutations may have produced new outbox
@@ -107,6 +145,7 @@ export class SyncBridge {
 
     ws.onopen = () => {
       opened = true;
+      this.attempt = 0;
       this.opts.engine.handleConnected();
       this.pumpOutbox();
       this.drainEngineEvents();
@@ -137,7 +176,7 @@ export class SyncBridge {
         // network drop before scheduling the next attempt.
         void this.probeAndReconnect();
       } else {
-        this.timer = setTimeout(() => this.connect(), this.reconnectDelayMs);
+        this.scheduleReconnect();
       }
     };
     ws.onerror = () => {
@@ -155,8 +194,22 @@ export class SyncBridge {
         return;
       }
     }
+    // While the probe was in flight, the host may have called
+    // `reconnectNow()` (or `stop()`); don't double-schedule.
+    if (this.stopped || this.ws || this.timer) return;
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect(): void {
     if (this.stopped) return;
-    this.timer = setTimeout(() => this.connect(), this.reconnectDelayMs);
+    const exp = Math.min(this.maxMs, this.baseMs * 2 ** this.attempt);
+    const j = this.jitter > 0 ? 1 + (Math.random() * 2 - 1) * this.jitter : 1;
+    const delay = Math.max(0, Math.round(exp * j));
+    this.attempt++;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.connect();
+    }, delay);
   }
 
   private drainEngineEvents(): void {

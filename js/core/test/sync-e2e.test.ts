@@ -225,7 +225,7 @@ function attachEngine(
           resolveOk(bridge);
         }
       },
-      reconnectDelayMs: 50,
+      reconnectBackoff: { baseMs: 50, maxMs: 50, jitter: 0 },
     });
     bridge.start();
   });

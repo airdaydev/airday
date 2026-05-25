@@ -63,7 +63,7 @@ Note: `ops.id` is global-monotonic, not per-account. Per-account ordering is `(a
 ## Compaction
 
 After a snapshot at `up_to_op_id = N` lands, a background job may:
-1. Delete `ops` rows where `account_id = X AND id ≤ min(N, horizon_for_X)`.
+1. Delete `ops` rows where `account_id = X AND id ≤ N`. (N is set to the horizon at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so no separate horizon clamp is needed here.)
 2. Keep at most M=2 snapshots per account; delete older.
 
 Run on a timer, not synchronous with snapshot upload.
