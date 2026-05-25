@@ -16,6 +16,8 @@ Cargo.lock.legacy
 *.sqlite-wal
 *.sqlite-shm
 
+.claude
+
 # Generated dev artifacts (see js/config/gen-config.ts)
 local/
 

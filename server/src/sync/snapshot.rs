@@ -4,9 +4,12 @@ use std::time::Instant;
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use uuid::Uuid;
 
-// If we have 10k ops in our db - it's time to ask clients nicely to snapshot
+// Default threshold: 10k ops since the last snapshot makes an account
+// eligible. Operators override via `snapshot_threshold_ops` in the server
+// config (or `AIRDAY_SNAPSHOT_THRESHOLD_OPS`); JS e2e tests drop it to a
+// handful so the snapshot path runs in seconds.
 // Timeout after 5 minutes
-const SNAPSHOT_THRESHOLD_OPS: u64 = 10_000;
+pub const SNAPSHOT_THRESHOLD_OPS: u64 = 10_000;
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 struct ActiveLease {
@@ -40,6 +43,10 @@ pub enum ReleaseResult {
 impl SnapshotCoordinator {
     pub fn new() -> Self {
         Self::with_config(SNAPSHOT_THRESHOLD_OPS, SNAPSHOT_TIMEOUT)
+    }
+
+    pub fn with_threshold_ops(threshold_ops: u64) -> Self {
+        Self::with_config(threshold_ops, SNAPSHOT_TIMEOUT)
     }
 
     pub fn with_config(threshold_ops: u64, timeout: Duration) -> Self {

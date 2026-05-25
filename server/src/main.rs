@@ -49,7 +49,8 @@ async fn main() -> anyhow::Result<()> {
 
     let state = AppState::open(&cfg.db)
         .await?
-        .with_secure_cookies(cfg.secure_cookies);
+        .with_secure_cookies(cfg.secure_cookies)
+        .with_snapshot_threshold_ops(cfg.snapshot_threshold_ops);
     let app = router(state);
 
     let addr = cfg.bind_addr()?;

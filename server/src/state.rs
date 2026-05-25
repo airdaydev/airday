@@ -41,6 +41,11 @@ impl AppState {
         self.secure_cookies = secure;
         self
     }
+
+    pub fn with_snapshot_threshold_ops(mut self, threshold_ops: u64) -> Self {
+        self.snapshot_coordinator = SnapshotCoordinator::with_threshold_ops(threshold_ops);
+        self
+    }
 }
 
 /// Indirection so tests can fast-forward time without sleeping (used
