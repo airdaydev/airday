@@ -225,7 +225,7 @@ export function Settings(props: {
                   </Show>
                   <Show when={devices()}>
                     <ul class="device-list">
-                      <For each={devices()!}>
+                      <For each={[...devices()!].sort((a, b) => b.last_seen_at - a.last_seen_at)}>
                         {(d) => (
                           <li class="device-row">
                             <div class="device-row-main">
@@ -307,11 +307,11 @@ function MoonIcon() {
 
 function formatRelative(ms: number, locale: string): string {
   const diffSec = Math.round((Date.now() - ms) / 1000);
-  if (locale.startsWith("es")) return formatRelativeEs(ms, diffSec, locale);
-  return formatRelativeEn(ms, diffSec, locale);
+  if (locale.startsWith("es")) return formatRelativeEs(ms, diffSec);
+  return formatRelativeEn(ms, diffSec);
 }
 
-function formatRelativeEs(ms: number, diffSec: number, locale: string): string {
+function formatRelativeEs(ms: number, diffSec: number): string {
   if (diffSec < 60) return "ahora mismo";
   if (diffSec < 3600) {
     const m = Math.floor(diffSec / 60);
@@ -325,11 +325,11 @@ function formatRelativeEs(ms: number, diffSec: number, locale: string): string {
     const d = Math.floor(diffSec / 86400);
     return `hace ${d} día${d === 1 ? "" : "s"}`;
   }
-  return new Date(ms).toLocaleDateString(locale);
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
-function formatRelativeEn(ms: number, diffSec: number, locale: string): string {
-  if (diffSec < 60) return "just now";
+function formatRelativeEn(ms: number, diffSec: number): string {
+  if (diffSec < 60) return "Just now";
   if (diffSec < 3600) {
     const m = Math.floor(diffSec / 60);
     return `${m} minute${m === 1 ? "" : "s"} ago`;
@@ -342,7 +342,7 @@ function formatRelativeEn(ms: number, diffSec: number, locale: string): string {
     const d = Math.floor(diffSec / 86400);
     return `${d} day${d === 1 ? "" : "s"} ago`;
   }
-  return new Date(ms).toLocaleDateString(locale);
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 function CloseIcon() {
