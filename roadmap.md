@@ -32,6 +32,7 @@ One latent thing remains, but it was already scoped out in your handoff:
 
 ## Postgresql version
 - ensure single snapshot per account across replicas
+- ensure deletion/cleanup doesn't run too often and under contention across replicas?!
 - migration strategy
 
 ## CI
