@@ -1379,6 +1379,32 @@ function Workspace(props: {
   document.addEventListener("keydown", onSpaceAdd);
   onCleanup(() => document.removeEventListener("keydown", onSpaceAdd));
 
+  // [ / ]: cycle between lists in nav order (Home, then user lists),
+  // wrapping at both ends. Done / Bin don't participate — they're
+  // cross-cutting views, not lists. From a non-list view, ] goes to
+  // the first list and [ to the last, so the bracket pair always
+  // re-enters the list set.
+  const onBracketNavigate = (e: KeyboardEvent) => {
+    if (e.key !== "[" && e.key !== "]") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const ids = ["main", ...lists().map((l) => l.id)];
+    const v = view();
+    const idx = v.kind === "list" ? ids.indexOf(v.id) : -1;
+    const step = e.key === "]" ? 1 : -1;
+    let next: string;
+    if (idx === -1) {
+      next = step === 1 ? ids[0]! : ids[ids.length - 1]!;
+    } else {
+      next = ids[(idx + step + ids.length) % ids.length]!;
+    }
+    e.preventDefault();
+    setView({ kind: "list", id: next });
+  };
+  document.addEventListener("keydown", onBracketNavigate);
+  onCleanup(() => document.removeEventListener("keydown", onBracketNavigate));
+
   // Drag items into a list nav button to move them to that list as the
   // first items, or onto Bin to status-bin them. Discriminate from the
   // nav's own list-reorder drag by checking detail.items[0] for an
