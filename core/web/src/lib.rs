@@ -9,8 +9,9 @@
 use wasm_bindgen::prelude::*;
 
 use airday_core::{
-    derive_password_master, kek_from_master, AppEvent as CoreAppEvent, Dek as CoreDek,
-    Doc as CoreDoc, EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
+    derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
+    parse_recovery_code, AppEvent as CoreAppEvent, Dek as CoreDek, Doc as CoreDoc,
+    EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
     SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
@@ -524,6 +525,74 @@ pub fn unwrap_dek(
     };
     let dek = kek.unwrap(&wrapped).map_err(js_err)?;
     Ok(Dek { inner: dek })
+}
+
+// ---------- Recovery code ----------
+
+/// Result of `deriveRecovery`: recovery KEK (in-memory only — pass to
+/// `unwrapDek` to open the server-held recovery wrap) and the recovery
+/// auth secret to send to `/api/account/recover`. Both are 32-byte
+/// arrays, mirroring `DerivedLogin`.
+#[wasm_bindgen]
+pub struct DerivedRecovery {
+    recovery_kek: Vec<u8>,
+    recovery_auth_secret: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl DerivedRecovery {
+    #[wasm_bindgen(getter, js_name = recoveryKek)]
+    pub fn recovery_kek(&self) -> Vec<u8> {
+        self.recovery_kek.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = recoveryAuthSecret)]
+    pub fn recovery_auth_secret(&self) -> Vec<u8> {
+        self.recovery_auth_secret.clone()
+    }
+}
+
+/// Fresh 12-word BIP39 phrase. Show once at signup; never persist on
+/// the client (the user's the only one who keeps it).
+#[wasm_bindgen(js_name = generateRecoveryCode)]
+pub fn generate_recovery_code_js() -> Result<String, JsError> {
+    Ok(generate_recovery_code()
+        .map_err(js_err)?
+        .as_str()
+        .to_string())
+}
+
+/// Validate + normalize a user-typed recovery phrase. Tolerates extra
+/// whitespace and case. Throws on invalid words or bad checksum — the
+/// UI should surface that as "recovery code not recognized."
+#[wasm_bindgen(js_name = parseRecoveryCode)]
+pub fn parse_recovery_code_js(input: &str) -> Result<String, JsError> {
+    Ok(parse_recovery_code(input)
+        .map_err(js_err)?
+        .as_str()
+        .to_string())
+}
+
+/// Argon2id over the recovery phrase + `recovery_salt`, then HKDF into
+/// the recovery KEK and recovery auth secret. Mirrors `deriveLogin`'s
+/// shape so the host can shovel both into `wrapDek`/`unwrapDek` and the
+/// recovery endpoint without thinking about the split.
+#[wasm_bindgen(js_name = deriveRecovery)]
+pub fn derive_recovery_js(
+    recovery_code: &str,
+    salt: &[u8],
+    m_kib: u32,
+    t: u32,
+    p: u32,
+) -> Result<DerivedRecovery, JsError> {
+    let params = CoreKdfParams { m_kib, t, p };
+    let master = derive_recovery_master(recovery_code, salt, params).map_err(js_err)?;
+    let kek = master.kek().map_err(js_err)?;
+    let auth = master.auth_secret().map_err(js_err)?;
+    Ok(DerivedRecovery {
+        recovery_kek: kek.as_bytes().to_vec(),
+        recovery_auth_secret: auth.as_bytes().to_vec(),
+    })
 }
 
 // ---------- EncryptedBlob ----------

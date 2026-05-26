@@ -39,3 +39,6 @@ One latent thing remains, but it was already scoped out in your handoff:
 
 ## CLI
 - Sqlite storage
+
+## Bug
+- When we click done, then edit the item, waiting for it to depart that list, it goes bad.
