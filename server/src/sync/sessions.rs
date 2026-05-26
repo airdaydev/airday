@@ -9,7 +9,7 @@
 //! (`CHANNEL_CAPACITY`). On a full or closed channel the broadcast
 //! drops the message *and* removes the subscriber. The session task
 //! observes its rx going `None` and exits; the client reconnects and
-//! pulls from `last_acked_op_id`. The op stream is the durable
+//! pulls from `last_acked_blob_id`. The op stream is the durable
 //! channel — broadcast is just an optimization to skip the round-trip
 //! when peers are live, so dropping a frame is safe.
 
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use airday_protocol::{ServerFrame, StoredOp};
+use airday_protocol::{ServerFrame, StoredBlob};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -119,7 +119,7 @@ impl SyncSessions {
     /// Returns the number of subscribers that received it (slow /
     /// closed receivers are dropped from the registry as a side
     /// effect).
-    pub fn broadcast(&self, account_id: Uuid, exclude_sub: u64, ops: Vec<StoredOp>) -> usize {
+    pub fn broadcast(&self, account_id: Uuid, exclude_sub: u64, ops: Vec<StoredBlob>) -> usize {
         if ops.is_empty() {
             return 0;
         }

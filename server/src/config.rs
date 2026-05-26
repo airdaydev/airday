@@ -121,9 +121,9 @@ impl Config {
             config.secure_cookies = matches!(v.as_str(), "1" | "true" | "TRUE");
         }
         if let Ok(v) = std::env::var("AIRDAY_SNAPSHOT_THRESHOLD_BLOBS") {
-            config.snapshot_threshold_blobs = v.parse().unwrap_or_else(|e| {
-                panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}")
-            });
+            config.snapshot_threshold_blobs = v
+                .parse()
+                .unwrap_or_else(|e| panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}"));
         }
 
         (config, source)

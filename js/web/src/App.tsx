@@ -486,7 +486,7 @@ function BootGate(props: {
       tap("WAL replay done", performance.now());
       props.setBoot({
         doc,
-        lastAcked: BigInt(device?.lastAckedOpId ?? 0),
+        lastAcked: BigInt(device?.lastAckedBlobId ?? 0),
         wal,
         prefs: await prefsPromise,
       });
@@ -553,7 +553,7 @@ function MainApp(props: {
   console.debug(
     "MainApp mount, freshSignup=",
     props.session.freshSignup,
-    "lastAcked=",
+    "lastAckedBlob=",
     String(props.boot.lastAcked),
   );
   // Both SyncEngine and the WAL store consume their Dek argument, and
@@ -696,7 +696,7 @@ function MainApp(props: {
           // load-bearing piece of "which server am I talking to".
           serverUrl: window.location.origin,
           deviceId: props.session.deviceId!,
-          lastAckedOpId: Number(engine.highestSeenOpId()),
+          lastAckedBlobId: Number(engine.highestSeenBlobId()),
           lastSyncAt: Date.now(),
         });
       }
@@ -713,7 +713,7 @@ function MainApp(props: {
 
   // ---------- Device config: light writes on each frontier change ----------
   //
-  // `lastAckedOpId` advances independently of mutations. Persist it on
+  // `lastAckedBlobId` advances independently of mutations. Persist it on
   // a coarse debounce so reload picks up the right resume point even
   // if no snapshot lands in between.
   let deviceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -728,7 +728,7 @@ function MainApp(props: {
           email: props.session.email!,
           serverUrl: window.location.origin,
           deviceId: props.session.deviceId!,
-          lastAckedOpId: Number(engine.highestSeenOpId()),
+          lastAckedBlobId: Number(engine.highestSeenBlobId()),
           lastSyncAt: Date.now(),
         })
         .catch((e) => {
@@ -1866,7 +1866,7 @@ function CloudIcon() {
 }
 
 /** Click-to-open popover anchored to the cloud icon. Shows rolled-up
- *  connection/sync status, last-synced relative time, op id,
+ *  connection/sync status, last-synced relative time, blob id,
  *  fingerprint, and items+lists counts. Periodic ticker only runs
  *  while the popover is open. */
 function ConnectionStatusPopover(props: {
@@ -1897,9 +1897,9 @@ function ConnectionStatusPopover(props: {
     props.app.version();
     return props.app.engine.hasPendingOps();
   };
-  const opIdLabel = (): string => {
+  const blobIdLabel = (): string => {
     props.app.version();
-    return String(props.app.engine.highestSeenOpId());
+    return String(props.app.engine.highestSeenBlobId());
   };
   const fingerprintHex = (): string => {
     props.app.version();
@@ -1961,7 +1961,7 @@ function ConnectionStatusPopover(props: {
           <Show when={sinceLabel()}>
             {(label) => <div class="status-line status-muted">{label()}</div>}
           </Show>
-          <div class="status-line status-muted">{m().nav.opLabel(opIdLabel())}</div>
+          <div class="status-line status-muted">{m().nav.blobLabel(blobIdLabel())}</div>
           <div class="status-fingerprint status-muted status-mono">
             {fingerprintHex()}
           </div>

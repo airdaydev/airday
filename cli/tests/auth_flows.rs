@@ -171,7 +171,7 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
     let profile_b = reopen_profile(tmp_b.path());
     let device = profile_b.read_device().unwrap();
     assert!(
-        device.last_acked_op_id > 0,
+        device.last_acked_blob_id > 0,
         "recovered device should sync history"
     );
 }

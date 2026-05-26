@@ -17,7 +17,7 @@
 // queued.
 
 import type { Dek, EncryptedBlob } from "../../wasm/airday_core_web.js";
-import type { DeviceConfig } from "./adapter.ts";
+import { normalizeDeviceConfig, type DeviceConfig } from "./adapter.ts";
 import {
   SNAPSHOT_THRESHOLD,
   type ReplayPayload,
@@ -298,7 +298,7 @@ export class IdbWalStorage implements WalStorage {
       const req = tx.objectStore(STORE_DEVICE).get(this.accountId);
       req.onsuccess = () => {
         const row = req.result as DeviceRow | undefined;
-        resolve(row?.device ?? null);
+        resolve(normalizeDeviceConfig(row?.device));
       };
       req.onerror = () => reject(req.error);
     });
@@ -401,7 +401,7 @@ export class IdbWalStorage implements WalStorage {
       const deviceReq = tx.objectStore(STORE_DEVICE).get(this.accountId);
       deviceReq.onsuccess = () => {
         const row = deviceReq.result as DeviceRow | undefined;
-        device = row?.device ?? null;
+        device = normalizeDeviceConfig(row?.device);
       };
       tx.oncomplete = () => resolve({ meta, rows, device });
       tx.onerror = () => reject(tx.error);

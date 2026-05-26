@@ -5,7 +5,7 @@
 //! the local Loro doc via `session.doc()`, `flush()` at end. With sync
 //! requested, open does the WS handshake and initial pull through the
 //! engine; flush saves `loro.bin`, asks the engine to push pending ops,
-//! advances the device's `last_acked_op_id`.
+//! advances the device's `last_acked_blob_id`.
 //!
 //! Offline-by-default per `spec/cli.md`:
 //! - Default: no network. Mutations append to `loro.bin` and ship on
@@ -90,7 +90,7 @@ impl Session {
         let engine = SyncEngine::new(
             doc,
             dek,
-            device.last_acked_op_id,
+            device.last_acked_blob_id,
             EngineOptions {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
@@ -206,9 +206,9 @@ impl Session {
 
     fn persist_engine_state(&mut self) -> Result<(), SyncError> {
         self.profile.write_doc(self.engine.doc())?;
-        let acked = self.engine.highest_seen_op_id();
-        if acked > self.device.last_acked_op_id {
-            self.device.last_acked_op_id = acked;
+        let acked = self.engine.highest_seen_blob_id();
+        if acked > self.device.last_acked_blob_id {
+            self.device.last_acked_blob_id = acked;
         }
         self.device.last_sync_at = Some(now_millis());
         self.profile.write_device(&self.device)?;

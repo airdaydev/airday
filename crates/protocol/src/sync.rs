@@ -22,10 +22,10 @@ pub struct EncryptedBlob {
     pub ciphertext: Vec<u8>,
 }
 
-/// Server-assigned op id paired with the encrypted payload.
+/// Server-assigned blob id paired with the encrypted payload.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StoredOp {
-    pub id: u64,
+pub struct StoredBlob {
+    pub blob_id: u64,
     pub blob: EncryptedBlob,
 }
 
@@ -61,19 +61,19 @@ pub struct HelloRejected {
 pub enum ClientFrame {
     /// Append ops. Server assigns monotonic ids and replies `OpsAck`.
     PushOps { ops: Vec<EncryptedBlob> },
-    /// Request all ops with id > since_op_id. Streamed back as
+    /// Request all ops with id > since_blob_id. Streamed back as
     /// one or more `OpsBatch` frames; the last carries `complete=true`.
-    PullOps { since_op_id: u64 },
+    PullOps { since_blob_id: u64 },
     /// Advance this device's frontier. Sent after Loro accepts the ops
     /// locally — never on raw byte receipt.
-    Ack { last_acked_op_id: u64 },
-    /// Response to a `SnapshotRequest`. `up_to_op_id` is the encoded
-    /// state frontier; `shallow_start_op_id` is where the snapshot's
+    Ack { last_acked_blob_id: u64 },
+    /// Response to a `SnapshotRequest`. `up_to_blob_id` is the encoded
+    /// state frontier; `shallow_start_blob_id` is where the snapshot's
     /// retained history starts (Loro shallow-snapshot boundary, doubles
     /// as the server's compaction floor for ops below it).
     PushSnapshot {
-        up_to_op_id: u64,
-        shallow_start_op_id: u64,
+        up_to_blob_id: u64,
+        shallow_start_blob_id: u64,
         blob: EncryptedBlob,
     },
     /// Request the latest snapshot blob. Reserved for the snapshot work.
@@ -89,34 +89,37 @@ pub enum ServerFrame {
     /// from the request, in order.
     OpsAck { assigned_ids: Vec<u64> },
     /// Chunk of pulled ops. May be one of several frames per `PullOps`.
-    OpsBatch { ops: Vec<StoredOp>, complete: bool },
+    OpsBatch {
+        ops: Vec<StoredBlob>,
+        complete: bool,
+    },
     /// Pushed when another device on the same account commits ops.
     /// Reserved for the broadcast work.
-    OpsBroadcast { ops: Vec<StoredOp> },
+    OpsBroadcast { ops: Vec<StoredBlob> },
     /// Server asks a connected, caught-up client to produce a snapshot.
-    /// `up_to_op_id` is the requested state frontier (= server's idea
-    /// of the producer's `last_acked_op_id`); `shallow_start_op_id` is
+    /// `up_to_blob_id` is the requested state frontier (= server's idea
+    /// of the producer's `last_acked_blob_id`); `shallow_start_blob_id` is
     /// the retained-history boundary (= horizon). The client encodes a
     /// Loro shallow snapshot with these two frontiers.
     SnapshotRequest {
-        up_to_op_id: u64,
-        shallow_start_op_id: u64,
+        up_to_blob_id: u64,
+        shallow_start_blob_id: u64,
     },
-    /// Response to `PullSnapshot`. `up_to_op_id` is the snapshot's
+    /// Response to `PullSnapshot`. `up_to_blob_id` is the snapshot's
     /// encoded state frontier; the bootstrapping client uses it as
-    /// its next `since_op_id` for `PullOps`.
+    /// its next `since_blob_id` for `PullOps`.
     Snapshot {
-        up_to_op_id: u64,
+        up_to_blob_id: u64,
         blob: EncryptedBlob,
     },
-    /// Sent in lieu of `OpsBatch` when the client's `since_op_id` is
-    /// below the latest snapshot's `shallow_start_op_id` — the ops it
+    /// Sent in lieu of `OpsBatch` when the client's `since_blob_id` is
+    /// below the latest snapshot's `shallow_start_blob_id` — the ops it
     /// needs have been compacted, so it can't resume from ops alone.
-    /// (Devices between `shallow_start_op_id` and `up_to_op_id` can
+    /// (Devices between `shallow_start_blob_id` and `up_to_blob_id` can
     /// still delta-pull — horizon-bounded compaction preserves those.)
     /// The client must `PullSnapshot`, apply the returned `Snapshot`,
     /// then re-issue `PullOps` from the snapshot's state frontier.
-    /// `up_to_op_id` here is informational; the authoritative value is
+    /// `up_to_blob_id` here is informational; the authoritative value is
     /// the one in the `Snapshot` frame.
-    SnapshotRequired { up_to_op_id: u64 },
+    SnapshotRequired { up_to_blob_id: u64 },
 }

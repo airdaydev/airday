@@ -289,15 +289,15 @@ describe("e2e snapshot + second-device bootstrap", () => {
     // without ambiguity about off-by-one in the eligibility check.
     // Push one item at a time and wait for the server ack between
     // each — the engine bundles co-pending mutations into a single op
-    // blob (= one server-assigned op id), so a tight batch wouldn't
-    // accumulate enough op ids to cross the threshold.
+    // blob (= one server-assigned blob id), so a tight batch wouldn't
+    // accumulate enough blob ids to cross the threshold.
     const ITEMS = SNAPSHOT_THRESHOLD + 3;
     for (let i = 0; i < ITEMS; i++) {
       engineA.addItem(LIST_MAIN, `item ${i}`);
       engineA.flush();
       bridgeA.pumpOutbox();
       await waitFor(
-        () => engineA.highestSeenOpId() >= BigInt(i + 1),
+        () => engineA.highestSeenBlobId() >= BigInt(i + 1),
         `op ${i + 1} acked by server`,
       );
     }
@@ -307,7 +307,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
     // PushSnapshot from the engine and committed it.
     await waitFor(() => snapshotCount(server.dbPath) > 0, "snapshot row", 10_000);
 
-    // Device B comes online fresh. Its `last_acked_op_id=0` is below
+    // Device B comes online fresh. Its `last_acked_blob_id=0` is below
     // the server's snapshot floor, so the server replies with
     // `SnapshotRequired` rather than streaming every op. The engine
     // transparently fetches the snapshot, loads it, and resumes.

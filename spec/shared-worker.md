@@ -15,7 +15,7 @@ Run one browser-local runtime per origin/account:
 This removes cross-tab duplication and coordination hazards around:
 
 - remote WAL appends
-- `lastAckedOpId` persistence
+- `lastAckedBlobId` persistence
 - websocket ownership
 - OPFS snapshot writes
 

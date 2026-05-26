@@ -632,14 +632,14 @@ pub struct SyncEngine {
 #[wasm_bindgen]
 impl SyncEngine {
     /// Build a new engine. Consumes `doc` and `dek` — the JS handles
-    /// must not be reused after this call. `last_acked_op_id` is the
+    /// must not be reused after this call. `last_acked_blob_id` is the
     /// frontier persisted from the previous session (or 0 for a fresh
     /// device).
     #[wasm_bindgen(constructor)]
     pub fn new(
         doc: Doc,
         dek: Dek,
-        last_acked_op_id: u64,
+        last_acked_blob_id: u64,
         client_name: String,
         client_version: String,
     ) -> SyncEngine {
@@ -647,7 +647,7 @@ impl SyncEngine {
             inner: CoreSyncEngine::new(
                 doc.inner,
                 dek.inner,
-                last_acked_op_id,
+                last_acked_blob_id,
                 CoreEngineOptions {
                     client_name,
                     client_version,
@@ -741,11 +741,11 @@ impl SyncEngine {
         self.inner.is_idle()
     }
 
-    /// Highest server-assigned op id the engine knows about — caller
-    /// persists this as `last_acked_op_id` between sessions.
-    #[wasm_bindgen(js_name = highestSeenOpId)]
-    pub fn highest_seen_op_id(&self) -> u64 {
-        self.inner.highest_seen_op_id()
+    /// Highest server-assigned blob id the engine knows about — caller
+    /// persists this as `last_acked_blob_id` between sessions.
+    #[wasm_bindgen(js_name = highestSeenBlobId)]
+    pub fn highest_seen_blob_id(&self) -> u64 {
+        self.inner.highest_seen_blob_id()
     }
 
     // -- doc passthrough --
@@ -1026,13 +1026,13 @@ impl SyncEngine {
 
 /// Flat JS-friendly view of `airday_core::Event`. The host switches on
 /// `kind` and reads the payload-specific getter — exactly one of
-/// `online`, `opId`, `message` will be set per event (or none, for
+/// `online`, `blobId`, `message` will be set per event (or none, for
 /// payload-less variants).
 #[wasm_bindgen]
 pub struct EngineEvent {
     kind: &'static str,
     online: Option<bool>,
-    op_id: Option<u64>,
+    blob_id: Option<u64>,
     message: Option<String>,
 }
 
@@ -1048,9 +1048,9 @@ impl EngineEvent {
         self.online
     }
 
-    #[wasm_bindgen(getter, js_name = opId)]
-    pub fn op_id(&self) -> Option<u64> {
-        self.op_id
+    #[wasm_bindgen(getter, js_name = blobId)]
+    pub fn blob_id(&self) -> Option<u64> {
+        self.blob_id
     }
 
     #[wasm_bindgen(getter)]
@@ -1065,31 +1065,31 @@ impl From<CoreEvent> for EngineEvent {
             CoreEvent::ConnStateChanged { online } => EngineEvent {
                 kind: "connStateChanged",
                 online: Some(online),
-                op_id: None,
+                blob_id: None,
                 message: None,
             },
             CoreEvent::PulledInitial => EngineEvent {
                 kind: "pulledInitial",
                 online: None,
-                op_id: None,
+                blob_id: None,
                 message: None,
             },
             CoreEvent::Pushed => EngineEvent {
                 kind: "pushed",
                 online: None,
-                op_id: None,
+                blob_id: None,
                 message: None,
             },
-            CoreEvent::FrontierAdvanced { id } => EngineEvent {
+            CoreEvent::FrontierAdvanced { blob_id } => EngineEvent {
                 kind: "frontierAdvanced",
                 online: None,
-                op_id: Some(id),
+                blob_id: Some(blob_id),
                 message: None,
             },
             CoreEvent::Error(message) => EngineEvent {
                 kind: "error",
                 online: None,
-                op_id: None,
+                blob_id: None,
                 message: Some(message),
             },
         }

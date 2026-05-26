@@ -45,7 +45,7 @@ describe("BunFileStorage", () => {
       email: "user@example.com",
       serverUrl: "http://localhost:8080",
       deviceId: "dev-aaaaaaaa",
-      lastAckedOpId: 0,
+      lastAckedBlobId: 0,
       lastSyncAt: null,
     };
     await storage.putDevice(cfg);

@@ -38,11 +38,11 @@ Single binary `airday`. Subcommands:
 - `airday bin rm <item_id>`
 
 ### Status
-- `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_op_id`, pending-push op count. Read-only against local state; never opens a WS.
+- `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_blob_id`, pending-push op count. Read-only against local state; never opens a WS.
 
 ### Cache
 - `airday cache status` — profile directory and `loro.bin` size. Read-only; never opens a WS.
-- `airday cache clear [--force]` — delete `loro.bin` and reset `last_acked_op_id` to 0; the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
+- `airday cache clear [--force]` — delete `loro.bin` and reset `last_acked_blob_id` to 0; the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
 
 ### Export
 - `airday export-json [--out PATH]` — semantic account export: built-in/user lists plus items/status/timestamps as regular JSON. Defaults to stdout; `--out` writes a file. This is a portability dump, not a CRDT backup/restore format.
@@ -54,7 +54,7 @@ Single binary `airday`. Subcommands:
 
 CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists ls`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to `loro.bin` and ship on the next sync.
 
-To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_op_id: last_acked_op_id }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
+To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_blob_id: last_acked_blob_id }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
 
 A future TUI may hold the WS open while running and surface `OpsBroadcast` reactively in the same `airday` binary. The daemon question stays deferred until the TUI exists and proves it needs more than that.
 
@@ -71,7 +71,7 @@ A future TUI may hold the WS open while running and surface `OpsBroadcast` react
 Single account per install. Per-account dir under XDG paths (`~/.local/share/airday/<account-id-prefix>/` on linux, equivalents elsewhere) — the prefix scopes state so a logout/re-signup as a different user doesn't collide with stale data, but only one account is active at a time:
 
 - `loro.bin` — local Loro doc snapshot, persisted on every commit
-- `device.json` — `{ device_id, server_url, last_acked_op_id, account_id, email }`
+- `device.json` — `{ device_id, server_url, last_acked_blob_id, account_id, email }`
 
 Secrets in OS keychain (`security` on macOS, `libsecret` on linux):
 - `airday:<account_id>:token` — device auth token

@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::db::Db;
 use crate::sync::{SnapshotCoordinator, SyncSessions};

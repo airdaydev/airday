@@ -4,13 +4,13 @@ WebSocket per device. Frames are binary, MessagePack-encoded (`rmp-serde`). Each
 
 ## Terminology
 
-The wire calls them "ops" (`PushOps`, `OpsAck`, `op_id`, `since_op_id`, `last_acked_op_id`) but each one is an **encrypted op blob** — a single `EncryptedBlob` carrying a Loro update-pack that contains *1..N* CRDT operations. The client engine bundles every pending mutation since the last push into one blob per `PushOps`, so "1 op id" on the server ≈ "one push cycle" on the client, not "one user action".
+The wire calls them "ops" (`PushOps`, `OpsAck`, `blob_id`, `since_blob_id`, `last_acked_blob_id`) but each one is an **encrypted op blob** — a single `EncryptedBlob` carrying a Loro update-pack that contains *1..N* CRDT operations. The client engine bundles every pending mutation since the last push into one blob per `PushOps`, so "1 blob id" on the server ≈ "one push cycle" on the client, not "one user action".
 
 Consequences worth remembering:
 
-- Server-assigned `op_id` enumerates *blobs*, not user actions. A user typing 1000 characters in one session and pressing flush once = 1 op id.
+- Server-assigned `blob_id` enumerates *blobs*, not user actions. A user typing 1000 characters in one session and pressing flush once = 1 blob id.
 - `snapshot_threshold_blobs` (below) is in blob count, not action count or bytes.
-- Compaction by `op_id ≤ snapshot.shallow_start_op_id` deletes *whole blobs* — a single fat blob is uncompactable.
+- Compaction by `blob_id ≤ snapshot.shallow_start_blob_id` deletes *whole blobs* — a single fat blob is uncompactable.
 - `PushOps { ops: [EncryptedBlob] }` accepts a vector, so the wire supports >1 blob per push even though the current engine sends one.
 
 A future move to byte-based eligibility / compaction would close the asymmetry; tracked in `roadmap.md`.
@@ -29,9 +29,9 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 | Type | Body | Purpose |
 |---|---|---|
 | `PushOps` | `{ ops: [EncryptedBlob] }` | Append ops. Server assigns ids. |
-| `PullOps` | `{ since_op_id: u64 }` | Request ops with id > since_op_id. |
-| `Ack` | `{ last_acked_op_id: u64 }` | Advance this device's frontier. |
-| `PushSnapshot` | `{ up_to_op_id: u64, shallow_start_op_id: u64, blob: EncryptedBlob }` | In response to `SnapshotRequest`. `up_to_op_id` = encoded state frontier; `shallow_start_op_id` = retained-history start (compaction floor). |
+| `PullOps` | `{ since_blob_id: u64 }` | Request ops with id > since_blob_id. |
+| `Ack` | `{ last_acked_blob_id: u64 }` | Advance this device's frontier. |
+| `PushSnapshot` | `{ up_to_blob_id: u64, shallow_start_blob_id: u64, blob: EncryptedBlob }` | In response to `SnapshotRequest`. `up_to_blob_id` = encoded state frontier; `shallow_start_blob_id` = retained-history start (compaction floor). |
 | `PullSnapshot` | `{}` | Request the latest snapshot blob. |
 
 ## Server → Client
@@ -41,9 +41,9 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 | `OpsAck` | `{ assigned_ids: [u64] }` | Response to `PushOps`. |
 | `OpsBatch` | `{ ops: [(u64, EncryptedBlob)], complete: bool }` | Response to `PullOps`; may chunk. |
 | `OpsBroadcast` | `{ ops: [(u64, EncryptedBlob)] }` | Pushed when another device sends ops. |
-| `SnapshotRequest` | `{ up_to_op_id: u64, shallow_start_op_id: u64 }` | Server asks a connected client to produce a snapshot. `up_to_op_id` = state frontier to encode at (= the producer's `last_acked_op_id`); `shallow_start_op_id` = where the snapshot's retained history starts (= horizon). |
-| `Snapshot` | `{ up_to_op_id: u64, blob: EncryptedBlob }` | Response to `PullSnapshot`. `up_to_op_id` is the encoded state frontier; the bootstrapping client uses it as its next `since_op_id`. |
-| `SnapshotRequired` | `{ up_to_op_id: u64 }` | Sent in lieu of `OpsBatch` when the client's `since_op_id` is below the latest snapshot's `shallow_start_op_id` (compaction floor — server can't serve the missing ops). Client must bootstrap from snapshot before resuming ops. `up_to_op_id` is informational; the authoritative state frontier is the one returned in `Snapshot`. |
+| `SnapshotRequest` | `{ up_to_blob_id: u64, shallow_start_blob_id: u64 }` | Server asks a connected client to produce a snapshot. `up_to_blob_id` = state frontier to encode at (= the producer's `last_acked_blob_id`); `shallow_start_blob_id` = where the snapshot's retained history starts (= horizon). |
+| `Snapshot` | `{ up_to_blob_id: u64, blob: EncryptedBlob }` | Response to `PullSnapshot`. `up_to_blob_id` is the encoded state frontier; the bootstrapping client uses it as its next `since_blob_id`. |
+| `SnapshotRequired` | `{ up_to_blob_id: u64 }` | Sent in lieu of `OpsBatch` when the client's `since_blob_id` is below the latest snapshot's `shallow_start_blob_id` (compaction floor — server can't serve the missing ops). Client must bootstrap from snapshot before resuming ops. `up_to_blob_id` is informational; the authoritative state frontier is the one returned in `Snapshot`. |
 
 `EncryptedBlob = { nonce: bytes, ciphertext: bytes }`.
 
@@ -51,8 +51,8 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 
 - Server orders ops by server-assigned `id` of arrival. Per-account FIFO.
 - Client decrypts ops and applies via Loro; Loro handles real causal ordering.
-- Client sends `Ack { last_acked_op_id }` after applying. Server stores in `devices.last_acked_op_id`.
-- **Horizon** = `min(last_acked_op_id)` across all non-revoked devices for the account. Equivalent to the meet of all device VVs at that point — the server doesn't need to see Loro VVs because every device by definition has every op up to the horizon. Time-based eviction is deliberately *not* used to advance the horizon: a Loro shallow snapshot taken past a device's frontier produces ops the stale device can't merge back when it eventually reconnects (Loro rejects updates concurrent to the shallow start frontier; they sit in `ImportStatus.pending` forever). The user-facing escape hatch is explicit revoke via `DELETE /api/devices/:id` — revoking a stale device immediately drops it from the horizon calc, unblocking compaction.
+- Client sends `Ack { last_acked_blob_id }` after applying. Server stores in `devices.last_acked_blob_id`.
+- **Horizon** = `min(last_acked_blob_id)` across all non-revoked devices for the account. Equivalent to the meet of all device VVs at that point — the server doesn't need to see Loro VVs because every device by definition has every op up to the horizon. Time-based eviction is deliberately *not* used to advance the horizon: a Loro shallow snapshot taken past a device's frontier produces ops the stale device can't merge back when it eventually reconnects (Loro rejects updates concurrent to the shallow start frontier; they sit in `ImportStatus.pending` forever). The user-facing escape hatch is explicit revoke via `DELETE /api/devices/:id` — revoking a stale device immediately drops it from the horizon calc, unblocking compaction.
 - **`OpsBroadcast` is post-commit only.** Server fans out to other devices only after the originating `PushOps` is durable in storage. Otherwise a crash between broadcast and fsync could leave peers holding ops the sender will re-push (under new ids) on reconnect.
 
 ## Commit origin tagging
@@ -68,7 +68,7 @@ This exists so a future `UndoManager` can `exclude_origin_prefixes(["remote"])` 
 
 `OpsBatch` chunks are sent **fire-and-forget** — the server emits them back-to-back without waiting for client acknowledgement. WebSocket sits on TCP, which has its own flow control: if the client can't drain its receive buffer fast enough (slow decrypt, low memory, paused tab), the TCP window closes and the server's `send` blocks. No application-level pacing required. This avoids paying RTT × chunk-count on catch-up — for a 10-chunk catch-up at 100 ms RTT, request-ack-request would burn 1 s of pure waiting; fire-and-forget burns 0.
 
-The application-level `Ack { last_acked_op_id }` is **decoupled from chunk delivery**. It's emitted by the client *after* successfully applying ops to the local Loro doc, not on receipt of bytes. Server uses it only for horizon tracking; it does not gate further sends. This decoupling makes resume-after-disconnect correct: the client persists `last_acked_op_id` only after Loro accepts the op, so reconnecting with `since_op_id = last_acked_op_id` replays from the last *applied* op, not the last *delivered* one. No double-apply, no skipped ops.
+The application-level `Ack { last_acked_blob_id }` is **decoupled from chunk delivery**. It's emitted by the client *after* successfully applying ops to the local Loro doc, not on receipt of bytes. Server uses it only for horizon tracking; it does not gate further sends. This decoupling makes resume-after-disconnect correct: the client persists `last_acked_blob_id` only after Loro accepts the op, so reconnecting with `since_blob_id = last_acked_blob_id` replays from the last *applied* op, not the last *delivered* one. No double-apply, no skipped ops.
 
 The `complete: bool` on `OpsBatch` signals "no more chunks for this `PullOps`" — the client flushes its progress UI and considers the pull finished.
 
@@ -80,26 +80,26 @@ Snapshotting is **server-orchestrated, best-effort, and must never wedge sync**.
 
 A snapshot carries **two frontiers** (the two-frontier model maps directly onto Loro's shallow-snapshot primitive):
 
-- **`up_to_op_id`** — the snapshot's encoded *state* frontier. Determines what current state a bootstrapping client sees, and the value the client uses as `since_op_id` for the post-bootstrap `PullOps`. Wants to be as recent as possible for bootstrap perf — ideally equal to the producer's `last_acked_op_id` (and hence equal to `server_last_op_id` when the producer is fully caught up).
-- **`shallow_start_op_id`** — where the snapshot's retained history begins. Loro keeps every op between `shallow_start_op_id` and `up_to_op_id` individually addressable; ops below `shallow_start_op_id` are trimmed. **Must be ≤ horizon** so any device's offline-made commits (which causally depend on its `last_acked_op_id ≥ horizon`) remain mergeable on peers that bootstrap from this snapshot. Doubles as the **compaction floor**: ops with `id ≤ shallow_start_op_id` are deletable. Monotonic across snapshots — never regresses (see below).
+- **`up_to_blob_id`** — the snapshot's encoded *state* frontier. Determines what current state a bootstrapping client sees, and the value the client uses as `since_blob_id` for the post-bootstrap `PullOps`. Wants to be as recent as possible for bootstrap perf — ideally equal to the producer's `last_acked_blob_id` (and hence equal to `server_last_blob_id` when the producer is fully caught up).
+- **`shallow_start_blob_id`** — where the snapshot's retained history begins. Loro keeps every op between `shallow_start_blob_id` and `up_to_blob_id` individually addressable; ops below `shallow_start_blob_id` are trimmed. **Must be ≤ horizon** so any device's offline-made commits (which causally depend on its `last_acked_blob_id ≥ horizon`) remain mergeable on peers that bootstrap from this snapshot. Doubles as the **compaction floor**: ops with `id ≤ shallow_start_blob_id` are deletable. Monotonic across snapshots — never regresses (see below).
 
 Orchestration:
 
 - Trigger: snapshot when **both**
-  - `(latest_op_id − latest_snapshot.up_to_op_id) > snapshot_threshold_blobs` (default `10_000`, configurable via `snapshot_threshold_blobs` / `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`) — enough new state has accumulated that a new snapshot materially shortens a bootstrapping client's `PullOps` catch-up, and
-  - the triggering device is caught up to `server_last_op_id` — that's what we set `up_to_op_id` to, so the producer must be at that point to encode it. Lagging connections are skipped as producers but still contribute to horizon.
+  - `(latest_blob_id − latest_snapshot.up_to_blob_id) > snapshot_threshold_blobs` (default `10_000`, configurable via `snapshot_threshold_blobs` / `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`) — enough new state has accumulated that a new snapshot materially shortens a bootstrapping client's `PullOps` catch-up, and
+  - the triggering device is caught up to `server_last_blob_id` — that's what we set `up_to_blob_id` to, so the producer must be at that point to encode it. Lagging connections are skipped as producers but still contribute to horizon.
   Counts blobs, not user actions or bytes — see §"Terminology" for why that matters.
-  Horizon is intentionally **not** a trigger condition. Snapshotting is valuable for bootstrap perf independent of compaction — a single snapshot row replaces an arbitrarily long `OpsBatch` replay. If horizon hasn't moved, the new snapshot's `shallow_start_op_id` is the same as the previous one, so compaction doesn't advance — but the new snapshot still cuts bootstrap cost.
-- `up_to_op_id` = the producer's `last_acked_op_id` = `server_last_op_id` (since the producer is caught up).
-- `shallow_start_op_id` = `max(horizon, previous_snapshot.shallow_start_op_id)`. Normally just horizon; the `max` enforces monotonicity for the edge case where a fresh device's join drops horizon below the existing floor — compaction is one-way, so the floor stays put.
-- Production: server sends `SnapshotRequest { up_to_op_id, shallow_start_op_id }`. Client serializes a Loro shallow snapshot — state at `up_to_op_id`, retained-history start at `shallow_start_op_id` — encrypts with DEK, uploads via `PushSnapshot { up_to_op_id, shallow_start_op_id, blob }`.
-- Compaction: after a snapshot is durable, compaction may delete ops with `id ≤ snapshot.shallow_start_op_id`.
+  Horizon is intentionally **not** a trigger condition. Snapshotting is valuable for bootstrap perf independent of compaction — a single snapshot row replaces an arbitrarily long `OpsBatch` replay. If horizon hasn't moved, the new snapshot's `shallow_start_blob_id` is the same as the previous one, so compaction doesn't advance — but the new snapshot still cuts bootstrap cost.
+- `up_to_blob_id` = the producer's `last_acked_blob_id` = `server_last_blob_id` (since the producer is caught up).
+- `shallow_start_blob_id` = `max(horizon, previous_snapshot.shallow_start_blob_id)`. Normally just horizon; the `max` enforces monotonicity for the edge case where a fresh device's join drops horizon below the existing floor — compaction is one-way, so the floor stays put.
+- Production: server sends `SnapshotRequest { up_to_blob_id, shallow_start_blob_id }`. Client serializes a Loro shallow snapshot — state at `up_to_blob_id`, retained-history start at `shallow_start_blob_id` — encrypts with DEK, uploads via `PushSnapshot { up_to_blob_id, shallow_start_blob_id, blob }`.
+- Compaction: after a snapshot is durable, compaction may delete ops with `id ≤ snapshot.shallow_start_blob_id`.
 
 Server keeps **at most one in-flight snapshot request per account**:
 
 - State:
   - `Idle`
-  - `Requested { device_id, up_to_op_id, deadline }`
+  - `Requested { device_id, up_to_blob_id, deadline }`
 - Transition to `Requested` only when no request is already in flight.
 - Snapshot orchestration is per-account; one stuck or slow account must not block others.
 
@@ -123,7 +123,7 @@ Correctness / acceptance rules:
 - Late snapshots from a timed-out, disconnected, or superseded assignee are ignored.
 - Unsolicited snapshots (no in-flight request) are ignored.
 - Server stores only the latest durable snapshot; no multi-snapshot chain is required.
-- The uploaded `up_to_op_id` must be **at least** the requested `up_to_op_id`, and `shallow_start_op_id` must equal the requested value (the server is asserting a specific compaction floor, not a range). Mismatched snapshots are ignored.
+- The uploaded `up_to_blob_id` must be **at least** the requested `up_to_blob_id`, and `shallow_start_blob_id` must equal the requested value (the server is asserting a specific compaction floor, not a range). Mismatched snapshots are ignored.
 - A newer snapshot may replace an older one atomically once durable.
 
 Operational notes:
@@ -134,18 +134,18 @@ Operational notes:
 
 ## Bootstrap from snapshot
 
-A device whose `since_op_id` is below the latest snapshot's `shallow_start_op_id` cannot resume from ops alone — the ops it needs have been compacted. (Devices whose `since_op_id` is between `shallow_start_op_id` and `up_to_op_id` *can* still delta-pull, because those ops are preserved by horizon-bounded compaction.) On receiving a `PullOps` with `since_op_id < shallow_start_op_id`, the server replies `SnapshotRequired { up_to_op_id }` instead of `OpsBatch`. The client then:
+A device whose `since_blob_id` is below the latest snapshot's `shallow_start_blob_id` cannot resume from ops alone — the ops it needs have been compacted. (Devices whose `since_blob_id` is between `shallow_start_blob_id` and `up_to_blob_id` *can* still delta-pull, because those ops are preserved by horizon-bounded compaction.) On receiving a `PullOps` with `since_blob_id < shallow_start_blob_id`, the server replies `SnapshotRequired { up_to_blob_id }` instead of `OpsBatch`. The client then:
 
-1. `PullSnapshot` → server returns `Snapshot { up_to_op_id, blob }`.
+1. `PullSnapshot` → server returns `Snapshot { up_to_blob_id, blob }`.
 2. Decrypt the blob and apply it to the local doc (Loro merges — local-only commits not yet pushed are preserved automatically; CRDT op-id reconciliation handles overlap with the device's own prior contributions).
-3. `PullOps { since_op_id: up_to_op_id }` to catch up on any ops written after the snapshot was taken.
+3. `PullOps { since_blob_id: up_to_blob_id }` to catch up on any ops written after the snapshot was taken.
 
-The `up_to_op_id` carried by `SnapshotRequired` is informational; the authoritative value is the one returned in the `Snapshot` frame, since the latest snapshot may advance between the two round trips.
+The `up_to_blob_id` carried by `SnapshotRequired` is informational; the authoritative value is the one returned in the `Snapshot` frame, since the latest snapshot may advance between the two round trips.
 
 `SnapshotRequired` and `Snapshot` are only valid in the bootstrap path. Up-to-date devices in steady state never receive either — `OpsBatch` / `OpsBroadcast` covers them. The `Snapshot` frame is therefore only accepted by a client in its bootstrap state, never mid-pull.
 
 ## Reconnect
 
-Client maintains `last_acked_op_id` in local state. On reconnect: WS upgrade with token → `PullOps { since_op_id: last_acked_op_id }` → resume.
+Client maintains `last_acked_blob_id` in local state. On reconnect: WS upgrade with token → `PullOps { since_blob_id: last_acked_blob_id }` → resume.
 
 Exponential backoff 1s → 30s.

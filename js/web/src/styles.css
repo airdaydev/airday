@@ -670,7 +670,7 @@ body {
   font-size: 13px;
   color: var(--text);
   /* The global #root rule kills text selection app-wide; this is a
-     read-only debug surface where copy-paste of op id / fingerprint
+     read-only debug surface where copy-paste of blob id / fingerprint
      is the whole point. */
   user-select: text;
   -webkit-user-select: text;

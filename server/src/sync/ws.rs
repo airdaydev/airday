@@ -8,7 +8,7 @@
 use std::time::Instant;
 
 use airday_protocol::{
-    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, ServerFrame, StoredOp,
+    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, ServerFrame, StoredBlob,
     PROTOCOL_VERSION,
 };
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -219,27 +219,36 @@ async fn handle_frame(
 ) -> Result<(), SessionError> {
     match frame {
         ClientFrame::PushOps { ops } => push_ops(socket, state, ws_session, ops).await,
-        ClientFrame::PullOps { since_op_id } => {
-            pull_ops(socket, state, &ws_session.auth, since_op_id).await
+        ClientFrame::PullOps { since_blob_id } => {
+            pull_ops(socket, state, &ws_session.auth, since_blob_id).await
         }
-        ClientFrame::Ack { last_acked_op_id } => {
-            let ack_span = tracing::info_span!("ws.ack", last_acked_op_id = last_acked_op_id);
-            queries::advance_last_acked_op_id(
+        ClientFrame::Ack { last_acked_blob_id } => {
+            let ack_span = tracing::info_span!("ws.ack", last_acked_blob_id = last_acked_blob_id);
+            queries::advance_last_acked_blob_id(
                 &state.db,
                 ws_session.auth.device_id,
-                last_acked_op_id,
+                last_acked_blob_id,
             )
             .await?;
-            evaluate_snapshot(socket, state, ws_session, last_acked_op_id).await?;
+            evaluate_snapshot(socket, state, ws_session, last_acked_blob_id).await?;
             tracing::debug!(parent: &ack_span, "ws ack applied");
             Ok(())
         }
         ClientFrame::PullSnapshot => pull_snapshot(socket, state, &ws_session.auth).await,
         ClientFrame::PushSnapshot {
-            up_to_op_id,
-            shallow_start_op_id,
+            up_to_blob_id,
+            shallow_start_blob_id,
             blob,
-        } => push_snapshot(state, ws_session, up_to_op_id, shallow_start_op_id, blob).await,
+        } => {
+            push_snapshot(
+                state,
+                ws_session,
+                up_to_blob_id,
+                shallow_start_blob_id,
+                blob,
+            )
+            .await
+        }
     }
 }
 
@@ -247,33 +256,33 @@ async fn handle_frame(
 /// caller is responsible for emitting `SnapshotRequest` when the
 /// decision is `Issue`. Separating compute from send lets the push
 /// path interleave `OpsAck` before `SnapshotRequest` (clients use
-/// `OpsAck` to advance `highest_seen_op_id` before producing the
+/// `OpsAck` to advance `highest_seen_blob_id` before producing the
 /// snapshot — otherwise the snapshot stamps a stale frontier).
 async fn evaluate_snapshot_decision(
     state: &AppState,
     ws_session: &WSSession,
-    device_last_acked_op_id: u64,
+    device_last_acked_blob_id: u64,
 ) -> Result<Decision, SessionError> {
     let account_id = ws_session.auth.account_id;
     let (snap_up_to, snap_shallow) = queries::latest_snapshot_meta(&state.db, account_id)
         .await?
-        .map(|m| (m.up_to_op_id, m.shallow_start_op_id))
+        .map(|m| (m.up_to_blob_id, m.shallow_start_blob_id))
         .unwrap_or((0, 0));
-    let server_last_op_id = queries::latest_account_op_id(&state.db, account_id).await?;
+    let server_last_blob_id = queries::latest_account_blob_id(&state.db, account_id).await?;
     let horizon = queries::account_horizon(
         &state.db,
         account_id,
         ws_session.auth.device_id,
-        device_last_acked_op_id,
+        device_last_acked_blob_id,
     )
     .await?;
     Ok(state.snapshot_coordinator.evaluate(
         account_id,
         snap_up_to,
         snap_shallow,
-        server_last_op_id,
+        server_last_blob_id,
         horizon,
-        device_last_acked_op_id,
+        device_last_acked_blob_id,
         Instant::now(),
     ))
 }
@@ -285,23 +294,23 @@ async fn issue_snapshot_request(
 ) -> Result<(), SessionError> {
     if let Decision::Issue {
         lease_id,
-        up_to_op_id,
-        shallow_start_op_id,
+        up_to_blob_id,
+        shallow_start_blob_id,
     } = decision
     {
         ws_session.snapshot_lease = Some(lease_id);
         send_msgpack(
             socket,
             &ServerFrame::SnapshotRequest {
-                up_to_op_id,
-                shallow_start_op_id,
+                up_to_blob_id,
+                shallow_start_blob_id,
             },
         )
         .await?;
         tracing::info!(
             lease_id,
-            up_to_op_id,
-            shallow_start_op_id,
+            up_to_blob_id,
+            shallow_start_blob_id,
             "ws snapshot requested"
         );
     }
@@ -312,10 +321,9 @@ async fn evaluate_snapshot(
     socket: &mut WebSocket,
     state: &AppState,
     ws_session: &mut WSSession,
-    device_last_acked_op_id: u64,
+    device_last_acked_blob_id: u64,
 ) -> Result<(), SessionError> {
-    let decision =
-        evaluate_snapshot_decision(state, ws_session, device_last_acked_op_id).await?;
+    let decision = evaluate_snapshot_decision(state, ws_session, device_last_acked_blob_id).await?;
     issue_snapshot_request(socket, ws_session, decision).await
 }
 
@@ -349,11 +357,11 @@ async fn push_ops(
         // are correct (the originator's ack and peer broadcasts are
         // independent), but queueing first means peers don't race the
         // originator's "I'm done pushing" signal.
-        let stored: Vec<StoredOp> = assigned_ids
+        let stored: Vec<StoredBlob> = assigned_ids
             .iter()
             .copied()
             .zip(blobs_for_broadcast)
-            .map(|(id, blob)| StoredOp { id, blob })
+            .map(|(id, blob)| StoredBlob { blob_id: id, blob })
             .collect();
         state
             .sync_sessions
@@ -361,21 +369,21 @@ async fn push_ops(
 
         tracing::info!(
             assigned_id_count = assigned_ids.len(),
-            first_assigned_op_id = assigned_ids.first().copied(),
-            last_assigned_op_id = assigned_ids.last().copied(),
+            first_assigned_blob_id = assigned_ids.first().copied(),
+            last_assigned_blob_id = assigned_ids.last().copied(),
             "ws push_ops persisted"
         );
 
         // Order matters: compute the snapshot decision (DB reads only)
         // BEFORE sending OpsAck, then send OpsAck BEFORE
         // SnapshotRequest. The client uses OpsAck to advance
-        // `highest_seen_op_id` — and that's what gets stamped as the
-        // snapshot's `up_to_op_id` when it produces. If SnapshotRequest
+        // `highest_seen_blob_id` — and that's what gets stamped as the
+        // snapshot's `up_to_blob_id` when it produces. If SnapshotRequest
         // arrives first, the client snapshots at its pre-push frontier,
         // landing a snapshot with `up_to < shallow_start`, which traps
         // later bootstrappers in an infinite SnapshotRequired loop.
-        let snapshot_decision = if let Some(latest_op_id) = assigned_ids.last().copied() {
-            Some(evaluate_snapshot_decision(state, ws_session, latest_op_id).await?)
+        let snapshot_decision = if let Some(latest_blob_id) = assigned_ids.last().copied() {
+            Some(evaluate_snapshot_decision(state, ws_session, latest_blob_id).await?)
         } else {
             None
         };
@@ -396,31 +404,31 @@ async fn pull_ops(
     socket: &mut WebSocket,
     state: &AppState,
     auth: &DeviceAuth,
-    since_op_id: u64,
+    since_blob_id: u64,
 ) -> Result<(), SessionError> {
-    let pull_span = tracing::info_span!("ws.pull_ops", since_op_id = since_op_id);
+    let pull_span = tracing::info_span!("ws.pull_ops", since_blob_id = since_blob_id);
     // Bootstrap-from-snapshot precondition: if the latest snapshot's
-    // `up_to_op_id` is ahead of the client's cursor, the client cannot
+    // `up_to_blob_id` is ahead of the client's cursor, the client cannot
     // resume from ops alone (compacted ops below the floor are gone,
     // and even when they aren't, replaying every op since 0 wastes
     // round trips). Hand back `SnapshotRequired` and let the client
     // drive the bootstrap exchange.
     async {
         if let Some(meta) = queries::latest_snapshot_meta(&state.db, auth.account_id).await? {
-            // Compaction floor (= snapshot's shallow_start_op_id) is
+            // Compaction floor (= snapshot's shallow_start_blob_id) is
             // what determines whether the ops are still available.
             // Devices between shallow_start and up_to can still
             // delta-pull; only those below shallow_start need bootstrap.
-            if since_op_id < meta.shallow_start_op_id {
+            if since_blob_id < meta.shallow_start_blob_id {
                 tracing::info!(
-                    shallow_start_op_id = meta.shallow_start_op_id,
-                    snapshot_up_to_op_id = meta.up_to_op_id,
+                    shallow_start_blob_id = meta.shallow_start_blob_id,
+                    snapshot_up_to_blob_id = meta.up_to_blob_id,
                     "ws pull_ops below compaction floor; sending SnapshotRequired"
                 );
                 send_msgpack(
                     socket,
                     &ServerFrame::SnapshotRequired {
-                        up_to_op_id: meta.up_to_op_id,
+                        up_to_blob_id: meta.up_to_blob_id,
                     },
                 )
                 .await?;
@@ -428,13 +436,13 @@ async fn pull_ops(
             }
         }
 
-        let mut cursor = since_op_id;
+        let mut cursor = since_blob_id;
         let mut batch_count = 0u64;
         let mut total_ops = 0usize;
         loop {
             let batch = queries::fetch_ops_batch(&state.db, auth.account_id, cursor).await?;
             let batch_len = batch.ops.len();
-            let next_cursor = batch.ops.last().map(|o| o.id).unwrap_or(cursor);
+            let next_cursor = batch.ops.last().map(|o| o.blob_id).unwrap_or(cursor);
             let complete = !batch.has_more;
             send_msgpack(
                 socket,
@@ -450,7 +458,7 @@ async fn pull_ops(
                 tracing::info!(
                     batch_count = batch_count,
                     op_count = total_ops,
-                    final_op_id = next_cursor,
+                    final_blob_id = next_cursor,
                     "ws pull_ops completed"
                 );
                 return Ok(());
@@ -465,14 +473,14 @@ async fn pull_ops(
 async fn push_snapshot(
     state: &AppState,
     ws_session: &mut WSSession,
-    up_to_op_id: u64,
-    shallow_start_op_id: u64,
+    up_to_blob_id: u64,
+    shallow_start_blob_id: u64,
     blob: EncryptedBlob,
 ) -> Result<(), SessionError> {
     let span = tracing::info_span!(
         "ws.push_snapshot",
-        up_to_op_id = up_to_op_id,
-        shallow_start_op_id = shallow_start_op_id,
+        up_to_blob_id = up_to_blob_id,
+        shallow_start_blob_id = shallow_start_blob_id,
         blob_bytes = blob.ciphertext.len(),
     );
     async {
@@ -492,8 +500,8 @@ async fn push_snapshot(
         let row_id = queries::insert_snapshot(
             &state.db,
             ws_session.auth.account_id,
-            up_to_op_id,
-            shallow_start_op_id,
+            up_to_blob_id,
+            shallow_start_blob_id,
             blob,
         )
         .await?;
@@ -542,11 +550,14 @@ async fn pull_snapshot(
     async {
         match queries::latest_snapshot(&state.db, auth.account_id).await? {
             Some(snap) => {
-                tracing::info!(up_to_op_id = snap.up_to_op_id, "ws pull_snapshot served");
+                tracing::info!(
+                    up_to_blob_id = snap.up_to_blob_id,
+                    "ws pull_snapshot served"
+                );
                 send_msgpack(
                     socket,
                     &ServerFrame::Snapshot {
-                        up_to_op_id: snap.up_to_op_id,
+                        up_to_blob_id: snap.up_to_blob_id,
                         blob: snap.blob,
                     },
                 )

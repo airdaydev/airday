@@ -31,7 +31,7 @@ CREATE TABLE devices (
   account_id          BLOB NOT NULL REFERENCES accounts(id),
   name                TEXT NOT NULL,
   auth_token_hash     BLOB NOT NULL,                           -- SHA-256(device_token bytes)
-  last_acked_op_id    INTEGER NOT NULL DEFAULT 0,
+  last_acked_blob_id  INTEGER NOT NULL DEFAULT 0,
   last_seen_at        INTEGER NOT NULL,
   created_at          INTEGER NOT NULL
 );
@@ -39,19 +39,19 @@ CREATE INDEX devices_account_id_idx ON devices (account_id);
 CREATE INDEX devices_token_hash_idx ON devices (auth_token_hash);
 
 CREATE TABLE ops (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,           -- monotonic per-server
+  blob_id         INTEGER PRIMARY KEY AUTOINCREMENT,           -- monotonic per-server
   account_id      BLOB NOT NULL REFERENCES accounts(id),
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
   created_at      INTEGER NOT NULL
 );
-CREATE INDEX ops_account_id_idx ON ops (account_id, id);
+CREATE INDEX ops_account_id_idx ON ops (account_id, blob_id);
 
 CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
-  up_to_op_id           INTEGER NOT NULL,                        -- encoded state frontier
-  shallow_start_op_id   INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
+  up_to_blob_id         INTEGER NOT NULL,                        -- encoded state frontier
+  shallow_start_blob_id INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL

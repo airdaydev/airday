@@ -17,9 +17,44 @@ export interface DeviceConfig {
   serverUrl: string;
   deviceId: string;
   /** Sync engine's frontier. 0 until the sync slice ships. */
-  lastAckedOpId: number;
+  lastAckedBlobId: number;
   /** Unix millis of the last successful online flush, or null. */
   lastSyncAt: number | null;
+}
+
+type LegacyDeviceConfig = DeviceConfig & {
+  lastAckedOpId?: number;
+};
+
+export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
+  if (!value || typeof value !== "object") return null;
+  const device = value as LegacyDeviceConfig;
+  if (
+    typeof device.accountId !== "string" ||
+    typeof device.email !== "string" ||
+    typeof device.serverUrl !== "string" ||
+    typeof device.deviceId !== "string"
+  ) {
+    return null;
+  }
+  const lastAckedBlobId =
+    typeof device.lastAckedBlobId === "number"
+      ? device.lastAckedBlobId
+      : typeof device.lastAckedOpId === "number"
+        ? device.lastAckedOpId
+        : 0;
+  const lastSyncAt =
+    typeof device.lastSyncAt === "number" || device.lastSyncAt === null
+      ? device.lastSyncAt
+      : null;
+  return {
+    accountId: device.accountId,
+    email: device.email,
+    serverUrl: device.serverUrl,
+    deviceId: device.deviceId,
+    lastAckedBlobId,
+    lastSyncAt,
+  };
 }
 
 /** Storage adapter contract. Methods are async to accommodate IDB. */

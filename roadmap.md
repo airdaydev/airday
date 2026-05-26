@@ -17,6 +17,17 @@ One latent thing remains, but it was already scoped out in your handoff:
   needs the op_id → Loro frontier mapping that doesn't exist client-side yet — separate
   task whenever you want to chase it.
 
+Implement a client-side sync index that records the cumulative Loro VersionVector or
+  frontiers for each contiguous server op_id prefix as blobs are applied or acknowledged,
+  persist that index alongside local state, seed it correctly when bootstrapping from a
+  server snapshot by also carrying the snapshot’s shallow_start_op_id, and then change
+  snapshot production so SnapshotRequest.shallow_start_op_id is translated through that
+  index into the corresponding Loro frontier and exported with
+  ExportMode::shallow_snapshot(...) instead of ExportMode::Snapshot; the server logic can
+  stay essentially the same apart from including the snapshot floor metadata on bootstrap
+  responses.
+
+
 ## Web app
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.

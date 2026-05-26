@@ -32,26 +32,26 @@ CREATE TABLE devices (
   account_id          BLOB NOT NULL REFERENCES accounts(id),
   name                TEXT NOT NULL,
   auth_token_hash     TEXT NOT NULL,
-  last_acked_op_id    INTEGER NOT NULL DEFAULT 0,
+  last_acked_blob_id  INTEGER NOT NULL DEFAULT 0,
   last_seen_at        INTEGER NOT NULL,
   created_at          INTEGER NOT NULL
 );
 CREATE INDEX devices_account_id_idx ON devices (account_id);
 
 CREATE TABLE ops (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,        -- monotonic per-server
+  blob_id         INTEGER PRIMARY KEY AUTOINCREMENT,       -- monotonic per-server
   account_id      BLOB NOT NULL REFERENCES accounts(id),
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
   created_at      INTEGER NOT NULL
 );
-CREATE INDEX ops_account_id_idx ON ops (account_id, id);
+CREATE INDEX ops_account_id_idx ON ops (account_id, blob_id);
 
 CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
-  up_to_op_id           INTEGER NOT NULL,    -- snapshot's encoded state frontier
-  shallow_start_op_id   INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
+  up_to_blob_id         INTEGER NOT NULL,    -- snapshot's encoded state frontier
+  shallow_start_blob_id INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL
@@ -59,12 +59,12 @@ CREATE TABLE snapshots (
 CREATE INDEX snapshots_account_id_idx ON snapshots (account_id, id DESC);
 ```
 
-Note: `ops.id` is global-monotonic, not per-account. Per-account ordering is `(account_id, id)`. This keeps ack math simple.
+Note: `ops.blob_id` is global-monotonic, not per-account. Per-account ordering is `(account_id, blob_id)`. This keeps ack math simple.
 
 ## Compaction
 
 After a snapshot lands, a background job may:
-1. Delete `ops` rows where `account_id = X AND id ≤ snapshot.shallow_start_op_id`. (`shallow_start_op_id` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
+1. Delete `ops` rows where `account_id = X AND blob_id ≤ snapshot.shallow_start_blob_id`. (`shallow_start_blob_id` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
 2. Keep at most M=2 snapshots per account; delete older.
 
 Run on a timer, not synchronous with snapshot upload.
@@ -78,7 +78,8 @@ Run on a timer, not synchronous with snapshot upload.
 
 ## Migrations
 
-Single `001_init.sql` for now. Greenfield — until v1.0, we reset the DB rather than migrate.
+- `001_init.sql` creates the current schema for fresh servers.
+- `002_blob_id_rename.sql` is a forward-only live migration from the legacy `*_op_id` / `ops.id` naming to `*_blob_id` / `ops.blob_id`.
 
 ## Open questions
 

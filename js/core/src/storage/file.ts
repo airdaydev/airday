@@ -7,7 +7,11 @@
 // `dirs::data_local_dir`'s JS equivalent here; that policy belongs to
 // the consumer (CLI, tests, web bootstrap shim).
 
-import type { DeviceConfig, StorageAdapter } from "./adapter.ts";
+import {
+  normalizeDeviceConfig,
+  type DeviceConfig,
+  type StorageAdapter,
+} from "./adapter.ts";
 
 const DEVICE_FILE = "device.json";
 const DOC_FILE = "loro.bin";
@@ -30,7 +34,7 @@ export class BunFileStorage implements StorageAdapter {
   async getDevice(): Promise<DeviceConfig | null> {
     const file = Bun.file(`${this.root}/${DEVICE_FILE}`);
     if (!(await file.exists())) return null;
-    return (await file.json()) as DeviceConfig;
+    return normalizeDeviceConfig(await file.json());
   }
 
   async putDevice(device: DeviceConfig): Promise<void> {
