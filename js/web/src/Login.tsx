@@ -4,6 +4,7 @@
 // proxies /api/* in dev) — no runtime server picker; self-hosters
 // serve their own bundle from their own domain.
 
+import { Dialog } from "@kobalte/core/dialog";
 import { createSignal, Show } from "solid-js";
 import {
   Dek,
@@ -40,7 +41,7 @@ function defaultDeviceName(): string {
   return `web-${typeof navigator !== "undefined" ? navigator.platform : "unknown"}`;
 }
 
-export function AuthForm(props: {
+function AuthForm(props: {
   initialMode?: "login" | "signup";
   onSession: (s: Session) => void;
 }) {
@@ -73,9 +74,9 @@ export function AuthForm(props: {
 
   return (
     <form class="auth-form" onSubmit={submit}>
-      <h3 class="auth-popover-title">
+      <Dialog.Title class="auth-dialog-title">
         {mode() === "login" ? m().auth.signIn : m().auth.signUp}
-      </h3>
+      </Dialog.Title>
       <label>
         {m().auth.email}
         <input
@@ -121,6 +122,55 @@ export function AuthForm(props: {
         <div class="error">{error()}</div>
       </Show>
     </form>
+  );
+}
+
+/** Controlled Kobalte Dialog wrapping the auth form. Mirrors the shape
+ *  of `Settings` — App owns the open signal, the dialog owns its own
+ *  portal/overlay/close-button. ESC and overlay click both close. */
+export function AuthDialog(props: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  onSession: (s: Session) => void;
+  initialMode?: "login" | "signup";
+}) {
+  const { m } = useAppI18n();
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange} modal>
+      <Dialog.Portal>
+        <Dialog.Overlay class="dialog-overlay" />
+        <div class="dialog-positioner">
+          <Dialog.Content class="auth-dialog">
+            <Dialog.CloseButton class="auth-dialog-close" aria-label={m().common.close}>
+              <CloseIcon />
+            </Dialog.CloseButton>
+            <AuthForm
+              initialMode={props.initialMode}
+              onSession={props.onSession}
+            />
+          </Dialog.Content>
+        </div>
+      </Dialog.Portal>
+    </Dialog>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   );
 }
 

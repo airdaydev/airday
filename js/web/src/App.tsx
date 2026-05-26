@@ -49,7 +49,7 @@ import { dekVault } from "./dekVault.ts";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import type { SearchResult } from "./search.ts";
-import { AuthForm, type Session } from "./Login.tsx";
+import { AuthDialog, type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
 import {
   createSyncedApp,
@@ -2397,14 +2397,18 @@ function Nav(props: {
       </div>
       <div class="nav-footer">
         <Show when={props.session.anonymous}>
-          <Popover open={authOpen()} onOpenChange={setAuthOpen}>
-            <Popover.Trigger class="signin-button">{m().auth.signIn}</Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content class="auth-popover">
-                <AuthForm onSession={handleSession} />
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover>
+          <button
+            type="button"
+            class="signin-button"
+            onClick={() => setAuthOpen(true)}
+          >
+            {m().auth.signIn}
+          </button>
+          <AuthDialog
+            open={authOpen()}
+            onOpenChange={setAuthOpen}
+            onSession={handleSession}
+          />
         </Show>
         <Show when={!props.session.anonymous}>
           <ConnectionStatusPopover
