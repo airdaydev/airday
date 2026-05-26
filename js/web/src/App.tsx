@@ -3011,6 +3011,7 @@ function Row(props: {
       >
         <input
           type="checkbox"
+          tabIndex={-1}
           checked={isDone(props.item())}
           onChange={(e) =>
             props.app.setDone(props.item().id, e.currentTarget.checked)
