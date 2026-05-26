@@ -46,3 +46,4 @@ One latent thing remains, but it was already scoped out in your handoff:
 
 ## Maybe
 - Encoding habits?
+- vi keys (as an option)
