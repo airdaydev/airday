@@ -1727,6 +1727,7 @@ function Workspace(props: {
               expandable
               clearOnClickOutside
               fillHeight
+              autofocus
               reorder={view().kind === "list"}
               onReorder={onReorder}
             >

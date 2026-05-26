@@ -203,7 +203,20 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     listboxEl.addEventListener("touchend", controller.onTouchEnd);
 
     if (props.autofocus) {
-      queueMicrotask(() => listboxEl.focus());
+      queueMicrotask(() => {
+        // Don't steal focus from an editable element that another mount
+        // path (e.g. rename-on-dblclick) just focused via microtask.
+        const ae = document.activeElement;
+        if (
+          ae instanceof HTMLElement &&
+          (ae.isContentEditable ||
+            ae.tagName === "INPUT" ||
+            ae.tagName === "TEXTAREA")
+        ) {
+          return;
+        }
+        listboxEl.focus();
+      });
     }
 
     props.ref?.({
