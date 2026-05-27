@@ -11,8 +11,8 @@ use wasm_bindgen::prelude::*;
 use airday_core::{
     derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
     parse_recovery_code, AppEvent as CoreAppEvent, Dek as CoreDek, Doc as CoreDoc,
-    EngineOptions as CoreEngineOptions, Event as CoreEvent, Kek as CoreKek,
-    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
+    EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
+    Kek as CoreKek, SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -327,6 +327,17 @@ impl Doc {
     #[wasm_bindgen(js_name = exportJson)]
     pub fn export_json(&self) -> String {
         self.inner.export_json_string()
+    }
+
+    /// Additive JSON import — counterpart to `exportJson`. Source lists
+    /// become fresh local lists; `main`-bound items land in the local
+    /// `main`; existing local content is untouched. Returns a JSON
+    /// string of `{ listsAdded, itemsAdded, itemsSkipped }` for UI
+    /// summary.
+    #[wasm_bindgen(js_name = importJson)]
+    pub fn import_json(&self, json: &str) -> Result<String, JsError> {
+        let summary = self.inner.import_json_str(json).map_err(js_err)?;
+        Ok(summary_to_json(&summary))
     }
 
     /// Replay one WAL row. Caller has already decrypted; we just feed
@@ -804,6 +815,17 @@ impl SyncEngine {
     #[wasm_bindgen(js_name = exportJson)]
     pub fn export_json(&self) -> String {
         self.inner.doc().export_json_string()
+    }
+
+    /// Additive JSON import — counterpart of `exportJson` on the engine
+    /// surface. Returns a JSON string of `{ listsAdded, itemsAdded,
+    /// itemsSkipped }`. Doesn't push or flush — caller's normal
+    /// post-mutation flow (WAL append, sync push) handles the new ops
+    /// like any other local commit.
+    #[wasm_bindgen(js_name = importJson)]
+    pub fn import_json(&self, json: &str) -> Result<String, JsError> {
+        let summary = self.inner.doc().import_json_str(json).map_err(js_err)?;
+        Ok(summary_to_json(&summary))
     }
 
     // -- mutations: items --
@@ -1369,6 +1391,13 @@ fn items_to_json(items: &[airday_core::ItemView]) -> String {
     }
     s.push(']');
     s
+}
+
+fn summary_to_json(s: &CoreImportSummary) -> String {
+    format!(
+        "{{\"listsAdded\":{},\"itemsAdded\":{},\"itemsSkipped\":{}}}",
+        s.lists_added, s.items_added, s.items_skipped,
+    )
 }
 
 fn json_string(s: &str) -> String {

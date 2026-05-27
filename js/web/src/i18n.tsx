@@ -80,6 +80,9 @@ type Messages = {
     exportBackup: string;
     exportJson: string;
     exportFailed: string;
+    importJson: string;
+    importSucceeded: (items: number, lists: number) => string;
+    importFailed: string;
   };
   workspace: {
     emptyBin: string;
@@ -175,6 +178,10 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       exportBackup: "Copia de seguridad (.bin)",
       exportJson: "JSON (.json)",
       exportFailed: "No se pudo exportar la copia de seguridad",
+      importJson: "Importar JSON…",
+      importSucceeded: (items, lists) =>
+        `Importado: ${items} elemento${items === 1 ? "" : "s"}, ${lists} lista${lists === 1 ? "" : "s"}`,
+      importFailed: "No se pudo importar el archivo",
     },
     workspace: {
       emptyBin: "Vaciar papelera",
@@ -269,6 +276,10 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       exportBackup: "Backup (.bin)",
       exportJson: "JSON (.json)",
       exportFailed: "Could not export backup",
+      importJson: "Import JSON…",
+      importSucceeded: (items, lists) =>
+        `Imported ${items} item${items === 1 ? "" : "s"}, ${lists} list${lists === 1 ? "" : "s"}`,
+      importFailed: "Could not import file",
     },
     workspace: {
       emptyBin: "Empty",

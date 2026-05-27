@@ -126,6 +126,16 @@ export interface DocApp {
   canUndo(): boolean;
   canRedo(): boolean;
   withActionBatch<T>(fn: () => T): T;
+  /** Additive JSON import: lists in `json` are created as fresh user
+   *  lists, items get fresh IDs and route into them (or local `main`).
+   *  Single Loro commit → one undo step. */
+  importJson(json: string): ImportSummary;
+}
+
+export interface ImportSummary {
+  listsAdded: number;
+  itemsAdded: number;
+  itemsSkipped: number;
 }
 
 const COARSE_BATCH_THRESHOLD = 64;
@@ -484,6 +494,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     renameList(id, name) {
       mutate(() => engine.renameList(id, name));
+    },
+    importJson(json) {
+      return mutate(() => {
+        const summaryJson = engine.importJson(json);
+        return JSON.parse(summaryJson) as ImportSummary;
+      });
     },
     moveList(id, index) {
       mutate(() => engine.moveList(id, index));

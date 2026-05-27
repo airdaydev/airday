@@ -160,6 +160,18 @@ pub struct JsonExport {
     pub items: Vec<ExportItem>,
 }
 
+/// Counts surfaced to the UI after a successful `import_json`.
+/// `items_skipped` covers entries dropped because their `text` was
+/// empty after trim — defensively guarded so a malformed export can't
+/// land empty rows in the doc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSummary {
+    pub lists_added: usize,
+    pub items_added: usize,
+    pub items_skipped: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
@@ -868,6 +880,102 @@ impl Doc {
     pub fn export_json_string(&self) -> String {
         serde_json::to_string_pretty(&self.export_json())
             .expect("JsonExport contains only primitives — serialization is infallible")
+    }
+
+    /// Additive JSON import. Source lists are created as fresh user
+    /// lists (new IDs); source items keep their text / notes /
+    /// timestamps / done-binned state but get fresh IDs and follow the
+    /// id-map: anything in the source's `main` lands in the local
+    /// `main`, builtin entries are not duplicated, and items whose
+    /// `list_id` references a list not present in the export fall
+    /// back to `main` (same orphan handling as `delete_list`).
+    /// Existing local content is untouched. All writes land in a
+    /// single Loro commit; UI events are emitted via the standard
+    /// pre/post state-diff.
+    pub fn import_json(&self, export: &JsonExport) -> Result<ImportSummary, DocError> {
+        if export.version != 1 {
+            return Err(DocError::Invalid(format!(
+                "unsupported export version: {} (expected 1)",
+                export.version
+            )));
+        }
+
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let pre_lists: Vec<ListView> = self.all_lists();
+        let pre_settings = self.get_settings();
+
+        let mut id_map: HashMap<String, String> = HashMap::new();
+        id_map.insert(LIST_MAIN.to_string(), LIST_MAIN.to_string());
+
+        let lists = self.lists();
+        let mut lists_added: usize = 0;
+        for src_list in &export.lists {
+            if src_list.builtin || src_list.id == LIST_MAIN {
+                id_map.insert(src_list.id.clone(), LIST_MAIN.to_string());
+                continue;
+            }
+            let name = src_list.name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            let new_list_id = new_id();
+            let map = lists.push_container(LoroMap::new())?;
+            let created_at = src_list.created_at.unwrap_or_else(now_millis);
+            map.insert(KEY_ID, new_list_id.as_str())?;
+            map.insert(KEY_NAME, name)?;
+            map.insert(KEY_CREATED_AT, created_at)?;
+            id_map.insert(src_list.id.clone(), new_list_id);
+            lists_added += 1;
+        }
+
+        let items = self.items();
+        let mut items_added: usize = 0;
+        let mut items_skipped: usize = 0;
+        for src_item in &export.items {
+            let text = src_item.text.trim();
+            if text.is_empty() {
+                items_skipped += 1;
+                continue;
+            }
+            let target_list_id = id_map
+                .get(&src_item.list_id)
+                .cloned()
+                .unwrap_or_else(|| LIST_MAIN.to_string());
+            let new_item_id = new_id();
+            let map = items.push_container(LoroMap::new())?;
+            map.insert(KEY_ID, new_item_id.as_str())?;
+            map.insert(KEY_TEXT, text)?;
+            map.insert(KEY_LIST_ID, target_list_id.as_str())?;
+            map.insert(KEY_CREATED_AT, src_item.created_at)?;
+            let notes = src_item.notes.trim();
+            if !notes.is_empty() {
+                map.insert(KEY_NOTES, notes)?;
+            }
+            if let Some(t) = src_item.done_at {
+                map.insert(KEY_DONE_AT, t)?;
+            }
+            if let Some(t) = src_item.binned_at {
+                map.insert(KEY_BINNED_AT, t)?;
+            }
+            items_added += 1;
+        }
+
+        self.inner.commit();
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
+
+        Ok(ImportSummary {
+            lists_added,
+            items_added,
+            items_skipped,
+        })
+    }
+
+    /// JSON-string convenience wrapper around `import_json` — what the
+    /// web client hands the user-selected file contents to.
+    pub fn import_json_str(&self, json: &str) -> Result<ImportSummary, DocError> {
+        let export: JsonExport = serde_json::from_str(json)
+            .map_err(|e| DocError::Invalid(format!("invalid JSON export: {e}")))?;
+        self.import_json(&export)
     }
 
     pub fn get_item(&self, item_id: &str) -> Option<ItemView> {
@@ -2607,6 +2715,200 @@ mod tests {
         // Round-trips through serde_json into the same struct.
         let parsed: JsonExport = serde_json::from_str(&s).unwrap();
         assert_eq!(parsed, doc.export_json());
+    }
+
+    #[test]
+    fn import_json_creates_lists_with_fresh_ids_and_routes_main_locally() {
+        let src = Doc::new().unwrap();
+        let other = src.add_list("Other").unwrap();
+        let _ = src.add_item(LIST_MAIN, "in-main").unwrap();
+        let _ = src.add_item(&other, "in-other").unwrap();
+        let export = src.export_json();
+
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json(&export).unwrap();
+
+        assert_eq!(summary.lists_added, 1);
+        assert_eq!(summary.items_added, 2);
+        assert_eq!(summary.items_skipped, 0);
+
+        let dst_lists = dst.all_lists();
+        assert_eq!(dst_lists.len(), 1);
+        assert_eq!(dst_lists[0].name, "Other");
+        // New list got a fresh id — additive means we do *not* reuse the
+        // source's list id.
+        assert_ne!(dst_lists[0].id, other);
+
+        let texts_main: Vec<String> = dst
+            .iter_items()
+            .filter(|i| i.list_id == LIST_MAIN)
+            .map(|i| i.text)
+            .collect();
+        assert_eq!(texts_main, vec!["in-main"]);
+
+        let texts_other: Vec<String> = dst
+            .iter_items()
+            .filter(|i| i.list_id == dst_lists[0].id)
+            .map(|i| i.text)
+            .collect();
+        assert_eq!(texts_other, vec!["in-other"]);
+    }
+
+    #[test]
+    fn import_json_preserves_timestamps_done_binned_and_notes() {
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_MAIN, "alpha").unwrap();
+        let b = src.add_item(LIST_MAIN, "beta").unwrap();
+        let c = src.add_item(LIST_MAIN, "gamma").unwrap();
+        src.edit_item_notes(&a, "alpha notes").unwrap();
+        src.set_item_done(&b, true).unwrap();
+        src.set_item_binned(&c, true).unwrap();
+
+        let src_view_a = src.get_item(&a).unwrap();
+        let src_view_b = src.get_item(&b).unwrap();
+        let src_view_c = src.get_item(&c).unwrap();
+        let export = src.export_json();
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+
+        let imported: Vec<ItemView> = dst.iter_items().collect();
+        let by_text = |t: &str| imported.iter().find(|i| i.text == t).unwrap();
+        let ia = by_text("alpha");
+        let ib = by_text("beta");
+        let ic = by_text("gamma");
+
+        assert_eq!(ia.notes, "alpha notes");
+        assert_eq!(ia.created_at, src_view_a.created_at);
+
+        assert_eq!(ib.done_at, src_view_b.done_at);
+        assert!(ib.done_at.is_some());
+
+        assert_eq!(ic.binned_at, src_view_c.binned_at);
+        assert!(ic.binned_at.is_some());
+    }
+
+    #[test]
+    fn import_json_is_additive_existing_content_untouched() {
+        let dst = Doc::new().unwrap();
+        let local_list = dst.add_list("LocalKeep").unwrap();
+        let local_item = dst.add_item(LIST_MAIN, "local-main").unwrap();
+        let _ = dst.add_item(&local_list, "local-other").unwrap();
+
+        let src = Doc::new().unwrap();
+        let _ = src.add_list("Imported").unwrap();
+        let _ = src.add_item(LIST_MAIN, "src-main").unwrap();
+        let export = src.export_json();
+
+        dst.import_json(&export).unwrap();
+
+        // Pre-existing list and item still present, untouched.
+        assert!(dst.get_item(&local_item).is_some());
+        let names: Vec<String> = dst.all_lists().into_iter().map(|l| l.name).collect();
+        assert!(names.contains(&"LocalKeep".to_string()));
+        assert!(names.contains(&"Imported".to_string()));
+        assert_eq!(names.len(), 2);
+
+        // Both `src-main` and `local-main` live in main.
+        let main_texts: Vec<String> = dst
+            .iter_items()
+            .filter(|i| i.list_id == LIST_MAIN)
+            .map(|i| i.text)
+            .collect();
+        assert!(main_texts.contains(&"local-main".to_string()));
+        assert!(main_texts.contains(&"src-main".to_string()));
+    }
+
+    #[test]
+    fn import_json_orphan_items_fall_back_to_main() {
+        // Hand-crafted export with an item pointing at a list_id that
+        // isn't in `lists` — same orphan handling as a deleted source
+        // list. Should land in main, not silently dropped.
+        let export = JsonExport {
+            version: 1,
+            settings: ExportSettings {
+                show_list_counts: false,
+                main_name: None,
+            },
+            lists: vec![ExportList {
+                id: LIST_MAIN.to_string(),
+                name: LIST_MAIN_NAME.to_string(),
+                created_at: None,
+                builtin: true,
+            }],
+            items: vec![ExportItem {
+                id: "orphan-id".to_string(),
+                text: "stranded".to_string(),
+                notes: String::new(),
+                list_id: "no-such-list".to_string(),
+                created_at: 1_700_000_000_000,
+                done_at: None,
+                binned_at: None,
+            }],
+        };
+
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json(&export).unwrap();
+        assert_eq!(summary.items_added, 1);
+        assert_eq!(summary.lists_added, 0);
+
+        let items: Vec<ItemView> = dst.iter_items().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].text, "stranded");
+        assert_eq!(items[0].list_id, LIST_MAIN);
+    }
+
+    #[test]
+    fn import_json_str_round_trips_through_serde() {
+        let src = Doc::new().unwrap();
+        let l = src.add_list("Roundtrip").unwrap();
+        let _ = src.add_item(&l, "via-string").unwrap();
+        let json = src.export_json_string();
+
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json_str(&json).unwrap();
+        assert_eq!(summary.lists_added, 1);
+        assert_eq!(summary.items_added, 1);
+    }
+
+    #[test]
+    fn import_json_rejects_unknown_version() {
+        let export = JsonExport {
+            version: 99,
+            settings: ExportSettings {
+                show_list_counts: false,
+                main_name: None,
+            },
+            lists: vec![],
+            items: vec![],
+        };
+        let dst = Doc::new().unwrap();
+        let err = dst.import_json(&export).unwrap_err();
+        assert!(matches!(err, DocError::Invalid(_)));
+    }
+
+    #[test]
+    fn import_json_emits_item_added_events() {
+        let src = Doc::new().unwrap();
+        let _ = src.add_item(LIST_MAIN, "e1").unwrap();
+        let _ = src.add_item(LIST_MAIN, "e2").unwrap();
+        let export = src.export_json();
+
+        let dst = Doc::new().unwrap();
+        let _ = dst.drain_events();
+        dst.import_json(&export).unwrap();
+
+        let evs = dst.drain_events();
+        let added: Vec<&str> = evs
+            .iter()
+            .filter_map(|e| match e {
+                AppEvent::ItemAdded { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(added.len(), 2);
+        assert!(added.contains(&"e1"));
+        assert!(added.contains(&"e2"));
     }
 
     #[test]

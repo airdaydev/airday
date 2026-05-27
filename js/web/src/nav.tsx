@@ -281,6 +281,27 @@ export function Nav(props: {
     }
   };
 
+  // Hidden file input the "Import JSON" menu item triggers via .click().
+  // Resetting `value` between picks is what lets the user choose the same
+  // file twice in a row — without it the change event never fires the
+  // second time.
+  let importFileInput: HTMLInputElement | undefined;
+  const onImportFilePicked = async (
+    e: Event & { currentTarget: HTMLInputElement },
+  ): Promise<void> => {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const summary = props.app.importJson(text);
+      alert(m().nav.importSucceeded(summary.itemsAdded, summary.listsAdded));
+    } catch (err) {
+      console.error("import json failed:", err);
+      alert(m().nav.importFailed);
+    }
+  };
+
   const onReorder = (op: DndOp<NavList>) => {
     if (op.type !== "move") return;
     const ids = props.lists.map((l) => l.id);
@@ -313,6 +334,13 @@ export function Nav(props: {
   let startHomeRename: (() => void) | undefined;
   return (
     <nav class="nav" onKeyDown={onNavKeyDown}>
+      <input
+        ref={importFileInput}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={onImportFilePicked}
+      />
       <div class="nav-group">
         <ContextMenu>
           <ContextMenu.Trigger
@@ -610,6 +638,16 @@ export function Nav(props: {
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Portal>
               </DropdownMenu.Sub>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => {
+                  // Defer past the menu close + focus-restore so the
+                  // native file picker isn't fighting Kobalte for focus.
+                  requestAnimationFrame(() => importFileInput?.click());
+                }}
+              >
+                {m().nav.importJson}
+              </DropdownMenu.Item>
               <DropdownMenu.Item
                 class="dropdown-menu-item"
                 onSelect={() => props.onOpenSettings()}
