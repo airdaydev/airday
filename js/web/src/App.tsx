@@ -33,8 +33,11 @@ import type { DndDragEventDetail } from "./dnd";
 import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
+import cloudSvg from "./icons/cloud.svg?raw";
+import cloudOffSvg from "./icons/cloud-off.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import externalLinkSvg from "./icons/external-link.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
@@ -1759,66 +1762,6 @@ function Workspace(props: {
   );
 }
 
-function CloudOffIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
-}
-
-function ExternalIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.25"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class="external-icon"
-      aria-hidden="true"
-    >
-      <line x1="7" y1="17" x2="17" y2="7" />
-      <polyline points="7 7 17 7 17 17" />
-    </svg>
-  );
-}
-
-function CloudIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-    </svg>
-  );
-}
-
 /** Click-to-open popover anchored to the cloud icon. Shows rolled-up
  *  connection/sync status, last-synced relative time, blob id,
  *  fingerprint, and items+lists counts. Periodic ticker only runs
@@ -1890,8 +1833,11 @@ function ConnectionStatusPopover(props: {
         class="connection-indicator"
         aria-label={props.online ? m().nav.connected : m().nav.disconnected}
       >
-        <Show when={props.online} fallback={<CloudOffIcon />}>
-          <CloudIcon />
+        <Show
+          when={props.online}
+          fallback={<span innerHTML={cloudOffSvg} />}
+        >
+          <span innerHTML={cloudSvg} />
         </Show>
       </Popover.Trigger>
       <Popover.Portal>
@@ -2438,7 +2384,7 @@ function Nav(props: {
                 rel="noopener noreferrer"
               >
                 {m().nav.website}
-                <ExternalIcon />
+                <span innerHTML={externalLinkSvg} />
               </DropdownMenu.Item>
               <Show when={!props.session.anonymous}>
                 <DropdownMenu.Item
