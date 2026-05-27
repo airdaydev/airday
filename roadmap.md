@@ -8,7 +8,7 @@
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
 
-## Compaction
+## Compaction [CONSIDER LEAVING THIS TIL POST-RELEASE]
 One latent thing remains, but it was already scoped out in your handoff:
   core/src/doc.rs::snapshot_blob still calls ExportMode::Snapshot (full), so the
   snapshot payload doesn't trim Loro's internal history even though the ops table does.
