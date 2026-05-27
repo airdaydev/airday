@@ -13,19 +13,9 @@ One latent thing remains, but it was already scoped out in your handoff:
   core/src/doc.rs::snapshot_blob still calls ExportMode::Snapshot (full), so the
   snapshot payload doesn't trim Loro's internal history even though the ops table does.
   That means bootstrap downloads are bigger than they need to be, but the ops-table
-  storage win is fully realized. Switching to ExportMode::shallow_snapshot(frontier)
-  needs the op_id → Loro frontier mapping that doesn't exist client-side yet — separate
-  task whenever you want to chase it.
+  storage win is fully realized. Switching to ExportMode::shallow_snapshot(frontier) means VV tracking.
 
-Implement a client-side sync index that records the cumulative Loro VersionVector or
-  frontiers for each contiguous server op_id prefix as blobs are applied or acknowledged,
-  persist that index alongside local state, seed it correctly when bootstrapping from a
-  server snapshot by also carrying the snapshot’s shallow_start_op_id, and then change
-  snapshot production so SnapshotRequest.shallow_start_op_id is translated through that
-  index into the corresponding Loro frontier and exported with
-  ExportMode::shallow_snapshot(...) instead of ExportMode::Snapshot; the server logic can
-  stay essentially the same apart from including the snapshot floor metadata on bootstrap
-  responses.
+GC is done on client with VV knowledge accumulated from devices directly. blobs are GC'd separately via op_seq_id, we know the latest contiguous op_seq_id within the client-generated snapshot, the snapshot having some additional extra local information is fine VV is for computing horizon and gc at snapshot time (deleting useless past) op_seq_id is for computing server blob GC (deleting redundancies on server)
 
 
 ## Web app
