@@ -58,7 +58,7 @@ CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
   up_to_seq             INTEGER NOT NULL,    -- snapshot's encoded state frontier (per-account)
-  shallow_start_seq     INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
+  compaction_floor_seq  INTEGER NOT NULL,    -- seq at/below which op blobs are eligible for GC once this snapshot lands (= max(horizon, prev snapshot's compaction_floor_seq) at snapshot time). Doubles as the bootstrap gate.
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL
@@ -73,7 +73,7 @@ The `account_sequences` row for an account is created on first `insert_ops` via 
 ## Compaction
 
 After a snapshot lands, a background job may:
-1. Delete `ops` rows where `account_id = X AND seq ≤ snapshot.shallow_start_seq`. (`shallow_start_seq` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
+1. Delete `ops` rows where `account_id = X AND seq ≤ snapshot.compaction_floor_seq`. (`compaction_floor_seq` is set to `max(horizon, prev snapshot's compaction_floor_seq)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
 2. Keep at most M=2 snapshots per account; delete older.
 
 Run on a timer, not synchronous with snapshot upload. The `account_sequences.next_seq` counter is **not** rewound by compaction — `next_seq` keeps climbing even when the rows below the snapshot floor are pruned.

@@ -233,9 +233,9 @@ async fn handle_frame(
         ClientFrame::PullSnapshot => pull_snapshot(socket, state, &ws_session.auth).await,
         ClientFrame::PushSnapshot {
             up_to_seq,
-            shallow_start_seq,
+            compaction_floor_seq,
             blob,
-        } => push_snapshot(state, ws_session, up_to_seq, shallow_start_seq, blob).await,
+        } => push_snapshot(state, ws_session, up_to_seq, compaction_floor_seq, blob).await,
     }
 }
 
@@ -251,9 +251,9 @@ async fn evaluate_snapshot_decision(
     device_last_acked_seq: u64,
 ) -> Result<Decision, SessionError> {
     let account_id = ws_session.auth.account_id;
-    let (snap_up_to, snap_shallow) = queries::latest_snapshot_meta(&state.db, account_id)
+    let (prev_snap_up_to, prev_compaction_floor) = queries::latest_snapshot_meta(&state.db, account_id)
         .await?
-        .map(|m| (m.up_to_seq, m.shallow_start_seq))
+        .map(|m| (m.up_to_seq, m.compaction_floor_seq))
         .unwrap_or((0, 0));
     let server_last_seq = queries::latest_account_seq(&state.db, account_id).await?;
     let horizon = queries::account_horizon(
@@ -265,8 +265,8 @@ async fn evaluate_snapshot_decision(
     .await?;
     Ok(state.snapshot_coordinator.evaluate(
         account_id,
-        snap_up_to,
-        snap_shallow,
+        prev_snap_up_to,
+        prev_compaction_floor,
         server_last_seq,
         horizon,
         device_last_acked_seq,
@@ -282,7 +282,7 @@ async fn issue_snapshot_request(
     if let Decision::Issue {
         lease_id,
         up_to_seq,
-        shallow_start_seq,
+        compaction_floor_seq,
     } = decision
     {
         ws_session.snapshot_lease = Some(lease_id);
@@ -290,14 +290,14 @@ async fn issue_snapshot_request(
             socket,
             &ServerFrame::SnapshotRequest {
                 up_to_seq,
-                shallow_start_seq,
+                compaction_floor_seq,
             },
         )
         .await?;
         tracing::info!(
             lease_id,
             up_to_seq,
-            shallow_start_seq,
+            compaction_floor_seq,
             "ws snapshot requested"
         );
     }
@@ -367,8 +367,8 @@ async fn push_ops(
         // `last_contiguous_seq` — and that's what gets stamped as the
         // snapshot's `up_to_seq` when it produces. If SnapshotRequest
         // arrives first, the client snapshots at its pre-push frontier,
-        // landing a snapshot with `up_to < shallow_start`, which traps
-        // later bootstrappers in an infinite SnapshotRequired loop.
+        // landing a snapshot with `up_to < compaction_floor`, which
+        // traps later bootstrappers in an infinite SnapshotRequired loop.
         let snapshot_decision = if let Some(latest_seq) = assigned_seqs.last().copied() {
             Some(evaluate_snapshot_decision(state, ws_session, latest_seq).await?)
         } else {
@@ -402,13 +402,13 @@ async fn pull_ops(
     // drive the bootstrap exchange.
     async {
         if let Some(meta) = queries::latest_snapshot_meta(&state.db, auth.account_id).await? {
-            // Compaction floor (= snapshot's shallow_start_seq) is
+            // Compaction floor (= snapshot's compaction_floor_seq) is
             // what determines whether the ops are still available.
-            // Devices between shallow_start and up_to can still
-            // delta-pull; only those below shallow_start need bootstrap.
-            if since_seq < meta.shallow_start_seq {
+            // Devices between compaction_floor and up_to can still
+            // delta-pull; only those below the floor need bootstrap.
+            if since_seq < meta.compaction_floor_seq {
                 tracing::info!(
-                    shallow_start_seq = meta.shallow_start_seq,
+                    compaction_floor_seq = meta.compaction_floor_seq,
                     snapshot_up_to_seq = meta.up_to_seq,
                     "ws pull_ops below compaction floor; sending SnapshotRequired"
                 );
@@ -461,13 +461,13 @@ async fn push_snapshot(
     state: &AppState,
     ws_session: &mut WSSession,
     up_to_seq: u64,
-    shallow_start_seq: u64,
+    compaction_floor_seq: u64,
     blob: EncryptedBlob,
 ) -> Result<(), SessionError> {
     let span = tracing::info_span!(
         "ws.push_snapshot",
         up_to_seq = up_to_seq,
-        shallow_start_seq = shallow_start_seq,
+        compaction_floor_seq = compaction_floor_seq,
         blob_bytes = blob.ciphertext.len(),
     );
     async {
@@ -488,7 +488,7 @@ async fn push_snapshot(
             &state.db,
             ws_session.auth.account_id,
             up_to_seq,
-            shallow_start_seq,
+            compaction_floor_seq,
             blob,
         )
         .await?;

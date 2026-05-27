@@ -539,7 +539,7 @@ impl SyncEngine {
             }
             ServerFrame::SnapshotRequest {
                 up_to_seq: _,
-                shallow_start_seq,
+                compaction_floor_seq,
             } => {
                 // Server picked us as the snapshot producer. We produce
                 // at the doc's current frontier and tag with our true
@@ -548,13 +548,13 @@ impl SyncEngine {
                 // any active state is fine — snapshots are state-of-doc,
                 // not a state-machine transition.
                 //
-                // TODO: `snapshot_blob` currently produces a full Loro
-                // snapshot, not a shallow one — `shallow_start_seq`
-                // is echoed back verbatim so the server's bookkeeping
-                // (compaction floor) is correct, but no history is
-                // actually trimmed yet. Switch to
-                // `ExportMode::shallow_snapshot(frontier)` when the
-                // seq -> Loro frontier mapping is wired through.
+                // `compaction_floor_seq` is server-side bookkeeping for
+                // op-blob GC and is echoed back verbatim — it doesn't
+                // influence the produced blob. True Loro shallow
+                // snapshotting (history trimming) is a separate, future
+                // mechanism driven by a VV horizon reported by clients;
+                // see `spec/sync-protocol.md` §"Shallow snapshots
+                // (future)".
                 let blob = match self.doc.snapshot_blob(&self.dek) {
                     Ok(b) => b,
                     Err(e) => {
@@ -565,7 +565,7 @@ impl SyncEngine {
                 };
                 let frame = ClientFrame::PushSnapshot {
                     up_to_seq: self.last_contiguous_seq,
-                    shallow_start_seq,
+                    compaction_floor_seq,
                     blob,
                 };
                 if let Err(e) = self.encode_into_outbox(&frame) {
@@ -1449,24 +1449,24 @@ mod tests {
         let _ = drain_outbox(&mut eng); // drop the auto-Ack
 
         // Server requests a snapshot at up_to=0 (below our current
-        // frontier of 1) with shallow_start at 0.
+        // frontier of 1) with compaction_floor at 0.
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
             up_to_seq: 0,
-            shallow_start_seq: 0,
+            compaction_floor_seq: 0,
         }), 0);
         let push: ClientFrame = dec(&eng.pop_outbox().expect("PushSnapshot"));
-        let (tagged_up_to, tagged_shallow, blob) = match push {
+        let (tagged_up_to, tagged_floor, blob) = match push {
             ClientFrame::PushSnapshot {
                 up_to_seq,
-                shallow_start_seq,
+                compaction_floor_seq,
                 blob,
-            } => (up_to_seq, shallow_start_seq, blob),
+            } => (up_to_seq, compaction_floor_seq, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         // Tagged with our actual frontier, not the requested value.
         assert_eq!(tagged_up_to, 1);
-        // Shallow start echoes the server's requested value verbatim.
-        assert_eq!(tagged_shallow, 0);
+        // Compaction floor echoes the server's requested value verbatim.
+        assert_eq!(tagged_floor, 0);
 
         // Round-trip: apply the blob to a peer doc and verify
         // fingerprints match — the producer/consumer round trip
@@ -1673,22 +1673,22 @@ mod tests {
         assert_eq!(a.last_contiguous_seq(), next_seq);
 
         // -- Server requests a snapshot from A. Single-device account,
-        //    so horizon == next_seq; shallow_start equals up_to. --
+        //    so horizon == next_seq; compaction_floor equals up_to. --
         a.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
             up_to_seq: next_seq,
-            shallow_start_seq: next_seq,
+            compaction_floor_seq: next_seq,
         }), 0);
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushSnapshot"));
-        let (snapshot_up_to, snapshot_shallow, snapshot_blob) = match push {
+        let (snapshot_up_to, snapshot_floor, snapshot_blob) = match push {
             ClientFrame::PushSnapshot {
                 up_to_seq,
-                shallow_start_seq,
+                compaction_floor_seq,
                 blob,
-            } => (up_to_seq, shallow_start_seq, blob),
+            } => (up_to_seq, compaction_floor_seq, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         assert_eq!(snapshot_up_to, next_seq);
-        assert_eq!(snapshot_shallow, next_seq);
+        assert_eq!(snapshot_floor, next_seq);
 
         // -- A keeps mutating after the snapshot was taken, so B's
         //    bootstrap exercises both the snapshot apply *and* the

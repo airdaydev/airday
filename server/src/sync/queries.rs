@@ -146,7 +146,7 @@ pub async fn advance_last_acked_seq(
 /// in that case and `pull_ops` falls through to op streaming.
 pub struct LatestSnapshot {
     pub up_to_seq: u64,
-    pub shallow_start_seq: u64,
+    pub compaction_floor_seq: u64,
     pub blob: EncryptedBlob,
 }
 
@@ -155,7 +155,7 @@ pub struct LatestSnapshot {
 /// snapshot coordinator (trigger eval). `None` if no snapshot exists.
 pub struct LatestSnapshotMeta {
     pub up_to_seq: u64,
-    pub shallow_start_seq: u64,
+    pub compaction_floor_seq: u64,
 }
 
 /// Insert a snapshot row. Used by snapshot orchestration; integration
@@ -164,19 +164,19 @@ pub async fn insert_snapshot(
     db: &Db,
     account_id: Uuid,
     up_to_seq: u64,
-    shallow_start_seq: u64,
+    compaction_floor_seq: u64,
     blob: EncryptedBlob,
 ) -> anyhow::Result<u64> {
     let acc_bytes = account_id.as_bytes().to_vec();
     let now = now_millis();
     db.call(move |c| {
         c.execute(
-            "INSERT INTO snapshots (account_id, up_to_seq, shallow_start_seq, payload, payload_nonce, created_at)
+            "INSERT INTO snapshots (account_id, up_to_seq, compaction_floor_seq, payload, payload_nonce, created_at)
              VALUES (?, ?, ?, ?, ?, ?)",
             params![
                 acc_bytes,
                 up_to_seq as i64,
-                shallow_start_seq as i64,
+                compaction_floor_seq as i64,
                 blob.ciphertext,
                 blob.nonce,
                 now,
@@ -192,7 +192,7 @@ pub async fn latest_snapshot(db: &Db, account_id: Uuid) -> anyhow::Result<Option
     db.call(move |c| {
         let row = c
             .query_row(
-                "SELECT up_to_seq, shallow_start_seq, payload, payload_nonce
+                "SELECT up_to_seq, compaction_floor_seq, payload, payload_nonce
                  FROM snapshots
                  WHERE account_id = ?
                  ORDER BY id DESC
@@ -209,9 +209,9 @@ pub async fn latest_snapshot(db: &Db, account_id: Uuid) -> anyhow::Result<Option
             )
             .optional()?;
         Ok(row.map(
-            |(up_to_seq, shallow_start_seq, ciphertext, nonce)| LatestSnapshot {
+            |(up_to_seq, compaction_floor_seq, ciphertext, nonce)| LatestSnapshot {
                 up_to_seq,
-                shallow_start_seq,
+                compaction_floor_seq,
                 blob: EncryptedBlob { nonce, ciphertext },
             },
         ))
@@ -227,7 +227,7 @@ pub async fn latest_snapshot_meta(
     db.call(move |c| {
         let row = c
             .query_row(
-                "SELECT up_to_seq, shallow_start_seq
+                "SELECT up_to_seq, compaction_floor_seq
                  FROM snapshots
                  WHERE account_id = ?
                  ORDER BY id DESC
@@ -237,9 +237,9 @@ pub async fn latest_snapshot_meta(
             )
             .optional()?;
         Ok(
-            row.map(|(up_to_seq, shallow_start_seq)| LatestSnapshotMeta {
+            row.map(|(up_to_seq, compaction_floor_seq)| LatestSnapshotMeta {
                 up_to_seq,
-                shallow_start_seq,
+                compaction_floor_seq,
             }),
         )
     })
@@ -263,8 +263,9 @@ pub async fn get_last_acked_seq(db: &Db, device_id: Uuid) -> anyhow::Result<u64>
 
 /// Horizon: `min(last_acked_seq)` across all of an account's
 /// devices, with `override_device_id`'s row replaced by
-/// `override_value`. Used as the shallow-snapshot start frontier
-/// (see `spec/sync-protocol.md` §"Snapshot orchestration") and
+/// `override_value`. Used as the compaction-floor input to the
+/// snapshot coordinator (see `spec/sync-protocol.md` §"Snapshot
+/// orchestration") and
 /// computed from the calling device's optimistic frontier:
 /// during a push, the device has the just-assigned seqs locally
 /// but hasn't sent the `Ack` yet, so its DB row would drag horizon
@@ -302,7 +303,7 @@ pub struct CompactionStats {
     pub snapshots_deleted: u64,
 }
 
-/// Delete ops at or below the latest snapshot's `shallow_start_seq`
+/// Delete ops at or below the latest snapshot's `compaction_floor_seq`
 /// and prune snapshots older than the `keep_snapshots` newest. The
 /// snapshot read + both deletes run in one transaction so a concurrent
 /// `insert_snapshot` can't shift the floor mid-deletion. Returns 0/0
@@ -317,7 +318,7 @@ pub async fn compact_account(
         let tx = c.transaction()?;
         let floor: Option<i64> = tx
             .query_row(
-                "SELECT shallow_start_seq
+                "SELECT compaction_floor_seq
                  FROM snapshots
                  WHERE account_id = ?
                  ORDER BY id DESC

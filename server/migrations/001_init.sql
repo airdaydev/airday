@@ -60,7 +60,7 @@ CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
   up_to_seq             INTEGER NOT NULL,                        -- encoded state frontier (per-account)
-  shallow_start_seq     INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
+  compaction_floor_seq  INTEGER NOT NULL,                        -- seq at/below which op blobs are eligible for GC once this snapshot lands
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL

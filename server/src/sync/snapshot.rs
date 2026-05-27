@@ -39,9 +39,10 @@ pub enum Decision {
         /// `last_acked_seq`, = `server_last_seq` since producer
         /// must be caught up).
         up_to_seq: u64,
-        /// Retained-history boundary (= horizon). Doubles as the
-        /// compaction floor once the snapshot lands.
-        shallow_start_seq: u64,
+        /// Seq at/below which op blobs become eligible for GC once
+        /// this snapshot lands (= `max(horizon, prev compaction_floor_seq)`).
+        /// Server-only concept — does not affect what Loro encodes.
+        compaction_floor_seq: u64,
     },
     Skip,
 }
@@ -80,25 +81,25 @@ impl SnapshotCoordinator {
     ///    horizon).
     ///
     /// Horizon is **not** a trigger condition — a new snapshot at an
-    /// unchanged `shallow_start_seq` still pays off for bootstrap
+    /// unchanged `compaction_floor_seq` still pays off for bootstrap
     /// even when no further compaction is possible.
     ///
-    /// `shallow_start_seq = max(horizon, prev_snap_shallow)`. The
-    /// `max` enforces monotonicity: if a new device's join drops
+    /// `compaction_floor_seq = max(horizon, prev_compaction_floor_seq)`.
+    /// The `max` enforces monotonicity: if a new device's join drops
     /// horizon below the existing floor, we can't undo prior
     /// compaction, so the floor stays put.
     pub fn evaluate(
         &self,
         account: Uuid,
-        server_snapshot_up_to_seq: u64, // latest snapshot's state frontier
-        server_snapshot_shallow_seq: u64, // latest snapshot's shallow start
-        server_last_seq: u64,           // latest seq on server for this account
-        horizon_seq: u64,               // min(last_acked) across devices
-        device_last_acked_seq: u64,     // triggering device's frontier
+        prev_snapshot_up_to_seq: u64,    // latest snapshot's state frontier
+        prev_compaction_floor_seq: u64,  // latest snapshot's compaction floor
+        server_last_seq: u64,            // latest seq on server for this account
+        horizon_seq: u64,                // min(last_acked) across devices
+        device_last_acked_seq: u64,      // triggering device's frontier
         now: Instant,
     ) -> Decision {
         // Not enough new content to bother.
-        if server_last_seq.saturating_sub(server_snapshot_up_to_seq) < self.threshold_blobs {
+        if server_last_seq.saturating_sub(prev_snapshot_up_to_seq) < self.threshold_blobs {
             return Decision::Skip;
         }
         // Triggering device isn't caught up — can't be producer.
@@ -123,7 +124,7 @@ impl SnapshotCoordinator {
         Decision::Issue {
             lease_id,
             up_to_seq: device_last_acked_seq,
-            shallow_start_seq: horizon_seq.max(server_snapshot_shallow_seq),
+            compaction_floor_seq: horizon_seq.max(prev_compaction_floor_seq),
         }
     }
     pub fn release(&self, account: Uuid, incoming_lease_id: u64) -> ReleaseResult {
@@ -153,7 +154,7 @@ mod tests {
     use super::*;
 
     // Signature reminder:
-    //   evaluate(account, snap_up_to, snap_shallow, server_last,
+    //   evaluate(account, prev_up_to, prev_floor, server_last,
     //            horizon, device_last_acked, now)
 
     #[test]
@@ -176,7 +177,7 @@ mod tests {
             decision,
             Decision::Issue {
                 up_to_seq: 12_000,
-                shallow_start_seq: 12_000,
+                compaction_floor_seq: 12_000,
                 ..
             }
         ));
@@ -197,7 +198,7 @@ mod tests {
             decision_2,
             Decision::Issue {
                 up_to_seq: 22_000,
-                shallow_start_seq: 22_000,
+                compaction_floor_seq: 22_000,
                 ..
             }
         ));
@@ -222,10 +223,10 @@ mod tests {
     }
 
     #[test]
-    fn issues_with_unchanged_shallow_when_horizon_pinned() {
-        // Lagger pins horizon at the existing shallow_start. New
+    fn issues_with_unchanged_floor_when_horizon_pinned() {
+        // Lagger pins horizon at the existing compaction floor. New
         // snapshot still issued for bootstrap perf (state frontier
-        // advances), but shallow_start stays put — no new compaction.
+        // advances), but the floor stays put — no new compaction.
         let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
         let now = Instant::now();
@@ -235,17 +236,17 @@ mod tests {
             decision,
             Decision::Issue {
                 up_to_seq: 22_000,
-                shallow_start_seq: 10_000,
+                compaction_floor_seq: 10_000,
                 ..
             }
         ));
     }
 
     #[test]
-    fn shallow_start_never_regresses() {
-        // Horizon dipped below the existing shallow_start (e.g., a new
-        // device joined with last_acked=0). Compaction can't unwind,
-        // so the new snapshot's shallow_start is clamped up to the
+    fn compaction_floor_never_regresses() {
+        // Horizon dipped below the existing compaction floor (e.g., a
+        // new device joined with last_acked=0). Compaction can't
+        // unwind, so the new snapshot's floor is clamped up to the
         // existing floor.
         let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
@@ -256,16 +257,16 @@ mod tests {
             decision,
             Decision::Issue {
                 up_to_seq: 22_000,
-                shallow_start_seq: 10_000,
+                compaction_floor_seq: 10_000,
                 ..
             }
         ));
     }
 
     #[test]
-    fn issues_with_advancing_shallow_when_horizon_moves() {
-        // Horizon advances past the existing shallow_start — new
-        // shallow_start tracks horizon, advancing the compaction floor.
+    fn issues_with_advancing_floor_when_horizon_moves() {
+        // Horizon advances past the existing compaction floor — new
+        // floor tracks horizon, advancing compaction.
         let coord = SnapshotCoordinator::new();
         let account = Uuid::now_v7();
         let now = Instant::now();
@@ -275,7 +276,7 @@ mod tests {
             decision,
             Decision::Issue {
                 up_to_seq: 22_000,
-                shallow_start_seq: 15_000,
+                compaction_floor_seq: 15_000,
                 ..
             }
         ));
