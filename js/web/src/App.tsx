@@ -18,7 +18,7 @@ import {
   Show,
 } from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import { IdbWalStorage, probeOpfs } from "@airday/core";
+import { bootWal, IdbWalStorage, probeOpfs, WalBridge } from "@airday/core";
 import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
@@ -460,30 +460,16 @@ function BootGate(props: {
         props.session.dek.clone(),
         EncryptedBlob,
       );
-      const replay = await wal.loadForReplay();
-      tap(
-        `loadForReplay (${replay.walEntries.length} wal)`,
-        performance.now(),
-      );
-      // `loadForReplay` already pulled the device row in the same
-      // tx; only fall back to a separate get if an implementation
-      // skipped it.
-      const device =
-        replay.device !== undefined ? replay.device : await wal.getDevice();
-      const doc = replay.snapshot ? Doc.load(replay.snapshot) : Doc.empty();
-      tap("Doc.load(snapshot)", performance.now());
-      // The replay path tags WAL imports as "remote" so the rebuilt
-      // UndoManager skips them; replay order is wal_seq ascending,
-      // matching the order they were committed locally.
-      for (const entry of replay.walEntries) {
-        try {
-          doc.importWalUpdates(entry.plaintext);
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn(`wal replay failed at seq ${entry.walSeq}:`, e);
-        }
+      const { doc, device, replayErrors } = await bootWal({
+        wal,
+        emptyDoc: () => Doc.empty(),
+        loadDoc: (snap) => Doc.load(snap),
+      });
+      tap("bootWal done", performance.now());
+      for (const { walSeq, error } of replayErrors) {
+        // eslint-disable-next-line no-console
+        console.warn(`wal replay failed at seq ${walSeq}:`, error);
       }
-      tap("WAL replay done", performance.now());
       props.setBoot({
         doc,
         lastAcked: BigInt(device?.lastAckedBlobId ?? 0),
@@ -594,44 +580,51 @@ function MainApp(props: {
 
   const wal = props.boot.wal;
 
-  // ---------- WAL: hot path, per commit ----------
+  // ---------- WAL: per-commit capture + snapshot scheduling ----------
   //
-  // After every mutation (local or remote) we capture a Loro update
-  // covering everything since the previous WAL append, encrypt it, and
-  // append a row to IndexedDB. `walVvCursor` advances each time so the
-  // next chunk is strictly the new ops. Remote-applied ops also flow
-  // through here — including them is wasteful but harmless on replay
-  // (CRDT updates are idempotent).
+  // `WalBridge` owns the cursor + serialised append chain + threshold-
+  // triggered snapshot path (see `js/core/src/wal-bridge.ts`). All the
+  // web layer wires is when to call `captureAndAppend()` (after local
+  // commits and after server frames) and `snapshotNow()` (on tab
+  // hide). Without OPFS we skip the bridge entirely — IDB-only would
+  // orphan the WAL on reload, so we fall back to engine-only state
+  // that sync catches up.
   //
-  // Fresh-signup seeding: `Doc.create()` happens in the boot path before
-  // this listener is wired, so the seeded built-ins are already in the
-  // engine. Start the cursor at empty so the very first capture emits
-  // them as `wal_seq = 1` — that gives reload pure-WAL replay (per
-  // spec/idb-wal.md "Fresh Account") without needing a special
-  // snapshot-at-signup that would otherwise commit a `seq = 0` snapshot
-  // and conflict with the visibility-hidden snapshot path.
-  let walVvCursor: Uint8Array | null = wal
-    ? props.session.freshSignup
-      ? new Uint8Array(0)
-      : engine.oplogVvBytes()
-    : null;
-  let walAppendChain: Promise<void> = Promise.resolve();
-  const captureAndAppend = (): void => {
-    if (!wal || !walVvCursor) return;
-    const updates = engine.exportUpdatesAfter(walVvCursor);
-    if (updates.length === 0) return;
-    walVvCursor = engine.oplogVvBytes();
-    const w = wal;
-    walAppendChain = walAppendChain
-      .then(() => w.appendWal(updates))
-      .then(() => {
-        if (w.shouldSnapshot()) scheduleSnapshot();
-      })
-      .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error("wal append failed:", e);
-      });
+  // Fresh-signup cursor: `Doc.create()` already happened in boot, so
+  // the seeded built-ins are in the oplog. Start at empty so the very
+  // first capture emits them as `wal_seq = 1` (per spec/idb-wal.md
+  // "Fresh Account"). For replay-restored boots we start at the
+  // current oplog VV so we don't re-emit replayed rows.
+  //
+  // After every snapshot (threshold-triggered or host-forced) also
+  // persist the device row so reload picks up the right resume point
+  // even if no debounced `saveDeviceSoon` write has landed yet.
+  // Anonymous sessions skip — there's no server identity to record.
+  const persistDevice = async (): Promise<void> => {
+    if (!wal || props.session.anonymous) return;
+    await wal.putDevice({
+      accountId: props.session.accountId,
+      email: props.session.email!,
+      // Bundle is served from the same origin as the API; record that
+      // origin for completeness even though the cookie is the
+      // load-bearing piece of "which server am I talking to".
+      serverUrl: window.location.origin,
+      deviceId: props.session.deviceId!,
+      lastAckedBlobId: Number(engine.highestSeenBlobId()),
+      lastSyncAt: Date.now(),
+    });
   };
+
+  const walBridge: WalBridge | null = wal
+    ? new WalBridge({
+        engine,
+        wal,
+        initialCursor: props.session.freshSignup
+          ? new Uint8Array(0)
+          : engine.oplogVvBytes(),
+        afterSnapshot: persistDevice,
+      })
+    : null;
 
   // Anonymous sessions are local-only by definition — no account on
   // the server to authenticate to. Skip the WebSocket pump entirely;
@@ -655,61 +648,22 @@ function MainApp(props: {
         app.drainEvents();
         // Server frame applied → capture remote-imported ops too. Cheap
         // when nothing changed (export returns 0 bytes).
-        captureAndAppend();
+        walBridge?.captureAndAppend();
       },
       onAuthFailed: () => void props.logout(),
     });
     const b = bridge;
     app.setOnFlush(() => {
-      captureAndAppend();
+      walBridge?.captureAndAppend();
       b.pumpOutbox();
     });
     bridge.start();
     onCleanup(() => b.stop());
   } else {
     // Anonymous: still capture local commits for WAL durability.
-    app.setOnFlush(() => captureAndAppend());
+    app.setOnFlush(() => walBridge?.captureAndAppend());
   }
 
-  // ---------- Snapshot: cold path ----------
-  //
-  // Triggered when the WAL has accumulated `SNAPSHOT_THRESHOLD` rows
-  // since the last committed snapshot, or by a visibility-hidden flush
-  // on tab close. We wait for the in-flight WAL chain so the new
-  // `snapshot_wal_seq` we record actually covers every appended row.
-  let snapshotChain: Promise<void> = Promise.resolve();
-  let snapshotPending = false;
-  const snapshotNow = async (): Promise<void> => {
-    if (!wal) return;
-    snapshotPending = false;
-    try {
-      await walAppendChain;
-      const bytes = engine.save();
-      const snapshotSeq = wal.highestWalSeq();
-      await wal.commitSnapshot(bytes, snapshotSeq);
-      if (!props.session.anonymous) {
-        await wal.putDevice({
-          accountId: props.session.accountId,
-          email: props.session.email!,
-          // Bundle is served from the same origin as the API; record
-          // that origin for completeness even though the cookie is the
-          // load-bearing piece of "which server am I talking to".
-          serverUrl: window.location.origin,
-          deviceId: props.session.deviceId!,
-          lastAckedBlobId: Number(engine.highestSeenBlobId()),
-          lastSyncAt: Date.now(),
-        });
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("snapshot failed:", e);
-    }
-  };
-  const scheduleSnapshot = (): void => {
-    if (snapshotPending) return;
-    snapshotPending = true;
-    snapshotChain = snapshotChain.then(snapshotNow);
-  };
 
   // ---------- Device config: light writes on each frontier change ----------
   //
@@ -777,18 +731,18 @@ function MainApp(props: {
   // with the same `snapshotWalSeq` (the same-seq case would overwrite a
   // currently-committed snapshot file in place; see spec/idb-wal.md
   // "Atomicity Rule").
-  if (wal && props.session.freshSignup) {
-    captureAndAppend();
+  if (walBridge && props.session.freshSignup) {
+    walBridge.captureAndAppend();
   }
 
   const onVisibility = () => {
     if (document.visibilityState === "hidden") {
       // Drain WAL appends in flight, then commit a snapshot so the
       // next boot has a fresh base. Best-effort — IDB writes already
-      // queued behind `walAppendChain` will land regardless of whether
-      // the snapshot fires before the page goes away.
+      // queued behind the bridge's append chain will land regardless
+      // of whether the snapshot fires before the page goes away.
       if (deviceTimer) clearTimeout(deviceTimer);
-      void snapshotNow();
+      void walBridge?.snapshotNow();
     }
   };
   document.addEventListener("visibilitychange", onVisibility);

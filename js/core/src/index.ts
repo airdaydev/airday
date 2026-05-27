@@ -25,3 +25,10 @@ export {
   type ReconnectBackoff,
   type SyncBridgeOpts,
 } from "./sync-bridge.ts";
+export {
+  WalBridge,
+  bootWal,
+  type BootWalOpts,
+  type BootWalResult,
+  type WalBridgeOpts,
+} from "./wal-bridge.ts";
