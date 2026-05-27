@@ -72,10 +72,16 @@ export interface SyncBridgeOpts {
 const DEFAULT_BASE_MS = 500;
 const DEFAULT_MAX_MS = 30_000;
 const DEFAULT_JITTER = 0.2;
+/** Cadence at which the bridge calls `engine.handleTimeout(now)` to
+ *  drive the gap-retry timer. The retry windows are coarse (3s / 6s /
+ *  12s), so 1s polling adds at most ~1s of jitter to a retry decision
+ *  while keeping wake-up cost negligible. */
+const TICK_INTERVAL_MS = 1_000;
 
 export class SyncBridge {
   private ws: WebSocket | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private tickTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
   private attempt = 0;
   private readonly baseMs: number;
@@ -91,6 +97,15 @@ export class SyncBridge {
 
   start(): void {
     this.connect();
+    if (!this.tickTimer) {
+      // Periodic tick drives the engine's gap-retry timer. Cheap —
+      // when no hole is open, `handleTimeout` is essentially a no-op.
+      this.tickTimer = setInterval(() => {
+        this.opts.engine.handleTimeout(BigInt(Date.now()));
+        this.pumpOutbox();
+        this.drainEngineEvents();
+      }, TICK_INTERVAL_MS);
+    }
   }
 
   stop(): void {
@@ -98,6 +113,10 @@ export class SyncBridge {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
+    }
+    if (this.tickTimer) {
+      clearInterval(this.tickTimer);
+      this.tickTimer = null;
     }
     if (this.ws) {
       this.ws.onclose = null;
@@ -160,7 +179,11 @@ export class SyncBridge {
             ? new Uint8Array(ev.data.buffer, ev.data.byteOffset, ev.data.byteLength)
             : null;
       if (!data) return; // text frames ignored
-      this.opts.engine.handleServerBytes(data);
+      const nowMs = BigInt(Date.now());
+      this.opts.engine.handleServerBytes(data, nowMs);
+      // If this frame opened a new gap, give the timer an immediate
+      // chance to fire (the interval tick might still be ~1s away).
+      this.opts.engine.handleTimeout(nowMs);
       this.pumpOutbox();
       this.drainEngineEvents();
       this.opts.onServerFrame?.();

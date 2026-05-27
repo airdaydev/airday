@@ -682,17 +682,25 @@ impl SyncEngine {
         self.inner.handle_disconnected();
     }
 
-    /// Caller-driven timeout (e.g. handshake watchdog). Only escalates
-    /// when in `Hello`; no-op elsewhere.
+    /// Caller-driven tick. Two responsibilities:
+    /// (1) escalate the `Hello` handshake watchdog (no-op outside
+    /// Hello), (2) drive the gap-retry timer when an inbound seq hole
+    /// is open. Hosts should call this periodically (e.g., every
+    /// ~1s via `setInterval`) AND after any `handleServerBytes` call
+    /// that may have opened a new gap.
+    ///
+    /// `nowMs` is a monotonic millisecond clock — `Date.now()` is
+    /// fine in the browser; the engine itself never reads a clock.
     #[wasm_bindgen(js_name = handleTimeout)]
-    pub fn handle_timeout(&mut self) {
-        self.inner.handle_timeout();
+    pub fn handle_timeout(&mut self, now_ms: u64) {
+        self.inner.handle_timeout(now_ms);
     }
 
-    /// Hand one binary WebSocket frame to the engine.
+    /// Hand one binary WebSocket frame to the engine. `nowMs` is used
+    /// to stamp gap-open timing if an out-of-order seq arrives.
     #[wasm_bindgen(js_name = handleServerBytes)]
-    pub fn handle_server_bytes(&mut self, bytes: &[u8]) {
-        self.inner.handle_server_bytes(bytes);
+    pub fn handle_server_bytes(&mut self, bytes: &[u8], now_ms: u64) {
+        self.inner.handle_server_bytes(bytes, now_ms);
     }
 
     // -- caller drives --
@@ -1133,6 +1141,15 @@ impl From<CoreEvent> for EngineEvent {
                 online: None,
                 seq: None,
                 message: Some(message),
+            },
+            CoreEvent::SyncHalted {
+                reason,
+                missing_seq,
+            } => EngineEvent {
+                kind: "syncHalted",
+                online: None,
+                seq: Some(missing_seq),
+                message: Some(reason),
             },
         }
     }

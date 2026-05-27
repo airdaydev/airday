@@ -145,7 +145,12 @@ impl Session {
                     None => break,
                 };
                 processed += 1;
-                self.engine.handle_server_bytes(&bytes);
+                self.engine.handle_server_bytes(&bytes, monotonic_ms());
+                // Drive the gap-retry tick after every server frame
+                // too — if a hole just opened, this gives the timer a
+                // chance to fire as soon as backoff elapses without
+                // waiting for a separate polling loop.
+                self.engine.handle_timeout(monotonic_ms());
                 // Persist before flushing the outbox — the engine
                 // doesn't queue Acks for newly-applied ops until
                 // `persist_engine_state` calls `notify_wal_durable`.
@@ -257,7 +262,7 @@ async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<
             return Ok(());
         }
         let bytes = recv_bytes(ws).await?;
-        engine.handle_server_bytes(&bytes);
+        engine.handle_server_bytes(&bytes, monotonic_ms());
     }
 }
 
@@ -296,6 +301,18 @@ fn now_millis() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+/// Monotonic millis since the process started. Fed to the engine's
+/// `handle_*` methods that need a clock — the engine itself is
+/// time-free. Wall-clock skew is irrelevant; we only need
+/// non-decreasing deltas for the gap-retry timer.
+fn monotonic_ms() -> u64 {
+    use std::sync::OnceLock;
+    use std::time::Instant;
+    static EPOCH: OnceLock<Instant> = OnceLock::new();
+    let epoch = EPOCH.get_or_init(Instant::now);
+    epoch.elapsed().as_millis() as u64
 }
 
 fn ws_url(server_url: &str) -> String {

@@ -178,9 +178,9 @@ function broadcastBytes(seq: number, blob: EncryptedBlob): Uint8Array {
 function driveToIdle(eng: SyncEngine): void {
   eng.handleConnected();
   eng.popOutbox(); // Hello
-  eng.handleServerBytes(helloAckBytes());
+  eng.handleServerBytes(helloAckBytes(), 0n);
   eng.popOutbox(); // PullOps
-  eng.handleServerBytes(emptyBatchCompleteBytes());
+  eng.handleServerBytes(emptyBatchCompleteBytes(), 0n);
   if (!eng.isIdle()) {
     throw new Error("expected engine to be idle after empty pull");
   }
@@ -234,11 +234,14 @@ describe("inbound Ack is gated on WAL durability", () => {
       },
     });
 
-    // Inbound: deliver the encrypted op as OpsBroadcast at seq=7.
-    engineB.handleServerBytes(broadcastBytes(7, blob));
+    // Inbound: deliver the encrypted op as OpsBroadcast at seq=1
+    // (the contiguous next after the empty initial pull). Under the
+    // new gap-aware engine, higher seqs would land in the reorder
+    // buffer instead of advancing the contiguous prefix.
+    engineB.handleServerBytes(broadcastBytes(1, blob), 0n);
 
     // Engine has applied in memory but must not have queued an Ack.
-    expect(engineB.lastContiguousSeq()).toBe(7n);
+    expect(engineB.lastContiguousSeq()).toBe(1n);
     expect(engineB.lastDurableSeq()).toBe(0n);
     expect(durableCount).toBe(0);
     expect(drainOutbox(engineB).filter(isAck).length).toBe(0);
@@ -260,14 +263,14 @@ describe("inbound Ack is gated on WAL durability", () => {
     wal.releaseNext();
     await bridge.drain();
 
-    expect(engineB.lastDurableSeq()).toBe(7n);
+    expect(engineB.lastDurableSeq()).toBe(1n);
     expect(durableCount).toBe(1);
 
     const acks = drainOutbox(engineB).filter(isAck);
     expect(acks.length).toBe(1);
     const decoded = decodeClientFrame(acks[0]!);
     expect(decoded.type).toBe("Ack");
-    expect(BigInt(decoded.last_acked_seq as number | bigint)).toBe(7n);
+    expect(BigInt(decoded.last_acked_seq as number | bigint)).toBe(1n);
   });
 
   test("OpsAck (locally-pushed): Ack not queued until prior captureAndAppend's WAL row commits", async () => {
@@ -303,11 +306,14 @@ describe("inbound Ack is gated on WAL durability", () => {
     expect(pushFrame).toBeDefined();
     expect(decodeClientFrame(pushFrame!).type).toBe("PushOps");
 
-    // Server returns OpsAck assigning seq=4. Engine advances
-    // last_contiguous_seq but, with the gate held, the corresponding
-    // Ack-back-to-server must NOT yet appear.
-    engine.handleServerBytes(encode({ type: "OpsAck", assigned_seqs: [4] }));
-    expect(engine.lastContiguousSeq()).toBe(4n);
+    // Server returns OpsAck assigning seq=1 (the contiguous next).
+    // Engine advances last_contiguous_seq but, with the gate held,
+    // the corresponding Ack-back-to-server must NOT yet appear.
+    engine.handleServerBytes(
+      encode({ type: "OpsAck", assigned_seqs: [1] }),
+      0n,
+    );
+    expect(engine.lastContiguousSeq()).toBe(1n);
     expect(engine.lastDurableSeq()).toBe(0n);
     bridge.captureAndAppend(); // matches App.tsx onServerFrame
     await flushMicrotasks();
@@ -322,11 +328,11 @@ describe("inbound Ack is gated on WAL durability", () => {
     await wal.drainAllGates();
     await bridge.drain();
 
-    expect(engine.lastDurableSeq()).toBe(4n);
+    expect(engine.lastDurableSeq()).toBe(1n);
     const acks = drainOutbox(engine).filter(isAck);
     expect(acks.length).toBe(1);
     expect(BigInt(decodeClientFrame(acks[0]!).last_acked_seq as bigint)).toBe(
-      4n,
+      1n,
     );
     expect(durableCount).toBeGreaterThanOrEqual(1);
   });

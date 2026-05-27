@@ -22,7 +22,7 @@
 //!     Pulling ── complete ─▶ Idle ◀──────────────────────────── ┘
 //! ```
 
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
 use airday_protocol::{
     ClientFrame, Hello, HelloAck, HelloRejected, ServerFrame, StoredBlob, PROTOCOL_VERSION,
@@ -32,6 +32,25 @@ use serde::Serialize;
 
 use crate::crypto::Dek;
 use crate::doc::Doc;
+
+/// Reorder-buffer cap. When an inbound seq stream has accumulated this
+/// many out-of-order arrivals above `last_contiguous_seq` without the
+/// hole closing, the engine escalates directly to the bootstrap tier
+/// (see `spec/sync-protocol.md` "Buffer bound"). Bounds memory under
+/// pathological replica lag.
+///
+/// Lowered under `cfg(test)` so a single test can exercise the
+/// overflow path without delivering 10k blobs.
+#[cfg(not(test))]
+const MAX_REORDER_BUFFER: usize = 10_000;
+#[cfg(test)]
+const MAX_REORDER_BUFFER: usize = 10;
+/// Base wait before the first gap-retry `PullOps`. Subsequent retries
+/// double the wait (3s, then 6s, then 12s).
+const GAP_RETRY_BASE_MS: u64 = 3_000;
+/// Maximum number of gap-retry `PullOps` issues before escalating to
+/// bootstrap.
+const GAP_RETRY_LIMIT: u8 = 3;
 
 /// Engine-emitted notification, drained via `pop_event()`. None of
 /// these are fatal on their own — the caller decides whether to
@@ -56,6 +75,14 @@ pub enum Event {
     /// `ConnStateChanged { online: false }` so the caller knows the
     /// engine is already back to `Disconnected`.
     Error(String),
+    /// Reserved for the future "hard-stop" tier of gap escalation
+    /// (`spec/sync-protocol.md` §"Escalation" case 3): a primary read
+    /// confirms a missing seq has been genuinely lost server-side. Not
+    /// emitted today — included in the API so hosts can build the
+    /// surfacing path before the protocol message that triggers it
+    /// lands. Local mutations continue when this fires; recovery is
+    /// operational (server restore from backup), not protocol-level.
+    SyncHalted { reason: String, missing_seq: u64 },
 }
 
 /// Identity advertised in the `Hello` frame. Set once at construction.
@@ -63,6 +90,19 @@ pub enum Event {
 pub struct EngineOptions {
     pub client_name: String,
     pub client_version: String,
+}
+
+/// Tracks an open hole in the inbound seq stream. Created when
+/// `seen_above_contig` becomes non-empty; cleared when the buffer
+/// drains. `next_retry_at_ms` is the absolute wall-clock millisecond
+/// at which the next gap-retry `PullOps` is due; `retry_count` is the
+/// number of retries already issued (caps at `GAP_RETRY_LIMIT` before
+/// the engine escalates to bootstrap).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GapState {
+    since_ms: u64,
+    next_retry_at_ms: u64,
+    retry_count: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,6 +146,18 @@ pub struct SyncEngine {
     /// Highest seq we've already shipped in an `Ack`. Lets us coalesce:
     /// queue an `Ack` only when `last_durable_seq` overtakes this.
     last_sent_ack: u64,
+    /// Out-of-order seqs received above `last_contiguous_seq`. A hole
+    /// is implicit: any value in `(last_contiguous_seq, max)` not in
+    /// this set is missing. Empty in production today (sqlite
+    /// single-writer makes gaps structurally impossible); the
+    /// mechanism exists ahead of the Postgres+replicas deploy so the
+    /// safety invariant is built before a real gap can surface.
+    seen_above_contig: BTreeSet<u64>,
+    /// `Some` while `seen_above_contig` is non-empty. Tracks
+    /// gap-retry pacing so the host's periodic `handle_timeout` calls
+    /// know when to re-issue `PullOps` against (hopefully) a more
+    /// caught-up replica.
+    gap_state: Option<GapState>,
     /// VV captured at the moment of the in-flight `PushOps` export. On
     /// `OpsAck` we merge this into `Doc::last_pushed_vv`. Cleared on
     /// disconnect so a re-push after reconnect re-exports from the
@@ -128,6 +180,8 @@ impl SyncEngine {
             last_contiguous_seq: last_acked_seq,
             last_durable_seq: last_acked_seq,
             last_sent_ack: last_acked_seq,
+            seen_above_contig: BTreeSet::new(),
+            gap_state: None,
             in_flight_push_vv: None,
             outbox: VecDeque::new(),
             events: VecDeque::new(),
@@ -248,20 +302,33 @@ impl SyncEngine {
         self.go_disconnected();
     }
 
-    /// Caller's per-state timeout fired. The engine only escalates the
-    /// `Hello` case (handshake didn't complete); other states are the
-    /// caller's policy. Idempotent in non-Hello states.
-    pub fn handle_timeout(&mut self) {
+    /// Caller's tick. Two responsibilities:
+    ///
+    ///   - Escalate the `Hello` handshake timeout (idempotent in
+    ///     non-Hello states).
+    ///   - Drive gap-retry pacing. When `seen_above_contig` is
+    ///     non-empty, this is what re-issues `PullOps` after
+    ///     exponential backoff (`spec/sync-protocol.md` "Escalation"
+    ///     retry tier), and what escalates to bootstrap once
+    ///     `GAP_RETRY_LIMIT` retries have elapsed.
+    ///
+    /// `now_ms` is monotonic milliseconds — the engine never reads a
+    /// clock itself. Hosts call this periodically (e.g., every
+    /// ~1s via setInterval / tokio::time::interval) AND after any
+    /// `handle_server_bytes` call that may have opened a new gap.
+    pub fn handle_timeout(&mut self, now_ms: u64) {
         if matches!(self.state, ConnState::Hello) {
             self.events
                 .push_back(Event::Error("handshake timed out".into()));
+            return;
         }
+        self.tick_gap_retry(now_ms);
     }
 
-    /// One frame's worth of bytes from the server. Caller is
-    /// responsible for the WebSocket framing; the engine only sees the
-    /// payload of one binary frame at a time.
-    pub fn handle_server_bytes(&mut self, bytes: &[u8]) {
+    /// One frame's worth of bytes from the server. `now_ms` is used
+    /// to stamp gap-open timing if an out-of-order seq arrives —
+    /// monotonic milliseconds, supplied by the caller.
+    pub fn handle_server_bytes(&mut self, bytes: &[u8], now_ms: u64) {
         match self.state {
             ConnState::Disconnected => {
                 self.events.push_back(Event::Error(
@@ -273,7 +340,7 @@ impl SyncEngine {
             | ConnState::Bootstrapping
             | ConnState::Idle
             | ConnState::Pushing
-            | ConnState::PushingDirty => self.handle_server_frame(bytes),
+            | ConnState::PushingDirty => self.handle_server_frame(bytes, now_ms),
         }
     }
 
@@ -335,7 +402,7 @@ impl SyncEngine {
         self.go_disconnected();
     }
 
-    fn handle_server_frame(&mut self, bytes: &[u8]) {
+    fn handle_server_frame(&mut self, bytes: &[u8], now_ms: u64) {
         let frame = match rmp_serde::from_slice::<ServerFrame>(bytes) {
             Ok(f) => f,
             Err(e) => {
@@ -352,7 +419,7 @@ impl SyncEngine {
                     ));
                     return;
                 }
-                self.apply_remote_ops(ops);
+                self.apply_remote_ops(ops, now_ms);
                 // Ack is gated on `notify_wal_durable` — the host
                 // calls back once the encrypted WAL row covering these
                 // ops is committed.
@@ -371,7 +438,7 @@ impl SyncEngine {
                     // re-delivers anything past `up_to_seq`.
                     return;
                 }
-                self.apply_remote_ops(ops);
+                self.apply_remote_ops(ops, now_ms);
                 // Ack gated on host's `notify_wal_durable`.
             }
             ServerFrame::OpsAck { assigned_seqs } => {
@@ -382,11 +449,18 @@ impl SyncEngine {
                     )));
                     return;
                 }
-                if let Some(top) = assigned_seqs.iter().copied().max() {
-                    if top > self.last_contiguous_seq {
-                        self.last_contiguous_seq = top;
-                        self.events.push_back(Event::FrontierAdvanced { seq: top });
-                    }
+                // Server bumps the per-account counter atomically, so
+                // `assigned_seqs` is contiguous (the spec's
+                // dense/gap-free invariant). Ingest each so contiguity
+                // bookkeeping stays consistent with the inbound path.
+                let prev_contig = self.last_contiguous_seq;
+                for &seq in &assigned_seqs {
+                    self.ingest_seq(seq, now_ms);
+                }
+                if self.last_contiguous_seq > prev_contig {
+                    self.events.push_back(Event::FrontierAdvanced {
+                        seq: self.last_contiguous_seq,
+                    });
                 }
                 if let Some(vv) = self.in_flight_push_vv.take() {
                     self.doc.mark_pushed_at(vv);
@@ -442,6 +516,10 @@ impl SyncEngine {
                     self.events
                         .push_back(Event::FrontierAdvanced { seq: up_to_seq });
                 }
+                // Snapshot supersedes any open gap below up_to_seq —
+                // drop redundant buffered seqs and peel anything
+                // contiguous above the new frontier.
+                self.compact_seen_above_contig();
                 // Ack gated on `notify_wal_durable` — the host needs
                 // to persist the snapshot (either by committing it
                 // directly via `commitSnapshot` or by exporting +
@@ -498,16 +576,15 @@ impl SyncEngine {
         }
     }
 
-    fn apply_remote_ops(&mut self, ops: Vec<StoredBlob>) {
+    fn apply_remote_ops(&mut self, ops: Vec<StoredBlob>, now_ms: u64) {
         if ops.is_empty() {
             return;
         }
 
-        let top = ops
-            .iter()
-            .map(|op| op.seq)
-            .max()
-            .unwrap_or(self.last_contiguous_seq);
+        // Apply all blobs to Loro first — the CRDT tolerates
+        // out-of-order arrivals (VV handles causality), so a hole at
+        // the seq layer doesn't block doc convergence. This also
+        // keeps the UI responsive under replica lag.
         if let Err(e) = self
             .doc
             .apply_remote_batch(&self.dek, ops.iter().map(|op| &op.blob))
@@ -516,21 +593,156 @@ impl SyncEngine {
                 .iter()
                 .find(|op| op.seq > self.last_contiguous_seq)
                 .map(|op| op.seq)
-                .unwrap_or(top);
+                .unwrap_or_else(|| ops.iter().map(|op| op.seq).max().unwrap_or(0));
             self.events
                 .push_back(Event::Error(format!("apply remote blob {failed_seq}: {e}")));
             return;
         }
 
-        if top > self.last_contiguous_seq {
-            self.last_contiguous_seq = top;
-            self.events.push_back(Event::FrontierAdvanced { seq: top });
+        // Bookkeep each seq separately: advances over the contiguous
+        // prefix, holes land in `seen_above_contig`. The Loro state
+        // is already current — we just track what the *server* has
+        // gotten back to us about.
+        let prev_contig = self.last_contiguous_seq;
+        for op in &ops {
+            self.ingest_seq(op.seq, now_ms);
         }
+        if self.last_contiguous_seq > prev_contig {
+            self.events.push_back(Event::FrontierAdvanced {
+                seq: self.last_contiguous_seq,
+            });
+        }
+
+        // Reorder-buffer cap: too many out-of-order arrivals without
+        // the hole closing is indistinguishable from "the seq is
+        // never coming." Skip the retry tier, jump straight to
+        // bootstrap.
+        if self.seen_above_contig.len() > MAX_REORDER_BUFFER {
+            self.escalate_to_bootstrap();
+        }
+
         // Domain-level deltas (`AppEvent`) flow through `Doc`'s own
         // queue — drained by the host alongside this protocol event
         // queue. The engine no longer fires a coarse "OpsApplied"
         // signal; consumers poll `Doc::pop_event` for granular
         // `ItemAdded` / `ItemTextChanged` / etc.
+    }
+
+    /// Bookkeep a single inbound seq. Does not touch the Loro doc —
+    /// callers are responsible for the apply.
+    fn ingest_seq(&mut self, n: u64, now_ms: u64) {
+        if n <= self.last_contiguous_seq {
+            // Already covered by the contiguous prefix — drop.
+            return;
+        }
+        if n == self.last_contiguous_seq + 1 {
+            self.last_contiguous_seq = n;
+            self.compact_seen_above_contig();
+        } else {
+            // n > last_contiguous_seq + 1 → hole somewhere below.
+            // We don't fire an `Event::Error` here — under
+            // Postgres+replicas an open gap is normal operation. Hosts
+            // that want to observe can sample whatever telemetry hook
+            // they wrap the engine with, or watch the gap-retry
+            // `PullOps` frames appear in the outbox.
+            let newly_inserted = self.seen_above_contig.insert(n);
+            if newly_inserted && self.gap_state.is_none() {
+                self.gap_state = Some(GapState {
+                    since_ms: now_ms,
+                    next_retry_at_ms: now_ms.saturating_add(GAP_RETRY_BASE_MS),
+                    retry_count: 0,
+                });
+            }
+        }
+    }
+
+    /// Drop redundant entries (seqs ≤ `last_contiguous_seq`) and peel
+    /// any contiguous suffix off the buffer. Clears `gap_state` if
+    /// the buffer empties. Called after every advance of
+    /// `last_contiguous_seq` from `ingest_seq` or `Snapshot` apply.
+    fn compact_seen_above_contig(&mut self) {
+        loop {
+            let Some(&next) = self.seen_above_contig.iter().next() else {
+                break;
+            };
+            if next <= self.last_contiguous_seq {
+                self.seen_above_contig.pop_first();
+            } else if next == self.last_contiguous_seq + 1 {
+                self.seen_above_contig.pop_first();
+                self.last_contiguous_seq = next;
+            } else {
+                break;
+            }
+        }
+        if self.seen_above_contig.is_empty() {
+            self.gap_state = None;
+        }
+    }
+
+    /// Periodic gap-retry tick. Called from `handle_timeout`. Issues
+    /// `PullOps { since_seq: last_contiguous_seq }` once per backoff
+    /// window (3s, 6s, 12s) while a buffered hole persists; on the
+    /// `GAP_RETRY_LIMIT`-th miss, escalates to bootstrap.
+    fn tick_gap_retry(&mut self, now_ms: u64) {
+        let Some(gap) = self.gap_state else { return };
+        if now_ms < gap.next_retry_at_ms {
+            return;
+        }
+        if gap.retry_count >= GAP_RETRY_LIMIT {
+            self.escalate_to_bootstrap();
+            return;
+        }
+        // Don't pile retries on top of an in-flight bootstrap or
+        // disconnected state — they wouldn't be answerable anyway.
+        if matches!(
+            self.state,
+            ConnState::Bootstrapping | ConnState::Disconnected | ConnState::Hello
+        ) {
+            return;
+        }
+        let next_count = gap.retry_count + 1;
+        let backoff = GAP_RETRY_BASE_MS.saturating_mul(1u64 << next_count.min(5));
+        self.gap_state = Some(GapState {
+            since_ms: gap.since_ms,
+            next_retry_at_ms: now_ms.saturating_add(backoff),
+            retry_count: next_count,
+        });
+        let frame = ClientFrame::PullOps {
+            since_seq: self.last_contiguous_seq,
+        };
+        if let Err(e) = self.encode_into_outbox(&frame) {
+            self.events.push_back(Event::Error(format!(
+                "encode gap-retry PullOps: {e}"
+            )));
+        }
+    }
+
+    /// Jump to the bootstrap tier: clear gap state, emit
+    /// `PullSnapshot`, transition to `Bootstrapping`. Used both on
+    /// `seen_above_contig` overflow and on `GAP_RETRY_LIMIT`-exhausted
+    /// timeouts. A snapshot's `up_to_seq` covers the missing seq's
+    /// payload as part of the encoded state, so this is the cleanest
+    /// recovery short of the (future) primary-confirmed hard-stop.
+    fn escalate_to_bootstrap(&mut self) {
+        self.seen_above_contig.clear();
+        self.gap_state = None;
+        if matches!(self.state, ConnState::Bootstrapping) {
+            return;
+        }
+        if matches!(self.state, ConnState::Disconnected | ConnState::Hello) {
+            // Can't bootstrap without a connection. Reconnect will
+            // re-pull from `last_contiguous_seq` and either fill the
+            // gap naturally or land back here.
+            return;
+        }
+        self.state = ConnState::Bootstrapping;
+        let frame = ClientFrame::PullSnapshot;
+        if let Err(e) = self.encode_into_outbox(&frame) {
+            self.events.push_back(Event::Error(format!(
+                "encode PullSnapshot for gap escalation: {e}"
+            )));
+            self.go_disconnected();
+        }
     }
 
     fn queue_ack_if_advanced(&mut self) {
@@ -575,6 +787,14 @@ impl SyncEngine {
         self.state = ConnState::Disconnected;
         self.in_flight_push_vv = None;
         self.outbox.clear();
+        // Drop the gap-retry timer on disconnect. The reorder buffer
+        // itself stays — those ops are in the doc and the seqs are
+        // legitimate observations of server state. On reconnect, the
+        // resume `PullOps { since_seq: last_contiguous_seq }` may
+        // re-deliver the missing seqs and the buffer drains; if not,
+        // the next inbound out-of-order arrival re-arms the gap
+        // timer.
+        self.gap_state = None;
         self.events
             .push_back(Event::ConnStateChanged { online: false });
     }
@@ -651,12 +871,12 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "test".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _pull = eng.pop_outbox().expect("PullOps");
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         assert!(eng.is_idle(), "expected Idle after empty pull");
     }
 
@@ -690,14 +910,14 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let pull: ClientFrame = dec(&eng.pop_outbox().unwrap());
         assert!(matches!(pull, ClientFrame::PullOps { since_seq: 0 }));
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         assert!(eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::PulledInitial));
@@ -717,12 +937,12 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _pull = eng.pop_outbox().unwrap();
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         assert!(
             eng.pop_outbox().is_none(),
             "no follow-up push for untouched fresh doc"
@@ -738,7 +958,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&HelloRejected {
             reason: "no overlap".into(),
-        }));
+        }), 0);
         assert!(!eng.is_online());
         let events = drain_events(&mut eng);
         assert!(matches!(events[0], Event::Error(ref s) if s.contains("rejected")));
@@ -757,7 +977,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: 9999,
-        }));
+        }), 0);
         assert!(!eng.is_online());
         let events = drain_events(&mut eng);
         assert!(matches!(events[0], Event::Error(ref s) if s.contains("9999")));
@@ -766,7 +986,7 @@ mod tests {
     #[test]
     fn handle_timeout_in_hello_emits_error_only() {
         let mut eng = fresh_engine_clean();
-        eng.handle_timeout();
+        eng.handle_timeout(0);
         assert!(
             drain_events(&mut eng).is_empty(),
             "no error in Disconnected"
@@ -775,7 +995,7 @@ mod tests {
         eng.handle_connected();
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
-        eng.handle_timeout();
+        eng.handle_timeout(0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("timed out")));
 
@@ -783,7 +1003,7 @@ mod tests {
         let mut eng2 = fresh_engine_clean();
         drive_to_idle(&mut eng2);
         let _ = drain_events(&mut eng2);
-        eng2.handle_timeout();
+        eng2.handle_timeout(0);
         assert!(drain_events(&mut eng2).is_empty());
     }
 
@@ -807,7 +1027,7 @@ mod tests {
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
             assigned_seqs: vec![1],
-        }));
+        }), 0);
         assert!(eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::Pushed));
@@ -864,7 +1084,7 @@ mod tests {
         // Server acks the first push.
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
             assigned_seqs: vec![1],
-        }));
+        }), 0);
 
         // Engine should immediately re-push with the mid-push mutation.
         let mut saw_repush = false;
@@ -878,7 +1098,7 @@ mod tests {
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
             assigned_seqs: vec![2],
-        }));
+        }), 0);
         assert!(eng.is_idle());
         // The mid-push mutation made it into the doc and the second
         // push acked it.
@@ -893,7 +1113,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = eng.pop_outbox().unwrap(); // PullOps
 
         // User mutates and flushes while we're still Pulling.
@@ -905,7 +1125,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         let frame: ClientFrame = dec(&eng.pop_outbox().expect("PushOps after pull"));
         assert!(matches!(frame, ClientFrame::PushOps { .. }));
     }
@@ -918,18 +1138,19 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // Build a remote-origin blob, hand it to the engine via
-        // OpsBroadcast with an assigned seq of 7.
+        // OpsBroadcast at seq=1 (the contiguous next after the empty
+        // initial pull). Higher seqs would land in the reorder buffer.
         let remote_blob = make_remote_blob(&dek, |d| {
             d.add_item(LIST_MAIN, "from peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                seq: 7,
+                seq: 1,
                 blob: remote_blob,
             }],
-        }));
+        }), 0);
         let events = drain_events(&mut eng);
-        assert!(events.contains(&Event::FrontierAdvanced { seq: 7 }));
+        assert!(events.contains(&Event::FrontierAdvanced { seq: 1 }));
         // Granular AppEvent: the peer item shows up on the doc's queue.
         let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
         assert!(
@@ -938,16 +1159,16 @@ mod tests {
                 .any(|e| matches!(e, crate::events::AppEvent::ItemAdded { text, .. } if text == "from peer")),
             "expected ItemAdded for `from peer` in {app_evs:?}"
         );
-        assert_eq!(eng.last_contiguous_seq(), 7);
+        assert_eq!(eng.last_contiguous_seq(), 1);
         assert_eq!(eng.last_durable_seq(), 0, "durable lags until notify");
         // No Ack until host confirms durability.
         assert!(
             eng.pop_outbox().is_none(),
             "Ack frame queued before notify_wal_durable",
         );
-        eng.notify_wal_durable(7);
+        eng.notify_wal_durable(1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 7 }));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
 
         // Local doc reflects the applied peer op.
         let names: Vec<_> = eng
@@ -977,19 +1198,19 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![
                 StoredBlob {
-                    seq: 7,
+                    seq: 1,
                     blob: setup_blob,
                 },
                 StoredBlob {
-                    seq: 8,
+                    seq: 2,
                     blob: edit_blob,
                 },
             ],
             complete: false,
-        }));
+        }), 0);
 
         let events = drain_events(&mut eng);
-        assert_eq!(events, vec![Event::FrontierAdvanced { seq: 8 }]);
+        assert_eq!(events, vec![Event::FrontierAdvanced { seq: 2 }]);
 
         let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
         assert!(
@@ -1009,11 +1230,11 @@ mod tests {
 
         // Ack gated on host-confirmed durability.
         assert!(eng.pop_outbox().is_none());
-        eng.notify_wal_durable(8);
+        eng.notify_wal_durable(2);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 8 }));
-        assert_eq!(eng.last_contiguous_seq(), 8);
-        assert_eq!(eng.last_durable_seq(), 8);
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 2 }));
+        assert_eq!(eng.last_contiguous_seq(), 2);
+        assert_eq!(eng.last_durable_seq(), 2);
     }
 
     #[test]
@@ -1028,16 +1249,19 @@ mod tests {
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
 
-        // Broadcast arrives during Pushing.
+        // Broadcast arrives during Pushing. seq=1 is the next
+        // contiguous value (engine starts at 0); the server would
+        // assign it to whichever device's push the primary committed
+        // first.
         let remote_blob = make_remote_blob(&dek, |d| {
             d.add_item(LIST_MAIN, "peer-during-push").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                seq: 5,
+                seq: 1,
                 blob: remote_blob,
             }],
-        }));
+        }), 0);
         // State still Pushing — broadcast doesn't transition.
         assert!(!eng.is_idle());
         // Peer op applied.
@@ -1047,10 +1271,11 @@ mod tests {
             .iter()
             .any(|i| i.text == "peer-during-push"));
 
-        // Server acks our push with seq 6.
+        // Server acks our push with seq 2 (continuing the contiguous
+        // sequence after the broadcast at seq 1).
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_seqs: vec![6],
-        }));
+            assigned_seqs: vec![2],
+        }), 0);
         assert!(eng.is_idle());
         // No Ack queued yet (gated on `notify_wal_durable`); drain
         // anyway in case future engine evolution adds post-ack
@@ -1071,7 +1296,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = eng.pop_outbox().unwrap();
 
         // First batch: not complete, engine stays Pulling.
@@ -1084,7 +1309,7 @@ mod tests {
                 blob: blob1,
             }],
             complete: false,
-        }));
+        }), 0);
         assert!(!eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(!events.contains(&Event::PulledInitial));
@@ -1099,7 +1324,7 @@ mod tests {
                 blob: blob2,
             }],
             complete: true,
-        }));
+        }), 0);
         assert!(eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::PulledInitial));
@@ -1134,12 +1359,12 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = eng.pop_outbox().unwrap();
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         let frame: ClientFrame = dec(&eng.pop_outbox().expect("re-push after reconnect"));
         assert!(matches!(frame, ClientFrame::PushOps { .. }));
     }
@@ -1147,7 +1372,7 @@ mod tests {
     #[test]
     fn server_bytes_while_disconnected_is_an_error() {
         let mut eng = fresh_engine_clean();
-        eng.handle_server_bytes(b"\x00\x01");
+        eng.handle_server_bytes(b"\x00\x01", 0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(_)]));
     }
@@ -1169,7 +1394,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
             assigned_seqs: vec![42],
-        }));
+        }), 0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("OpsAck")));
     }
@@ -1184,7 +1409,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let pull: ClientFrame = dec(&eng.pop_outbox().unwrap());
         assert!(matches!(pull, ClientFrame::PullOps { since_seq: 42 }));
     }
@@ -1206,27 +1431,29 @@ mod tests {
         // visible.
         eng.doc_mut().add_item(LIST_MAIN, "alpha").unwrap();
         eng.doc_mut().add_item(LIST_MAIN, "beta").unwrap();
-        // Simulate our last server-acked frontier sitting at 50.
-        // (We can't easily mutate via public API; mimic via a
-        // broadcast that advances `last_contiguous_seq` to 50.)
+        // Bump our frontier via a contiguous broadcast at seq=1.
+        // Under the new gap-aware engine, broadcasts with non-
+        // contiguous seqs land in the reorder buffer instead of
+        // advancing `last_contiguous_seq`. Numbers don't matter here
+        // — only the invariant "engine's frontier ≥ requested up_to".
         let dek = eng.dek.clone();
         let bump_blob = make_remote_blob(&dek, |d| {
             d.add_item(LIST_MAIN, "from-peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                seq: 50,
+                seq: 1,
                 blob: bump_blob,
             }],
-        }));
+        }), 0);
         let _ = drain_outbox(&mut eng); // drop the auto-Ack
 
-        // Server requests a snapshot up to 30 (below our current 50)
-        // with shallow_start at 20.
+        // Server requests a snapshot at up_to=0 (below our current
+        // frontier of 1) with shallow_start at 0.
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
-            up_to_seq: 30,
-            shallow_start_seq: 20,
-        }));
+            up_to_seq: 0,
+            shallow_start_seq: 0,
+        }), 0);
         let push: ClientFrame = dec(&eng.pop_outbox().expect("PushSnapshot"));
         let (tagged_up_to, tagged_shallow, blob) = match push {
             ClientFrame::PushSnapshot {
@@ -1237,9 +1464,9 @@ mod tests {
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         // Tagged with our actual frontier, not the requested value.
-        assert_eq!(tagged_up_to, 50);
+        assert_eq!(tagged_up_to, 1);
         // Shallow start echoes the server's requested value verbatim.
-        assert_eq!(tagged_shallow, 20);
+        assert_eq!(tagged_shallow, 0);
 
         // Round-trip: apply the blob to a peer doc and verify
         // fingerprints match — the producer/consumer round trip
@@ -1260,7 +1487,7 @@ mod tests {
                 nonce: vec![0; 24],
                 ciphertext: vec![],
             },
-        }));
+        }), 0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("Snapshot")));
     }
@@ -1277,11 +1504,11 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = eng.pop_outbox().unwrap(); // PullOps
 
         // Server says cursor is below the floor.
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 42 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 42 }), 0);
         let pull_snap: ClientFrame = dec(&eng.pop_outbox().expect("PullSnapshot"));
         assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
         // Engine is now in Bootstrapping (not idle, not pulling).
@@ -1295,7 +1522,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
             up_to_seq: 42,
             blob: snapshot_blob,
-        }));
+        }), 0);
 
         // Engine should have advanced its frontier and re-issued
         // PullOps. The Ack waits for the host to confirm the
@@ -1330,7 +1557,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         assert!(eng.is_idle());
     }
 
@@ -1343,9 +1570,9 @@ mod tests {
         eng.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = eng.pop_outbox().unwrap(); // PullOps
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 10 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 10 }), 0);
         let _ = eng.pop_outbox().unwrap(); // PullSnapshot
 
         // Broadcast while bootstrapping — must be ignored entirely.
@@ -1357,7 +1584,7 @@ mod tests {
                 seq: 11,
                 blob: stray,
             }],
-        }));
+        }), 0);
         assert!(
             !eng.doc()
                 .items_in_list(LIST_MAIN, false)
@@ -1395,12 +1622,12 @@ mod tests {
         a.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = a.pop_outbox().unwrap();
         a.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         // Drain A's seed push and any subsequent pushes; ack each.
         while let Some(bytes) = a.pop_outbox() {
             if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
@@ -1417,7 +1644,7 @@ mod tests {
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
                     assigned_seqs: assigned,
-                }));
+                }), 0);
             }
         }
 
@@ -1439,7 +1666,7 @@ mod tests {
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
                     assigned_seqs: assigned,
-                }));
+                }), 0);
             }
         }
         let _ = drain_outbox(&mut a);
@@ -1450,7 +1677,7 @@ mod tests {
         a.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
             up_to_seq: next_seq,
             shallow_start_seq: next_seq,
-        }));
+        }), 0);
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushSnapshot"));
         let (snapshot_up_to, snapshot_shallow, snapshot_blob) = match push {
             ClientFrame::PushSnapshot {
@@ -1486,7 +1713,7 @@ mod tests {
                 }
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
                     assigned_seqs: assigned,
-                }));
+                }), 0);
             }
         }
         let _ = drain_outbox(&mut a);
@@ -1501,14 +1728,14 @@ mod tests {
         b.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let pull: ClientFrame = dec(&b.pop_outbox().unwrap());
         assert!(matches!(pull, ClientFrame::PullOps { since_seq: 0 }));
 
         // Fake server: since (0) < snapshot.up_to_seq, reply SnapshotRequired.
         b.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired {
             up_to_seq: snapshot_up_to,
-        }));
+        }), 0);
         let pull_snap: ClientFrame = dec(&b.pop_outbox().expect("PullSnapshot"));
         assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
 
@@ -1516,7 +1743,7 @@ mod tests {
         b.handle_server_bytes(&enc(&ServerFrame::Snapshot {
             up_to_seq: snapshot_up_to,
             blob: snapshot_blob,
-        }));
+        }), 0);
 
         // B should re-issue PullOps from the snapshot's up_to.
         let mut saw_resume_pull = false;
@@ -1535,7 +1762,7 @@ mod tests {
         b.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: post_snap_ops,
             complete: true,
-        }));
+        }), 0);
         assert!(b.is_idle());
 
         // Both pre-snapshot and post-snapshot items land on B.
@@ -1555,7 +1782,7 @@ mod tests {
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 1 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 1 }), 0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("SnapshotRequired")));
     }
@@ -1574,13 +1801,13 @@ mod tests {
             d.add_item(LIST_MAIN, "x").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
-            ops: vec![StoredBlob { seq: 3, blob }],
-        }));
-        assert_eq!(eng.last_contiguous_seq(), 3);
+            ops: vec![StoredBlob { seq: 1, blob }],
+        }), 0);
+        assert_eq!(eng.last_contiguous_seq(), 1);
         eng.notify_wal_durable(999);
-        assert_eq!(eng.last_durable_seq(), 3);
+        assert_eq!(eng.last_durable_seq(), 1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 3 }));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
     }
 
     #[test]
@@ -1597,21 +1824,21 @@ mod tests {
             d.add_item(LIST_MAIN, "a").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
-            ops: vec![StoredBlob { seq: 5, blob: b1 }],
-        }));
+            ops: vec![StoredBlob { seq: 1, blob: b1 }],
+        }), 0);
         assert!(eng.pop_outbox().is_none());
 
-        eng.notify_wal_durable(5);
+        eng.notify_wal_durable(1);
         let _ack: ClientFrame = dec(&eng.pop_outbox().expect("first Ack"));
 
-        // Re-notify at 5 (e.g. a follow-up zero-bytes captureAndAppend
+        // Re-notify at 1 (e.g. a follow-up zero-bytes captureAndAppend
         // chain entry) — no duplicate Ack.
-        eng.notify_wal_durable(5);
+        eng.notify_wal_durable(1);
         assert!(eng.pop_outbox().is_none());
 
         // Notify backwards is a no-op.
-        eng.notify_wal_durable(2);
-        assert_eq!(eng.last_durable_seq(), 5);
+        eng.notify_wal_durable(0);
+        assert_eq!(eng.last_durable_seq(), 1);
         assert!(eng.pop_outbox().is_none());
     }
 
@@ -1630,12 +1857,12 @@ mod tests {
             d.add_item(LIST_MAIN, "remote").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
-            ops: vec![StoredBlob { seq: 4, blob }],
-        }));
+            ops: vec![StoredBlob { seq: 1, blob }],
+        }), 0);
 
         // Engine has applied in memory but must not have queued an
         // Ack frame.
-        assert_eq!(eng.last_contiguous_seq(), 4);
+        assert_eq!(eng.last_contiguous_seq(), 1);
         assert_eq!(eng.last_durable_seq(), 0);
         while let Some(bytes) = eng.pop_outbox() {
             let frame: ClientFrame = dec(&bytes);
@@ -1646,12 +1873,244 @@ mod tests {
         }
     }
 
+    /// Produce N independent encrypted blobs, each containing one
+    /// "op-i" mutation. Each blob comes from a fresh peer Doc so the
+    /// CRDT op IDs don't collide on import. Used for tests that need
+    /// a stream of valid blobs without caring about their content.
+    fn make_blob_stream(dek: &Dek, n: usize) -> Vec<airday_protocol::EncryptedBlob> {
+        (0..n)
+            .map(|i| {
+                make_remote_blob(dek, |d| {
+                    d.add_item(LIST_MAIN, &format!("op-{i}")).unwrap();
+                })
+            })
+            .collect()
+    }
+
+    #[test]
+    fn gap_fills_naturally_advancing_through_buffered_seqs() {
+        // [1, 2, 4] then [3] — assert engine acks 2 first, then 4
+        // (peeling the buffered seq from `seen_above_contig`).
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+
+        let blobs = make_blob_stream(&dek, 4);
+        eng.handle_server_bytes(
+            &enc(&ServerFrame::OpsBatch {
+                ops: vec![
+                    StoredBlob {
+                        seq: 1,
+                        blob: blobs[0].clone(),
+                    },
+                    StoredBlob {
+                        seq: 2,
+                        blob: blobs[1].clone(),
+                    },
+                    StoredBlob {
+                        seq: 4,
+                        blob: blobs[3].clone(),
+                    },
+                ],
+                complete: false,
+            }),
+            1_000,
+        );
+
+        // Contiguous prefix stopped at 2; 4 is buffered.
+        assert_eq!(eng.last_contiguous_seq(), 2);
+        eng.notify_wal_durable(2);
+        let ack: ClientFrame = dec(&eng.pop_outbox().expect("first Ack"));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 2 }));
+
+        // Missing seq arrives → engine peels 4 off the buffer.
+        eng.handle_server_bytes(
+            &enc(&ServerFrame::OpsBroadcast {
+                ops: vec![StoredBlob {
+                    seq: 3,
+                    blob: blobs[2].clone(),
+                }],
+            }),
+            1_100,
+        );
+        assert_eq!(eng.last_contiguous_seq(), 4);
+        eng.notify_wal_durable(4);
+        let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack 4"));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 4 }));
+    }
+
+    #[test]
+    fn gap_retry_emits_pullops_after_backoff() {
+        // [1, 2, 4] held; tick simulated clock past 3s / 9s and
+        // assert the engine emits fresh `PullOps { since_seq: 2 }`
+        // frames at the matching backoff windows.
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+
+        let blobs = make_blob_stream(&dek, 4);
+        let gap_open_ms = 1_000;
+        eng.handle_server_bytes(
+            &enc(&ServerFrame::OpsBatch {
+                ops: vec![
+                    StoredBlob {
+                        seq: 1,
+                        blob: blobs[0].clone(),
+                    },
+                    StoredBlob {
+                        seq: 2,
+                        blob: blobs[1].clone(),
+                    },
+                    StoredBlob {
+                        seq: 4,
+                        blob: blobs[3].clone(),
+                    },
+                ],
+                complete: false,
+            }),
+            gap_open_ms,
+        );
+        let _ = drain_outbox(&mut eng);
+
+        // Just before the 3s threshold — no retry yet.
+        eng.handle_timeout(gap_open_ms + 2_999);
+        assert!(eng.pop_outbox().is_none(), "no retry before backoff window");
+
+        // At the 3s threshold — retry #1 fires with since_seq=2.
+        eng.handle_timeout(gap_open_ms + 3_000);
+        let frame: ClientFrame = dec(&eng.pop_outbox().expect("retry #1"));
+        assert!(
+            matches!(frame, ClientFrame::PullOps { since_seq: 2 }),
+            "expected PullOps{{since_seq:2}}, got {frame:?}",
+        );
+
+        // Between retry #1 and the next backoff (6s after retry #1
+        // fired) — no further retry.
+        eng.handle_timeout(gap_open_ms + 5_000);
+        assert!(eng.pop_outbox().is_none(), "second backoff not yet elapsed");
+
+        // 6s after retry #1 → retry #2.
+        eng.handle_timeout(gap_open_ms + 9_001);
+        let frame: ClientFrame = dec(&eng.pop_outbox().expect("retry #2"));
+        assert!(matches!(frame, ClientFrame::PullOps { since_seq: 2 }));
+    }
+
+    #[test]
+    fn gap_escalates_to_bootstrap_after_exhausted_retries() {
+        // Same setup as the retry test, but drive past
+        // GAP_RETRY_LIMIT retries — engine emits `PullSnapshot` and
+        // transitions to `Bootstrapping`.
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+
+        let blobs = make_blob_stream(&dek, 4);
+        eng.handle_server_bytes(
+            &enc(&ServerFrame::OpsBatch {
+                ops: vec![
+                    StoredBlob {
+                        seq: 1,
+                        blob: blobs[0].clone(),
+                    },
+                    StoredBlob {
+                        seq: 2,
+                        blob: blobs[1].clone(),
+                    },
+                    StoredBlob {
+                        seq: 4,
+                        blob: blobs[3].clone(),
+                    },
+                ],
+                complete: false,
+            }),
+            1_000,
+        );
+        let _ = drain_outbox(&mut eng);
+
+        // Fire retries #1, #2, #3 at backoff windows.
+        // 3s, then +6s = 9s, then +12s = 21s after gap open.
+        for &deadline in &[1_000 + 3_000, 1_000 + 9_001, 1_000 + 21_002] {
+            eng.handle_timeout(deadline);
+            let frame: ClientFrame = dec(&eng.pop_outbox().expect("retry"));
+            assert!(matches!(frame, ClientFrame::PullOps { since_seq: 2 }));
+        }
+        // Engine should still be idle (not bootstrapping) — three
+        // retries fired.
+        assert!(eng.is_idle());
+
+        // One more tick past the next backoff (24s after retry #3 =
+        // 21002 + 24000 = 45002) — engine escalates to bootstrap.
+        eng.handle_timeout(1_000 + 45_003);
+        let frame: ClientFrame = dec(&eng.pop_outbox().expect("PullSnapshot"));
+        assert!(
+            matches!(frame, ClientFrame::PullSnapshot),
+            "expected PullSnapshot after exhausted retries, got {frame:?}",
+        );
+        assert!(!eng.is_idle(), "engine should be Bootstrapping");
+    }
+
+    #[test]
+    fn buffer_overflow_escalates_directly_to_bootstrap() {
+        // MAX_REORDER_BUFFER = 10 under cfg(test). Deliver a contiguous
+        // pair plus enough out-of-order seqs to exceed the cap —
+        // engine skips the retry tier and emits `PullSnapshot` on the
+        // same call.
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+
+        // 2 contiguous + 11 out-of-order = 11 entries in the buffer,
+        // > MAX_REORDER_BUFFER (10).
+        let blobs = make_blob_stream(&dek, 14);
+        let mut ops = vec![
+            StoredBlob {
+                seq: 1,
+                blob: blobs[0].clone(),
+            },
+            StoredBlob {
+                seq: 2,
+                blob: blobs[1].clone(),
+            },
+        ];
+        for (i, blob) in blobs[3..14].iter().enumerate() {
+            ops.push(StoredBlob {
+                seq: 4 + i as u64,
+                blob: blob.clone(),
+            });
+        }
+        eng.handle_server_bytes(
+            &enc(&ServerFrame::OpsBatch {
+                ops,
+                complete: false,
+            }),
+            1_000,
+        );
+
+        // PullSnapshot should have been emitted on the same call.
+        let mut saw_pull_snapshot = false;
+        while let Some(bytes) = eng.pop_outbox() {
+            if let Ok(ClientFrame::PullSnapshot) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
+                saw_pull_snapshot = true;
+            }
+        }
+        assert!(saw_pull_snapshot, "expected PullSnapshot from buffer overflow");
+        assert!(!eng.is_idle(), "engine should be Bootstrapping");
+    }
+
     #[test]
     fn malformed_server_frame_emits_error_without_disconnect() {
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.handle_server_bytes(b"not msgpack at all");
+        eng.handle_server_bytes(b"not msgpack at all", 0);
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(_)]));
         // Engine remains Idle — caller decides whether to disconnect.
@@ -1687,12 +2146,12 @@ mod tests {
         a.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = a.pop_outbox().unwrap();
         a.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
             complete: true,
-        }));
+        }), 0);
         // A's seed auto-pushes; collect & ack.
         while let Some(bytes) = a.pop_outbox() {
             if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
@@ -1709,7 +2168,7 @@ mod tests {
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
                     assigned_seqs: assigned,
-                }));
+                }), 0);
             }
         }
         let _ = drain_outbox(&mut a);
@@ -1735,7 +2194,7 @@ mod tests {
             .collect();
         a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
             assigned_seqs: assigned,
-        }));
+        }), 0);
         let _ = drain_outbox(&mut a);
 
         // -- B connects, pulls everything from the log --
@@ -1744,12 +2203,12 @@ mod tests {
         b.handle_server_bytes(&enc(&HelloAck {
             server_version: "s".into(),
             protocol_version: PROTOCOL_VERSION,
-        }));
+        }), 0);
         let _ = b.pop_outbox().unwrap();
         b.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: ops_log.clone(),
             complete: true,
-        }));
+        }), 0);
         // B should now hold A's item.
         assert!(b.doc().get_item(&item_a).is_some());
 
