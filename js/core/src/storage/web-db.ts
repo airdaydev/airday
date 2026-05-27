@@ -3,7 +3,7 @@
 // All persistent-at-rest browser state for airday lives in the
 // `airday-web` database. Three modules write to it:
 //
-//   - `dekVault` (in `@airday/web`)  — `vault`         store: wrapped DEK
+//   - `DekVault` (here)              — `vault`         store: wrapped DEK
 //   - `IdbWalStorage` (here)         — `ops`           store: WAL rows
 //                                    — `snapshot_meta` store: snapshot pointer
 //                                    — `device`        store: device identity + sync frontier

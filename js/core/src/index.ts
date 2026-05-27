@@ -14,6 +14,11 @@ export { probeOpfs } from "./storage/opfs-probe.ts";
 export { IdbWalStorage } from "./storage/idb-wal.ts";
 export { MemWalStorage } from "./storage/mem-wal.ts";
 export {
+  DekVault,
+  type DekFromHex,
+  type VaultedSession,
+} from "./storage/dek-vault.ts";
+export {
   SNAPSHOT_THRESHOLD,
   type ReplayPayload,
   type WalEntry,
