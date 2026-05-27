@@ -58,12 +58,12 @@ The server **cannot**:
 
 The server **can**:
 - authenticate accounts and devices
-- assign monotonic blob ids
-- track per-device `last_acked_blob_id`
-- compute horizon = min(`last_acked_blob_id`) across all non-revoked devices
+- assign per-account monotonic, gap-free `seq`
+- track per-device `last_acked_seq`
+- compute horizon = min(`last_acked_seq`) across all non-revoked devices
 - decide when a snapshot is due (op-count threshold past last snapshot, triggering device caught up)
-- ask any caught-up connected client to produce the snapshot (state frontier = `server_last_blob_id`, shallow-history start = `max(horizon, prev snapshot's shallow_start)`)
-- replace prior snapshots and prune ops up to the snapshot's `shallow_start_blob_id`
+- ask any caught-up connected client to produce the snapshot (state frontier = `server_last_seq`, shallow-history start = `max(horizon, prev snapshot's shallow_start)`)
+- replace prior snapshots and prune ops up to the snapshot's `shallow_start_seq`
 
 This thesis is load-bearing for everything in `sync-protocol.md`.
 

@@ -643,14 +643,14 @@ pub struct SyncEngine {
 #[wasm_bindgen]
 impl SyncEngine {
     /// Build a new engine. Consumes `doc` and `dek` — the JS handles
-    /// must not be reused after this call. `last_acked_blob_id` is the
-    /// frontier persisted from the previous session (or 0 for a fresh
-    /// device).
+    /// must not be reused after this call. `last_acked_seq` is the
+    /// contiguous-prefix seq persisted from the previous session (or 0
+    /// for a fresh device).
     #[wasm_bindgen(constructor)]
     pub fn new(
         doc: Doc,
         dek: Dek,
-        last_acked_blob_id: u64,
+        last_acked_seq: u64,
         client_name: String,
         client_version: String,
     ) -> SyncEngine {
@@ -658,7 +658,7 @@ impl SyncEngine {
             inner: CoreSyncEngine::new(
                 doc.inner,
                 dek.inner,
-                last_acked_blob_id,
+                last_acked_seq,
                 CoreEngineOptions {
                     client_name,
                     client_version,
@@ -752,11 +752,11 @@ impl SyncEngine {
         self.inner.is_idle()
     }
 
-    /// Highest server-assigned blob id the engine knows about — caller
-    /// persists this as `last_acked_blob_id` between sessions.
-    #[wasm_bindgen(js_name = highestSeenBlobId)]
-    pub fn highest_seen_blob_id(&self) -> u64 {
-        self.inner.highest_seen_blob_id()
+    /// Contiguous-prefix seq the engine has applied — caller persists
+    /// this as `last_acked_seq` between sessions.
+    #[wasm_bindgen(js_name = lastContiguousSeq)]
+    pub fn last_contiguous_seq(&self) -> u64 {
+        self.inner.last_contiguous_seq()
     }
 
     // -- doc passthrough --
@@ -1048,13 +1048,13 @@ impl SyncEngine {
 
 /// Flat JS-friendly view of `airday_core::Event`. The host switches on
 /// `kind` and reads the payload-specific getter — exactly one of
-/// `online`, `blobId`, `message` will be set per event (or none, for
+/// `online`, `seq`, `message` will be set per event (or none, for
 /// payload-less variants).
 #[wasm_bindgen]
 pub struct EngineEvent {
     kind: &'static str,
     online: Option<bool>,
-    blob_id: Option<u64>,
+    seq: Option<u64>,
     message: Option<String>,
 }
 
@@ -1070,9 +1070,9 @@ impl EngineEvent {
         self.online
     }
 
-    #[wasm_bindgen(getter, js_name = blobId)]
-    pub fn blob_id(&self) -> Option<u64> {
-        self.blob_id
+    #[wasm_bindgen(getter)]
+    pub fn seq(&self) -> Option<u64> {
+        self.seq
     }
 
     #[wasm_bindgen(getter)]
@@ -1087,31 +1087,31 @@ impl From<CoreEvent> for EngineEvent {
             CoreEvent::ConnStateChanged { online } => EngineEvent {
                 kind: "connStateChanged",
                 online: Some(online),
-                blob_id: None,
+                seq: None,
                 message: None,
             },
             CoreEvent::PulledInitial => EngineEvent {
                 kind: "pulledInitial",
                 online: None,
-                blob_id: None,
+                seq: None,
                 message: None,
             },
             CoreEvent::Pushed => EngineEvent {
                 kind: "pushed",
                 online: None,
-                blob_id: None,
+                seq: None,
                 message: None,
             },
-            CoreEvent::FrontierAdvanced { blob_id } => EngineEvent {
+            CoreEvent::FrontierAdvanced { seq } => EngineEvent {
                 kind: "frontierAdvanced",
                 online: None,
-                blob_id: Some(blob_id),
+                seq: Some(seq),
                 message: None,
             },
             CoreEvent::Error(message) => EngineEvent {
                 kind: "error",
                 online: None,
-                blob_id: None,
+                seq: None,
                 message: Some(message),
             },
         }

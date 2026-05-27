@@ -100,8 +100,8 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     }
 
     let mut device = profile.read_device()?;
-    if device.last_acked_blob_id != 0 {
-        device.last_acked_blob_id = 0;
+    if device.last_acked_seq != 0 {
+        device.last_acked_seq = 0;
         profile.write_device(&device)?;
     }
 

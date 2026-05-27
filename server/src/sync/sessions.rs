@@ -9,7 +9,7 @@
 //! (`CHANNEL_CAPACITY`). On a full or closed channel the broadcast
 //! drops the message *and* removes the subscriber. The session task
 //! observes its rx going `None` and exits; the client reconnects and
-//! pulls from `last_acked_blob_id`. The op stream is the durable
+//! pulls from `last_acked_seq`. The op stream is the durable
 //! channel — broadcast is just an optimization to skip the round-trip
 //! when peers are live, so dropping a frame is safe.
 

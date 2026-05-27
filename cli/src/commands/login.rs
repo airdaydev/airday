@@ -88,14 +88,14 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         email,
         server_url: args.server,
         device_id: device.device_id,
-        last_acked_blob_id: 0,
+        last_acked_seq: 0,
         last_sync_at: None,
     })?;
     profile.write_secrets(&Secrets {
         device_token: device.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    // Empty doc; the initial sync below pulls from blob id 0, applies
+    // Empty doc; the initial sync below pulls from seq 0, applies
     // device-1's seed + history, and we converge.
     profile.write_doc(&Doc::empty())?;
 

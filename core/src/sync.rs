@@ -48,10 +48,9 @@ pub enum Event {
     PulledInitial,
     /// Our own `PushOps` was acked and `Doc::last_pushed_vv` advanced.
     Pushed,
-    /// The highest server-assigned blob id we know about advanced to
-    /// `blob_id`. Useful for callers persisting `last_acked_blob_id` between
-    /// sessions.
-    FrontierAdvanced { blob_id: u64 },
+    /// The contiguous-prefix seq the engine has applied advanced.
+    /// Useful for callers persisting `last_acked_seq` between sessions.
+    FrontierAdvanced { seq: u64 },
     /// Recoverable error — the caller may choose to disconnect or just
     /// log and continue. Fatal handshake errors come paired with a
     /// `ConnStateChanged { online: false }` so the caller knows the
@@ -86,12 +85,13 @@ pub struct SyncEngine {
     dek: Dek,
     opts: EngineOptions,
     state: ConnState,
-    /// Highest server-assigned blob id we've seen — from pulls,
-    /// broadcasts, or our own push acks.
-    highest_seen_blob_id: u64,
-    /// Highest blob id we've already shipped in an `Ack`. Lets us
-    /// coalesce: queue an `Ack` only when `highest_seen_blob_id` overtakes
-    /// this.
+    /// Contiguous-prefix seq we've applied — the value safe to ack.
+    /// Equal to the maximum seq seen under sqlite single-writer (no
+    /// gaps possible); under Postgres + replicas, this lags the
+    /// max-seen until a reorder buffer fills the holes.
+    last_contiguous_seq: u64,
+    /// Highest seq we've already shipped in an `Ack`. Lets us coalesce:
+    /// queue an `Ack` only when `last_contiguous_seq` overtakes this.
     last_sent_ack: u64,
     /// VV captured at the moment of the in-flight `PushOps` export. On
     /// `OpsAck` we merge this into `Doc::last_pushed_vv`. Cleared on
@@ -103,17 +103,17 @@ pub struct SyncEngine {
 }
 
 impl SyncEngine {
-    /// Build a fresh engine. `last_acked_blob_id` is the persisted
-    /// frontier from the previous session — used as `since_blob_id` in
-    /// the initial pull.
-    pub fn new(doc: Doc, dek: Dek, last_acked_blob_id: u64, opts: EngineOptions) -> Self {
+    /// Build a fresh engine. `last_acked_seq` is the persisted
+    /// contiguous-prefix from the previous session — used as
+    /// `since_seq` in the initial pull.
+    pub fn new(doc: Doc, dek: Dek, last_acked_seq: u64, opts: EngineOptions) -> Self {
         Self {
             doc,
             dek,
             opts,
             state: ConnState::Disconnected,
-            highest_seen_blob_id: last_acked_blob_id,
-            last_sent_ack: last_acked_blob_id,
+            last_contiguous_seq: last_acked_seq,
+            last_sent_ack: last_acked_seq,
             in_flight_push_vv: None,
             outbox: VecDeque::new(),
             events: VecDeque::new(),
@@ -128,10 +128,10 @@ impl SyncEngine {
         &mut self.doc
     }
 
-    /// Highest server-assigned blob id known to the engine — caller
-    /// persists this as `last_acked_blob_id` between sessions.
-    pub fn highest_seen_blob_id(&self) -> u64 {
-        self.highest_seen_blob_id
+    /// Contiguous-prefix seq known to the engine — caller persists this
+    /// as `last_acked_seq` between sessions.
+    pub fn last_contiguous_seq(&self) -> u64 {
+        self.last_contiguous_seq
     }
 
     /// True if the engine is past `Disconnected` — caller can treat
@@ -267,7 +267,7 @@ impl SyncEngine {
             }
             self.state = ConnState::Pulling;
             let frame = ClientFrame::PullOps {
-                since_blob_id: self.highest_seen_blob_id,
+                since_seq: self.last_contiguous_seq,
             };
             if let Err(e) = self.encode_into_outbox(&frame) {
                 self.events
@@ -319,13 +319,13 @@ impl SyncEngine {
                     // Broadcasts during bootstrap would either re-fire
                     // AppEvents on next pull or land before the snapshot
                     // baseline. Drop them — the post-bootstrap PullOps
-                    // re-delivers anything past `up_to_blob_id`.
+                    // re-delivers anything past `up_to_seq`.
                     return;
                 }
                 self.apply_remote_ops(ops);
                 self.queue_ack_if_advanced();
             }
-            ServerFrame::OpsAck { assigned_ids } => {
+            ServerFrame::OpsAck { assigned_seqs } => {
                 if !matches!(self.state, ConnState::Pushing | ConnState::PushingDirty) {
                     self.events.push_back(Event::Error(format!(
                         "OpsAck received in unexpected state {:?}",
@@ -333,11 +333,10 @@ impl SyncEngine {
                     )));
                     return;
                 }
-                if let Some(top) = assigned_ids.iter().copied().max() {
-                    if top > self.highest_seen_blob_id {
-                        self.highest_seen_blob_id = top;
-                        self.events
-                            .push_back(Event::FrontierAdvanced { blob_id: top });
+                if let Some(top) = assigned_seqs.iter().copied().max() {
+                    if top > self.last_contiguous_seq {
+                        self.last_contiguous_seq = top;
+                        self.events.push_back(Event::FrontierAdvanced { seq: top });
                     }
                 }
                 if let Some(vv) = self.in_flight_push_vv.take() {
@@ -353,7 +352,7 @@ impl SyncEngine {
                     self.try_start_push();
                 }
             }
-            ServerFrame::SnapshotRequired { up_to_blob_id: _ } => {
+            ServerFrame::SnapshotRequired { up_to_seq: _ } => {
                 if !matches!(self.state, ConnState::Pulling) {
                     self.events.push_back(Event::Error(format!(
                         "SnapshotRequired received in unexpected state {:?}",
@@ -361,7 +360,7 @@ impl SyncEngine {
                     )));
                     return;
                 }
-                // `up_to_blob_id` is informational — the authoritative
+                // `up_to_seq` is informational — the authoritative
                 // value is the one returned in the `Snapshot` frame.
                 self.state = ConnState::Bootstrapping;
                 let frame = ClientFrame::PullSnapshot;
@@ -371,10 +370,7 @@ impl SyncEngine {
                     self.go_disconnected();
                 }
             }
-            ServerFrame::Snapshot {
-                up_to_blob_id,
-                blob,
-            } => {
+            ServerFrame::Snapshot { up_to_seq, blob } => {
                 if !matches!(self.state, ConnState::Bootstrapping) {
                     self.events.push_back(Event::Error(format!(
                         "Snapshot received in unexpected state {:?}",
@@ -388,18 +384,17 @@ impl SyncEngine {
                     self.go_disconnected();
                     return;
                 }
-                if up_to_blob_id > self.highest_seen_blob_id {
-                    self.highest_seen_blob_id = up_to_blob_id;
-                    self.events.push_back(Event::FrontierAdvanced {
-                        blob_id: up_to_blob_id,
-                    });
+                if up_to_seq > self.last_contiguous_seq {
+                    self.last_contiguous_seq = up_to_seq;
+                    self.events
+                        .push_back(Event::FrontierAdvanced { seq: up_to_seq });
                 }
                 self.queue_ack_if_advanced();
                 // Resume the catch-up: pull any ops written after the
                 // snapshot was taken.
                 self.state = ConnState::Pulling;
                 let frame = ClientFrame::PullOps {
-                    since_blob_id: self.highest_seen_blob_id,
+                    since_seq: self.last_contiguous_seq,
                 };
                 if let Err(e) = self.encode_into_outbox(&frame) {
                     self.events
@@ -408,23 +403,23 @@ impl SyncEngine {
                 }
             }
             ServerFrame::SnapshotRequest {
-                up_to_blob_id: _,
-                shallow_start_blob_id,
+                up_to_seq: _,
+                shallow_start_seq,
             } => {
                 // Server picked us as the snapshot producer. We produce
                 // at the doc's current frontier and tag with our true
-                // `highest_seen_blob_id`, which is ≥ the requested value
+                // `last_contiguous_seq`, which is ≥ the requested value
                 // (server only asks caught-up producers). Producing in
                 // any active state is fine — snapshots are state-of-doc,
                 // not a state-machine transition.
                 //
                 // TODO: `snapshot_blob` currently produces a full Loro
-                // snapshot, not a shallow one — `shallow_start_blob_id`
+                // snapshot, not a shallow one — `shallow_start_seq`
                 // is echoed back verbatim so the server's bookkeeping
                 // (compaction floor) is correct, but no history is
                 // actually trimmed yet. Switch to
                 // `ExportMode::shallow_snapshot(frontier)` when the
-                // blob_id -> Loro frontier mapping is wired through.
+                // seq -> Loro frontier mapping is wired through.
                 let blob = match self.doc.snapshot_blob(&self.dek) {
                     Ok(b) => b,
                     Err(e) => {
@@ -434,8 +429,8 @@ impl SyncEngine {
                     }
                 };
                 let frame = ClientFrame::PushSnapshot {
-                    up_to_blob_id: self.highest_seen_blob_id,
-                    shallow_start_blob_id,
+                    up_to_seq: self.last_contiguous_seq,
+                    shallow_start_seq,
                     blob,
                 };
                 if let Err(e) = self.encode_into_outbox(&frame) {
@@ -453,28 +448,26 @@ impl SyncEngine {
 
         let top = ops
             .iter()
-            .map(|op| op.blob_id)
+            .map(|op| op.seq)
             .max()
-            .unwrap_or(self.highest_seen_blob_id);
+            .unwrap_or(self.last_contiguous_seq);
         if let Err(e) = self
             .doc
             .apply_remote_batch(&self.dek, ops.iter().map(|op| &op.blob))
         {
-            let failed_blob_id = ops
+            let failed_seq = ops
                 .iter()
-                .find(|op| op.blob_id > self.highest_seen_blob_id)
-                .map(|op| op.blob_id)
+                .find(|op| op.seq > self.last_contiguous_seq)
+                .map(|op| op.seq)
                 .unwrap_or(top);
-            self.events.push_back(Event::Error(format!(
-                "apply remote blob {failed_blob_id}: {e}"
-            )));
+            self.events
+                .push_back(Event::Error(format!("apply remote blob {failed_seq}: {e}")));
             return;
         }
 
-        if top > self.highest_seen_blob_id {
-            self.highest_seen_blob_id = top;
-            self.events
-                .push_back(Event::FrontierAdvanced { blob_id: top });
+        if top > self.last_contiguous_seq {
+            self.last_contiguous_seq = top;
+            self.events.push_back(Event::FrontierAdvanced { seq: top });
         }
         // Domain-level deltas (`AppEvent`) flow through `Doc`'s own
         // queue — drained by the host alongside this protocol event
@@ -484,12 +477,12 @@ impl SyncEngine {
     }
 
     fn queue_ack_if_advanced(&mut self) {
-        if self.highest_seen_blob_id > self.last_sent_ack {
+        if self.last_contiguous_seq > self.last_sent_ack {
             let ack = ClientFrame::Ack {
-                last_acked_blob_id: self.highest_seen_blob_id,
+                last_acked_seq: self.last_contiguous_seq,
             };
             if self.encode_into_outbox(&ack).is_ok() {
-                self.last_sent_ack = self.highest_seen_blob_id;
+                self.last_sent_ack = self.last_contiguous_seq;
             }
         }
     }
@@ -642,7 +635,7 @@ mod tests {
             protocol_version: PROTOCOL_VERSION,
         }));
         let pull: ClientFrame = dec(&eng.pop_outbox().unwrap());
-        assert!(matches!(pull, ClientFrame::PullOps { since_blob_id: 0 }));
+        assert!(matches!(pull, ClientFrame::PullOps { since_seq: 0 }));
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![],
@@ -756,21 +749,16 @@ mod tests {
         };
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: vec![1],
+            assigned_seqs: vec![1],
         }));
         assert!(eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::Pushed));
-        assert!(events.contains(&Event::FrontierAdvanced { blob_id: 1 }));
+        assert!(events.contains(&Event::FrontierAdvanced { seq: 1 }));
 
         // After ack we must also have queued an Ack frame.
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(
-            ack,
-            ClientFrame::Ack {
-                last_acked_blob_id: 1
-            }
-        ));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
 
         // No double-push: doc has nothing new since the in-flight VV
         // we just marked as pushed.
@@ -810,7 +798,7 @@ mod tests {
 
         // Server acks the first push.
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: vec![1],
+            assigned_seqs: vec![1],
         }));
 
         // Engine should immediately re-push with the mid-push mutation.
@@ -824,7 +812,7 @@ mod tests {
         assert!(saw_repush, "PushingDirty must re-push after ack");
 
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: vec![2],
+            assigned_seqs: vec![2],
         }));
         assert!(eng.is_idle());
         // The mid-push mutation made it into the doc and the second
@@ -865,18 +853,18 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // Build a remote-origin blob, hand it to the engine via
-        // OpsBroadcast with an assigned id of 7.
+        // OpsBroadcast with an assigned seq of 7.
         let remote_blob = make_remote_blob(&dek, |d| {
             d.add_item(LIST_MAIN, "from peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                blob_id: 7,
+                seq: 7,
                 blob: remote_blob,
             }],
         }));
         let events = drain_events(&mut eng);
-        assert!(events.contains(&Event::FrontierAdvanced { blob_id: 7 }));
+        assert!(events.contains(&Event::FrontierAdvanced { seq: 7 }));
         // Granular AppEvent: the peer item shows up on the doc's queue.
         let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
         assert!(
@@ -885,15 +873,10 @@ mod tests {
                 .any(|e| matches!(e, crate::events::AppEvent::ItemAdded { text, .. } if text == "from peer")),
             "expected ItemAdded for `from peer` in {app_evs:?}"
         );
-        assert_eq!(eng.highest_seen_blob_id(), 7);
+        assert_eq!(eng.last_contiguous_seq(), 7);
         // Frontier advance should produce an Ack.
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(
-            ack,
-            ClientFrame::Ack {
-                last_acked_blob_id: 7
-            }
-        ));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 7 }));
 
         // Local doc reflects the applied peer op.
         let names: Vec<_> = eng
@@ -923,11 +906,11 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![
                 StoredBlob {
-                    blob_id: 7,
+                    seq: 7,
                     blob: setup_blob,
                 },
                 StoredBlob {
-                    blob_id: 8,
+                    seq: 8,
                     blob: edit_blob,
                 },
             ],
@@ -935,7 +918,7 @@ mod tests {
         }));
 
         let events = drain_events(&mut eng);
-        assert_eq!(events, vec![Event::FrontierAdvanced { blob_id: 8 }]);
+        assert_eq!(events, vec![Event::FrontierAdvanced { seq: 8 }]);
 
         let app_evs: Vec<_> = std::iter::from_fn(|| eng.pop_app_event()).collect();
         assert!(
@@ -954,13 +937,8 @@ mod tests {
         );
 
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
-        assert!(matches!(
-            ack,
-            ClientFrame::Ack {
-                last_acked_blob_id: 8
-            }
-        ));
-        assert_eq!(eng.highest_seen_blob_id(), 8);
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 8 }));
+        assert_eq!(eng.last_contiguous_seq(), 8);
     }
 
     #[test]
@@ -981,7 +959,7 @@ mod tests {
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                blob_id: 5,
+                seq: 5,
                 blob: remote_blob,
             }],
         }));
@@ -994,9 +972,9 @@ mod tests {
             .iter()
             .any(|i| i.text == "peer-during-push"));
 
-        // Server acks our push with id 6.
+        // Server acks our push with seq 6.
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: vec![6],
+            assigned_seqs: vec![6],
         }));
         assert!(eng.is_idle());
         // Drain the post-ack housekeeping (Ack frame queued from
@@ -1027,7 +1005,7 @@ mod tests {
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredBlob {
-                blob_id: 1,
+                seq: 1,
                 blob: blob1,
             }],
             complete: false,
@@ -1042,7 +1020,7 @@ mod tests {
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredBlob {
-                blob_id: 2,
+                seq: 2,
                 blob: blob2,
             }],
             complete: true,
@@ -1050,7 +1028,7 @@ mod tests {
         assert!(eng.is_idle());
         let events = drain_events(&mut eng);
         assert!(events.contains(&Event::PulledInitial));
-        assert_eq!(eng.highest_seen_blob_id(), 2);
+        assert_eq!(eng.last_contiguous_seq(), 2);
     }
 
     #[test]
@@ -1115,14 +1093,14 @@ mod tests {
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: vec![42],
+            assigned_seqs: vec![42],
         }));
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("OpsAck")));
     }
 
     #[test]
-    fn since_blob_id_carries_persisted_frontier() {
+    fn since_seq_carries_persisted_frontier() {
         let mut doc = Doc::new().unwrap();
         doc.mark_pushed();
         let mut eng = SyncEngine::new(doc, Dek::generate(), 42, opts());
@@ -1133,13 +1111,13 @@ mod tests {
             protocol_version: PROTOCOL_VERSION,
         }));
         let pull: ClientFrame = dec(&eng.pop_outbox().unwrap());
-        assert!(matches!(pull, ClientFrame::PullOps { since_blob_id: 42 }));
+        assert!(matches!(pull, ClientFrame::PullOps { since_seq: 42 }));
     }
 
     #[test]
     fn snapshot_request_produces_pushsnapshot_with_current_frontier() {
         // Server picks us as snapshot producer. We tag with our true
-        // `highest_seen_blob_id` (≥ requested up_to_blob_id), and the blob
+        // `last_contiguous_seq` (≥ requested up_to_seq), and the blob
         // must round-trip through `apply_remote` into a peer doc to
         // the same logical state — that's the property that makes the
         // snapshot useful for bootstrap.
@@ -1155,14 +1133,14 @@ mod tests {
         eng.doc_mut().add_item(LIST_MAIN, "beta").unwrap();
         // Simulate our last server-acked frontier sitting at 50.
         // (We can't easily mutate via public API; mimic via a
-        // broadcast that advances `highest_seen_blob_id` to 50.)
+        // broadcast that advances `last_contiguous_seq` to 50.)
         let dek = eng.dek.clone();
         let bump_blob = make_remote_blob(&dek, |d| {
             d.add_item(LIST_MAIN, "from-peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                blob_id: 50,
+                seq: 50,
                 blob: bump_blob,
             }],
         }));
@@ -1171,16 +1149,16 @@ mod tests {
         // Server requests a snapshot up to 30 (below our current 50)
         // with shallow_start at 20.
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
-            up_to_blob_id: 30,
-            shallow_start_blob_id: 20,
+            up_to_seq: 30,
+            shallow_start_seq: 20,
         }));
         let push: ClientFrame = dec(&eng.pop_outbox().expect("PushSnapshot"));
         let (tagged_up_to, tagged_shallow, blob) = match push {
             ClientFrame::PushSnapshot {
-                up_to_blob_id,
-                shallow_start_blob_id,
+                up_to_seq,
+                shallow_start_seq,
                 blob,
-            } => (up_to_blob_id, shallow_start_blob_id, blob),
+            } => (up_to_seq, shallow_start_seq, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
         // Tagged with our actual frontier, not the requested value.
@@ -1202,7 +1180,7 @@ mod tests {
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
-            up_to_blob_id: 99,
+            up_to_seq: 99,
             blob: EncryptedBlob {
                 nonce: vec![0; 24],
                 ciphertext: vec![],
@@ -1228,7 +1206,7 @@ mod tests {
         let _ = eng.pop_outbox().unwrap(); // PullOps
 
         // Server says cursor is below the floor.
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_blob_id: 42 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 42 }));
         let pull_snap: ClientFrame = dec(&eng.pop_outbox().expect("PullSnapshot"));
         assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
         // Engine is now in Bootstrapping (not idle, not pulling).
@@ -1240,26 +1218,23 @@ mod tests {
             d.add_item(LIST_MAIN, "from-snapshot").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
-            up_to_blob_id: 42,
+            up_to_seq: 42,
             blob: snapshot_blob,
         }));
 
         // Engine should have advanced its frontier and re-issued PullOps.
-        assert_eq!(eng.highest_seen_blob_id(), 42);
+        assert_eq!(eng.last_contiguous_seq(), 42);
         let mut frames: Vec<ClientFrame> = Vec::new();
         while let Some(b) = eng.pop_outbox() {
             frames.push(dec(&b));
         }
         // Order: Ack(42) (frontier advance), PullOps(since=42).
-        assert!(frames.iter().any(|f| matches!(
-            f,
-            ClientFrame::Ack {
-                last_acked_blob_id: 42
-            }
-        )));
         assert!(frames
             .iter()
-            .any(|f| matches!(f, ClientFrame::PullOps { since_blob_id: 42 })));
+            .any(|f| matches!(f, ClientFrame::Ack { last_acked_seq: 42 })));
+        assert!(frames
+            .iter()
+            .any(|f| matches!(f, ClientFrame::PullOps { since_seq: 42 })));
 
         // Bootstrapped item is in the doc.
         assert!(eng
@@ -1287,7 +1262,7 @@ mod tests {
             protocol_version: PROTOCOL_VERSION,
         }));
         let _ = eng.pop_outbox().unwrap(); // PullOps
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_blob_id: 10 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 10 }));
         let _ = eng.pop_outbox().unwrap(); // PullSnapshot
 
         // Broadcast while bootstrapping — must be ignored entirely.
@@ -1296,7 +1271,7 @@ mod tests {
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
-                blob_id: 11,
+                seq: 11,
                 blob: stray,
             }],
         }));
@@ -1307,7 +1282,7 @@ mod tests {
                 .any(|i| i.text == "should-not-appear"),
             "broadcast applied during Bootstrapping",
         );
-        assert_eq!(eng.highest_seen_blob_id(), 0, "frontier must not advance");
+        assert_eq!(eng.last_contiguous_seq(), 0, "frontier must not advance");
     }
 
     #[test]
@@ -1328,7 +1303,7 @@ mod tests {
         };
 
         // Fake server state.
-        let mut next_id: u64 = 0;
+        let mut next_seq: u64 = 0;
         let mut ops_log: Vec<StoredBlob> = Vec::new();
 
         // -- A connects, pushes its seed --
@@ -1349,16 +1324,16 @@ mod tests {
                 let assigned: Vec<u64> = ops
                     .into_iter()
                     .map(|blob| {
-                        next_id += 1;
+                        next_seq += 1;
                         ops_log.push(StoredBlob {
-                            blob_id: next_id,
+                            seq: next_seq,
                             blob,
                         });
-                        next_id
+                        next_seq
                     })
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-                    assigned_ids: assigned,
+                    assigned_seqs: assigned,
                 }));
             }
         }
@@ -1371,39 +1346,39 @@ mod tests {
                 let assigned: Vec<u64> = ops
                     .into_iter()
                     .map(|blob| {
-                        next_id += 1;
+                        next_seq += 1;
                         ops_log.push(StoredBlob {
-                            blob_id: next_id,
+                            seq: next_seq,
                             blob,
                         });
-                        next_id
+                        next_seq
                     })
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-                    assigned_ids: assigned,
+                    assigned_seqs: assigned,
                 }));
             }
         }
         let _ = drain_outbox(&mut a);
-        assert_eq!(a.highest_seen_blob_id(), next_id);
+        assert_eq!(a.last_contiguous_seq(), next_seq);
 
         // -- Server requests a snapshot from A. Single-device account,
-        //    so horizon == next_id; shallow_start equals up_to. --
+        //    so horizon == next_seq; shallow_start equals up_to. --
         a.handle_server_bytes(&enc(&ServerFrame::SnapshotRequest {
-            up_to_blob_id: next_id,
-            shallow_start_blob_id: next_id,
+            up_to_seq: next_seq,
+            shallow_start_seq: next_seq,
         }));
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushSnapshot"));
         let (snapshot_up_to, snapshot_shallow, snapshot_blob) = match push {
             ClientFrame::PushSnapshot {
-                up_to_blob_id,
-                shallow_start_blob_id,
+                up_to_seq,
+                shallow_start_seq,
                 blob,
-            } => (up_to_blob_id, shallow_start_blob_id, blob),
+            } => (up_to_seq, shallow_start_seq, blob),
             other => panic!("expected PushSnapshot, got {other:?}"),
         };
-        assert_eq!(snapshot_up_to, next_id);
-        assert_eq!(snapshot_shallow, next_id);
+        assert_eq!(snapshot_up_to, next_seq);
+        assert_eq!(snapshot_shallow, next_seq);
 
         // -- A keeps mutating after the snapshot was taken, so B's
         //    bootstrap exercises both the snapshot apply *and* the
@@ -1415,19 +1390,19 @@ mod tests {
             if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
                 let mut assigned = Vec::new();
                 for blob in ops {
-                    next_id += 1;
+                    next_seq += 1;
                     post_snap_ops.push(StoredBlob {
-                        blob_id: next_id,
+                        seq: next_seq,
                         blob: blob.clone(),
                     });
                     ops_log.push(StoredBlob {
-                        blob_id: next_id,
+                        seq: next_seq,
                         blob,
                     });
-                    assigned.push(next_id);
+                    assigned.push(next_seq);
                 }
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-                    assigned_ids: assigned,
+                    assigned_seqs: assigned,
                 }));
             }
         }
@@ -1445,18 +1420,18 @@ mod tests {
             protocol_version: PROTOCOL_VERSION,
         }));
         let pull: ClientFrame = dec(&b.pop_outbox().unwrap());
-        assert!(matches!(pull, ClientFrame::PullOps { since_blob_id: 0 }));
+        assert!(matches!(pull, ClientFrame::PullOps { since_seq: 0 }));
 
-        // Fake server: since (0) < snapshot.up_to_blob_id, reply SnapshotRequired.
+        // Fake server: since (0) < snapshot.up_to_seq, reply SnapshotRequired.
         b.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired {
-            up_to_blob_id: snapshot_up_to,
+            up_to_seq: snapshot_up_to,
         }));
         let pull_snap: ClientFrame = dec(&b.pop_outbox().expect("PullSnapshot"));
         assert!(matches!(pull_snap, ClientFrame::PullSnapshot));
 
         // Fake server: hand back the stored snapshot.
         b.handle_server_bytes(&enc(&ServerFrame::Snapshot {
-            up_to_blob_id: snapshot_up_to,
+            up_to_seq: snapshot_up_to,
             blob: snapshot_blob,
         }));
 
@@ -1464,7 +1439,7 @@ mod tests {
         let mut saw_resume_pull = false;
         while let Some(bytes) = b.pop_outbox() {
             if let Ok(frame) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
-                if matches!(frame, ClientFrame::PullOps { since_blob_id } if since_blob_id == snapshot_up_to)
+                if matches!(frame, ClientFrame::PullOps { since_seq } if since_seq == snapshot_up_to)
                 {
                     saw_resume_pull = true;
                 }
@@ -1497,7 +1472,7 @@ mod tests {
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_blob_id: 1 }));
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 1 }));
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("SnapshotRequired")));
     }
@@ -1531,11 +1506,11 @@ mod tests {
             SyncEngine::new(doc, dek.clone(), 0, opts())
         };
 
-        let mut next_id: u64 = 0;
+        let mut next_seq: u64 = 0;
         let mut ops_log: Vec<StoredBlob> = Vec::new();
 
         // Helper closure replaced with explicit flow because we can't
-        // borrow mutably across `next_id` + `ops_log` in a closure.
+        // borrow mutably across `next_seq` + `ops_log` in a closure.
 
         // -- A connects --
         a.handle_connected();
@@ -1555,16 +1530,16 @@ mod tests {
                 let assigned: Vec<u64> = ops
                     .into_iter()
                     .map(|blob| {
-                        next_id += 1;
+                        next_seq += 1;
                         ops_log.push(StoredBlob {
-                            blob_id: next_id,
+                            seq: next_seq,
                             blob,
                         });
-                        next_id
+                        next_seq
                     })
                     .collect();
                 a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-                    assigned_ids: assigned,
+                    assigned_seqs: assigned,
                 }));
             }
         }
@@ -1581,16 +1556,16 @@ mod tests {
         let assigned: Vec<u64> = push_ops
             .into_iter()
             .map(|blob| {
-                next_id += 1;
+                next_seq += 1;
                 ops_log.push(StoredBlob {
-                    blob_id: next_id,
+                    seq: next_seq,
                     blob,
                 });
-                next_id
+                next_seq
             })
             .collect();
         a.handle_server_bytes(&enc(&ServerFrame::OpsAck {
-            assigned_ids: assigned,
+            assigned_seqs: assigned,
         }));
         let _ = drain_outbox(&mut a);
 

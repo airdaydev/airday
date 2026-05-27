@@ -110,7 +110,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         email: email.clone(),
         server_url: args.server,
         device_id: resp.device_id,
-        last_acked_blob_id: 0,
+        last_acked_seq: 0,
         last_sync_at: None,
     })?;
     profile.write_secrets(&Secrets {

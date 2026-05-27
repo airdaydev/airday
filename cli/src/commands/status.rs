@@ -20,7 +20,7 @@ struct StatusJson<'a> {
     server_url: &'a str,
     device_id: &'a str,
     last_sync_at: Option<i64>,
-    last_acked_blob_id: u64,
+    last_acked_seq: u64,
     pending_changes: bool,
 }
 
@@ -38,7 +38,7 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
             server_url: &device.server_url,
             device_id: &device.device_id,
             last_sync_at: device.last_sync_at,
-            last_acked_blob_id: device.last_acked_blob_id,
+            last_acked_seq: device.last_acked_seq,
             pending_changes: pending,
         })?;
     } else {
@@ -52,7 +52,7 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
                 .map(format_relative_millis)
                 .unwrap_or_else(|| "never".into())
         );
-        println!("Last acked blob id: {}", device.last_acked_blob_id);
+        println!("Last acked seq: {}", device.last_acked_seq);
         println!("Pending changes: {}", if pending { "yes" } else { "no" });
     }
     Ok(())

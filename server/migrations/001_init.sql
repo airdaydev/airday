@@ -31,27 +31,36 @@ CREATE TABLE devices (
   account_id          BLOB NOT NULL REFERENCES accounts(id),
   name                TEXT NOT NULL,
   auth_token_hash     BLOB NOT NULL,                           -- SHA-256(device_token bytes)
-  last_acked_blob_id  INTEGER NOT NULL DEFAULT 0,
+  last_acked_seq      INTEGER NOT NULL DEFAULT 0,              -- per-account contiguous-prefix frontier
   last_seen_at        INTEGER NOT NULL,
   created_at          INTEGER NOT NULL
 );
 CREATE INDEX devices_account_id_idx ON devices (account_id);
 CREATE INDEX devices_token_hash_idx ON devices (auth_token_hash);
 
+-- Per-account monotonic counter. Bumped inside the same transaction
+-- that inserts ops so seqs are dense, contiguous, and gap-free for any
+-- single account — clients spot real holes (replica lag, dropped frames)
+-- instead of confusing them with "another account got that id".
+CREATE TABLE account_sequences (
+  account_id   BLOB PRIMARY KEY REFERENCES accounts(id),
+  next_seq     INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE ops (
-  blob_id         INTEGER PRIMARY KEY AUTOINCREMENT,           -- monotonic per-server
   account_id      BLOB NOT NULL REFERENCES accounts(id),
+  seq             INTEGER NOT NULL,                            -- per-account monotonic, gap-free
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
-  created_at      INTEGER NOT NULL
+  created_at      INTEGER NOT NULL,
+  PRIMARY KEY (account_id, seq)
 );
-CREATE INDEX ops_account_id_idx ON ops (account_id, blob_id);
 
 CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
-  up_to_blob_id         INTEGER NOT NULL,                        -- encoded state frontier
-  shallow_start_blob_id INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
+  up_to_seq             INTEGER NOT NULL,                        -- encoded state frontier (per-account)
+  shallow_start_seq     INTEGER NOT NULL,                        -- retained-history boundary = compaction floor
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL

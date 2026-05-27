@@ -50,9 +50,9 @@ function ConnectionStatusPopover(props: {
     props.app.version();
     return props.app.engine.hasPendingOps();
   };
-  const blobIdLabel = (): string => {
+  const seqLabel = (): string => {
     props.app.version();
-    return String(props.app.engine.highestSeenBlobId());
+    return String(props.app.engine.lastContiguousSeq());
   };
   const fingerprintHex = (): string => {
     props.app.version();
@@ -117,7 +117,7 @@ function ConnectionStatusPopover(props: {
           <Show when={sinceLabel()}>
             {(label) => <div class="status-line status-muted">{label()}</div>}
           </Show>
-          <div class="status-line status-muted">{m().nav.blobLabel(blobIdLabel())}</div>
+          <div class="status-line status-muted">{m().nav.seqLabel(seqLabel())}</div>
           <div class="status-fingerprint status-muted status-mono">
             {fingerprintHex()}
           </div>

@@ -53,16 +53,16 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     let account_id = Uuid::parse_str(&signup.account_id).unwrap();
     let batch = wait_for_ops(&server, account_id, 1).await;
     assert_eq!(batch.ops.len(), 1, "only the add-item mutation should push");
-    let highest_assigned = batch.ops.iter().map(|o| o.blob_id).max().unwrap();
+    let highest_assigned = batch.ops.iter().map(|o| o.seq).max().unwrap();
 
     // Device's frontier should have advanced to the highest assigned id.
     let device_uuid = Uuid::parse_str(&signup.device_id).unwrap();
-    let acked = queries::get_last_acked_blob_id(&server.state.db, device_uuid)
+    let acked = queries::get_last_acked_seq(&server.state.db, device_uuid)
         .await
         .unwrap();
     assert_eq!(acked, highest_assigned);
 
-    // Re-open. last_acked_blob_id is persisted, so the pull is empty,
+    // Re-open. last_acked_seq is persisted, so the pull is empty,
     // and `pending_export` should be `None`.
     let profile2 = reopen_profile(tmp.path());
     let session2 = Session::open_with_profile(profile2, true).await.unwrap();
@@ -94,7 +94,7 @@ async fn default_open_skips_connect() {
             email: "offline@example.com".into(),
             server_url: "http://127.0.0.1:1".into(), // guaranteed unreachable
             device_id: Uuid::now_v7().to_string(),
-            last_acked_blob_id: 0,
+            last_acked_seq: 0,
             last_sync_at: None,
         })
         .unwrap();
@@ -165,7 +165,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
             email: "smoke-test@example.com".into(),
             server_url: server.base.clone(),
             device_id: device_b.device_id.clone(),
-            last_acked_blob_id: 0,
+            last_acked_seq: 0,
             last_sync_at: None,
         })
         .unwrap();

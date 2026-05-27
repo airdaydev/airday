@@ -113,13 +113,13 @@ The data plane is **region-pinned, not server-pinned**. Any app server in the re
 
 The sync system's durable properties come from Postgres, not the pub/sub layer:
 
-- Postgres assigns / stores the monotonic blob ids
+- Postgres assigns / stores the per-account monotonic `seq`
 - Postgres is the replay source for reconnect / catch-up
 - Postgres owns the durable account state
 
-Inter-server fanout is an in-region acceleration layer only. A thin NATS deployment is acceptable for this, but it is not part of the durable sync model. Missed fanout messages must be harmless because clients can always resume from Postgres via `since_blob_id`.
+Inter-server fanout is an in-region acceleration layer only. A thin NATS deployment is acceptable for this, but it is not part of the durable sync model. Missed fanout messages must be harmless because clients can always resume from Postgres via `since_seq`. Per-account gap-free `seq` makes that resume robust to read-replica lag: a client that observes `[1, 2, 4]` knows to wait for `3` rather than acking `4` and stranding `3`.
 
-NATS JetStream is unnecessary for the base design. Regional sync already has durability, ordering, and replay from Postgres + monotonic blob ids; a durable broker would duplicate responsibilities and complicate retention/ordering semantics.
+NATS JetStream is unnecessary for the base design. Regional sync already has durability, ordering, and replay from Postgres + per-account `seq`; a durable broker would duplicate responsibilities and complicate retention/ordering semantics.
 
 Multi-region replication of the hot path is out of scope for the initial SaaS architecture. The system is single-region per account, with explicit migration between regions if needed later.
 

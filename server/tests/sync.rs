@@ -249,29 +249,17 @@ async fn ack_does_not_move_backwards() {
     .await;
     let resp: ServerFrame = recv_msgpack(&mut ws).await;
     let id = match resp {
-        ServerFrame::OpsAck { assigned_ids } => assigned_ids[0],
+        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs[0],
         other => panic!("expected OpsAck, got {other:?}"),
     };
 
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::Ack {
-            last_acked_blob_id: id,
-        },
-    )
-    .await;
+    send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_seq: id }).await;
     wait_for_acked(&acc, id).await;
     // Stale ack from a slow client mustn't drag the frontier down.
-    send_msgpack(
-        &mut ws,
-        &ClientFrame::Ack {
-            last_acked_blob_id: 0,
-        },
-    )
-    .await;
+    send_msgpack(&mut ws, &ClientFrame::Ack { last_acked_seq: 0 }).await;
     // Give the server time to *not* apply it.
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    let stored = queries::get_last_acked_blob_id(&acc.server.state.db, acc.device_id)
+    let stored = queries::get_last_acked_seq(&acc.server.state.db, acc.device_id)
         .await
         .unwrap();
     assert_eq!(stored, id);
@@ -328,22 +316,22 @@ async fn push_on_a_broadcasts_to_b_not_a() {
     // A receives its own OpsAck; A must NOT receive a broadcast for
     // its own push. Asserting absence requires a small wait —
     // anything pending arrives well within 200ms on localhost.
-    let assigned_ids = match recv_msgpack::<ServerFrame>(&mut ws_a).await {
-        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
+    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut ws_a).await {
+        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
         other => panic!("expected OpsAck on A, got {other:?}"),
     };
-    assert_eq!(assigned_ids.len(), 2);
+    assert_eq!(assigned_seqs.len(), 2);
 
     // B receives the broadcast with the same ids/blobs.
     let broadcast = match recv_msgpack::<ServerFrame>(&mut ws_b).await {
         ServerFrame::OpsBroadcast { ops } => ops,
         other => panic!("expected OpsBroadcast on B, got {other:?}"),
     };
-    let want: Vec<StoredBlob> = assigned_ids
+    let want: Vec<StoredBlob> = assigned_seqs
         .iter()
         .copied()
         .zip(blobs)
-        .map(|(id, blob)| StoredBlob { blob_id: id, blob })
+        .map(|(seq, blob)| StoredBlob { seq, blob })
         .collect();
     assert_eq!(broadcast, want);
 
@@ -370,21 +358,21 @@ async fn push_on_one_tab_broadcasts_to_other_tab_same_device() {
     send_msgpack(&mut tab_a, &ClientFrame::PushOps { ops: blobs.clone() }).await;
 
     // Tab A — its own ack, no broadcast echo.
-    let assigned_ids = match recv_msgpack::<ServerFrame>(&mut tab_a).await {
-        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
+    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut tab_a).await {
+        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
         other => panic!("expected OpsAck on A, got {other:?}"),
     };
-    assert_eq!(assigned_ids.len(), 1);
+    assert_eq!(assigned_seqs.len(), 1);
 
     // Tab B — receives the broadcast even though it shares device_id.
     let broadcast = match recv_msgpack::<ServerFrame>(&mut tab_b).await {
         ServerFrame::OpsBroadcast { ops } => ops,
         other => panic!("expected OpsBroadcast on B, got {other:?}"),
     };
-    let want: Vec<StoredBlob> = assigned_ids
+    let want: Vec<StoredBlob> = assigned_seqs
         .into_iter()
         .zip(blobs)
-        .map(|(id, blob)| StoredBlob { blob_id: id, blob })
+        .map(|(seq, blob)| StoredBlob { seq, blob })
         .collect();
     assert_eq!(broadcast, want);
 }
@@ -421,7 +409,7 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
 
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_blob_id: 50 }).await;
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_seq: 50 }).await;
     let pulled = expect_complete_batch(&mut ws).await;
     assert!(pulled.is_empty());
 }
@@ -436,15 +424,15 @@ async fn no_snapshot_request_below_threshold() {
 
     let blobs: Vec<EncryptedBlob> = (0..3).map(fake_blob).collect();
     send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
-    let assigned_ids = match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::OpsAck { assigned_ids } => assigned_ids,
+    let assigned_seqs = match recv_msgpack::<ServerFrame>(&mut ws).await {
+        ServerFrame::OpsAck { assigned_seqs } => assigned_seqs,
         other => panic!("expected OpsAck, got {other:?}"),
     };
-    let last_id = *assigned_ids.last().unwrap();
+    let last_id = *assigned_seqs.last().unwrap();
     send_msgpack(
         &mut ws,
         &ClientFrame::Ack {
-            last_acked_blob_id: last_id,
+            last_acked_seq: last_id,
         },
     )
     .await;
@@ -462,24 +450,24 @@ async fn push_path_triggers_snapshot_request_and_persists() {
 
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
     send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
-    let (up_to_blob_id, shallow_start_blob_id) = expect_snapshot_request(&mut ws).await;
-    assert_eq!(up_to_blob_id, 5);
+    let (up_to_seq, shallow_start_seq) = expect_snapshot_request(&mut ws).await;
+    assert_eq!(up_to_seq, 5);
     // Single device, just pushed-and-acked: horizon = 5 = up_to.
-    assert_eq!(shallow_start_blob_id, 5);
+    assert_eq!(shallow_start_seq, 5);
 
     let snapshot_blob = fake_blob(0xCC);
     send_msgpack(
         &mut ws,
         &ClientFrame::PushSnapshot {
-            up_to_blob_id,
-            shallow_start_blob_id,
+            up_to_seq,
+            shallow_start_seq,
             blob: snapshot_blob.clone(),
         },
     )
     .await;
-    let snap = wait_for_snapshot(&acc, up_to_blob_id).await;
+    let snap = wait_for_snapshot(&acc, up_to_seq).await;
     assert_eq!(snap.blob, snapshot_blob);
-    assert_eq!(snap.shallow_start_blob_id, shallow_start_blob_id);
+    assert_eq!(snap.shallow_start_seq, shallow_start_seq);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -490,22 +478,22 @@ async fn ack_path_triggers_snapshot_request() {
     // evaluate and emit a SnapshotRequest.
     let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    let assigned_ids = queries::insert_ops(&acc.server.state.db, acc.account_id, blobs)
+    let assigned_seqs = queries::insert_ops(&acc.server.state.db, acc.account_id, blobs)
         .await
         .unwrap();
-    let last_id = *assigned_ids.last().unwrap();
+    let last_id = *assigned_seqs.last().unwrap();
 
     let mut ws = connect_ws(&acc.server, &acc.device_token).await;
     handshake(&mut ws).await;
     send_msgpack(
         &mut ws,
         &ClientFrame::Ack {
-            last_acked_blob_id: last_id,
+            last_acked_seq: last_id,
         },
     )
     .await;
-    let (up_to_blob_id, _shallow_start_blob_id) = expect_snapshot_request(&mut ws).await;
-    assert_eq!(up_to_blob_id, last_id);
+    let (up_to_seq, _shallow_start_seq) = expect_snapshot_request(&mut ws).await;
+    assert_eq!(up_to_seq, last_id);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -521,11 +509,11 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     handshake(&mut ws_a).await;
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
     send_msgpack(&mut ws_a, &ClientFrame::PushOps { ops: blobs }).await;
-    let (up_to_blob_id, shallow_start_blob_id) = expect_snapshot_request(&mut ws_a).await;
-    assert_eq!(up_to_blob_id, 5);
+    let (up_to_seq, shallow_start_seq) = expect_snapshot_request(&mut ws_a).await;
+    assert_eq!(up_to_seq, 5);
     // B has never acked, so horizon == 0 — first snapshot has no
     // compaction floor, just bootstrap state.
-    assert_eq!(shallow_start_blob_id, 0);
+    assert_eq!(shallow_start_seq, 0);
 
     // A acks (a real client would, off the back of OpsAck) so its DB
     // row advances. Otherwise B's later ack eval still sees horizon=0.
@@ -533,7 +521,7 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     send_msgpack(
         &mut ws_a,
         &ClientFrame::Ack {
-            last_acked_blob_id: up_to_blob_id,
+            last_acked_seq: up_to_seq,
         },
     )
     .await;
@@ -548,12 +536,12 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     send_msgpack(
         &mut ws_b,
         &ClientFrame::Ack {
-            last_acked_blob_id: up_to_blob_id,
+            last_acked_seq: up_to_seq,
         },
     )
     .await;
     let (b_up_to, b_shallow) = expect_snapshot_request(&mut ws_b).await;
-    assert_eq!(b_up_to, up_to_blob_id);
+    assert_eq!(b_up_to, up_to_seq);
     // Both devices now caught up → horizon advances to 5; B's lease's
     // shallow_start tracks horizon.
     assert_eq!(b_shallow, 5);
@@ -563,8 +551,8 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     send_msgpack(
         &mut ws_a,
         &ClientFrame::PushSnapshot {
-            up_to_blob_id,
-            shallow_start_blob_id,
+            up_to_seq,
+            shallow_start_seq,
             blob: fake_blob(0xAA),
         },
     )
@@ -607,7 +595,7 @@ async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
     let batch = queries::fetch_ops_batch(db, acc.account_id, 0)
         .await
         .unwrap();
-    let surviving_ids: Vec<u64> = batch.ops.iter().map(|o| o.blob_id).collect();
+    let surviving_ids: Vec<u64> = batch.ops.iter().map(|o| o.seq).collect();
     assert_eq!(surviving_ids, vec![7, 8, 9, 10]);
 
     // Idempotent — second run finds no new floor movement.
@@ -636,9 +624,9 @@ async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
     let fresh_device = register_second_device(&acc, "device-fresh").await;
     let mut ws = connect_ws(&acc.server, &fresh_device.device_token).await;
     handshake(&mut ws).await;
-    send_msgpack(&mut ws, &ClientFrame::PullOps { since_blob_id: 0 }).await;
+    send_msgpack(&mut ws, &ClientFrame::PullOps { since_seq: 0 }).await;
     match recv_msgpack::<ServerFrame>(&mut ws).await {
-        ServerFrame::SnapshotRequired { up_to_blob_id } => assert_eq!(up_to_blob_id, 10),
+        ServerFrame::SnapshotRequired { up_to_seq } => assert_eq!(up_to_seq, 10),
         other => panic!("expected SnapshotRequired, got {other:?}"),
     }
 }
@@ -674,19 +662,19 @@ async fn push_snapshot_opportunistically_compacts_ops_below_floor() {
 
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
     send_msgpack(&mut ws, &ClientFrame::PushOps { ops: blobs }).await;
-    let (up_to_blob_id, shallow_start_blob_id) = expect_snapshot_request(&mut ws).await;
-    assert_eq!(shallow_start_blob_id, 5);
+    let (up_to_seq, shallow_start_seq) = expect_snapshot_request(&mut ws).await;
+    assert_eq!(shallow_start_seq, 5);
 
     send_msgpack(
         &mut ws,
         &ClientFrame::PushSnapshot {
-            up_to_blob_id,
-            shallow_start_blob_id,
+            up_to_seq,
+            shallow_start_seq,
             blob: fake_blob(0xCC),
         },
     )
     .await;
-    wait_for_snapshot(&acc, up_to_blob_id).await;
+    wait_for_snapshot(&acc, up_to_seq).await;
 
     // Compaction is spawned, not awaited inline — poll until the ops
     // disappear (or the deadline trips).
@@ -718,9 +706,9 @@ async fn expect_snapshot_request(ws: &mut WsStream) -> (u64, u64) {
         };
         match frame {
             ServerFrame::SnapshotRequest {
-                up_to_blob_id,
-                shallow_start_blob_id,
-            } => return (up_to_blob_id, shallow_start_blob_id),
+                up_to_seq,
+                shallow_start_seq,
+            } => return (up_to_seq, shallow_start_seq),
             ServerFrame::OpsAck { .. } | ServerFrame::OpsBroadcast { .. } => continue,
             other => panic!("unexpected frame while waiting for SnapshotRequest: {other:?}"),
         }
@@ -737,11 +725,11 @@ async fn assert_no_snapshot_request(ws: &mut WsStream, window: std::time::Durati
         match tokio::time::timeout(remaining, recv_msgpack::<ServerFrame>(ws)).await {
             Ok(ServerFrame::OpsAck { .. }) | Ok(ServerFrame::OpsBroadcast { .. }) => continue,
             Ok(ServerFrame::SnapshotRequest {
-                up_to_blob_id,
-                shallow_start_blob_id,
+                up_to_seq,
+                shallow_start_seq,
             }) => {
                 panic!(
-                    "unexpected SnapshotRequest up_to_blob_id={up_to_blob_id} shallow_start_blob_id={shallow_start_blob_id}"
+                    "unexpected SnapshotRequest up_to_seq={up_to_seq} shallow_start_seq={shallow_start_seq}"
                 );
             }
             Ok(other) => panic!("unexpected frame: {other:?}"),
@@ -757,7 +745,7 @@ async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot
             .await
             .unwrap()
         {
-            if snap.up_to_blob_id == up_to {
+            if snap.up_to_seq == up_to {
                 return snap;
             }
         }
@@ -800,13 +788,13 @@ async fn wait_for_subscribers(acc: &Account, target: usize) {
     }
 }
 
-/// Poll until the device row's `last_acked_blob_id` reaches the target,
+/// Poll until the device row's `last_acked_seq` reaches the target,
 /// then return whatever the row holds. Avoids racing the WS task's
 /// commit point.
 async fn wait_for_acked(acc: &Account, target: u64) -> u64 {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        let stored = queries::get_last_acked_blob_id(&acc.server.state.db, acc.device_id)
+        let stored = queries::get_last_acked_seq(&acc.server.state.db, acc.device_id)
             .await
             .unwrap();
         if stored >= target {

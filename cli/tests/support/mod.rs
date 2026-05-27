@@ -415,7 +415,7 @@ pub fn materialize_profile(
             email: email.into(),
             server_url: server_url.into(),
             device_id: device_id.into(),
-            last_acked_blob_id: 0,
+            last_acked_seq: 0,
             last_sync_at: None,
         })
         .unwrap();

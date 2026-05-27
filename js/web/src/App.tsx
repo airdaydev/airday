@@ -318,7 +318,7 @@ function BootGate(props: {
       }
       props.setBoot({
         doc,
-        lastAcked: BigInt(device?.lastAckedBlobId ?? 0),
+        lastAcked: BigInt(device?.lastAckedSeq ?? 0),
         wal,
         prefs: await prefsPromise,
       });
@@ -456,7 +456,7 @@ function MainApp(props: {
       // load-bearing piece of "which server am I talking to".
       serverUrl: window.location.origin,
       deviceId: props.session.deviceId!,
-      lastAckedBlobId: Number(engine.highestSeenBlobId()),
+      lastAckedSeq: Number(engine.lastContiguousSeq()),
       lastSyncAt: Date.now(),
     });
   };
@@ -513,7 +513,7 @@ function MainApp(props: {
 
   // ---------- Device config: light writes on each frontier change ----------
   //
-  // `lastAckedBlobId` advances independently of mutations. Persist it on
+  // `lastAckedSeq` advances independently of mutations. Persist it on
   // a coarse debounce so reload picks up the right resume point even
   // if no snapshot lands in between.
   let deviceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -528,7 +528,7 @@ function MainApp(props: {
           email: props.session.email!,
           serverUrl: window.location.origin,
           deviceId: props.session.deviceId!,
-          lastAckedBlobId: Number(engine.highestSeenBlobId()),
+          lastAckedSeq: Number(engine.lastContiguousSeq()),
           lastSyncAt: Date.now(),
         })
         .catch((e) => {

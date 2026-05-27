@@ -36,12 +36,12 @@ pub enum Decision {
     Issue {
         lease_id: u64,
         /// State frontier the snapshot will be encoded at (= producer's
-        /// `last_acked_blob_id`, = `server_last_blob_id` since producer
+        /// `last_acked_seq`, = `server_last_seq` since producer
         /// must be caught up).
-        up_to_blob_id: u64,
+        up_to_seq: u64,
         /// Retained-history boundary (= horizon). Doubles as the
         /// compaction floor once the snapshot lands.
-        shallow_start_blob_id: u64,
+        shallow_start_seq: u64,
     },
     Skip,
 }
@@ -70,40 +70,39 @@ impl SnapshotCoordinator {
     }
     /// Trigger (see `spec/sync-protocol.md` §"Snapshot orchestration"):
     ///
-    /// 1. `server_last_blob_id − latest snapshot's up_to_blob_id > threshold`
+    /// 1. `server_last_seq − latest snapshot's up_to_seq > threshold`
     ///    — enough new content for a new snapshot to materially cut
     ///    bootstrap cost (smaller `PullOps` catch-up after import).
     /// 2. The triggering device is caught up
-    ///    (`device_last_acked_blob_id == server_last_blob_id`) — that
-    ///    value is what we hand back as `up_to_blob_id`. Lagging
+    ///    (`device_last_acked_seq == server_last_seq`) — that
+    ///    value is what we hand back as `up_to_seq`. Lagging
     ///    connections are skipped as producers (still contribute to
     ///    horizon).
     ///
     /// Horizon is **not** a trigger condition — a new snapshot at an
-    /// unchanged `shallow_start_blob_id` still pays off for bootstrap
+    /// unchanged `shallow_start_seq` still pays off for bootstrap
     /// even when no further compaction is possible.
     ///
-    /// `shallow_start_blob_id = max(horizon, prev_snap_shallow)`. The
+    /// `shallow_start_seq = max(horizon, prev_snap_shallow)`. The
     /// `max` enforces monotonicity: if a new device's join drops
     /// horizon below the existing floor, we can't undo prior
     /// compaction, so the floor stays put.
     pub fn evaluate(
         &self,
         account: Uuid,
-        server_snapshot_up_to_blob_id: u64, // latest snapshot's state frontier
-        server_snapshot_shallow_blob_id: u64, // latest snapshot's shallow start
-        server_last_blob_id: u64,           // latest blob id on server
-        horizon_blob_id: u64,               // min(last_acked) across devices
-        device_last_acked_blob_id: u64,     // triggering device's frontier
+        server_snapshot_up_to_seq: u64, // latest snapshot's state frontier
+        server_snapshot_shallow_seq: u64, // latest snapshot's shallow start
+        server_last_seq: u64,           // latest seq on server for this account
+        horizon_seq: u64,               // min(last_acked) across devices
+        device_last_acked_seq: u64,     // triggering device's frontier
         now: Instant,
     ) -> Decision {
         // Not enough new content to bother.
-        if server_last_blob_id.saturating_sub(server_snapshot_up_to_blob_id) < self.threshold_blobs
-        {
+        if server_last_seq.saturating_sub(server_snapshot_up_to_seq) < self.threshold_blobs {
             return Decision::Skip;
         }
         // Triggering device isn't caught up — can't be producer.
-        if device_last_acked_blob_id != server_last_blob_id {
+        if device_last_acked_seq != server_last_seq {
             return Decision::Skip;
         }
         let mut leases = self
@@ -123,8 +122,8 @@ impl SnapshotCoordinator {
         });
         Decision::Issue {
             lease_id,
-            up_to_blob_id: device_last_acked_blob_id,
-            shallow_start_blob_id: horizon_blob_id.max(server_snapshot_shallow_blob_id),
+            up_to_seq: device_last_acked_seq,
+            shallow_start_seq: horizon_seq.max(server_snapshot_shallow_seq),
         }
     }
     pub fn release(&self, account: Uuid, incoming_lease_id: u64) -> ReleaseResult {
@@ -176,8 +175,8 @@ mod tests {
         assert!(matches!(
             decision,
             Decision::Issue {
-                up_to_blob_id: 12_000,
-                shallow_start_blob_id: 12_000,
+                up_to_seq: 12_000,
+                shallow_start_seq: 12_000,
                 ..
             }
         ));
@@ -197,8 +196,8 @@ mod tests {
         assert!(matches!(
             decision_2,
             Decision::Issue {
-                up_to_blob_id: 22_000,
-                shallow_start_blob_id: 22_000,
+                up_to_seq: 22_000,
+                shallow_start_seq: 22_000,
                 ..
             }
         ));
@@ -216,7 +215,7 @@ mod tests {
         assert!(matches!(
             decision,
             Decision::Issue {
-                up_to_blob_id: 12_000,
+                up_to_seq: 12_000,
                 ..
             }
         ));
@@ -235,8 +234,8 @@ mod tests {
         assert!(matches!(
             decision,
             Decision::Issue {
-                up_to_blob_id: 22_000,
-                shallow_start_blob_id: 10_000,
+                up_to_seq: 22_000,
+                shallow_start_seq: 10_000,
                 ..
             }
         ));
@@ -256,8 +255,8 @@ mod tests {
         assert!(matches!(
             decision,
             Decision::Issue {
-                up_to_blob_id: 22_000,
-                shallow_start_blob_id: 10_000,
+                up_to_seq: 22_000,
+                shallow_start_seq: 10_000,
                 ..
             }
         ));
@@ -275,8 +274,8 @@ mod tests {
         assert!(matches!(
             decision,
             Decision::Issue {
-                up_to_blob_id: 22_000,
-                shallow_start_blob_id: 15_000,
+                up_to_seq: 22_000,
+                shallow_start_seq: 15_000,
                 ..
             }
         ));

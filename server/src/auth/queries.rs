@@ -104,7 +104,7 @@ pub async fn create_account(db: &Db, new: NewAccount) -> anyhow::Result<CreatedA
                 ],
             )?;
             tx.execute(
-                "INSERT INTO devices (id, account_id, name, auth_token_hash, last_acked_blob_id, last_seen_at, created_at)
+                "INSERT INTO devices (id, account_id, name, auth_token_hash, last_acked_seq, last_seen_at, created_at)
                  VALUES (?, ?, ?, ?, 0, ?, ?)",
                 params![
                     dev_bytes,
@@ -216,7 +216,7 @@ pub async fn create_device(
     let now = now_millis();
     db.call(move |c| {
         c.execute(
-            "INSERT INTO devices (id, account_id, name, auth_token_hash, last_acked_blob_id, last_seen_at, created_at)
+            "INSERT INTO devices (id, account_id, name, auth_token_hash, last_acked_seq, last_seen_at, created_at)
              VALUES (?, ?, ?, ?, 0, ?, ?)",
             params![id_bytes, acc_bytes, name, token_hash, now, now],
         )

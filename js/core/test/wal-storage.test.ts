@@ -350,7 +350,7 @@ describe("clear()", () => {
       email: "x@y",
       serverUrl: "http://x",
       deviceId: "d",
-      lastAckedBlobId: 7,
+      lastAckedSeq: 7,
       lastSyncAt: 0,
     });
 

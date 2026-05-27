@@ -29,7 +29,7 @@ describe("SyncEngine construction", () => {
     const eng = newEngine();
     expect(eng.isOnline()).toBe(false);
     expect(eng.isIdle()).toBe(false);
-    expect(eng.highestSeenBlobId()).toBe(0n);
+    expect(eng.lastContiguousSeq()).toBe(0n);
   });
 });
 
@@ -50,7 +50,7 @@ describe("transport callbacks", () => {
     expect(evt).toBeDefined();
     expect(evt!.kind).toBe("connStateChanged");
     expect(evt!.online).toBe(true);
-    expect(evt!.blobId).toBeUndefined();
+    expect(evt!.seq).toBeUndefined();
     expect(evt!.message).toBeUndefined();
     expect(eng.popEvent()).toBeUndefined();
   });

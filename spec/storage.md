@@ -28,30 +28,37 @@ CREATE TABLE recovery_sessions (
 CREATE INDEX recovery_sessions_account_id_idx ON recovery_sessions (account_id);
 
 CREATE TABLE devices (
-  id                  BLOB PRIMARY KEY,                    -- uuid v7
-  account_id          BLOB NOT NULL REFERENCES accounts(id),
-  name                TEXT NOT NULL,
-  auth_token_hash     TEXT NOT NULL,
-  last_acked_blob_id  INTEGER NOT NULL DEFAULT 0,
-  last_seen_at        INTEGER NOT NULL,
-  created_at          INTEGER NOT NULL
+  id              BLOB PRIMARY KEY,                        -- uuid v7
+  account_id      BLOB NOT NULL REFERENCES accounts(id),
+  name            TEXT NOT NULL,
+  auth_token_hash TEXT NOT NULL,
+  last_acked_seq  INTEGER NOT NULL DEFAULT 0,              -- per-account contiguous-prefix frontier
+  last_seen_at    INTEGER NOT NULL,
+  created_at      INTEGER NOT NULL
 );
 CREATE INDEX devices_account_id_idx ON devices (account_id);
 
+-- Per-account monotonic counter. UPDATEd in the same tx as the op
+-- insert so seqs are dense and gap-free for any single account.
+CREATE TABLE account_sequences (
+  account_id   BLOB PRIMARY KEY REFERENCES accounts(id),
+  next_seq     INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE ops (
-  blob_id         INTEGER PRIMARY KEY AUTOINCREMENT,       -- monotonic per-server
   account_id      BLOB NOT NULL REFERENCES accounts(id),
+  seq             INTEGER NOT NULL,                        -- per-account monotonic, gap-free
   payload         BLOB NOT NULL,
   payload_nonce   BLOB NOT NULL,
-  created_at      INTEGER NOT NULL
+  created_at      INTEGER NOT NULL,
+  PRIMARY KEY (account_id, seq)
 );
-CREATE INDEX ops_account_id_idx ON ops (account_id, blob_id);
 
 CREATE TABLE snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id            BLOB NOT NULL REFERENCES accounts(id),
-  up_to_blob_id         INTEGER NOT NULL,    -- snapshot's encoded state frontier
-  shallow_start_blob_id INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
+  up_to_seq             INTEGER NOT NULL,    -- snapshot's encoded state frontier (per-account)
+  shallow_start_seq     INTEGER NOT NULL,    -- retained-history start; doubles as compaction floor (= max(horizon, prev snapshot's shallow_start) at snapshot time)
   payload               BLOB NOT NULL,
   payload_nonce         BLOB NOT NULL,
   created_at            INTEGER NOT NULL
@@ -59,15 +66,17 @@ CREATE TABLE snapshots (
 CREATE INDEX snapshots_account_id_idx ON snapshots (account_id, id DESC);
 ```
 
-Note: `ops.blob_id` is global-monotonic, not per-account. Per-account ordering is `(account_id, blob_id)`. This keeps ack math simple.
+`ops.seq` is per-account, dense, and gap-free. Hole detection on the client is meaningful: a missing seq is a real loss (replica lag, dropped frame, server bug), not "another account got that id". The composite `(account_id, seq)` PK doubles as the per-account ordering index — no separate index needed.
+
+The `account_sequences` row for an account is created on first `insert_ops` via `INSERT … ON CONFLICT DO UPDATE`, so signup doesn't need a separate seed step. Reads (`SELECT seq … ORDER BY seq`) never touch the counter; only writers contend on the per-account row.
 
 ## Compaction
 
 After a snapshot lands, a background job may:
-1. Delete `ops` rows where `account_id = X AND blob_id ≤ snapshot.shallow_start_blob_id`. (`shallow_start_blob_id` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
+1. Delete `ops` rows where `account_id = X AND seq ≤ snapshot.shallow_start_seq`. (`shallow_start_seq` is set to `max(horizon, prev snapshot's shallow_start)` at snapshot creation time by the orchestrator — see `sync-protocol.md` §"Snapshot orchestration" — so it's safe by construction.)
 2. Keep at most M=2 snapshots per account; delete older.
 
-Run on a timer, not synchronous with snapshot upload.
+Run on a timer, not synchronous with snapshot upload. The `account_sequences.next_seq` counter is **not** rewound by compaction — `next_seq` keeps climbing even when the rows below the snapshot floor are pruned.
 
 ## Sqlite settings
 
@@ -79,7 +88,6 @@ Run on a timer, not synchronous with snapshot upload.
 ## Migrations
 
 - `001_init.sql` creates the current schema for fresh servers.
-- `002_blob_id_rename.sql` is a forward-only live migration from the legacy `*_op_id` / `ops.id` naming to `*_blob_id` / `ops.blob_id`.
 
 ## Open questions
 

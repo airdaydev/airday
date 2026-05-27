@@ -1,7 +1,7 @@
 //! Per-account on-disk state.
 //!
 //! `device.json` carries the public-ish state (account id, server URL,
-//! device id, last_acked_blob_id). `secrets.json` holds the device token
+//! device id, last_acked_seq). `secrets.json` holds the device token
 //! and DEK in cleartext. When keychain-backed storage lands,
 //! `secrets.json` becomes a fallback for non-keychain hosts.
 
@@ -35,10 +35,10 @@ pub struct DeviceConfig {
     pub email: String,
     pub server_url: String,
     pub device_id: String,
-    /// Sync engine's frontier; bumped after every applied op. 0 until
-    /// the sync layer ships.
-    #[serde(default, alias = "last_acked_op_id")]
-    pub last_acked_blob_id: u64,
+    /// Sync engine's contiguous-prefix frontier; bumped after every
+    /// applied op.
+    #[serde(default)]
+    pub last_acked_seq: u64,
     /// Unix millis of the last successful online flush. `None` means
     /// no online flush has ever completed for this device.
     #[serde(default)]
