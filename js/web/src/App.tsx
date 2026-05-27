@@ -456,11 +456,20 @@ function MainApp(props: {
       // load-bearing piece of "which server am I talking to".
       serverUrl: window.location.origin,
       deviceId: props.session.deviceId!,
-      lastAckedSeq: Number(engine.lastContiguousSeq()),
+      // Persist the *durable* frontier — what the server has been
+      // (or will be) told via `Ack`, and what the local WAL actually
+      // covers. The in-memory `lastContiguousSeq` may run ahead and
+      // would resume the next session from a seq the local doc can't
+      // reproduce after a crash mid-WAL-write.
+      lastAckedSeq: Number(engine.lastDurableSeq()),
       lastSyncAt: Date.now(),
     });
   };
 
+  // Anonymous sessions are local-only by definition — no account on
+  // the server to authenticate to. Skip the WebSocket pump entirely;
+  // local mutations still flow through the engine for WAL persist.
+  let bridge: SyncBridge | null = null;
   const walBridge: WalBridge | null = wal
     ? new WalBridge({
         engine,
@@ -469,13 +478,14 @@ function MainApp(props: {
           ? new Uint8Array(0)
           : engine.oplogVvBytes(),
         afterSnapshot: persistDevice,
+        // Once the WAL row is durable the engine has queued the
+        // corresponding `Ack` frame — pump so it leaves the socket
+        // without waiting for the next inbound frame to incidentally
+        // trigger a drain. The closure captures the `bridge` binding,
+        // not its value, so the late assignment below is picked up.
+        onDurable: () => bridge?.pumpOutbox(),
       })
     : null;
-
-  // Anonymous sessions are local-only by definition — no account on
-  // the server to authenticate to. Skip the WebSocket pump entirely;
-  // local mutations still flow through the engine for WAL persist.
-  let bridge: SyncBridge | null = null;
   if (!props.session.anonymous) {
     bridge = createSyncBridge({
       engine,
@@ -528,7 +538,8 @@ function MainApp(props: {
           email: props.session.email!,
           serverUrl: window.location.origin,
           deviceId: props.session.deviceId!,
-          lastAckedSeq: Number(engine.lastContiguousSeq()),
+          // See persistDevice — durable, not contiguous.
+          lastAckedSeq: Number(engine.lastDurableSeq()),
           lastSyncAt: Date.now(),
         })
         .catch((e) => {

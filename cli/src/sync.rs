@@ -146,13 +146,18 @@ impl Session {
                 };
                 processed += 1;
                 self.engine.handle_server_bytes(&bytes);
+                // Persist before flushing the outbox — the engine
+                // doesn't queue Acks for newly-applied ops until
+                // `persist_engine_state` calls `notify_wal_durable`.
+                // This binds every outbound Ack to a doc write
+                // already on disk.
+                self.persist_engine_state()?;
                 send_outbox(&mut ws, &mut self.engine).await?;
                 drain_engine_errors(&mut self.engine)?;
                 if !self.engine.is_online() {
                     return Err(SyncError::Engine("engine disconnected mid-pump".into()));
                 }
             }
-            self.persist_engine_state()?;
             Ok(processed)
         }
         .await;
@@ -169,7 +174,15 @@ impl Session {
         if let Some(mut ws) = self.ws.take() {
             self.engine.flush();
             drive_until_idle(&mut ws, &mut self.engine).await?;
+            // `drive_until_idle` returned with the engine Idle. Any
+            // server frame applied during the drive advanced the
+            // engine's in-memory frontier but **did not** queue an
+            // Ack (gated on `notify_wal_durable`). Persist now —
+            // that writes the doc and calls `notify_wal_durable`,
+            // which queues the Ack — then flush the outbox before
+            // closing so the ack actually leaves the wire.
             self.persist_engine_state()?;
+            send_outbox(&mut ws, &mut self.engine).await?;
 
             // Best-effort close — server will disconnect on its own
             // if the close frame is lost.
@@ -205,8 +218,16 @@ impl Session {
     }
 
     fn persist_engine_state(&mut self) -> Result<(), SyncError> {
+        // `write_doc` rewrites loro.bin in full — once it returns Ok
+        // every applied seq in the in-memory engine is on disk, so we
+        // can tell the engine "everything up to `last_contiguous_seq`
+        // is durable." That advances the durable cursor and queues an
+        // Ack frame for any seqs not yet sent. Callers needing the
+        // ack on the wire (`flush`) must `send_outbox` next.
         self.profile.write_doc(self.engine.doc())?;
-        let acked = self.engine.last_contiguous_seq();
+        let contiguous = self.engine.last_contiguous_seq();
+        self.engine.notify_wal_durable(contiguous);
+        let acked = self.engine.last_durable_seq();
         if acked > self.device.last_acked_seq {
             self.device.last_acked_seq = acked;
         }

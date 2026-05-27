@@ -44,6 +44,14 @@ export interface WalBridgeOpts {
    *  pipeline — keep it short. Errors flow through `onError` as
    *  `"snapshot"`. */
   afterSnapshot?: () => Promise<void> | void;
+  /** Fires after each successful `notifyWalDurable` call on the
+   *  engine — i.e. once the WAL row covering a sampled seq is
+   *  committed AND the engine has had a chance to queue the
+   *  corresponding `Ack` frame. Hosts wire this to
+   *  `SyncBridge.pumpOutbox` so the queued ack actually leaves the
+   *  socket. Without it the ack waits for the next incoming server
+   *  frame (or local mutation) to incidentally trigger a pump. */
+  onDurable?: () => void;
 }
 
 /**
@@ -65,19 +73,44 @@ export class WalBridge {
 
   /**
    * Capture engine ops since the previous cursor and queue an
-   * encrypted append. Cheap no-op when nothing changed (export
-   * returns 0 bytes). Call after every local commit and after every
-   * server frame the engine applies — remote ops captured here are
-   * wasteful but harmless on replay (CRDT updates are idempotent).
+   * encrypted append. Cheap no-op for the bytes path when nothing
+   * changed (export returns 0 bytes), but the zero-bytes case still
+   * chains a `notifyWalDurable` so an `OpsAck`-only server frame
+   * (which doesn't add to the doc) still ratchets the durable
+   * cursor forward — its bytes were already exported on the local
+   * mutation that produced them. Call after every local commit AND
+   * after every server frame the engine applies.
+   *
+   * Ordering: `lastContiguousSeq` is sampled **synchronously** at
+   * call time, before any await. The `notifyWalDurable(sample)`
+   * fires only after the prior chain entries (including the
+   * `appendWal` that durably persisted those bytes) have resolved —
+   * the FIFO appendChain is what binds the notify to actual
+   * durability.
    */
   captureAndAppend(): void {
-    const updates = this.opts.engine.exportUpdatesAfter(this.cursor);
-    if (updates.length === 0) return;
-    this.cursor = this.opts.engine.oplogVvBytes();
+    const engine = this.opts.engine;
+    const updates = engine.exportUpdatesAfter(this.cursor);
+    // Sample BEFORE awaiting anything — captures the seq that is
+    // covered by the bytes we're about to persist (or, in the
+    // zero-bytes case, the seq we already persisted earlier).
+    const sampledSeq = engine.lastContiguousSeq();
+    if (updates.length === 0) {
+      this.appendChain = this.appendChain
+        .then(() => {
+          engine.notifyWalDurable(sampledSeq);
+          this.opts.onDurable?.();
+        })
+        .catch((e) => this.reportError("appendWal", e));
+      return;
+    }
+    this.cursor = engine.oplogVvBytes();
     const wal = this.opts.wal;
     this.appendChain = this.appendChain
       .then(() => wal.appendWal(updates))
       .then(() => {
+        engine.notifyWalDurable(sampledSeq);
+        this.opts.onDurable?.();
         if (wal.shouldSnapshot()) this.scheduleSnapshot();
       })
       .catch((e) => this.reportError("appendWal", e));
@@ -93,9 +126,16 @@ export class WalBridge {
     this.snapshotPending = false;
     try {
       await this.appendChain;
+      // Sample just before `save()` — captures the in-memory frontier
+      // the snapshot encodes. A successful `commitSnapshot` makes
+      // every applied seq up to here durable on disk, even ones whose
+      // `appendWal` row was still in flight at the moment of capture.
+      const sampledSeq = this.opts.engine.lastContiguousSeq();
       const bytes = this.opts.engine.save();
       const seq = this.opts.wal.highestWalSeq();
       await this.opts.wal.commitSnapshot(bytes, seq);
+      this.opts.engine.notifyWalDurable(sampledSeq);
+      this.opts.onDurable?.();
       if (this.opts.afterSnapshot) await this.opts.afterSnapshot();
     } catch (e) {
       this.reportError("snapshot", e);

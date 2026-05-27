@@ -752,11 +752,31 @@ impl SyncEngine {
         self.inner.is_idle()
     }
 
-    /// Contiguous-prefix seq the engine has applied — caller persists
-    /// this as `last_acked_seq` between sessions.
+    /// Contiguous-prefix seq the engine has applied **in memory**.
+    /// Use for transport-layer decisions; persist `lastDurableSeq()`
+    /// as the resume cursor instead so a crash never resumes from a
+    /// seq the local WAL doesn't cover.
     #[wasm_bindgen(js_name = lastContiguousSeq)]
     pub fn last_contiguous_seq(&self) -> u64 {
         self.inner.last_contiguous_seq()
+    }
+
+    /// Contiguous-prefix seq the host has confirmed locally durable.
+    /// Equals the highest `last_acked_seq` the engine has shipped (or
+    /// will ship) in `Ack` frames. Persist this between sessions.
+    #[wasm_bindgen(js_name = lastDurableSeq)]
+    pub fn last_durable_seq(&self) -> u64 {
+        self.inner.last_durable_seq()
+    }
+
+    /// Host signal: bytes covering up to `seq` are now durable in
+    /// local storage (encrypted WAL row committed). Advances the
+    /// durable frontier and queues an `Ack` frame if it overtakes the
+    /// last one shipped. Caller must `popOutbox()` afterwards to
+    /// drain the queued frame onto the wire.
+    #[wasm_bindgen(js_name = notifyWalDurable)]
+    pub fn notify_wal_durable(&mut self, seq: u64) {
+        self.inner.notify_wal_durable(seq);
     }
 
     // -- doc passthrough --

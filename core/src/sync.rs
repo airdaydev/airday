@@ -85,13 +85,26 @@ pub struct SyncEngine {
     dek: Dek,
     opts: EngineOptions,
     state: ConnState,
-    /// Contiguous-prefix seq we've applied — the value safe to ack.
-    /// Equal to the maximum seq seen under sqlite single-writer (no
-    /// gaps possible); under Postgres + replicas, this lags the
-    /// max-seen until a reorder buffer fills the holes.
+    /// Contiguous-prefix seq we've applied in memory. Advances
+    /// synchronously inside `apply_remote_ops` / `OpsAck` / `Snapshot`.
+    /// Under sqlite single-writer this equals the maximum seq seen;
+    /// under Postgres + replicas it lags the max-seen until a reorder
+    /// buffer fills the holes. **Not** the value we ack — the engine
+    /// only ships an Ack for a seq the host has confirmed durable via
+    /// `notify_wal_durable`.
     last_contiguous_seq: u64,
+    /// Contiguous-prefix seq the host has confirmed locally durable
+    /// (encrypted WAL row committed for the bytes covering this seq).
+    /// `<= last_contiguous_seq`. This is the value the engine sends
+    /// in `Ack { last_acked_seq }`, and the value callers persist
+    /// between sessions as the resume cursor (`PullOps`'s
+    /// `since_seq`). Advances only via `notify_wal_durable`; a crash
+    /// before the host's durable-notify means the server learns we
+    /// have a seq strictly later than the previous session's cursor
+    /// only after we re-apply + re-durable on the next run.
+    last_durable_seq: u64,
     /// Highest seq we've already shipped in an `Ack`. Lets us coalesce:
-    /// queue an `Ack` only when `last_contiguous_seq` overtakes this.
+    /// queue an `Ack` only when `last_durable_seq` overtakes this.
     last_sent_ack: u64,
     /// VV captured at the moment of the in-flight `PushOps` export. On
     /// `OpsAck` we merge this into `Doc::last_pushed_vv`. Cleared on
@@ -104,8 +117,8 @@ pub struct SyncEngine {
 
 impl SyncEngine {
     /// Build a fresh engine. `last_acked_seq` is the persisted
-    /// contiguous-prefix from the previous session — used as
-    /// `since_seq` in the initial pull.
+    /// durable-prefix from the previous session — used as `since_seq`
+    /// in the initial pull and as the floor for `last_durable_seq`.
     pub fn new(doc: Doc, dek: Dek, last_acked_seq: u64, opts: EngineOptions) -> Self {
         Self {
             doc,
@@ -113,6 +126,7 @@ impl SyncEngine {
             opts,
             state: ConnState::Disconnected,
             last_contiguous_seq: last_acked_seq,
+            last_durable_seq: last_acked_seq,
             last_sent_ack: last_acked_seq,
             in_flight_push_vv: None,
             outbox: VecDeque::new(),
@@ -128,10 +142,43 @@ impl SyncEngine {
         &mut self.doc
     }
 
-    /// Contiguous-prefix seq known to the engine — caller persists this
-    /// as `last_acked_seq` between sessions.
+    /// Contiguous-prefix seq the engine has applied **in memory**.
+    /// Use this for transport-layer decisions (the `since_seq` of a
+    /// mid-session resume `PullOps`, snapshot eligibility) — NOT as
+    /// the persisted resume cursor. The persisted cursor must be
+    /// `last_durable_seq()` so a crash never resumes from a seq the
+    /// local doc/WAL doesn't actually contain.
     pub fn last_contiguous_seq(&self) -> u64 {
         self.last_contiguous_seq
+    }
+
+    /// Contiguous-prefix seq the host has confirmed locally durable.
+    /// This is the value the engine has shipped (or will ship) in
+    /// `Ack` frames, and the value callers persist between sessions
+    /// as the resume cursor.
+    pub fn last_durable_seq(&self) -> u64 {
+        self.last_durable_seq
+    }
+
+    /// Host signal: every byte the engine had advanced through up to
+    /// `seq` is now durable in local storage (encrypted WAL row
+    /// committed). Advances `last_durable_seq` — clamped to
+    /// `last_contiguous_seq` and monotonic — and queues an `Ack` if
+    /// that advance overtakes `last_sent_ack`. Caller must
+    /// `pop_outbox()` afterwards to ship the queued frame.
+    ///
+    /// Callers should sample `last_contiguous_seq()` *synchronously*
+    /// at the moment of the durability work (e.g. just before queueing
+    /// the IDB `appendWal` promise) and pass that sample back here
+    /// after the write commits — this binds the notify to bytes that
+    /// were actually persisted, not to wherever the in-memory engine
+    /// has run on to in the meantime.
+    pub fn notify_wal_durable(&mut self, seq: u64) {
+        let clamped = seq.min(self.last_contiguous_seq);
+        if clamped > self.last_durable_seq {
+            self.last_durable_seq = clamped;
+            self.queue_ack_if_advanced();
+        }
     }
 
     /// True if the engine is past `Disconnected` — caller can treat
@@ -306,7 +353,9 @@ impl SyncEngine {
                     return;
                 }
                 self.apply_remote_ops(ops);
-                self.queue_ack_if_advanced();
+                // Ack is gated on `notify_wal_durable` — the host
+                // calls back once the encrypted WAL row covering these
+                // ops is committed.
                 if complete && matches!(self.state, ConnState::Pulling) {
                     self.state = ConnState::Idle;
                     self.events.push_back(Event::PulledInitial);
@@ -323,7 +372,7 @@ impl SyncEngine {
                     return;
                 }
                 self.apply_remote_ops(ops);
-                self.queue_ack_if_advanced();
+                // Ack gated on host's `notify_wal_durable`.
             }
             ServerFrame::OpsAck { assigned_seqs } => {
                 if !matches!(self.state, ConnState::Pushing | ConnState::PushingDirty) {
@@ -343,7 +392,11 @@ impl SyncEngine {
                     self.doc.mark_pushed_at(vv);
                 }
                 self.events.push_back(Event::Pushed);
-                self.queue_ack_if_advanced();
+                // Ack gated on `notify_wal_durable`. The local op's
+                // bytes may or may not be on disk yet (the host's
+                // appendChain runs alongside the wire push), so the
+                // engine doesn't tell the server "I have seq N" until
+                // the host confirms it.
                 let was_dirty = matches!(self.state, ConnState::PushingDirty);
                 self.state = ConnState::Idle;
                 if was_dirty {
@@ -389,7 +442,11 @@ impl SyncEngine {
                     self.events
                         .push_back(Event::FrontierAdvanced { seq: up_to_seq });
                 }
-                self.queue_ack_if_advanced();
+                // Ack gated on `notify_wal_durable` — the host needs
+                // to persist the snapshot (either by committing it
+                // directly via `commitSnapshot` or by exporting +
+                // appending the resulting delta) before we tell the
+                // server we have `up_to_seq`.
                 // Resume the catch-up: pull any ops written after the
                 // snapshot was taken.
                 self.state = ConnState::Pulling;
@@ -477,12 +534,12 @@ impl SyncEngine {
     }
 
     fn queue_ack_if_advanced(&mut self) {
-        if self.last_contiguous_seq > self.last_sent_ack {
+        if self.last_durable_seq > self.last_sent_ack {
             let ack = ClientFrame::Ack {
-                last_acked_seq: self.last_contiguous_seq,
+                last_acked_seq: self.last_durable_seq,
             };
             if self.encode_into_outbox(&ack).is_ok() {
-                self.last_sent_ack = self.last_contiguous_seq;
+                self.last_sent_ack = self.last_durable_seq;
             }
         }
     }
@@ -756,7 +813,15 @@ mod tests {
         assert!(events.contains(&Event::Pushed));
         assert!(events.contains(&Event::FrontierAdvanced { seq: 1 }));
 
-        // After ack we must also have queued an Ack frame.
+        // Engine must NOT queue an Ack before the host confirms the
+        // op's bytes are locally durable — even on our own OpsAck.
+        assert!(
+            eng.pop_outbox().is_none(),
+            "Ack frame queued before notify_wal_durable",
+        );
+
+        // Host signals "WAL row covering seq 1 is on disk" → ack ships.
+        eng.notify_wal_durable(1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
 
@@ -874,7 +939,13 @@ mod tests {
             "expected ItemAdded for `from peer` in {app_evs:?}"
         );
         assert_eq!(eng.last_contiguous_seq(), 7);
-        // Frontier advance should produce an Ack.
+        assert_eq!(eng.last_durable_seq(), 0, "durable lags until notify");
+        // No Ack until host confirms durability.
+        assert!(
+            eng.pop_outbox().is_none(),
+            "Ack frame queued before notify_wal_durable",
+        );
+        eng.notify_wal_durable(7);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 7 }));
 
@@ -936,9 +1007,13 @@ mod tests {
             "batch apply should not emit intermediate ItemTextChanged churn: {app_evs:?}"
         );
 
+        // Ack gated on host-confirmed durability.
+        assert!(eng.pop_outbox().is_none());
+        eng.notify_wal_durable(8);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 8 }));
         assert_eq!(eng.last_contiguous_seq(), 8);
+        assert_eq!(eng.last_durable_seq(), 8);
     }
 
     #[test]
@@ -977,9 +1052,9 @@ mod tests {
             assigned_seqs: vec![6],
         }));
         assert!(eng.is_idle());
-        // Drain the post-ack housekeeping (Ack frame queued from
-        // frontier advance) so the next assertion sees only what
-        // `flush()` produces.
+        // No Ack queued yet (gated on `notify_wal_durable`); drain
+        // anyway in case future engine evolution adds post-ack
+        // housekeeping here.
         let _ = drain_outbox(&mut eng);
         // Doc's last_pushed_vv now covers BOTH our local mutation and
         // the peer op — so a fresh flush has nothing new to ship.
@@ -1222,19 +1297,27 @@ mod tests {
             blob: snapshot_blob,
         }));
 
-        // Engine should have advanced its frontier and re-issued PullOps.
+        // Engine should have advanced its frontier and re-issued
+        // PullOps. The Ack waits for the host to confirm the
+        // bootstrap snapshot is locally durable.
         assert_eq!(eng.last_contiguous_seq(), 42);
+        assert_eq!(eng.last_durable_seq(), 0);
         let mut frames: Vec<ClientFrame> = Vec::new();
         while let Some(b) = eng.pop_outbox() {
             frames.push(dec(&b));
         }
-        // Order: Ack(42) (frontier advance), PullOps(since=42).
-        assert!(frames
-            .iter()
-            .any(|f| matches!(f, ClientFrame::Ack { last_acked_seq: 42 })));
+        assert!(
+            !frames.iter().any(|f| matches!(f, ClientFrame::Ack { .. })),
+            "Ack queued before notify_wal_durable: {frames:?}",
+        );
         assert!(frames
             .iter()
             .any(|f| matches!(f, ClientFrame::PullOps { since_seq: 42 })));
+
+        // Host commits the snapshot → ack ships.
+        eng.notify_wal_durable(42);
+        let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 42 }));
 
         // Bootstrapped item is in the doc.
         assert!(eng
@@ -1475,6 +1558,92 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 1 }));
         let evs = drain_events(&mut eng);
         assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("SnapshotRequired")));
+    }
+
+    #[test]
+    fn notify_wal_durable_clamps_to_last_contiguous() {
+        // Calling with a seq beyond what the engine has applied
+        // in-memory must clamp — a host bug shouldn't trick the
+        // engine into acking ops it never saw.
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+        let blob = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "x").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
+            ops: vec![StoredBlob { seq: 3, blob }],
+        }));
+        assert_eq!(eng.last_contiguous_seq(), 3);
+        eng.notify_wal_durable(999);
+        assert_eq!(eng.last_durable_seq(), 3);
+        let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
+        assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 3 }));
+    }
+
+    #[test]
+    fn notify_wal_durable_is_monotonic_and_coalesces() {
+        // A backwards notify must not regress last_durable_seq.
+        // Repeated notifies at the same value must not re-queue an
+        // Ack (the same coalescing as `queue_ack_if_advanced`).
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+        let b1 = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "a").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
+            ops: vec![StoredBlob { seq: 5, blob: b1 }],
+        }));
+        assert!(eng.pop_outbox().is_none());
+
+        eng.notify_wal_durable(5);
+        let _ack: ClientFrame = dec(&eng.pop_outbox().expect("first Ack"));
+
+        // Re-notify at 5 (e.g. a follow-up zero-bytes captureAndAppend
+        // chain entry) — no duplicate Ack.
+        eng.notify_wal_durable(5);
+        assert!(eng.pop_outbox().is_none());
+
+        // Notify backwards is a no-op.
+        eng.notify_wal_durable(2);
+        assert_eq!(eng.last_durable_seq(), 5);
+        assert!(eng.pop_outbox().is_none());
+    }
+
+    #[test]
+    fn inbound_apply_does_not_queue_ack_until_durable() {
+        // Regression guard against the original bug: a remote op
+        // arriving must NOT cause an Ack frame to land in the outbox
+        // until `notify_wal_durable` says the WAL row is committed.
+        let mut eng = fresh_engine_clean();
+        let dek = eng.dek.clone();
+        drive_to_idle(&mut eng);
+        let _ = drain_outbox(&mut eng);
+        let _ = drain_events(&mut eng);
+
+        let blob = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "remote").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
+            ops: vec![StoredBlob { seq: 4, blob }],
+        }));
+
+        // Engine has applied in memory but must not have queued an
+        // Ack frame.
+        assert_eq!(eng.last_contiguous_seq(), 4);
+        assert_eq!(eng.last_durable_seq(), 0);
+        while let Some(bytes) = eng.pop_outbox() {
+            let frame: ClientFrame = dec(&bytes);
+            assert!(
+                !matches!(frame, ClientFrame::Ack { .. }),
+                "outbox carried an Ack before notify_wal_durable: {frame:?}",
+            );
+        }
     }
 
     #[test]
