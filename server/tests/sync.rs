@@ -123,6 +123,7 @@ struct Account {
     device_token: String,
     device_id: Uuid,
     account_id: Uuid,
+    primary_doc_id: Uuid,
 }
 
 struct ExtraDevice {
@@ -177,9 +178,19 @@ async fn signup_into(server: TestServer) -> Account {
         },
     )
     .await;
+    let account_id = Uuid::parse_str(&resp.account_id).unwrap();
+    // SignupResponse doesn't carry primary_doc_id (wire is unchanged in this
+    // pass); fetch it from the DB so test helpers can target the doc-scoped
+    // query functions.
+    let primary_doc_id = airday_server::auth::queries::find_account_by_id(&server.state.db, account_id)
+        .await
+        .unwrap()
+        .expect("account just created should be findable")
+        .primary_doc_id;
     Account {
         device_id: Uuid::parse_str(&resp.device_id).unwrap(),
-        account_id: Uuid::parse_str(&resp.account_id).unwrap(),
+        account_id,
+        primary_doc_id,
         device_token: resp.device_token,
         server,
     }
@@ -398,7 +409,7 @@ async fn pull_at_or_above_snapshot_floor_streams_ops_normally() {
     // not below — pull_ops should still stream normally without bootstrap.
     queries::insert_snapshot(
         &acc.server.state.db,
-        acc.account_id,
+        acc.primary_doc_id,
         50,
         50,
         fake_blob(0xAA),
@@ -478,7 +489,7 @@ async fn ack_path_triggers_snapshot_request() {
     // evaluate and emit a SnapshotRequest.
     let acc = signup_account_with_snapshot_config(5, std::time::Duration::from_secs(60)).await;
     let blobs: Vec<EncryptedBlob> = (0..5).map(fake_blob).collect();
-    let assigned_seqs = queries::insert_ops(&acc.server.state.db, acc.account_id, blobs)
+    let assigned_seqs = queries::insert_ops(&acc.server.state.db, acc.primary_doc_id, blobs)
         .await
         .unwrap();
     let last_id = *assigned_seqs.last().unwrap();
@@ -558,7 +569,7 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
     )
     .await;
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    let snap = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
+    let snap = queries::latest_snapshot(&acc.server.state.db, acc.primary_doc_id)
         .await
         .unwrap();
     assert!(
@@ -568,7 +579,7 @@ async fn stale_snapshot_after_lease_expiry_rejected() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
+async fn compact_doc_deletes_ops_below_floor_and_prunes_old_snapshots() {
     // Insert 10 ops + a snapshot pinning compaction_floor at 6 (so ids
     // 1..=6 are below the floor, 7..=10 are above). Run compaction:
     // ops below should be gone, ops above intact. Then insert two more
@@ -576,43 +587,43 @@ async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
     let acc = signup_account().await;
     let db = &acc.server.state.db;
     let blobs: Vec<EncryptedBlob> = (0..10).map(fake_blob).collect();
-    let ids = queries::insert_ops(db, acc.account_id, blobs)
+    let ids = queries::insert_ops(db, acc.primary_doc_id, blobs)
         .await
         .unwrap();
     assert_eq!(ids, (1..=10).collect::<Vec<_>>());
 
-    let snap1 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA1))
+    let snap1 = queries::insert_snapshot(db, acc.primary_doc_id, 10, 6, fake_blob(0xA1))
         .await
         .unwrap();
 
-    let stats = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+    let stats = queries::compact_doc(db, acc.primary_doc_id, queries::KEEP_SNAPSHOTS)
         .await
         .unwrap();
     assert_eq!(stats.ops_deleted, 6);
     assert_eq!(stats.snapshots_deleted, 0);
 
     // Surviving ops are exactly 7..=10.
-    let batch = queries::fetch_ops_batch(db, acc.account_id, 0)
+    let batch = queries::fetch_ops_batch(db, acc.primary_doc_id, 0)
         .await
         .unwrap();
     let surviving_ids: Vec<u64> = batch.ops.iter().map(|o| o.seq).collect();
     assert_eq!(surviving_ids, vec![7, 8, 9, 10]);
 
     // Idempotent — second run finds no new floor movement.
-    let stats2 = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+    let stats2 = queries::compact_doc(db, acc.primary_doc_id, queries::KEEP_SNAPSHOTS)
         .await
         .unwrap();
     assert_eq!(stats2.ops_deleted, 0);
     assert_eq!(stats2.snapshots_deleted, 0);
 
     // Pile on two more snapshots — KEEP=2 leaves only the latest pair.
-    let _snap2 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA2))
+    let _snap2 = queries::insert_snapshot(db, acc.primary_doc_id, 10, 6, fake_blob(0xA2))
         .await
         .unwrap();
-    let snap3 = queries::insert_snapshot(db, acc.account_id, 10, 6, fake_blob(0xA3))
+    let snap3 = queries::insert_snapshot(db, acc.primary_doc_id, 10, 6, fake_blob(0xA3))
         .await
         .unwrap();
-    let stats3 = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+    let stats3 = queries::compact_doc(db, acc.primary_doc_id, queries::KEEP_SNAPSHOTS)
         .await
         .unwrap();
     assert_eq!(stats3.snapshots_deleted, 1, "snap1 should be pruned");
@@ -632,19 +643,19 @@ async fn compact_account_deletes_ops_below_floor_and_prunes_old_snapshots() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn compact_account_with_no_snapshot_is_noop() {
+async fn compact_doc_with_no_snapshot_is_noop() {
     let acc = signup_account().await;
     let db = &acc.server.state.db;
-    queries::insert_ops(db, acc.account_id, vec![fake_blob(1), fake_blob(2)])
+    queries::insert_ops(db, acc.primary_doc_id, vec![fake_blob(1), fake_blob(2)])
         .await
         .unwrap();
-    let stats = queries::compact_account(db, acc.account_id, queries::KEEP_SNAPSHOTS)
+    let stats = queries::compact_doc(db, acc.primary_doc_id, queries::KEEP_SNAPSHOTS)
         .await
         .unwrap();
     assert_eq!(stats.ops_deleted, 0);
     assert_eq!(stats.snapshots_deleted, 0);
     // Ops untouched.
-    let batch = queries::fetch_ops_batch(db, acc.account_id, 0)
+    let batch = queries::fetch_ops_batch(db, acc.primary_doc_id, 0)
         .await
         .unwrap();
     assert_eq!(batch.ops.len(), 2);
@@ -680,7 +691,7 @@ async fn push_snapshot_opportunistically_compacts_ops_below_floor() {
     // disappear (or the deadline trips).
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        let batch = queries::fetch_ops_batch(&acc.server.state.db, acc.account_id, 0)
+        let batch = queries::fetch_ops_batch(&acc.server.state.db, acc.primary_doc_id, 0)
             .await
             .unwrap();
         if batch.ops.is_empty() {
@@ -741,7 +752,7 @@ async fn assert_no_snapshot_request(ws: &mut WsStream, window: std::time::Durati
 async fn wait_for_snapshot(acc: &Account, up_to: u64) -> queries::LatestSnapshot {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        if let Some(snap) = queries::latest_snapshot(&acc.server.state.db, acc.account_id)
+        if let Some(snap) = queries::latest_snapshot(&acc.server.state.db, acc.primary_doc_id)
             .await
             .unwrap()
         {
@@ -777,7 +788,7 @@ async fn wait_for_subscribers(acc: &Account, target: usize) {
             .server
             .state
             .sync_sessions
-            .subscriber_count(acc.account_id);
+            .subscriber_count(acc.primary_doc_id);
         if (target == 0 && count == 0) || (target > 0 && count >= target) {
             return;
         }

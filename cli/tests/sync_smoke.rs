@@ -52,7 +52,12 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     session.flush().await.unwrap();
 
     let account_id = Uuid::parse_str(&signup.account_id).unwrap();
-    let batch = wait_for_ops(&server, account_id, 1).await;
+    let primary_doc_id = airday_server::auth::queries::find_account_by_id(&server.state.db, account_id)
+        .await
+        .unwrap()
+        .expect("account just created should be findable")
+        .primary_doc_id;
+    let batch = wait_for_ops(&server, primary_doc_id, 1).await;
     assert_eq!(batch.ops.len(), 1, "only the add-item mutation should push");
     let highest_assigned = batch.ops.iter().map(|o| o.seq).max().unwrap();
 
@@ -76,7 +81,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     session2.flush().await.unwrap();
 
     // No new op blobs should have been pushed.
-    let after = queries::fetch_ops_batch(&server.state.db, account_id, 0)
+    let after = queries::fetch_ops_batch(&server.state.db, primary_doc_id, 0)
         .await
         .unwrap();
     assert_eq!(after.ops.len(), 1, "second flush must not re-push");
@@ -192,12 +197,12 @@ async fn second_device_observes_first_devices_items_via_pull() {
 
 async fn wait_for_ops(
     server: &TestServer,
-    account_id: Uuid,
+    doc_id: Uuid,
     target: usize,
 ) -> queries::FetchedBatch {
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
     loop {
-        let batch = queries::fetch_ops_batch(&server.state.db, account_id, 0)
+        let batch = queries::fetch_ops_batch(&server.state.db, doc_id, 0)
             .await
             .unwrap();
         if batch.ops.len() >= target {

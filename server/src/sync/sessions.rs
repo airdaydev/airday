@@ -1,9 +1,10 @@
 //! In-memory subscriber registry for op broadcast.
 //!
-//! Each connected sync session subscribes; pushes from one device fan
-//! out to peer sessions on the same account. The fan-out delivers
-//! pre-encoded msgpack bytes so we encode once per push, not once per
-//! peer.
+//! Each connected sync session subscribes against the doc it's synchronising
+//! (today: always the device's account's primary doc; tomorrow with sharing:
+//! any doc the device is a member of). Pushes from one device fan out to
+//! peer sessions subscribed to the same doc. The fan-out delivers
+//! pre-encoded msgpack bytes so we encode once per push, not once per peer.
 //!
 //! **Backpressure policy.** Each subscriber gets a bounded mpsc
 //! (`CHANNEL_CAPACITY`). On a full or closed channel the broadcast
@@ -34,7 +35,7 @@ pub struct SyncSessions {
 
 #[derive(Default)]
 struct Inner {
-    accounts: HashMap<Uuid, Vec<Subscriber>>,
+    docs: HashMap<Uuid, Vec<Subscriber>>,
 }
 
 struct Subscriber {
@@ -52,7 +53,7 @@ pub struct ConnectedSubscriber {
 /// RAII subscription handle. Dropping deregisters the subscriber.
 pub struct Subscription {
     sessions: SyncSessions,
-    account_id: Uuid,
+    doc_id: Uuid,
     sub_id: u64,
     pub rx: mpsc::Receiver<Vec<u8>>,
 }
@@ -68,7 +69,7 @@ impl Subscription {
 
 impl Drop for Subscription {
     fn drop(&mut self) {
-        self.sessions.unsubscribe(self.account_id, self.sub_id);
+        self.sessions.unsubscribe(self.doc_id, self.sub_id);
     }
 }
 
@@ -77,38 +78,34 @@ impl SyncSessions {
         Self::default()
     }
 
-    pub fn subscribe(&self, account_id: Uuid, device_id: Uuid) -> Subscription {
+    pub fn subscribe(&self, doc_id: Uuid, device_id: Uuid) -> Subscription {
         let (tx, rx) = mpsc::channel(CHANNEL_CAPACITY);
         let sub_id = next_sub_id();
         let mut inner = self.inner.lock().unwrap();
-        inner
-            .accounts
-            .entry(account_id)
-            .or_default()
-            .push(Subscriber {
-                sub_id,
-                device_id,
-                tx,
-            });
+        inner.docs.entry(doc_id).or_default().push(Subscriber {
+            sub_id,
+            device_id,
+            tx,
+        });
         Subscription {
             sessions: self.clone(),
-            account_id,
+            doc_id,
             sub_id,
             rx,
         }
     }
 
-    fn unsubscribe(&self, account_id: Uuid, sub_id: u64) {
+    fn unsubscribe(&self, doc_id: Uuid, sub_id: u64) {
         let mut inner = self.inner.lock().unwrap();
-        if let Some(subs) = inner.accounts.get_mut(&account_id) {
+        if let Some(subs) = inner.docs.get_mut(&doc_id) {
             subs.retain(|s| s.sub_id != sub_id);
             if subs.is_empty() {
-                inner.accounts.remove(&account_id);
+                inner.docs.remove(&doc_id);
             }
         }
     }
 
-    /// Fan out an op set to every subscriber on `account_id` except
+    /// Fan out an op set to every subscriber on `doc_id` except
     /// `exclude_sub`. Excluding by `sub_id` rather than `device_id`
     /// matters for multi-tab on the same device — both tabs share the
     /// device cookie, so a `device_id` filter would silence tab-to-tab
@@ -119,7 +116,7 @@ impl SyncSessions {
     /// Returns the number of subscribers that received it (slow /
     /// closed receivers are dropped from the registry as a side
     /// effect).
-    pub fn broadcast(&self, account_id: Uuid, exclude_sub: u64, ops: Vec<StoredBlob>) -> usize {
+    pub fn broadcast(&self, doc_id: Uuid, exclude_sub: u64, ops: Vec<StoredBlob>) -> usize {
         if ops.is_empty() {
             return 0;
         }
@@ -132,7 +129,7 @@ impl SyncSessions {
         };
         let mut delivered = 0;
         let mut inner = self.inner.lock().unwrap();
-        if let Some(subs) = inner.accounts.get_mut(&account_id) {
+        if let Some(subs) = inner.docs.get_mut(&doc_id) {
             subs.retain(|s| {
                 if s.sub_id == exclude_sub {
                     return true;
@@ -152,36 +149,32 @@ impl SyncSessions {
         delivered
     }
 
-    /// Snapshot the current subscriber ids for an account. Used by
+    /// Snapshot the current subscriber ids for a doc. Used by
     /// tests (and the future orchestrator) as input to candidate
     /// selection. Order is not stable — caller must apply its own
     /// ordering policy.
-    pub fn subscriber_ids(&self, account_id: Uuid) -> Vec<u64> {
+    pub fn subscriber_ids(&self, doc_id: Uuid) -> Vec<u64> {
         let inner = self.inner.lock().unwrap();
         inner
-            .accounts
-            .get(&account_id)
+            .docs
+            .get(&doc_id)
             .map(|s| s.iter().map(|sub| sub.sub_id).collect())
             .unwrap_or_default()
     }
 
-    /// Live subscriber count for an account. Used by integration tests
+    /// Live subscriber count for a doc. Used by integration tests
     /// to wait until a freshly-connected peer is registered before
     /// pushing into the broadcast path.
-    pub fn subscriber_count(&self, account_id: Uuid) -> usize {
+    pub fn subscriber_count(&self, doc_id: Uuid) -> usize {
         let inner = self.inner.lock().unwrap();
-        inner
-            .accounts
-            .get(&account_id)
-            .map(|s| s.len())
-            .unwrap_or(0)
+        inner.docs.get(&doc_id).map(|s| s.len()).unwrap_or(0)
     }
 
-    pub fn connected_subscribers(&self, account_id: Uuid) -> Vec<ConnectedSubscriber> {
+    pub fn connected_subscribers(&self, doc_id: Uuid) -> Vec<ConnectedSubscriber> {
         let inner = self.inner.lock().unwrap();
         inner
-            .accounts
-            .get(&account_id)
+            .docs
+            .get(&doc_id)
             .map(|subs| {
                 subs.iter()
                     .map(|sub| ConnectedSubscriber {

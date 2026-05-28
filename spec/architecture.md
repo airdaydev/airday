@@ -50,25 +50,22 @@ Platform policy stays outside `core`:
 
 ## Server-is-dumb thesis
 
-The unit of sync is the **doc**, not the account. An account is a login identity that owns one primary doc and may (post-v1) be a member of N shared docs. Everything below is per-doc.
-
 The server **cannot**:
-- read op contents (opaque encrypted blobs, each encrypted with its doc's DEK)
+- read op contents (opaque encrypted blobs)
 - run a Loro doc
 - validate op semantics
 - compute snapshots
-- tell which DEK encrypted any given blob (it just routes by `doc_id`)
 
 The server **can**:
-- authenticate accounts and devices, and check `doc_members` for per-doc access
-- assign per-doc monotonic, gap-free `seq`
-- track per-(device, doc) `last_acked_seq`
-- compute per-doc horizon = min(`last_acked_seq`) across all member-devices of that doc
-- decide when a snapshot is due for a doc (op-count threshold past that doc's last snapshot, triggering device caught up on that doc)
-- ask any caught-up connected member-device to produce the snapshot for a doc (state frontier = `doc_last_seq`, compaction floor = `max(horizon, prev snapshot's compaction_floor_seq)` for that doc)
-- replace prior snapshots and prune ops up to a doc's snapshot's `compaction_floor_seq`
+- authenticate accounts and devices
+- assign per-account monotonic, gap-free `seq`
+- track per-device `last_acked_seq`
+- compute horizon = min(`last_acked_seq`) across all non-revoked devices
+- decide when a snapshot is due (op-count threshold past last snapshot, triggering device caught up)
+- ask any caught-up connected client to produce the snapshot (state frontier = `server_last_seq`, compaction floor = `max(horizon, prev snapshot's compaction_floor_seq)`)
+- replace prior snapshots and prune ops up to the snapshot's `compaction_floor_seq`
 
-This thesis is load-bearing for everything in `sync-protocol.md`. Sharing endpoints (`sharing.md`) add membership management on top but do not change what the server can see — it remains blind to doc contents and to which DEK any blob was encrypted with.
+This thesis is load-bearing for everything in `sync-protocol.md`.
 
 ## Wire encoding
 

@@ -1,7 +1,9 @@
 //! `DeviceAuth` extractor: validates a device token presented via
 //! `Authorization: Bearer <hex>` (CLI) or the `airday_device` cookie
 //! (web) against the `devices` table and surfaces `(account_id,
-//! device_id)` to handlers.
+//! device_id, primary_doc_id)` to handlers. The doc id is picked up
+//! at the same JOIN as the device lookup so the WS path doesn't need
+//! a second query at upgrade.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -17,6 +19,7 @@ use crate::state::AppState;
 pub struct DeviceAuth {
     pub account_id: Uuid,
     pub device_id: Uuid,
+    pub primary_doc_id: Uuid,
 }
 
 impl FromRequestParts<AppState> for DeviceAuth {
@@ -44,6 +47,7 @@ impl FromRequestParts<AppState> for DeviceAuth {
         Ok(Self {
             account_id: lookup.account_id,
             device_id: lookup.device_id,
+            primary_doc_id: lookup.primary_doc_id,
         })
     }
 }

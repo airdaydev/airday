@@ -78,6 +78,7 @@ pub async fn ws_handler(
     let auth = DeviceAuth {
         account_id: lookup.account_id,
         device_id: lookup.device_id,
+        primary_doc_id: lookup.primary_doc_id,
     };
     let session_id = Uuid::now_v7().to_string();
     let upgrade_request_id = request_id.0;
@@ -169,10 +170,12 @@ async fn run_session(
 
     // Subscribe *after* a successful handshake so we never deliver
     // peer broadcasts to a session that hasn't agreed on the protocol
-    // version. Subscription is RAII — dropping deregisters.
+    // version. Subscription is RAII — dropping deregisters. Subscription
+    // is keyed by the doc the device is syncing (today: always its
+    // account's primary doc).
     let mut sub = state
         .sync_sessions
-        .subscribe(auth.account_id, auth.device_id);
+        .subscribe(auth.primary_doc_id, auth.device_id);
 
     let sub_id = sub.sub_id();
 
@@ -206,7 +209,7 @@ async fn run_session(
     if let Some(lease_id) = ws_session.snapshot_lease.take() {
         state
             .snapshot_coordinator
-            .release(ws_session.auth.account_id, lease_id);
+            .release(ws_session.auth.primary_doc_id, lease_id);
     }
     result
 }
@@ -251,11 +254,15 @@ async fn evaluate_snapshot_decision(
     device_last_acked_seq: u64,
 ) -> Result<Decision, SessionError> {
     let account_id = ws_session.auth.account_id;
-    let (prev_snap_up_to, prev_compaction_floor) = queries::latest_snapshot_meta(&state.db, account_id)
+    let doc_id = ws_session.auth.primary_doc_id;
+    let (prev_snap_up_to, prev_compaction_floor) = queries::latest_snapshot_meta(&state.db, doc_id)
         .await?
         .map(|m| (m.up_to_seq, m.compaction_floor_seq))
         .unwrap_or((0, 0));
-    let server_last_seq = queries::latest_account_seq(&state.db, account_id).await?;
+    let server_last_seq = queries::latest_doc_seq(&state.db, doc_id).await?;
+    // Horizon stays account-scoped: devices are still per-account, and while
+    // each account has exactly one doc the per-account horizon equals the
+    // per-doc horizon. See `account_horizon` doc comment.
     let horizon = queries::account_horizon(
         &state.db,
         account_id,
@@ -264,7 +271,7 @@ async fn evaluate_snapshot_decision(
     )
     .await?;
     Ok(state.snapshot_coordinator.evaluate(
-        account_id,
+        doc_id,
         prev_snap_up_to,
         prev_compaction_floor,
         server_last_seq,
@@ -338,7 +345,8 @@ async fn push_ops(
 
     async {
         let blobs_for_broadcast = ops.clone();
-        let assigned_seqs = queries::insert_ops(&state.db, ws_session.auth.account_id, ops).await?;
+        let assigned_seqs =
+            queries::insert_ops(&state.db, ws_session.auth.primary_doc_id, ops).await?;
 
         // Post-commit fan-out, before acking the originator. Both branches
         // are correct (the originator's ack and peer broadcasts are
@@ -350,9 +358,11 @@ async fn push_ops(
             .zip(blobs_for_broadcast)
             .map(|(seq, blob)| StoredBlob { seq, blob })
             .collect();
-        state
-            .sync_sessions
-            .broadcast(ws_session.auth.account_id, ws_session.sub_id, stored);
+        state.sync_sessions.broadcast(
+            ws_session.auth.primary_doc_id,
+            ws_session.sub_id,
+            stored,
+        );
 
         tracing::info!(
             assigned_seq_count = assigned_seqs.len(),
@@ -394,6 +404,7 @@ async fn pull_ops(
     since_seq: u64,
 ) -> Result<(), SessionError> {
     let pull_span = tracing::info_span!("ws.pull_ops", since_seq = since_seq);
+    let doc_id = auth.primary_doc_id;
     // Bootstrap-from-snapshot precondition: if the latest snapshot's
     // `up_to_seq` is ahead of the client's cursor, the client cannot
     // resume from ops alone (compacted ops below the floor are gone,
@@ -401,7 +412,7 @@ async fn pull_ops(
     // round trips). Hand back `SnapshotRequired` and let the client
     // drive the bootstrap exchange.
     async {
-        if let Some(meta) = queries::latest_snapshot_meta(&state.db, auth.account_id).await? {
+        if let Some(meta) = queries::latest_snapshot_meta(&state.db, doc_id).await? {
             // Compaction floor (= snapshot's compaction_floor_seq) is
             // what determines whether the ops are still available.
             // Devices between compaction_floor and up_to can still
@@ -427,7 +438,7 @@ async fn pull_ops(
         let mut batch_count = 0u64;
         let mut total_ops = 0usize;
         loop {
-            let batch = queries::fetch_ops_batch(&state.db, auth.account_id, cursor).await?;
+            let batch = queries::fetch_ops_batch(&state.db, doc_id, cursor).await?;
             let batch_len = batch.ops.len();
             let next_cursor = batch.ops.last().map(|o| o.seq).unwrap_or(cursor);
             let complete = !batch.has_more;
@@ -475,9 +486,8 @@ async fn push_snapshot(
             tracing::warn!("no snapshot lease found");
             return Ok(());
         };
-        let result = state
-            .snapshot_coordinator
-            .release(ws_session.auth.account_id, snapshot_lease);
+        let doc_id = ws_session.auth.primary_doc_id;
+        let result = state.snapshot_coordinator.release(doc_id, snapshot_lease);
         if let ReleaseResult::Stale = result {
             tracing::warn!("ignoring unsolicited or stale PushSnapshot");
             return Ok(());
@@ -486,7 +496,7 @@ async fn push_snapshot(
         // TODO: While this is inserting, an entire other snapshot could feasibly go through..
         let row_id = queries::insert_snapshot(
             &state.db,
-            ws_session.auth.account_id,
+            doc_id,
             up_to_seq,
             compaction_floor_seq,
             blob,
@@ -500,14 +510,13 @@ async fn push_snapshot(
         // compaction itself is one tx, so a second snapshot landing
         // before this runs just shifts the floor we'll read.
         let db = state.db.clone();
-        let account_id = ws_session.auth.account_id;
         let compact_span = tracing::info_span!(
             "ws.push_snapshot.compact",
-            account_id = %account_id,
+            doc_id = %doc_id,
         );
         tokio::spawn(
             async move {
-                match queries::compact_account(&db, account_id, queries::KEEP_SNAPSHOTS).await {
+                match queries::compact_doc(&db, doc_id, queries::KEEP_SNAPSHOTS).await {
                     Ok(stats) => tracing::info!(
                         ops_deleted = stats.ops_deleted,
                         snapshots_deleted = stats.snapshots_deleted,
@@ -535,7 +544,7 @@ async fn pull_snapshot(
 ) -> Result<(), SessionError> {
     let span = tracing::info_span!("ws.pull_snapshot");
     async {
-        match queries::latest_snapshot(&state.db, auth.account_id).await? {
+        match queries::latest_snapshot(&state.db, auth.primary_doc_id).await? {
             Some(snap) => {
                 tracing::info!(up_to_seq = snap.up_to_seq, "ws pull_snapshot served");
                 send_msgpack(

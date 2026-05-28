@@ -14,6 +14,7 @@ pub struct AccountRow {
     pub password_hash: Vec<u8>,
     pub password_salt: Vec<u8>,
     pub kdf_params: KdfParams,
+    pub primary_doc_id: Uuid,
     pub wrapped_dek: Vec<u8>,
     pub wrapped_dek_nonce: Vec<u8>,
     pub recovery_salt: Option<Vec<u8>>,
@@ -58,22 +59,31 @@ pub struct NewAccount {
 pub struct CreatedAccount {
     pub account_id: Uuid,
     pub device_id: Uuid,
+    pub primary_doc_id: Uuid,
 }
 
 pub async fn create_account(db: &Db, new: NewAccount) -> anyhow::Result<CreatedAccount> {
     let account_id = Uuid::now_v7();
     let device_id = Uuid::now_v7();
+    let primary_doc_id = Uuid::now_v7();
     let now = now_millis();
     let acc_bytes = account_id.as_bytes().to_vec();
     let dev_bytes = device_id.as_bytes().to_vec();
+    let doc_bytes = primary_doc_id.as_bytes().to_vec();
     let dup_marker = "UNIQUE constraint failed: accounts.email";
     let res: anyhow::Result<()> = db
         .call(move |c| {
             let tx = c.transaction()?;
+            // Mint the primary doc first so the accounts FK is satisfiable.
+            tx.execute(
+                "INSERT INTO docs (id, created_at) VALUES (?, ?)",
+                params![doc_bytes, now],
+            )?;
             tx.execute(
                 "INSERT INTO accounts (
                    id, email, password_hash, password_salt,
                    kdf_m_kib, kdf_t, kdf_p,
+                   primary_doc_id,
                    wrapped_dek, wrapped_dek_nonce,
                    recovery_salt, recovery_auth_hash,
                    recovery_wrapped_dek, recovery_wrapped_dek_nonce,
@@ -81,6 +91,7 @@ pub async fn create_account(db: &Db, new: NewAccount) -> anyhow::Result<CreatedA
                  ) VALUES (
                    ?, ?, ?, ?,
                    ?, ?, ?,
+                   ?,
                    ?, ?,
                    ?, ?,
                    ?, ?,
@@ -94,6 +105,7 @@ pub async fn create_account(db: &Db, new: NewAccount) -> anyhow::Result<CreatedA
                     new.kdf_params.m_kib as i64,
                     new.kdf_params.t as i64,
                     new.kdf_params.p as i64,
+                    doc_bytes,
                     new.wrapped_dek,
                     new.wrapped_dek_nonce,
                     new.recovery_salt,
@@ -131,6 +143,7 @@ pub async fn create_account(db: &Db, new: NewAccount) -> anyhow::Result<CreatedA
     Ok(CreatedAccount {
         account_id,
         device_id,
+        primary_doc_id,
     })
 }
 
@@ -139,6 +152,7 @@ pub async fn find_account_by_email(db: &Db, email: String) -> anyhow::Result<Opt
         c.query_row(
             "SELECT id, email, password_hash, password_salt,
                     kdf_m_kib, kdf_t, kdf_p,
+                    primary_doc_id,
                     wrapped_dek, wrapped_dek_nonce,
                     recovery_salt, recovery_auth_hash,
                     recovery_wrapped_dek, recovery_wrapped_dek_nonce
@@ -157,6 +171,7 @@ pub async fn find_account_by_id(db: &Db, account_id: Uuid) -> anyhow::Result<Opt
         c.query_row(
             "SELECT id, email, password_hash, password_salt,
                     kdf_m_kib, kdf_t, kdf_p,
+                    primary_doc_id,
                     wrapped_dek, wrapped_dek_nonce,
                     recovery_salt, recovery_auth_hash,
                     recovery_wrapped_dek, recovery_wrapped_dek_nonce
@@ -259,6 +274,7 @@ pub async fn revoke_device(db: &Db, account_id: Uuid, device_id: Uuid) -> anyhow
 pub struct DeviceLookup {
     pub account_id: Uuid,
     pub device_id: Uuid,
+    pub primary_doc_id: Uuid,
 }
 
 pub async fn find_device_by_token_hash(
@@ -267,14 +283,19 @@ pub async fn find_device_by_token_hash(
 ) -> anyhow::Result<Option<DeviceLookup>> {
     db.call(move |c| {
         c.query_row(
-            "SELECT id, account_id FROM devices WHERE auth_token_hash = ?",
+            "SELECT d.id, d.account_id, a.primary_doc_id
+             FROM devices d
+             JOIN accounts a ON a.id = d.account_id
+             WHERE d.auth_token_hash = ?",
             [token_hash],
             |r| {
                 let id = uuid_from_blob(r.get::<_, Vec<u8>>(0)?)?;
                 let account_id = uuid_from_blob(r.get::<_, Vec<u8>>(1)?)?;
+                let primary_doc_id = uuid_from_blob(r.get::<_, Vec<u8>>(2)?)?;
                 Ok(DeviceLookup {
                     account_id,
                     device_id: id,
+                    primary_doc_id,
                 })
             },
         )
@@ -365,12 +386,13 @@ fn row_to_account(r: &rusqlite::Row<'_>) -> rusqlite::Result<AccountRow> {
             t: r.get::<_, i64>(5)? as u32,
             p: r.get::<_, i64>(6)? as u32,
         },
-        wrapped_dek: r.get(7)?,
-        wrapped_dek_nonce: r.get(8)?,
-        recovery_salt: r.get(9)?,
-        recovery_auth_hash: r.get(10)?,
-        recovery_wrapped_dek: r.get(11)?,
-        recovery_wrapped_dek_nonce: r.get(12)?,
+        primary_doc_id: uuid_from_blob(r.get::<_, Vec<u8>>(7)?)?,
+        wrapped_dek: r.get(8)?,
+        wrapped_dek_nonce: r.get(9)?,
+        recovery_salt: r.get(10)?,
+        recovery_auth_hash: r.get(11)?,
+        recovery_wrapped_dek: r.get(12)?,
+        recovery_wrapped_dek_nonce: r.get(13)?,
     })
 }
 

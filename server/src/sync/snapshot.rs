@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 // Default threshold: 10k *op blobs* (each is one encrypted PushOps push;
 // see `spec/sync-protocol.md` §"Terminology") since the last snapshot
-// makes an account eligible. Operators override via
+// makes a doc eligible. Operators override via
 // `snapshot_threshold_blobs` in the server config (or
 // `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`); JS e2e tests drop it to a handful
 // so the snapshot path runs in seconds.
@@ -90,10 +90,10 @@ impl SnapshotCoordinator {
     /// compaction, so the floor stays put.
     pub fn evaluate(
         &self,
-        account: Uuid,
+        doc_id: Uuid,
         prev_snapshot_up_to_seq: u64,    // latest snapshot's state frontier
         prev_compaction_floor_seq: u64,  // latest snapshot's compaction floor
-        server_last_seq: u64,            // latest seq on server for this account
+        server_last_seq: u64,            // latest seq on server for this doc
         horizon_seq: u64,                // min(last_acked) across devices
         device_last_acked_seq: u64,      // triggering device's frontier
         now: Instant,
@@ -110,7 +110,7 @@ impl SnapshotCoordinator {
             .leases
             .lock()
             .expect("snapshot coordinator mutex poisoned");
-        let lease_state = leases.entry(account).or_insert_with(|| LeaseState::Idle);
+        let lease_state = leases.entry(doc_id).or_insert_with(|| LeaseState::Idle);
         if let LeaseState::Active(lease) = lease_state {
             if now < lease.expires_at {
                 return Decision::Skip;
@@ -127,12 +127,12 @@ impl SnapshotCoordinator {
             compaction_floor_seq: horizon_seq.max(prev_compaction_floor_seq),
         }
     }
-    pub fn release(&self, account: Uuid, incoming_lease_id: u64) -> ReleaseResult {
+    pub fn release(&self, doc_id: Uuid, incoming_lease_id: u64) -> ReleaseResult {
         let mut leases = self
             .leases
             .lock()
             .expect("snapshot coordinator mutex poisoned");
-        if let Some(lease_state) = leases.get_mut(&account) {
+        if let Some(lease_state) = leases.get_mut(&doc_id) {
             return match lease_state {
                 LeaseState::Idle => ReleaseResult::Stale,
                 LeaseState::Active(server_lease) => {
@@ -154,25 +154,25 @@ mod tests {
     use super::*;
 
     // Signature reminder:
-    //   evaluate(account, prev_up_to, prev_floor, server_last,
+    //   evaluate(doc_id, prev_up_to, prev_floor, server_last,
     //            horizon, device_last_acked, now)
 
     #[test]
     fn issues_when_threshold_exceeded_horizon_advances_and_producer_caught_up() {
         let coord = SnapshotCoordinator::new();
-        let account = Uuid::now_v7();
+        let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
         // Within default threshold (10k) — skip.
-        let decision = coord.evaluate(account, 5_000, 5_000, 12_000, 12_000, 12_000, now);
+        let decision = coord.evaluate(doc_id, 5_000, 5_000, 12_000, 12_000, 12_000, now);
         assert!(matches!(decision, Decision::Skip));
 
         // Producer not caught up — skip.
-        let decision = coord.evaluate(account, 0, 0, 12_000, 11_999, 11_999, now);
+        let decision = coord.evaluate(doc_id, 0, 0, 12_000, 11_999, 11_999, now);
         assert!(matches!(decision, Decision::Skip));
 
         // All preconditions met — issue.
-        let decision = coord.evaluate(account, 0, 0, 12_000, 12_000, 12_000, now);
+        let decision = coord.evaluate(doc_id, 0, 0, 12_000, 12_000, 12_000, now);
         assert!(matches!(
             decision,
             Decision::Issue {
@@ -186,14 +186,14 @@ mod tests {
         };
 
         // In-flight — skip second request.
-        let decision = coord.evaluate(account, 0, 0, 22_000, 22_000, 22_000, now);
+        let decision = coord.evaluate(doc_id, 0, 0, 22_000, 22_000, 22_000, now);
         assert!(matches!(decision, Decision::Skip));
 
-        let result = coord.release(account, lease_id);
+        let result = coord.release(doc_id, lease_id);
         assert!(matches!(result, ReleaseResult::Accepted));
 
         // After release, issues again.
-        let decision_2 = coord.evaluate(account, 0, 0, 22_000, 22_000, 22_000, now);
+        let decision_2 = coord.evaluate(doc_id, 0, 0, 22_000, 22_000, 22_000, now);
         assert!(matches!(
             decision_2,
             Decision::Issue {
@@ -205,7 +205,7 @@ mod tests {
 
         // Expired lease — issues again.
         let decision = coord.evaluate(
-            account,
+            doc_id,
             0,
             0,
             12_000,
@@ -228,10 +228,10 @@ mod tests {
         // snapshot still issued for bootstrap perf (state frontier
         // advances), but the floor stays put — no new compaction.
         let coord = SnapshotCoordinator::new();
-        let account = Uuid::now_v7();
+        let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
-        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 10_000, 22_000, now);
+        let decision = coord.evaluate(doc_id, 10_000, 10_000, 22_000, 10_000, 22_000, now);
         assert!(matches!(
             decision,
             Decision::Issue {
@@ -249,10 +249,10 @@ mod tests {
         // unwind, so the new snapshot's floor is clamped up to the
         // existing floor.
         let coord = SnapshotCoordinator::new();
-        let account = Uuid::now_v7();
+        let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
-        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 0, 22_000, now);
+        let decision = coord.evaluate(doc_id, 10_000, 10_000, 22_000, 0, 22_000, now);
         assert!(matches!(
             decision,
             Decision::Issue {
@@ -268,10 +268,10 @@ mod tests {
         // Horizon advances past the existing compaction floor — new
         // floor tracks horizon, advancing compaction.
         let coord = SnapshotCoordinator::new();
-        let account = Uuid::now_v7();
+        let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
-        let decision = coord.evaluate(account, 10_000, 10_000, 22_000, 15_000, 22_000, now);
+        let decision = coord.evaluate(doc_id, 10_000, 10_000, 22_000, 15_000, 22_000, now);
         assert!(matches!(
             decision,
             Decision::Issue {
@@ -285,17 +285,17 @@ mod tests {
     #[test]
     fn stale_completions_ignored() {
         let coord = SnapshotCoordinator::new();
-        let account = Uuid::now_v7();
+        let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
-        let result = coord.release(account, 100);
+        let result = coord.release(doc_id, 100);
         assert!(
             matches!(result, ReleaseResult::Stale),
             "Stale result if coordinator does not track any snapshot"
         );
 
-        coord.evaluate(account, 0, 0, 12_000, 12_000, 12_000, now);
-        let result_2 = coord.release(account, 100);
+        coord.evaluate(doc_id, 0, 0, 12_000, 12_000, 12_000, now);
+        let result_2 = coord.release(doc_id, 100);
         assert!(
             matches!(result_2, ReleaseResult::Stale),
             "Stale result if coordinator snapshot mismatch with client"

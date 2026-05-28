@@ -2,11 +2,11 @@
 
 ## Loro doc layout
 
-Each Loro doc has this structure. Every account has exactly one **primary doc** (their Home) — non-deletable, non-leavable, the first thing the user sees on sign-in. Shared docs (planned; see `sharing.md`) reuse the same layout. For v1 the primary doc is the only doc per account; the per-doc shape is in place so adding shared docs later is purely an additive change.
+One Loro doc per account.
 
 - `doc.get_movable_list("items")` — `LoroMovableList<LoroMap>` where each map is one Item.
 - `doc.get_movable_list("lists")` — `LoroMovableList<LoroMap>` where each map is one ListMeta.
-- `doc.get_map("settings")` — `LoroMap` for doc-wide synced workspace settings.
+- `doc.get_map("settings")` — `LoroMap` for account-wide synced workspace settings.
 
 ## Item
 
@@ -41,15 +41,15 @@ Whether the nav shows a live-item count beside each list is governed by a single
 
 ## Built-in lists
 
-Each doc has one reserved primary capture list:
+Airday has one reserved primary capture list:
 
-- `main` — rendered as "Queue". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable. Doc-level settings for it live in `settings`. Reserved per-doc — a shared doc has its own `main` independent of any member's primary doc.
+- `main` — rendered as "Queue". This id is reserved and addressable by items, but it is not stored as a `ListMeta` row in the `lists` MovableList. Its label is currently client-defined and it is non-renamable, non-movable, and non-deletable. Doc-level settings for it live in `settings`.
 
 The bin is *not* a list; it's the `Binned` status on items.
 
 ## WorkspaceSettings
 
-Doc-level synced settings that are not owned by any specific `ListMeta`. Per-doc — shared docs do not inherit the inviter's settings.
+Doc-level synced settings that are not owned by any specific `ListMeta`.
 
 | Field | Type | Notes |
 |---|---|---|
