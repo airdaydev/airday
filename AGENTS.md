@@ -34,6 +34,7 @@ Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
+| [`spec/sharing.md`](spec/sharing.md) | Planned: doc membership, invite flow, ownership transfer, known limitations |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
 | [`spec/saas.md`](spec/saas.md) | Future SaaS contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 

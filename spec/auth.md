@@ -15,7 +15,9 @@ POST   /api/devices                    (register a new device)
 DELETE /api/devices/:device_id
 ```
 
-WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>` (CLI) or the `airday_device` cookie (web). Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. No per-message auth. (Frame encoding + version handshake: see `sync-protocol.md`.)
+WebSocket upgrade: `GET /api/sync` with `Authorization: Bearer <device_token>` (CLI) or the `airday_device` cookie (web). Server validates on upgrade; the connection is bound to `(account_id, device_id)` for its lifetime. One connection multiplexes sync for every doc the account is a member of; each payload-carrying frame names a `doc_id` and the server checks `doc_members(doc_id, account_id)` per-frame. No per-message auth beyond that membership check. (Frame encoding + version handshake + multiplexing model: see `sync-protocol.md`.)
+
+Sharing endpoints (`/api/docs/*`, `/api/invites/*`) are planned but not in v1; see `sharing.md`. v1 implements only the primary-doc-per-account case, but the wire shape (memberships arrays in login/recover/password-change bodies) is already plural to avoid a second migration when sharing lands.
 
 All HTTP request and response bodies are MessagePack-encoded (`Content-Type: application/msgpack`). Same encoding as the WS path; one wire format across the system.
 
@@ -72,8 +74,8 @@ Client cannot derive `auth_secret` without the salt. Standard pattern:
 
 1. `POST /api/account/prelogin { email }` → server returns `{ password_salt, kdf_params }`, or **404 if email unknown**. We accept that this leaks account existence: signup (duplicate-email rejection) and recovery already leak the same bit, so faking a deterministic dummy salt here would be theatre while costing every typo'd-email attempt a full client-side Argon2id pass. Defence is rate-limiting (per-IP + per-email backoff), not response shaping. Revisit only if Airday ever holds data where "is X a user" is itself sensitive.
 2. Client computes `master`, `kek`, `auth_secret` from the password and salt.
-3. `POST /api/account/login { email, auth_secret }` → server verifies, returns `{ wrapped_dek, wrapped_dek_nonce, recovery_present, device_token? }` (device_token only if registering this client as a device in the same call; otherwise client follows up with `POST /api/devices`).
-4. Client unwraps DEK with `kek`.
+3. `POST /api/account/login { email, auth_secret }` → server verifies, returns `{ primary_doc_id, memberships: [{ doc_id, wrapped_dek, wrapped_dek_nonce }], recovery_present, device_token? }` (device_token only if registering this client as a device in the same call; otherwise client follows up with `POST /api/devices`). For v1 `memberships` always carries exactly one entry — the primary doc.
+4. Client unwraps every membership's DEK with `kek` and keys them by `doc_id` for sync.
 
 ## Device pairing
 
@@ -84,19 +86,19 @@ Client cannot derive `auth_secret` without the salt. Standard pattern:
 ### Device 2 (existing account)
 1. POST `/api/account/prelogin { email }` → returns `password_salt`.
 2. Client derives `master` → `kek`, `auth_secret` from password + salt.
-3. POST `/api/account/login { email, auth_secret }` → returns `wrapped_dek`.
-4. Client unwraps DEK with `kek`.
+3. POST `/api/account/login { email, auth_secret }` → returns `{ primary_doc_id, memberships: [...] }`.
+4. Client unwraps each membership's DEK with `kek`.
 5. POST `/api/devices` → returns new `device_token`.
-6. WS connect, `PullSnapshot` if present, then `PullOps`.
+6. WS connect, then per doc: `PullSnapshot { doc_id }` if present, then `PullOps { doc_id }`.
 
 ### Recovery (lost password / fresh device)
 1. POST `/api/account/prelogin { email }` → `{ master_salt, recovery_salt }`.
 2. Client computes `recovery_master = Argon2id(recovery_code, recovery_salt)` → `recovery_kek`, `recovery_auth_secret`.
-3. POST `/api/account/recover { email, recovery_auth_secret }` → server verifies `SHA-256(recovery_auth_secret) == recovery_auth_hash`, returns `{ recovery_wrapped_dek, recovery_wrapped_dek_nonce, recovery_session_token }`. **Wrap is never released without this proof.** `recovery_session_token` is single-use and TTL 15 min — long enough to type a strong new password without rushing, short enough that an abandoned tab doesn't leave the reset window open.
-4. Client unwraps DEK locally with `recovery_kek`.
-5. Client picks new password, derives new `master_salt`, `master`, `kek`, `auth_secret`; re-wraps DEK.
-6. POST `/api/account/password/reset { recovery_session_token, new_master_salt, new_auth_secret, new_wrapped_dek, new_wrapped_dek_nonce, device_name }` → atomically updates password material + creates device row + invalidates session token, returns `{ device_id, device_token }`.
-7. WS connect, `PullSnapshot` if present, then `PullOps`.
+3. POST `/api/account/recover { email, recovery_auth_secret }` → server verifies `SHA-256(recovery_auth_secret) == recovery_auth_hash`, returns `{ memberships: [{ doc_id, recovery_wrapped_dek, recovery_wrapped_dek_nonce }], recovery_session_token }`. **Wraps are never released without this proof.** `recovery_session_token` is single-use and TTL 15 min — long enough to type a strong new password without rushing, short enough that an abandoned tab doesn't leave the reset window open. For v1 `memberships` carries one entry.
+4. Client unwraps each membership's DEK locally with `recovery_kek`.
+5. Client picks new password, derives new `master_salt`, `master`, `kek`, `auth_secret`; re-wraps every DEK with the new `kek`.
+6. POST `/api/account/password/reset { recovery_session_token, new_master_salt, new_auth_secret, memberships: [{ doc_id, wrapped_dek, wrapped_dek_nonce }], device_name }` → atomically updates password material + replaces every `doc_members.wrapped_dek` for this account + creates device row + invalidates session token, returns `{ device_id, device_token }`.
+7. WS connect, then per doc: `PullSnapshot { doc_id }` if present, then `PullOps { doc_id }`.
 
 ## Rate limiting
 
