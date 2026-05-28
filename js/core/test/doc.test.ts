@@ -52,6 +52,7 @@ describe("Doc + MemStorage", () => {
     await storage.putDoc(new Uint8Array([1, 2, 3]));
     await storage.putDevice({
       accountId: "acct-1",
+      primaryDocId: "doc-1",
       email: "user@example.com",
       serverUrl: "http://localhost:8080",
       deviceId: "dev-1",

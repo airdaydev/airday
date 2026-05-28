@@ -13,10 +13,12 @@
 
 export interface DeviceConfig {
   accountId: string;
+  /** Server-assigned id of the account's primary (Home) doc. */
+  primaryDocId: string;
   email: string;
   serverUrl: string;
   deviceId: string;
-  /** Sync engine's contiguous-prefix per-account seq. */
+  /** Sync engine's contiguous-prefix per-doc seq. */
   lastAckedSeq: number;
   /** Unix millis of the last successful online flush, or null. */
   lastSyncAt: number | null;
@@ -27,6 +29,7 @@ export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
   const device = value as DeviceConfig;
   if (
     typeof device.accountId !== "string" ||
+    typeof device.primaryDocId !== "string" ||
     typeof device.email !== "string" ||
     typeof device.serverUrl !== "string" ||
     typeof device.deviceId !== "string"
@@ -41,6 +44,7 @@ export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
       : null;
   return {
     accountId: device.accountId,
+    primaryDocId: device.primaryDocId,
     email: device.email,
     serverUrl: device.serverUrl,
     deviceId: device.deviceId,

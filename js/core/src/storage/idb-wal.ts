@@ -1,11 +1,12 @@
 // Browser local snapshot + IndexedDB WAL.
 //
-// See `spec/idb-wal.md`. Two layers per account:
+// See `spec/idb-wal.md`. Two layers per doc:
 //
 //   - OPFS:  the encrypted full-state snapshot (file pointed at by
-//            `snapshot_meta.snapshot_file`).
-//   - IDB :  one row per local commit in the `ops` store; the
-//            authoritative commit pointer in `snapshot_meta`.
+//            `snapshot_meta.snapshot_file`). Per-doc directory.
+//   - IDB :  one row per local commit in the `ops` store (keyed by
+//            `[doc_id, wal_seq]`); the authoritative commit pointer
+//            in `snapshot_meta` (keyed by `doc_id`).
 //
 // Restore = load the snapshot pointed to by `snapshot_meta`, then
 // replay every WAL row with `wal_seq > snapshot_wal_seq`. The
@@ -15,6 +16,12 @@
 // Storage of WAL rows uses one IDB transaction per append (no
 // batching) so a tab close mid-burst still flushes the rows already
 // queued.
+//
+// `accountId` is carried alongside `docId` only for the per-account
+// `device` row (which holds the sync frontier + primary doc pointer).
+// All per-doc data — ops, snapshot meta, OPFS files — is scoped by
+// `docId` only, so adding shared docs later doesn't require a key
+// migration.
 
 import type { Dek, EncryptedBlob } from "../../wasm/airday_core_web.js";
 import { normalizeDeviceConfig, type DeviceConfig } from "./adapter.ts";
@@ -39,7 +46,7 @@ type EncryptedBlobCtor = new (
 ) => EncryptedBlob;
 
 interface WalRow {
-  account_id: string;
+  doc_id: string;
   wal_seq: number;
   nonce: Uint8Array;
   ciphertext: Uint8Array;
@@ -48,9 +55,9 @@ interface WalRow {
 
 interface SnapshotMetaRow {
   version: number;
-  account_id: string;
+  doc_id: string;
   snapshot_file: string;
-  /** Monotonic per-account generation counter. Drives the filename so
+  /** Monotonic per-doc generation counter. Drives the filename so
    *  consecutive commits at the same `snapshot_wal_seq` (visibility-
    *  hidden flushes, signup seeding) write to distinct paths and never
    *  overwrite a currently-committed file in place. Absent on rows
@@ -70,7 +77,7 @@ interface DeviceRow {
 }
 
 /**
- * Per-account snapshot+WAL store backed by OPFS + IndexedDB.
+ * Per-doc snapshot+WAL store backed by OPFS + IndexedDB.
  *
  * Single-tab assumption: this class does *not* coordinate with peer
  * tabs. Wal_seq ordering is enforced by IDB primary-key constraints
@@ -86,6 +93,7 @@ export class IdbWalStorage implements WalStorage {
 
   constructor(
     private readonly accountId: string,
+    private readonly docId: string,
     private readonly dek: Dek,
     private readonly EncryptedBlobCtor: EncryptedBlobCtor,
   ) {}
@@ -115,7 +123,7 @@ export class IdbWalStorage implements WalStorage {
     // Kick the OPFS file read off first so the disk read is in
     // flight while we decrypt the WAL tail synchronously below.
     const opfsCipherPromise: Promise<Uint8Array | null> = meta
-      ? readOpfsFile(this.accountId, meta.snapshot_file)
+      ? readOpfsFile(this.docId, meta.snapshot_file)
       : Promise.resolve(null);
 
     const tailRows = rows.filter((r) => r.wal_seq > snapshotWalSeq);
@@ -204,7 +212,7 @@ export class IdbWalStorage implements WalStorage {
     const walSeq = this.nextWalSeq++;
     const sealed = this.dek.seal(plaintext);
     const row: WalRow = {
-      account_id: this.accountId,
+      doc_id: this.docId,
       wal_seq: walSeq,
       nonce: sealed.nonce,
       ciphertext: sealed.ciphertext,
@@ -258,11 +266,11 @@ export class IdbWalStorage implements WalStorage {
     // first commit after upgrade.
     const gen = (previous?.snapshot_gen ?? 0) + 1;
     const fileName = `snap-${gen}.bin`;
-    await writeOpfsFile(this.accountId, fileName, cipher);
+    await writeOpfsFile(this.docId, fileName, cipher);
 
     const next: SnapshotMetaRow = {
       version: META_VERSION,
-      account_id: this.accountId,
+      doc_id: this.docId,
       snapshot_file: fileName,
       snapshot_gen: gen,
       snapshot_wal_seq: snapshotWalSeq,
@@ -278,7 +286,7 @@ export class IdbWalStorage implements WalStorage {
     // orphaned. Best-effort; if it fails we leak the file but
     // correctness is unaffected (clear() reaps everything on logout).
     if (previous && previous.snapshot_file !== fileName) {
-      void deleteOpfsFile(this.accountId, previous.snapshot_file).catch(() => {});
+      void deleteOpfsFile(this.docId, previous.snapshot_file).catch(() => {});
     }
 
     // The WAL itself stays untouched — `spec/idb-wal.md` "WAL Retention"
@@ -314,12 +322,13 @@ export class IdbWalStorage implements WalStorage {
 
   // ---------- destructive ----------
 
-  /** Drop every byte we own for this account: OPFS snapshot files,
-   *  WAL rows, snapshot meta, device row. */
+  /** Drop every byte we own for this doc: OPFS snapshot files for
+   *  this docId, IDB ops + snapshot_meta rows for this docId, and the
+   *  per-account device row. */
   async clear(): Promise<void> {
     try {
       const root = await navigator.storage.getDirectory();
-      await root.removeEntry(this.accountId, { recursive: true });
+      await root.removeEntry(this.docId, { recursive: true });
     } catch {
       // already gone
     }
@@ -331,11 +340,11 @@ export class IdbWalStorage implements WalStorage {
       (tx) => {
         const ops = tx.objectStore(STORE_OPS);
         const range = IDBKeyRange.bound(
-          [this.accountId, 0],
-          [this.accountId, Number.MAX_SAFE_INTEGER],
+          [this.docId, 0],
+          [this.docId, Number.MAX_SAFE_INTEGER],
         );
         ops.delete(range);
-        tx.objectStore(STORE_SNAPSHOT_META).delete(this.accountId);
+        tx.objectStore(STORE_SNAPSHOT_META).delete(this.docId);
         tx.objectStore(STORE_DEVICE).delete(this.accountId);
       },
     );
@@ -353,7 +362,7 @@ export class IdbWalStorage implements WalStorage {
   private async getMeta(db: IDBDatabase): Promise<SnapshotMetaRow | null> {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_SNAPSHOT_META, "readonly");
-      const req = tx.objectStore(STORE_SNAPSHOT_META).get(this.accountId);
+      const req = tx.objectStore(STORE_SNAPSHOT_META).get(this.docId);
       req.onsuccess = () => resolve((req.result as SnapshotMetaRow) ?? null);
       req.onerror = () => reject(req.error);
     });
@@ -361,12 +370,12 @@ export class IdbWalStorage implements WalStorage {
 
   /**
    * Single readonly transaction that reads `snapshot_meta`, the
-   * full WAL row range, and the device row for this account in one
-   * go. `getAll` returns every match in one event-loop trip; the
+   * full WAL row range, and the device row for this doc/account in
+   * one go. `getAll` returns every match in one event-loop trip; the
    * cursor variant fired one `onsuccess` per row and was the
    * dominant cost on real IDB.
    *
-   * The WAL range is keyed as `[account_id, 0] .. [account_id, MAX]`
+   * The WAL range is keyed as `[docId, 0] .. [docId, MAX]`
    * so the read covers both pre- and post-snapshot rows; the caller
    * filters down to the post-snapshot tail once it knows
    * `snapshotWalSeq` from the meta row.
@@ -384,15 +393,13 @@ export class IdbWalStorage implements WalStorage {
       let meta: SnapshotMetaRow | null = null;
       let rows: WalRow[] = [];
       let device: DeviceConfig | null = null;
-      const metaReq = tx
-        .objectStore(STORE_SNAPSHOT_META)
-        .get(this.accountId);
+      const metaReq = tx.objectStore(STORE_SNAPSHOT_META).get(this.docId);
       metaReq.onsuccess = () => {
         meta = (metaReq.result as SnapshotMetaRow) ?? null;
       };
       const range = IDBKeyRange.bound(
-        [this.accountId, 0],
-        [this.accountId, Number.MAX_SAFE_INTEGER],
+        [this.docId, 0],
+        [this.docId, Number.MAX_SAFE_INTEGER],
       );
       const opsReq = tx.objectStore(STORE_OPS).getAll(range);
       opsReq.onsuccess = () => {
@@ -438,19 +445,19 @@ function runTx(
 
 // ---------- OPFS helpers ----------
 
-async function opfsAccountDir(
-  accountId: string,
+async function opfsDocDir(
+  docId: string,
 ): Promise<FileSystemDirectoryHandle> {
   const root = await navigator.storage.getDirectory();
-  return root.getDirectoryHandle(accountId, { create: true });
+  return root.getDirectoryHandle(docId, { create: true });
 }
 
 async function readOpfsFile(
-  accountId: string,
+  docId: string,
   name: string,
 ): Promise<Uint8Array | null> {
   try {
-    const dir = await opfsAccountDir(accountId);
+    const dir = await opfsDocDir(docId);
     const fh = await dir.getFileHandle(name);
     const file = await fh.getFile();
     return new Uint8Array(await file.arrayBuffer());
@@ -461,11 +468,11 @@ async function readOpfsFile(
 }
 
 async function writeOpfsFile(
-  accountId: string,
+  docId: string,
   name: string,
   bytes: Uint8Array,
 ): Promise<void> {
-  const dir = await opfsAccountDir(accountId);
+  const dir = await opfsDocDir(docId);
   const fh = await dir.getFileHandle(name, { create: true });
   const w = await fh.createWritable();
   // Copy to a fresh ArrayBuffer (not SharedArrayBuffer-backed) so the
@@ -477,11 +484,11 @@ async function writeOpfsFile(
 }
 
 async function deleteOpfsFile(
-  accountId: string,
+  docId: string,
   name: string,
 ): Promise<void> {
   try {
-    const dir = await opfsAccountDir(accountId);
+    const dir = await opfsDocDir(docId);
     await dir.removeEntry(name);
   } catch (e) {
     if (isNotFound(e)) return;

@@ -42,6 +42,7 @@ describe("BunFileStorage", () => {
     const storage = new BunFileStorage(root);
     const cfg = {
       accountId: "acct-aaaaaaaa",
+      primaryDocId: "doc-aaaaaaaa",
       email: "user@example.com",
       serverUrl: "http://localhost:8080",
       deviceId: "dev-aaaaaaaa",

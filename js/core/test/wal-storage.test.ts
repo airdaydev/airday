@@ -347,6 +347,7 @@ describe("clear()", () => {
     await wal.commitSnapshot(engine.save(), wal.highestWalSeq());
     await wal.putDevice({
       accountId: "a",
+      primaryDocId: "doc-a",
       email: "x@y",
       serverUrl: "http://x",
       deviceId: "d",

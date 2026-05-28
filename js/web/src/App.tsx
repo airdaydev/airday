@@ -124,6 +124,7 @@ function AppBody() {
           anonymous: v.anonymous,
           email: v.email,
           accountId: v.accountId,
+          primaryDocId: v.primaryDocId,
           deviceId: v.deviceId,
           dek: v.dek,
           freshSignup: false,
@@ -212,10 +213,15 @@ function shouldEnforceSingleTab(): boolean {
 
 async function createAnonymousSession(): Promise<Session> {
   const accountId = `anon-${crypto.randomUUID()}`;
+  // Anonymous sessions never reach the server, so there's no
+  // server-assigned doc id to use. Mint one locally; matches the
+  // shape authenticated sessions get from signup/login responses.
+  const primaryDocId = crypto.randomUUID();
   const dek = Dek.generate();
   const session: Session = {
     anonymous: true,
     accountId,
+    primaryDocId,
     email: null,
     deviceId: null,
     dek,
@@ -227,6 +233,7 @@ async function createAnonymousSession(): Promise<Session> {
     await dekVault.save({
       anonymous: true,
       accountId,
+      primaryDocId,
       email: null,
       deviceId: null,
       dek: dek.clone(),
@@ -303,6 +310,7 @@ function BootGate(props: {
       }
       const wal = new IdbWalStorage(
         props.session.accountId,
+        props.session.primaryDocId,
         props.session.dek.clone(),
         EncryptedBlob,
       );
@@ -362,6 +370,7 @@ async function tryInitWal(
   if (!opfsOk) return null;
   const wal = new IdbWalStorage(
     session.accountId,
+    session.primaryDocId,
     session.dek.clone(),
     EncryptedBlob,
   );
@@ -450,6 +459,7 @@ function MainApp(props: {
     if (!wal || props.session.anonymous) return;
     await wal.putDevice({
       accountId: props.session.accountId,
+      primaryDocId: props.session.primaryDocId,
       email: props.session.email!,
       // Bundle is served from the same origin as the API; record that
       // origin for completeness even though the cookie is the
@@ -535,6 +545,7 @@ function MainApp(props: {
       void wal
         .putDevice({
           accountId: props.session.accountId,
+          primaryDocId: props.session.primaryDocId,
           email: props.session.email!,
           serverUrl: window.location.origin,
           deviceId: props.session.deviceId!,

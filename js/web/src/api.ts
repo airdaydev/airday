@@ -31,6 +31,10 @@ export interface DeviceCredential {
 
 export interface LoginResponse {
   account_id: string;
+  /** Server-assigned id of the account's primary (Home) doc. Used to key
+   *  local storage so ops/snapshots live under the real doc id rather
+   *  than a per-account placeholder. */
+  primary_doc_id: string;
   wrapped_dek: Uint8Array;
   wrapped_dek_nonce: Uint8Array;
   recovery_present: boolean;
@@ -90,7 +94,13 @@ export const api = {
     wrapped_dek: Uint8Array;
     wrapped_dek_nonce: Uint8Array;
     device_name: string;
-  }): Promise<{ account_id: string; device_id: string; device_token: string }> {
+  }): Promise<{
+    account_id: string;
+    device_id: string;
+    device_token: string;
+    /** Server-assigned id of the new account's primary doc; see LoginResponse. */
+    primary_doc_id: string;
+  }> {
     return post("/api/account/signup", {
       email: args.email,
       master_salt: args.master_salt,

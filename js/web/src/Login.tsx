@@ -23,8 +23,13 @@ export interface Session {
    *  sign up or log in. */
   anonymous: boolean;
   /** Account id — server-issued for authenticated sessions, locally
-   *  generated (`anon-<uuid>`) for anonymous ones. Used to namespace OPFS. */
+   *  generated (`anon-<uuid>`) for anonymous ones. Used to namespace
+   *  per-account state (device row, prefs). */
   accountId: string;
+  /** Doc id of the account's primary (Home) doc — server-assigned for
+   *  authenticated sessions, locally generated for anonymous ones. Keys
+   *  the per-doc data plane (ops WAL, snapshot, OPFS dir). */
+  primaryDocId: string;
   /** Null on anonymous sessions. */
   email: string | null;
   /** Null on anonymous sessions. */
@@ -200,6 +205,7 @@ async function doLogin(
     anonymous: false,
     email,
     accountId: resp.account_id,
+    primaryDocId: resp.primary_doc_id,
     deviceId: resp.device.device_id,
     dek,
     freshSignup: false,
@@ -244,6 +250,7 @@ async function doSignup(
     anonymous: false,
     email,
     accountId: resp.account_id,
+    primaryDocId: resp.primary_doc_id,
     deviceId: resp.device_id,
     dek,
     freshSignup: true,
@@ -260,6 +267,7 @@ async function persistVault(session: Session): Promise<void> {
     await dekVault.save({
       anonymous: session.anonymous,
       accountId: session.accountId,
+      primaryDocId: session.primaryDocId,
       email: session.email,
       deviceId: session.deviceId,
       dek: session.dek.clone(),

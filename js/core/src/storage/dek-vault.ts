@@ -28,6 +28,9 @@ export interface VaultedSession {
    *  and deviceId are null in this mode. */
   anonymous: boolean;
   accountId: string;
+  /** Doc id of the account's primary (Home) doc. Server-assigned for
+   *  authenticated sessions, locally generated for anonymous ones. */
+  primaryDocId: string;
   email: string | null;
   deviceId: string | null;
   dek: Dek;
@@ -36,6 +39,7 @@ export interface VaultedSession {
 interface VaultRecord {
   anonymous: boolean;
   accountId: string;
+  primaryDocId: string;
   email: string | null;
   deviceId: string | null;
   wrappingKey: CryptoKey;
@@ -75,11 +79,20 @@ export class DekVault {
         ),
       );
       const dek = this.dekFromHex(toHex(dekBytes));
+      // Records written before primaryDocId landed don't carry one;
+      // the only way to recover is to log in again so the next vault
+      // write captures it. Surface as a "missing" session — callers
+      // should treat this as "no session" and prompt for auth.
+      if (typeof rec.primaryDocId !== "string" || rec.primaryDocId.length === 0) {
+        await this.clear();
+        return null;
+      }
       return {
         // Records written before anonymous mode landed have no flag;
         // they're authenticated by definition.
         anonymous: rec.anonymous ?? false,
         accountId: rec.accountId,
+        primaryDocId: rec.primaryDocId,
         email: rec.email ?? null,
         deviceId: rec.deviceId ?? null,
         dek,
@@ -112,6 +125,7 @@ export class DekVault {
     const rec: VaultRecord = {
       anonymous: s.anonymous,
       accountId: s.accountId,
+      primaryDocId: s.primaryDocId,
       email: s.email,
       deviceId: s.deviceId,
       wrappingKey,
