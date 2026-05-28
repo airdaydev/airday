@@ -10,7 +10,7 @@
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
-import { createSearchEngine, type SearchEngine } from "./search.ts";
+import { createSearchEngine, type SearchEngine } from "../search.ts";
 
 /** Done and binned are independent flags — an item can be both. The
  *  presence of the timestamp *is* the flag; there's no separate

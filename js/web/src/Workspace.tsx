@@ -32,7 +32,7 @@ import {
   type DocApp,
   type ItemView,
   type ListView,
-} from "./store.ts";
+} from "./sync/store.ts";
 import { createTheme, type ThemePreference } from "./theme.ts";
 
 // Done items linger in their live list this long after being marked

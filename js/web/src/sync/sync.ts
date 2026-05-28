@@ -9,7 +9,7 @@ import {
   SyncBridge,
   type SyncBridgeOpts,
 } from "@airday/core/sync-bridge";
-import { api, ApiError } from "./api.ts";
+import { api, ApiError } from "../api.ts";
 
 type WebOpts = Omit<SyncBridgeOpts, "socketFactory" | "probeAuth">;
 

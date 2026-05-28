@@ -13,7 +13,7 @@ import {
   wrapDek,
 } from "@airday/core/wasm";
 import { api, ApiError, type LoginResponse } from "./api.ts";
-import { dekVault } from "./dekVault.ts";
+import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
 
 export interface Session {

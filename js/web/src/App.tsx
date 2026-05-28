@@ -20,11 +20,11 @@ import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { bootWal, IdbWalStorage, probeOpfs, WalBridge } from "@airday/core";
 import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
 import { api } from "./api.ts";
-import { dekVault } from "./dekVault.ts";
+import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { type Session } from "./Login.tsx";
-import { createSyncedApp } from "./store.ts";
-import { createSyncBridge, SyncBridge } from "./sync.ts";
+import { createSyncedApp } from "./sync/store.ts";
+import { createSyncBridge, SyncBridge } from "./sync/sync.ts";
 import { Workspace } from "./Workspace.tsx";
 
 const CLIENT_NAME = "airday-web";

@@ -22,7 +22,7 @@ import {
   isInListView,
   type DocApp,
   type ItemView,
-} from "./store.ts";
+} from "./sync/store.ts";
 
 // Draft items live only in the dnd's items list — never in the engine —
 // until the user commits them. The id prefix is the discriminator the
