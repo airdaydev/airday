@@ -12,7 +12,7 @@ import {
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
-import type { DocApp } from "./store.ts";
+import type { DocApp } from "./sync/store.ts";
 import type { SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
 

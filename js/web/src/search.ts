@@ -5,7 +5,7 @@
 // stream the store dispatches.
 
 import type { AppEventJs } from "@airday/core/wasm";
-import type { ItemView, ListView, WorkspaceState } from "./store.ts";
+import type { ItemView, ListView, WorkspaceState } from "./sync/store.ts";
 
 export type SearchKind = "item" | "list";
 export type SearchStatus = "live" | "done" | "binned";

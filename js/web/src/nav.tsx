@@ -20,7 +20,7 @@ import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
 import type { ViewKey } from "./prefs.ts";
-import type { DocApp } from "./store.ts";
+import type { DocApp } from "./sync/store.ts";
 
 function ConnectionStatusPopover(props: {
   app: DocApp;
