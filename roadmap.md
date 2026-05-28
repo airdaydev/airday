@@ -8,16 +8,14 @@
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
 
-## Compaction [CONSIDER LEAVING THIS TIL POST-RELEASE]
+## Compaction *wait until sync / wal / storage is settled
 One latent thing remains, but it was already scoped out in your handoff:
   core/src/doc.rs::snapshot_blob still calls ExportMode::Snapshot (full), so the
   snapshot payload doesn't trim Loro's internal history even though the ops table does.
   That means bootstrap downloads are bigger than they need to be, but the ops-table
   storage win is fully realized. Switching to ExportMode::shallow_snapshot(frontier) means VV tracking.
 
-
 ## Web app
-- Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.
 - Browser automation harness. Manual smoke is still doing the job, but Playwright becomes worthwhile as a sanity check.
 
@@ -47,3 +45,4 @@ One latent thing remains, but it was already scoped out in your handoff:
 - Encoding habits?
 - vi keys (as an option)
 - Consider bounding sizes of client blobs (by KiB or op count)
+- Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data - while this seems like a good idea, in practice it slows things down enough it is important to have client-side optimistic changes which is of course, slightly harder than it looks
