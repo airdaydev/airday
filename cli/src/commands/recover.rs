@@ -111,7 +111,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         )
         .await?;
 
-    let profile = Profile::create(&recovered.account_id)?;
+    let profile = Profile::create()?;
     let primary_doc_uuid = uuid::Uuid::parse_str(&reset.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
     profile.write_device(&DeviceConfig {

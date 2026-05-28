@@ -74,7 +74,7 @@ impl Session {
 
     /// As `open`, but takes an explicit profile. Used by tests that
     /// need to point the runtime at a tempdir without mutating
-    /// process-global state (env vars, the `active` symlink).
+    /// process-global state (the `AIRDAY_DATA_DIR` env var).
     pub async fn open_with_profile(profile: Profile, sync: bool) -> Result<Self, SyncError> {
         let device = profile.read_device()?;
         let doc_id = Uuid::parse_str(&device.primary_doc_id)

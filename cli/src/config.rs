@@ -68,11 +68,12 @@ pub struct Secrets {
     pub dek_hex: String,
 }
 
-/// Top-level on-disk handle. Path layout:
+/// Top-level on-disk handle. Path layout under the root dir (system
+/// default `<data>/airday/`, or `AIRDAY_DATA_DIR` if set):
 /// ```text
-///   <data>/airday/<account-id-prefix>/device.json
-///   <data>/airday/<account-id-prefix>/secrets.json
-///   <data>/airday/<account-id-prefix>/loro.db
+///   <root>/device.json
+///   <root>/secrets.json
+///   <root>/loro.db
 /// ```
 pub struct Profile {
     pub dir: PathBuf,
@@ -87,20 +88,13 @@ impl Profile {
         }
     }
 
-    /// Path to the active profile, if one is logged in. Active = the
-    /// one symlink at `<data>/airday/active` resolves to.
+    /// The single per-install profile, if one is logged in. Airday is
+    /// single-human-user (see product thesis); one account at a time,
+    /// no profile switching, so "active" collapses to "does the
+    /// device file exist?". Run two accounts side-by-side in dev by
+    /// pointing `AIRDAY_DATA_DIR` at distinct roots.
     pub fn active() -> Result<Option<Self>, ConfigError> {
-        let root = root_dir()?;
-        let active = root.join("active");
-        if !active.exists() {
-            return Ok(None);
-        }
-        let target = std::fs::read_link(&active)?;
-        let dir = if target.is_absolute() {
-            target
-        } else {
-            root.join(target)
-        };
+        let dir = root_dir()?;
         if !dir.join(DEVICE_FILE).exists() {
             return Ok(None);
         }
@@ -111,18 +105,10 @@ impl Profile {
         Self::active()?.ok_or(ConfigError::NotLoggedIn)
     }
 
-    /// Open or create the profile directory for an account id, then
-    /// point `active` at it.
-    pub fn create(account_id: &str) -> Result<Self, ConfigError> {
-        let root = root_dir()?;
-        std::fs::create_dir_all(&root)?;
-        let prefix = account_id_prefix(account_id);
-        let dir = root.join(prefix);
+    /// Create (or reuse) the single per-install profile directory.
+    pub fn create() -> Result<Self, ConfigError> {
+        let dir = root_dir()?;
         std::fs::create_dir_all(&dir)?;
-        // Repoint the `active` symlink to this profile.
-        let active = root.join("active");
-        let _ = std::fs::remove_file(&active);
-        symlink(&dir, &active)?;
         Ok(Self::new(dir))
     }
 
@@ -197,8 +183,6 @@ impl Profile {
         if self.dir.exists() {
             std::fs::remove_dir_all(&self.dir)?;
         }
-        let active = root_dir()?.join("active");
-        let _ = std::fs::remove_file(active);
         Ok(())
     }
 
@@ -229,25 +213,25 @@ fn now_millis() -> i64 {
 
 fn root_dir() -> Result<PathBuf, ConfigError> {
     // `AIRDAY_DATA_DIR` lets tests (and adventurous users) override the
-    // platform-default data dir without rebuilding. Production paths
-    // never set it.
-    if let Ok(v) = std::env::var("AIRDAY_DATA_DIR") {
-        if !v.is_empty() {
-            return Ok(PathBuf::from(v).join(ROOT_DIR));
-        }
+    // platform-default data dir without rebuilding. Taken verbatim:
+    // the user picked the path, so we don't append `airday/` to it.
+    // Production paths leave the env var unset, falling through to the
+    // namespaced default below — `data_local_dir` is always absolute.
+    let raw = match std::env::var("AIRDAY_DATA_DIR") {
+        Ok(v) if !v.is_empty() => PathBuf::from(v),
+        _ => dirs::data_local_dir()
+            .ok_or(ConfigError::NoDataDir)?
+            .join(ROOT_DIR),
+    };
+    // Resolve relative paths against CWD at first read so downstream
+    // calls don't silently look in the wrong place if the user `cd`s
+    // mid-session. `std::path::absolute` doesn't require the path to
+    // exist (unlike `canonicalize`), which matches first-run UX.
+    if raw.is_absolute() {
+        Ok(raw)
+    } else {
+        Ok(std::path::absolute(&raw)?)
     }
-    let base = dirs::data_local_dir().ok_or(ConfigError::NoDataDir)?;
-    Ok(base.join(ROOT_DIR))
-}
-
-fn account_id_prefix(account_id: &str) -> String {
-    // First 8 hex chars of the uuid (without dashes) is enough for
-    // local disambiguation between accounts on the same machine.
-    let stripped: String = account_id
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit())
-        .collect();
-    stripped.chars().take(8).collect()
 }
 
 fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), ConfigError> {
@@ -266,18 +250,4 @@ fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), Co
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ConfigError> {
     let bytes = std::fs::read(path)?;
     Ok(serde_json::from_slice(&bytes)?)
-}
-
-#[cfg(unix)]
-fn symlink(target: &Path, link: &Path) -> std::io::Result<()> {
-    std::os::unix::fs::symlink(target, link)
-}
-
-#[cfg(windows)]
-fn symlink(target: &Path, link: &Path) -> std::io::Result<()> {
-    if target.is_dir() {
-        std::os::windows::fs::symlink_dir(target, link)
-    } else {
-        std::os::windows::fs::symlink_file(target, link)
-    }
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Wipe the local dev sqlite database.
+# Wipe the local dev sqlite database AND the local dev CLI profile dir.
 #
 # Safe by design:
-#   - hardcoded target under the gitignored `local/` dir
+#   - hardcoded targets under the gitignored `local/` dir
 #   - refuses if any process has the db open (server still running)
 #   - prompts unless --yes is passed
 #
@@ -12,7 +12,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 db="$repo_root/local/airday.sqlite"
-targets=("$db" "$db-wal" "$db-shm")
+cli_dir="$repo_root/local/cli"
+targets=("$db" "$db-wal" "$db-shm" "$cli_dir")
 
 assume_yes=0
 for arg in "$@"; do
@@ -20,7 +21,7 @@ for arg in "$@"; do
     -y|--yes) assume_yes=1 ;;
     -h|--help)
       echo "Usage: bun run wipe [-y|--yes]"
-      echo "Deletes local/airday.sqlite{,-wal,-shm}."
+      echo "Deletes local/airday.sqlite{,-wal,-shm} and the local/cli/ CLI profile dir."
       exit 0
       ;;
     *)
@@ -59,5 +60,5 @@ if [ "$assume_yes" -ne 1 ]; then
   esac
 fi
 
-rm -f -- "${existing[@]}"
+rm -rf -- "${existing[@]}"
 echo "Wiped."
