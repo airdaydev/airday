@@ -40,7 +40,8 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
         &dek,
         "smoke-test@example.com",
         true,
-    );
+    )
+    .await;
 
     // First open: connect, handshake, pull (empty). The seeded doc is
     // already persisted locally; only the user's new mutation should
@@ -84,9 +85,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
 #[tokio::test]
 async fn default_open_skips_connect() {
     let tmp = tempfile::tempdir().unwrap();
-    let profile = Profile {
-        dir: tmp.path().to_path_buf(),
-    };
+    let profile = Profile::new(tmp.path().to_path_buf());
     let fake_account = Uuid::now_v7().to_string();
     profile
         .write_device(&DeviceConfig {
@@ -105,7 +104,7 @@ async fn default_open_skips_connect() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile.write_doc(&Doc::new().unwrap()).unwrap();
+    profile.write_doc(&Doc::new().unwrap()).await.unwrap();
 
     // Without --sync the open call is fast — no 2s timeout penalty.
     let started = std::time::Instant::now();
@@ -149,16 +148,15 @@ async fn second_device_observes_first_devices_items_via_pull() {
         &dek,
         "smoke-test@example.com",
         true,
-    );
+    )
+    .await;
 
     // Device B: register a second device on the same account, share
     // the DEK (paranthesis: the real device-2 path derives the DEK
     // from password+wrap; here we cheat because we already have it).
     let device_b = register_device(&server, &signup.device_token, "device-b").await;
     let tmp_b = tempfile::tempdir().unwrap();
-    let profile_b = Profile {
-        dir: tmp_b.path().to_path_buf(),
-    };
+    let profile_b = Profile::new(tmp_b.path().to_path_buf());
     profile_b
         .write_device(&DeviceConfig {
             account_id: signup.account_id.clone(),
@@ -175,7 +173,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile_b.write_doc(&Doc::empty()).unwrap();
+    profile_b.write_doc(&Doc::empty()).await.unwrap();
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();

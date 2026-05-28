@@ -4,11 +4,11 @@
 //! `Session` is the per-invocation handle: open at command start, mutate
 //! the local Loro doc via `session.doc()`, `flush()` at end. With sync
 //! requested, open does the WS handshake and initial pull through the
-//! engine; flush saves `loro.bin`, asks the engine to push pending ops,
-//! advances the device's per-account `last_acked_seq`.
+//! engine; flush saves the doc snapshot, asks the engine to push
+//! pending ops, advances the device's per-account `last_acked_seq`.
 //!
 //! Offline-by-default per `spec/cli.md`:
-//! - Default: no network. Mutations append to `loro.bin` and ship on
+//! - Default: no network. Mutations are persisted locally and ship on
 //!   the next sync invocation.
 //! - `--sync` / `-s` / `AIRDAY_SYNC=1`: attempt WS connect with a 2s
 //!   timeout. Failure → local-only with a stderr warning. The dedicated
@@ -75,7 +75,7 @@ impl Session {
         let device = profile.read_device()?;
         let secrets = profile.read_secrets()?;
         let dek = dek_from_hex(&secrets.dek_hex)?;
-        let doc = match profile.read_doc() {
+        let doc = match profile.read_doc().await {
             Ok(d) => d,
             Err(ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
                 // First-run shouldn't hit this — signup writes the doc —
@@ -156,7 +156,7 @@ impl Session {
                 // `persist_engine_state` calls `notify_wal_durable`.
                 // This binds every outbound Ack to a doc write
                 // already on disk.
-                self.persist_engine_state()?;
+                self.persist_engine_state().await?;
                 send_outbox(&mut ws, &mut self.engine).await?;
                 drain_engine_errors(&mut self.engine)?;
                 if !self.engine.is_online() {
@@ -174,7 +174,7 @@ impl Session {
     /// the socket. Local persistence runs first so a network failure
     /// after a mutation can't silently drop the change.
     pub async fn flush(mut self) -> Result<(), SyncError> {
-        self.persist_engine_state()?;
+        self.persist_engine_state().await?;
 
         if let Some(mut ws) = self.ws.take() {
             self.engine.flush();
@@ -186,7 +186,7 @@ impl Session {
             // that writes the doc and calls `notify_wal_durable`,
             // which queues the Ack — then flush the outbox before
             // closing so the ack actually leaves the wire.
-            self.persist_engine_state()?;
+            self.persist_engine_state().await?;
             send_outbox(&mut ws, &mut self.engine).await?;
 
             // Best-effort close — server will disconnect on its own
@@ -222,14 +222,15 @@ impl Session {
         Ok(ws)
     }
 
-    fn persist_engine_state(&mut self) -> Result<(), SyncError> {
-        // `write_doc` rewrites loro.bin in full — once it returns Ok
-        // every applied seq in the in-memory engine is on disk, so we
-        // can tell the engine "everything up to `last_contiguous_seq`
-        // is durable." That advances the durable cursor and queues an
-        // Ack frame for any seqs not yet sent. Callers needing the
-        // ack on the wire (`flush`) must `send_outbox` next.
-        self.profile.write_doc(self.engine.doc())?;
+    async fn persist_engine_state(&mut self) -> Result<(), SyncError> {
+        // `write_doc` upserts the full snapshot blob — once it returns
+        // Ok every applied seq in the in-memory engine is on disk, so
+        // we can tell the engine "everything up to
+        // `last_contiguous_seq` is durable." That advances the durable
+        // cursor and queues an Ack frame for any seqs not yet sent.
+        // Callers needing the ack on the wire (`flush`) must
+        // `send_outbox` next.
+        self.profile.write_doc(self.engine.doc()).await?;
         let contiguous = self.engine.last_contiguous_seq();
         self.engine.notify_wal_durable(contiguous);
         let acked = self.engine.last_durable_seq();

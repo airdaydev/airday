@@ -26,7 +26,8 @@ async fn login_registers_second_device_and_pulls_existing_doc() {
         &signup.dek,
         &signup.email,
         true,
-    );
+    )
+    .await;
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a
         .doc()
@@ -51,7 +52,8 @@ async fn login_registers_second_device_and_pulls_existing_doc() {
         &login.dek,
         &signup.email,
         false,
-    );
+    )
+    .await;
     let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
     assert!(session_b.is_online());
     let item = session_b.doc().get_item(&item_id).unwrap();
@@ -74,7 +76,8 @@ async fn password_change_preserves_dek_and_existing_items_for_new_login() {
         &signup.dek,
         &signup.email,
         true,
-    );
+    )
+    .await;
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a
         .doc()
@@ -109,7 +112,8 @@ async fn password_change_preserves_dek_and_existing_items_for_new_login() {
         &login.dek,
         &signup.email,
         false,
-    );
+    )
+    .await;
     let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
     assert_eq!(
         session_b.doc().get_item(&item_id).unwrap().text,
@@ -133,7 +137,8 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
         &signup.dek,
         &signup.email,
         true,
-    );
+    )
+    .await;
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a.doc().add_item(LIST_MAIN, "recover-me").unwrap();
     session_a.flush().await.unwrap();
@@ -160,7 +165,8 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
         &recovered.dek,
         &signup.email,
         false,
-    );
+    )
+    .await;
     let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
     assert_eq!(
         session_b.doc().get_item(&item_id).unwrap().text,

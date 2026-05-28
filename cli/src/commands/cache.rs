@@ -73,11 +73,17 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
     let doc_path = profile.doc_path();
 
-    let pending = doc_path
-        .exists()
-        .then(|| profile.read_doc().map(|d| d.has_pending_ops()))
-        .transpose()?
-        .unwrap_or(false);
+    let pending = if doc_path.exists() {
+        match profile.read_doc().await {
+            Ok(d) => d.has_pending_ops(),
+            Err(crate::config::ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+                false
+            }
+            Err(e) => return Err(e.into()),
+        }
+    } else {
+        false
+    };
 
     if pending && !force {
         if !std::io::stdin().is_terminal() {
@@ -96,7 +102,18 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     }
 
     if doc_path.exists() {
+        // Nuke the sqlite db file and its WAL/shm sidecars. The next
+        // sync rehydrates from the server. If `read_doc` above already
+        // opened a connection, it stays alive against the unlinked
+        // inode until the profile drops — harmless on unix.
         std::fs::remove_file(&doc_path)?;
+        for suffix in ["-wal", "-shm"] {
+            let sidecar = doc_path.with_file_name(format!(
+                "{}{suffix}",
+                doc_path.file_name().unwrap().to_string_lossy()
+            ));
+            let _ = std::fs::remove_file(sidecar);
+        }
     }
 
     let mut device = profile.read_device()?;

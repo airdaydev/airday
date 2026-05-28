@@ -395,7 +395,7 @@ pub async fn register_device(
 /// Stand up the on-disk profile a real `airday signup` would have
 /// written. Constructed directly under `data_dir` so each test owns
 /// its profile and parallel runs don't race on `AIRDAY_DATA_DIR`.
-pub fn materialize_profile(
+pub async fn materialize_profile(
     data_dir: &std::path::Path,
     server_url: &str,
     account_id: &str,
@@ -406,9 +406,7 @@ pub fn materialize_profile(
     seed_doc: bool,
 ) -> Profile {
     std::fs::create_dir_all(data_dir).unwrap();
-    let profile = Profile {
-        dir: data_dir.to_path_buf(),
-    };
+    let profile = Profile::new(data_dir.to_path_buf());
     profile
         .write_device(&DeviceConfig {
             account_id: account_id.into(),
@@ -430,11 +428,11 @@ pub fn materialize_profile(
     } else {
         Doc::empty()
     };
-    profile.write_doc(&doc).unwrap();
+    profile.write_doc(&doc).await.unwrap();
     profile
 }
 
-pub fn materialize_signup_profile(
+pub async fn materialize_signup_profile(
     data_dir: &std::path::Path,
     server_url: &str,
     signup: &SignupResponse,
@@ -452,10 +450,9 @@ pub fn materialize_signup_profile(
         email,
         seed_doc,
     )
+    .await
 }
 
 pub fn reopen_profile(data_dir: &std::path::Path) -> Profile {
-    Profile {
-        dir: data_dir.to_path_buf(),
-    }
+    Profile::new(data_dir.to_path_buf())
 }

@@ -119,7 +119,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     })?;
     // Seed the local doc with built-in lists. The seed travels to
     // future devices as the first push on the op stream.
-    profile.write_doc(&Doc::new()?)?;
+    profile.write_doc(&Doc::new()?).await?;
 
     println!("Account created: {email} ({})", resp.account_id);
     if let Some(code) = recovery_code_to_show {

@@ -97,7 +97,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     })?;
     // Empty doc; the initial sync below pulls from seq 0, applies
     // device-1's seed + history, and we converge.
-    profile.write_doc(&Doc::empty())?;
+    profile.write_doc(&Doc::empty()).await?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;

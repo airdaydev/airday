@@ -9,11 +9,16 @@ use std::path::{Path, PathBuf};
 
 use airday_core::{Doc, DocError};
 use serde::{Deserialize, Serialize};
+use tokio::sync::OnceCell;
+use tokio_rusqlite::Connection;
+
+use crate::db;
 
 const ROOT_DIR: &str = "airday";
 const DEVICE_FILE: &str = "device.json";
 const SECRETS_FILE: &str = "secrets.json";
-const DOC_FILE: &str = "loro.bin";
+const DOC_DB_FILE: &str = "loro.db";
+const LEGACY_DOC_FILE: &str = "loro.bin";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -23,6 +28,10 @@ pub enum ConfigError {
     Decode(#[from] serde_json::Error),
     #[error("doc: {0}")]
     Doc(#[from] DocError),
+    #[error("db: {0}")]
+    Db(#[from] db::DbError),
+    #[error("sqlite: {0}")]
+    Sqlite(#[from] tokio_rusqlite::Error),
     #[error("no XDG data directory available")]
     NoDataDir,
     #[error("not logged in")]
@@ -57,12 +66,21 @@ pub struct Secrets {
 /// ```text
 ///   <data>/airday/<account-id-prefix>/device.json
 ///   <data>/airday/<account-id-prefix>/secrets.json
+///   <data>/airday/<account-id-prefix>/loro.db
 /// ```
 pub struct Profile {
     pub dir: PathBuf,
+    conn: OnceCell<Connection>,
 }
 
 impl Profile {
+    pub fn new(dir: PathBuf) -> Self {
+        Self {
+            dir,
+            conn: OnceCell::new(),
+        }
+    }
+
     /// Path to the active profile, if one is logged in. Active = the
     /// one symlink at `<data>/airday/active` resolves to.
     pub fn active() -> Result<Option<Self>, ConfigError> {
@@ -80,7 +98,7 @@ impl Profile {
         if !dir.join(DEVICE_FILE).exists() {
             return Ok(None);
         }
-        Ok(Some(Self { dir }))
+        Ok(Some(Self::new(dir)))
     }
 
     pub fn require_active() -> Result<Self, ConfigError> {
@@ -99,7 +117,7 @@ impl Profile {
         let active = root.join("active");
         let _ = std::fs::remove_file(&active);
         symlink(&dir, &active)?;
-        Ok(Self { dir })
+        Ok(Self::new(dir))
     }
 
     pub fn write_device(&self, cfg: &DeviceConfig) -> Result<(), ConfigError> {
@@ -118,18 +136,51 @@ impl Profile {
         read_json(&self.dir.join(SECRETS_FILE))
     }
 
-    pub fn write_doc(&self, doc: &Doc) -> Result<(), ConfigError> {
+    pub async fn write_doc(&self, doc: &Doc) -> Result<(), ConfigError> {
         let bytes = doc.save()?;
-        write_bytes(&self.dir.join(DOC_FILE), &bytes, 0o600)
+        let conn = self.conn().await?;
+        conn.call(move |c| {
+            c.execute(
+                "INSERT INTO doc_snapshot (id, payload, updated_at) VALUES (1, ?, ?)
+                 ON CONFLICT (id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at",
+                rusqlite::params![bytes, now_millis()],
+            )?;
+            Ok(())
+        })
+        .await?;
+        Ok(())
     }
 
-    pub fn read_doc(&self) -> Result<Doc, ConfigError> {
-        let bytes = std::fs::read(self.dir.join(DOC_FILE))?;
-        Ok(Doc::load(&bytes)?)
+    /// Read the persisted doc. Returns `NotFound` (as `Io`) when no
+    /// snapshot row exists yet — matches the previous file-based
+    /// `read_doc` shape so call sites that healed `NotFound` into
+    /// `Doc::empty()` keep working unchanged.
+    pub async fn read_doc(&self) -> Result<Doc, ConfigError> {
+        let conn = self.conn().await?;
+        let bytes: Option<Vec<u8>> = conn
+            .call(|c| {
+                let result =
+                    c.query_row("SELECT payload FROM doc_snapshot WHERE id = 1", [], |r| {
+                        r.get::<_, Vec<u8>>(0)
+                    });
+                match result {
+                    Ok(bytes) => Ok(Some(bytes)),
+                    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                    Err(e) => Err(e.into()),
+                }
+            })
+            .await?;
+        match bytes {
+            Some(bytes) => Ok(Doc::load(&bytes)?),
+            None => Err(ConfigError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no doc snapshot",
+            ))),
+        }
     }
 
     pub fn doc_path(&self) -> PathBuf {
-        self.dir.join(DOC_FILE)
+        self.dir.join(DOC_DB_FILE)
     }
 
     /// Wipe local state. Used by `airday logout`.
@@ -141,6 +192,30 @@ impl Profile {
         let _ = std::fs::remove_file(active);
         Ok(())
     }
+
+    async fn conn(&self) -> Result<&Connection, ConfigError> {
+        self.conn
+            .get_or_try_init(|| async {
+                // Older builds wrote a `loro.bin` blob in this dir.
+                // Nuke it on first sqlite open — we're not preserving
+                // it; users rehydrate via `airday sync`.
+                let legacy = self.dir.join(LEGACY_DOC_FILE);
+                if legacy.exists() {
+                    let _ = std::fs::remove_file(&legacy);
+                }
+                let conn = db::open(&self.dir.join(DOC_DB_FILE)).await?;
+                Ok(conn)
+            })
+            .await
+    }
+}
+
+fn now_millis() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn root_dir() -> Result<PathBuf, ConfigError> {
@@ -182,18 +257,6 @@ fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), Co
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ConfigError> {
     let bytes = std::fs::read(path)?;
     Ok(serde_json::from_slice(&bytes)?)
-}
-
-fn write_bytes(path: &Path, bytes: &[u8], _mode: u32) -> Result<(), ConfigError> {
-    std::fs::write(path, bytes)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perm = std::fs::metadata(path)?.permissions();
-        perm.set_mode(_mode);
-        std::fs::set_permissions(path, perm)?;
-    }
-    Ok(())
 }
 
 #[cfg(unix)]

@@ -124,7 +124,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: reset.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    profile.write_doc(&Doc::empty())?;
+    profile.write_doc(&Doc::empty()).await?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;

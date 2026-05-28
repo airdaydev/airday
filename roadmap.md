@@ -15,8 +15,6 @@ One latent thing remains, but it was already scoped out in your handoff:
   That means bootstrap downloads are bigger than they need to be, but the ops-table
   storage win is fully realized. Switching to ExportMode::shallow_snapshot(frontier) means VV tracking.
 
-GC is done on client with VV knowledge accumulated from devices directly. blobs are GC'd separately via op_seq_id, we know the latest contiguous op_seq_id within the client-generated snapshot, the snapshot having some additional extra local information is fine VV is for computing horizon and gc at snapshot time (deleting useless past) op_seq_id is for computing server blob GC (deleting redundancies on server)
-
 
 ## Web app
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data.
@@ -48,3 +46,4 @@ GC is done on client with VV knowledge accumulated from devices directly. blobs 
 ## Maybe
 - Encoding habits?
 - vi keys (as an option)
+- Consider bounding sizes of client blobs (by KiB or op count)

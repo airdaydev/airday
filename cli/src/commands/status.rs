@@ -27,7 +27,7 @@ struct StatusJson<'a> {
 pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
     let device = profile.read_device()?;
-    let doc = profile.read_doc()?;
+    let doc = profile.read_doc().await?;
 
     let pending = doc.has_pending_ops();
 
