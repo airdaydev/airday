@@ -23,6 +23,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use uuid::Uuid;
 
 use crate::config::{ConfigError, DeviceConfig, Profile};
 use crate::keystore::{dek_from_hex, KeystoreError};
@@ -55,6 +56,9 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub struct Session {
     profile: Profile,
     device: DeviceConfig,
+    /// Parsed `device.primary_doc_id` — the doc this session reads/writes.
+    /// CLI sessions only ever operate on the account's primary doc today.
+    doc_id: Uuid,
     engine: SyncEngine,
     ws: Option<WsStream>,
 }
@@ -73,9 +77,11 @@ impl Session {
     /// process-global state (env vars, the `active` symlink).
     pub async fn open_with_profile(profile: Profile, sync: bool) -> Result<Self, SyncError> {
         let device = profile.read_device()?;
+        let doc_id = Uuid::parse_str(&device.primary_doc_id)
+            .map_err(|e| SyncError::Engine(format!("invalid primary_doc_id: {e}")))?;
         let secrets = profile.read_secrets()?;
         let dek = dek_from_hex(&secrets.dek_hex)?;
-        let doc = match profile.read_doc().await {
+        let doc = match profile.read_doc(&doc_id).await {
             Ok(d) => d,
             Err(ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
                 // First-run shouldn't hit this — signup writes the doc —
@@ -100,6 +106,7 @@ impl Session {
         let mut session = Session {
             profile,
             device,
+            doc_id,
             engine,
             ws: None,
         };
@@ -230,7 +237,7 @@ impl Session {
         // cursor and queues an Ack frame for any seqs not yet sent.
         // Callers needing the ack on the wire (`flush`) must
         // `send_outbox` next.
-        self.profile.write_doc(self.engine.doc()).await?;
+        self.profile.write_doc(&self.doc_id, self.engine.doc()).await?;
         let contiguous = self.engine.last_contiguous_seq();
         self.engine.notify_wal_durable(contiguous);
         let acked = self.engine.last_durable_seq();

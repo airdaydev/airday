@@ -27,7 +27,9 @@ struct StatusJson<'a> {
 pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
     let device = profile.read_device()?;
-    let doc = profile.read_doc().await?;
+    let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
+        .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
+    let doc = profile.read_doc(&doc_id).await?;
 
     let pending = doc.has_pending_ops();
 

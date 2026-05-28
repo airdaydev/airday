@@ -64,6 +64,7 @@ pub async fn signup(
             account_id: created.account_id.to_string(),
             device_id: created.device_id.to_string(),
             device_token: token_hex,
+            primary_doc_id: created.primary_doc_id.to_string(),
         }),
     ))
 }
@@ -119,6 +120,7 @@ pub async fn login(
         headers,
         Msgpack(LoginResponse {
             account_id: account.id.to_string(),
+            primary_doc_id: account.primary_doc_id.to_string(),
             wrapped_dek: account.wrapped_dek,
             wrapped_dek_nonce: account.wrapped_dek_nonce,
             recovery_present,
@@ -223,6 +225,13 @@ pub async fn password_reset(
         sha256(&device_token).to_vec(),
     )
     .await?;
+    // Look up primary_doc_id so the resetting device can key its local
+    // storage without an extra round trip. Account must exist — we just
+    // updated it above — so a missing row is internal.
+    let primary_doc_id = find_account_by_id(&state.db, consumed.account_id)
+        .await?
+        .map(|a| a.primary_doc_id)
+        .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("account missing after password reset")))?;
 
     let token_hex = encode_token(&device_token);
     Ok((
@@ -230,6 +239,7 @@ pub async fn password_reset(
         Msgpack(PasswordResetResponse {
             device_id: device_id.to_string(),
             device_token: token_hex,
+            primary_doc_id: primary_doc_id.to_string(),
         }),
     ))
 }

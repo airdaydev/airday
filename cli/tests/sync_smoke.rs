@@ -51,12 +51,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     let item_id = session.doc().add_item(LIST_MAIN, "hello world").unwrap();
     session.flush().await.unwrap();
 
-    let account_id = Uuid::parse_str(&signup.account_id).unwrap();
-    let primary_doc_id = airday_server::auth::queries::find_account_by_id(&server.state.db, account_id)
-        .await
-        .unwrap()
-        .expect("account just created should be findable")
-        .primary_doc_id;
+    let primary_doc_id = Uuid::parse_str(&signup.primary_doc_id).unwrap();
     let batch = wait_for_ops(&server, primary_doc_id, 1).await;
     assert_eq!(batch.ops.len(), 1, "only the add-item mutation should push");
     let highest_assigned = batch.ops.iter().map(|o| o.seq).max().unwrap();
@@ -92,9 +87,11 @@ async fn default_open_skips_connect() {
     let tmp = tempfile::tempdir().unwrap();
     let profile = Profile::new(tmp.path().to_path_buf());
     let fake_account = Uuid::now_v7().to_string();
+    let fake_doc_uuid = Uuid::now_v7();
     profile
         .write_device(&DeviceConfig {
             account_id: fake_account.clone(),
+            primary_doc_id: fake_doc_uuid.to_string(),
             email: "offline@example.com".into(),
             server_url: "http://127.0.0.1:1".into(), // guaranteed unreachable
             device_id: Uuid::now_v7().to_string(),
@@ -109,7 +106,10 @@ async fn default_open_skips_connect() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile.write_doc(&Doc::new().unwrap()).await.unwrap();
+    profile
+        .write_doc(&fake_doc_uuid, &Doc::new().unwrap())
+        .await
+        .unwrap();
 
     // Without --sync the open call is fast — no 2s timeout penalty.
     let started = std::time::Instant::now();
@@ -162,9 +162,11 @@ async fn second_device_observes_first_devices_items_via_pull() {
     let device_b = register_device(&server, &signup.device_token, "device-b").await;
     let tmp_b = tempfile::tempdir().unwrap();
     let profile_b = Profile::new(tmp_b.path().to_path_buf());
+    let primary_doc_uuid = Uuid::parse_str(&signup.primary_doc_id).unwrap();
     profile_b
         .write_device(&DeviceConfig {
             account_id: signup.account_id.clone(),
+            primary_doc_id: signup.primary_doc_id.clone(),
             email: "smoke-test@example.com".into(),
             server_url: server.base.clone(),
             device_id: device_b.device_id.clone(),
@@ -178,7 +180,10 @@ async fn second_device_observes_first_devices_items_via_pull() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile_b.write_doc(&Doc::empty()).await.unwrap();
+    profile_b
+        .write_doc(&primary_doc_uuid, &Doc::empty())
+        .await
+        .unwrap();
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();

@@ -23,6 +23,7 @@ pub const TEST_PASSWORD: &str = "correct horse battery staple";
 pub struct SignedUpAccount {
     pub email: String,
     pub account_id: String,
+    pub primary_doc_id: String,
     pub device_id: String,
     pub device_token: String,
     pub dek: Dek,
@@ -34,6 +35,7 @@ pub struct SignedUpAccount {
 
 pub struct LoggedInDevice {
     pub account_id: String,
+    pub primary_doc_id: String,
     pub device_id: String,
     pub device_token: String,
     pub dek: Dek,
@@ -42,6 +44,7 @@ pub struct LoggedInDevice {
 
 pub struct RecoveredDevice {
     pub account_id: String,
+    pub primary_doc_id: String,
     pub device_id: String,
     pub device_token: String,
     pub dek: Dek,
@@ -157,6 +160,7 @@ pub async fn signup_account(
     SignedUpAccount {
         email,
         account_id: signup.account_id,
+        primary_doc_id: signup.primary_doc_id,
         device_id: signup.device_id,
         device_token: signup.device_token,
         dek,
@@ -247,6 +251,7 @@ pub async fn login_device(
 
     Ok(LoggedInDevice {
         account_id: resp.account_id,
+        primary_doc_id: resp.primary_doc_id,
         device_id: device.device_id,
         device_token: device.device_token,
         dek,
@@ -364,6 +369,7 @@ pub async fn recover_device(
 
     Ok(RecoveredDevice {
         account_id: recovered.account_id,
+        primary_doc_id: reset.primary_doc_id,
         device_id: reset.device_id,
         device_token: reset.device_token,
         dek,
@@ -399,6 +405,7 @@ pub async fn materialize_profile(
     data_dir: &std::path::Path,
     server_url: &str,
     account_id: &str,
+    primary_doc_id: &str,
     device_id: &str,
     device_token: &str,
     dek: &Dek,
@@ -410,6 +417,7 @@ pub async fn materialize_profile(
     profile
         .write_device(&DeviceConfig {
             account_id: account_id.into(),
+            primary_doc_id: primary_doc_id.into(),
             email: email.into(),
             server_url: server_url.into(),
             device_id: device_id.into(),
@@ -428,7 +436,8 @@ pub async fn materialize_profile(
     } else {
         Doc::empty()
     };
-    profile.write_doc(&doc).await.unwrap();
+    let doc_uuid = Uuid::parse_str(primary_doc_id).expect("test passed malformed primary_doc_id");
+    profile.write_doc(&doc_uuid, &doc).await.unwrap();
     profile
 }
 
@@ -444,6 +453,7 @@ pub async fn materialize_signup_profile(
         data_dir,
         server_url,
         &signup.account_id,
+        &signup.primary_doc_id,
         &signup.device_id,
         &signup.device_token,
         dek,

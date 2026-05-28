@@ -11,6 +11,7 @@ use airday_core::{Doc, DocError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 use tokio_rusqlite::Connection;
+use uuid::Uuid;
 
 use crate::db;
 
@@ -41,6 +42,11 @@ pub enum ConfigError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceConfig {
     pub account_id: String,
+    /// The account's primary (Home) doc id — uuid string. Server-generated
+    /// at signup, returned in signup/login/password-reset responses, and
+    /// persisted here so local storage can key snapshots on the real
+    /// doc id instead of a hardcoded placeholder.
+    pub primary_doc_id: String,
     pub email: String,
     pub server_url: String,
     pub device_id: String,
@@ -136,14 +142,15 @@ impl Profile {
         read_json(&self.dir.join(SECRETS_FILE))
     }
 
-    pub async fn write_doc(&self, doc: &Doc) -> Result<(), ConfigError> {
+    pub async fn write_doc(&self, doc_id: &Uuid, doc: &Doc) -> Result<(), ConfigError> {
         let bytes = doc.save()?;
+        let doc_bytes = doc_id.as_bytes().to_vec();
         let conn = self.conn().await?;
         conn.call(move |c| {
             c.execute(
-                "INSERT INTO doc_snapshot (id, payload, updated_at) VALUES (1, ?, ?)
-                 ON CONFLICT (id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at",
-                rusqlite::params![bytes, now_millis()],
+                "INSERT INTO docs (doc_id, payload, updated_at) VALUES (?, ?, ?)
+                 ON CONFLICT (doc_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at",
+                rusqlite::params![doc_bytes, bytes, now_millis()],
             )?;
             Ok(())
         })
@@ -151,18 +158,20 @@ impl Profile {
         Ok(())
     }
 
-    /// Read the persisted doc. Returns `NotFound` (as `Io`) when no
-    /// snapshot row exists yet — matches the previous file-based
-    /// `read_doc` shape so call sites that healed `NotFound` into
-    /// `Doc::empty()` keep working unchanged.
-    pub async fn read_doc(&self) -> Result<Doc, ConfigError> {
+    /// Read the persisted doc for `doc_id`. Returns `NotFound` (as `Io`)
+    /// when no snapshot row exists yet — matches the previous
+    /// file-based `read_doc` shape so call sites that healed `NotFound`
+    /// into `Doc::empty()` keep working unchanged.
+    pub async fn read_doc(&self, doc_id: &Uuid) -> Result<Doc, ConfigError> {
         let conn = self.conn().await?;
+        let doc_bytes = doc_id.as_bytes().to_vec();
         let bytes: Option<Vec<u8>> = conn
-            .call(|c| {
-                let result =
-                    c.query_row("SELECT payload FROM doc_snapshot WHERE id = 1", [], |r| {
-                        r.get::<_, Vec<u8>>(0)
-                    });
+            .call(move |c| {
+                let result = c.query_row(
+                    "SELECT payload FROM docs WHERE doc_id = ?",
+                    [doc_bytes],
+                    |r| r.get::<_, Vec<u8>>(0),
+                );
                 match result {
                     Ok(bytes) => Ok(Some(bytes)),
                     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),

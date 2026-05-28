@@ -83,8 +83,11 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     })?;
 
     let profile = Profile::create(&resp.account_id)?;
+    let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
+        .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
     profile.write_device(&DeviceConfig {
         account_id: resp.account_id.clone(),
+        primary_doc_id: resp.primary_doc_id.clone(),
         email,
         server_url: args.server,
         device_id: device.device_id,
@@ -97,7 +100,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     })?;
     // Empty doc; the initial sync below pulls from seq 0, applies
     // device-1's seed + history, and we converge.
-    profile.write_doc(&Doc::empty()).await?;
+    profile.write_doc(&primary_doc_uuid, &Doc::empty()).await?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;

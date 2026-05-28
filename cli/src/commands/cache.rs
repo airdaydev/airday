@@ -74,7 +74,10 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     let doc_path = profile.doc_path();
 
     let pending = if doc_path.exists() {
-        match profile.read_doc().await {
+        let device = profile.read_device()?;
+        let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
+            .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
+        match profile.read_doc(&doc_id).await {
             Ok(d) => d.has_pending_ops(),
             Err(crate::config::ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
                 false

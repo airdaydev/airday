@@ -74,6 +74,10 @@ pub struct SignupResponse {
     pub account_id: String,
     pub device_id: String,
     pub device_token: String,
+    /// The account's primary (Home) doc. Server-generated at signup; the
+    /// client persists it so local storage can key snapshots/state on the
+    /// real doc id rather than a hardcoded "the doc" placeholder.
+    pub primary_doc_id: String,
 }
 
 // ---------- /api/account/prelogin ----------
@@ -109,6 +113,9 @@ pub struct LoginRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginResponse {
     pub account_id: String,
+    /// The account's primary (Home) doc. New devices use it to key
+    /// local storage; existing devices already hold the same value.
+    pub primary_doc_id: String,
     #[serde(with = "serde_bytes")]
     pub wrapped_dek: Vec<u8>,
     #[serde(with = "serde_bytes")]
@@ -178,6 +185,9 @@ pub struct PasswordResetRequest {
 pub struct PasswordResetResponse {
     pub device_id: String,
     pub device_token: String,
+    /// The account's primary (Home) doc. Returned so the new device can
+    /// key local storage without an extra round trip.
+    pub primary_doc_id: String,
 }
 
 // ---------- /api/devices ----------

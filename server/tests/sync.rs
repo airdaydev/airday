@@ -178,19 +178,10 @@ async fn signup_into(server: TestServer) -> Account {
         },
     )
     .await;
-    let account_id = Uuid::parse_str(&resp.account_id).unwrap();
-    // SignupResponse doesn't carry primary_doc_id (wire is unchanged in this
-    // pass); fetch it from the DB so test helpers can target the doc-scoped
-    // query functions.
-    let primary_doc_id = airday_server::auth::queries::find_account_by_id(&server.state.db, account_id)
-        .await
-        .unwrap()
-        .expect("account just created should be findable")
-        .primary_doc_id;
     Account {
         device_id: Uuid::parse_str(&resp.device_id).unwrap(),
-        account_id,
-        primary_doc_id,
+        account_id: Uuid::parse_str(&resp.account_id).unwrap(),
+        primary_doc_id: Uuid::parse_str(&resp.primary_doc_id).unwrap(),
         device_token: resp.device_token,
         server,
     }

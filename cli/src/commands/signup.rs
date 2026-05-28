@@ -105,8 +105,11 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         .await?;
 
     let profile = Profile::create(&resp.account_id)?;
+    let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
+        .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
     profile.write_device(&DeviceConfig {
         account_id: resp.account_id.clone(),
+        primary_doc_id: resp.primary_doc_id.clone(),
         email: email.clone(),
         server_url: args.server,
         device_id: resp.device_id,
@@ -119,7 +122,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     })?;
     // Seed the local doc with built-in lists. The seed travels to
     // future devices as the first push on the op stream.
-    profile.write_doc(&Doc::new()?).await?;
+    profile.write_doc(&primary_doc_uuid, &Doc::new()?).await?;
 
     println!("Account created: {email} ({})", resp.account_id);
     if let Some(code) = recovery_code_to_show {
