@@ -136,6 +136,7 @@ async function stopServer(s: ServerHandle): Promise<void> {
 interface Account {
   accountId: string;
   deviceToken: string;
+  primaryDocId: string;
 }
 
 async function signup(s: ServerHandle, dekForWrap: Dek): Promise<Account> {
@@ -171,8 +172,13 @@ async function signup(s: ServerHandle, dekForWrap: Dek): Promise<Account> {
     account_id: string;
     device_token: string;
     device_id: string;
+    primary_doc_id: string;
   };
-  return { accountId: decoded.account_id, deviceToken: decoded.device_token };
+  return {
+    accountId: decoded.account_id,
+    deviceToken: decoded.device_token,
+    primaryDocId: decoded.primary_doc_id,
+  };
 }
 
 async function registerDevice(
@@ -278,6 +284,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
 
     const engineA = new SyncEngine(
       Doc.create(),
+      account.primaryDocId,
       seedDek.clone(),
       0n,
       "device-a",
@@ -314,6 +321,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
     const tokenB = await registerDevice(server, account.deviceToken, "device-b");
     const engineB = new SyncEngine(
       Doc.empty(),
+      account.primaryDocId,
       seedDek.clone(),
       0n,
       "device-b",

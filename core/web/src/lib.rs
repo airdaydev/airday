@@ -11,8 +11,9 @@ use wasm_bindgen::prelude::*;
 use airday_core::{
     derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
     parse_recovery_code, AppEvent as CoreAppEvent, Dek as CoreDek, Doc as CoreDoc,
-    EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
-    Kek as CoreKek, SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
+    DocId as CoreDocId, EngineOptions as CoreEngineOptions, Event as CoreEvent,
+    ImportSummary as CoreImportSummary, Kek as CoreKek, NoopStorage as CoreNoopStorage,
+    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -643,28 +644,40 @@ pub struct SyncEngine {
 #[wasm_bindgen]
 impl SyncEngine {
     /// Build a new engine. Consumes `doc` and `dek` — the JS handles
-    /// must not be reused after this call. `last_acked_seq` is the
-    /// contiguous-prefix seq persisted from the previous session (or 0
-    /// for a fresh device).
+    /// must not be reused after this call. `doc_id` is the server-
+    /// assigned UUID for this doc (the value JS already has in
+    /// `session.primaryDocId`). `last_acked_seq` is the contiguous-
+    /// prefix seq persisted from the previous session (or 0 for a
+    /// fresh device).
     #[wasm_bindgen(constructor)]
     pub fn new(
         doc: Doc,
+        doc_id: String,
         dek: Dek,
         last_acked_seq: u64,
         client_name: String,
         client_version: String,
-    ) -> SyncEngine {
-        SyncEngine {
+    ) -> Result<SyncEngine, JsError> {
+        let parsed = uuid::Uuid::parse_str(&doc_id)
+            .map_err(|e| JsError::new(&format!("invalid doc_id: {e}")))?;
+        Ok(SyncEngine {
             inner: CoreSyncEngine::new(
                 doc.inner,
+                CoreDocId(parsed),
                 dek.inner,
                 last_acked_seq,
                 CoreEngineOptions {
                     client_name,
                     client_version,
                 },
+                // Phase 0b: trait fires alongside the legacy IDB WAL
+                // + OPFS snapshot path. `NoopStorage` swallows the
+                // calls; persistence still flows through the legacy
+                // adapters. Phase 2 swaps for `WebStorage` wrapping
+                // a JS-implemented `IdbStorage`.
+                Box::new(CoreNoopStorage),
             ),
-        }
+        })
     }
 
     // -- transport callbacks --

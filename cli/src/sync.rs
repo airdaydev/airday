@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use airday_core::{Doc, EngineOptions, Event, SyncEngine};
+use airday_core::{Doc, DocId, EngineOptions, Event, NoopStorage, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use tokio::net::TcpStream;
@@ -95,12 +95,20 @@ impl Session {
 
         let engine = SyncEngine::new(
             doc,
+            DocId(doc_id),
             dek,
             device.last_acked_seq,
             EngineOptions {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
             },
+            // Phase 0b: trait fires alongside the legacy
+            // `pending_export` / single-row `docs` blob path.
+            // `NoopStorage` swallows the trait calls; CLI persistence
+            // still flows through `cli/migrations/001_init.sql`.
+            // Phase 1 swaps this for `SqliteStorage` and cuts the
+            // legacy path.
+            Box::new(NoopStorage),
         );
 
         let mut session = Session {
@@ -237,7 +245,9 @@ impl Session {
         // cursor and queues an Ack frame for any seqs not yet sent.
         // Callers needing the ack on the wire (`flush`) must
         // `send_outbox` next.
-        self.profile.write_doc(&self.doc_id, self.engine.doc()).await?;
+        self.profile
+            .write_doc(&self.doc_id, self.engine.doc())
+            .await?;
         let contiguous = self.engine.last_contiguous_seq();
         self.engine.notify_wal_durable(contiguous);
         let acked = self.engine.last_durable_seq();

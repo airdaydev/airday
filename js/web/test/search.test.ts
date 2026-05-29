@@ -19,7 +19,7 @@ import {
 const LIST_MAIN = "main";
 
 function newSearch(): { eng: SyncEngine; search: SearchEngine } {
-  const eng = new SyncEngine(Doc.create(), Dek.generate(), 0n, "t", "0");
+  const eng = new SyncEngine(Doc.create(), "00000000-0000-0000-0000-000000000000", Dek.generate(), 0n, "t", "0");
   const search = createSearchEngine();
   // Same path the web store uses on attach: feed the synthetic burst
   // describing current doc state through the dispatcher.

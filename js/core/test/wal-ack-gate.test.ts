@@ -215,7 +215,7 @@ describe("inbound Ack is gated on WAL durability", () => {
 
     const docB = Doc.empty();
     docB.markPushed();
-    const engineB = new SyncEngine(docB, dek.clone(), 0n, "test-b", "0.0.0");
+    const engineB = new SyncEngine(docB, "00000000-0000-0000-0000-000000000000", dek.clone(), 0n, "test-b", "0.0.0");
     driveToIdle(engineB);
 
     // Mem WAL → stallable wrapper → real WalBridge wired with an
@@ -282,7 +282,7 @@ describe("inbound Ack is gated on WAL durability", () => {
     const dek = Dek.generate();
     const doc = Doc.create();
     doc.markPushed();
-    const engine = new SyncEngine(doc, dek.clone(), 0n, "test", "0.0.0");
+    const engine = new SyncEngine(doc, "00000000-0000-0000-0000-000000000000", dek.clone(), 0n, "test", "0.0.0");
     driveToIdle(engine);
 
     const innerWal = new MemWalStorage(dek.clone(), EncryptedBlob);

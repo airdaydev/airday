@@ -3,6 +3,7 @@
 pub mod crypto;
 pub mod doc;
 pub mod events;
+pub mod storage;
 pub mod sync;
 
 pub use crypto::*;
@@ -11,4 +12,8 @@ pub use doc::{
     ListView, SettingsView, LIST_MAIN, LIST_MAIN_NAME,
 };
 pub use events::AppEvent;
+pub use storage::{
+    BootState, ClientOpId, DocId, LocalOpRow, LocalSeq, LocalStorage, MemStorage, NoopStorage,
+    OutboxRow, RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
+};
 pub use sync::{EngineOptions, Event, SyncEngine};

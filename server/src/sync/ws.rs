@@ -358,11 +358,9 @@ async fn push_ops(
             .zip(blobs_for_broadcast)
             .map(|(seq, blob)| StoredBlob { seq, blob })
             .collect();
-        state.sync_sessions.broadcast(
-            ws_session.auth.primary_doc_id,
-            ws_session.sub_id,
-            stored,
-        );
+        state
+            .sync_sessions
+            .broadcast(ws_session.auth.primary_doc_id, ws_session.sub_id, stored);
 
         tracing::info!(
             assigned_seq_count = assigned_seqs.len(),
@@ -494,14 +492,9 @@ async fn push_snapshot(
         }
         ws_session.snapshot_lease = None;
         // TODO: While this is inserting, an entire other snapshot could feasibly go through..
-        let row_id = queries::insert_snapshot(
-            &state.db,
-            doc_id,
-            up_to_seq,
-            compaction_floor_seq,
-            blob,
-        )
-        .await?;
+        let row_id =
+            queries::insert_snapshot(&state.db, doc_id, up_to_seq, compaction_floor_seq, blob)
+                .await?;
         tracing::info!(snapshot_row_id = row_id, "ws push_snapshot persisted");
 
         // Opportunistic compaction: a snapshot just landed, so the

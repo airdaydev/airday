@@ -45,7 +45,7 @@ async function bootEngine(
   for (const entry of replay.walEntries) {
     doc.importWalUpdates(entry.plaintext);
   }
-  const engine = new SyncEngine(doc, d.clone(), 0n, "test", "0.0.0");
+  const engine = new SyncEngine(doc, "00000000-0000-0000-0000-000000000000", d.clone(), 0n, "test", "0.0.0");
   const cursor = engine.oplogVvBytes();
   return { engine, cursor };
 }

@@ -404,6 +404,7 @@ function MainApp(props: {
   // `props.session.dek` is untouched.
   const engine = new SyncEngine(
     props.boot.doc,
+    props.session.primaryDocId,
     props.session.dek.clone(),
     props.boot.lastAcked,
     CLIENT_NAME,

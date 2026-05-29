@@ -231,7 +231,9 @@ pub async fn password_reset(
     let primary_doc_id = find_account_by_id(&state.db, consumed.account_id)
         .await?
         .map(|a| a.primary_doc_id)
-        .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("account missing after password reset")))?;
+        .ok_or_else(|| {
+            ApiError::Internal(anyhow::anyhow!("account missing after password reset"))
+        })?;
 
     let token_hex = encode_token(&device_token);
     Ok((

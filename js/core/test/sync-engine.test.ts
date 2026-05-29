@@ -21,7 +21,7 @@ function newEngine(): SyncEngine {
   // Doc.create() builds a fresh doc with no commits (no seeded user
   // lists). Mutations through the engine are what put it in a
   // pending state.
-  return new SyncEngine(Doc.create(), Dek.generate(), 0n, "test", "0.0.0");
+  return new SyncEngine(Doc.create(), "00000000-0000-0000-0000-000000000000", Dek.generate(), 0n, "test", "0.0.0");
 }
 
 describe("SyncEngine construction", () => {
@@ -144,6 +144,7 @@ describe("save / load round trip", () => {
     const dek = Dek.generate();
     const restored = new SyncEngine(
       Doc.load(snapshot),
+      "00000000-0000-0000-0000-000000000000",
       dek,
       0n,
       "test",

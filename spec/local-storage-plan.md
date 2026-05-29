@@ -37,9 +37,17 @@ The trait shape mirrors the data model already specified in the spec it replaces
 
 ## Phased plan
 
-### Phase 0 — Define the trait in `core/`
+### Phase 0a — Define the trait + plumb it through `SyncEngine` *(done)*
 
-`core/src/storage.rs` (new):
+`core/src/storage.rs` defines:
+
+- Newtypes: `DocId(Uuid)`, `ClientOpId(Uuid)`, `LocalSeq(u64)`, `ServerSeq(u64)`.
+- Row types: `LocalOpRow`, `RemoteOpRow`, `OutboxRow`, `ReplayRow`, `SnapshotRow`, `BootState`. No `created_at` field — engine is clock-free, impls supply timestamps (sqlite `unixepoch()`, JS `Date.now()`, MemStorage zero).
+- `StorageError` (`Backend` / `DocNotFound` / `UnknownClientOpId`).
+- `LocalStorage` trait with `boot` / `append_local_op` / `append_remote_op` / `ack_local_op` / `outbox` / `write_snapshot`. All methods take `&self` so impls can use interior mutability (sqlite `Mutex<Connection>`, JS handle by-reference).
+- `MemStorage` — in-memory test double, substrate for `core/`'s engine tests.
+- `NoopStorage` — empty-results stub used while hosts migrate; deleted in Phase 3.
+- `impl<T: LocalStorage + ?Sized> LocalStorage for Arc<T>` — lets tests share one storage handle between the engine and the test body.
 
 ```rust
 pub trait LocalStorage {
@@ -52,15 +60,39 @@ pub trait LocalStorage {
 }
 ```
 
-Plus the row types (`LocalOpRow`, `RemoteOpRow`, `OutboxRow`, `BootState`) modelled after the schema in `spec/local-storage.md`'s data model section (resurrect that spec or restate the schema here — the underlying shape is correct, only the "must be sqlite on every platform" framing was wrong).
+`SyncEngine` grows a `storage: DynStorage` field. `DynStorage = Box<dyn LocalStorage + Send>` on native, `Box<dyn LocalStorage>` on wasm (wasm is single-threaded and `JsValue`-holding impls are `!Send` by construction — the bound flips off via `#[cfg(target_arch = "wasm32")]`). `SyncEngine::new` accepts it. Held but not yet called.
 
-The engine consumes the trait via generic or `Box<dyn>`. `SyncEngine::new` takes a `Storage` parameter. The web wasm binding accepts a JS interface implementing the trait's methods synchronously (the engine calls storage from the same thread as the IDB-backed JS impl runs, so sync is fine).
+CLI and web both construct `Box::new(NoopStorage)`. Zero behavior change.
 
-**Exit criteria:** trait compiles, engine threads it through, neither CLI nor web is wired to it yet (both still use their legacy paths). No behavior change.
+### Phase 0b — Engine fires trait calls as observers *(done)*
 
-### Phase 1 — `SqliteStorage` for CLI
+`SyncEngine::new` additionally takes `doc_id: DocId`. CLI passes its existing `primary_doc_id`; web passes `session.primaryDocId` through the wasm constructor (`new SyncEngine(doc, docId, dek, lastAcked, clientName, clientVersion)`).
 
-Native implementation using `rusqlite`. Schema from the existing local-storage data-model spec:
+The engine fires the trait at three transitions:
+
+- `try_start_push`: mints a `ClientOpId`, calls `storage.append_local_op` with the sealed delta from `pending_export`, remembers the id in `in_flight_client_op_id` alongside `in_flight_push_vv`.
+- `OpsAck` handler: calls `storage.ack_local_op(remembered_id, ServerSeq(assigned_seqs[0]))`. `try_start_push` always pushes one blob, so the first seq is the one.
+- `apply_remote_ops`: calls `storage.append_remote_op(ServerSeq(op.seq), op.blob.clone())` for each blob in the batch.
+- `go_disconnected` clears `in_flight_client_op_id` — the storage row stays unacked for outbox-driven re-push (Phase 1+); the engine just drops the in-memory tracker so a stale OpsAck in a fresh session can't ack a row from a prior one.
+
+Legacy `pending_export` / `mark_pushed_at` / `notify_wal_durable` remain the source of truth for what goes on the wire. `NoopStorage` on CLI/web swallows the observer calls — no behavior change. Three new `MemStorage`-driven tests in `core/src/sync.rs` lock in that the trait is being fed correctly:
+
+- `push_appends_local_op_row_then_ack_clears_outbox`
+- `apply_remote_ops_appends_one_row_per_blob`
+- `disconnect_mid_push_leaves_storage_row_unacked`
+
+**Granularity caveat (carried into Phase 1):** each `try_start_push` produces *one* storage row covering the merged blob from `pending_export` — so N committed ops between flushes collapse into a single `local_op` row with a single `client_op_id`. Spec's per-op intent is unmet. Phase 1 either accepts per-push granularity (simpler, matches current wire shape) or grows a per-commit hook so each `doc.add_item` produces its own row. Decide before SqliteStorage's schema is locked in.
+
+### Phase 1 — `SqliteStorage` for CLI + load-bearing cutover
+
+Two coupled pieces of work, since the trait stops being an observer here:
+
+1. **Implement `SqliteStorage`** in `cli/src/storage.rs` (new) using `rusqlite`. Schema below.
+2. **Migrate the engine's push path** from `pending_export` / `mark_pushed_at` to `storage.outbox()` / `storage.ack_local_op()`. `try_start_push` reads outbox rows and ships them as separate blobs in `PushOps.ops`; the server's `OpsAck.assigned_seqs[i]` aligns with `ops[i]` and the engine acks each row by its `client_op_id`. `Doc::last_pushed_vv` and `pending_export` stay in `core/` (web still uses them in Phase 1) but the CLI no longer calls them.
+
+Granularity choice from Phase 0b's caveat is settled here.
+
+Schema from the existing local-storage data-model spec:
 
 ```sql
 CREATE TABLE docs (id BLOB PRIMARY KEY, created_at INTEGER NOT NULL);
@@ -124,6 +156,9 @@ The existing `airday-web` IDB database (vault + idb-wal + prefs) stays untouched
 
 After Phase 2 is verified in real use:
 
+- Delete `core::NoopStorage` (and its hosts' construction sites) once CLI and web are on real impls.
+- Delete `Doc::pending_export`, `Doc::mark_pushed_at`, `Doc::last_pushed_vv` from `core/src/doc.rs` — `storage.outbox()` / `storage.ack_local_op()` have taken over their job.
+- Decide on the durability callback (`notify_wal_durable` today): keep it as the IDB flush signal (web only needs it; sqlite is synchronously durable) or fold it into the trait via a callback handle. Either is fine; pick when Phase 2 lands.
 - Delete `js/core/src/storage/idb-wal.ts`, `wal-adapter.ts`, `mem-wal.ts`, `wal-bridge.ts`.
 - Delete the OPFS-snapshot code path in the legacy storage.
 - Delete the v1–v6 schema-bump branches in `js/core/src/storage/web-db.ts` — only the vault + prefs stores survive there (or fold those into `airday-engine` if it makes sense).

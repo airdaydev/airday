@@ -91,11 +91,11 @@ impl SnapshotCoordinator {
     pub fn evaluate(
         &self,
         doc_id: Uuid,
-        prev_snapshot_up_to_seq: u64,    // latest snapshot's state frontier
-        prev_compaction_floor_seq: u64,  // latest snapshot's compaction floor
-        server_last_seq: u64,            // latest seq on server for this doc
-        horizon_seq: u64,                // min(last_acked) across devices
-        device_last_acked_seq: u64,      // triggering device's frontier
+        prev_snapshot_up_to_seq: u64, // latest snapshot's state frontier
+        prev_compaction_floor_seq: u64, // latest snapshot's compaction floor
+        server_last_seq: u64,         // latest seq on server for this doc
+        horizon_seq: u64,             // min(last_acked) across devices
+        device_last_acked_seq: u64,   // triggering device's frontier
         now: Instant,
     ) -> Decision {
         // Not enough new content to bother.

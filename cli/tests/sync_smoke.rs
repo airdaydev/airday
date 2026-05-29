@@ -200,11 +200,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
     session_b.flush().await.unwrap();
 }
 
-async fn wait_for_ops(
-    server: &TestServer,
-    doc_id: Uuid,
-    target: usize,
-) -> queries::FetchedBatch {
+async fn wait_for_ops(server: &TestServer, doc_id: Uuid, target: usize) -> queries::FetchedBatch {
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
     loop {
         let batch = queries::fetch_ops_batch(&server.state.db, doc_id, 0)
