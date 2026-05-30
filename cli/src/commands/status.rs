@@ -1,5 +1,6 @@
 //! `airday status` — local-only summary. Never opens a WS.
 
+use airday_core::LocalStorage;
 use clap::Parser;
 use serde::Serialize;
 
@@ -29,9 +30,15 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let device = profile.read_device()?;
     let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
-    let doc = profile.read_doc(&doc_id).await?;
 
-    let pending = doc.has_pending_ops();
+    // "Pending" = unacked local ops still in the outbox (captured but
+    // not yet acked by the server). Read straight from storage — no
+    // need to decrypt and rebuild the whole doc.
+    let storage = crate::storage::open_storage(&profile)?;
+    let pending = !storage
+        .outbox(airday_core::DocId(doc_id))
+        .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
+        .is_empty();
 
     if args.json {
         print_json(&StatusJson {

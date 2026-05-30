@@ -120,9 +120,16 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: resp.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    // Seed the local doc with built-in lists. The seed travels to
-    // future devices as the first push on the op stream.
-    profile.write_doc(&primary_doc_uuid, &Doc::new()?).await?;
+    // Seed the local doc with built-in lists, written as the baseline
+    // snapshot. The seed travels to future devices as the first push on
+    // the op stream.
+    let storage = crate::storage::open_storage(&profile)?;
+    crate::storage::seed_snapshot(
+        &storage,
+        &dek,
+        airday_core::DocId(primary_doc_uuid),
+        &Doc::new()?,
+    )?;
 
     println!("Account created: {email} ({})", resp.account_id);
     if let Some(code) = recovery_code_to_show {

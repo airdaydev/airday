@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use airday_core::{Doc, DocId, EngineOptions, Event, NoopStorage, SyncEngine};
+use airday_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use tokio::net::TcpStream;
@@ -38,6 +38,10 @@ pub enum SyncError {
     Keystore(#[from] KeystoreError),
     #[error(transparent)]
     Doc(#[from] airday_core::DocError),
+    #[error(transparent)]
+    StorageInit(#[from] crate::storage::StorageInitError),
+    #[error("storage: {0}")]
+    Storage(#[from] airday_core::StorageError),
     #[error("ws: {0}")]
     Ws(String),
     #[error("engine: {0}")]
@@ -56,9 +60,6 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub struct Session {
     profile: Profile,
     device: DeviceConfig,
-    /// Parsed `device.primary_doc_id` — the doc this session reads/writes.
-    /// CLI sessions only ever operate on the account's primary doc today.
-    doc_id: Uuid,
     engine: SyncEngine,
     ws: Option<WsStream>,
 }
@@ -81,19 +82,13 @@ impl Session {
             .map_err(|e| SyncError::Engine(format!("invalid primary_doc_id: {e}")))?;
         let secrets = profile.read_secrets()?;
         let dek = dek_from_hex(&secrets.dek_hex)?;
-        let doc = match profile.read_doc(&doc_id).await {
-            Ok(d) => d,
-            Err(ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-                // First-run shouldn't hit this — signup writes the doc —
-                // but a partially-set-up profile (e.g. from a debug
-                // build that predates this slice) heals into an empty
-                // doc rather than crashing the next subcommand.
-                Doc::empty()
-            }
-            Err(e) => return Err(e.into()),
-        };
+        // Boot the doc from the op log + snapshot. A fresh profile (no
+        // snapshot yet) reconstructs an empty doc — the same healing
+        // behaviour the old file-based `read_doc` NotFound branch had.
+        let storage = crate::storage::open_storage(&profile)?;
+        let (doc, last_local) = crate::storage::boot_doc(&storage, &dek, DocId(doc_id))?;
 
-        let engine = SyncEngine::new(
+        let mut engine = SyncEngine::new(
             doc,
             DocId(doc_id),
             dek,
@@ -102,19 +97,13 @@ impl Session {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
             },
-            // Phase 0b: trait fires alongside the legacy
-            // `pending_export` / single-row `docs` blob path.
-            // `NoopStorage` swallows the trait calls; CLI persistence
-            // still flows through `cli/migrations/001_init.sql`.
-            // Phase 1 swaps this for `SqliteStorage` and cuts the
-            // legacy path.
-            Box::new(NoopStorage),
+            Box::new(storage),
         );
+        engine.set_last_local_seq(last_local);
 
         let mut session = Session {
             profile,
             device,
-            doc_id,
             engine,
             ws: None,
         };
@@ -238,16 +227,17 @@ impl Session {
     }
 
     async fn persist_engine_state(&mut self) -> Result<(), SyncError> {
-        // `write_doc` upserts the full snapshot blob — once it returns
-        // Ok every applied seq in the in-memory engine is on disk, so
-        // we can tell the engine "everything up to
-        // `last_contiguous_seq` is durable." That advances the durable
-        // cursor and queues an Ack frame for any seqs not yet sent.
-        // Callers needing the ack on the wire (`flush`) must
-        // `send_outbox` next.
-        self.profile
-            .write_doc(&self.doc_id, self.engine.doc())
-            .await?;
+        // Capture any locally-committed mutations into a durable op-log
+        // row first — this is what `try_start_push` ships, and it's on
+        // disk before any Ack leaves the wire. Then compact: once every
+        // captured op is acked (outbox empty), fold the log into a fresh
+        // snapshot. `SqliteStorage` is synchronously durable, so by the
+        // time these return every applied seq is on disk and we can tell
+        // the engine "everything up to `last_contiguous_seq` is durable"
+        // — which advances the durable cursor and queues an Ack. Callers
+        // needing the ack on the wire (`flush`) must `send_outbox` next.
+        self.engine.capture_local_ops()?;
+        self.engine.snapshot_if_fully_synced()?;
         let contiguous = self.engine.last_contiguous_seq();
         self.engine.notify_wal_durable(contiguous);
         let acked = self.engine.last_durable_seq();

@@ -33,7 +33,6 @@ zeroize = { workspace = true }
 serde_json = "1"
 gethostname = "0.5"
 rusqlite = { workspace = true }
-tokio-rusqlite = { workspace = true }
 tokio-tungstenite = "0.24"
 http = "1"
 futures-util = "0.3"

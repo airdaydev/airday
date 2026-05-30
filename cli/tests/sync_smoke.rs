@@ -82,6 +82,66 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     assert_eq!(after.ops.len(), 1, "second flush must not re-push");
 }
 
+/// The CLI is one-shot per command: an offline `add` must be captured
+/// into the durable op log, survive a process restart (boot replays it),
+/// and ship to the server on the next sync. Exercises the
+/// capture → boot-replay → outbox-push path end-to-end.
+#[tokio::test]
+async fn offline_add_survives_restart_then_syncs() {
+    let server = TestServer::start().await;
+    let dek = Dek::generate();
+    let signup = signup_via_http(&server, &dek, "offline-test").await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let profile = materialize_signup_profile(
+        tmp.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "offline-test@example.com",
+        true,
+    )
+    .await;
+
+    // Offline add — no connect; the mutation is captured to the op log.
+    let session = Session::open_with_profile(profile, false).await.unwrap();
+    assert!(!session.is_online());
+    let item_id = session.doc().add_item(LIST_MAIN, "offline item").unwrap();
+    session.flush().await.unwrap();
+
+    // Restart (still offline): the captured op replays from storage.
+    let session2 = Session::open_with_profile(reopen_profile(tmp.path()), false)
+        .await
+        .unwrap();
+    assert!(
+        session2.doc().get_item(&item_id).is_some(),
+        "offline add survived a restart"
+    );
+    session2.flush().await.unwrap();
+
+    // Now sync: the outbox op ships to the server.
+    let session3 = Session::open_with_profile(reopen_profile(tmp.path()), true)
+        .await
+        .unwrap();
+    assert!(session3.is_online());
+    session3.flush().await.unwrap();
+
+    let primary_doc_id = Uuid::parse_str(&signup.primary_doc_id).unwrap();
+    let batch = wait_for_ops(&server, primary_doc_id, 1).await;
+    assert_eq!(batch.ops.len(), 1, "the offline op reached the server");
+
+    // Reopen once more: clean, nothing re-pushes (op acked + compacted).
+    let session4 = Session::open_with_profile(reopen_profile(tmp.path()), true)
+        .await
+        .unwrap();
+    assert!(session4.doc().get_item(&item_id).is_some());
+    session4.flush().await.unwrap();
+    let after = queries::fetch_ops_batch(&server.state.db, primary_doc_id, 0)
+        .await
+        .unwrap();
+    assert_eq!(after.ops.len(), 1, "no duplicate re-push after ack");
+}
+
 #[tokio::test]
 async fn default_open_skips_connect() {
     let tmp = tempfile::tempdir().unwrap();
@@ -106,10 +166,14 @@ async fn default_open_skips_connect() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile
-        .write_doc(&fake_doc_uuid, &Doc::new().unwrap())
-        .await
-        .unwrap();
+    let storage = airday_cli::storage::open_storage(&profile).unwrap();
+    airday_cli::storage::seed_snapshot(
+        &storage,
+        &dek,
+        airday_core::DocId(fake_doc_uuid),
+        &Doc::new().unwrap(),
+    )
+    .unwrap();
 
     // Without --sync the open call is fast — no 2s timeout penalty.
     let started = std::time::Instant::now();
@@ -180,10 +244,14 @@ async fn second_device_observes_first_devices_items_via_pull() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    profile_b
-        .write_doc(&primary_doc_uuid, &Doc::empty())
-        .await
-        .unwrap();
+    let storage_b = airday_cli::storage::open_storage(&profile_b).unwrap();
+    airday_cli::storage::seed_snapshot(
+        &storage_b,
+        &dek,
+        airday_core::DocId(primary_doc_uuid),
+        &Doc::empty(),
+    )
+    .unwrap();
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();

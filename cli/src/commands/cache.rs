@@ -2,6 +2,7 @@
 
 use std::io::IsTerminal;
 
+use airday_core::LocalStorage;
 use clap::{Parser, Subcommand};
 use dialoguer::Confirm;
 use serde::Serialize;
@@ -73,17 +74,18 @@ async fn clear(force: bool) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
     let doc_path = profile.doc_path();
 
+    // Unacked local ops in the outbox would be lost by a cache wipe.
+    // Scope the storage handle so its sqlite connection is dropped
+    // before we unlink the file below.
     let pending = if doc_path.exists() {
         let device = profile.read_device()?;
         let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
             .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
-        match profile.read_doc(&doc_id).await {
-            Ok(d) => d.has_pending_ops(),
-            Err(crate::config::ConfigError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-                false
-            }
-            Err(e) => return Err(e.into()),
-        }
+        let storage = crate::storage::open_storage(&profile)?;
+        !storage
+            .outbox(airday_core::DocId(doc_id))
+            .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
+            .is_empty()
     } else {
         false
     };

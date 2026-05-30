@@ -7,19 +7,12 @@
 
 use std::path::{Path, PathBuf};
 
-use airday_core::{Doc, DocError};
 use serde::{Deserialize, Serialize};
-use tokio::sync::OnceCell;
-use tokio_rusqlite::Connection;
-use uuid::Uuid;
-
-use crate::db;
 
 const ROOT_DIR: &str = "airday";
 const DEVICE_FILE: &str = "device.json";
 const SECRETS_FILE: &str = "secrets.json";
 const DOC_DB_FILE: &str = "loro.db";
-const LEGACY_DOC_FILE: &str = "loro.bin";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -27,12 +20,6 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
     #[error("decode: {0}")]
     Decode(#[from] serde_json::Error),
-    #[error("doc: {0}")]
-    Doc(#[from] DocError),
-    #[error("db: {0}")]
-    Db(#[from] db::DbError),
-    #[error("sqlite: {0}")]
-    Sqlite(#[from] tokio_rusqlite::Error),
     #[error("no XDG data directory available")]
     NoDataDir,
     #[error("not logged in")]
@@ -77,15 +64,11 @@ pub struct Secrets {
 /// ```
 pub struct Profile {
     pub dir: PathBuf,
-    conn: OnceCell<Connection>,
 }
 
 impl Profile {
     pub fn new(dir: PathBuf) -> Self {
-        Self {
-            dir,
-            conn: OnceCell::new(),
-        }
+        Self { dir }
     }
 
     /// The single per-install profile, if one is logged in. Airday is
@@ -128,52 +111,10 @@ impl Profile {
         read_json(&self.dir.join(SECRETS_FILE))
     }
 
-    pub async fn write_doc(&self, doc_id: &Uuid, doc: &Doc) -> Result<(), ConfigError> {
-        let bytes = doc.save()?;
-        let doc_bytes = doc_id.as_bytes().to_vec();
-        let conn = self.conn().await?;
-        conn.call(move |c| {
-            c.execute(
-                "INSERT INTO docs (doc_id, payload, updated_at) VALUES (?, ?, ?)
-                 ON CONFLICT (doc_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at",
-                rusqlite::params![doc_bytes, bytes, now_millis()],
-            )?;
-            Ok(())
-        })
-        .await?;
-        Ok(())
-    }
-
-    /// Read the persisted doc for `doc_id`. Returns `NotFound` (as `Io`)
-    /// when no snapshot row exists yet — matches the previous
-    /// file-based `read_doc` shape so call sites that healed `NotFound`
-    /// into `Doc::empty()` keep working unchanged.
-    pub async fn read_doc(&self, doc_id: &Uuid) -> Result<Doc, ConfigError> {
-        let conn = self.conn().await?;
-        let doc_bytes = doc_id.as_bytes().to_vec();
-        let bytes: Option<Vec<u8>> = conn
-            .call(move |c| {
-                let result = c.query_row(
-                    "SELECT payload FROM docs WHERE doc_id = ?",
-                    [doc_bytes],
-                    |r| r.get::<_, Vec<u8>>(0),
-                );
-                match result {
-                    Ok(bytes) => Ok(Some(bytes)),
-                    Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                    Err(e) => Err(e.into()),
-                }
-            })
-            .await?;
-        match bytes {
-            Some(bytes) => Ok(Doc::load(&bytes)?),
-            None => Err(ConfigError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "no doc snapshot",
-            ))),
-        }
-    }
-
+    /// Path to the per-profile sqlite file. The doc itself is persisted
+    /// through `crate::storage::SqliteStorage` (opened against this
+    /// path); `Profile` only owns the JSON device/secrets files and the
+    /// directory layout.
     pub fn doc_path(&self) -> PathBuf {
         self.dir.join(DOC_DB_FILE)
     }
@@ -185,30 +126,6 @@ impl Profile {
         }
         Ok(())
     }
-
-    async fn conn(&self) -> Result<&Connection, ConfigError> {
-        self.conn
-            .get_or_try_init(|| async {
-                // Older builds wrote a `loro.bin` blob in this dir.
-                // Nuke it on first sqlite open — we're not preserving
-                // it; users rehydrate via `airday sync`.
-                let legacy = self.dir.join(LEGACY_DOC_FILE);
-                if legacy.exists() {
-                    let _ = std::fs::remove_file(&legacy);
-                }
-                let conn = db::open(&self.dir.join(DOC_DB_FILE)).await?;
-                Ok(conn)
-            })
-            .await
-    }
-}
-
-fn now_millis() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
 }
 
 fn root_dir() -> Result<PathBuf, ConfigError> {

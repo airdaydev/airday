@@ -127,7 +127,13 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: reset.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    profile.write_doc(&primary_doc_uuid, &Doc::empty()).await?;
+    let storage = crate::storage::open_storage(&profile)?;
+    crate::storage::seed_snapshot(
+        &storage,
+        &dek,
+        airday_core::DocId(primary_doc_uuid),
+        &Doc::empty(),
+    )?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;

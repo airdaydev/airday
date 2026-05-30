@@ -437,7 +437,8 @@ pub async fn materialize_profile(
         Doc::empty()
     };
     let doc_uuid = Uuid::parse_str(primary_doc_id).expect("test passed malformed primary_doc_id");
-    profile.write_doc(&doc_uuid, &doc).await.unwrap();
+    let storage = airday_cli::storage::open_storage(&profile).unwrap();
+    airday_cli::storage::seed_snapshot(&storage, dek, airday_core::DocId(doc_uuid), &doc).unwrap();
     profile
 }
 

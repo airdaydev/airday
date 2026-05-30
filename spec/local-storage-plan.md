@@ -83,7 +83,19 @@ Legacy `pending_export` / `mark_pushed_at` / `notify_wal_durable` remain the sou
 
 **Granularity caveat (carried into Phase 1):** each `try_start_push` produces *one* storage row covering the merged blob from `pending_export` — so N committed ops between flushes collapse into a single `local_op` row with a single `client_op_id`. Spec's per-op intent is unmet. Phase 1 either accepts per-push granularity (simpler, matches current wire shape) or grows a per-commit hook so each `doc.add_item` produces its own row. Decide before SqliteStorage's schema is locked in.
 
-### Phase 1 — `SqliteStorage` for CLI + load-bearing cutover
+### Phase 1 — `SqliteStorage` for CLI + load-bearing cutover *(done)*
+
+**Granularity settled: per-push.** One `ops` row per flush — the merged sealed delta from
+`pending_export`, one `client_op_id`, shipped as one blob → one server seq. `Doc` needs no
+per-commit API; the CLI reuses `pending_export` + `mark_pushed_at` as a *capture cursor*. The
+shared engine forks in `try_start_push`/`OpsAck` on whether `storage.outbox()` yields rows: the
+CLI (`SqliteStorage`) ships outbox rows and acks them by `client_op_id`; web (`NoopStorage`, still
+Phase 1) keeps an empty outbox and falls through to the legacy `pending_export` path unchanged.
+New engine methods `capture_local_ops` (durable before any Ack) and `snapshot_if_fully_synced`
+(compact once the outbox drains) drive CLI persistence; `cli/src/storage.rs`'s `boot_doc` rebuilds
+the doc via `apply_remote_batch(snapshot + replay)`. Migration `002_local_storage` preserves the
+old `docs(payload)` blob as `docs_legacy_v1` and the boot layer drains it into a sealed snapshot.
+`Profile` lost `write_doc`/`read_doc`; the CLI dropped `tokio-rusqlite` for plain sync `rusqlite`.
 
 Two coupled pieces of work, since the trait stops being an observer here:
 

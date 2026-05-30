@@ -98,9 +98,15 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         device_token: device.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    // Empty doc; the initial sync below pulls from seq 0, applies
-    // device-1's seed + history, and we converge.
-    profile.write_doc(&primary_doc_uuid, &Doc::empty()).await?;
+    // Empty doc baseline; the initial sync below pulls from seq 0,
+    // applies device-1's seed + history, and we converge.
+    let storage = crate::storage::open_storage(&profile)?;
+    crate::storage::seed_snapshot(
+        &storage,
+        &dek,
+        airday_core::DocId(primary_doc_uuid),
+        &Doc::empty(),
+    )?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;
