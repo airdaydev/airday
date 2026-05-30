@@ -7,6 +7,7 @@
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - OPFS has a torn-write hazard: `createWritable -> write -> close` is non-atomic. Likely fix is an incremental update log plus periodic checkpoint.
+- Roll devices.json / secret.json from cli into sqlite & rename db ext to .sqlite
 
 ## Compaction *wait until sync / wal / storage is settled
 One latent thing remains, but it was already scoped out in your handoff:
