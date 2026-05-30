@@ -141,6 +141,15 @@ CLI boots through the trait. `cli/src/db.rs` becomes thin — open the file, han
 
 JS implementation behind a wasm-bindgen extern interface passed to `SyncEngine::new`. Lives somewhere like `js/core/src/storage/idb-storage.ts`.
 
+**Continuity note (post-Phase-1):** the engine's push path is now outbox-driven and forks on
+`storage.outbox()`. The moment web swaps `NoopStorage` → `IdbStorage`, the engine starts taking
+the *outbox* branch for web too — so web must feed that outbox or it'll push nothing. Mirror the
+CLI: call `engine.capture_local_ops()` (commit → durable op row, advances the capture cursor) on
+every local mutation, and `engine.snapshot_if_fully_synced()` to compact. The legacy
+`pending_export` fallback only fires while the outbox is empty, so once `IdbStorage` is live the
+web client owns capture exactly like the CLI does. Delete the legacy fallback in Phase 3, not
+Phase 2 (it's the safety net during cutover).
+
 IDB schema (mirrors the sqlite logical shape; IDB partial-unique indexes fall out for free because IDB excludes records where any compound-key element is `undefined`):
 
 ```ts
