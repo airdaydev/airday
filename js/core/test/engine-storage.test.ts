@@ -17,77 +17,12 @@ import { describe, expect, test } from "bun:test";
 import { decode, encode } from "@msgpack/msgpack";
 
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "../wasm/airday_core_web.js";
+import type { EngineStorage } from "../wasm/airday_core_web.js";
+import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const PROTOCOL_VERSION = 1;
 const LIST_MAIN = "main";
 const DOC_ID = "00000000-0000-0000-0000-000000000000";
-
-// In-memory `EngineStorage` — same shape the wasm extern calls, same
-// semantics as `core::MemStorage`. Method names line up with the
-// `EngineStorage` interface generated into the wasm `.d.ts`.
-interface MirrorOp {
-  localSeq: number;
-  clientOpId?: string;
-  serverSeq?: number;
-  ciphertext: Uint8Array;
-  nonce: Uint8Array;
-}
-
-class MemEngineStorage {
-  nextLocalSeq = 0;
-  ops: MirrorOp[] = [];
-  snapshot: { upToLocalSeq: number; ciphertext: Uint8Array; nonce: Uint8Array } | null = null;
-  lastAckedServerSeq = 0;
-
-  appendLocalOp(clientOpId: Uint8Array, ciphertext: Uint8Array, nonce: Uint8Array): number {
-    const localSeq = ++this.nextLocalSeq;
-    this.ops.push({ localSeq, clientOpId: hex(clientOpId), ciphertext, nonce });
-    return localSeq;
-  }
-
-  appendRemoteOp(serverSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): number {
-    const existing = this.ops.find((o) => o.serverSeq === serverSeq);
-    if (existing) return existing.localSeq;
-    const localSeq = ++this.nextLocalSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
-    this.ops.push({ localSeq, serverSeq, ciphertext, nonce });
-    return localSeq;
-  }
-
-  ackLocalOp(clientOpId: Uint8Array, serverSeq: number): void {
-    const h = hex(clientOpId);
-    const op = this.ops.find((o) => o.clientOpId === h);
-    if (!op) throw new Error(`ackLocalOp: unknown clientOpId ${h}`);
-    op.serverSeq = serverSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
-  }
-
-  outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[] {
-    return this.ops
-      .filter((o) => o.clientOpId != null && o.serverSeq == null)
-      .sort((a, b) => a.localSeq - b.localSeq)
-      .map((o) => ({
-        localSeq: o.localSeq,
-        clientOpId: unhex(o.clientOpId as string),
-        ciphertext: o.ciphertext,
-        nonce: o.nonce,
-      }));
-  }
-
-  writeSnapshot(upToLocalSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): void {
-    this.snapshot = { upToLocalSeq, ciphertext, nonce };
-    this.ops = this.ops.filter((o) => o.localSeq > upToLocalSeq);
-  }
-}
-
-function hex(bytes: Uint8Array): string {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-function unhex(s: string): Uint8Array {
-  const out = new Uint8Array(s.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i * 2, i * 2 + 2), 16);
-  return out;
-}
 
 function helloAckBytes(): Uint8Array {
   return encode({ server_version: "test", protocol_version: PROTOCOL_VERSION });
@@ -124,7 +59,7 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
       0n,
       "test",
       "0.0.0",
-      storage as unknown as import("../wasm/airday_core_web.js").EngineStorage,
+      storage as unknown as EngineStorage,
     );
     engine.setLastLocalSeq(0);
     driveToIdle(engine);
@@ -185,7 +120,7 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
       0n,
       "test",
       "0.0.0",
-      storage as unknown as import("../wasm/airday_core_web.js").EngineStorage,
+      storage as unknown as EngineStorage,
     );
     engine.setLastLocalSeq(0);
     driveToIdle(engine);

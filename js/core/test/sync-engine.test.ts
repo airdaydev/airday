@@ -14,14 +14,28 @@
 import { describe, expect, test } from "bun:test";
 
 import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
+import type { EngineStorage } from "../wasm/airday_core_web.js";
+import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const LIST_MAIN = "main";
+
+function memStorage(): EngineStorage {
+  return new MemEngineStorage() as unknown as EngineStorage;
+}
 
 function newEngine(): SyncEngine {
   // Doc.create() builds a fresh doc with no commits (no seeded user
   // lists). Mutations through the engine are what put it in a
   // pending state.
-  return new SyncEngine(Doc.create(), "00000000-0000-0000-0000-000000000000", Dek.generate(), 0n, "test", "0.0.0");
+  return new SyncEngine(
+    Doc.create(),
+    "00000000-0000-0000-0000-000000000000",
+    Dek.generate(),
+    0n,
+    "test",
+    "0.0.0",
+    memStorage(),
+  );
 }
 
 describe("SyncEngine construction", () => {
@@ -149,6 +163,7 @@ describe("save / load round trip", () => {
       0n,
       "test",
       "0.0.0",
+      memStorage(),
     );
     const fingerprintAfter = restored.fingerprint();
 

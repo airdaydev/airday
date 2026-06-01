@@ -26,7 +26,9 @@ import {
   SyncEngine,
   wrapDek,
 } from "../wasm/airday_core_web.js";
+import type { EngineStorage } from "../wasm/airday_core_web.js";
 import { SyncBridge } from "../src/sync-bridge.ts";
+import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const SERVER_BIN = join(REPO_ROOT, "target/debug/airday-server");
@@ -289,6 +291,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
       0n,
       "device-a",
       "0.0.0",
+      new MemEngineStorage() as unknown as EngineStorage,
     );
     const bridgeA = await attachEngine(server, account.deviceToken, engineA);
 
@@ -301,6 +304,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
     const ITEMS = SNAPSHOT_THRESHOLD + 3;
     for (let i = 0; i < ITEMS; i++) {
       engineA.addItem(LIST_MAIN, `item ${i}`);
+      engineA.captureLocalOps();
       engineA.flush();
       bridgeA.pumpOutbox();
       await waitFor(
@@ -326,6 +330,7 @@ describe("e2e snapshot + second-device bootstrap", () => {
       0n,
       "device-b",
       "0.0.0",
+      new MemEngineStorage() as unknown as EngineStorage,
     );
     const bridgeB = await attachEngine(server, tokenB, engineB);
 

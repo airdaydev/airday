@@ -187,7 +187,25 @@ The existing `airday-web` IDB database (vault + prefs + the now-defunct WAL/OPFS
 
 **Exit criteria:** web builds, anonymous + authed sessions work end-to-end, reload survives, multi-tab works as it does today (single tab via `navigator.locks` — *not* trying to be multi-tab-coherent, that's a separate effort).
 
-### Phase 3 — Cleanup
+### Phase 3 — Cleanup *(done)*
+
+**What landed (read before re-deriving):**
+
+- **`NoopStorage` + legacy `pending_export` fallback deleted.** `storage` is mandatory everywhere: native `SyncEngine::new` already took `DynStorage`; the wasm 7th arg is now a required `EngineStorage` (not `Option`). `try_start_push` ships the outbox unconditionally; `OpsAck` always acks by `client_op_id`; `in_flight_push_vv` and its OpsAck branch are gone.
+- **`Doc::pending_export` / `mark_pushed_at` / `mark_pushed` / `last_pushed_vv` were KEPT** — the caveat below was decisive. They're not legacy; they're the live **capture cursor** the outbox path depends on (`capture_local_ops` exports the delta via `pending_export` and advances the cursor via `mark_pushed_at`; web boot calls `markPushed()` after replay). Deleting them would mean redesigning the capture-cursor model, which is out of scope for cleanup. Only the genuinely-dead legacy push code was removed.
+- **Rust test fallout:** seven `sync.rs` legacy-auto-push tests now call `eng.capture_local_ops()` before the flush/pull-complete/ack that drives the push (the seed-pushing multi-engine tests capture the seed right after construction). All green.
+- **JS test fallout:** `MemEngineStorage` promoted to a shared helper `js/core/test/mem-engine-storage.ts`, threaded into `sync-engine.test.ts`, `sync-e2e.test.ts` (which also gained `captureLocalOps()` in its push loop), and `js/web/test/search.test.ts`. `wal-ack-gate.test.ts` + `wal-storage.test.ts` were **deleted** (their durability invariants are covered by `core/src/sync.rs`).
+  - ⚠️ **The shared `MemEngineStorage` MUST copy wasm-passed bytes on entry** (`.slice()`), exactly like the real `IdbStorage`. The first cut didn't, and the e2e failed with a decrypt error on the peer — the retained `ciphertext`/`nonce` were transient views into wasm linear memory, reused by the time the outbox shipped them after the async server round-trip. (Same gotcha the Phase 2 note flags for `IdbStorage`.)
+- **Legacy JS WAL + OPFS files deleted:** `idb-wal.ts`, `wal-adapter.ts`, `mem-wal.ts`, `wal-bridge.ts`, `opfs-probe.ts`, plus their `index.ts` + `package.json` exports.
+- **`web-db.ts`:** bumped to **v7**; `ops` + `snapshot_meta` stores dropped on upgrade (deleted if present, data abandoned). Surviving: `vault`, `device`, `prefs`. The v1–v6 branch ladder collapsed to idempotent create-if-missing.
+- **`App.tsx` boot now hard-fails when IndexedDB can't be opened** (decided this phase): there's no storage-less engine, so a failed `IdbStorage.open` / doc-rebuild surfaces a "Failed to start" screen instead of booting on `null` storage. `BootInfo.storage` is non-null; the `if (!storage)` guards and the dead `bootError` MainApp prop are gone. Removed the `__airday` debug handle and the `console.debug` mount line (kept the boot-failure `console.error`).
+- **`forceSnapshot`** left as-is (fired on `visibilitychange → hidden`) — low priority per the note below; anonymous docs are small/short-lived.
+- **`notify_wal_durable`** kept as the IDB flush signal, as decided in Phase 2.
+- `spec/idb-wal.md` dropped; `spec/architecture.md` gained a "Local persistence" section pointing at the trait.
+
+---
+
+_Original Phase 3 checklist (kept for provenance):_
 
 Phase 2 is verified in real use (anonymous + authed add → reload → restore, both confirmed in a real browser). Remaining cleanup, with the **test fallout** each item triggers — that fallout is the bulk of the work, not the deletions:
 

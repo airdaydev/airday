@@ -10,7 +10,6 @@ export type {
 } from "./storage/adapter.ts";
 export { MemStorage } from "./storage/mem.ts";
 export { BunFileStorage } from "./storage/file.ts";
-export { probeOpfs } from "./storage/opfs-probe.ts";
 export {
   IdbStorage,
   type EngineBootRows,
@@ -23,29 +22,14 @@ export {
   ENGINE_DB_VERSION,
 } from "./storage/engine-db.ts";
 export { getDevice, putDevice } from "./storage/device-store.ts";
-export { IdbWalStorage } from "./storage/idb-wal.ts";
-export { MemWalStorage } from "./storage/mem-wal.ts";
 export {
   DekVault,
   type DekFromHex,
   type VaultedSession,
 } from "./storage/dek-vault.ts";
 export {
-  SNAPSHOT_THRESHOLD,
-  type ReplayPayload,
-  type WalEntry,
-  type WalStorage,
-} from "./storage/wal-adapter.ts";
-export {
   SyncBridge,
   type ConnectionEvent,
   type ReconnectBackoff,
   type SyncBridgeOpts,
 } from "./sync-bridge.ts";
-export {
-  WalBridge,
-  bootWal,
-  type BootWalOpts,
-  type BootWalResult,
-  type WalBridgeOpts,
-} from "./wal-bridge.ts";

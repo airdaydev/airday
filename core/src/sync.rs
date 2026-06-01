@@ -27,7 +27,6 @@ use std::collections::{BTreeSet, VecDeque};
 use airday_protocol::{
     ClientFrame, Hello, HelloAck, HelloRejected, ServerFrame, StoredBlob, PROTOCOL_VERSION,
 };
-use loro::VersionVector;
 use serde::Serialize;
 
 use crate::crypto::Dek;
@@ -140,20 +139,16 @@ pub struct SyncEngine {
     /// once multi-doc sharing lands; today every engine only ever
     /// drives one doc).
     doc_id: DocId,
-    /// Per-doc local persistence. On the CLI (`SqliteStorage`, Phase 1)
-    /// this is load-bearing: `try_start_push` ships `storage.outbox()`
-    /// rows and `OpsAck` acks them by `client_op_id`. On web
-    /// (`NoopStorage` in Phase 1) the outbox is always empty, so the
-    /// engine falls through to the legacy `pending_export` /
-    /// `mark_pushed_at` path — keeping web byte-for-byte unchanged
-    /// until Phase 2 (`IdbStorage`).
+    /// Per-doc local persistence (`SqliteStorage` on the CLI,
+    /// `IdbStorage` on web). Load-bearing: the host captures its
+    /// pending mutations into op-log rows (`capture_local_ops`),
+    /// `try_start_push` ships `storage.outbox()` rows, and `OpsAck`
+    /// acks them by `client_op_id`.
     storage: DynStorage,
-    /// `ClientOpId`s of the rows in the in-flight outbox-driven push,
-    /// in the same order they were shipped in `PushOps.ops` (so
-    /// `assigned_seqs[i]` acks `id[i]`). Non-empty only while a
-    /// `SqliteStorage`-style push is in flight; empty on the legacy
-    /// (web) path, which uses `in_flight_push_vv` instead. Cleared on
-    /// `OpsAck` (after `storage.ack_local_op`) or on disconnect (the
+    /// `ClientOpId`s of the rows in the in-flight push, in the same
+    /// order they were shipped in `PushOps.ops` (so `assigned_seqs[i]`
+    /// acks `id[i]`). Non-empty only while a push is in flight. Cleared
+    /// on `OpsAck` (after `storage.ack_local_op`) or on disconnect (the
     /// rows stay unacked in storage, ready for the next reconnect's
     /// outbox re-push).
     in_flight_client_op_ids: Vec<ClientOpId>,
@@ -202,11 +197,6 @@ pub struct SyncEngine {
     /// know when to re-issue `PullOps` against (hopefully) a more
     /// caught-up replica.
     gap_state: Option<GapState>,
-    /// VV captured at the moment of the in-flight `PushOps` export. On
-    /// `OpsAck` we merge this into `Doc::last_pushed_vv`. Cleared on
-    /// disconnect so a re-push after reconnect re-exports from the
-    /// server's last-known frontier.
-    in_flight_push_vv: Option<VersionVector>,
     outbox: VecDeque<Vec<u8>>,
     events: VecDeque<Event>,
 }
@@ -215,10 +205,8 @@ impl SyncEngine {
     /// Build a fresh engine. `last_acked_seq` is the persisted
     /// durable-prefix from the previous session — used as `since_seq`
     /// in the initial pull and as the floor for `last_durable_seq`.
-    /// `storage` is wired into push / ack / remote-apply as an
-    /// additive observer in Phase 0b; pass `Box::new(NoopStorage)`
-    /// from hosts whose real persistence still goes through the
-    /// legacy path.
+    /// `storage` is mandatory: push / ack / remote-apply all flow
+    /// through it (`SqliteStorage` on the CLI, `IdbStorage` on web).
     pub fn new(
         doc: Doc,
         doc_id: DocId,
@@ -242,7 +230,6 @@ impl SyncEngine {
             last_sent_ack: last_acked_seq,
             seen_above_contig: BTreeSet::new(),
             gap_state: None,
-            in_flight_push_vv: None,
             outbox: VecDeque::new(),
             events: VecDeque::new(),
         }
@@ -257,11 +244,9 @@ impl SyncEngine {
     }
 
     /// Seed the highest `local_seq` the storage has assigned for this
-    /// doc, read from `BootState::last_local_seq`. The CLI calls this
-    /// once right after construction; thereafter the engine maintains
-    /// it from every `append_local_op` / `append_remote_op`. Hosts on
-    /// `NoopStorage` (web in Phase 1) leave it at the `LocalSeq(0)`
-    /// default — they never drive the outbox path.
+    /// doc, read from `BootState::last_local_seq`. Hosts call this once
+    /// right after construction; thereafter the engine maintains it
+    /// from every `append_local_op` / `append_remote_op`.
     pub fn set_last_local_seq(&mut self, seq: LocalSeq) {
         self.last_local_seq = seq;
         // A fresh boot loaded its replay log against the last snapshot;
@@ -622,33 +607,23 @@ impl SyncEngine {
                         seq: self.last_contiguous_seq,
                     });
                 }
-                // Two push paths, distinguished by whether the in-flight
-                // push was outbox-driven (CLI / `SqliteStorage`) or
-                // legacy (web / `NoopStorage`):
-                //
-                //   - outbox-driven: `in_flight_client_op_ids[i]` was
-                //     shipped as `PushOps.ops[i]`, so `assigned_seqs[i]`
-                //     acks it. Stamp each row's `server_seq` and drain
-                //     the tracker. `Doc::last_pushed_vv` was already
-                //     advanced at capture time, so don't touch it here.
-                //   - legacy: nothing was captured; advance
-                //     `Doc::last_pushed_vv` via the in-flight VV.
-                if !self.in_flight_client_op_ids.is_empty() {
-                    for (client_op_id, &seq) in self
-                        .in_flight_client_op_ids
-                        .drain(..)
-                        .zip(assigned_seqs.iter())
+                // `in_flight_client_op_ids[i]` was shipped as
+                // `PushOps.ops[i]`, so `assigned_seqs[i]` acks it. Stamp
+                // each row's `server_seq` and drain the tracker.
+                // `Doc::last_pushed_vv` was already advanced at capture
+                // time (`capture_local_ops`), so don't touch it here.
+                for (client_op_id, &seq) in self
+                    .in_flight_client_op_ids
+                    .drain(..)
+                    .zip(assigned_seqs.iter())
+                {
+                    if let Err(e) =
+                        self.storage
+                            .ack_local_op(self.doc_id, client_op_id, ServerSeq(seq))
                     {
-                        if let Err(e) =
-                            self.storage
-                                .ack_local_op(self.doc_id, client_op_id, ServerSeq(seq))
-                        {
-                            self.events
-                                .push_back(Event::Error(format!("storage.ack_local_op: {e}")));
-                        }
+                        self.events
+                            .push_back(Event::Error(format!("storage.ack_local_op: {e}")));
                     }
-                } else if let Some(vv) = self.in_flight_push_vv.take() {
-                    self.doc.mark_pushed_at(vv);
                 }
                 self.events.push_back(Event::Pushed);
                 // Ack gated on `notify_wal_durable`. The local op's
@@ -787,9 +762,8 @@ impl SyncEngine {
         // Mirror each applied blob into the op log as a remote_op row.
         // Order matches the wire (server-side seq order), which is also
         // the order the boot replay needs. Errors don't roll back the
-        // Loro apply — the CLI surfaces the event and the next boot
-        // re-pulls from the durable cursor; web (`NoopStorage`) swallows
-        // these.
+        // Loro apply — the host surfaces the event and the next boot
+        // re-pulls from the durable cursor.
         for op in &ops {
             match self.storage.append_remote_op(
                 self.doc_id,
@@ -967,66 +941,39 @@ impl SyncEngine {
         if !matches!(self.state, ConnState::Idle) {
             return;
         }
-        // Prefer the durable outbox (CLI / `SqliteStorage`): the host
-        // already captured its pending mutations into op-log rows, so
+        // Ship the durable outbox: the host already captured its
+        // pending mutations into op-log rows (`capture_local_ops`), so
         // ship those verbatim and ack them by `client_op_id` on
-        // `OpsAck`. An empty outbox means either nothing to push, or a
-        // host on `NoopStorage` (web in Phase 1) — fall through to the
-        // legacy `pending_export` path below.
+        // `OpsAck`. An empty outbox means nothing to push.
         let outbox = match self.storage.outbox(self.doc_id) {
             Ok(rows) => rows,
             Err(e) => {
                 self.events
                     .push_back(Event::Error(format!("storage.outbox: {e}")));
-                Vec::new()
-            }
-        };
-        if !outbox.is_empty() {
-            let mut ops = Vec::with_capacity(outbox.len());
-            let mut ids = Vec::with_capacity(outbox.len());
-            for row in outbox {
-                ops.push(row.payload);
-                ids.push(row.client_op_id);
-            }
-            let frame = ClientFrame::PushOps { ops };
-            if let Err(e) = self.encode_into_outbox(&frame) {
-                self.events
-                    .push_back(Event::Error(format!("encode PushOps: {e}")));
                 return;
             }
-            self.in_flight_push_vv = None;
-            self.in_flight_client_op_ids = ids;
-            self.state = ConnState::Pushing;
+        };
+        if outbox.is_empty() {
             return;
         }
-
-        // Legacy path (web / Phase 1): export everything since the push
-        // cursor as one blob. Snapshot the oplog VV *before* exporting
-        // so we can mark exactly these ops as pushed on ack — even if
-        // the user mutates the doc again before the ack lands.
-        let pre_vv = self.doc.oplog_vv();
-        let blob = match self.doc.pending_export(&self.dek) {
-            Ok(Some(b)) => b,
-            Ok(None) => return,
-            Err(e) => {
-                self.events
-                    .push_back(Event::Error(format!("pending_export: {e}")));
-                return;
-            }
-        };
-        let frame = ClientFrame::PushOps { ops: vec![blob] };
+        let mut ops = Vec::with_capacity(outbox.len());
+        let mut ids = Vec::with_capacity(outbox.len());
+        for row in outbox {
+            ops.push(row.payload);
+            ids.push(row.client_op_id);
+        }
+        let frame = ClientFrame::PushOps { ops };
         if let Err(e) = self.encode_into_outbox(&frame) {
             self.events
                 .push_back(Event::Error(format!("encode PushOps: {e}")));
             return;
         }
-        self.in_flight_push_vv = Some(pre_vv);
+        self.in_flight_client_op_ids = ids;
         self.state = ConnState::Pushing;
     }
 
     fn go_disconnected(&mut self) {
         self.state = ConnState::Disconnected;
-        self.in_flight_push_vv = None;
         // The rows we shipped at push time stay unacked in storage;
         // outbox-driven re-push picks them up on the next connection.
         // The in-memory tracker just drops so a future OpsAck in a
@@ -1074,7 +1021,7 @@ mod tests {
     }
 
     /// Tests don't care which doc — the trait isn't load-bearing on
-    /// the wire yet, and `NoopStorage` / `MemStorage` are per-instance.
+    /// the wire yet, and `MemStorage` instances are per-engine.
     fn fake_doc_id() -> DocId {
         DocId(uuid::Uuid::nil())
     }
@@ -1303,6 +1250,7 @@ mod tests {
         let _ = drain_outbox(&mut eng);
 
         eng.doc_mut().add_item(LIST_MAIN, "thing").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         let frame: ClientFrame = dec(&eng.pop_outbox().expect("PushOps"));
         let blob = match frame {
@@ -1363,11 +1311,13 @@ mod tests {
 
         // First mutation + flush starts a push.
         eng.doc_mut().add_item(LIST_MAIN, "first").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         let _first_push = eng.pop_outbox().expect("first PushOps");
 
         // Mutate again while the push is in flight.
         let item_id = eng.doc_mut().add_item(LIST_MAIN, "during-push").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         // No new wire bytes yet — engine is in PushingDirty, waiting.
         assert!(eng.pop_outbox().is_none());
@@ -1418,6 +1368,7 @@ mod tests {
 
         // User mutates and flushes while we're still Pulling.
         eng.doc_mut().add_item(LIST_MAIN, "during pull").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         assert!(eng.pop_outbox().is_none(), "Pulling defers push until Idle");
 
@@ -1555,6 +1506,7 @@ mod tests {
 
         // Mutate locally, start a push.
         eng.doc_mut().add_item(LIST_MAIN, "local-pushing").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
 
@@ -1661,6 +1613,7 @@ mod tests {
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
         eng.doc_mut().add_item(LIST_MAIN, "stranded").unwrap();
+        eng.capture_local_ops().unwrap();
         eng.flush();
         let _ = eng.pop_outbox().unwrap();
         let _ = drain_events(&mut eng);
@@ -1675,9 +1628,9 @@ mod tests {
         // Outbox drained; reconnect can re-derive frames.
         assert!(eng.pop_outbox().is_none());
 
-        // Re-connect, run an empty pull. The doc still has pending ops
-        // (the first push never landed) so the engine auto-pushes on
-        // pull-complete.
+        // Re-connect, run an empty pull. The captured row stays unacked
+        // in storage (the first push never landed) so the engine
+        // re-ships the outbox on pull-complete.
         eng.handle_connected();
         let _ = eng.pop_outbox().unwrap();
         eng.handle_server_bytes(
@@ -1979,6 +1932,9 @@ mod tests {
             SyncEngine::new(doc, fake_doc_id(), dek.clone(), 0, opts(), mem())
         };
 
+        // Capture A's seeded built-ins so the outbox ships them.
+        a.capture_local_ops().unwrap();
+
         // Fake server state.
         let mut next_seq: u64 = 0;
         let mut ops_log: Vec<StoredBlob> = Vec::new();
@@ -2026,6 +1982,7 @@ mod tests {
 
         // -- A makes a real-content change --
         let item_id = a.doc_mut().add_item(LIST_MAIN, "snapshotted").unwrap();
+        a.capture_local_ops().unwrap();
         a.flush();
         if let Some(bytes) = a.pop_outbox() {
             if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
@@ -2076,6 +2033,7 @@ mod tests {
         //    bootstrap exercises both the snapshot apply *and* the
         //    post-snapshot catch-up via OpsBatch. --
         let post_snap_id = a.doc_mut().add_item(LIST_MAIN, "post-snap").unwrap();
+        a.capture_local_ops().unwrap();
         a.flush();
         let mut post_snap_ops: Vec<StoredBlob> = Vec::new();
         if let Some(bytes) = a.pop_outbox() {
@@ -2550,6 +2508,9 @@ mod tests {
             SyncEngine::new(doc, fake_doc_id(), dek.clone(), 0, opts(), mem())
         };
 
+        // Capture A's seeded built-ins so the outbox ships them.
+        a.capture_local_ops().unwrap();
+
         let mut next_seq: u64 = 0;
         let mut ops_log: Vec<StoredBlob> = Vec::new();
 
@@ -2574,7 +2535,7 @@ mod tests {
             }),
             0,
         );
-        // A's seed auto-pushes; collect & ack.
+        // A's seed ships from the outbox; collect & ack.
         while let Some(bytes) = a.pop_outbox() {
             if let Ok(ClientFrame::PushOps { ops }) = rmp_serde::from_slice::<ClientFrame>(&bytes) {
                 let assigned: Vec<u64> = ops
@@ -2600,6 +2561,7 @@ mod tests {
 
         // -- A makes a local change and pushes --
         let item_a = a.doc_mut().add_item(LIST_MAIN, "from-a").unwrap();
+        a.capture_local_ops().unwrap();
         a.flush();
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushOps"));
         let push_ops = match push {
@@ -2652,13 +2614,11 @@ mod tests {
 
     // ---------- storage-trait–driven push path ----------
     //
-    // On a real impl (`MemStorage` here, `SqliteStorage` on the CLI)
-    // the push path is load-bearing: the host captures pending
-    // mutations into op-log rows via `capture_local_ops`, the engine
-    // ships `storage.outbox()` rows in `PushOps`, and `OpsAck` acks
-    // each row by `client_op_id`. Web (`NoopStorage`) keeps an empty
-    // outbox and falls through to the legacy `pending_export` path —
-    // covered by the wire-level tests above.
+    // The push path is outbox-driven on every host (`MemStorage` here,
+    // `SqliteStorage` on the CLI, `IdbStorage` on web): the host
+    // captures pending mutations into op-log rows via
+    // `capture_local_ops`, the engine ships `storage.outbox()` rows in
+    // `PushOps`, and `OpsAck` acks each row by `client_op_id`.
 
     fn engine_with_mem() -> (SyncEngine, std::sync::Arc<MemStorage>) {
         let mut doc = Doc::new().unwrap();

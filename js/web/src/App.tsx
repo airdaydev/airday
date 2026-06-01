@@ -239,10 +239,11 @@ async function createAnonymousSession(): Promise<Session> {
 type BootInfo = {
   doc: Doc;
   lastAcked: bigint;
-  /** Engine op-log store (IndexedDB `airday-engine`), or null if it
-   *  couldn't be opened — then the engine runs on `NoopStorage` and
-   *  there's no local persistence. */
-  storage: IdbStorage | null;
+  /** Engine op-log store (IndexedDB `airday-engine`). Mandatory — the
+   *  engine has no storage-less mode; if IDB can't be opened the boot
+   *  fails hard (see `BootGate`) rather than running without local
+   *  persistence. */
+  storage: IdbStorage;
   /** Highest `localSeq` the store has assigned — seeds the engine. */
   lastLocalSeq: number;
   /** True when the doc was freshly created (`Doc.create()`) and its
@@ -325,35 +326,34 @@ function BootGate(props: {
         prefs: await prefsPromise,
       });
     } catch (e) {
+      // Storage is mandatory now (the engine has no storage-less mode):
+      // a failure to open IDB or rebuild the doc is fatal. Surface it
+      // rather than booting a broken engine.
       // eslint-disable-next-line no-console
       console.error("[boot] FAILED:", e);
       props.setBootError(e instanceof Error ? e.message : String(e));
-      props.setBoot({
-        doc: Doc.empty(),
-        lastAcked: 0n,
-        storage: null,
-        lastLocalSeq: 0,
-        seeded: false,
-        prefs: null,
-      });
     }
   })();
 
   return (
-    <Show when={props.boot} fallback={<div class="empty">{m().common.loading}</div>}>
-      {(b) => (
-        <MainApp
-          session={props.session}
-          boot={b()}
-          bootError={props.bootError}
-          setOnline={props.setOnline}
-          online={props.online}
-          lastSyncAt={props.lastSyncAt}
-          setLastSyncAt={props.setLastSyncAt}
-          logout={props.logout}
-          onSession={props.onSession}
-        />
-      )}
+    <Show
+      when={!props.bootError}
+      fallback={<div class="empty">Failed to start: {props.bootError}</div>}
+    >
+      <Show when={props.boot} fallback={<div class="empty">{m().common.loading}</div>}>
+        {(b) => (
+          <MainApp
+            session={props.session}
+            boot={b()}
+            setOnline={props.setOnline}
+            online={props.online}
+            lastSyncAt={props.lastSyncAt}
+            setLastSyncAt={props.setLastSyncAt}
+            logout={props.logout}
+            onSession={props.onSession}
+          />
+        )}
+      </Show>
     </Show>
   );
 }
@@ -361,7 +361,6 @@ function BootGate(props: {
 function MainApp(props: {
   session: Session;
   boot: BootInfo;
-  bootError: string | null;
   online: boolean;
   setOnline: (b: boolean) => void;
   lastSyncAt: number | null;
@@ -369,13 +368,6 @@ function MainApp(props: {
   logout: () => void;
   onSession: (s: Session) => void;
 }) {
-  // eslint-disable-next-line no-console
-  console.debug(
-    "MainApp mount, freshSignup=",
-    props.session.freshSignup,
-    "lastAckedBlob=",
-    String(props.boot.lastAcked),
-  );
   const storage = props.boot.storage;
   // `SyncEngine` consumes its Dek argument, and the session-level Dek
   // must stay valid across MainApp remounts (anonymous → authed swap
@@ -390,7 +382,7 @@ function MainApp(props: {
     props.boot.lastAcked,
     CLIENT_NAME,
     CLIENT_VERSION,
-    storage ?? undefined,
+    storage,
   );
   // Seed the engine's `localSeq` cursor from what the store loaded so
   // new appends continue past the persisted log.
@@ -435,7 +427,6 @@ function MainApp(props: {
   //     IDB write to actually land, then tells the engine the bytes are
   //     durable (which queues the `Ack`) and pumps it onto the wire.
   const capture = (): void => {
-    if (!storage) return;
     try {
       engine.captureLocalOps();
     } catch (e) {
@@ -444,7 +435,6 @@ function MainApp(props: {
     }
   };
   const compact = (): void => {
-    if (!storage) return;
     try {
       engine.snapshotIfFullySynced();
     } catch (e) {
@@ -459,7 +449,7 @@ function MainApp(props: {
   // `lastContiguousSeq`, so a crash never resumes from a seq the local
   // store doesn't actually cover.
   const persistDeviceNow = async (): Promise<void> => {
-    if (!storage || props.session.anonymous) return;
+    if (props.session.anonymous) return;
     await putDevice(props.session.accountId, {
       accountId: props.session.accountId,
       primaryDocId: props.session.primaryDocId,
@@ -476,7 +466,6 @@ function MainApp(props: {
   // then mark durable + ship the resulting Ack. Sampling synchronously
   // binds the notify to bytes that were actually being persisted.
   const scheduleDurable = (): void => {
-    if (!storage) return;
     const seq = engine.lastContiguousSeq();
     storage
       .whenFlushed()
@@ -538,7 +527,7 @@ function MainApp(props: {
   // a coarse debounce so reload picks up the right resume point.
   let deviceTimer: ReturnType<typeof setTimeout> | null = null;
   const saveDeviceSoon = (): void => {
-    if (!storage || props.session.anonymous) return;
+    if (props.session.anonymous) return;
     if (deviceTimer) clearTimeout(deviceTimer);
     deviceTimer = setTimeout(() => {
       deviceTimer = null;
@@ -583,7 +572,7 @@ function MainApp(props: {
   // the seeded built-ins as the first op row so a reload before any user
   // mutation still has something to replay. The op row is unacked, so
   // for authed sessions it also pushes to the server via the outbox.
-  if (storage && props.boot.seeded) {
+  if (props.boot.seeded) {
     capture();
     scheduleDurable();
   }
@@ -596,14 +585,12 @@ function MainApp(props: {
       // never drains and `snapshotIfFullySynced` would never fire —
       // force a full-state snapshot (prune-all) instead. Best-effort.
       capture();
-      if (storage) {
-        try {
-          if (props.session.anonymous) engine.forceSnapshot();
-          else engine.snapshotIfFullySynced();
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error("snapshot on hide failed:", e);
-        }
+      try {
+        if (props.session.anonymous) engine.forceSnapshot();
+        else engine.snapshotIfFullySynced();
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("snapshot on hide failed:", e);
       }
       void persistDeviceNow().catch(() => {});
     }
@@ -613,10 +600,6 @@ function MainApp(props: {
     document.removeEventListener("visibilitychange", onVisibility);
     if (deviceTimer) clearTimeout(deviceTimer);
   });
-
-  if (typeof window !== "undefined") {
-    (window as any).__airday = { app, engine, bridge, storage };
-  }
 
   return (
     <Workspace

@@ -380,52 +380,6 @@ impl LocalStorage for MemStorage {
     }
 }
 
-// ---------- noop impl ----------
-
-/// `LocalStorage` that drops everything on the floor. Used in Phase 0a
-/// to thread the trait through `SyncEngine::new` on the CLI and web
-/// without yet wiring real persistence — preserves "no behavior
-/// change" while the engine continues to use its legacy
-/// `pending_export` / `notify_wal_durable` path. Removed once Phase 1
-/// (CLI → `SqliteStorage`) and Phase 2 (web → `IdbStorage`) land.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct NoopStorage;
-
-impl LocalStorage for NoopStorage {
-    fn boot(&self, _doc_id: DocId) -> Result<BootState, StorageError> {
-        Ok(BootState::default())
-    }
-    fn append_local_op(&self, _doc_id: DocId, _row: LocalOpRow) -> Result<LocalSeq, StorageError> {
-        Ok(LocalSeq(0))
-    }
-    fn append_remote_op(
-        &self,
-        _doc_id: DocId,
-        _row: RemoteOpRow,
-    ) -> Result<LocalSeq, StorageError> {
-        Ok(LocalSeq(0))
-    }
-    fn ack_local_op(
-        &self,
-        _doc_id: DocId,
-        _client_op_id: ClientOpId,
-        _server_seq: ServerSeq,
-    ) -> Result<(), StorageError> {
-        Ok(())
-    }
-    fn outbox(&self, _doc_id: DocId) -> Result<Vec<OutboxRow>, StorageError> {
-        Ok(Vec::new())
-    }
-    fn write_snapshot(
-        &self,
-        _doc_id: DocId,
-        _up_to_local_seq: LocalSeq,
-        _payload: EncryptedBlob,
-    ) -> Result<(), StorageError> {
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546,24 +500,5 @@ mod tests {
         // next_local_seq is preserved across snapshot — new ops continue
         // from where they left off.
         assert_eq!(boot.last_local_seq, LocalSeq(3));
-    }
-
-    #[test]
-    fn noop_storage_satisfies_trait_with_empty_results() {
-        let s = NoopStorage;
-        let boot = s.boot(doc_id()).unwrap();
-        assert!(boot.replay.is_empty());
-        assert_eq!(boot.last_local_seq, LocalSeq(0));
-        assert!(s.outbox(doc_id()).unwrap().is_empty());
-        let seq = s
-            .append_local_op(
-                doc_id(),
-                LocalOpRow {
-                    client_op_id: client_op_id(1),
-                    payload: blob(1),
-                },
-            )
-            .unwrap();
-        assert_eq!(seq, LocalSeq(0));
     }
 }

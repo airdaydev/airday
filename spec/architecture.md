@@ -38,7 +38,7 @@ This keeps Loro + crypto + protocol behavior identical across clients while lett
 
 Two boundary rules matter:
 
-- **No push pipelining.** The engine serializes pushes. If local mutations happen while a push is in flight, the engine marks itself dirty and re-exports only after the server ack arrives. This avoids duplicate export windows and keeps host adapters simple.
+- **No push pipelining.** The engine serializes pushes. If local mutations happen while a push is in flight, the engine marks itself dirty and re-ships its outbox only after the server ack arrives. This avoids duplicate export windows and keeps host adapters simple.
 - **Auth stays outside the engine.** The engine starts from "socket is authenticated and usable". Whether that came from a bearer header, cookie-backed browser session, or future ticket exchange is a client / transport concern documented in `auth.md`.
 
 Platform policy stays outside `core`:
@@ -47,6 +47,17 @@ Platform policy stays outside `core`:
 - online/offline and visibility hooks
 - mutation flush debounce
 - worker placement for expensive client-side KDF work
+
+## Local persistence
+
+Persistence is **inside** the engine's contract, via one Rust trait — `core::LocalStorage` (`core/src/storage.rs`). The engine appends an encrypted op row on each local commit (`capture_local_ops`) and each applied remote op, stamps `server_seq` on ack, drives the push from `storage.outbox()`, and rebuilds the doc from snapshot + replay on boot. Storage is mandatory: there is no storage-less engine mode.
+
+Two implementations satisfy the same semantics on different substrates:
+
+- **CLI / server-side single-account flows:** `SqliteStorage` (`cli/src/storage.rs`, `rusqlite`, file on disk; synchronously durable).
+- **Web:** `IdbStorage` (`js/core/src/storage/idb-storage.ts`) behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). The trait is synchronous; IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror the engine reads/writes immediately and flushes IDB in the background, signalling real durability back via `notify_wal_durable`. The engine stays on the main thread (no Worker).
+
+The rationale and history — including why web uses IDB rather than sqlite-wasm — live in `spec/local-storage.md` and `spec/local-storage-plan.md`.
 
 ## Server-is-dumb thesis
 

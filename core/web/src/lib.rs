@@ -14,9 +14,9 @@ use airday_core::{
     ClientOpId as CoreClientOpId, Dek as CoreDek, Doc as CoreDoc, DocId as CoreDocId,
     EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
     Kek as CoreKek, LocalOpRow as CoreLocalOpRow, LocalSeq as CoreLocalSeq,
-    LocalStorage as CoreLocalStorage, NoopStorage as CoreNoopStorage, OutboxRow as CoreOutboxRow,
-    RemoteOpRow as CoreRemoteOpRow, ServerSeq as CoreServerSeq, StorageError as CoreStorageError,
-    SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
+    LocalStorage as CoreLocalStorage, OutboxRow as CoreOutboxRow, RemoteOpRow as CoreRemoteOpRow,
+    ServerSeq as CoreServerSeq, StorageError as CoreStorageError, SyncEngine as CoreSyncEngine,
+    WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -769,7 +769,11 @@ impl CoreLocalStorage for WebStorage {
     ) -> Result<CoreLocalSeq, CoreStorageError> {
         let seq = self
             .js
-            .append_remote_op(row.server_seq.0 as f64, &row.payload.ciphertext, &row.payload.nonce)
+            .append_remote_op(
+                row.server_seq.0 as f64,
+                &row.payload.ciphertext,
+                &row.payload.nonce,
+            )
             .map_err(jsval_err)?;
         Ok(CoreLocalSeq(seq as u64))
     }
@@ -812,7 +816,11 @@ impl CoreLocalStorage for WebStorage {
         payload: CoreEncryptedBlob,
     ) -> Result<(), CoreStorageError> {
         self.js
-            .write_snapshot(up_to_local_seq.0 as f64, &payload.ciphertext, &payload.nonce)
+            .write_snapshot(
+                up_to_local_seq.0 as f64,
+                &payload.ciphertext,
+                &payload.nonce,
+            )
             .map_err(jsval_err)
     }
 }
@@ -840,19 +848,13 @@ impl SyncEngine {
         last_acked_seq: u64,
         client_name: String,
         client_version: String,
-        storage: Option<EngineStorage>,
+        storage: EngineStorage,
     ) -> Result<SyncEngine, JsError> {
         let parsed = uuid::Uuid::parse_str(&doc_id)
             .map_err(|e| JsError::new(&format!("invalid doc_id: {e}")))?;
-        // Phase 2: when the host passes a JS `EngineStorage` (the
-        // `IdbStorage` mirror), the engine takes the outbox-driven push
-        // path — capture, ack, and remote-apply all flow through it.
-        // Hosts that omit it (tests, transitional callers) fall back to
-        // `NoopStorage`, which keeps the legacy `pending_export` path.
-        let dyn_storage: Box<dyn CoreLocalStorage> = match storage {
-            Some(js) => Box::new(WebStorage { js }),
-            None => Box::new(CoreNoopStorage),
-        };
+        // The host always passes a JS `EngineStorage` (the `IdbStorage`
+        // mirror): capture, ack, and remote-apply all flow through it.
+        let dyn_storage: Box<dyn CoreLocalStorage> = Box::new(WebStorage { js: storage });
         Ok(SyncEngine {
             inner: CoreSyncEngine::new(
                 doc.inner,

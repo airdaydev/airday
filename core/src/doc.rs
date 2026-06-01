@@ -2486,6 +2486,52 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_then_multiple_trailing_deltas_converge_on_fresh_peer() {
+        // Mirrors the e2e bootstrap: a producer captures N ops one at a
+        // time (pending_export + mark_pushed, the capture-cursor model),
+        // a full snapshot is taken mid-stream, then more ops are
+        // captured. A fresh peer applies the snapshot followed by the
+        // trailing per-op deltas as a batch and must converge.
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        a.mark_pushed(); // cursor at the seed, like Doc.create() on web
+
+        // Five captured ops, one delta each.
+        for i in 0..5 {
+            a.add_item(LIST_MAIN, &format!("item {i}")).unwrap();
+            let _ = a.pending_export(&dek).unwrap().unwrap();
+            a.mark_pushed();
+        }
+        // Snapshot taken here (frontier = 5 items).
+        let snapshot = a.snapshot_blob(&dek).unwrap();
+
+        // Three more captured ops, one delta each.
+        let mut trailing = Vec::new();
+        for i in 5..8 {
+            a.add_item(LIST_MAIN, &format!("item {i}")).unwrap();
+            trailing.push(a.pending_export(&dek).unwrap().unwrap());
+            a.mark_pushed();
+        }
+
+        // Fresh peer: snapshot, then the trailing deltas as a batch.
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &snapshot).unwrap();
+        b.apply_remote_batch(&dek, trailing.iter()).unwrap();
+
+        assert_eq!(b.fingerprint(), a.fingerprint());
+        let texts: Vec<String> = b
+            .items_in_list(LIST_MAIN, false)
+            .into_iter()
+            .map(|it| it.text)
+            .collect();
+        assert_eq!(
+            texts.len(),
+            8,
+            "expected all 8 items on the peer, got {texts:?}"
+        );
+    }
+
+    #[test]
     fn add_item_at_inserts_at_target_position() {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();

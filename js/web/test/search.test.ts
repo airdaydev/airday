@@ -10,6 +10,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { Dek, Doc, SyncEngine } from "@airday/core/wasm";
+import type { EngineStorage } from "@airday/core/wasm";
+import { MemEngineStorage } from "../../core/test/mem-engine-storage.ts";
 import {
   createSearchEngine,
   tokenize,
@@ -19,7 +21,17 @@ import {
 const LIST_MAIN = "main";
 
 function newSearch(): { eng: SyncEngine; search: SearchEngine } {
-  const eng = new SyncEngine(Doc.create(), "00000000-0000-0000-0000-000000000000", Dek.generate(), 0n, "t", "0");
+  // Search only consumes the engine's AppEvent stream — it never
+  // captures or syncs — but the constructor now requires a storage.
+  const eng = new SyncEngine(
+    Doc.create(),
+    "00000000-0000-0000-0000-000000000000",
+    Dek.generate(),
+    0n,
+    "t",
+    "0",
+    new MemEngineStorage() as unknown as EngineStorage,
+  );
   const search = createSearchEngine();
   // Same path the web store uses on attach: feed the synthetic burst
   // describing current doc state through the dispatcher.
