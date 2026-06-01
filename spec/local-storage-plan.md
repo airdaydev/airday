@@ -137,9 +137,21 @@ CLI boots through the trait. `cli/src/db.rs` becomes thin — open the file, han
 
 **Exit criteria:** CLI builds, tests pass against the new schema, every CLI smoke test (signup, add, sync, restart, replay) works through the trait.
 
-### Phase 2 — `IdbStorage` for web (main thread)
+### Phase 2 — `IdbStorage` for web (main thread) *(done)*
 
-JS implementation behind a wasm-bindgen extern interface passed to `SyncEngine::new`. Lives somewhere like `js/core/src/storage/idb-storage.ts`.
+JS implementation behind a wasm-bindgen extern interface passed to `SyncEngine::new`. Lives at `js/core/src/storage/idb-storage.ts`.
+
+**What actually landed (read before Phase 3 — the sketch below is partly superseded):**
+
+- **`EngineStorage` extern + `WebStorage` adapter** in `core/web/src/lib.rs`. The trait is synchronous; IDB is async. `IdbStorage` keeps a **synchronous in-memory mirror** of the op log that the extern methods (`appendLocalOp` / `appendRemoteOp` / `ackLocalOp` / `outbox` / `writeSnapshot`) read/write immediately, and flushes IDB on a background promise chain. Durability is surfaced out-of-band via `IdbStorage.whenFlushed()` → host's `notifyWalDurable`. `WebStorage::boot` returns `BootState::default()` — the engine never calls `storage.boot()`; the host reconstructs the `Doc` in JS (see boot below).
+- **`SyncEngine::new` gained an optional 7th arg** `storage?: EngineStorage`. Present → `WebStorage`; absent → `NoopStorage` (legacy `pending_export` path; still used by the js/core + js/web tests that construct the engine with 6 args).
+- **New wasm `SyncEngine` methods:** `captureLocalOps`, `snapshotIfFullySynced`, `forceSnapshot`, `setLastLocalSeq`.
+- **`core::SyncEngine::force_snapshot()`** (new) — unconditional prune-all snapshot for **anonymous / local-only** sessions: they never sync, so the outbox never drains and `snapshot_if_fully_synced` never fires. Fired on tab-hide. MUST NOT be called on a syncing doc.
+- **`store.ts` gained `setBeforeFlush`** — `captureLocalOps()` runs *before* `engine.flush()` so the outbox-driven push ships the just-captured row (otherwise `try_start_push` sees an empty outbox and falls back to the legacy path).
+- **Resume cursor stays in the `airday-web` `device` row** (`js/core/src/storage/device-store.ts`), seeded into `SyncEngine::new`'s `last_acked_seq`. This mirrors the CLI keeping the cursor in its config file rather than deriving it from the (compacted) op log. `BootState::last_acked_server_seq` is deliberately **not** used for the cursor.
+- **Migration: skipped.** Per explicit direction ("flush all existing data"), `airday-engine` is a fresh DB and the old `airday-web` WAL/OPFS data is abandoned, not drained. The drain described at the end of this section was **not** built.
+
+> ⚠️ **wasm `&[u8]` transient-view gotcha (cost a real bug, fixed):** when wasm-bindgen passes a `&[u8]` arg to a JS extern method, the `Uint8Array` is a *view into wasm linear memory* valid only for that synchronous call. `IdbStorage` retains ciphertext/nonce (mirror + deferred IDB write), so it **must copy on entry** (`copyBytes` = `.slice()`). Without the copy, the deferred write persisted reused/garbage memory → decrypt failed on the next boot → items vanished on refresh (in-session was fine, since the doc is the source of truth). The synchronous mock test did **not** catch it; only a real browser reload did. Any future JS-side `EngineStorage` impl that retains wasm-passed bytes must copy.
 
 **Continuity note (post-Phase-1):** the engine's push path is now outbox-driven and forks on
 `storage.outbox()`. The moment web swaps `NoopStorage` → `IdbStorage`, the engine starts taking
@@ -165,26 +177,32 @@ objectStores:
 
 Reference implementation existed on the `spike/shared-worker` branch at `js/web/src/worker/idb-store.ts` — schema setup is verbatim usable; the harness wrap-up (encrypt with DEK, append on commit, replay on boot) is also reusable. Just delete the worker scaffolding around it; the same code runs on the main thread.
 
-The DEK seal/open round-trip:
-- On commit: `engine.exportUpdatesAfter(cursor)` → plaintext → `dek.seal(bytes)` → store `{ciphertext, nonce}` as an `ops` row. Advance `cursor = engine.oplogVvBytes()`.
-- On boot: read snapshot row (if any) → `dek.open(blob)` → `Doc.load(plaintext)`; then iterate `ops` rows in `localSeq` order → `dek.open` → `doc.importWalUpdates(plaintext)`. Construct `SyncEngine` from the populated `Doc`.
+The DEK seal/open round-trip (**as built** — note the boot path differs from the original sketch):
+- Commit + ack are driven by the engine through the trait: `captureLocalOps()` seals via `pending_export` and calls `appendLocalOp`; `OpsAck` calls `ackLocalOp`; remote frames call `appendRemoteOp` from inside `handleServerBytes`. The host no longer manages a cursor.
+- **Boot is host-driven in JS and mirrors the CLI's `boot_doc`** (NOT `Doc.load`): the snapshot payload is a *bare Loro snapshot* (`doc.snapshot_blob` = `export(Snapshot)`), not a `save()` envelope. So:
+  `doc = Doc.empty()` → `doc.importWalUpdates(dek.open(snapshot))` (if any) → `doc.importWalUpdates(dek.open(row))` for each replay row in `localSeq` order → `doc.markPushed()`. `importWalUpdates` (= `import_with(_, "remote")`) accepts both snapshot- and update-mode payloads and emits no events. `markPushed()` advances `last_pushed_vv` so the engine doesn't re-capture replayed ops; unacked ops re-push from the **persisted outbox**, not `pending_export`.
+  Then `new SyncEngine(doc, …, storage)` and `engine.setLastLocalSeq(bootRows.lastLocalSeq)`. For a fresh signup (or brand-new anonymous doc with an empty store) start from `Doc.create()` and `captureLocalOps()` the seed; for an authed device with an empty store start `Doc.empty()` and let sync deliver a snapshot.
 
-The existing `airday-web` IDB database (vault + idb-wal + prefs) stays untouched in this phase. The new `airday-engine` database is fresh; no live migration needed for development. **For users with real data: a one-shot drain from the old `ops` + OPFS `loro.bin` into the new schema runs at first boot under the new code, then deletes the legacy stores.** The reference for that migration also lives on the spike branch (`worker/migration.ts` shape, minus the worker wrapper).
+The existing `airday-web` IDB database (vault + prefs + the now-defunct WAL/OPFS/device stores) stays untouched in this phase. The new `airday-engine` database is fresh. **No migration/drain was built — abandoning old `airday-web` op data was explicitly authorized.** (Original plan called for a one-shot drain from the spike's `worker/migration.ts`; intentionally skipped.)
 
 **Exit criteria:** web builds, anonymous + authed sessions work end-to-end, reload survives, multi-tab works as it does today (single tab via `navigator.locks` — *not* trying to be multi-tab-coherent, that's a separate effort).
 
 ### Phase 3 — Cleanup
 
-After Phase 2 is verified in real use:
+Phase 2 is verified in real use (anonymous + authed add → reload → restore, both confirmed in a real browser). Remaining cleanup, with the **test fallout** each item triggers — that fallout is the bulk of the work, not the deletions:
 
-- Delete `core::NoopStorage` (and its hosts' construction sites) once CLI and web are on real impls.
-- Delete `Doc::pending_export`, `Doc::mark_pushed_at`, `Doc::last_pushed_vv` from `core/src/doc.rs` — `storage.outbox()` / `storage.ack_local_op()` have taken over their job.
-- Decide on the durability callback (`notify_wal_durable` today): keep it as the IDB flush signal (web only needs it; sqlite is synchronously durable) or fold it into the trait via a callback handle. Either is fine; pick when Phase 2 lands.
-- Delete `js/core/src/storage/idb-wal.ts`, `wal-adapter.ts`, `mem-wal.ts`, `wal-bridge.ts`.
-- Delete the OPFS-snapshot code path in the legacy storage.
-- Delete the v1–v6 schema-bump branches in `js/core/src/storage/web-db.ts` — only the vault + prefs stores survive there (or fold those into `airday-engine` if it makes sense).
-- Drop `spec/idb-wal.md` (already superseded by the data-model section in this plan / resurrected `spec/local-storage.md`).
+- **Delete `core::NoopStorage` + the legacy `pending_export` push fallback.** These are coupled: today `SyncEngine::new`'s `storage: None` branch builds `NoopStorage`, and `try_start_push` falls back to `pending_export` when `storage.outbox()` is empty. Removing them means **`storage` becomes mandatory** on the wasm + native constructors. Fallout:
+  - The wasm `SyncEngine::new` 7th-arg `Option<EngineStorage>` becomes required (or keep optional but error on `None`).
+  - js/core + js/web tests construct the engine with **6 args** (no storage) and rely on the legacy path: `js/core/test/sync-engine.test.ts`, `sync-e2e.test.ts`, `wal-ack-gate.test.ts`, `wal-storage.test.ts`, `js/web/test/search.test.ts`. These must pass a real/mem `EngineStorage`. The pattern is already in `js/core/test/engine-storage.test.ts` (`MemEngineStorage` mock) — promote it to a shared test helper and thread it through.
+- **Delete `Doc::pending_export`, `Doc::mark_pushed_at`, `Doc::last_pushed_vv`** from `core/src/doc.rs`. Caveat: web **boot** currently calls `doc.markPushed()` to advance `last_pushed_vv` after replay (so the engine doesn't re-capture replayed ops). If `last_pushed_vv` goes away, boot needs an equivalent "these ops are already captured" signal, or the capture-cursor model must change. Don't delete blindly — trace `markPushed`/`mark_pushed_at` in `core/web/src/lib.rs` + `js/web/src/App.tsx` boot first.
+- **Durability callback — decision made in Phase 2: keep `notify_wal_durable` as the IDB flush signal.** `IdbStorage.whenFlushed()` → `engine.notifyWalDurable(sampledSeq)` in `App.tsx`. sqlite is synchronously durable so the CLI calls it inline. No need to fold into the trait; leave as-is unless it gets in the way.
+- **Delete the legacy JS WAL files:** `js/core/src/storage/idb-wal.ts`, `wal-adapter.ts`, `mem-wal.ts`, `wal-bridge.ts`, and their exports in `js/core/src/index.ts` + `js/core/package.json`. `wal-ack-gate.test.ts` + `wal-storage.test.ts` are built entirely on `WalBridge`/`MemWalStorage` — they must be rewritten against `IdbStorage`/`MemEngineStorage` or deleted (the engine-level durability invariants they assert are also covered by the Rust tests in `core/src/sync.rs`).
+- **Delete the OPFS-snapshot code path** (`opfs-probe.ts` and OPFS reads/writes in the old `idb-wal.ts`). Snapshots now live in the `airday-engine` `snapshots` store. `probeOpfs` is no longer imported by `App.tsx`.
+- **`web-db.ts` (`airday-web`):** the `ops` + `snapshot_meta` stores are now dead (engine data moved to `airday-engine`). Surviving stores: `vault`, `prefs`, and `device` (the resume cursor — see `device-store.ts`; keep it here or fold into `airday-engine`). Collapse the v1–v6 upgrade branches accordingly.
+- Drop `spec/idb-wal.md` (superseded by this plan).
 - Update `spec/architecture.md` to point at the trait.
+- **Decide on `forceSnapshot` for anonymous compaction.** Currently fired only on `visibilitychange → hidden` (`App.tsx`). If that's too coarse (long-lived anonymous tab never hidden → unbounded op log), consider a count-based trigger. Low priority — anonymous docs are small and short-lived pre-signup.
+- Remove the dev-only `(window as any).__airday = { app, engine, bridge, storage }` debug handle and the boot `console.error`/`console.debug` lines in `App.tsx` if not wanted (the boot-failure `console.error` is arguably worth keeping).
 
 ## Verification
 
@@ -192,7 +210,7 @@ After Phase 2 is verified in real use:
 - All existing `bun test` suites pass (especially `js/web/test/search.test.ts` which feeds `AppEvent`s through the dispatcher — the trait shouldn't affect that path).
 - Manual: sign up, add items, switch lists, edit, undo, reload, log out, log back in — every flow survives.
 - Sync: two devices (CLI + web, or two CLI instances) converge through the server.
-- Migration: snapshot a real `airday-web` IDB + OPFS profile from current code, boot on new code, verify state survives the one-shot drain and legacy stores are deleted after commit.
+- ~~Migration: drain a real `airday-web` IDB + OPFS profile into the new schema.~~ **Cut** — flushing old data was authorized; `airday-engine` is fresh and old data is abandoned.
 
 ## What's explicitly out of scope
 
