@@ -11,6 +11,18 @@ export type {
 export { MemStorage } from "./storage/mem.ts";
 export { BunFileStorage } from "./storage/file.ts";
 export { probeOpfs } from "./storage/opfs-probe.ts";
+export {
+  IdbStorage,
+  type EngineBootRows,
+  type OutboxRowJs,
+} from "./storage/idb-storage.ts";
+export {
+  openEngineDb,
+  _resetEngineDbForTests,
+  ENGINE_DB_NAME,
+  ENGINE_DB_VERSION,
+} from "./storage/engine-db.ts";
+export { getDevice, putDevice } from "./storage/device-store.ts";
 export { IdbWalStorage } from "./storage/idb-wal.ts";
 export { MemWalStorage } from "./storage/mem-wal.ts";
 export {

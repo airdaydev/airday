@@ -10,9 +10,12 @@ use wasm_bindgen::prelude::*;
 
 use airday_core::{
     derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
-    parse_recovery_code, AppEvent as CoreAppEvent, Dek as CoreDek, Doc as CoreDoc,
-    DocId as CoreDocId, EngineOptions as CoreEngineOptions, Event as CoreEvent,
-    ImportSummary as CoreImportSummary, Kek as CoreKek, NoopStorage as CoreNoopStorage,
+    parse_recovery_code, AppEvent as CoreAppEvent, BootState as CoreBootState,
+    ClientOpId as CoreClientOpId, Dek as CoreDek, Doc as CoreDoc, DocId as CoreDocId,
+    EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
+    Kek as CoreKek, LocalOpRow as CoreLocalOpRow, LocalSeq as CoreLocalSeq,
+    LocalStorage as CoreLocalStorage, NoopStorage as CoreNoopStorage, OutboxRow as CoreOutboxRow,
+    RemoteOpRow as CoreRemoteOpRow, ServerSeq as CoreServerSeq, StorageError as CoreStorageError,
     SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
@@ -634,6 +637,186 @@ impl EncryptedBlob {
     }
 }
 
+// ---------- EngineStorage (JS-implemented LocalStorage) ----------
+//
+// The engine's `LocalStorage` trait is synchronous, but IndexedDB is
+// async. The JS side bridges the gap with an in-memory mirror that
+// answers these methods immediately and flushes IDB in the
+// background (see `js/core/src/storage/idb-storage.ts`). These extern
+// methods are therefore plain synchronous JS calls.
+//
+// Marshalling conventions across the boundary:
+//   - encrypted payloads cross as `(ciphertext, nonce)` byte pairs;
+//   - `localSeq` / `serverSeq` cross as JS `number` (`f64`) — both fit
+//     in 2^53 for any realistic op log, so we skip the `bigint` dance;
+//   - `clientOpId` crosses as the raw 16 UUID bytes;
+//   - `outbox()` returns a JS array of
+//     `{ localSeq, clientOpId, ciphertext, nonce }` objects, read back
+//     via `js_sys` reflection.
+//
+// `boot()` is intentionally absent — on web the host reconstructs the
+// `Doc` in JS directly from IDB before constructing the engine, and
+// the engine never calls `storage.boot()` itself (verified in
+// `core/src/sync.rs`). `WebStorage::boot` returns an empty
+// `BootState` to satisfy the trait.
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "EngineStorage")]
+    pub type EngineStorage;
+
+    #[wasm_bindgen(method, catch, js_name = appendLocalOp)]
+    fn append_local_op(
+        this: &EngineStorage,
+        client_op_id: &[u8],
+        ciphertext: &[u8],
+        nonce: &[u8],
+    ) -> Result<f64, JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = appendRemoteOp)]
+    fn append_remote_op(
+        this: &EngineStorage,
+        server_seq: f64,
+        ciphertext: &[u8],
+        nonce: &[u8],
+    ) -> Result<f64, JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = ackLocalOp)]
+    fn ack_local_op(
+        this: &EngineStorage,
+        client_op_id: &[u8],
+        server_seq: f64,
+    ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = outbox)]
+    fn outbox(this: &EngineStorage) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = writeSnapshot)]
+    fn write_snapshot(
+        this: &EngineStorage,
+        up_to_local_seq: f64,
+        ciphertext: &[u8],
+        nonce: &[u8],
+    ) -> Result<(), JsValue>;
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_ENGINE_STORAGE: &'static str = r#"
+export interface EngineStorage {
+  appendLocalOp(clientOpId: Uint8Array, ciphertext: Uint8Array, nonce: Uint8Array): number;
+  appendRemoteOp(serverSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): number;
+  ackLocalOp(clientOpId: Uint8Array, serverSeq: number): void;
+  outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[];
+  writeSnapshot(upToLocalSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
+}
+"#;
+
+/// Rust `LocalStorage` over a JS-implemented `EngineStorage`. Every
+/// call forwards synchronously to the JS in-memory mirror; durability
+/// (the background IDB flush) is the JS side's concern and is surfaced
+/// to the engine out-of-band via `notifyWalDurable`.
+struct WebStorage {
+    js: EngineStorage,
+}
+
+fn jsval_err(e: JsValue) -> CoreStorageError {
+    CoreStorageError::Backend(
+        e.as_string()
+            .or_else(|| js_sys::Error::from(e).message().as_string())
+            .unwrap_or_else(|| "JS exception".into()),
+    )
+}
+
+fn reflect_f64(obj: &JsValue, key: &str) -> Result<f64, CoreStorageError> {
+    js_sys::Reflect::get(obj, &JsValue::from_str(key))
+        .map_err(jsval_err)?
+        .as_f64()
+        .ok_or_else(|| CoreStorageError::Backend(format!("outbox row: {key} not a number")))
+}
+
+fn reflect_bytes(obj: &JsValue, key: &str) -> Result<Vec<u8>, CoreStorageError> {
+    let v = js_sys::Reflect::get(obj, &JsValue::from_str(key)).map_err(jsval_err)?;
+    Ok(js_sys::Uint8Array::new(&v).to_vec())
+}
+
+impl CoreLocalStorage for WebStorage {
+    fn boot(&self, _doc_id: CoreDocId) -> Result<CoreBootState, CoreStorageError> {
+        // Never reached: the web host rebuilds the `Doc` from IDB in JS
+        // before constructing the engine, and the engine itself never
+        // calls `boot()`.
+        Ok(CoreBootState::default())
+    }
+
+    fn append_local_op(
+        &self,
+        _doc_id: CoreDocId,
+        row: CoreLocalOpRow,
+    ) -> Result<CoreLocalSeq, CoreStorageError> {
+        let seq = self
+            .js
+            .append_local_op(
+                row.client_op_id.0.as_bytes(),
+                &row.payload.ciphertext,
+                &row.payload.nonce,
+            )
+            .map_err(jsval_err)?;
+        Ok(CoreLocalSeq(seq as u64))
+    }
+
+    fn append_remote_op(
+        &self,
+        _doc_id: CoreDocId,
+        row: CoreRemoteOpRow,
+    ) -> Result<CoreLocalSeq, CoreStorageError> {
+        let seq = self
+            .js
+            .append_remote_op(row.server_seq.0 as f64, &row.payload.ciphertext, &row.payload.nonce)
+            .map_err(jsval_err)?;
+        Ok(CoreLocalSeq(seq as u64))
+    }
+
+    fn ack_local_op(
+        &self,
+        _doc_id: CoreDocId,
+        client_op_id: CoreClientOpId,
+        server_seq: CoreServerSeq,
+    ) -> Result<(), CoreStorageError> {
+        self.js
+            .ack_local_op(client_op_id.0.as_bytes(), server_seq.0 as f64)
+            .map_err(jsval_err)
+    }
+
+    fn outbox(&self, _doc_id: CoreDocId) -> Result<Vec<CoreOutboxRow>, CoreStorageError> {
+        let arr = js_sys::Array::from(&self.js.outbox().map_err(jsval_err)?);
+        let mut out = Vec::with_capacity(arr.length() as usize);
+        for item in arr.iter() {
+            let local_seq = reflect_f64(&item, "localSeq")? as u64;
+            let client_op_id = reflect_bytes(&item, "clientOpId")?;
+            let ciphertext = reflect_bytes(&item, "ciphertext")?;
+            let nonce = reflect_bytes(&item, "nonce")?;
+            let uuid = uuid::Uuid::from_slice(&client_op_id).map_err(|e| {
+                CoreStorageError::Backend(format!("outbox row: invalid clientOpId: {e}"))
+            })?;
+            out.push(CoreOutboxRow {
+                local_seq: CoreLocalSeq(local_seq),
+                client_op_id: CoreClientOpId(uuid),
+                payload: CoreEncryptedBlob { nonce, ciphertext },
+            });
+        }
+        Ok(out)
+    }
+
+    fn write_snapshot(
+        &self,
+        _doc_id: CoreDocId,
+        up_to_local_seq: CoreLocalSeq,
+        payload: CoreEncryptedBlob,
+    ) -> Result<(), CoreStorageError> {
+        self.js
+            .write_snapshot(up_to_local_seq.0 as f64, &payload.ciphertext, &payload.nonce)
+            .map_err(jsval_err)
+    }
+}
+
 // ---------- SyncEngine ----------
 
 #[wasm_bindgen]
@@ -657,9 +840,19 @@ impl SyncEngine {
         last_acked_seq: u64,
         client_name: String,
         client_version: String,
+        storage: Option<EngineStorage>,
     ) -> Result<SyncEngine, JsError> {
         let parsed = uuid::Uuid::parse_str(&doc_id)
             .map_err(|e| JsError::new(&format!("invalid doc_id: {e}")))?;
+        // Phase 2: when the host passes a JS `EngineStorage` (the
+        // `IdbStorage` mirror), the engine takes the outbox-driven push
+        // path — capture, ack, and remote-apply all flow through it.
+        // Hosts that omit it (tests, transitional callers) fall back to
+        // `NoopStorage`, which keeps the legacy `pending_export` path.
+        let dyn_storage: Box<dyn CoreLocalStorage> = match storage {
+            Some(js) => Box::new(WebStorage { js }),
+            None => Box::new(CoreNoopStorage),
+        };
         Ok(SyncEngine {
             inner: CoreSyncEngine::new(
                 doc.inner,
@@ -670,14 +863,45 @@ impl SyncEngine {
                     client_name,
                     client_version,
                 },
-                // Phase 0b: trait fires alongside the legacy IDB WAL
-                // + OPFS snapshot path. `NoopStorage` swallows the
-                // calls; persistence still flows through the legacy
-                // adapters. Phase 2 swaps for `WebStorage` wrapping
-                // a JS-implemented `IdbStorage`.
-                Box::new(CoreNoopStorage),
+                dyn_storage,
             ),
         })
+    }
+
+    /// Persist any locally-committed mutations as a durable op-log row
+    /// (and advance the capture cursor). Returns the assigned `localSeq`
+    /// or `undefined` when nothing was pending. Call **before**
+    /// `flush()` so the outbox-driven push ships the captured row.
+    #[wasm_bindgen(js_name = captureLocalOps)]
+    pub fn capture_local_ops(&mut self) -> Result<Option<f64>, JsError> {
+        Ok(self
+            .inner
+            .capture_local_ops()
+            .map_err(js_err)?
+            .map(|s| s.0 as f64))
+    }
+
+    /// Compact the op log into a fresh snapshot when fully synced
+    /// (outbox drained). No-op while unacked ops remain. Returns whether
+    /// a snapshot was written.
+    #[wasm_bindgen(js_name = snapshotIfFullySynced)]
+    pub fn snapshot_if_fully_synced(&mut self) -> Result<bool, JsError> {
+        self.inner.snapshot_if_fully_synced().map_err(js_err)
+    }
+
+    /// Unconditionally compact every op row into a snapshot — for
+    /// local-only (anonymous) sessions that never sync. MUST NOT be
+    /// used on a syncing doc; see `core::SyncEngine::force_snapshot`.
+    #[wasm_bindgen(js_name = forceSnapshot)]
+    pub fn force_snapshot(&mut self) -> Result<bool, JsError> {
+        self.inner.force_snapshot().map_err(js_err)
+    }
+
+    /// Seed the highest `localSeq` the storage has assigned for this
+    /// doc (from the JS boot). Call once right after construction.
+    #[wasm_bindgen(js_name = setLastLocalSeq)]
+    pub fn set_last_local_seq(&mut self, seq: f64) {
+        self.inner.set_last_local_seq(CoreLocalSeq(seq as u64));
     }
 
     // -- transport callbacks --

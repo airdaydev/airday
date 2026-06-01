@@ -329,6 +329,33 @@ impl SyncEngine {
         Ok(true)
     }
 
+    /// Unconditionally write a full-state snapshot at `last_local_seq`,
+    /// pruning **every** op row regardless of ack state. Returns whether
+    /// a snapshot was written (`Ok(false)` when nothing has advanced
+    /// since the last snapshot).
+    ///
+    /// For local-only docs that never sync — the web client's anonymous
+    /// sessions, which have no server to ack pushes, so the outbox never
+    /// drains and `snapshot_if_fully_synced` would never fire and the op
+    /// log would grow without bound. The full-state snapshot encodes the
+    /// effect of those unacked rows, so pruning them loses nothing **as
+    /// long as there is no server to push them to**. MUST NOT be called
+    /// on a syncing doc — it would discard outbox rows the server never
+    /// received.
+    pub fn force_snapshot(&mut self) -> Result<bool, StorageError> {
+        if self.last_local_seq <= self.last_snapshot_local_seq {
+            return Ok(false);
+        }
+        let blob = self
+            .doc
+            .snapshot_blob(&self.dek)
+            .map_err(|e| StorageError::Backend(format!("snapshot_blob: {e}")))?;
+        self.storage
+            .write_snapshot(self.doc_id, self.last_local_seq, blob)?;
+        self.last_snapshot_local_seq = self.last_local_seq;
+        Ok(true)
+    }
+
     /// Contiguous-prefix seq the engine has applied **in memory**.
     /// Use this for transport-layer decisions (the `since_seq` of a
     /// mid-session resume `PullOps`, snapshot eligibility) — NOT as

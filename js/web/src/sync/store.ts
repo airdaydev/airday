@@ -79,6 +79,13 @@ export interface DocApp {
   /** Hook the WS bridge installs to push outbox bytes immediately
    *  after a local mutation rather than waiting for a server frame. */
   setOnFlush(cb: () => void): void;
+  /** Hook run *before* `engine.flush()` on every local commit. The web
+   *  host wires `engine.captureLocalOps()` here so the just-committed
+   *  mutation is a durable op-log row before `flush()` triggers the
+   *  outbox-driven push (which reads `storage.outbox()`). Without this
+   *  the push would see an empty outbox and fall back to the legacy
+   *  `pending_export` path. */
+  setBeforeFlush(cb: () => void): void;
   // Reads
   getItem(id: string): ItemView | undefined;
   // Mutations
@@ -400,11 +407,13 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   search.rebuild(initialState);
 
   let onFlush: () => void = () => {};
+  let beforeFlush: () => void = () => {};
   const flush = (): void => {
     if (actionBatchDepth > 0) {
       flushDeferred = true;
       return;
     }
+    beforeFlush();
     engine.flush();
     onFlush();
     // Local mutations enqueue AppEvents synchronously; pull them so
@@ -440,6 +449,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     drainEvents,
     setOnFlush(cb) {
       onFlush = cb;
+    },
+    setBeforeFlush(cb) {
+      beforeFlush = cb;
     },
     getItem(id) {
       return state.itemsById[id];

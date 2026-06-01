@@ -17,7 +17,7 @@ import {
   Show,
 } from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import { bootWal, IdbWalStorage, probeOpfs, WalBridge } from "@airday/core";
+import { getDevice, IdbStorage, putDevice } from "@airday/core";
 import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
 import { api } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
@@ -102,13 +102,6 @@ function AppBody() {
   const [lastSyncAt, setLastSyncAt] = createSignal<number | null>(null);
   const [boot, setBoot] = createSignal<BootInfo | null>(null);
   const [bootError, setBootError] = createSignal<string | null>(null);
-  const [opfsOk, setOpfsOk] = createSignal<boolean | null>(null);
-
-  void (async () => {
-    const ok = await probeOpfs();
-    if (!ok) console.warn("OPFS not available");
-    setOpfsOk(ok);
-  })();
 
   // Probe the vault on mount. If a wrapped DEK is present and we can
   // unwrap it, restore that session — for authenticated records, the
@@ -173,7 +166,7 @@ function AppBody() {
 
   return (
     <Show
-      when={session() !== undefined && opfsOk() !== null}
+      when={session() !== undefined}
       fallback={<div class="empty">{m().common.loading}</div>}
     >
       <Show keyed when={session()}>
@@ -190,7 +183,6 @@ function AppBody() {
             setLastSyncAt={setLastSyncAt}
             logout={logout}
             onSession={onAuthenticated}
-            opfsOk={opfsOk() ?? false}
           />
         )}
       </Show>
@@ -247,7 +239,15 @@ async function createAnonymousSession(): Promise<Session> {
 type BootInfo = {
   doc: Doc;
   lastAcked: bigint;
-  wal: IdbWalStorage | null;
+  /** Engine op-log store (IndexedDB `airday-engine`), or null if it
+   *  couldn't be opened — then the engine runs on `NoopStorage` and
+   *  there's no local persistence. */
+  storage: IdbStorage | null;
+  /** Highest `localSeq` the store has assigned — seeds the engine. */
+  lastLocalSeq: number;
+  /** True when the doc was freshly created (`Doc.create()`) and its
+   *  seeded built-ins still need an initial `captureLocalOps`. */
+  seeded: boolean;
   /** Whatever was in the `prefs` store for this account at boot. Null
    *  if the row was missing (first run for this account on this
    *  device). `MainApp` consumes the fields it cares about. */
@@ -266,76 +266,74 @@ function BootGate(props: {
   setLastSyncAt: (ts: number | null) => void;
   logout: () => void;
   onSession: (s: Session) => void;
-  opfsOk: boolean;
 }) {
   const { m } = useAppI18n();
-  // Restore the doc per `spec/idb-wal.md`: load the committed OPFS
-  // snapshot, then replay every IndexedDB WAL row strictly after
-  // `snapshot_wal_seq`. On signup we still start with a fresh
-  // `Doc.create()` so the seeded built-ins land. Without OPFS we
-  // can't snapshot (and IDB-only would orphan the WAL on reload), so
-  // fall through to an empty doc that sync catches up.
+  // Rebuild the doc from the engine op log (`spec/local-storage-plan.md`
+  // Phase 2), mirroring the CLI's `boot_doc`: load the snapshot (a bare
+  // Loro snapshot) and replay every op row after it via
+  // `importWalUpdates`, then `markPushed()` so the engine's push cursor
+  // covers the replayed ops (unacked ones re-push from the persisted
+  // outbox, not `pending_export`). Fresh signups — and brand-new
+  // anonymous docs with an empty store — start from `Doc.create()` so
+  // the seeded built-ins land; authed devices with an empty store start
+  // empty and let sync deliver a snapshot.
   void (async () => {
-    const t0 = performance.now();
-    const tap = (label: string, t: number) => {
-      // eslint-disable-next-line no-console
-      console.debug(`[boot] ${label.padEnd(28)} ${(t - t0).toFixed(1)}ms`);
-    };
     try {
-      // Prefs are independent of the WAL replay — fire in parallel
-      // so they don't add a serial roundtrip to first paint. Both are
-      // small keyed IDB reads against the same DB. A miss (first run
-      // for this account on this device) resolves null and `MainApp`
+      // Prefs are independent of the op-log replay — fire in parallel so
+      // they don't add a serial roundtrip to first paint. A miss (first
+      // run for this account on this device) resolves null and `MainApp`
       // falls back to defaults.
       const prefsPromise = loadPrefs(props.session.accountId).catch(() => null);
+      const dek = props.session.dek;
+      const storage = await IdbStorage.open(props.session.primaryDocId);
+      const device = props.session.anonymous
+        ? null
+        : await getDevice(props.session.accountId).catch(() => null);
+      const rows = storage.bootRows();
+
+      let doc: Doc;
+      let seeded = false;
       if (props.session.freshSignup) {
-        const wal = await tryInitWal(props.session, props.opfsOk);
-        tap("freshSignup wal init", performance.now());
-        props.setBoot({
-          doc: Doc.create(),
-          lastAcked: 0n,
-          wal,
-          prefs: await prefsPromise,
-        });
-        return;
+        doc = Doc.create();
+        seeded = true;
+      } else if (rows.snapshot || rows.replay.length > 0) {
+        doc = Doc.empty();
+        if (rows.snapshot) {
+          doc.importWalUpdates(
+            dek.open(new EncryptedBlob(rows.snapshot.nonce, rows.snapshot.ciphertext)),
+          );
+        }
+        for (const r of rows.replay) {
+          doc.importWalUpdates(dek.open(new EncryptedBlob(r.nonce, r.ciphertext)));
+        }
+        doc.markPushed();
+      } else if (props.session.anonymous) {
+        // Brand-new (or wiped) local-only doc — seed the built-ins.
+        doc = Doc.create();
+        seeded = true;
+      } else {
+        // Authed device, empty local store — sync will send a snapshot.
+        doc = Doc.empty();
       }
-      if (!props.opfsOk) {
-        props.setBoot({
-          doc: Doc.empty(),
-          lastAcked: 0n,
-          wal: null,
-          prefs: await prefsPromise,
-        });
-        return;
-      }
-      const wal = new IdbWalStorage(
-        props.session.accountId,
-        props.session.primaryDocId,
-        props.session.dek.clone(),
-        EncryptedBlob,
-      );
-      const { doc, device, replayErrors } = await bootWal({
-        wal,
-        emptyDoc: () => Doc.empty(),
-        loadDoc: (snap) => Doc.load(snap),
-      });
-      tap("bootWal done", performance.now());
-      for (const { walSeq, error } of replayErrors) {
-        // eslint-disable-next-line no-console
-        console.warn(`wal replay failed at seq ${walSeq}:`, error);
-      }
+
       props.setBoot({
         doc,
         lastAcked: BigInt(device?.lastAckedSeq ?? 0),
-        wal,
+        storage,
+        lastLocalSeq: rows.lastLocalSeq,
+        seeded,
         prefs: await prefsPromise,
       });
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[boot] FAILED:", e);
       props.setBootError(e instanceof Error ? e.message : String(e));
       props.setBoot({
         doc: Doc.empty(),
         lastAcked: 0n,
-        wal: null,
+        storage: null,
+        lastLocalSeq: 0,
+        seeded: false,
         prefs: null,
       });
     }
@@ -354,28 +352,10 @@ function BootGate(props: {
           setLastSyncAt={props.setLastSyncAt}
           logout={props.logout}
           onSession={props.onSession}
-          opfsOk={props.opfsOk}
         />
       )}
     </Show>
   );
-}
-
-/** Initialise an empty WAL store for a freshly-signed-up session so
- *  the first commits land in IDB even before the first snapshot. */
-async function tryInitWal(
-  session: Session,
-  opfsOk: boolean,
-): Promise<IdbWalStorage | null> {
-  if (!opfsOk) return null;
-  const wal = new IdbWalStorage(
-    session.accountId,
-    session.primaryDocId,
-    session.dek.clone(),
-    EncryptedBlob,
-  );
-  await wal.loadForReplay();
-  return wal;
 }
 
 function MainApp(props: {
@@ -388,7 +368,6 @@ function MainApp(props: {
   setLastSyncAt: (ts: number | null) => void;
   logout: () => void;
   onSession: (s: Session) => void;
-  opfsOk: boolean;
 }) {
   // eslint-disable-next-line no-console
   console.debug(
@@ -397,11 +376,13 @@ function MainApp(props: {
     "lastAckedBlob=",
     String(props.boot.lastAcked),
   );
-  // Both SyncEngine and the WAL store consume their Dek argument, and
-  // the session-level Dek must stay valid across MainApp remounts
-  // (anonymous → authed swap remounts this whole tree on the Session
-  // key). So clone for each consumer; the original on
-  // `props.session.dek` is untouched.
+  const storage = props.boot.storage;
+  // `SyncEngine` consumes its Dek argument, and the session-level Dek
+  // must stay valid across MainApp remounts (anonymous → authed swap
+  // remounts this whole tree on the Session key). So clone for the
+  // engine; the original on `props.session.dek` is untouched. The
+  // `IdbStorage` mirror is handed in as the engine's `EngineStorage` —
+  // capture / ack / remote-apply now flow through it.
   const engine = new SyncEngine(
     props.boot.doc,
     props.session.primaryDocId,
@@ -409,7 +390,11 @@ function MainApp(props: {
     props.boot.lastAcked,
     CLIENT_NAME,
     CLIENT_VERSION,
+    storage ?? undefined,
   );
+  // Seed the engine's `localSeq` cursor from what the store loaded so
+  // new appends continue past the persisted log.
+  engine.setLastLocalSeq(props.boot.lastLocalSeq);
   const app = createSyncedApp(engine);
 
   if (import.meta.env.DEV) {
@@ -434,69 +419,84 @@ function MainApp(props: {
   })();
   const [view, setView] = createSignal<ViewKey>(initialView);
 
-  const wal = props.boot.wal;
+  // ---------- Engine op-log persistence (IdbStorage) ----------
+  //
+  // The engine's `LocalStorage` trait does the heavy lifting now: local
+  // commits become durable op rows via `captureLocalOps`, remote ops are
+  // mirrored inside `handleServerBytes`, and the outbox drives the push.
+  // The web host's job is just the CLI's `persist_engine_state` rhythm,
+  // adapted for IDB's async durability:
+  //
+  //   - `capture()` (before every `flush()`) writes the just-committed
+  //     mutation to a durable op row *before* the outbox-driven push
+  //     reads it. This must precede `engine.flush()`.
+  //   - `compact()` folds a fully-synced log into a fresh snapshot.
+  //   - `scheduleDurable()` samples the contiguous seq, waits for the
+  //     IDB write to actually land, then tells the engine the bytes are
+  //     durable (which queues the `Ack`) and pumps it onto the wire.
+  const capture = (): void => {
+    if (!storage) return;
+    try {
+      engine.captureLocalOps();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("captureLocalOps failed:", e);
+    }
+  };
+  const compact = (): void => {
+    if (!storage) return;
+    try {
+      engine.snapshotIfFullySynced();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("snapshotIfFullySynced failed:", e);
+    }
+  };
 
-  // ---------- WAL: per-commit capture + snapshot scheduling ----------
-  //
-  // `WalBridge` owns the cursor + serialised append chain + threshold-
-  // triggered snapshot path (see `js/core/src/wal-bridge.ts`). All the
-  // web layer wires is when to call `captureAndAppend()` (after local
-  // commits and after server frames) and `snapshotNow()` (on tab
-  // hide). Without OPFS we skip the bridge entirely — IDB-only would
-  // orphan the WAL on reload, so we fall back to engine-only state
-  // that sync catches up.
-  //
-  // Fresh-signup cursor: `Doc.create()` already happened in boot, so
-  // the seeded built-ins are in the oplog. Start at empty so the very
-  // first capture emits them as `wal_seq = 1` (per spec/idb-wal.md
-  // "Fresh Account"). For replay-restored boots we start at the
-  // current oplog VV so we don't re-emit replayed rows.
-  //
-  // After every snapshot (threshold-triggered or host-forced) also
-  // persist the device row so reload picks up the right resume point
-  // even if no debounced `saveDeviceSoon` write has landed yet.
-  // Anonymous sessions skip — there's no server identity to record.
-  const persistDevice = async (): Promise<void> => {
-    if (!wal || props.session.anonymous) return;
-    await wal.putDevice({
+  // Persist the device row (sync identity + durable resume cursor).
+  // Anonymous sessions skip — there's no server identity to record. We
+  // persist the *durable* frontier (`lastDurableSeq`), not the in-memory
+  // `lastContiguousSeq`, so a crash never resumes from a seq the local
+  // store doesn't actually cover.
+  const persistDeviceNow = async (): Promise<void> => {
+    if (!storage || props.session.anonymous) return;
+    await putDevice(props.session.accountId, {
       accountId: props.session.accountId,
       primaryDocId: props.session.primaryDocId,
       email: props.session.email!,
-      // Bundle is served from the same origin as the API; record that
-      // origin for completeness even though the cookie is the
-      // load-bearing piece of "which server am I talking to".
       serverUrl: window.location.origin,
       deviceId: props.session.deviceId!,
-      // Persist the *durable* frontier — what the server has been
-      // (or will be) told via `Ack`, and what the local WAL actually
-      // covers. The in-memory `lastContiguousSeq` may run ahead and
-      // would resume the next session from a seq the local doc can't
-      // reproduce after a crash mid-WAL-write.
       lastAckedSeq: Number(engine.lastDurableSeq()),
       lastSyncAt: Date.now(),
     });
   };
 
-  // Anonymous sessions are local-only by definition — no account on
-  // the server to authenticate to. Skip the WebSocket pump entirely;
-  // local mutations still flow through the engine for WAL persist.
   let bridge: SyncBridge | null = null;
-  const walBridge: WalBridge | null = wal
-    ? new WalBridge({
-        engine,
-        wal,
-        initialCursor: props.session.freshSignup
-          ? new Uint8Array(0)
-          : engine.oplogVvBytes(),
-        afterSnapshot: persistDevice,
-        // Once the WAL row is durable the engine has queued the
-        // corresponding `Ack` frame — pump so it leaves the socket
-        // without waiting for the next inbound frame to incidentally
-        // trigger a drain. The closure captures the `bridge` binding,
-        // not its value, so the late assignment below is picked up.
-        onDurable: () => bridge?.pumpOutbox(),
+  // Sample the contiguous seq now, wait for queued IDB writes to land,
+  // then mark durable + ship the resulting Ack. Sampling synchronously
+  // binds the notify to bytes that were actually being persisted.
+  const scheduleDurable = (): void => {
+    if (!storage) return;
+    const seq = engine.lastContiguousSeq();
+    storage
+      .whenFlushed()
+      .then(() => {
+        engine.notifyWalDurable(seq);
+        bridge?.pumpOutbox();
       })
-    : null;
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("durable flush failed:", e);
+      });
+  };
+
+  // Capture local commits before the push reads the outbox — both
+  // anonymous and authed need durable op rows.
+  app.setBeforeFlush(capture);
+
+  // Anonymous sessions are local-only by definition — no account on the
+  // server to authenticate to. Skip the WebSocket pump entirely; local
+  // commits still persist through `capture()` above.
   if (!props.session.anonymous) {
     bridge = createSyncBridge({
       engine,
@@ -513,51 +513,39 @@ function MainApp(props: {
       },
       onServerFrame: () => {
         app.drainEvents();
-        // Server frame applied → capture remote-imported ops too. Cheap
-        // when nothing changed (export returns 0 bytes).
-        walBridge?.captureAndAppend();
+        // The engine already mirrored remote ops + acks into storage
+        // inside `handleServerBytes`. Compact if that drained the
+        // outbox, then ratchet the durable cursor once the writes land.
+        compact();
+        scheduleDurable();
+        saveDeviceSoon();
       },
       onAuthFailed: () => void props.logout(),
     });
     const b = bridge;
     app.setOnFlush(() => {
-      walBridge?.captureAndAppend();
       b.pumpOutbox();
+      compact();
+      scheduleDurable();
     });
     bridge.start();
     onCleanup(() => b.stop());
-  } else {
-    // Anonymous: still capture local commits for WAL durability.
-    app.setOnFlush(() => walBridge?.captureAndAppend());
   }
-
 
   // ---------- Device config: light writes on each frontier change ----------
   //
   // `lastAckedSeq` advances independently of mutations. Persist it on
-  // a coarse debounce so reload picks up the right resume point even
-  // if no snapshot lands in between.
+  // a coarse debounce so reload picks up the right resume point.
   let deviceTimer: ReturnType<typeof setTimeout> | null = null;
   const saveDeviceSoon = (): void => {
-    if (!wal || props.session.anonymous) return;
+    if (!storage || props.session.anonymous) return;
     if (deviceTimer) clearTimeout(deviceTimer);
     deviceTimer = setTimeout(() => {
       deviceTimer = null;
-      void wal
-        .putDevice({
-          accountId: props.session.accountId,
-          primaryDocId: props.session.primaryDocId,
-          email: props.session.email!,
-          serverUrl: window.location.origin,
-          deviceId: props.session.deviceId!,
-          // See persistDevice — durable, not contiguous.
-          lastAckedSeq: Number(engine.lastDurableSeq()),
-          lastSyncAt: Date.now(),
-        })
-        .catch((e) => {
-          // eslint-disable-next-line no-console
-          console.error("device save failed:", e);
-        });
+      void persistDeviceNow().catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("device save failed:", e);
+      });
     }, 500);
   };
   createEffect(() => {
@@ -591,27 +579,33 @@ function MainApp(props: {
     ),
   );
 
-  // Fresh signup: capture the seeded built-ins as the first WAL row so
-  // a reload before any user mutation has something to replay. Cursor
-  // is initialised to empty above, so this single call exports
-  // everything in the doc since genesis. Snapshots are then triggered
-  // strictly by the WAL-threshold path — no special-case OPFS write at
-  // signup, which keeps `commitSnapshot` from ever being called twice
-  // with the same `snapshotWalSeq` (the same-seq case would overwrite a
-  // currently-committed snapshot file in place; see spec/idb-wal.md
-  // "Atomicity Rule").
-  if (walBridge && props.session.freshSignup) {
-    walBridge.captureAndAppend();
+  // Freshly-created doc (signup, or a brand-new anonymous doc): persist
+  // the seeded built-ins as the first op row so a reload before any user
+  // mutation still has something to replay. The op row is unacked, so
+  // for authed sessions it also pushes to the server via the outbox.
+  if (storage && props.boot.seeded) {
+    capture();
+    scheduleDurable();
   }
 
   const onVisibility = () => {
     if (document.visibilityState === "hidden") {
-      // Drain WAL appends in flight, then commit a snapshot so the
-      // next boot has a fresh base. Best-effort — IDB writes already
-      // queued behind the bridge's append chain will land regardless
-      // of whether the snapshot fires before the page goes away.
       if (deviceTimer) clearTimeout(deviceTimer);
-      void walBridge?.snapshotNow();
+      // Persist any uncommitted local op, then compact so the next boot
+      // has a fresh base. Anonymous sessions never sync, so their outbox
+      // never drains and `snapshotIfFullySynced` would never fire —
+      // force a full-state snapshot (prune-all) instead. Best-effort.
+      capture();
+      if (storage) {
+        try {
+          if (props.session.anonymous) engine.forceSnapshot();
+          else engine.snapshotIfFullySynced();
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error("snapshot on hide failed:", e);
+        }
+      }
+      void persistDeviceNow().catch(() => {});
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
@@ -621,7 +615,7 @@ function MainApp(props: {
   });
 
   if (typeof window !== "undefined") {
-    (window as any).__airday = { app, engine, bridge, wal };
+    (window as any).__airday = { app, engine, bridge, storage };
   }
 
   return (
