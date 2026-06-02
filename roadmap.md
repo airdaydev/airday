@@ -62,8 +62,9 @@ notes on the transient-view gotcha.
 ## Bug
 - When we click done, then edit the item, waiting for it to depart that list, it goes bad.
 
-## Maybe
+## Maybe/later
 - Encoding habits?
 - vi keys (as an option)
 - Consider bounding sizes of client blobs (by KiB or op count)
 - Multi-tab single-engine sharing via SharedWorker to avoid duplication of resources, data - while this seems like a good idea, in practice it slows things down enough it is important to have client-side optimistic changes which is of course, slightly harder than it looks
+- Corruption detection - later
