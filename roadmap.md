@@ -2,6 +2,7 @@
 - list deleting - orphan handling?
 - list deleting - binned first?
 - import/export
+- Due dates
 
 ## Sync & persistence
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.
