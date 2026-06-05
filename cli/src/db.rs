@@ -1,6 +1,6 @@
 //! Per-profile sqlite for local doc storage.
 //!
-//! One database file per profile (`loro.sqlite`). Opens synchronously and
+//! One database file per profile (`airday.sqlite`). Opens synchronously and
 //! runs the migration ledger; the `LocalStorage` trait
 //! (`crate::storage::SqliteStorage`) drives every read/write on top of
 //! the connection. The trait is synchronous (`&self`), so this uses
