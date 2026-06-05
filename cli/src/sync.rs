@@ -184,6 +184,8 @@ impl Session {
                 if !self.engine.is_online() {
                     return Err(SyncError::Engine("engine disconnected mid-pump".into()));
                 }
+                // Each processed frame is a confirmed online exchange.
+                self.mark_synced()?;
             }
             Ok(processed)
         }
@@ -214,6 +216,9 @@ impl Session {
             // Best-effort close — server will disconnect on its own
             // if the close frame is lost.
             let _ = ws.close(None).await;
+
+            // We completed an online push/pull/ack exchange — record it.
+            self.mark_synced()?;
         }
         Ok(())
     }
@@ -262,6 +267,27 @@ impl Session {
         if acked > self.last_acked {
             self.last_acked = acked;
         }
+        // Persist the cursor on every flush — local-only included, since
+        // an offline mutation still advances it. `last_sync_at` is *not*
+        // touched here: it means "last successful online sync", and this
+        // path runs even when offline (`flush` calls it unconditionally,
+        // and every command — even read-only `ls` — flushes). It's
+        // stamped only by `mark_synced`, on a confirmed online exchange.
+        self.store.write_sync_cursor(
+            self.doc_id,
+            SyncCursor {
+                last_acked_server_seq: ServerSeq(self.last_acked),
+                last_sync_at: self.last_sync_at,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Stamp "last successful online sync" = now and persist it. Called
+    /// only after a confirmed online exchange — never on an offline or
+    /// purely local flush — so `airday status` reports when this device
+    /// actually last reached the server, not when it last ran a command.
+    fn mark_synced(&mut self) -> Result<(), SyncError> {
         self.last_sync_at = Some(now_millis());
         self.store.write_sync_cursor(
             self.doc_id,

@@ -143,6 +143,65 @@ async fn offline_add_survives_restart_then_syncs() {
     assert_eq!(after.ops.len(), 1, "no duplicate re-push after ack");
 }
 
+/// `last_sync_at` means "last successful *online* sync". It must stay
+/// unset across offline flushes (every command flushes, even read-only
+/// ones) and land only after a real server exchange. Regression guard
+/// for the bug where `flush()` stamped it unconditionally — which made
+/// `airday status` report "Last sync: 0s ago" while fully offline.
+#[tokio::test]
+async fn last_sync_at_set_only_after_online_sync() {
+    let server = TestServer::start().await;
+    let dek = Dek::generate();
+    let signup = signup_via_http(&server, &dek, "lastsync-test").await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let profile = materialize_signup_profile(
+        tmp.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "lastsync-test@example.com",
+        true,
+    )
+    .await;
+    let doc_id = airday_core::DocId(Uuid::parse_str(&signup.primary_doc_id).unwrap());
+
+    // Offline flush, even with a mutation, must not stamp last_sync_at.
+    let session = Session::open_with_profile(profile, false).await.unwrap();
+    assert!(!session.is_online());
+    session.doc().add_item(LIST_MAIN, "offline item").unwrap();
+    session.flush().await.unwrap();
+    {
+        let storage = airday_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
+        assert!(
+            storage
+                .read_sync_cursor(doc_id)
+                .unwrap()
+                .last_sync_at
+                .is_none(),
+            "offline flush must not set last_sync_at"
+        );
+    }
+
+    // A real online sync stamps it.
+    let session2 = Session::open_with_profile(reopen_profile(tmp.path()), true)
+        .await
+        .unwrap();
+    assert!(session2.is_online());
+    session2.flush().await.unwrap();
+    {
+        let storage = airday_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
+        assert!(
+            storage
+                .read_sync_cursor(doc_id)
+                .unwrap()
+                .last_sync_at
+                .is_some(),
+            "online sync must set last_sync_at"
+        );
+    }
+}
+
 #[tokio::test]
 async fn default_open_skips_connect() {
     let tmp = tempfile::tempdir().unwrap();

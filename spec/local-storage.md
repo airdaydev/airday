@@ -36,7 +36,7 @@ CREATE TABLE docs (
   id                    BLOB PRIMARY KEY,          -- uuid v7, matches server-side docs.id
   created_at            INTEGER NOT NULL,
   last_acked_server_seq INTEGER NOT NULL DEFAULT 0, -- per-doc pull cursor; persisted, not derived (survives compaction)
-  last_sync_at          INTEGER                    -- unix millis of last successful flush; NULL = never
+  last_sync_at          INTEGER                    -- unix millis of last successful ONLINE sync; NULL = never (not bumped by offline/local flushes)
 );
 
 CREATE TABLE ops (
