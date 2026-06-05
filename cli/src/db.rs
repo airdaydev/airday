@@ -12,7 +12,6 @@ use std::path::Path;
 use rusqlite::{params, Connection};
 
 const MIGRATION_001: &str = include_str!("../migrations/001_init.sql");
-const MIGRATION_002: &str = include_str!("../migrations/002_local_storage.sql");
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
@@ -45,7 +44,6 @@ fn run_migrations(conn: &mut Connection) -> Result<(), DbError> {
          );",
     )?;
     apply_migration(conn, "001_init", MIGRATION_001)?;
-    apply_migration(conn, "002_local_storage", MIGRATION_002)?;
     Ok(())
 }
 

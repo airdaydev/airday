@@ -3,8 +3,8 @@
 //! `SqliteStorage` is the native `LocalStorage` implementation: plain
 //! `rusqlite` behind a `Mutex`, synchronously durable (the trait method
 //! returns only after the `INSERT`/`UPDATE` commits). The schema is
-//! `cli/migrations/002_local_storage.sql` — an append-only `ops` log
-//! plus one `snapshots` row per doc.
+//! `cli/migrations/001_init.sql` — an append-only `ops` log plus one
+//! `snapshots` row per doc.
 //!
 //! The free functions at the bottom (`boot_doc`, `seed_snapshot`,
 //! `load_doc`) turn the trait into a live `Doc`: they hold the DEK and
@@ -41,39 +41,6 @@ impl SqliteStorage {
         })
     }
 
-    /// The old `001_init` doc blob, preserved by migration `002` as
-    /// `docs_legacy_v1` — an unencrypted `Doc::save()` envelope, if a
-    /// pre-migration profile is being opened. `None` once the table has
-    /// been drained and dropped (`drop_legacy_doc`).
-    pub fn legacy_doc_payload(&self) -> Result<Option<Vec<u8>>, DbError> {
-        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
-        let exists = conn
-            .query_row(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='docs_legacy_v1'",
-                [],
-                |_| Ok(()),
-            )
-            .optional()?
-            .is_some();
-        if !exists {
-            return Ok(None);
-        }
-        let payload = conn
-            .query_row("SELECT payload FROM docs_legacy_v1 LIMIT 1", [], |r| {
-                r.get::<_, Vec<u8>>(0)
-            })
-            .optional()?;
-        Ok(payload)
-    }
-
-    /// Drop the legacy table once its contents have been migrated.
-    pub fn drop_legacy_doc(&self) -> Result<(), DbError> {
-        self.conn
-            .lock()
-            .expect("SqliteStorage mutex poisoned")
-            .execute("DROP TABLE IF EXISTS docs_legacy_v1", [])?;
-        Ok(())
-    }
 }
 
 impl LocalStorage for SqliteStorage {
@@ -348,8 +315,6 @@ pub fn boot_doc(
     dek: &Dek,
     doc_id: DocId,
 ) -> Result<(Doc, LocalSeq), StorageInitError> {
-    drain_legacy_doc(storage, dek, doc_id)?;
-
     let boot = storage.boot(doc_id)?;
     let mut doc = Doc::empty();
     let mut blobs: Vec<EncryptedBlob> = Vec::with_capacity(1 + boot.replay.len());
@@ -386,21 +351,5 @@ pub fn seed_snapshot(
 ) -> Result<(), StorageInitError> {
     let blob = doc.snapshot_blob(dek)?;
     storage.write_snapshot(doc_id, LocalSeq(0), blob)?;
-    Ok(())
-}
-
-/// One-shot migration: if a pre-002 `docs_legacy_v1` blob survives,
-/// load its plaintext envelope, seal it as the baseline snapshot, and
-/// drop the table. No-op on already-migrated profiles.
-fn drain_legacy_doc(
-    storage: &SqliteStorage,
-    dek: &Dek,
-    doc_id: DocId,
-) -> Result<(), StorageInitError> {
-    if let Some(bytes) = storage.legacy_doc_payload()? {
-        let doc = Doc::load(&bytes)?;
-        seed_snapshot(storage, dek, doc_id, &doc)?;
-    }
-    storage.drop_legacy_doc()?;
     Ok(())
 }

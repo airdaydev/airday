@@ -1,13 +1,13 @@
 ## Product Thesis
 
-Airday is the lowest-friction, FOSS, single-human-user, E2EE, multi-device intent/capture/log tool. Capture is the entire point — anything that gets in the way of capturing or sorting is wrong.
+Airday is the lowest-friction, FOSS, single-human-user, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, etc. It is flexible but built with particular regard to improving user's productivity & focus.
 
 Workflow: a reserved primary capture list ("Home", id `main`), any number of user-created lists, and a bin. Items move between lists, can be done, binned, restored, and deleted.
 
 ## Architecture
 
 - **Rust core** (`core/`) — Loro CRDT, E2EE, sync engine. Compiles to native (CLI, server) and WASM (web) via `core/web/`.
-- **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration.
+- **Rust server** (`server/`) — sqlite-backed, sequenced encrypted-blob store + auth + WS relay. The server is *dumb*: it cannot read op contents, cannot run a Loro doc, cannot validate semantics. Its job is auth, ordering, durability, frontier tracking, snapshot orchestration. TODO: Compaction may put an asterisk on "DUMB".
 - **CLI** (`cli/`) — Airday CLI
 - **Web** (`js/web/`, consuming `core/web/` wasm via `js/core/`) — browser client; multi-device proof spans CLI ↔ web.
 - **iOS / Android / native macOS** — future clients
@@ -15,6 +15,8 @@ Workflow: a reserved primary capture list ("Home", id `main`), any number of use
 E2EE: password-derived KEK wraps a randomly-generated DEK. DEK encrypts every op blob. Server has no key. Recovery via a user-held recovery code (independent wrap of DEK) is implemented; server-assisted escrow (Vault-backed, opt-in) is future work.
 
 Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs with server-assigned monotonic ids. Each device tracks its `last_acked_op_id`; the minimum across active devices is the compaction horizon. Snapshots are produced by the most-acked active client on server request.
+
+Migrations: while pre-release, keep exactly one migration file per database (`001_init.sql`) and edit it in place — never add incremental or legacy-bridge migrations.
 
 ## Source of truth
 
@@ -38,9 +40,9 @@ Sync: WebSocket per device. Auth on upgrade. Ops are append-only encrypted blobs
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
 | [`spec/saas.md`](spec/saas.md) | Future SaaS contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
 
-Future work: postgres + multi-tenant, SaaS billing, multi-region, MCP, native apps, device priority targeting, pricing, Vault-backed escrow.
+Future work: postgres + multi-tenant, SaaS billing, multi-region, native apps, pricing, Hashicorp Vault-backed escrow.
 
-**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, MCP, native app deployment. These live in `roadmap.md`.
+**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, native app deployment. These live in `roadmap.md`.
 
 ## Build & run
 
