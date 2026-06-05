@@ -1,25 +1,27 @@
 //! Per-account on-disk state.
 //!
-//! `device.json` carries the public-ish state (account id, server URL,
-//! device id, last_acked_seq). `secrets.json` holds the device token
+//! `device.toml` carries the public-ish state (account id, server URL,
+//! device id, last_acked_seq). `secrets.toml` holds the device token
 //! and DEK in cleartext. When keychain-backed storage lands,
-//! `secrets.json` becomes a fallback for non-keychain hosts.
+//! `secrets.toml` becomes a fallback for non-keychain hosts.
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 const ROOT_DIR: &str = "airday";
-const DEVICE_FILE: &str = "device.json";
-const SECRETS_FILE: &str = "secrets.json";
+const DEVICE_FILE: &str = "device.toml";
+const SECRETS_FILE: &str = "secrets.toml";
 const DOC_DB_FILE: &str = "airday.sqlite";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
+    #[error("encode: {0}")]
+    Encode(#[from] toml::ser::Error),
     #[error("decode: {0}")]
-    Decode(#[from] serde_json::Error),
+    Decode(#[from] toml::de::Error),
     #[error("no XDG data directory available")]
     NoDataDir,
     #[error("not logged in")]
@@ -58,8 +60,8 @@ pub struct Secrets {
 /// Top-level on-disk handle. Path layout under the root dir (system
 /// default `<data>/airday/`, or `AIRDAY_DATA_DIR` if set):
 /// ```text
-///   <root>/device.json
-///   <root>/secrets.json
+///   <root>/device.toml
+///   <root>/secrets.toml
 ///   <root>/airday.sqlite
 /// ```
 pub struct Profile {
@@ -96,24 +98,24 @@ impl Profile {
     }
 
     pub fn write_device(&self, cfg: &DeviceConfig) -> Result<(), ConfigError> {
-        write_json(&self.dir.join(DEVICE_FILE), cfg, 0o600)
+        write_toml(&self.dir.join(DEVICE_FILE), cfg, 0o600)
     }
 
     pub fn read_device(&self) -> Result<DeviceConfig, ConfigError> {
-        read_json(&self.dir.join(DEVICE_FILE))
+        read_toml(&self.dir.join(DEVICE_FILE))
     }
 
     pub fn write_secrets(&self, secrets: &Secrets) -> Result<(), ConfigError> {
-        write_json(&self.dir.join(SECRETS_FILE), secrets, 0o600)
+        write_toml(&self.dir.join(SECRETS_FILE), secrets, 0o600)
     }
 
     pub fn read_secrets(&self) -> Result<Secrets, ConfigError> {
-        read_json(&self.dir.join(SECRETS_FILE))
+        read_toml(&self.dir.join(SECRETS_FILE))
     }
 
     /// Path to the per-profile sqlite file. The doc itself is persisted
     /// through `crate::storage::SqliteStorage` (opened against this
-    /// path); `Profile` only owns the JSON device/secrets files and the
+    /// path); `Profile` only owns the TOML device/secrets files and the
     /// directory layout.
     pub fn doc_path(&self) -> PathBuf {
         self.dir.join(DOC_DB_FILE)
@@ -151,9 +153,9 @@ fn root_dir() -> Result<PathBuf, ConfigError> {
     }
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), ConfigError> {
-    let bytes = serde_json::to_vec_pretty(value)?;
-    std::fs::write(path, bytes)?;
+fn write_toml<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), ConfigError> {
+    let text = toml::to_string_pretty(value)?;
+    std::fs::write(path, text)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -164,7 +166,7 @@ fn write_json<T: Serialize>(path: &Path, value: &T, _mode: u32) -> Result<(), Co
     Ok(())
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ConfigError> {
-    let bytes = std::fs::read(path)?;
-    Ok(serde_json::from_slice(&bytes)?)
+fn read_toml<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ConfigError> {
+    let text = std::fs::read_to_string(path)?;
+    Ok(toml::from_str(&text)?)
 }

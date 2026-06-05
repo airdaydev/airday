@@ -71,7 +71,7 @@ A future TUI may hold the WS open while running and surface `OpsBroadcast` react
 Single account per install. One dir under XDG paths (`~/.local/share/airday/` on linux, equivalents elsewhere) — `logout` wipes it, signup/login re-creates it. Two side-by-side test accounts in dev: point `AIRDAY_DATA_DIR` at distinct roots.
 
 - `loro.bin` — local Loro doc snapshot, persisted on every commit
-- `device.json` — `{ device_id, server_url, last_acked_seq, account_id, primary_doc_id, email }` — `primary_doc_id` is the server-assigned id of the account's Home doc, used to key local snapshot storage
+- `device.toml` — `{ device_id, server_url, last_acked_seq, account_id, primary_doc_id, email }` — `primary_doc_id` is the server-assigned id of the account's Home doc, used to key local snapshot storage
 
 Secrets in OS keychain (`security` on macOS, `libsecret` on linux):
 - `airday:<account_id>:token` — device auth token
