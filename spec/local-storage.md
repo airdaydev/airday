@@ -105,8 +105,8 @@ Local mutation:
 Remote frame:
 
 1. Decrypt and apply the frame to the live Loro doc (this is what the engine does today regardless of persistence).
-2. `INSERT INTO ops (doc_id, local_seq, client_op_id=NULL, server_seq, payload, payload_nonce, created_at)` — the encrypted bytes are the ones the server sent, stored verbatim.
-3. Advance `docs.last_acked_server_seq` (the per-doc pull cursor) once the contiguous-prefix invariant allows it (see `spec/sync-protocol.md`).
+2. `INSERT INTO ops (doc_id, local_seq, client_op_id=NULL, server_seq, payload, payload_nonce, created_at)` — the encrypted bytes are the ones the server sent, stored verbatim. This insert does **not** touch the pull cursor.
+3. Separately, when the host signals durability (`SyncEngine::notify_wal_durable`) the engine advances its in-memory contiguous/durable frontier and persists the new value through `LocalStorage::write_acked_seq(doc_id, seq)` → `docs.last_acked_server_seq`. The engine is the sole authority: it passes the *contiguous* frontier (an out-of-order op above a gap does not move it), so storage never derives the cursor itself (see `spec/sync-protocol.md`).
 
 Wire batching is a separate concern: the WS layer **may** pack multiple rows into one frame for throughput. Each row keeps its own `client_op_id` and gets its own `server_seq` in the ack. The storage layer does not know about batching.
 
@@ -171,7 +171,7 @@ Pending rows (`server_seq IS NULL`) are never compacted. An offline client accum
 - **Crash during local append**: the row is either fully committed in sqlite or not — sqlite transaction guarantees. No torn rows.
 - **Crash between append and send**: row exists with `server_seq IS NULL`. On boot, outbox drain re-sends it. Server dedupes by `client_op_id`.
 - **Crash between send and ack**: row exists with `server_seq IS NULL`; server may already have it. On boot, outbox drain re-sends; server's recent-ids window maps the retry to the existing server row and returns the original `server_seq` in the ack.
-- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a separate write (`flush`), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. (A future tightening could fold the cursor advance into the op-insert transaction via a `LocalStorage` trait change shared with web.)
+- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a *separate* write (`write_acked_seq`, driven by the engine on `notify_wal_durable` after the op rows are durable), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops — never ahead. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. The two writes are deliberately *not* one transaction: the cursor value is the engine's contiguous frontier (unknown at op-insert time, since out-of-order ops above a gap mustn't advance it), and the durability seam (`notify_wal_durable`) is what lets the sync engine straddle synchronous sqlite and async IDB.
 - **Crash during snapshot**: the snapshot + the ops DELETE are one transaction; either both land or neither. Pre-snapshot ops survive in full if the transaction aborted, so replay still works from the previous snapshot row (or pure-WAL if there wasn't one).
 
 ## Design constraints
@@ -192,7 +192,7 @@ An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VF
 
 ### Web boot + the bytes-copy gotcha
 
-Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor lives in the `airday-web` `device` row, not derived from the (compacted) op log.
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the `airday-engine` DB (written via `writeAckedSeq`), **not** the `airday-web` `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
 
 ⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. (`idb-storage.ts` documents this inline; `roadmap.md` tracks a proposal to enforce the copy Rust-side.)
 

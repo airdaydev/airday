@@ -697,6 +697,9 @@ extern "C" {
         ciphertext: &[u8],
         nonce: &[u8],
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = writeAckedSeq)]
+    fn write_acked_seq(this: &EngineStorage, seq: f64) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -707,6 +710,7 @@ export interface EngineStorage {
   ackLocalOp(clientOpId: Uint8Array, serverSeq: number): void;
   outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[];
   writeSnapshot(upToLocalSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
+  writeAckedSeq(seq: number): void;
 }
 "#;
 
@@ -822,6 +826,14 @@ impl CoreLocalStorage for WebStorage {
                 &payload.nonce,
             )
             .map_err(jsval_err)
+    }
+
+    fn write_acked_seq(
+        &self,
+        _doc_id: CoreDocId,
+        seq: CoreServerSeq,
+    ) -> Result<(), CoreStorageError> {
+        self.js.write_acked_seq(seq.0 as f64).map_err(jsval_err)
     }
 }
 

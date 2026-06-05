@@ -144,19 +144,19 @@ impl SqliteStorage {
         })
     }
 
-    /// Persist the per-doc sync cursor (creating the `docs` row if the
-    /// first write lands before any op).
-    pub fn write_sync_cursor(&self, doc_id: DocId, cursor: SyncCursor) -> Result<(), StorageError> {
+    /// Persist the observability timestamp only — the "Last sync" shown
+    /// by `airday status`. Deliberately separate from the resume cursor:
+    /// the engine owns `last_acked_server_seq` (via the `LocalStorage`
+    /// trait's `write_acked_seq`), while `last_sync_at` is a CLI-only
+    /// stamp nothing in the sync path reads. (Creates the `docs` row if
+    /// the first write lands before any op.)
+    pub fn write_last_sync_at(&self, doc_id: DocId, at_millis: i64) -> Result<(), StorageError> {
         let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
         let id = doc_id.0.as_bytes().to_vec();
         ensure_doc(&conn, &id)?;
         conn.execute(
-            "UPDATE docs SET last_acked_server_seq = ?2, last_sync_at = ?3 WHERE id = ?1",
-            params![
-                id,
-                cursor.last_acked_server_seq.0 as i64,
-                cursor.last_sync_at
-            ],
+            "UPDATE docs SET last_sync_at = ?2 WHERE id = ?1",
+            params![id, at_millis],
         )
         .map_err(backend)?;
         Ok(())
@@ -386,6 +386,18 @@ impl LocalStorage for SqliteStorage {
         tx.commit().map_err(backend)?;
         Ok(())
     }
+
+    fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
+        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        let id = doc_id.0.as_bytes().to_vec();
+        ensure_doc(&conn, &id)?;
+        conn.execute(
+            "UPDATE docs SET last_acked_server_seq = ?2 WHERE id = ?1",
+            params![id, seq.0 as i64],
+        )
+        .map_err(backend)?;
+        Ok(())
+    }
 }
 
 fn backend(e: rusqlite::Error) -> StorageError {
@@ -448,13 +460,14 @@ pub fn open_storage(profile: &Profile) -> Result<SqliteStorage, StorageInitError
 /// (if any) and replay every op past it. `apply_remote_batch` decrypts
 /// and imports each blob and advances `last_pushed_vv` to cover them,
 /// so the returned doc reports `has_pending_ops() == false` — every
-/// stored op is already captured. Returns the doc plus the storage's
-/// `last_local_seq` (for `SyncEngine::set_last_local_seq`).
+/// stored op is already captured. Returns the doc, the storage's
+/// `last_local_seq` (for `SyncEngine::set_last_local_seq`), and the
+/// persisted resume cursor `last_acked_server_seq` (for `SyncEngine::new`).
 pub fn boot_doc(
     storage: &SqliteStorage,
     dek: &Dek,
     doc_id: DocId,
-) -> Result<(Doc, LocalSeq), StorageInitError> {
+) -> Result<(Doc, LocalSeq, ServerSeq), StorageInitError> {
     let boot = storage.boot(doc_id)?;
     let mut doc = Doc::empty();
     let mut blobs: Vec<EncryptedBlob> = Vec::with_capacity(1 + boot.replay.len());
@@ -468,7 +481,7 @@ pub fn boot_doc(
     // Replaying historical state shouldn't surface as live UI changes —
     // drop the AppEvents the import emitted.
     while doc.pop_event().is_some() {}
-    Ok((doc, boot.last_local_seq))
+    Ok((doc, boot.last_local_seq, boot.last_acked_server_seq))
 }
 
 /// As `boot_doc`, but discards the cursor — for read-only commands.

@@ -17,7 +17,7 @@ import {
   Show,
 } from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import { getDevice, IdbStorage, putDevice } from "@airday/core";
+import { IdbStorage, putDevice } from "@airday/core";
 import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
 import { api } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
@@ -287,9 +287,6 @@ function BootGate(props: {
       const prefsPromise = loadPrefs(props.session.accountId).catch(() => null);
       const dek = props.session.dek;
       const storage = await IdbStorage.open(props.session.primaryDocId);
-      const device = props.session.anonymous
-        ? null
-        : await getDevice(props.session.accountId).catch(() => null);
       const rows = storage.bootRows();
 
       let doc: Doc;
@@ -319,7 +316,9 @@ function BootGate(props: {
 
       props.setBoot({
         doc,
-        lastAcked: BigInt(device?.lastAckedSeq ?? 0),
+        // Resume cursor comes from the engine's own persisted state
+        // (`IdbStorage`/`writeAckedSeq`), not the device row.
+        lastAcked: BigInt(rows.lastAckedSeq),
         storage,
         lastLocalSeq: rows.lastLocalSeq,
         seeded,
@@ -443,11 +442,11 @@ function MainApp(props: {
     }
   };
 
-  // Persist the device row (sync identity + durable resume cursor).
-  // Anonymous sessions skip — there's no server identity to record. We
-  // persist the *durable* frontier (`lastDurableSeq`), not the in-memory
-  // `lastContiguousSeq`, so a crash never resumes from a seq the local
-  // store doesn't actually cover.
+  // Persist the device row — identity + the "last synced" stamp
+  // (observability only). The resume cursor is no longer stored here:
+  // the engine owns it and persists it itself via
+  // `IdbStorage.writeAckedSeq` (clamped to the durable contiguous
+  // frontier). Anonymous sessions skip — no server identity to record.
   const persistDeviceNow = async (): Promise<void> => {
     if (props.session.anonymous) return;
     await putDevice(props.session.accountId, {
@@ -456,7 +455,6 @@ function MainApp(props: {
       email: props.session.email!,
       serverUrl: window.location.origin,
       deviceId: props.session.deviceId!,
-      lastAckedSeq: Number(engine.lastDurableSeq()),
       lastSyncAt: Date.now(),
     });
   };
@@ -523,8 +521,9 @@ function MainApp(props: {
 
   // ---------- Device config: light writes on each frontier change ----------
   //
-  // `lastAckedSeq` advances independently of mutations. Persist it on
-  // a coarse debounce so reload picks up the right resume point.
+  // Refreshes the "last synced" stamp (observability) on a coarse
+  // debounce. The resume cursor is persisted separately by the engine
+  // (`IdbStorage.writeAckedSeq`), so this no longer carries it.
   let deviceTimer: ReturnType<typeof setTimeout> | null = null;
   const saveDeviceSoon = (): void => {
     if (props.session.anonymous) return;

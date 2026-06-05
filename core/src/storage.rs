@@ -207,6 +207,20 @@ pub trait LocalStorage {
         up_to_local_seq: LocalSeq,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError>;
+
+    /// Persist the resume cursor: the highest *contiguous* `server_seq`
+    /// the engine has durably applied. The engine calls this from
+    /// `notify_wal_durable` whenever the durable frontier advances, and
+    /// impls must return this exact value as `BootState::last_acked_server_seq`
+    /// next boot.
+    ///
+    /// This is set **explicitly**, never derived from
+    /// `MAX(ops.server_seq)`: that derivation underestimates once
+    /// compaction prunes the acked ops, and over-estimates past a gap
+    /// (an out-of-order op above a hole must not advance the cursor).
+    /// The engine is the sole authority for the value — impls just store
+    /// the last one handed to them.
+    fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError>;
 }
 
 /// Lets tests share one MemStorage between the engine (via
@@ -241,6 +255,9 @@ impl<T: LocalStorage + ?Sized> LocalStorage for Arc<T> {
         payload: EncryptedBlob,
     ) -> Result<(), StorageError> {
         (**self).write_snapshot(doc_id, up_to_local_seq, payload)
+    }
+    fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
+        (**self).write_acked_seq(doc_id, seq)
     }
 }
 
@@ -317,9 +334,9 @@ impl LocalStorage for MemStorage {
         let mut inner = self.inner.lock().expect("MemStorage mutex poisoned");
         inner.next_local_seq += 1;
         let local_seq = LocalSeq(inner.next_local_seq);
-        if row.server_seq.0 > inner.last_acked_server_seq {
-            inner.last_acked_server_seq = row.server_seq.0;
-        }
+        // Appending an op does NOT advance the resume cursor — that's
+        // `write_acked_seq`'s job (an out-of-order op above a gap would
+        // wrongly jump it). Mirrors the real sqlite/IDB impls.
         inner.ops.push(MemOpRow {
             local_seq,
             client_op_id: None,
@@ -342,9 +359,8 @@ impl LocalStorage for MemStorage {
             .find(|r| r.client_op_id == Some(client_op_id))
             .ok_or(StorageError::UnknownClientOpId(client_op_id))?;
         row.server_seq = Some(server_seq);
-        if server_seq.0 > inner.last_acked_server_seq {
-            inner.last_acked_server_seq = server_seq.0;
-        }
+        // As in `append_remote_op`: stamping a server_seq doesn't move
+        // the resume cursor — only `write_acked_seq` does.
         Ok(())
     }
 
@@ -376,6 +392,15 @@ impl LocalStorage for MemStorage {
             payload,
         });
         inner.ops.retain(|r| r.local_seq > up_to_local_seq);
+        Ok(())
+    }
+
+    fn write_acked_seq(&self, _doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
+        // Standalone field, independent of the `ops` vec — so it survives
+        // `write_snapshot` pruning the rows it was derived from, the same
+        // way the real impls persist a dedicated cursor column.
+        let mut inner = self.inner.lock().expect("MemStorage mutex poisoned");
+        inner.last_acked_server_seq = seq.0;
         Ok(())
     }
 }

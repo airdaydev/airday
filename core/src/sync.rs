@@ -376,6 +376,19 @@ impl SyncEngine {
         let clamped = seq.min(self.last_contiguous_seq);
         if clamped > self.last_durable_seq {
             self.last_durable_seq = clamped;
+            // Persist the resume cursor at the one moment it advances —
+            // through the engine's own storage handle, so the host never
+            // has to read it back out and re-persist it. Storage failure
+            // surfaces as an Event::Error (consistent with the other
+            // storage calls); the ack still queues so the wire isn't
+            // blocked on a local write.
+            if let Err(e) = self
+                .storage
+                .write_acked_seq(self.doc_id, ServerSeq(clamped))
+            {
+                self.events
+                    .push_back(Event::Error(format!("storage.write_acked_seq: {e}")));
+            }
             self.queue_ack_if_advanced();
         }
     }
@@ -2760,10 +2773,21 @@ mod tests {
             crate::storage::LocalSeq(2),
             "two remote_op rows expected"
         );
+        // The contiguous frontier advanced in memory...
+        assert_eq!(eng.last_contiguous_seq(), 2);
+        // ...but the *persisted* resume cursor must NOT move on append
+        // alone — an op above a gap would jump it past the hole. Only
+        // `notify_wal_durable` (the host's durability signal) persists it.
         assert_eq!(
             boot.last_acked_server_seq,
+            ServerSeq(0),
+            "append must not persist the cursor",
+        );
+        eng.notify_wal_durable(2);
+        assert_eq!(
+            mem.boot(fake_doc_id()).unwrap().last_acked_server_seq,
             ServerSeq(2),
-            "remote ops carry their server_seq through to storage"
+            "durability signal persists the contiguous cursor",
         );
         assert!(
             mem.outbox(fake_doc_id()).unwrap().is_empty(),

@@ -56,7 +56,6 @@ describe("Doc + MemStorage", () => {
       email: "user@example.com",
       serverUrl: "http://localhost:8080",
       deviceId: "dev-1",
-      lastAckedSeq: 0,
       lastSyncAt: null,
     });
     await storage.clear();

@@ -19,6 +19,7 @@
 // this boundary — the engine seals/opens before/after).
 
 import {
+  type DocRow,
   type OpRow,
   openEngineDb,
   type SnapshotRow,
@@ -46,6 +47,10 @@ export interface EngineBootRows {
   /** Highest `localSeq` ever assigned (max of snapshot frontier and
    *  the op log) — seeds `engine.setLastLocalSeq`. */
   lastLocalSeq: number;
+  /** Persisted resume cursor — the highest contiguous serverSeq the
+   *  engine durably applied last session. Seeds `SyncEngine`'s
+   *  `lastAckedSeq` (the `since_seq` of the resume `PullOps`). */
+  lastAckedSeq: number;
 }
 
 /** One outbox row, in the shape the wasm extern reads back. */
@@ -89,6 +94,9 @@ export class IdbStorage {
   private snapshot: SnapshotRow | null = null;
   private ops: MirrorOp[] = [];
   private lastAckedServerSeq = 0;
+  // Preserved across `writeAckedSeq` so updating the docs row doesn't
+  // clobber the original creation time.
+  private docCreatedAt = 0;
   // Background IDB writes are serialised through this chain so on-disk
   // order matches mirror order. Per-segment errors are logged and
   // swallowed to keep the chain alive (a poisoned chain would stall
@@ -118,7 +126,13 @@ export class IdbStorage {
       const docs = tx.objectStore(STORE_DOCS);
       const docGet = docs.get(this.docId);
       docGet.onsuccess = () => {
-        if (!docGet.result) docs.put({ id: this.docId, createdAt: Date.now() });
+        if (!docGet.result) {
+          docs.put({
+            id: this.docId,
+            createdAt: Date.now(),
+            lastAckedServerSeq: 0,
+          });
+        }
       };
       const range = IDBKeyRange.bound(
         [this.docId, 0],
@@ -140,10 +154,13 @@ export class IdbStorage {
         const snapFloor = this.snapshot?.upToLocalSeq ?? 0;
         const maxOp = rows.reduce((m, r) => Math.max(m, r.localSeq), 0);
         this.nextLocalSeq = Math.max(snapFloor, maxOp);
-        this.lastAckedServerSeq = rows.reduce(
-          (m, r) => (r.serverSeq != null ? Math.max(m, r.serverSeq) : m),
-          0,
-        );
+        // Read the persisted resume cursor from the docs row — NOT
+        // `MAX(serverSeq)` over the op log, which jumps past gaps and
+        // drops after compaction (see `DocRow`). The engine is the
+        // authority; we just replay what it last wrote.
+        const docRow = docGet.result as DocRow | undefined;
+        this.docCreatedAt = docRow?.createdAt ?? Date.now();
+        this.lastAckedServerSeq = docRow?.lastAckedServerSeq ?? 0;
         resolve();
       };
       tx.onerror = () => reject(tx.error);
@@ -168,6 +185,7 @@ export class IdbStorage {
         : null,
       replay,
       lastLocalSeq: this.nextLocalSeq,
+      lastAckedSeq: this.lastAckedServerSeq,
     };
   }
 
@@ -213,7 +231,9 @@ export class IdbStorage {
     const existing = this.ops.find((o) => o.serverSeq === serverSeq);
     if (existing) return existing.localSeq;
     const localSeq = ++this.nextLocalSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
+    // Appending does NOT advance the resume cursor — that's
+    // `writeAckedSeq`'s job (an op above a gap would jump it past the
+    // hole). Mirrors `core::MemStorage` / `SqliteStorage`.
     const row: OpRow = {
       docId: this.docId,
       localSeq,
@@ -232,7 +252,8 @@ export class IdbStorage {
     const op = this.ops.find((o) => o.clientOpId === hex);
     if (!op) throw new Error(`ackLocalOp: unknown clientOpId ${hex}`);
     op.serverSeq = serverSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
+    // As in `appendRemoteOp`: stamping a serverSeq doesn't move the
+    // resume cursor — only `writeAckedSeq` does.
     this.enqueuePut(STORE_OPS, mirrorToRow(op, this.docId));
   }
 
@@ -269,6 +290,16 @@ export class IdbStorage {
         IDBKeyRange.bound([docId, 0], [docId, upToLocalSeq]),
       );
     });
+  }
+
+  writeAckedSeq(serverSeq: number): void {
+    this.lastAckedServerSeq = serverSeq;
+    const row: DocRow = {
+      id: this.docId,
+      createdAt: this.docCreatedAt,
+      lastAckedServerSeq: serverSeq,
+    };
+    this.enqueuePut(STORE_DOCS, row);
   }
 
   // ---------- IDB flush plumbing ----------

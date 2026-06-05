@@ -44,6 +44,17 @@ export interface SnapshotRow {
   createdAt: number;
 }
 
+/** One row in the `docs` store. `lastAckedServerSeq` is the persisted
+ *  resume cursor — the highest *contiguous* serverSeq the engine has
+ *  durably applied. Set explicitly via `writeAckedSeq` (never derived
+ *  from `MAX(serverSeq)`, which over-shoots gaps and under-shoots after
+ *  compaction). See `spec/local-storage.md`. */
+export interface DocRow {
+  id: string;
+  createdAt: number;
+  lastAckedServerSeq: number;
+}
+
 let cached: Promise<IDBDatabase> | null = null;
 
 /** Open (or return the cached) `airday-engine` database. A

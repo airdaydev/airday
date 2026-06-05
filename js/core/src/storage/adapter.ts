@@ -18,9 +18,9 @@ export interface DeviceConfig {
   email: string;
   serverUrl: string;
   deviceId: string;
-  /** Sync engine's contiguous-prefix per-doc seq. */
-  lastAckedSeq: number;
-  /** Unix millis of the last successful online flush, or null. */
+  /** Unix millis of the last successful online sync, or null.
+   *  Observability only (the "Synced …" status) — the resume cursor is
+   *  the engine's, persisted via `IdbStorage.writeAckedSeq`. */
   lastSyncAt: number | null;
 }
 
@@ -36,8 +36,6 @@ export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
   ) {
     return null;
   }
-  const lastAckedSeq =
-    typeof device.lastAckedSeq === "number" ? device.lastAckedSeq : 0;
   const lastSyncAt =
     typeof device.lastSyncAt === "number" || device.lastSyncAt === null
       ? device.lastSyncAt
@@ -48,7 +46,6 @@ export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
     email: device.email,
     serverUrl: device.serverUrl,
     deviceId: device.deviceId,
-    lastAckedSeq,
     lastSyncAt,
   };
 }

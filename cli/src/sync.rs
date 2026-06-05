@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use airday_core::{Doc, DocId, EngineOptions, Event, ServerSeq, SyncEngine};
+use airday_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use tokio::net::TcpStream;
@@ -26,7 +26,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::config::{ConfigError, Profile};
 use crate::keystore::{dek_from_hex, KeystoreError};
-use crate::storage::{SqliteStorage, SyncCursor};
+use crate::storage::SqliteStorage;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -61,14 +61,13 @@ pub struct Session {
     profile: Profile,
     server_url: String,
     doc_id: DocId,
-    /// Handle for persisting the sync cursor. A clone of the storage the
-    /// engine owns — same underlying connection (see `SqliteStorage`'s
-    /// `Clone`) — since the engine's handle is boxed behind `dyn
-    /// LocalStorage` and its inherent cursor methods aren't reachable
-    /// through it.
+    /// Handle for persisting the `last_sync_at` observability stamp — a
+    /// clone of the storage the engine owns (same connection, see
+    /// `SqliteStorage`'s `Clone`). The engine persists the *resume
+    /// cursor* itself via the `LocalStorage` trait; this clone exists
+    /// only because `last_sync_at` is a CLI-only concern the time-free
+    /// engine can't stamp.
     store: SqliteStorage,
-    last_acked: u64,
-    last_sync_at: Option<i64>,
     engine: SyncEngine,
     ws: Option<WsStream>,
 }
@@ -95,18 +94,17 @@ impl Session {
         let storage = crate::storage::open_storage(&profile)?;
         let account = storage.read_account()?;
         let doc_id = account.primary_doc_id;
-        let (doc, last_local) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
-        let cursor = storage.read_sync_cursor(doc_id)?;
-        // `store` and the engine's storage are clones sharing one
-        // connection (see `SqliteStorage`'s `Clone`), so `Session` can
-        // persist the cursor while the engine owns its handle.
+        let (doc, last_local, last_acked) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
+        // `store` shares the engine's connection (see `SqliteStorage`'s
+        // `Clone`) — used only for the `last_sync_at` stamp; the engine
+        // persists the resume cursor itself.
         let store = storage.clone();
 
         let mut engine = SyncEngine::new(
             doc,
             doc_id,
             dek,
-            cursor.last_acked_server_seq.0,
+            last_acked.0,
             EngineOptions {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
@@ -120,8 +118,6 @@ impl Session {
             server_url: config.server_url,
             doc_id,
             store,
-            last_acked: cursor.last_acked_server_seq.0,
-            last_sync_at: cursor.last_sync_at,
             engine,
             ws: None,
         };
@@ -262,40 +258,20 @@ impl Session {
         self.engine.capture_local_ops()?;
         self.engine.snapshot_if_fully_synced()?;
         let contiguous = self.engine.last_contiguous_seq();
+        // `notify_wal_durable` advances the engine's durable frontier and
+        // persists the resume cursor itself (via the `LocalStorage`
+        // trait). The CLI no longer reads it back or re-writes it.
         self.engine.notify_wal_durable(contiguous);
-        let acked = self.engine.last_durable_seq();
-        if acked > self.last_acked {
-            self.last_acked = acked;
-        }
-        // Persist the cursor on every flush — local-only included, since
-        // an offline mutation still advances it. `last_sync_at` is *not*
-        // touched here: it means "last successful online sync", and this
-        // path runs even when offline (`flush` calls it unconditionally,
-        // and every command — even read-only `ls` — flushes). It's
-        // stamped only by `mark_synced`, on a confirmed online exchange.
-        self.store.write_sync_cursor(
-            self.doc_id,
-            SyncCursor {
-                last_acked_server_seq: ServerSeq(self.last_acked),
-                last_sync_at: self.last_sync_at,
-            },
-        )?;
         Ok(())
     }
 
-    /// Stamp "last successful online sync" = now and persist it. Called
-    /// only after a confirmed online exchange — never on an offline or
-    /// purely local flush — so `airday status` reports when this device
-    /// actually last reached the server, not when it last ran a command.
+    /// Stamp "last successful online sync" = now. Called only after a
+    /// confirmed online exchange — never on an offline or purely local
+    /// flush — so `airday status` reports when this device actually last
+    /// reached the server, not when it last ran a command. Pure
+    /// observability; nothing in the sync path reads it.
     fn mark_synced(&mut self) -> Result<(), SyncError> {
-        self.last_sync_at = Some(now_millis());
-        self.store.write_sync_cursor(
-            self.doc_id,
-            SyncCursor {
-                last_acked_server_seq: ServerSeq(self.last_acked),
-                last_sync_at: self.last_sync_at,
-            },
-        )?;
+        self.store.write_last_sync_at(self.doc_id, now_millis())?;
         Ok(())
     }
 }

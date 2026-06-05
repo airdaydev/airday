@@ -1,18 +1,15 @@
-// Per-account device row — sync identity + resume cursor.
+// Per-account device row — sync identity + the "last synced" stamp.
 //
 // Lives in the `airday-web` database (alongside vault + prefs), keyed
-// per account. It is the web analogue of the CLI's `device.json`:
-// `lastAckedSeq` is the durable resume cursor the engine is seeded with
-// at boot and re-persisted as it advances. Kept separate from the
-// engine's op-log database (`airday-engine`) for the same reason the
-// CLI keeps the cursor in config rather than deriving it from the op
-// log — compaction prunes acked rows, so the op log can't be the
-// source of truth for "how far has the server acked us."
+// per account. The resume cursor used to live here too, but it's now
+// the engine's: persisted in the `airday-engine` op-log DB via
+// `IdbStorage.writeAckedSeq` (clamped to the durable contiguous
+// frontier — see `spec/local-storage.md`). This row carries only
+// identity and `lastSyncAt`, which is observability for the "Synced …"
+// status and never consulted by the sync path.
 //
 // Extracted from the now-retired `IdbWalStorage` so the engine op log
-// can move to `IdbStorage` while this row stays put. The row shape
-// (`{ account_id, device }`) is unchanged, so existing device rows
-// written by the WAL build are read back verbatim.
+// can move to `IdbStorage` while this row stays put.
 
 import { type DeviceConfig, normalizeDeviceConfig } from "./adapter.ts";
 import { openAirdayDb, STORE_DEVICE } from "./web-db.ts";

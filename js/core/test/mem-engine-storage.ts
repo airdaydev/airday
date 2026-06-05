@@ -49,7 +49,7 @@ export class MemEngineStorage {
     const existing = this.ops.find((o) => o.serverSeq === serverSeq);
     if (existing) return existing.localSeq;
     const localSeq = ++this.nextLocalSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
+    // Cursor advances only via writeAckedSeq (mirrors core::MemStorage).
     this.ops.push({ localSeq, serverSeq, ciphertext: copy(ciphertext), nonce: copy(nonce) });
     return localSeq;
   }
@@ -59,7 +59,10 @@ export class MemEngineStorage {
     const op = this.ops.find((o) => o.clientOpId === h);
     if (!op) throw new Error(`ackLocalOp: unknown clientOpId ${h}`);
     op.serverSeq = serverSeq;
-    if (serverSeq > this.lastAckedServerSeq) this.lastAckedServerSeq = serverSeq;
+  }
+
+  writeAckedSeq(serverSeq: number): void {
+    this.lastAckedServerSeq = serverSeq;
   }
 
   outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[] {
