@@ -147,49 +147,6 @@ impl Session {
         self.engine.doc()
     }
 
-    /// Drive any inbound frames already waiting on the live socket,
-    /// then return once the connection has been quiet for `quiet_for`.
-    /// Useful for long-lived tests that need to keep servicing
-    /// broadcasts or `SnapshotRequest`s between local mutations.
-    pub async fn pump_until_quiet(&mut self, quiet_for: Duration) -> Result<usize, SyncError> {
-        let Some(mut ws) = self.ws.take() else {
-            return Ok(0);
-        };
-        let result = async {
-            let mut processed = 0usize;
-            loop {
-                let bytes = match recv_bytes_timeout(&mut ws, quiet_for).await? {
-                    Some(bytes) => bytes,
-                    None => break,
-                };
-                processed += 1;
-                self.engine.handle_server_bytes(&bytes, monotonic_ms());
-                // Drive the gap-retry tick after every server frame
-                // too — if a hole just opened, this gives the timer a
-                // chance to fire as soon as backoff elapses without
-                // waiting for a separate polling loop.
-                self.engine.handle_timeout(monotonic_ms());
-                // Persist before flushing the outbox — the engine
-                // doesn't queue Acks for newly-applied ops until
-                // `persist_engine_state` calls `notify_wal_durable`.
-                // This binds every outbound Ack to a doc write
-                // already on disk.
-                self.persist_engine_state().await?;
-                send_outbox(&mut ws, &mut self.engine).await?;
-                drain_engine_errors(&mut self.engine)?;
-                if !self.engine.is_online() {
-                    return Err(SyncError::Engine("engine disconnected mid-pump".into()));
-                }
-                // Each processed frame is a confirmed online exchange.
-                self.mark_synced()?;
-            }
-            Ok(processed)
-        }
-        .await;
-        self.ws = Some(ws);
-        result
-    }
-
     /// Persist the doc, push any pending ops, ack the frontier, close
     /// the socket. Local persistence runs first so a network failure
     /// after a mutation can't silently drop the change.
