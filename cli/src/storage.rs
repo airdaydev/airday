@@ -25,8 +25,6 @@ use uuid::Uuid;
 use crate::config::Profile;
 use crate::db::{self, DbError};
 
-const LEGACY_DOC_FILE: &str = "loro.bin";
-
 /// The account + device identity this install is logged in as. Persisted
 /// as the singleton `account` row (see `001_init.sql`); written once at
 /// signup/login/recover, read by every command that needs identity.
@@ -435,13 +433,8 @@ pub enum StorageInitError {
     Doc(#[from] DocError),
 }
 
-/// Open the profile's `SqliteStorage`, nuking any stray legacy
-/// `loro.bin` blob from pre-sqlite builds first.
+/// Open the profile's `SqliteStorage`.
 pub fn open_storage(profile: &Profile) -> Result<SqliteStorage, StorageInitError> {
-    let legacy = profile.dir.join(LEGACY_DOC_FILE);
-    if legacy.exists() {
-        let _ = std::fs::remove_file(&legacy);
-    }
     Ok(SqliteStorage::open(&profile.doc_path())?)
 }
 

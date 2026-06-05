@@ -1269,9 +1269,9 @@ impl Doc {
 
     // ---------- persistence ----------
 
-    /// Serialize doc state + last-pushed VV for the on-disk
-    /// `loro.bin`. Encoding is msgpack — small, additively evolvable,
-    /// and matches the wire format used everywhere else.
+    /// Serialize doc state + last-pushed VV. Encoding is msgpack —
+    /// small, additively evolvable, and matches the wire format used
+    /// everywhere else.
     pub fn save(&self) -> Result<Vec<u8>, DocError> {
         let snapshot = self.inner.export(ExportMode::Snapshot)?;
         let envelope = LocalState {
