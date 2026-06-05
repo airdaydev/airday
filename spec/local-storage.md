@@ -1,6 +1,6 @@
 # Local Storage
 
-Per-account local persistence for the doc — same model on every client. Sqlite as the substrate, encrypted-at-rest op rows as the hot path, occasional encrypted snapshot rows as cheap-replay base. Supersedes `spec/idb-wal.md` and `cli/migrations/001_init.sql`'s single-row docs table.
+Per-account local persistence for the doc — the **same logical model on every client**, behind one Rust trait (`core::LocalStorage`, `core/src/storage.rs`). Encrypted-at-rest op rows are the hot path; occasional encrypted snapshot rows are the cheap-replay base. The substrate differs by platform — **CLI: sqlite on disk; web: IndexedDB on the main thread** — but the schema, boot semantics, and snapshot policy are identical (the engine only ever sees the trait).
 
 ## Thesis
 
@@ -11,19 +11,23 @@ The local store mirrors the server's storage shape: append-only encrypted op blo
 
 A WAL row is *the* unit. It is what Loro exported, what gets encrypted at rest, what gets sent on the wire, what the server stores under its own seq, what gets ack-mapped, and what gets replayed on boot. There is no separate "upload parcel" abstraction.
 
-## What this supersedes
+## History
 
-- The prior OPFS-snapshot + IDB-WAL split (previously specified in `spec/idb-wal.md`, now removed) is replaced by a single sqlite DB per account.
-- `cli/migrations/001_init.sql` — the single-row `docs(payload BLOB)` table is replaced by the schema below.
+This model replaced two earlier designs, both now removed:
+
+- The web client's **OPFS-snapshot + IDB-WAL split** (once spec'd in `spec/idb-wal.md`).
+- The CLI's **single-row `docs(payload BLOB)` table** (the original `cli/migrations/001_init.sql`; that file now holds the schema below).
+
+An earlier attempt to unify *both* platforms on sqlite-wasm + OPFS inside a SharedWorker (branch `spike/shared-worker`) was abandoned. See **Why IDB on web** below — that rationale is load-bearing, not trivia.
 
 ## Storage substrate
 
 Per account, one sqlite database.
 
-- **CLI**: file on disk under the profile dir (`<profile>/airday.db`). Same pragmas as the server (`spec/storage.md` §Sqlite settings).
-- **Web**: sqlite-wasm running inside a dedicated Worker, backed by the OPFS-SAH-pool VFS. The main thread talks to the Worker over postMessage. OPFS is **hard-required**; sessions without OPFS (older browsers, some private-window modes) fall back to an in-memory store that does not survive reload. The previous IDB-only fallback for anonymous sessions is dropped.
+- **CLI**: `SqliteStorage` (`cli/src/storage.rs`) — a file on disk under the profile dir. Same pragmas as the server (`spec/storage.md` §Sqlite settings). Writes are synchronously durable: the trait method returns only after the `INSERT` commits.
+- **Web**: `IdbStorage` (`js/core/src/storage/idb-storage.ts`) — IndexedDB on the **main thread**, behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). No Worker, no OPFS, no sqlite-wasm. The trait is synchronous but IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror of the op log that the extern methods read/write immediately and flushes the real IDB transaction on a background promise chain; durability is signalled back out-of-band (`whenFlushed()` → the host's `notify_wal_durable`) so an `Ack` isn't shipped until the bytes are on disk. IndexedDB is **hard-required** — a session that can't open it surfaces a "Failed to start" screen rather than booting on a storage-less engine.
 
-Same schema, same migrations, same code path (the engine sees a single `Storage` trait — the CLI binds to a native sqlite handle, the web binds to a thin wrapper that proxies SQL to the Worker).
+The engine sees a single `LocalStorage` trait; the CLI binds a native sqlite handle, the web binds the IDB-backed extern. Storage is mandatory — there is no storage-less engine mode.
 
 ## Schema
 
@@ -162,10 +166,27 @@ Pending rows (`server_seq IS NULL`) are never compacted. An offline client accum
 - Op blobs in the local DB are byte-for-byte the same as what's on the wire and what's stored on the server. No re-encryption, no re-encoding on resend.
 - The wire ack format must carry `{client_op_id → server_seq}` per acknowledged op. The exact frame layout is specified in `spec/sync-protocol.md`.
 
+## Why IDB on web (not sqlite / Worker / OPFS)
+
+An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VFS inside a SharedWorker, with the engine off the main thread. It worked end-to-end and was abandoned. The reasons are durable design constraints, not incidental:
+
+1. **`createSyncAccessHandle` is `DedicatedWorkerGlobalScope`-only by spec** — not a vendor bug. A SharedWorker therefore *cannot* host OPFS-backed sqlite in any browser. ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/FileSystemFileHandle/createSyncAccessHandle), [wa-sqlite #79](https://github.com/rhashimoto/wa-sqlite/discussions/79)). Don't propose this combination again.
+2. **sqlite-wasm buys nothing here.** We store opaque encrypted blobs, not queryable data, so we never use SQL's query power — but we'd pay ~1 MB of bundle plus the COOP/COEP header requirement. IDB is exactly the right shape (ordered keyed store with transactions) and ships in every browser for free.
+3. **The engine must stay on the main thread.** Moving it into a Worker adds a postMessage round-trip to every mutation; the lag is perceptible in tight UI loops (typing, drag-reorder). Multi-tab coherence and Argon2id-off-main are real wins but not worth that regression.
+4. **The trait is the prize, not a unified storage technology.** "Same Rust engine, same boot semantics, same op log, same snapshot policy" is the value. sqlite on one side and IDB on the other satisfy it identically — the engine never knows which.
+
+### Web boot + the bytes-copy gotcha
+
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor lives in the `airday-web` `device` row, not derived from the (compacted) op log.
+
+⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. (`idb-storage.ts` documents this inline; `roadmap.md` tracks a proposal to enforce the copy Rust-side.)
+
 ## Migration
 
-- **CLI**: existing `docs(doc_id, payload, updated_at)` rows are read once at boot, decoded as Loro snapshots, re-encrypted with the DEK, and inserted into the new `snapshots` table; the old table is then dropped. The migration runs inside the standard `_migrations` machinery as `002_local_storage`.
-- **Web**: IDB `ops` rows are drained, re-encoded as `ops` table rows under matching `local_seq` values; the OPFS `loro.bin` is read and inserted into the `snapshots` table; the `airday-web` IDB database and the OPFS snapshot file are deleted after the transaction commits. Run-once at the first boot under the new schema; idempotent on subsequent runs.
+Pre-release: **no data was migrated from the old layouts** — both clients start fresh under this schema. This is deliberate (pre-release, single-user, no production data to preserve) and is the standing migration rule (see `AGENTS.md`).
+
+- **CLI**: the schema ships as a single migration file (`cli/migrations/001_init.sql`); there is no incremental migration and no legacy-bridge table. The old single-row `docs(payload)` blob is not drained.
+- **Web**: the new engine store is a fresh IDB database (`airday-engine`). The old `airday-web` WAL/OPFS op data was abandoned, not drained; `web-db.ts` drops the dead `ops` / `snapshot_meta` stores on upgrade and keeps only `vault` / `device` / `prefs`.
 
 ## Testing
 
@@ -178,6 +199,13 @@ Required cases:
 5. Crash between send and ack: re-send maps to original `server_seq` via dedupe, ack updates the row.
 6. Multiple snapshot cycles preserve replay correctness; pending rows survive across snapshots and remain in the outbox.
 7. Re-upload after the WS layer drops mid-frame works without producing duplicate server rows.
+
+## Out of scope
+
+- **Multi-tab coherence on web.** One engine, one tab; the `navigator.locks` single-tab gate stays. Making tabs coherent is a separate effort.
+- **Engine in a Worker.** Stays on the main thread — see *Why IDB on web* §3.
+- **Argon2id off the main thread.** It blocks the UI for ~hundreds of ms on login. Acceptable for now; solvable later with a dedicated Worker *just* for the KDF, without disturbing the engine.
+- **sqlite on web.** Not happening unless the OPFS-SAH spec changes — see *Why IDB on web* §1.
 
 ## Open questions
 

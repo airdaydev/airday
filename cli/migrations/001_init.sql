@@ -1,4 +1,4 @@
--- Local doc storage for the airday CLI (spec/local-storage-plan.md):
+-- Local doc storage for the airday CLI (spec/local-storage.md):
 -- an append-only `ops` log keyed by (doc_id, local_seq) plus one
 -- `snapshots` row per doc. Mirrors the sqlite schema the server uses.
 --

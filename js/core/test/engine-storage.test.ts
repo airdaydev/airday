@@ -1,5 +1,5 @@
-// Phase 2 (`spec/local-storage-plan.md`): the web client drives the
-// engine through a JS-implemented `EngineStorage` (the in-memory mirror
+// The web client drives the engine through a JS-implemented
+// `EngineStorage` (`spec/local-storage.md`) — the in-memory mirror
 // behind `IdbStorage`). This test exercises that wasm boundary —
 // `captureLocalOps` / `snapshotIfFullySynced` / `setLastLocalSeq` plus
 // the `EngineStorage` extern — without IndexedDB or a server, using a

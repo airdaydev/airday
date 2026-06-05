@@ -1,5 +1,5 @@
 // IndexedDB schema for the engine's op log — the web implementation of
-// the Rust `LocalStorage` trait (`spec/local-storage-plan.md` Phase 2).
+// the Rust `LocalStorage` trait (`spec/local-storage.md`).
 //
 // This is a SEPARATE database from `airday-web` (vault + prefs +
 // device + the now-defunct WAL/OPFS stores). Keeping it separate means

@@ -34,8 +34,8 @@ Fix to make it impossible by construction: copy on the **Rust** side — in `Web
 to take those instead of `&[u8]`. Then every JS impl receives a stable owned array regardless of what it does;
 the per-impl `.slice()` discipline (and the calls themselves) can go. Cost: one small heap copy per byte-arg
 per call (negligible vs crypto + IDB). Before committing, verify wasm-bindgen's generated glue for the new
-signature actually yields an owned copy, not another view. Cross-ref: `spec/local-storage-plan.md` Phase 2/3
-notes on the transient-view gotcha.
+signature actually yields an owned copy, not another view. Cross-ref: `spec/local-storage.md`
+§"Web boot + the bytes-copy gotcha".
 
 ## Web app
 - Touch / mobile drag-and-drop support; current primavera DnD is desktop-first.

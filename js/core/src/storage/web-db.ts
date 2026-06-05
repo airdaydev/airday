@@ -9,7 +9,7 @@
 //
 // The engine op log (snapshots + ops) used to live here too, but moved
 // to its own `airday-engine` database behind the `LocalStorage` trait
-// (`spec/local-storage-plan.md`). The old `ops` / `snapshot_meta`
+// (`spec/local-storage.md`). The old `ops` / `snapshot_meta`
 // stores are dropped on upgrade; their data is abandoned, not drained.
 //
 // Splitting `vault` / `device` / `prefs` across multiple databases

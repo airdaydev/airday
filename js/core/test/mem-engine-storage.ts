@@ -3,7 +3,7 @@
 // up with the `EngineStorage` interface generated into the wasm `.d.ts`.
 //
 // The engine's push path is outbox-driven on every host
-// (`spec/local-storage-plan.md`), so any test that constructs a
+// (`spec/local-storage.md`), so any test that constructs a
 // `SyncEngine` must hand it a real storage. Tests that only use the
 // engine as a doc / AppEvent source still need one to satisfy the
 // (now-mandatory) constructor — they just never call `captureLocalOps`.
@@ -19,7 +19,7 @@
 // on entry — exactly like the real `IdbStorage` (`copyBytes` =
 // `.slice()`). Without the copy, a capture that's read back after the
 // wasm allocator reuses that memory yields corrupted ciphertext →
-// decrypt fails on the peer. (See `spec/local-storage-plan.md` Phase 2.)
+// decrypt fails on the peer. (See `spec/local-storage.md`.)
 
 interface MirrorOp {
   localSeq: number;

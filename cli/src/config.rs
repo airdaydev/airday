@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 const ROOT_DIR: &str = "airday";
 const DEVICE_FILE: &str = "device.json";
 const SECRETS_FILE: &str = "secrets.json";
-const DOC_DB_FILE: &str = "loro.db";
+const DOC_DB_FILE: &str = "loro.sqlite";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -60,7 +60,7 @@ pub struct Secrets {
 /// ```text
 ///   <root>/device.json
 ///   <root>/secrets.json
-///   <root>/loro.db
+///   <root>/loro.sqlite
 /// ```
 pub struct Profile {
     pub dir: PathBuf,

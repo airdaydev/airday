@@ -21,13 +21,13 @@
 //!     durability via a separate callback so the server-side `Ack`
 //!     frame isn't shipped until the bytes are actually on disk.
 //!
-//! Both impls live outside `core/`: native in `cli/src/storage.rs`
-//! (Phase 1), web in `js/core/src/storage/idb-storage.ts` plus
-//! `core/web/src/storage.rs` (Phase 2). `MemStorage` (this file) is the
-//! in-memory test double used by `core` unit tests once Phase 0b moves
-//! push tracking onto the trait.
+//! Both impls live outside `core/`: native in `cli/src/storage.rs`,
+//! web in `js/core/src/storage/idb-storage.ts` plus `core/web/src/lib.rs`.
+//! `MemStorage` (this file) is the in-memory test double used by `core`
+//! unit tests.
 //!
-//! See `spec/local-storage-plan.md` for the rationale and phasing.
+//! See `spec/local-storage.md` for the schema, boot/replay semantics,
+//! and the rationale (notably why web uses IDB rather than sqlite-wasm).
 
 use airday_protocol::EncryptedBlob;
 use serde::{Deserialize, Serialize};
@@ -164,7 +164,7 @@ pub enum StorageError {
 /// All methods are synchronous. Native impls are also synchronously
 /// durable; the web impl returns from an in-memory mirror and flushes
 /// IDB in the background (durability signalled out-of-band — see
-/// `spec/local-storage-plan.md` Phase 2).
+/// `spec/local-storage.md`).
 pub trait LocalStorage {
     /// Load everything the engine needs to bring a doc back to its
     /// last-persisted state. For a doc the storage has never seen,

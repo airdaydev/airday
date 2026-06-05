@@ -1,5 +1,5 @@
 // Web implementation of the Rust `LocalStorage` trait
-// (`spec/local-storage-plan.md` Phase 2).
+// (`spec/local-storage.md`).
 //
 // The engine's trait is **synchronous** — `appendLocalOp` must return a
 // `localSeq` immediately, `outbox()` must return rows immediately — but

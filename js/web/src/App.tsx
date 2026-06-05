@@ -269,8 +269,8 @@ function BootGate(props: {
   onSession: (s: Session) => void;
 }) {
   const { m } = useAppI18n();
-  // Rebuild the doc from the engine op log (`spec/local-storage-plan.md`
-  // Phase 2), mirroring the CLI's `boot_doc`: load the snapshot (a bare
+  // Rebuild the doc from the engine op log (`spec/local-storage.md`
+  // §"Web boot"), mirroring the CLI's `boot_doc`: load the snapshot (a bare
   // Loro snapshot) and replay every op row after it via
   // `importWalUpdates`, then `markPushed()` so the engine's push cursor
   // covers the replayed ops (unacked ones re-push from the persisted
