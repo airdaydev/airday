@@ -61,9 +61,11 @@ pub struct Session {
     profile: Profile,
     server_url: String,
     doc_id: DocId,
-    /// Dedicated handle for persisting the sync cursor. The engine owns
-    /// its own `SqliteStorage` (boxed in `SyncEngine`), so `Session`
-    /// keeps a second connection to the same WAL db for cursor writes.
+    /// Handle for persisting the sync cursor. A clone of the storage the
+    /// engine owns — same underlying connection (see `SqliteStorage`'s
+    /// `Clone`) — since the engine's handle is boxed behind `dyn
+    /// LocalStorage` and its inherent cursor methods aren't reachable
+    /// through it.
     store: SqliteStorage,
     last_acked: u64,
     last_sync_at: Option<i64>,
@@ -95,9 +97,10 @@ impl Session {
         let doc_id = account.primary_doc_id;
         let (doc, last_local) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
         let cursor = storage.read_sync_cursor(doc_id)?;
-        // Second handle for cursor persistence — `storage` is moved into
-        // the engine below.
-        let store = crate::storage::open_storage(&profile)?;
+        // `store` and the engine's storage are clones sharing one
+        // connection (see `SqliteStorage`'s `Clone`), so `Session` can
+        // persist the cursor while the engine owns its handle.
+        let store = storage.clone();
 
         let mut engine = SyncEngine::new(
             doc,

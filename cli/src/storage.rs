@@ -12,7 +12,7 @@
 //! ever sees opaque `EncryptedBlob`s).
 
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use airday_core::{
     BootState, ClientOpId, Dek, Doc, DocError, DocId, LocalOpRow, LocalSeq, LocalStorage,
@@ -48,8 +48,14 @@ pub struct SyncCursor {
 }
 
 /// Native `LocalStorage` over a per-profile sqlite file.
+///
+/// `Clone` is shallow: clones share one `Connection` behind the `Arc<Mutex>`,
+/// so the engine and the owning `Session` can both hold a handle to the
+/// *same* db without a second file open. WAL + the `Mutex` serialise their
+/// (sequential, in the CLI) accesses.
+#[derive(Clone)]
 pub struct SqliteStorage {
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl SqliteStorage {
@@ -57,7 +63,7 @@ impl SqliteStorage {
     pub fn open(path: &Path) -> Result<Self, DbError> {
         let conn = db::open(path)?;
         Ok(Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
         })
     }
 
