@@ -1,8 +1,9 @@
 use std::sync::OnceLock;
 
-use airday_cli::config::{DeviceConfig, Profile, Secrets};
+use airday_cli::config::{Config, Profile, Secrets};
 use airday_cli::keystore::{dek_to_hex, derive_master};
 use airday_cli::net::Client;
+use airday_cli::storage::Account;
 use airday_core::{
     derive_password_master, derive_recovery_master, generate_recovery_code, random_bytes, Dek, Doc,
     WrappedDek, AEAD_NONCE_LEN,
@@ -414,15 +415,26 @@ pub async fn materialize_profile(
 ) -> Profile {
     std::fs::create_dir_all(data_dir).unwrap();
     let profile = Profile::new(data_dir.to_path_buf());
-    profile
-        .write_device(&DeviceConfig {
+    let doc = if seed_doc {
+        Doc::new().unwrap()
+    } else {
+        Doc::empty()
+    };
+    let doc_uuid = Uuid::parse_str(primary_doc_id).expect("test passed malformed primary_doc_id");
+    let doc_id = airday_core::DocId(doc_uuid);
+    let storage = airday_cli::storage::open_storage(&profile).unwrap();
+    airday_cli::storage::seed_snapshot(&storage, dek, doc_id, &doc).unwrap();
+    storage
+        .write_account(&Account {
             account_id: account_id.into(),
-            primary_doc_id: primary_doc_id.into(),
             email: email.into(),
-            server_url: server_url.into(),
             device_id: device_id.into(),
-            last_acked_seq: 0,
-            last_sync_at: None,
+            primary_doc_id: doc_id,
+        })
+        .unwrap();
+    profile
+        .write_config(&Config {
+            server_url: server_url.into(),
         })
         .unwrap();
     profile
@@ -431,14 +443,6 @@ pub async fn materialize_profile(
             dek_hex: dek_to_hex(dek),
         })
         .unwrap();
-    let doc = if seed_doc {
-        Doc::new().unwrap()
-    } else {
-        Doc::empty()
-    };
-    let doc_uuid = Uuid::parse_str(primary_doc_id).expect("test passed malformed primary_doc_id");
-    let storage = airday_cli::storage::open_storage(&profile).unwrap();
-    airday_cli::storage::seed_snapshot(&storage, dek, airday_core::DocId(doc_uuid), &doc).unwrap();
     profile
 }
 

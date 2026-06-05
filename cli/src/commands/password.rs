@@ -9,18 +9,20 @@ use crate::net::Client;
 
 pub async fn run() -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
-    let device = profile.read_device()?;
+    let config = profile.read_config()?;
     let secrets = profile.read_secrets()?;
+    let storage = crate::storage::open_storage(&profile)?;
+    let account = storage.read_account()?;
 
     let current_password: String = Password::new().with_prompt("Current password").interact()?;
     let new_password = prompt_new_password("New password")?;
 
-    let client = Client::new(device.server_url.clone());
+    let client = Client::new(config.server_url.clone());
     let pre: PreloginResponse = client
         .post(
             "/api/account/prelogin",
             &PreloginRequest {
-                email: device.email.clone(),
+                email: account.email.clone(),
             },
         )
         .await?;
@@ -64,7 +66,6 @@ pub async fn run() -> anyhow::Result<()> {
 
     // The DEK didn't change — only its server-side wrap. Local secrets
     // file already holds the correct DEK + device token.
-    let _ = profile;
 
     println!("Password changed.");
     Ok(())

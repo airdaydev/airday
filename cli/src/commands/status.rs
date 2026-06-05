@@ -27,41 +27,41 @@ struct StatusJson<'a> {
 
 pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
-    let device = profile.read_device()?;
-    let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
-        .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
+    let config = profile.read_config()?;
 
-    // "Pending" = unacked local ops still in the outbox (captured but
-    // not yet acked by the server). Read straight from storage — no
-    // need to decrypt and rebuild the whole doc.
+    // Identity + sync cursor live in the db; "pending" = unacked local
+    // ops still in the outbox. Read straight from storage — no need to
+    // decrypt and rebuild the whole doc.
     let storage = crate::storage::open_storage(&profile)?;
+    let account = storage.read_account()?;
+    let cursor = storage.read_sync_cursor(account.primary_doc_id)?;
     let pending = !storage
-        .outbox(airday_core::DocId(doc_id))
+        .outbox(account.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
         .is_empty();
 
     if args.json {
         print_json(&StatusJson {
-            account_id: &device.account_id,
-            email: &device.email,
-            server_url: &device.server_url,
-            device_id: &device.device_id,
-            last_sync_at: device.last_sync_at,
-            last_acked_seq: device.last_acked_seq,
+            account_id: &account.account_id,
+            email: &account.email,
+            server_url: &config.server_url,
+            device_id: &account.device_id,
+            last_sync_at: cursor.last_sync_at,
+            last_acked_seq: cursor.last_acked_server_seq.0,
             pending_changes: pending,
         })?;
     } else {
-        println!("Account: {} ({})", device.email, device.account_id);
-        println!("Device:  {}", device.device_id);
-        println!("Server:  {}", device.server_url);
+        println!("Account: {} ({})", account.email, account.account_id);
+        println!("Device:  {}", account.device_id);
+        println!("Server:  {}", config.server_url);
         println!(
             "Last sync: {}",
-            device
+            cursor
                 .last_sync_at
                 .map(format_relative_millis)
                 .unwrap_or_else(|| "never".into())
         );
-        println!("Last acked seq: {}", device.last_acked_seq);
+        println!("Last acked seq: {}", cursor.last_acked_server_seq.0);
         println!("Pending changes: {}", if pending { "yes" } else { "no" });
     }
     Ok(())

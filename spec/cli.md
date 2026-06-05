@@ -41,8 +41,8 @@ Single binary `airday`. Subcommands:
 - `airday status` — server URL, account email, device id, last successful sync timestamp, `last_acked_seq`, pending-push op count. Read-only against local state; never opens a WS.
 
 ### Cache
-- `airday cache status` — profile directory and `loro.bin` size. Read-only; never opens a WS.
-- `airday cache clear [--force]` — delete `loro.bin` and reset `last_acked_seq` to 0; the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
+- `airday cache status` — profile directory and `airday.sqlite` size. Read-only; never opens a WS.
+- `airday cache clear [--force]` — truncate the doc cache (`ops` + `snapshots`) and reset the per-doc sync cursor to 0, **keeping** account identity (so it does not log you out); the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
 
 ### Export
 - `airday export-json [--out PATH]` — semantic account export: built-in/user lists plus items/status/timestamps as regular JSON. Defaults to stdout; `--out` writes a file. This is a portability dump, not a CRDT backup/restore format.
@@ -52,7 +52,7 @@ Single binary `airday`. Subcommands:
 
 ## Sync lifecycle
 
-CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists ls`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to `loro.bin` and ship on the next sync.
+CLI subcommands are one-shot and **offline by default**. Reads (`ls`, `status`, `lists ls`) and writes (`add`, `done`, `mv`, ...) operate against the local Loro doc only; mutations append to the `ops` table in `airday.sqlite` and ship on the next sync.
 
 To hit the network, pass `-s` / `--sync` on any command (or set `AIRDAY_SYNC=1`): open WS → version handshake → `PullOps { since_seq: last_acked_seq }` → apply → run the command → `PushOps` if anything changed → `Ack` → close. The dedicated `airday sync` command is the same path with no doc mutation.
 
@@ -60,18 +60,19 @@ A future TUI may hold the WS open while running and surface `OpsBroadcast` react
 
 ### Connect behaviour
 
-- Default: no network attempt. Local doc is authoritative. Mutations queue in `loro.bin`.
+- Default: no network attempt. Local doc is authoritative. Mutations queue in the `ops` table of `airday.sqlite`.
 - `-s` / `--sync` / `AIRDAY_SYNC=1`: attempt WS connect with a ~2s timeout. On failure (no network, captive portal, server down), fall back to local-only and print a one-line stderr warning: `offline — sync deferred (<reason>)`. The command still runs against the local doc.
 - `airday sync`: same connect attempt, but failure exits non-zero — there's no local work to fall back to.
 - `airday login` and `airday recover` always attempt an initial sync after writing the profile; failure is a soft warning (they've already provisioned the account, the user can `airday sync` later).
-- Pending local ops live in `loro.bin`; the next sync pushes them as part of `PushOps`.
+- Pending local ops live in the `ops` table of `airday.sqlite`; the next sync pushes them as part of `PushOps`.
 
 ## Local state
 
 Single account per install. One dir under XDG paths (`~/.local/share/airday/` on linux, equivalents elsewhere) — `logout` wipes it, signup/login re-creates it. Two side-by-side test accounts in dev: point `AIRDAY_DATA_DIR` at distinct roots.
 
-- `loro.bin` — local Loro doc snapshot, persisted on every commit
-- `device.toml` — `{ device_id, server_url, last_acked_seq, account_id, primary_doc_id, email }` — `primary_doc_id` is the server-assigned id of the account's Home doc, used to key local snapshot storage
+- `airday.sqlite` — doc cache (append-only `ops` + per-doc `snapshots`), the per-doc sync cursor (`docs.last_acked_server_seq` / `last_sync_at`), and the singleton `account` row (account/device/primary-doc ids + email). `primary_doc_id` is the server-assigned id of the account's Home doc, used to key local snapshot storage. See `spec/storage.md`.
+- `config.toml` — `{ server_url }`. Bootstrap input (needed before the db exists); operator-editable.
+- `secrets.toml` — `{ device_token, dek_hex }` in cleartext. Also the "logged in" marker: its presence is what `airday status`/commands gate on.
 
 Secrets in OS keychain (`security` on macOS, `libsecret` on linux):
 - `airday:<account_id>:token` — device auth token

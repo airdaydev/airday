@@ -5,7 +5,7 @@
 //! the local Loro doc via `session.doc()`, `flush()` at end. With sync
 //! requested, open does the WS handshake and initial pull through the
 //! engine; flush saves the doc snapshot, asks the engine to push
-//! pending ops, advances the device's per-account `last_acked_seq`.
+//! pending ops, advances the per-doc sync cursor in sqlite.
 //!
 //! Offline-by-default per `spec/cli.md`:
 //! - Default: no network. Mutations are persisted locally and ship on
@@ -16,17 +16,17 @@
 
 use std::time::Duration;
 
-use airday_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
+use airday_core::{Doc, DocId, EngineOptions, Event, ServerSeq, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use uuid::Uuid;
 
-use crate::config::{ConfigError, DeviceConfig, Profile};
+use crate::config::{ConfigError, Profile};
 use crate::keystore::{dek_from_hex, KeystoreError};
+use crate::storage::{SqliteStorage, SyncCursor};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -59,7 +59,14 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 /// One-shot per-command sync handle.
 pub struct Session {
     profile: Profile,
-    device: DeviceConfig,
+    server_url: String,
+    doc_id: DocId,
+    /// Dedicated handle for persisting the sync cursor. The engine owns
+    /// its own `SqliteStorage` (boxed in `SyncEngine`), so `Session`
+    /// keeps a second connection to the same WAL db for cursor writes.
+    store: SqliteStorage,
+    last_acked: u64,
+    last_sync_at: Option<i64>,
     engine: SyncEngine,
     ws: Option<WsStream>,
 }
@@ -77,22 +84,26 @@ impl Session {
     /// need to point the runtime at a tempdir without mutating
     /// process-global state (the `AIRDAY_DATA_DIR` env var).
     pub async fn open_with_profile(profile: Profile, sync: bool) -> Result<Self, SyncError> {
-        let device = profile.read_device()?;
-        let doc_id = Uuid::parse_str(&device.primary_doc_id)
-            .map_err(|e| SyncError::Engine(format!("invalid primary_doc_id: {e}")))?;
+        let config = profile.read_config()?;
         let secrets = profile.read_secrets()?;
         let dek = dek_from_hex(&secrets.dek_hex)?;
         // Boot the doc from the op log + snapshot. A fresh profile (no
         // snapshot yet) reconstructs an empty doc — the same healing
         // behaviour the old file-based `read_doc` NotFound branch had.
         let storage = crate::storage::open_storage(&profile)?;
-        let (doc, last_local) = crate::storage::boot_doc(&storage, &dek, DocId(doc_id))?;
+        let account = storage.read_account()?;
+        let doc_id = account.primary_doc_id;
+        let (doc, last_local) = crate::storage::boot_doc(&storage, &dek, doc_id)?;
+        let cursor = storage.read_sync_cursor(doc_id)?;
+        // Second handle for cursor persistence — `storage` is moved into
+        // the engine below.
+        let store = crate::storage::open_storage(&profile)?;
 
         let mut engine = SyncEngine::new(
             doc,
-            DocId(doc_id),
+            doc_id,
             dek,
-            device.last_acked_seq,
+            cursor.last_acked_server_seq.0,
             EngineOptions {
                 client_name: "airday-cli".into(),
                 client_version: env!("CARGO_PKG_VERSION").into(),
@@ -103,7 +114,11 @@ impl Session {
 
         let mut session = Session {
             profile,
-            device,
+            server_url: config.server_url,
+            doc_id,
+            store,
+            last_acked: cursor.last_acked_server_seq.0,
+            last_sync_at: cursor.last_sync_at,
             engine,
             ws: None,
         };
@@ -211,7 +226,7 @@ impl Session {
     }
 
     async fn connect(&self) -> Result<WsStream, SyncError> {
-        let url = ws_url(&self.device.server_url);
+        let url = ws_url(&self.server_url);
         let mut req = url
             .into_client_request()
             .map_err(|e| SyncError::Ws(e.to_string()))?;
@@ -241,11 +256,17 @@ impl Session {
         let contiguous = self.engine.last_contiguous_seq();
         self.engine.notify_wal_durable(contiguous);
         let acked = self.engine.last_durable_seq();
-        if acked > self.device.last_acked_seq {
-            self.device.last_acked_seq = acked;
+        if acked > self.last_acked {
+            self.last_acked = acked;
         }
-        self.device.last_sync_at = Some(now_millis());
-        self.profile.write_device(&self.device)?;
+        self.last_sync_at = Some(now_millis());
+        self.store.write_sync_cursor(
+            self.doc_id,
+            SyncCursor {
+                last_acked_server_seq: ServerSeq(self.last_acked),
+                last_sync_at: self.last_sync_at,
+            },
+        )?;
         Ok(())
     }
 }

@@ -8,8 +8,29 @@
 -- migration. See spec/sharing-plan.md.
 
 CREATE TABLE docs (
-  id          BLOB PRIMARY KEY,            -- uuid v7 bytes; matches server-side docs.id
-  created_at  INTEGER NOT NULL             -- unix seconds (unixepoch())
+  id                    BLOB PRIMARY KEY,    -- uuid v7 bytes; matches server-side docs.id
+  created_at            INTEGER NOT NULL,    -- unix seconds (unixepoch())
+  -- Per-doc sync cursor. `last_acked_server_seq` is the highest
+  -- server_seq this device has pulled+applied; it's persisted here
+  -- (rather than derived from MAX(ops.server_seq)) so it survives
+  -- compaction pruning the very ops it was derived from. `last_sync_at`
+  -- is unix millis of the last successful online flush; NULL = never.
+  last_acked_server_seq INTEGER NOT NULL DEFAULT 0,
+  last_sync_at          INTEGER
+);
+
+-- Singleton (id pinned to 1): the account + device identity this
+-- install is logged in as. Server-assigned, written once at
+-- signup/login/recover. `primary_doc_id` is the Home doc's uuid bytes
+-- (matches docs.id). Lives in the db rather than a config file so
+-- identity and the doc cache share one transactional store; the
+-- presence of `secrets.toml` (not this row) is the "logged in" marker.
+CREATE TABLE account (
+  id             INTEGER PRIMARY KEY CHECK (id = 1),
+  account_id     TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  device_id      TEXT NOT NULL,
+  primary_doc_id BLOB NOT NULL
 );
 
 CREATE TABLE ops (

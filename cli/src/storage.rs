@@ -27,6 +27,28 @@ use crate::db::{self, DbError};
 
 const LEGACY_DOC_FILE: &str = "loro.bin";
 
+/// The account + device identity this install is logged in as. Persisted
+/// as the singleton `account` row (see `001_init.sql`); written once at
+/// signup/login/recover, read by every command that needs identity.
+#[derive(Debug, Clone)]
+pub struct Account {
+    pub account_id: String,
+    pub email: String,
+    pub device_id: String,
+    /// The account's primary (Home) doc. Server-assigned at signup.
+    pub primary_doc_id: DocId,
+}
+
+/// Per-doc sync cursor (the `last_acked_server_seq` / `last_sync_at`
+/// columns on `docs`). `last_acked_server_seq` is the highest server_seq
+/// pulled+applied — the pull cursor for the next sync. `last_sync_at` is
+/// unix millis of the last successful online flush (`None` = never).
+#[derive(Debug, Clone, Copy)]
+pub struct SyncCursor {
+    pub last_acked_server_seq: ServerSeq,
+    pub last_sync_at: Option<i64>,
+}
+
 /// Native `LocalStorage` over a per-profile sqlite file.
 pub struct SqliteStorage {
     conn: Mutex<Connection>,
@@ -41,6 +63,120 @@ impl SqliteStorage {
         })
     }
 
+    /// Read the singleton account row. Errors if no account is enrolled
+    /// (callers gate on `Profile::require_active` first, so a missing row
+    /// means a corrupt/half-written profile).
+    pub fn read_account(&self) -> Result<Account, StorageError> {
+        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        let row = conn
+            .query_row(
+                "SELECT account_id, email, device_id, primary_doc_id FROM account WHERE id = 1",
+                [],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                        r.get::<_, Vec<u8>>(3)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(backend)?;
+        let (account_id, email, device_id, doc_bytes) =
+            row.ok_or_else(|| StorageError::Backend("account row missing".into()))?;
+        Ok(Account {
+            account_id,
+            email,
+            device_id,
+            primary_doc_id: DocId(uuid_from_slice(&doc_bytes)?),
+        })
+    }
+
+    /// Upsert the singleton account row.
+    pub fn write_account(&self, account: &Account) -> Result<(), StorageError> {
+        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        conn.execute(
+            "INSERT INTO account (id, account_id, email, device_id, primary_doc_id)
+             VALUES (1, ?1, ?2, ?3, ?4)
+             ON CONFLICT(id) DO UPDATE SET
+               account_id     = excluded.account_id,
+               email          = excluded.email,
+               device_id      = excluded.device_id,
+               primary_doc_id = excluded.primary_doc_id",
+            params![
+                account.account_id,
+                account.email,
+                account.device_id,
+                account.primary_doc_id.0.as_bytes().to_vec(),
+            ],
+        )
+        .map_err(backend)?;
+        Ok(())
+    }
+
+    /// Read the per-doc sync cursor. Returns the zero cursor for a doc
+    /// with no row yet.
+    pub fn read_sync_cursor(&self, doc_id: DocId) -> Result<SyncCursor, StorageError> {
+        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        let id = doc_id.0.as_bytes().to_vec();
+        let row = conn
+            .query_row(
+                "SELECT last_acked_server_seq, last_sync_at FROM docs WHERE id = ?1",
+                [&id],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<i64>>(1)?)),
+            )
+            .optional()
+            .map_err(backend)?;
+        Ok(match row {
+            Some((acked, at)) => SyncCursor {
+                last_acked_server_seq: ServerSeq(acked as u64),
+                last_sync_at: at,
+            },
+            None => SyncCursor {
+                last_acked_server_seq: ServerSeq(0),
+                last_sync_at: None,
+            },
+        })
+    }
+
+    /// Persist the per-doc sync cursor (creating the `docs` row if the
+    /// first write lands before any op).
+    pub fn write_sync_cursor(&self, doc_id: DocId, cursor: SyncCursor) -> Result<(), StorageError> {
+        let conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        let id = doc_id.0.as_bytes().to_vec();
+        ensure_doc(&conn, &id)?;
+        conn.execute(
+            "UPDATE docs SET last_acked_server_seq = ?2, last_sync_at = ?3 WHERE id = ?1",
+            params![
+                id,
+                cursor.last_acked_server_seq.0 as i64,
+                cursor.last_sync_at
+            ],
+        )
+        .map_err(backend)?;
+        Ok(())
+    }
+
+    /// Drop the doc cache (ops + snapshot) and reset the sync cursor,
+    /// keeping account identity. Backs `airday cache clear`: the next
+    /// sync rehydrates from server_seq 0.
+    pub fn clear_cache(&self, doc_id: DocId) -> Result<(), StorageError> {
+        let mut conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
+        let id = doc_id.0.as_bytes().to_vec();
+        let tx = conn.transaction().map_err(backend)?;
+        tx.execute("DELETE FROM ops WHERE doc_id = ?1", [&id])
+            .map_err(backend)?;
+        tx.execute("DELETE FROM snapshots WHERE doc_id = ?1", [&id])
+            .map_err(backend)?;
+        tx.execute(
+            "UPDATE docs SET last_acked_server_seq = 0, last_sync_at = NULL WHERE id = ?1",
+            [&id],
+        )
+        .map_err(backend)?;
+        tx.commit().map_err(backend)?;
+        Ok(())
+    }
 }
 
 impl LocalStorage for SqliteStorage {
@@ -83,13 +219,18 @@ impl LocalStorage for SqliteStorage {
         };
 
         let last_local_seq = LocalSeq(max_local_seq(&conn, &id)?);
+        // Read the persisted cursor, not `MAX(ops.server_seq)` — the
+        // latter underestimates once compaction prunes the acked ops it
+        // was derived from. See `docs.last_acked_server_seq`.
         let last_acked: i64 = conn
             .query_row(
-                "SELECT COALESCE(MAX(server_seq), 0) FROM ops WHERE doc_id = ?1",
+                "SELECT COALESCE(last_acked_server_seq, 0) FROM docs WHERE id = ?1",
                 [&id],
                 |r| r.get(0),
             )
-            .map_err(backend)?;
+            .optional()
+            .map_err(backend)?
+            .unwrap_or(0);
 
         Ok(BootState {
             snapshot,

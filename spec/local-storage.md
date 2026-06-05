@@ -33,8 +33,10 @@ The engine sees a single `LocalStorage` trait; the CLI binds a native sqlite han
 
 ```sql
 CREATE TABLE docs (
-  id           BLOB PRIMARY KEY,                  -- uuid v7, matches server-side docs.id
-  created_at   INTEGER NOT NULL
+  id                    BLOB PRIMARY KEY,          -- uuid v7, matches server-side docs.id
+  created_at            INTEGER NOT NULL,
+  last_acked_server_seq INTEGER NOT NULL DEFAULT 0, -- per-doc pull cursor; persisted, not derived (survives compaction)
+  last_sync_at          INTEGER                    -- unix millis of last successful flush; NULL = never
 );
 
 CREATE TABLE ops (
@@ -57,6 +59,18 @@ CREATE TABLE snapshots (
   payload_nonce     BLOB    NOT NULL,
   created_at        INTEGER NOT NULL
 );
+
+-- CLI-only: singleton (id pinned to 1) account/device identity. Not part
+-- of the shared doc-storage model — web holds identity elsewhere — but it
+-- lives in the same db on the CLI so identity and the doc cache share one
+-- transactional store. See spec/cli.md "Local state".
+CREATE TABLE account (
+  id             INTEGER PRIMARY KEY CHECK (id = 1),
+  account_id     TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  device_id      TEXT NOT NULL,
+  primary_doc_id BLOB NOT NULL                    -- uuid bytes; matches docs.id
+);
 ```
 
 Notes:
@@ -65,6 +79,7 @@ Notes:
 - `client_op_id` is the idempotency key on the wire. Server keeps a recent-ids dedupe window so a retried upload after a crash maps to the existing server-side row instead of creating a duplicate.
 - `server_seq` here is **the same `seq`** that the server's `ops` table assigns. On the local row it is `NULL` until the corresponding ack arrives.
 - One snapshot row per doc — `INSERT OR REPLACE` on each new snapshot. There's no need for the M=2 retention the server uses (no concurrent bootstrap reader to protect).
+- `docs.last_acked_server_seq` is the **persisted** pull cursor — the highest `server_seq` applied. It is *not* derived from `MAX(ops.server_seq)`, which would underestimate once compaction prunes the acked ops it was read from.
 
 ## Origin invariants
 
@@ -91,7 +106,7 @@ Remote frame:
 
 1. Decrypt and apply the frame to the live Loro doc (this is what the engine does today regardless of persistence).
 2. `INSERT INTO ops (doc_id, local_seq, client_op_id=NULL, server_seq, payload, payload_nonce, created_at)` — the encrypted bytes are the ones the server sent, stored verbatim.
-3. Advance `last_acked_seq` on the device row once the contiguous-prefix invariant allows it (see `spec/sync-protocol.md`).
+3. Advance `docs.last_acked_server_seq` (the per-doc pull cursor) once the contiguous-prefix invariant allows it (see `spec/sync-protocol.md`).
 
 Wire batching is a separate concern: the WS layer **may** pack multiple rows into one frame for throughput. Each row keeps its own `client_op_id` and gets its own `server_seq` in the ack. The storage layer does not know about batching.
 
@@ -156,7 +171,7 @@ Pending rows (`server_seq IS NULL`) are never compacted. An offline client accum
 - **Crash during local append**: the row is either fully committed in sqlite or not — sqlite transaction guarantees. No torn rows.
 - **Crash between append and send**: row exists with `server_seq IS NULL`. On boot, outbox drain re-sends it. Server dedupes by `client_op_id`.
 - **Crash between send and ack**: row exists with `server_seq IS NULL`; server may already have it. On boot, outbox drain re-sends; server's recent-ids window maps the retry to the existing server row and returns the original `server_seq` in the ack.
-- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The engine's `last_acked_seq` advance happens in the same transaction, so the contiguous-prefix invariant holds.
+- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a separate write (`flush`), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. (A future tightening could fold the cursor advance into the op-insert transaction via a `LocalStorage` trait change shared with web.)
 - **Crash during snapshot**: the snapshot + the ops DELETE are one transaction; either both land or neither. Pre-snapshot ops survive in full if the transaction aborted, so replay still works from the previous snapshot row (or pure-WAL if there wasn't one).
 
 ## Design constraints

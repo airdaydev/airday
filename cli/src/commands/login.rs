@@ -5,9 +5,10 @@ use airday_protocol::{
 use clap::Parser;
 use dialoguer::{Input, Password};
 
-use crate::config::{DeviceConfig, Profile, Secrets};
+use crate::config::{Config, Profile, Secrets};
 use crate::keystore::{dek_to_hex, derive_master};
 use crate::net::Client;
+use crate::storage::Account;
 use crate::sync::Session;
 
 use super::{default_device_name, default_server};
@@ -85,28 +86,25 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let profile = Profile::create()?;
     let primary_doc_uuid = uuid::Uuid::parse_str(&resp.primary_doc_id)
         .map_err(|e| anyhow::anyhow!("server returned malformed primary_doc_id: {e}"))?;
-    profile.write_device(&DeviceConfig {
+    let doc_id = airday_core::DocId(primary_doc_uuid);
+    // Empty doc baseline; the initial sync below pulls from seq 0,
+    // applies device-1's seed + history, and we converge. secrets.toml
+    // is written last — it's the "logged in" marker.
+    let storage = crate::storage::open_storage(&profile)?;
+    crate::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::empty())?;
+    storage.write_account(&Account {
         account_id: resp.account_id.clone(),
-        primary_doc_id: resp.primary_doc_id.clone(),
         email,
-        server_url: args.server,
         device_id: device.device_id,
-        last_acked_seq: 0,
-        last_sync_at: None,
+        primary_doc_id: doc_id,
+    })?;
+    profile.write_config(&Config {
+        server_url: args.server,
     })?;
     profile.write_secrets(&Secrets {
         device_token: device.device_token,
         dek_hex: dek_to_hex(&dek),
     })?;
-    // Empty doc baseline; the initial sync below pulls from seq 0,
-    // applies device-1's seed + history, and we converge.
-    let storage = crate::storage::open_storage(&profile)?;
-    crate::storage::seed_snapshot(
-        &storage,
-        &dek,
-        airday_core::DocId(primary_doc_uuid),
-        &Doc::empty(),
-    )?;
 
     println!("Syncing…");
     let session = Session::open(true).await?;

@@ -13,8 +13,9 @@
 use std::time::Duration;
 
 use airday_cli::commands::export::write_export;
-use airday_cli::config::{DeviceConfig, Profile, Secrets};
+use airday_cli::config::{Config, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
+use airday_cli::storage::Account;
 use airday_cli::sync::Session;
 use airday_core::{Dek, Doc, LIST_MAIN};
 use airday_server::sync::queries;
@@ -148,32 +149,29 @@ async fn default_open_skips_connect() {
     let profile = Profile::new(tmp.path().to_path_buf());
     let fake_account = Uuid::now_v7().to_string();
     let fake_doc_uuid = Uuid::now_v7();
-    profile
-        .write_device(&DeviceConfig {
+    let doc_id = airday_core::DocId(fake_doc_uuid);
+    let dek = Dek::generate();
+    let storage = airday_cli::storage::open_storage(&profile).unwrap();
+    airday_cli::storage::seed_snapshot(&storage, &dek, doc_id, &Doc::new().unwrap()).unwrap();
+    storage
+        .write_account(&Account {
             account_id: fake_account.clone(),
-            primary_doc_id: fake_doc_uuid.to_string(),
             email: "offline@example.com".into(),
-            server_url: "http://127.0.0.1:1".into(), // guaranteed unreachable
             device_id: Uuid::now_v7().to_string(),
-            last_acked_seq: 0,
-            last_sync_at: None,
+            primary_doc_id: doc_id,
         })
         .unwrap();
-    let dek = Dek::generate();
+    profile
+        .write_config(&Config {
+            server_url: "http://127.0.0.1:1".into(), // guaranteed unreachable
+        })
+        .unwrap();
     profile
         .write_secrets(&Secrets {
             device_token: "deadbeef".repeat(8),
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    let storage = airday_cli::storage::open_storage(&profile).unwrap();
-    airday_cli::storage::seed_snapshot(
-        &storage,
-        &dek,
-        airday_core::DocId(fake_doc_uuid),
-        &Doc::new().unwrap(),
-    )
-    .unwrap();
 
     // Without --sync the open call is fast — no 2s timeout penalty.
     let started = std::time::Instant::now();
@@ -227,15 +225,19 @@ async fn second_device_observes_first_devices_items_via_pull() {
     let tmp_b = tempfile::tempdir().unwrap();
     let profile_b = Profile::new(tmp_b.path().to_path_buf());
     let primary_doc_uuid = Uuid::parse_str(&signup.primary_doc_id).unwrap();
-    profile_b
-        .write_device(&DeviceConfig {
+    let doc_id_b = airday_core::DocId(primary_doc_uuid);
+    let storage_b = airday_cli::storage::open_storage(&profile_b).unwrap();
+    storage_b
+        .write_account(&Account {
             account_id: signup.account_id.clone(),
-            primary_doc_id: signup.primary_doc_id.clone(),
             email: "smoke-test@example.com".into(),
-            server_url: server.base.clone(),
             device_id: device_b.device_id.clone(),
-            last_acked_seq: 0,
-            last_sync_at: None,
+            primary_doc_id: doc_id_b,
+        })
+        .unwrap();
+    profile_b
+        .write_config(&Config {
+            server_url: server.base.clone(),
         })
         .unwrap();
     profile_b
@@ -244,14 +246,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
             dek_hex: dek_to_hex(&dek),
         })
         .unwrap();
-    let storage_b = airday_cli::storage::open_storage(&profile_b).unwrap();
-    airday_cli::storage::seed_snapshot(
-        &storage_b,
-        &dek,
-        airday_core::DocId(primary_doc_uuid),
-        &Doc::empty(),
-    )
-    .unwrap();
+    airday_cli::storage::seed_snapshot(&storage_b, &dek, doc_id_b, &Doc::empty()).unwrap();
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();

@@ -1,16 +1,18 @@
-//! Per-account on-disk state.
+//! Per-account on-disk config + secrets.
 //!
-//! `device.toml` carries the public-ish state (account id, server URL,
-//! device id, last_acked_seq). `secrets.toml` holds the device token
-//! and DEK in cleartext. When keychain-backed storage lands,
-//! `secrets.toml` becomes a fallback for non-keychain hosts.
+//! `config.toml` holds operator-facing config (currently just
+//! `server_url`). `secrets.toml` holds the device token and DEK in
+//! cleartext, and doubles as the "logged in" marker. Account identity
+//! (account/device/doc ids, email) and the sync cursor live in the
+//! sqlite db (`crate::storage`), not here. When keychain-backed storage
+//! lands, `secrets.toml` becomes a fallback for non-keychain hosts.
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 const ROOT_DIR: &str = "airday";
-const DEVICE_FILE: &str = "device.toml";
+const CONFIG_FILE: &str = "config.toml";
 const SECRETS_FILE: &str = "secrets.toml";
 const DOC_DB_FILE: &str = "airday.sqlite";
 
@@ -29,24 +31,11 @@ pub enum ConfigError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceConfig {
-    pub account_id: String,
-    /// The account's primary (Home) doc id — uuid string. Server-generated
-    /// at signup, returned in signup/login/password-reset responses, and
-    /// persisted here so local storage can key snapshots on the real
-    /// doc id instead of a hardcoded placeholder.
-    pub primary_doc_id: String,
-    pub email: String,
+pub struct Config {
+    /// Base URL of the server this install talks to. Bootstrap input
+    /// (needed before any local db exists), so it lives in a file rather
+    /// than the sqlite db.
     pub server_url: String,
-    pub device_id: String,
-    /// Sync engine's contiguous-prefix frontier; bumped after every
-    /// applied op.
-    #[serde(default)]
-    pub last_acked_seq: u64,
-    /// Unix millis of the last successful online flush. `None` means
-    /// no online flush has ever completed for this device.
-    #[serde(default)]
-    pub last_sync_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,9 +49,9 @@ pub struct Secrets {
 /// Top-level on-disk handle. Path layout under the root dir (system
 /// default `<data>/airday/`, or `AIRDAY_DATA_DIR` if set):
 /// ```text
-///   <root>/device.toml
-///   <root>/secrets.toml
-///   <root>/airday.sqlite
+///   <root>/config.toml    — server_url
+///   <root>/secrets.toml   — device token + DEK ("logged in" marker)
+///   <root>/airday.sqlite  — doc cache + account identity + sync cursor
 /// ```
 pub struct Profile {
     pub dir: PathBuf,
@@ -75,12 +64,13 @@ impl Profile {
 
     /// The single per-install profile, if one is logged in. Airday is
     /// single-human-user (see product thesis); one account at a time,
-    /// no profile switching, so "active" collapses to "does the
-    /// device file exist?". Run two accounts side-by-side in dev by
-    /// pointing `AIRDAY_DATA_DIR` at distinct roots.
+    /// no profile switching, so "active" collapses to "do we hold device
+    /// credentials?" — i.e. does `secrets.toml` exist. Run two accounts
+    /// side-by-side in dev by pointing `AIRDAY_DATA_DIR` at distinct
+    /// roots.
     pub fn active() -> Result<Option<Self>, ConfigError> {
         let dir = root_dir()?;
-        if !dir.join(DEVICE_FILE).exists() {
+        if !dir.join(SECRETS_FILE).exists() {
             return Ok(None);
         }
         Ok(Some(Self::new(dir)))
@@ -97,12 +87,12 @@ impl Profile {
         Ok(Self::new(dir))
     }
 
-    pub fn write_device(&self, cfg: &DeviceConfig) -> Result<(), ConfigError> {
-        write_toml(&self.dir.join(DEVICE_FILE), cfg, 0o600)
+    pub fn write_config(&self, cfg: &Config) -> Result<(), ConfigError> {
+        write_toml(&self.dir.join(CONFIG_FILE), cfg, 0o600)
     }
 
-    pub fn read_device(&self) -> Result<DeviceConfig, ConfigError> {
-        read_toml(&self.dir.join(DEVICE_FILE))
+    pub fn read_config(&self) -> Result<Config, ConfigError> {
+        read_toml(&self.dir.join(CONFIG_FILE))
     }
 
     pub fn write_secrets(&self, secrets: &Secrets) -> Result<(), ConfigError> {
@@ -115,7 +105,7 @@ impl Profile {
 
     /// Path to the per-profile sqlite file. The doc itself is persisted
     /// through `crate::storage::SqliteStorage` (opened against this
-    /// path); `Profile` only owns the TOML device/secrets files and the
+    /// path); `Profile` only owns the TOML config/secrets files and the
     /// directory layout.
     pub fn doc_path(&self) -> PathBuf {
         self.dir.join(DOC_DB_FILE)

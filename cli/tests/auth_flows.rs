@@ -181,9 +181,11 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
     session_b.flush().await.unwrap();
 
     let profile_b = reopen_profile(tmp_b.path());
-    let device = profile_b.read_device().unwrap();
+    let storage = airday_cli::storage::open_storage(&profile_b).unwrap();
+    let account = storage.read_account().unwrap();
+    let cursor = storage.read_sync_cursor(account.primary_doc_id).unwrap();
     assert!(
-        device.last_acked_seq > 0,
+        cursor.last_acked_server_seq.0 > 0,
         "recovered device should sync history"
     );
 }

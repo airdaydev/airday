@@ -72,23 +72,20 @@ async fn status(json: bool) -> anyhow::Result<()> {
 
 async fn clear(force: bool) -> anyhow::Result<()> {
     let profile = Profile::require_active()?;
-    let doc_path = profile.doc_path();
+
+    // The doc cache (ops + snapshot) and sync cursor live in the sqlite
+    // db; account identity lives there too, so we truncate the cache
+    // tables rather than unlink the file — clearing the cache must not
+    // log the user out.
+    let storage = crate::storage::open_storage(&profile)?;
+    let account = storage.read_account()?;
+    let doc_id = account.primary_doc_id;
 
     // Unacked local ops in the outbox would be lost by a cache wipe.
-    // Scope the storage handle so its sqlite connection is dropped
-    // before we unlink the file below.
-    let pending = if doc_path.exists() {
-        let device = profile.read_device()?;
-        let doc_id = uuid::Uuid::parse_str(&device.primary_doc_id)
-            .map_err(|e| anyhow::anyhow!("device config has malformed primary_doc_id: {e}"))?;
-        let storage = crate::storage::open_storage(&profile)?;
-        !storage
-            .outbox(airday_core::DocId(doc_id))
-            .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
-            .is_empty()
-    } else {
-        false
-    };
+    let pending = !storage
+        .outbox(doc_id)
+        .map_err(|e| anyhow::anyhow!("read outbox: {e}"))?
+        .is_empty();
 
     if pending && !force {
         if !std::io::stdin().is_terminal() {
@@ -106,26 +103,7 @@ async fn clear(force: bool) -> anyhow::Result<()> {
         }
     }
 
-    if doc_path.exists() {
-        // Nuke the sqlite db file and its WAL/shm sidecars. The next
-        // sync rehydrates from the server. If `read_doc` above already
-        // opened a connection, it stays alive against the unlinked
-        // inode until the profile drops — harmless on unix.
-        std::fs::remove_file(&doc_path)?;
-        for suffix in ["-wal", "-shm"] {
-            let sidecar = doc_path.with_file_name(format!(
-                "{}{suffix}",
-                doc_path.file_name().unwrap().to_string_lossy()
-            ));
-            let _ = std::fs::remove_file(sidecar);
-        }
-    }
-
-    let mut device = profile.read_device()?;
-    if device.last_acked_seq != 0 {
-        device.last_acked_seq = 0;
-        profile.write_device(&device)?;
-    }
+    storage.clear_cache(doc_id)?;
 
     println!("Cache cleared. Run `airday sync` to rehydrate.");
     Ok(())
