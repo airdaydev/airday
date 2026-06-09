@@ -28,10 +28,10 @@ export function App() {
     document.documentElement.lang = locale();
     document.documentElement.dir = direction();
   });
-  // `undefined` = vault probe still in flight; once it resolves we
-  // either restore the persisted session or auto-mint a fresh
-  // anonymous one — `session()` is never null after that point.
-  const [session, setSession] = createSignal<Session | undefined>(undefined);
+  // `null` = vault probe still in flight; once it resolves we either
+  // restore the persisted session or auto-mint a fresh anonymous one —
+  // `session()` is never null after that point.
+  const [session, setSession] = createSignal<Session | null>(null);
   const [online, setOnline] = createSignal(false);
   // Wall-clock timestamp of the last successful server frame (recv or
   // outbox flush). Reset on logout/session-swap so the new account
@@ -103,7 +103,7 @@ export function App() {
 
   return (
     <Show
-      when={session() !== undefined}
+      when={session() !== null}
       fallback={<div class="empty">{m().common.loading}</div>}
     >
       <Show keyed when={session()}>
