@@ -252,7 +252,6 @@ function BootGate(props: {
       // Storage is mandatory now (the engine has no storage-less mode):
       // a failure to open IDB or rebuild the doc is fatal. Surface it
       // rather than booting a broken engine.
-      // eslint-disable-next-line no-console
       console.error("[boot] FAILED:", e);
       props.setBootError(e instanceof Error ? e.message : String(e));
     }
@@ -353,7 +352,6 @@ function MainApp(props: {
     try {
       engine.captureLocalOps();
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("captureLocalOps failed:", e);
     }
   };
@@ -361,7 +359,6 @@ function MainApp(props: {
     try {
       engine.snapshotIfFullySynced();
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("snapshotIfFullySynced failed:", e);
     }
   };
@@ -396,7 +393,6 @@ function MainApp(props: {
         bridge?.pumpOutbox();
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
         console.error("durable flush failed:", e);
       });
   };
@@ -455,7 +451,6 @@ function MainApp(props: {
     deviceTimer = setTimeout(() => {
       deviceTimer = null;
       void persistDeviceNow().catch((e) => {
-        // eslint-disable-next-line no-console
         console.error("device save failed:", e);
       });
     }, 500);
@@ -483,7 +478,6 @@ function MainApp(props: {
         void savePrefs(props.session.accountId, {
           currentView: view(),
         }).catch((e) => {
-          // eslint-disable-next-line no-console
           console.error("prefs save failed:", e);
         });
       },
@@ -512,7 +506,6 @@ function MainApp(props: {
         if (props.session.anonymous) engine.forceSnapshot();
         else engine.snapshotIfFullySynced();
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("snapshot on hide failed:", e);
       }
       void persistDeviceNow().catch(() => {});

@@ -65,7 +65,6 @@ export class DekVault {
       const db = await openAirdayDb();
       rec = await idbGet<VaultRecord>(db, STORE_VAULT, KEY);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn("DekVault.load: idb open/read failed:", e);
       return null;
     }
@@ -100,7 +99,6 @@ export class DekVault {
     } catch (e) {
       // Corrupt or tampered record — drop it so the next login can
       // write a fresh one.
-      // eslint-disable-next-line no-console
       console.warn("DekVault.load: unwrap failed, clearing:", e);
       await this.clear();
       return null;
@@ -141,7 +139,6 @@ export class DekVault {
       const db = await openAirdayDb();
       await idbDelete(db, STORE_VAULT, KEY);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn("DekVault.clear: idb delete failed:", e);
     }
   }

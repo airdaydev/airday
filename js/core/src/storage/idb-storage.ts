@@ -326,7 +326,6 @@ export class IdbStorage {
           }),
       )
       .catch((e) => {
-        // eslint-disable-next-line no-console
         console.error("[idb-storage] flush failed:", e);
       });
   }

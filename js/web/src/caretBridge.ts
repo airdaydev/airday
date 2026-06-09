@@ -171,7 +171,6 @@ function measureTextareaCaret(
     "paddingLeft",
   ] as const;
   for (const p of copyProps) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (mirror.style as any)[p] = (cs as any)[p];
   }
   mirror.style.position = "absolute";
@@ -279,7 +278,6 @@ function caretPositionFromPoint(
   y: number,
 ): { offsetNode: Node; offset: number } | null {
   // Standard API; widely supported in modern browsers.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc = document as any;
   if (typeof doc.caretPositionFromPoint === "function") {
     return doc.caretPositionFromPoint(x, y);
