@@ -7,7 +7,14 @@
 // sync, so peer ops apply live. Anonymous sessions run the same engine
 // but never ship ops to a server.
 
-import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
 import { IdbStorage, putDevice } from "@airday/core";
 import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
@@ -202,7 +209,7 @@ function BootGate(props: {
   // anonymous docs with an empty store — start from `Doc.create()` so
   // the seeded built-ins land; authed devices with an empty store start
   // empty and let sync deliver a snapshot.
-  void (async () => {
+  onMount(async () => {
     try {
       // Prefs are independent of the op-log replay — fire in parallel so
       // they don't add a serial roundtrip to first paint. A miss (first
@@ -255,7 +262,7 @@ function BootGate(props: {
       console.error("[boot] FAILED:", e);
       props.setBootError(e instanceof Error ? e.message : String(e));
     }
-  })();
+  });
 
   return (
     <Show
