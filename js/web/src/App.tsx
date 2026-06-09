@@ -43,7 +43,7 @@ export function App() {
   // failure if it isn't); for anonymous records, the local IndexedDB
   // op log is the source of truth. If there's no record at all, mint a
   // fresh anonymous session so the user lands directly in the app.
-  void (async () => {
+  onMount(async () => {
     try {
       const v = await dekVault.load();
       if (v) {
@@ -62,7 +62,7 @@ export function App() {
       console.warn("vault load failed:", e);
     }
     setSession(await createAnonymousSession());
-  })();
+  });
 
   // Logout: tear down server-side state and replace the session with
   // a fresh anonymous one. Anonymous sessions also flow through here
@@ -227,9 +227,7 @@ function BootGate(props: {
         prefs: await prefsPromise,
       });
     } catch (e) {
-      // Storage is mandatory now (the engine has no storage-less mode):
-      // a failure to open IDB or rebuild the doc is fatal. Surface it
-      // rather than booting a broken engine.
+      // Hard fail & surfaces idb boot errors
       console.error("[boot] FAILED:", e);
       props.setBootError(e instanceof Error ? e.message : String(e));
     }
