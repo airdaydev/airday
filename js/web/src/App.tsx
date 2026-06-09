@@ -7,27 +7,16 @@
 // sync, so peer ops apply live. Anonymous sessions run the same engine
 // but never ship ops to a server.
 
-import {
-  createEffect,
-  createSignal,
-  on,
-  onCleanup,
-  onMount,
-  Show,
-} from "solid-js";
-import { Dek, Doc, EncryptedBlob, SyncEngine } from "@airday/core/wasm";
-import { IdbStorage, putDevice } from "@airday/core";
-import { loadPrefs, savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
+import { createEffect, createSignal, onMount, Show } from "solid-js";
+import { Dek, Doc, EncryptedBlob } from "@airday/core/wasm";
+import { IdbStorage } from "@airday/core";
+import { loadPrefs } from "./prefs.ts";
 import { api } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { type Session } from "./Login.tsx";
-import { createSyncedApp } from "./sync/store.ts";
-import { createSyncBridge, SyncBridge } from "./sync/sync.ts";
 import { Workspace } from "./Workspace.tsx";
-
-const CLIENT_NAME = "airday-web";
-const CLIENT_VERSION = "0.1.0";
+import { createWorkspaceRuntime, type BootInfo } from "./workspaceRuntime.ts";
 
 export function App() {
   const { m, locale, direction } = useAppI18n();
@@ -167,25 +156,6 @@ async function createAnonymousSession(): Promise<Session> {
   return session;
 }
 
-type BootInfo = {
-  doc: Doc;
-  lastAcked: bigint;
-  /** Engine op-log store (IndexedDB `airday-engine`). Mandatory — the
-   *  engine has no storage-less mode; if IDB can't be opened the boot
-   *  fails hard (see `BootGate`) rather than running without local
-   *  persistence. */
-  storage: IdbStorage;
-  /** Highest `localSeq` the store has assigned — seeds the engine. */
-  lastLocalSeq: number;
-  /** True when the doc was freshly created (`Doc.create()`) and its
-   *  seeded built-ins still need an initial `captureLocalOps`. */
-  seeded: boolean;
-  /** Whatever was in the `prefs` store for this account at boot. Null
-   *  if the row was missing (first run for this account on this
-   *  device). `MainApp` consumes the fields it cares about. */
-  prefs: Prefs | null;
-};
-
 function BootGate(props: {
   session: Session;
   boot: BootInfo | null;
@@ -297,231 +267,12 @@ function MainApp(props: {
   logout: () => void;
   onSession: (s: Session) => void;
 }) {
-  const storage = props.boot.storage;
-  // `SyncEngine` consumes its Dek argument, and the session-level Dek
-  // must stay valid across MainApp remounts (anonymous → authed swap
-  // remounts this whole tree on the Session key). So clone for the
-  // engine; the original on `props.session.dek` is untouched. The
-  // `IdbStorage` mirror is handed in as the engine's `EngineStorage` —
-  // capture / ack / remote-apply now flow through it.
-  const engine = new SyncEngine(
-    props.boot.doc,
-    props.session.primaryDocId,
-    props.session.dek.clone(),
-    props.boot.lastAcked,
-    CLIENT_NAME,
-    CLIENT_VERSION,
-    storage,
-  );
-  // Seed the engine's `localSeq` cursor from what the store loaded so
-  // new appends continue past the persisted log.
-  engine.setLastLocalSeq(props.boot.lastLocalSeq);
-  const app = createSyncedApp(engine);
-
-  if (import.meta.env.DEV) {
-    (window as unknown as { __app: typeof app }).__app = app;
-    onCleanup(() => {
-      delete (window as unknown as { __app?: typeof app }).__app;
-    });
-  }
-
-  // Workspace view lives at this level so the prefs-save effect
-  // below can persist it independently of the device-frontier write.
-  // Seed from the prefs row; a `kind:"list"` pointing at a
-  // since-deleted list falls back to Home silently. `done`/`bin` are
-  // global views and always resolvable.
-  const initialView: ViewKey = (() => {
-    const v = props.boot.prefs?.currentView;
-    if (!v) return { kind: "list", id: "main" };
-    if (v.kind === "list" && !app.state.listsById[v.id]) {
-      return { kind: "list", id: "main" };
-    }
-    return v;
-  })();
-  const [view, setView] = createSignal<ViewKey>(initialView);
-
-  // ---------- Engine op-log persistence (IdbStorage) ----------
-  //
-  // The engine's `LocalStorage` trait does the heavy lifting now: local
-  // commits become durable op rows via `captureLocalOps`, remote ops are
-  // mirrored inside `handleServerBytes`, and the outbox drives the push.
-  // The web host's job is just the CLI's `persist_engine_state` rhythm,
-  // adapted for IDB's async durability:
-  //
-  //   - `capture()` (before every `flush()`) writes the just-committed
-  //     mutation to a durable op row *before* the outbox-driven push
-  //     reads it. This must precede `engine.flush()`.
-  //   - `compact()` folds a fully-synced log into a fresh snapshot.
-  //   - `scheduleDurable()` samples the contiguous seq, waits for the
-  //     IDB write to actually land, then tells the engine the bytes are
-  //     durable (which queues the `Ack`) and pumps it onto the wire.
-  const capture = (): void => {
-    try {
-      engine.captureLocalOps();
-    } catch (e) {
-      console.error("captureLocalOps failed:", e);
-    }
-  };
-  const compact = (): void => {
-    try {
-      engine.snapshotIfFullySynced();
-    } catch (e) {
-      console.error("snapshotIfFullySynced failed:", e);
-    }
-  };
-
-  // Persist the device row — identity + the "last synced" stamp
-  // (observability only). The resume cursor is no longer stored here:
-  // the engine owns it and persists it itself via
-  // `IdbStorage.writeAckedSeq` (clamped to the durable contiguous
-  // frontier). Anonymous sessions skip — no server identity to record.
-  const persistDeviceNow = async (): Promise<void> => {
-    if (props.session.anonymous) return;
-    await putDevice(props.session.accountId, {
-      accountId: props.session.accountId,
-      primaryDocId: props.session.primaryDocId,
-      email: props.session.email!,
-      serverUrl: window.location.origin,
-      deviceId: props.session.deviceId!,
-      lastSyncAt: Date.now(),
-    });
-  };
-
-  let bridge: SyncBridge | null = null;
-  // Sample the contiguous seq now, wait for queued IDB writes to land,
-  // then mark durable + ship the resulting Ack. Sampling synchronously
-  // binds the notify to bytes that were actually being persisted.
-  const scheduleDurable = (): void => {
-    const seq = engine.lastContiguousSeq();
-    storage
-      .whenFlushed()
-      .then(() => {
-        engine.notifyWalDurable(seq);
-        bridge?.pumpOutbox();
-      })
-      .catch((e) => {
-        console.error("durable flush failed:", e);
-      });
-  };
-
-  // Capture local commits before the push reads the outbox — both
-  // anonymous and authed need durable op rows.
-  app.setBeforeFlush(capture);
-
-  // Anonymous sessions are local-only by definition — no account on the
-  // server to authenticate to. Skip the WebSocket pump entirely; local
-  // commits still persist through `capture()` above.
-  if (!props.session.anonymous) {
-    bridge = createSyncBridge({
-      engine,
-      onChange: (kind) => {
-        if (kind === "online") {
-          props.setOnline(true);
-          props.setLastSyncAt(Date.now());
-        }
-        if (kind === "offline") props.setOnline(false);
-        // `drain` fires after every recv-frame pump and every outbox
-        // flush, so it's the natural pulse for "we just round-tripped
-        // with the server" — even when no app events were produced.
-        if (kind === "drain") props.setLastSyncAt(Date.now());
-      },
-      onServerFrame: () => {
-        app.drainEvents();
-        // The engine already mirrored remote ops + acks into storage
-        // inside `handleServerBytes`. Compact if that drained the
-        // outbox, then ratchet the durable cursor once the writes land.
-        compact();
-        scheduleDurable();
-        saveDeviceSoon();
-      },
-      onAuthFailed: () => void props.logout(),
-    });
-    const b = bridge;
-    app.setOnFlush(() => {
-      b.pumpOutbox();
-      compact();
-      scheduleDurable();
-    });
-    bridge.start();
-    onCleanup(() => b.stop());
-  }
-
-  // ---------- Device config: light writes on each frontier change ----------
-  //
-  // Refreshes the "last synced" stamp (observability) on a coarse
-  // debounce. The resume cursor is persisted separately by the engine
-  // (`IdbStorage.writeAckedSeq`), so this no longer carries it.
-  let deviceTimer: ReturnType<typeof setTimeout> | null = null;
-  const saveDeviceSoon = (): void => {
-    if (props.session.anonymous) return;
-    if (deviceTimer) clearTimeout(deviceTimer);
-    deviceTimer = setTimeout(() => {
-      deviceTimer = null;
-      void persistDeviceNow().catch((e) => {
-        console.error("device save failed:", e);
-      });
-    }, 500);
-  };
-  createEffect(() => {
-    app.version();
-    saveDeviceSoon();
-  });
-
-  // ---------- Prefs: separate store, write-through ----------
-  //
-  // View state ("which list / Done / Bin am I on?") lives in its own
-  // IDB store keyed per account. Decoupled from `device` so a burst
-  // of typing doesn't rewrite the view, and switching lists doesn't
-  // rewrite the sync frontier. Anonymous sessions persist too — the
-  // device row gate above is about identity, not local-only UI state.
-  //
-  // No debounce: view changes are user-initiated (click / keyboard
-  // nav) and rare on the timescale of an IDB write. Coalescing them
-  // would only buy us dropped saves when the tab closes mid-window.
-  createEffect(
-    on(
-      view,
-      () => {
-        void savePrefs(props.session.accountId, {
-          currentView: view(),
-        }).catch((e) => {
-          console.error("prefs save failed:", e);
-        });
-      },
-      { defer: true },
-    ),
-  );
-
-  // Freshly-created doc (signup, or a brand-new anonymous doc): persist
-  // the seeded built-ins as the first op row so a reload before any user
-  // mutation still has something to replay. The op row is unacked, so
-  // for authed sessions it also pushes to the server via the outbox.
-  if (props.boot.seeded) {
-    capture();
-    scheduleDurable();
-  }
-
-  const onVisibility = () => {
-    if (document.visibilityState === "hidden") {
-      if (deviceTimer) clearTimeout(deviceTimer);
-      // Persist any uncommitted local op, then compact so the next boot
-      // has a fresh base. Anonymous sessions never sync, so their outbox
-      // never drains and `snapshotIfFullySynced` would never fire —
-      // force a full-state snapshot (prune-all) instead. Best-effort.
-      capture();
-      try {
-        if (props.session.anonymous) engine.forceSnapshot();
-        else engine.snapshotIfFullySynced();
-      } catch (e) {
-        console.error("snapshot on hide failed:", e);
-      }
-      void persistDeviceNow().catch(() => {});
-    }
-  };
-  document.addEventListener("visibilitychange", onVisibility);
-  onCleanup(() => {
-    document.removeEventListener("visibilitychange", onVisibility);
-    if (deviceTimer) clearTimeout(deviceTimer);
+  const { app, view, setView } = createWorkspaceRuntime({
+    session: props.session,
+    boot: props.boot,
+    setOnline: props.setOnline,
+    setLastSyncAt: props.setLastSyncAt,
+    logout: props.logout,
   });
 
   return (
