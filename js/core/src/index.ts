@@ -4,12 +4,7 @@
 // Vite and the nodejs-target build under Bun without callers
 // thinking about it.
 
-export type {
-  StorageAdapter,
-  DeviceConfig,
-} from "./storage/adapter.ts";
-export { MemStorage } from "./storage/mem.ts";
-export { BunFileStorage } from "./storage/file.ts";
+export type { DeviceConfig } from "./storage/adapter.ts";
 export {
   IdbStorage,
   type EngineBootRows,

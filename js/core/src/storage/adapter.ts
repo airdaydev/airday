@@ -1,15 +1,10 @@
-// Storage abstraction for the airday core.
+// Per-account device identity (`DeviceConfig`) plus its normalizer.
 //
-// One adapter instance owns one account's local state. The Rust core
-// stays storage-agnostic; the JS layer picks an adapter (in-memory for
-// tests, Bun file-backed for headless smoke runs, IndexedDB for the
-// browser) and feeds the saved `loro.bin` bytes back into `Doc.load`.
-//
-// The shape mirrors the CLI's on-disk layout (`device.json` +
-// `loro.bin`) but consciously *omits* the secrets file. DEK lifetime
-// in the browser is in-memory only; the Bun adapter is a development
-// convenience and persists the DEK out-of-band the same way the CLI
-// does.
+// This is the sync identity row — account/device ids, server URL, and
+// the observability-only "last synced" stamp. On web it's persisted in
+// the `airday-web` IDB via `device-store.ts`; the engine's op log lives
+// separately in the `airday-engine` DB (`IdbStorage`). The DEK is never
+// stored here — its browser lifetime is in-memory only (see `DekVault`).
 
 export interface DeviceConfig {
   accountId: string;
@@ -48,18 +43,4 @@ export function normalizeDeviceConfig(value: unknown): DeviceConfig | null {
     deviceId: device.deviceId,
     lastSyncAt,
   };
-}
-
-/** Storage adapter contract. Methods are async to accommodate IDB. */
-export interface StorageAdapter {
-  /** Read the saved loro snapshot envelope, or null if none exists. */
-  getDoc(): Promise<Uint8Array | null>;
-  /** Persist the loro snapshot envelope verbatim. */
-  putDoc(bytes: Uint8Array): Promise<void>;
-  /** Read the device config, or null if the profile is fresh. */
-  getDevice(): Promise<DeviceConfig | null>;
-  /** Persist device config. */
-  putDevice(device: DeviceConfig): Promise<void>;
-  /** Wipe all state owned by this adapter. Used by `airday logout`. */
-  clear(): Promise<void>;
 }

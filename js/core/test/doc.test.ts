@@ -1,11 +1,10 @@
-// Headless smoke for the wasm Doc surface plus the in-memory adapter:
-// build a doc, mutate it, run it through the storage adapter, reload,
-// and prove the logical fingerprint survives the round trip.
+// Headless smoke for the wasm Doc surface: build a doc, mutate it, run
+// it through `save()`/`load()`, and prove the logical fingerprint
+// survives the round trip.
 
 import { describe, expect, test } from "bun:test";
 
 import { Dek, Doc, EncryptedBlob } from "../wasm/airday_core_web.js";
-import { MemStorage } from "../src/index.ts";
 
 const LIST_MAIN = "main";
 
@@ -17,20 +16,15 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-describe("Doc + MemStorage", () => {
-  test("addItem → save → put → get → load → fingerprint matches", async () => {
+describe("Doc save/load", () => {
+  test("addItem → save → load → fingerprint matches", () => {
     const doc = Doc.create();
     const itemId = doc.addItem(LIST_MAIN, "buy milk");
 
     const before = doc.fingerprint();
     const bytes = doc.save();
 
-    const storage = new MemStorage();
-    await storage.putDoc(bytes);
-    const restoredBytes = await storage.getDoc();
-    expect(restoredBytes).not.toBeNull();
-
-    const restored = Doc.load(restoredBytes!);
+    const restored = Doc.load(bytes);
     const after = restored.fingerprint();
 
     expect(bytesEqual(before, after)).toBe(true);
@@ -39,28 +33,6 @@ describe("Doc + MemStorage", () => {
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe(itemId);
     expect(items[0].text).toBe("buy milk");
-  });
-
-  test("getDoc on empty storage returns null", async () => {
-    const storage = new MemStorage();
-    expect(await storage.getDoc()).toBeNull();
-    expect(await storage.getDevice()).toBeNull();
-  });
-
-  test("clear wipes both doc and device", async () => {
-    const storage = new MemStorage();
-    await storage.putDoc(new Uint8Array([1, 2, 3]));
-    await storage.putDevice({
-      accountId: "acct-1",
-      primaryDocId: "doc-1",
-      email: "user@example.com",
-      serverUrl: "http://localhost:8080",
-      deviceId: "dev-1",
-      lastSyncAt: null,
-    });
-    await storage.clear();
-    expect(await storage.getDoc()).toBeNull();
-    expect(await storage.getDevice()).toBeNull();
   });
 
   test("fresh doc has no user lists; main is not a ListMeta", () => {

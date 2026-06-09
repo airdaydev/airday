@@ -1,4 +1,5 @@
 # Roadmap
+- indexeddb tests? do we have an in-mem storage adapter? via playwright?
 - list deleting - orphan handling?
 - list deleting - binned first?
 - import/export
