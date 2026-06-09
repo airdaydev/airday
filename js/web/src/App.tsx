@@ -17,6 +17,7 @@ import { useAppI18n } from "./i18n.tsx";
 import { type Session } from "./Login.tsx";
 import { Workspace } from "./Workspace.tsx";
 import { createWorkspaceRuntime, type BootInfo } from "./workspaceRuntime.ts";
+import { SessionProvider, useSession } from "./SessionContext.tsx";
 
 export function App() {
   const { m, locale, direction } = useAppI18n();
@@ -104,19 +105,25 @@ export function App() {
     >
       <Show keyed when={session()}>
         {(s) => (
-          <BootGate
-            session={s}
-            boot={boot()}
-            bootError={bootError()}
-            setBoot={setBoot}
-            setBootError={setBootError}
-            online={online()}
-            setOnline={setOnline}
-            lastSyncAt={lastSyncAt()}
-            setLastSyncAt={setLastSyncAt}
-            logout={logout}
-            onSession={onAuthenticated}
-          />
+          <SessionProvider
+            value={{
+              session: () => s,
+              online,
+              setOnline,
+              lastSyncAt,
+              setLastSyncAt,
+              logout,
+              swapSession: onAuthenticated,
+            }}
+          >
+            <BootGate
+              session={s}
+              boot={boot()}
+              bootError={bootError()}
+              setBoot={setBoot}
+              setBootError={setBootError}
+            />
+          </SessionProvider>
         )}
       </Show>
     </Show>
@@ -162,12 +169,6 @@ function BootGate(props: {
   bootError: string | null;
   setBoot: (b: BootInfo | null) => void;
   setBootError: (m: string | null) => void;
-  online: boolean;
-  setOnline: (b: boolean) => void;
-  lastSyncAt: number | null;
-  setLastSyncAt: (ts: number | null) => void;
-  logout: () => void;
-  onSession: (s: Session) => void;
 }) {
   const { m } = useAppI18n();
   // Rebuild the doc from the engine op log (`spec/local-storage.md`
@@ -240,51 +241,21 @@ function BootGate(props: {
       fallback={<div class="empty">Failed to start: {props.bootError}</div>}
     >
       <Show when={props.boot} fallback={<div class="empty">{m().common.loading}</div>}>
-        {(b) => (
-          <MainApp
-            session={props.session}
-            boot={b()}
-            setOnline={props.setOnline}
-            online={props.online}
-            lastSyncAt={props.lastSyncAt}
-            setLastSyncAt={props.setLastSyncAt}
-            logout={props.logout}
-            onSession={props.onSession}
-          />
-        )}
+        {(b) => <MainApp session={props.session} boot={b()} />}
       </Show>
     </Show>
   );
 }
 
-function MainApp(props: {
-  session: Session;
-  boot: BootInfo;
-  online: boolean;
-  setOnline: (b: boolean) => void;
-  lastSyncAt: number | null;
-  setLastSyncAt: (ts: number | null) => void;
-  logout: () => void;
-  onSession: (s: Session) => void;
-}) {
+function MainApp(props: { session: Session; boot: BootInfo }) {
+  const { setOnline, setLastSyncAt, logout } = useSession();
   const { app, view, setView } = createWorkspaceRuntime({
     session: props.session,
     boot: props.boot,
-    setOnline: props.setOnline,
-    setLastSyncAt: props.setLastSyncAt,
-    logout: props.logout,
+    setOnline,
+    setLastSyncAt,
+    logout,
   });
 
-  return (
-    <Workspace
-      app={app}
-      session={props.session}
-      online={props.online}
-      lastSyncAt={props.lastSyncAt}
-      logout={props.logout}
-      onSession={props.onSession}
-      view={view}
-      setView={setView}
-    />
-  );
+  return <Workspace app={app} view={view} setView={setView} />;
 }

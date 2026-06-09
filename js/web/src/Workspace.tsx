@@ -23,8 +23,8 @@ import { EditableNavLabel, Nav } from "./nav.tsx";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import type { SearchResult } from "./search.ts";
-import { type Session } from "./Login.tsx";
 import { Settings } from "./Settings.tsx";
+import { useSession } from "./SessionContext.tsx";
 import {
   isBinned,
   isDone,
@@ -59,11 +59,6 @@ function createKbDeviceSignal(): () => boolean {
 
 export function Workspace(props: {
   app: DocApp;
-  session: Session;
-  online: boolean;
-  lastSyncAt: number | null;
-  logout: () => void;
-  onSession: (s: Session) => void;
   // View lives in `MainApp` so device writes can persist it alongside
   // the sync frontier in one debounced put. See `currentView` on
   // `DeviceConfig`.
@@ -71,6 +66,7 @@ export function Workspace(props: {
   setView: (v: ViewKey) => void;
 }) {
   const { m } = useAppI18n();
+  const session = useSession();
   const app = props.app;
   const state = app.state;
   const view = props.view;
@@ -854,12 +850,12 @@ export function Workspace(props: {
             dndHandle?.focus();
           });
         }}
-        session={props.session}
-        online={props.online}
-        lastSyncAt={props.lastSyncAt}
-        logout={props.logout}
+        session={session.session()}
+        online={session.online()}
+        lastSyncAt={session.lastSyncAt()}
+        logout={session.logout}
         onOpenSettings={() => setSettingsOpen(true)}
-        onSession={props.onSession}
+        onSession={session.swapSession}
       />
       <FindPalette
         app={app}
@@ -875,8 +871,8 @@ export function Workspace(props: {
           setThemePref(pref);
           theme.set(pref);
         }}
-        session={props.session}
-        logout={props.logout}
+        session={session.session()}
+        logout={session.logout}
       />
       <main class="main">
         <header class="main-header">
