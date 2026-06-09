@@ -43,9 +43,9 @@ export function App() {
   // Probe the vault on mount. If a wrapped DEK is present and we can
   // unwrap it, restore that session — for authenticated records, the
   // device cookie should still be valid (the WS pump will surface the
-  // failure if it isn't); for anonymous records, OPFS is the source
-  // of truth. If there's no record at all, mint a fresh anonymous
-  // session so the user lands directly in the app.
+  // failure if it isn't); for anonymous records, the local IndexedDB
+  // op log is the source of truth. If there's no record at all, mint a
+  // fresh anonymous session so the user lands directly in the app.
   void (async () => {
     try {
       const v = await dekVault.load();
@@ -91,7 +91,7 @@ export function App() {
   };
 
   const onAuthenticated = (s: Session) => {
-    // Local-only anonymous data is left to drift in OPFS under the
+    // Local-only anonymous data is left to drift in IndexedDB under the
     // old anon accountId. It'll never be addressed again — option C
     // says clobber, not migrate. A future cleanup pass can reap it.
     setBoot(null);
@@ -142,7 +142,7 @@ async function createAnonymousSession(): Promise<Session> {
     deviceId: null,
     dek,
     // Seed the doc on first run via Doc.create(). On reload we read
-    // OPFS instead.
+    // the IndexedDB op log instead.
     freshSignup: true,
   };
   try {

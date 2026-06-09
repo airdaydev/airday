@@ -399,7 +399,7 @@ impl Dek {
 
     /// Duplicate the DEK handle. Needed because
     /// `new SyncEngine(doc, dek, ...)` *consumes* the JS handle, but
-    /// we also want the DEK around for encrypt-at-rest via OPFS.
+    /// we also want the DEK around for encrypt-at-rest of the local op log.
     /// Named `dup` (not `clone`) to dodge the `Clone` trait clash on
     /// the wasm wrapper while still being clear about the intent.
     #[wasm_bindgen(js_name = clone)]
@@ -414,8 +414,9 @@ impl Dek {
         hex::encode(self.inner.as_bytes())
     }
 
-    /// Encrypt an arbitrary byte buffer with this DEK. Used by the
-    /// browser OPFS adapter to encrypt-at-rest local doc snapshots.
+    /// Encrypt an arbitrary byte buffer with this DEK. Used to
+    /// encrypt-at-rest the local op log + snapshots in IndexedDB
+    /// (`IdbStorage`).
     pub fn seal(&self, plaintext: &[u8]) -> Result<EncryptedBlob, JsError> {
         let (ciphertext, nonce) = self.inner.seal(plaintext).map_err(js_err)?;
         Ok(EncryptedBlob {

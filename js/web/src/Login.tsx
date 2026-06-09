@@ -28,7 +28,7 @@ export interface Session {
   accountId: string;
   /** Doc id of the account's primary (Home) doc — server-assigned for
    *  authenticated sessions, locally generated for anonymous ones. Keys
-   *  the per-doc data plane (ops WAL, snapshot, OPFS dir). */
+   *  the per-doc data plane (the engine op log + snapshot in IndexedDB). */
   primaryDocId: string;
   /** Null on anonymous sessions. */
   email: string | null;
@@ -38,7 +38,8 @@ export interface Session {
   /** True iff this session was created via signup (we're device 1
    *  and need to seed the doc with built-in lists), or for a freshly
    *  minted anonymous session. False for login sessions and for
-   *  reload-restored sessions where OPFS is the source of truth. */
+   *  reload-restored sessions where the local IndexedDB op log is the
+   *  source of truth. */
   freshSignup: boolean;
 }
 
