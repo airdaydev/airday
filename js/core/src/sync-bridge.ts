@@ -1,7 +1,7 @@
 // WebSocket pump + lifecycle around a sans-IO `SyncEngine`. Owned by
-// the JS host (not the wasm core) so each platform — web, bun-based
-// tests, future node CLI — can drive the same engine with the same
-// reconnect / auth policy by injecting only the bits that differ:
+// the JS host (not the wasm core) so each platform — web and bun-based
+// tests — can drive the same engine with the same reconnect / auth
+// policy by injecting only the bits that differ:
 //
 //   - `socketFactory` builds a fresh `WebSocket` per attempt (cookie
 //     auth on the browser, bearer header in Bun, etc.).

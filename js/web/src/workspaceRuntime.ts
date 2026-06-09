@@ -90,7 +90,7 @@ export function createWorkspaceRuntime(props: {
 
   // ---------- Engine op-log persistence (IdbStorage) ----------
   //
-  // The engine's `LocalStorage` trait does the heavy lifting now: local
+  // The engine's `LocalStorage` trait does the heavy lifting: local
   // commits become durable op rows via `captureLocalOps`, remote ops are
   // mirrored inside `handleServerBytes`, and the outbox drives the push.
   // The web host's job is just the CLI's `persist_engine_state` rhythm,
