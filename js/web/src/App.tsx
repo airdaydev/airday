@@ -1,11 +1,11 @@
 // Top-level app. First visit auto-creates a local-only anonymous
 // session (DEK generated client-side, no server account) and drops
-// straight into the workspace — no auth gate. Sync stays off until
-// the user signs up or logs in via Settings, which swaps the
-// anonymous session for an authenticated one and clobbers the local
-// doc. After auth the UI is the same shape as the Doc-only build but
-// every read / mutation goes through the engine so peer ops apply
-// live.
+// straight into the workspace — no auth gate. Reads and mutations
+// always flow through the SyncEngine over an IndexedDB op log, anonymous
+// or authed. Signing up or logging in via Settings swaps the anonymous session for
+// an authenticated one (deleting the local doc) and turns on server
+// sync, so peer ops apply live. Anonymous sessions run the same engine
+// but never ship ops to a server.
 
 import {
   createEffect,
