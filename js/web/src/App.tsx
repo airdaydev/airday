@@ -3,8 +3,7 @@
 // straight into the workspace — no auth gate. Sync stays off until
 // the user signs up or logs in via Settings, which swaps the
 // anonymous session for an authenticated one and clobbers the local
-// doc (option C — punt the migration; document is in `phoenix.md`).
-// After auth the UI is the same shape as the Doc-only build but
+// doc. After auth the UI is the same shape as the Doc-only build but
 // every read / mutation goes through the engine so peer ops apply
 // live.
 
