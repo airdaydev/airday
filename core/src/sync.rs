@@ -471,9 +471,10 @@ impl SyncEngine {
     ///     `GAP_RETRY_LIMIT` retries have elapsed.
     ///
     /// `now_ms` is monotonic milliseconds — the engine never reads a
-    /// clock itself. Hosts call this periodically (e.g., every
-    /// ~1s via setInterval / tokio::time::interval) AND after any
-    /// `handle_server_bytes` call that may have opened a new gap.
+    /// clock itself. A periodic host tick (e.g., every ~1s via
+    /// setInterval / tokio::time::interval) is sufficient: a newly
+    /// opened gap arms a deadline `GAP_RETRY_BASE_MS` out, so retries
+    /// are never due in the same instant a gap opens.
     pub fn handle_timeout(&mut self, now_ms: u64) {
         if matches!(self.state, ConnState::Hello) {
             self.events

@@ -179,11 +179,7 @@ export class SyncBridge {
             ? new Uint8Array(ev.data.buffer, ev.data.byteOffset, ev.data.byteLength)
             : null;
       if (!data) return; // text frames ignored
-      const nowMs = BigInt(Date.now());
-      this.opts.engine.handleServerBytes(data, nowMs);
-      // If this frame opened a new gap, give the timer an immediate
-      // chance to fire (the interval tick might still be ~1s away).
-      this.opts.engine.handleTimeout(nowMs);
+      this.opts.engine.handleServerBytes(data, BigInt(Date.now()));
       this.pumpOutbox();
       this.drainEngineEvents();
       this.opts.onServerFrame?.();
