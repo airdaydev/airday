@@ -1092,7 +1092,9 @@ mod tests {
     /// so pull-complete leaves us cleanly Idle with no auto-push.
     fn drive_to_idle(eng: &mut SyncEngine) {
         eng.handle_connected();
-        let _hello = eng.pop_outbox().expect("Hello");
+        let _hello = eng
+            .pop_outbox()
+            .expect("Hello should be queued after handle_connected()");
         eng.handle_server_bytes(
             &enc(&HelloAck {
                 server_version: "test".into(),
@@ -1100,7 +1102,9 @@ mod tests {
             }),
             0,
         );
-        let _pull = eng.pop_outbox().expect("PullOps");
+        let _pull = eng
+            .pop_outbox()
+            .expect("PullOps should be queued after successful HelloAck()");
         eng.handle_server_bytes(
             &enc(&ServerFrame::OpsBatch {
                 ops: vec![],
