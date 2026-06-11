@@ -2,10 +2,7 @@
 
 [Airday](https://air.day/) is an e2ee, realtime, tasks app i.e. todo list with conflict resolution backed by Loro.
 
-⚠️ ATTN: Airday is undergoing extensive and frequent changes, it is not ready to use.
-
-## Saas vs Self-hosted
-This is the private repo currently containing everything. We will extract most of this repo into a public repo prior to release.
+⚠️ ATTN: Airday is undergoing extensive and frequent changes, you can use it locally, but you may have to manually export and import data between updates.
 
 ```
 📁 monorepo
@@ -37,5 +34,3 @@ bun install
 bun run config
 process-compose up
 ```
-
-- This repo will remain private

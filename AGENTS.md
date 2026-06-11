@@ -38,11 +38,6 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
-| [`spec/saas.md`](spec/saas.md) | Future SaaS contract: browser signup device flow, lapsed-account lifecycle, self-hosted migration |
-
-Future work: postgres + multi-tenant, SaaS billing, multi-region, native apps, pricing, Hashicorp Vault-backed escrow.
-
-**Future concerns:** postgres, multi-tenant, SaaS billing, web/iOS/Android/macOS clients, native app deployment. These live in `roadmap.md`.
 
 ## Build & run
 
