@@ -16,7 +16,7 @@ import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
 import { type Session } from "./Login.tsx";
 import { Workspace } from "./Workspace.tsx";
-import { createWorkspaceRuntime, type BootInfo } from "./workspaceRuntime.ts";
+import { createWorkspaceRuntime, type BootInfo } from "./sync/runtime.ts";
 import { SessionProvider, useSession } from "./SessionContext.tsx";
 
 export function App() {

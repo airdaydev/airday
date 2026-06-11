@@ -9,10 +9,10 @@
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { Doc, SyncEngine } from "@airday/core/wasm";
 import { IdbStorage, putDevice } from "@airday/core";
-import { savePrefs, type Prefs, type ViewKey } from "./prefs.ts";
-import { type Session } from "./Login.tsx";
-import { createSyncedApp } from "./sync/store.ts";
-import { createSyncBridge, SyncBridge } from "./sync/sync.ts";
+import { savePrefs, type Prefs, type ViewKey } from "../prefs.ts";
+import { type Session } from "../Login.tsx";
+import { createSyncedApp } from "./store.ts";
+import { createSyncBridge, SyncBridge } from "./sync.ts";
 
 const CLIENT_NAME = "airday-web";
 const CLIENT_VERSION = "0.1.0";
