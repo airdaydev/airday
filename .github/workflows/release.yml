@@ -1,0 +1,95 @@
+name: Release
+
+# Build the web client, embed it into the server binary (feature `bundled-web`),
+# and publish the binary + SHA-256 checksum as a GitHub Release. Triggers on
+# v-prefixed tags only (e.g. v0.0.1-alpha) — never on branch pushes.
+on:
+  push:
+    tags:
+      - "v*"
+
+# A release tag is immutable; don't run two builds for the same ref.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # required to create the release and upload assets
+
+env:
+  TARGET: x86_64-unknown-linux-gnu
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Build inside Debian stable for a boring, reproducible toolchain. The
+    # runner only hosts the container; the binary links against the container's
+    # glibc (bookworm = 2.36, supported to ~2028), not the runner's.
+    container: debian:bookworm-slim
+    steps:
+      # The slim image is bare. Install prerequisites before anything else:
+      # git must exist before checkout so the .git dir survives (build.rs reads
+      # the git sha from it), and build-essential provides the C toolchain that
+      # rusqlite's bundled sqlite compiles and links against.
+      - name: Install base build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config
+
+      # Avoid git's "dubious ownership" refusal on the checkout dir (the
+      # container runs as root over a bind-mounted workspace).
+      - name: Trust the checkout directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable + wasm target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      # The web client imports @airday/core, whose browser export resolves to
+      # the bundler-target wasm in js/core/wasm-web — build it before vite.
+      - name: Build browser wasm
+        run: bun run build:wasm:web
+
+      - name: Build web client (js/web/dist)
+        run: bun --cwd js/web run build
+
+      # Embeds js/web/dist into the binary via rust-embed at compile time.
+      - name: Build server with embedded web
+        run: cargo build --release -p airday-server --features bundled-web
+
+      - name: Package binary + checksum
+        id: package
+        run: |
+          set -euo pipefail
+          name="airday-server-${GITHUB_REF_NAME}-${TARGET}"
+          mkdir -p dist-release
+          cp target/release/airday-server "dist-release/${name}"
+          cd dist-release
+          sha256sum "${name}" > "${name}.sha256"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Tags with a hyphen (v0.0.1-alpha, -beta, -rc) are pre-releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            dist-release/${{ steps.package.outputs.name }}
+            dist-release/${{ steps.package.outputs.name }}.sha256

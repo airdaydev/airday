@@ -12,6 +12,13 @@ path = "src/main.rs"
 [lib]
 path = "src/lib.rs"
 
+[features]
+# Bake the built web client (js/web/dist) into the server binary and serve it
+# from `/`, `/index.html`, and `/assets/*`. Run the vite build (`cd js/web &&
+# bun run build`) before compiling with this feature: the bundle is embedded at
+# compile time, so a missing dist/ is a build error.
+bundled-web = ["dep:rust-embed"]
+
 [dependencies]
 airday-protocol = { path = "../crates/protocol" }
 airday-core = { path = "../core" }
@@ -36,6 +43,13 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 dirs = { workspace = true }
+# `debug-embed` so the bundle is embedded in debug builds too — "bundled" means
+# bundled, not silently read from disk. `mime-guess` powers `metadata.mimetype()`.
+rust-embed = { version = "8", optional = true, features = [
+    "mime-guess",            # metadata.mimetype()
+    "debug-embed",           # embed in debug builds too, not just release
+    "interpolate-folder-path", # expand $CARGO_MANIFEST_DIR in #[folder]
+] }
 
 [dev-dependencies]
 reqwest = { workspace = true }

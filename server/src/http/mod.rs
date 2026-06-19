@@ -3,6 +3,8 @@ pub mod request_id;
 
 mod auth_routes;
 mod device_routes;
+#[cfg(feature = "bundled-web")]
+mod web;
 
 use axum::http::{header, Method};
 use axum::middleware;
@@ -29,7 +31,7 @@ pub fn router(state: AppState) -> Router {
         ])
         .expose_headers([request_id::REQUEST_ID_HEADER]);
 
-    Router::new()
+    let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/api/account/signup", post(auth_routes::signup))
         .route("/api/account/prelogin", post(auth_routes::prelogin))
@@ -49,8 +51,13 @@ pub fn router(state: AppState) -> Router {
             get(device_routes::list).post(device_routes::register),
         )
         .route("/api/devices/{device_id}", delete(device_routes::revoke))
-        .route("/api/sync", any(ws_handler))
-        .layer(middleware::from_fn(request_id::middleware))
+        .route("/api/sync", any(ws_handler));
+
+    // Serve the embedded web client when built with `--features bundled-web`.
+    #[cfg(feature = "bundled-web")]
+    let app = app.merge(web::routes());
+
+    app.layer(middleware::from_fn(request_id::middleware))
         .layer(cors)
         .with_state(state)
 }
