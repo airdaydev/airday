@@ -75,7 +75,11 @@ jobs:
         with:
           # Tags with a hyphen (v0.0.1-alpha, -beta, -rc) are pre-releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # Keep GitHub's auto-generated notes; the image ref is appended below.
           generate_release_notes: true
+          append_body: true
+          body: |
+            **Container image:** `ghcr.io/${{ github.repository }}-server:${{ github.ref_name }}`
           files: |
             dist-release/${{ steps.package.outputs.name }}
             dist-release/${{ steps.package.outputs.name }}.sha256
