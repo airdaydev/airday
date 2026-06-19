@@ -21,27 +21,11 @@ env:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    # Build inside Debian stable for a boring, reproducible toolchain. The
-    # runner only hosts the container; the binary links against the container's
-    # glibc (bookworm = 2.36, supported to ~2028), not the runner's.
-    container: debian:bookworm-slim
+    # Pinned to a fixed Ubuntu (glibc 2.35) rather than ubuntu-latest: an older
+    # build-time glibc runs on the widest range of deploy hosts, and a fixed
+    # version keeps the build reproducible.
+    runs-on: ubuntu-22.04
     steps:
-      # The slim image is bare. Install prerequisites before anything else:
-      # git must exist before checkout so the .git dir survives (build.rs reads
-      # the git sha from it), and build-essential provides the C toolchain that
-      # rusqlite's bundled sqlite compiles and links against.
-      - name: Install base build dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates curl git build-essential pkg-config
-
-      # Avoid git's "dubious ownership" refusal on the checkout dir (the
-      # container runs as root over a bind-mounted workspace).
-      - name: Trust the checkout directory
-        run: git config --global --add safe.directory '*'
-
       - uses: actions/checkout@v4
 
       - name: Install Rust (stable + wasm target)
