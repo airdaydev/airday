@@ -372,11 +372,14 @@ mod tests {
     fn sync_env_var_honoured() {
         // SAFETY: tests run single-threaded under #[test] within this
         // module; no other test reads/writes AIRDAY_SYNC.
-        std::env::set_var("AIRDAY_SYNC", "1");
+        // FIXME: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("AIRDAY_SYNC", "1") };
         assert!(sync_requested(false));
-        std::env::set_var("AIRDAY_SYNC", "0");
+        // FIXME: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("AIRDAY_SYNC", "0") };
         assert!(!sync_requested(false));
-        std::env::remove_var("AIRDAY_SYNC");
+        // FIXME: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("AIRDAY_SYNC") };
         assert!(!sync_requested(false));
         assert!(sync_requested(true));
     }

@@ -1250,7 +1250,7 @@ mod tests {
         let _ = drain_outbox(&mut eng);
         eng.handle_timeout(0);
         let evs = drain_events(&mut eng);
-        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("timed out")));
+        assert!(matches!(evs.as_slice(), [Event::Error(s)] if s.contains("timed out")));
 
         // In Idle, timeout is a no-op.
         let mut eng2 = fresh_engine_clean();
@@ -1700,7 +1700,7 @@ mod tests {
             0,
         );
         let evs = drain_events(&mut eng);
-        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("OpsAck")));
+        assert!(matches!(evs.as_slice(), [Event::Error(s)] if s.contains("OpsAck")));
     }
 
     #[test]
@@ -1805,7 +1805,7 @@ mod tests {
             0,
         );
         let evs = drain_events(&mut eng);
-        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("Snapshot")));
+        assert!(matches!(evs.as_slice(), [Event::Error(s)] if s.contains("Snapshot")));
     }
 
     #[test]
@@ -2157,7 +2157,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 1 }), 0);
         let evs = drain_events(&mut eng);
-        assert!(matches!(evs.as_slice(), [Event::Error(ref s)] if s.contains("SnapshotRequired")));
+        assert!(matches!(evs.as_slice(), [Event::Error(s)] if s.contains("SnapshotRequired")));
     }
 
     #[test]
