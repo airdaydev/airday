@@ -2,10 +2,16 @@
 #
 # There is no build stage: the binary is produced in the release workflow (with
 # the web client embedded via the `bundled-web` feature) and copied in here.
-# debian:bookworm-slim supplies the glibc the gnu-target binary links against;
-# the server needs nothing else — sqlite is compiled into the binary and it
-# makes no outbound network calls.
-FROM debian:bookworm-slim
+# distroless/cc-debian12 is Debian 12 glibc plus libgcc_s — the latter is needed
+# because the gnu-target binary is built with panic=unwind and links it for
+# stack unwinding. The server needs nothing else: sqlite is compiled into the
+# binary and it makes no outbound network calls (so no ca-certificates either).
+#
+# The `:debug` tag is identical to the hardened base but bundles busybox at
+# /busybox, so `docker exec -it <c> /busybox/sh` still works for diagnosing
+# mount/config issues in a running container. Runs as root, matching the prior
+# bookworm-slim behaviour so the /data volume stays writable without a chown.
+FROM gcr.io/distroless/cc-debian12:debug
 
 # Staged next to this Dockerfile by the release workflow's build context.
 COPY airday-server /usr/local/bin/airday-server
