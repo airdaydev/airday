@@ -4,6 +4,15 @@
 
 ⚠️ ATTN: Airday is undergoing extensive and frequent changes, you can use it locally, but you may have to manually export and import data between updates.
 
+## Self-hosting with Docker
+
+```bash
+docker run -d \
+    -p 8000:8000 \
+    -v /srv/airday:/data \
+    ghcr.io/airdaydev/airday-server:v0.0.1-alpha.2
+```
+
 ```
 📁 monorepo
 ├── 📂 cli  → CLI app
