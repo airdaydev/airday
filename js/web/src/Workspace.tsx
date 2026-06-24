@@ -871,6 +871,8 @@ export function Workspace(props: {
           setThemePref(pref);
           theme.set(pref);
         }}
+        showListCounts={state.settings.showListCounts}
+        onShowListCountsChange={(show) => app.setShowListCounts(show)}
         session={session.session()}
         logout={session.logout}
       />

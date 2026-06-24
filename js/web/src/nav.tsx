@@ -380,16 +380,6 @@ export function Nav(props: {
               >
                 {m().nav.renameList}
               </ContextMenu.Item>
-              <ContextMenu.Item
-                class="context-menu-item"
-                onSelect={() => {
-                  props.app.setShowListCounts(!props.showListCounts);
-                }}
-              >
-                {props.showListCounts
-                  ? m().nav.hideListCounts
-                  : m().nav.showListCounts}
-              </ContextMenu.Item>
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu>
@@ -456,9 +446,6 @@ export function Nav(props: {
               let startRename: (() => void) | undefined;
               const selectedIds = (): string[] => selectedNavIds(l().id);
               const isMultiMenu = (): boolean => selectedIds().length > 1;
-              const toggleShowListCounts = (): void => {
-                props.app.setShowListCounts(!props.showListCounts);
-              };
               return (
                 <ContextMenu
                   onOpenChange={(open) => {
@@ -492,21 +479,15 @@ export function Nav(props: {
                       </span>
                     </Show>
                   </ContextMenu.Trigger>
-                  <ContextMenu.Portal>
-                    <ContextMenu.Content class="context-menu-content">
-                      <Show
-                        when={!isMultiMenu()}
-                        fallback={
-                          <ContextMenu.Item
-                            class="context-menu-item"
-                            onSelect={toggleShowListCounts}
-                          >
-                            {props.showListCounts
-                              ? m().nav.hideListCounts
-                              : m().nav.showListCounts}
-                          </ContextMenu.Item>
-                        }
-                      >
+                  {/* Rename + Delete are single-list actions. Multi-select
+                      previously only hosted the show/hide-counts toggle,
+                      which now lives in Settings → General, so a
+                      multi-selection has no per-list menu: gate the whole
+                      Portal so right-clicking a multi-selection shows
+                      nothing rather than an empty menu. */}
+                  <Show when={!isMultiMenu()}>
+                    <ContextMenu.Portal>
+                      <ContextMenu.Content class="context-menu-content">
                         <ContextMenu.Item
                           class="context-menu-item"
                           onSelect={() => {
@@ -521,14 +502,6 @@ export function Nav(props: {
                         </ContextMenu.Item>
                         <ContextMenu.Item
                           class="context-menu-item"
-                          onSelect={toggleShowListCounts}
-                        >
-                          {props.showListCounts
-                            ? m().nav.hideListCounts
-                            : m().nav.showListCounts}
-                        </ContextMenu.Item>
-                        <ContextMenu.Item
-                          class="context-menu-item"
                           onSelect={() => {
                             const id = l().id;
                             if (props.view.kind === "list" && props.view.id === id) {
@@ -539,9 +512,9 @@ export function Nav(props: {
                         >
                           {m().nav.deleteList}
                         </ContextMenu.Item>
-                      </Show>
-                    </ContextMenu.Content>
-                  </ContextMenu.Portal>
+                      </ContextMenu.Content>
+                    </ContextMenu.Portal>
+                  </Show>
                 </ContextMenu>
               );
             }}

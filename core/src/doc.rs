@@ -677,17 +677,16 @@ impl Doc {
     /// events or undo steps.
     pub fn set_show_list_counts(&self, show: bool) -> Result<(), DocError> {
         let settings = self.settings_map();
-        let current = read_bool(&settings, KEY_SHOW_LIST_COUNTS).unwrap_or(false);
+        let current = read_bool(&settings, KEY_SHOW_LIST_COUNTS).unwrap_or(true);
         if current == show {
             return Ok(());
         }
         if show {
-            settings.insert(KEY_SHOW_LIST_COUNTS, true)?;
-        } else {
-            // Drop the key entirely on the off path so an opt-out
-            // leaves no trace — on-disk state matches a never-toggled
-            // doc.
+            // Drop the key entirely on the on path so the default state
+            // leaves no trace — on-disk state matches a never-toggled doc.
             settings.delete(KEY_SHOW_LIST_COUNTS)?;
+        } else {
+            settings.insert(KEY_SHOW_LIST_COUNTS, false)?;
         }
         self.inner.commit();
         let post = settings_view(&settings);
@@ -1565,7 +1564,10 @@ fn read_bool(map: &LoroMap, key: &str) -> Option<bool> {
 
 fn settings_view(map: &LoroMap) -> SettingsView {
     SettingsView {
-        show_list_counts: read_bool(map, KEY_SHOW_LIST_COUNTS).unwrap_or(false),
+        // Defaults on: a never-toggled doc shows counts. The key is only
+        // persisted on the opt-out path (stored `false`); absence means
+        // the default.
+        show_list_counts: read_bool(map, KEY_SHOW_LIST_COUNTS).unwrap_or(true),
         // Read-side defaults to `None` when absent. Any persisted empty
         // string is treated the same — the mutation deletes the key on
         // empty input, but a caller that bypassed it shouldn't surface
@@ -1982,43 +1984,46 @@ mod tests {
     }
 
     #[test]
-    fn new_doc_has_show_list_counts_off() {
+    fn new_doc_has_show_list_counts_on() {
         let doc = Doc::new().unwrap();
-        assert!(!doc.get_settings().show_list_counts);
+        assert!(doc.get_settings().show_list_counts);
     }
 
     #[test]
     fn show_list_counts_round_trips() {
         let doc = Doc::new().unwrap();
-        doc.set_show_list_counts(true).unwrap();
-        assert!(doc.get_settings().show_list_counts);
-        let bytes = doc.save().unwrap();
-        let restored = Doc::load(&bytes).unwrap();
-        assert!(restored.get_settings().show_list_counts);
-        // Toggling off drops the key — verify the round-trip back to false.
+        // Default is on; the opt-out (`false`) is what gets persisted.
         doc.set_show_list_counts(false).unwrap();
         assert!(!doc.get_settings().show_list_counts);
+        let bytes = doc.save().unwrap();
+        let restored = Doc::load(&bytes).unwrap();
+        assert!(!restored.get_settings().show_list_counts);
+        // Toggling back on drops the key — verify the round-trip to the
+        // default.
+        doc.set_show_list_counts(true).unwrap();
+        assert!(doc.get_settings().show_list_counts);
     }
 
     #[test]
     fn show_list_counts_idempotent() {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
-        doc.set_show_list_counts(false).unwrap();
+        // On is the default, so setting it on is a no-op.
+        doc.set_show_list_counts(true).unwrap();
         assert!(
             doc.drain_events().is_empty(),
             "no-op toggle must not emit events"
         );
-        doc.set_show_list_counts(true).unwrap();
+        doc.set_show_list_counts(false).unwrap();
         let evs = doc.drain_events();
         assert!(matches!(
             evs.as_slice(),
             [AppEvent::SettingsChanged {
-                show_list_counts: true,
+                show_list_counts: false,
                 ..
             }]
         ));
-        doc.set_show_list_counts(true).unwrap();
+        doc.set_show_list_counts(false).unwrap();
         assert!(
             doc.drain_events().is_empty(),
             "second toggle to same value must not re-emit"
@@ -2967,16 +2972,17 @@ mod tests {
         let a = Doc::new().unwrap();
         let mut b = Doc::new().unwrap();
 
-        a.set_show_list_counts(true).unwrap();
+        // Counts default on, so the meaningful peer toggle is opting out.
+        a.set_show_list_counts(false).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
 
         b.apply_remote(&dek, &blob).unwrap();
 
-        assert!(b.get_settings().show_list_counts);
+        assert!(!b.get_settings().show_list_counts);
         assert!(matches!(
             b.drain_events().as_slice(),
             [AppEvent::SettingsChanged {
-                show_list_counts: true,
+                show_list_counts: false,
                 ..
             }]
         ));

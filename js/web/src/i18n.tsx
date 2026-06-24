@@ -61,8 +61,6 @@ type Messages = {
     bin: string;
     deleteList: string;
     renameList: string;
-    showListCounts: string;
-    hideListCounts: string;
     newList: string;
     connected: string;
     disconnected: string;
@@ -111,6 +109,7 @@ type Messages = {
     auto: string;
     light: string;
     dark: string;
+    showListCounts: string;
     localOnlyAccount: string;
     loginToSeeDevices: string;
     email: string;
@@ -158,8 +157,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Papelera",
       deleteList: "Eliminar",
       renameList: "Renombrar",
-      showListCounts: "Mostrar contadores",
-      hideListCounts: "Ocultar contadores",
       newList: "+ Nueva lista",
       connected: "Conectado",
       disconnected: "Desconectado",
@@ -210,6 +207,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       auto: "Auto",
       light: "Claro",
       dark: "Oscuro",
+      showListCounts: "Mostrar contadores de listas",
       localOnlyAccount:
         "Estás usando una cuenta solo local. Usa Iniciar sesión o Crear cuenta desde el menú de la cuenta para hacer copia de seguridad de tus datos y sincronizar entre dispositivos.",
       loginToSeeDevices: "Inicia sesión para ver los dispositivos vinculados a tu cuenta.",
@@ -256,8 +254,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       bin: "Bin",
       deleteList: "Delete",
       renameList: "Rename",
-      showListCounts: "Show list counts",
-      hideListCounts: "Hide list counts",
       newList: "+ Add list",
       connected: "Connected",
       disconnected: "Disconnected",
@@ -308,6 +304,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       auto: "Auto",
       light: "Light",
       dark: "Dark",
+      showListCounts: "Show list counts",
       localOnlyAccount:
         "You're using a local-only account. Use Sign in or Sign up from the account menu to back up your data and sync across devices.",
       loginToSeeDevices: "Log in to see devices linked to your account.",

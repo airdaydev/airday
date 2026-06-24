@@ -1,5 +1,6 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
+import { Switch } from "@kobalte/core/switch";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { api, type Device } from "./api.ts";
 import type { Session } from "./Login.tsx";
@@ -13,6 +14,8 @@ export function Settings(props: {
   onOpenChange: (b: boolean) => void;
   themePref: ThemePreference;
   onThemeChange: (pref: ThemePreference) => void;
+  showListCounts: boolean;
+  onShowListCountsChange: (show: boolean) => void;
   session: Session;
   logout: () => void;
 }) {
@@ -172,6 +175,22 @@ export function Settings(props: {
                       </SegmentedControl.ItemControl>
                     </SegmentedControl.Item>
                   </SegmentedControl>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    {m().settings.showListCounts}
+                  </div>
+                  <Switch
+                    class="settings-switch"
+                    aria-label={m().settings.showListCounts}
+                    checked={props.showListCounts}
+                    onChange={(checked) => props.onShowListCountsChange(checked)}
+                  >
+                    <Switch.Input class="settings-switch-input" />
+                    <Switch.Control class="settings-switch-control">
+                      <Switch.Thumb class="settings-switch-thumb" />
+                    </Switch.Control>
+                  </Switch>
                 </div>
               </Show>
               <Show when={section() === "account"}>

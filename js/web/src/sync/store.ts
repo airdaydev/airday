@@ -159,14 +159,14 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
   const listsOrder: string[] = [];
   const listsById: Record<string, ListView> = {};
   const settings: SettingsView = {
-    showListCounts: false,
+    showListCounts: true,
     mainName: null,
   };
 
   for (const ev of events) {
     switch (ev.kind) {
       case "settingsChanged": {
-        settings.showListCounts = ev.showListCounts ?? false;
+        settings.showListCounts = ev.showListCounts ?? true;
         settings.mainName = ev.mainName ?? null;
         break;
       }
@@ -220,7 +220,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     listsOrder: [],
     listsById: {},
     settings: {
-      showListCounts: false,
+      showListCounts: true,
       mainName: null,
     },
   });
@@ -360,7 +360,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         // wire format always sends the full known shape, so a single
         // setState keeps the store in lockstep with the doc.
         setState("settings", {
-          showListCounts: ev.showListCounts ?? false,
+          showListCounts: ev.showListCounts ?? true,
           mainName: ev.mainName ?? null,
         });
         break;
