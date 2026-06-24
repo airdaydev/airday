@@ -106,7 +106,7 @@ Tiered response when `last_contiguous_seq` hasn't advanced despite a non-empty `
 3. **Hard stop.** If the hole is *above* the latest snapshot's `up_to_seq` AND a direct `PullOps { since_seq: last_contiguous_seq }` against primary confirms the seq is genuinely missing from the server's `ops` table, the per-account dense-seq invariant has been violated server-side — data corruption, lost write, restored-from-stale-backup. The engine:
    - Stops syncing (no further `Ack` / `PushOps`).
    - Surfaces a structured error event to the host (`Event::SyncHalted { reason: "server seq gap unrecoverable", missing_seq }`).
-   - Local mutations continue to append to the doc / WAL — the client stays usable offline. Recovery is operational (server restore from backup), not protocol-level.
+   - Local mutations continue to append to the doc / oplog — the client stays usable offline. Recovery is operational (server restore from backup), not protocol-level.
 
 Hosts should render the hard-stop state to the user as something like *"Sync paused — server inconsistency detected. Your changes are safe locally."* Do not silently retry; the invariant break is the point.
 
@@ -128,7 +128,7 @@ Under the current sqlite single-writer + post-commit broadcast deployment, gaps 
 
 ## Commit origin tagging
 
-**Status:** Implemented. `apply_remote` and WAL replay set origin `"remote"`; `UndoManager` excludes it via `add_exclude_origin_prefix("remote")`.
+**Status:** Implemented. `apply_remote` and oplog replay set origin `"remote"`; `UndoManager` excludes it via `add_exclude_origin_prefix("remote")`.
 
 Every Loro commit carries an origin string. The engine uses two values:
 

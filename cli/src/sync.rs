@@ -159,8 +159,8 @@ impl Session {
             // `drive_until_idle` returned with the engine Idle. Any
             // server frame applied during the drive advanced the
             // engine's in-memory frontier but **did not** queue an
-            // Ack (gated on `notify_wal_durable`). Persist now —
-            // that writes the doc and calls `notify_wal_durable`,
+            // Ack (gated on `notify_oplog_durable`). Persist now —
+            // that writes the doc and calls `notify_oplog_durable`,
             // which queues the Ack — then flush the outbox before
             // closing so the ack actually leaves the wire.
             self.persist_engine_state().await?;
@@ -215,10 +215,10 @@ impl Session {
         self.engine.capture_local_ops()?;
         self.engine.snapshot_if_fully_synced()?;
         let contiguous = self.engine.last_contiguous_seq();
-        // `notify_wal_durable` advances the engine's durable frontier and
+        // `notify_oplog_durable` advances the engine's durable frontier and
         // persists the resume cursor itself (via the `LocalStorage`
         // trait). The CLI no longer reads it back or re-writes it.
-        self.engine.notify_wal_durable(contiguous);
+        self.engine.notify_oplog_durable(contiguous);
         Ok(())
     }
 

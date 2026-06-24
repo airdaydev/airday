@@ -28,9 +28,9 @@
 
 const DB_NAME = "airday-web";
 // v1–v6 built up (and re-keyed) the config stores plus a now-defunct
-// WAL/OPFS data plane (`ops` / `snapshot_meta`). v7 retired that WAL and
-// briefly homed the engine op log in a *separate* `airday-engine`
-// database. v8 collapses that split back in: the engine stores
+// op-log-on-OPFS data plane (`ops` / `snapshot_meta`). v7 retired that
+// data plane and briefly homed the engine op log in a *separate*
+// `airday-engine` database. v8 collapses that split back in: the engine stores
 // (`docs` / `ops` / `snapshots`) are created here, and `airday-engine`
 // is abandoned (its op log is re-pulled from the server, matching the
 // "abandon, not drain" convention). Note `ops` is reused as an engine
@@ -50,7 +50,7 @@ export const STORE_SNAPSHOTS = "snapshots";
 export const INDEX_OPS_CLIENT_OP_ID = "docIdClientOpId";
 export const INDEX_OPS_SERVER_SEQ = "docIdServerSeq";
 
-// Pre-v7 WAL/OPFS stores, deleted on upgrade if present. `ops` is in
+// Pre-v7 oplog/OPFS stores, deleted on upgrade if present. `ops` is in
 // this list *and* recreated below as an engine store — the delete runs
 // first, so the legacy schema never survives into the engine store.
 const LEGACY_STORES = ["snapshot_meta"];
@@ -120,7 +120,7 @@ function openOnce(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      // Drop the retired pre-v7 WAL/OPFS stores. The legacy `ops` store
+      // Drop the retired pre-v7 oplog/OPFS stores. The legacy `ops` store
       // shares a name with the engine `ops` store created below, so it
       // MUST be deleted before the engine store is (re)created.
       for (const name of [...LEGACY_STORES, STORE_OPS]) {

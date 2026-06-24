@@ -210,7 +210,7 @@ pub trait LocalStorage {
 
     /// Persist the resume cursor: the highest *contiguous* `server_seq`
     /// the engine has durably applied. The engine calls this from
-    /// `notify_wal_durable` whenever the durable frontier advances, and
+    /// `notify_oplog_durable` whenever the durable frontier advances, and
     /// impls must return this exact value as `BootState::last_acked_server_seq`
     /// next boot.
     ///

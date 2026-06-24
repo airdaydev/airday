@@ -8,7 +8,7 @@
 // once, while the underlying IDB write is queued onto a background
 // flush chain. Real durability (the IDB transaction committing) is
 // surfaced to the engine out-of-band via `whenFlushed()` → the host's
-// `notifyWalDurable`, so the server's `Ack` isn't shipped until the
+// `notifyOplogDurable`, so the server's `Ack` isn't shipped until the
 // bytes are actually on disk.
 //
 // This object is handed to the wasm `SyncEngine` constructor as the
@@ -190,7 +190,7 @@ export class IdbStorage {
   }
 
   /** Resolves once every queued IDB write has settled. The host awaits
-   *  this before `notifyWalDurable` so the server is told "I have seq
+   *  this before `notifyOplogDurable` so the server is told "I have seq
    *  N" only after N's bytes are on disk. */
   whenFlushed(): Promise<void> {
     return this.flushChain;

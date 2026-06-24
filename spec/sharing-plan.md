@@ -87,7 +87,7 @@ Server never sees DEK plaintext, never sees unlock key, never sees either party'
 - **Owner removes member.** `DELETE /api/docs/:doc_id/members/:account_id`. Sets `removed_at`. Server stops accepting any sync frames for `(doc_id, removed_account)`, excludes the removed account's devices from horizon calc, severs broadcast subscriptions.
 - **Member leaves voluntarily.** `DELETE /api/docs/:doc_id/members/:self`. Same effects. Rejected if the member is sole owner — must transfer first.
 
-Local client of the removed/leaving account should drop the local copy (snapshot, WAL, DEK entry). Can't enforce — if they took a backup, they keep it.
+Local client of the removed/leaving account should drop the local copy (snapshot, oplog, DEK entry). Can't enforce — if they took a backup, they keep it.
 
 ### Planned endpoints
 
@@ -230,7 +230,7 @@ Compile breaks downstream — fix in Phase 2.
 
 ### Phase 5 — Web
 
-- **IndexedDB schema** (`js/core/src/storage/web-db.ts`, `idb-wal.ts`): bump IDB version. `onupgradeneeded` drops old stores, creates new with composite keyPaths: `ops[account_id, doc_id, wal_seq]`, `snapshot_meta[account_id, doc_id]`. Wrap-key store: one entry per `doc_id` (non-extractable WebCrypto AES-GCM wrap).
+- **IndexedDB schema** (`js/core/src/storage/web-db.ts`): bump IDB version. `onupgradeneeded` drops old stores, creates new with composite keyPaths: `ops[account_id, doc_id, oplog_seq]`, `snapshot_meta[account_id, doc_id]`. Wrap-key store: one entry per `doc_id` (non-extractable WebCrypto AES-GCM wrap).
 - **SyncBridge → DocRouter** (`js/core/src/sync-bridge.ts`): bridge owns WS + reconnect; new `DocRouter` holds `Map<DocId, SyncEngine>`; routes inbound/outbound. v1 = primary doc engine only.
 - **App boot** (`js/web/src/App.tsx`): on login, unwrap each membership DEK with KEK, persist to IndexedDB. Boot the primary doc (`primary_doc_id`).
 - **Auth flows**: memberships-shaped bodies on relevant endpoints.

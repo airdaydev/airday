@@ -289,15 +289,15 @@ impl Doc {
             .map_err(js_err)
     }
 
-    // -- WAL primitives --
+    // -- oplog primitives --
     //
-    // These three methods back the browser local-snapshot + WAL
+    // These three methods back the browser local-snapshot + oplog
     // adapter (`spec/local-storage.md`). The JS host:
     //   1. captures `oplogVvBytes()` after each commit,
     //   2. asks for `exportUpdatesAfter(prev_vv)` to get the delta,
     //   3. encrypts + appends it to IndexedDB,
-    //   4. on boot, walks the WAL and feeds each plaintext blob back
-    //      via `importWalUpdates`.
+    //   4. on boot, walks the oplog and feeds each plaintext blob back
+    //      via `importOplogUpdates`.
 
     /// Encoded current oplog VersionVector.
     #[wasm_bindgen(js_name = oplogVvBytes)]
@@ -342,12 +342,12 @@ impl Doc {
         Ok(summary_to_json(&summary))
     }
 
-    /// Replay one WAL row. Caller has already decrypted; we just feed
+    /// Replay one oplog row. Caller has already decrypted; we just feed
     /// it back through the Loro doc tagged so the per-session undo
     /// stack stays clean.
-    #[wasm_bindgen(js_name = importWalUpdates)]
-    pub fn import_wal_updates(&mut self, plaintext: &[u8]) -> Result<(), JsError> {
-        self.inner.import_wal_updates(plaintext).map_err(js_err)
+    #[wasm_bindgen(js_name = importOplogUpdates)]
+    pub fn import_oplog_updates(&mut self, plaintext: &[u8]) -> Result<(), JsError> {
+        self.inner.import_oplog_updates(plaintext).map_err(js_err)
     }
 
     // -- undo / redo --
@@ -716,7 +716,7 @@ export interface EngineStorage {
 /// Rust `LocalStorage` over a JS-implemented `EngineStorage`. Every
 /// call forwards synchronously to the JS in-memory mirror; durability
 /// (the background IDB flush) is the JS side's concern and is surfaced
-/// to the engine out-of-band via `notifyWalDurable`.
+/// to the engine out-of-band via `notifyOplogDurable`.
 struct WebStorage {
     js: EngineStorage,
 }
@@ -1013,7 +1013,7 @@ impl SyncEngine {
     /// Contiguous-prefix seq the engine has applied **in memory**.
     /// Use for transport-layer decisions; persist `lastDurableSeq()`
     /// as the resume cursor instead so a crash never resumes from a
-    /// seq the local WAL doesn't cover.
+    /// seq the local oplog doesn't cover.
     #[wasm_bindgen(js_name = lastContiguousSeq)]
     pub fn last_contiguous_seq(&self) -> u64 {
         self.inner.last_contiguous_seq()
@@ -1028,13 +1028,13 @@ impl SyncEngine {
     }
 
     /// Host signal: bytes covering up to `seq` are now durable in
-    /// local storage (encrypted WAL row committed). Advances the
+    /// local storage (encrypted oplog row committed). Advances the
     /// durable frontier and queues an `Ack` frame if it overtakes the
     /// last one shipped. Caller must `popOutbox()` afterwards to
     /// drain the queued frame onto the wire.
-    #[wasm_bindgen(js_name = notifyWalDurable)]
-    pub fn notify_wal_durable(&mut self, seq: u64) {
-        self.inner.notify_wal_durable(seq);
+    #[wasm_bindgen(js_name = notifyOplogDurable)]
+    pub fn notify_oplog_durable(&mut self, seq: u64) {
+        self.inner.notify_oplog_durable(seq);
     }
 
     // -- doc passthrough --
@@ -1059,11 +1059,11 @@ impl SyncEngine {
         self.inner.doc().has_pending_ops()
     }
 
-    // -- WAL passthrough --
+    // -- oplog passthrough --
     //
     // After each local mutation the browser host captures the oplog
     // VV, asks for the delta since the previous capture, and pushes
-    // that into the IndexedDB WAL. Replay (`importWalUpdates`) runs
+    // that into the IndexedDB oplog. Replay (`importOplogUpdates`) runs
     // on the bare `Doc` before the engine is constructed, so it lives
     // on `Doc` only.
 
@@ -1082,7 +1082,7 @@ impl SyncEngine {
 
     /// Plaintext full-state Loro snapshot — backs the web client's
     /// "Export → Backup" menu item. Side-effect-free; doesn't touch
-    /// `last_pushed_vv` or the WAL frontier.
+    /// `last_pushed_vv` or the oplog frontier.
     #[wasm_bindgen(js_name = exportSnapshot)]
     pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
         self.inner.doc().export_snapshot_bytes().map_err(js_err)
@@ -1098,7 +1098,7 @@ impl SyncEngine {
     /// Additive JSON import — counterpart of `exportJson` on the engine
     /// surface. Returns a JSON string of `{ listsAdded, itemsAdded,
     /// itemsSkipped }`. Doesn't push or flush — caller's normal
-    /// post-mutation flow (WAL append, sync push) handles the new ops
+    /// post-mutation flow (oplog append, sync push) handles the new ops
     /// like any other local commit.
     #[wasm_bindgen(js_name = importJson)]
     pub fn import_json(&self, json: &str) -> Result<String, JsError> {

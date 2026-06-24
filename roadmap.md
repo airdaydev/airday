@@ -10,7 +10,7 @@
 - `status.pending_changes` is currently bool-like; exact pending-op counting can come later by walking the Loro VV diff.
 - Roll devices.json / secret.json from cli into sqlite & rename db ext to .sqlite
 
-## Compaction *wait until sync / wal / storage is settled
+## Compaction *wait until sync / oplog / storage is settled
 One latent thing remains, but it was already scoped out in your handoff:
   core/src/doc.rs::snapshot_blob still calls ExportMode::Snapshot (full), so the
   snapshot payload doesn't trim Loro's internal history even though the ops table does.

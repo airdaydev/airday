@@ -170,14 +170,14 @@ pub struct SyncEngine {
     /// under Postgres + replicas it lags the max-seen until a reorder
     /// buffer fills the holes. **Not** the value we ack — the engine
     /// only ships an Ack for a seq the host has confirmed durable via
-    /// `notify_wal_durable`.
+    /// `notify_oplog_durable`.
     last_contiguous_seq: u64,
     /// Contiguous-prefix seq the host has confirmed locally durable
-    /// (encrypted WAL row committed for the bytes covering this seq).
+    /// (encrypted oplog row committed for the bytes covering this seq).
     /// `<= last_contiguous_seq`. This is the value the engine sends
     /// in `Ack { last_acked_seq }`, and the value callers persist
     /// between sessions as the resume cursor (`PullOps`'s
-    /// `since_seq`). Advances only via `notify_wal_durable`; a crash
+    /// `since_seq`). Advances only via `notify_oplog_durable`; a crash
     /// before the host's durable-notify means the server learns we
     /// have a seq strictly later than the previous session's cursor
     /// only after we re-apply + re-durable on the next run.
@@ -346,7 +346,7 @@ impl SyncEngine {
     /// mid-session resume `PullOps`, snapshot eligibility) — NOT as
     /// the persisted resume cursor. The persisted cursor must be
     /// `last_durable_seq()` so a crash never resumes from a seq the
-    /// local doc/WAL doesn't actually contain.
+    /// local doc/oplog doesn't actually contain.
     pub fn last_contiguous_seq(&self) -> u64 {
         self.last_contiguous_seq
     }
@@ -360,7 +360,7 @@ impl SyncEngine {
     }
 
     /// Host signal: every byte the engine had advanced through up to
-    /// `seq` is now durable in local storage (encrypted WAL row
+    /// `seq` is now durable in local storage (encrypted oplog row
     /// committed). Advances `last_durable_seq` — clamped to
     /// `last_contiguous_seq` and monotonic — and queues an `Ack` if
     /// that advance overtakes `last_sent_ack`. Caller must
@@ -368,11 +368,11 @@ impl SyncEngine {
     ///
     /// Callers should sample `last_contiguous_seq()` *synchronously*
     /// at the moment of the durability work (e.g. just before queueing
-    /// the IDB `appendWal` promise) and pass that sample back here
+    /// the IDB `appendLocalOp` promise) and pass that sample back here
     /// after the write commits — this binds the notify to bytes that
     /// were actually persisted, not to wherever the in-memory engine
     /// has run on to in the meantime.
-    pub fn notify_wal_durable(&mut self, seq: u64) {
+    pub fn notify_oplog_durable(&mut self, seq: u64) {
         let clamped = seq.min(self.last_contiguous_seq);
         if clamped > self.last_durable_seq {
             self.last_durable_seq = clamped;
@@ -579,8 +579,8 @@ impl SyncEngine {
                     return;
                 }
                 self.apply_remote_ops(ops, now_ms);
-                // Ack is gated on `notify_wal_durable` — the host
-                // calls back once the encrypted WAL row covering these
+                // Ack is gated on `notify_oplog_durable` — the host
+                // calls back once the encrypted oplog row covering these
                 // ops is committed.
                 if complete && matches!(self.state, ConnState::Pulling) {
                     self.state = ConnState::Idle;
@@ -598,7 +598,7 @@ impl SyncEngine {
                     return;
                 }
                 self.apply_remote_ops(ops, now_ms);
-                // Ack gated on host's `notify_wal_durable`.
+                // Ack gated on host's `notify_oplog_durable`.
             }
             ServerFrame::OpsAck { assigned_seqs } => {
                 if !matches!(self.state, ConnState::Pushing | ConnState::PushingDirty) {
@@ -640,7 +640,7 @@ impl SyncEngine {
                     }
                 }
                 self.events.push_back(Event::Pushed);
-                // Ack gated on `notify_wal_durable`. The local op's
+                // Ack gated on `notify_oplog_durable`. The local op's
                 // bytes may or may not be on disk yet (the host's
                 // appendChain runs alongside the wire push), so the
                 // engine doesn't tell the server "I have seq N" until
@@ -694,7 +694,7 @@ impl SyncEngine {
                 // drop redundant buffered seqs and peel anything
                 // contiguous above the new frontier.
                 self.compact_seen_above_contig();
-                // Ack gated on `notify_wal_durable` — the host needs
+                // Ack gated on `notify_oplog_durable` — the host needs
                 // to persist the snapshot (either by committing it
                 // directly via `commitSnapshot` or by exporting +
                 // appending the resulting delta) before we tell the
@@ -1294,11 +1294,11 @@ mod tests {
         // op's bytes are locally durable — even on our own OpsAck.
         assert!(
             eng.pop_outbox().is_none(),
-            "Ack frame queued before notify_wal_durable",
+            "Ack frame queued before notify_oplog_durable",
         );
 
-        // Host signals "WAL row covering seq 1 is on disk" → ack ships.
-        eng.notify_wal_durable(1);
+        // Host signals "oplog row covering seq 1 is on disk" → ack ships.
+        eng.notify_oplog_durable(1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
 
@@ -1439,9 +1439,9 @@ mod tests {
         // No Ack until host confirms durability.
         assert!(
             eng.pop_outbox().is_none(),
-            "Ack frame queued before notify_wal_durable",
+            "Ack frame queued before notify_oplog_durable",
         );
-        eng.notify_wal_durable(1);
+        eng.notify_oplog_durable(1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
 
@@ -1508,7 +1508,7 @@ mod tests {
 
         // Ack gated on host-confirmed durability.
         assert!(eng.pop_outbox().is_none());
-        eng.notify_wal_durable(2);
+        eng.notify_oplog_durable(2);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 2 }));
         assert_eq!(eng.last_contiguous_seq(), 2);
@@ -1562,7 +1562,7 @@ mod tests {
             0,
         );
         assert!(eng.is_idle());
-        // No Ack queued yet (gated on `notify_wal_durable`); drain
+        // No Ack queued yet (gated on `notify_oplog_durable`); drain
         // anyway in case future engine evolution adds post-ack
         // housekeeping here.
         let _ = drain_outbox(&mut eng);
@@ -1857,14 +1857,14 @@ mod tests {
         }
         assert!(
             !frames.iter().any(|f| matches!(f, ClientFrame::Ack { .. })),
-            "Ack queued before notify_wal_durable: {frames:?}",
+            "Ack queued before notify_oplog_durable: {frames:?}",
         );
         assert!(frames
             .iter()
             .any(|f| matches!(f, ClientFrame::PullOps { since_seq: 42 })));
 
         // Host commits the snapshot → ack ships.
-        eng.notify_wal_durable(42);
+        eng.notify_oplog_durable(42);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 42 }));
 
@@ -2161,7 +2161,7 @@ mod tests {
     }
 
     #[test]
-    fn notify_wal_durable_clamps_to_last_contiguous() {
+    fn notify_oplog_durable_clamps_to_last_contiguous() {
         // Calling with a seq beyond what the engine has applied
         // in-memory must clamp — a host bug shouldn't trick the
         // engine into acking ops it never saw.
@@ -2180,14 +2180,14 @@ mod tests {
             0,
         );
         assert_eq!(eng.last_contiguous_seq(), 1);
-        eng.notify_wal_durable(999);
+        eng.notify_oplog_durable(999);
         assert_eq!(eng.last_durable_seq(), 1);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 1 }));
     }
 
     #[test]
-    fn notify_wal_durable_is_monotonic_and_coalesces() {
+    fn notify_oplog_durable_is_monotonic_and_coalesces() {
         // A backwards notify must not regress last_durable_seq.
         // Repeated notifies at the same value must not re-queue an
         // Ack (the same coalescing as `queue_ack_if_advanced`).
@@ -2207,16 +2207,16 @@ mod tests {
         );
         assert!(eng.pop_outbox().is_none());
 
-        eng.notify_wal_durable(1);
+        eng.notify_oplog_durable(1);
         let _ack: ClientFrame = dec(&eng.pop_outbox().expect("first Ack"));
 
         // Re-notify at 1 (e.g. a follow-up zero-bytes captureAndAppend
         // chain entry) — no duplicate Ack.
-        eng.notify_wal_durable(1);
+        eng.notify_oplog_durable(1);
         assert!(eng.pop_outbox().is_none());
 
         // Notify backwards is a no-op.
-        eng.notify_wal_durable(0);
+        eng.notify_oplog_durable(0);
         assert_eq!(eng.last_durable_seq(), 1);
         assert!(eng.pop_outbox().is_none());
     }
@@ -2225,7 +2225,7 @@ mod tests {
     fn inbound_apply_does_not_queue_ack_until_durable() {
         // Regression guard against the original bug: a remote op
         // arriving must NOT cause an Ack frame to land in the outbox
-        // until `notify_wal_durable` says the WAL row is committed.
+        // until `notify_oplog_durable` says the oplog row is committed.
         let mut eng = fresh_engine_clean();
         let dek = eng.dek.clone();
         drive_to_idle(&mut eng);
@@ -2250,7 +2250,7 @@ mod tests {
             let frame: ClientFrame = dec(&bytes);
             assert!(
                 !matches!(frame, ClientFrame::Ack { .. }),
-                "outbox carried an Ack before notify_wal_durable: {frame:?}",
+                "outbox carried an Ack before notify_oplog_durable: {frame:?}",
             );
         }
     }
@@ -2303,7 +2303,7 @@ mod tests {
 
         // Contiguous prefix stopped at 2; 4 is buffered.
         assert_eq!(eng.last_contiguous_seq(), 2);
-        eng.notify_wal_durable(2);
+        eng.notify_oplog_durable(2);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("first Ack"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 2 }));
 
@@ -2318,7 +2318,7 @@ mod tests {
             1_100,
         );
         assert_eq!(eng.last_contiguous_seq(), 4);
-        eng.notify_wal_durable(4);
+        eng.notify_oplog_durable(4);
         let ack: ClientFrame = dec(&eng.pop_outbox().expect("Ack 4"));
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 4 }));
     }
@@ -2782,13 +2782,13 @@ mod tests {
         assert_eq!(eng.last_contiguous_seq(), 2);
         // ...but the *persisted* resume cursor must NOT move on append
         // alone — an op above a gap would jump it past the hole. Only
-        // `notify_wal_durable` (the host's durability signal) persists it.
+        // `notify_oplog_durable` (the host's durability signal) persists it.
         assert_eq!(
             boot.last_acked_server_seq,
             ServerSeq(0),
             "append must not persist the cursor",
         );
-        eng.notify_wal_durable(2);
+        eng.notify_oplog_durable(2);
         assert_eq!(
             mem.boot(fake_doc_id()).unwrap().last_acked_server_seq,
             ServerSeq(2),

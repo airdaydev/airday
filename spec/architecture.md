@@ -55,7 +55,7 @@ Persistence is **inside** the engine's contract, via one Rust trait — `core::L
 Two implementations satisfy the same semantics on different substrates:
 
 - **CLI / server-side single-account flows:** `SqliteStorage` (`cli/src/storage.rs`, `rusqlite`, file on disk; synchronously durable).
-- **Web:** `IdbStorage` (`js/core/src/storage/idb-storage.ts`) behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). The trait is synchronous; IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror the engine reads/writes immediately and flushes IDB in the background, signalling real durability back via `notify_wal_durable`. The engine stays on the main thread (no Worker).
+- **Web:** `IdbStorage` (`js/core/src/storage/idb-storage.ts`) behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). The trait is synchronous; IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror the engine reads/writes immediately and flushes IDB in the background, signalling real durability back via `notify_oplog_durable`. The engine stays on the main thread (no Worker).
 
 The rationale and history — including why web uses IDB rather than sqlite-wasm — live in `spec/local-storage.md`.
 

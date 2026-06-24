@@ -145,7 +145,7 @@ export function createWorkspaceRuntime(props: {
     storage
       .whenFlushed()
       .then(() => {
-        engine.notifyWalDurable(seq);
+        engine.notifyOplogDurable(seq);
         bridge?.pumpOutbox();
       })
       .catch((e) => {

@@ -9,14 +9,14 @@ The local store mirrors the server's storage shape: append-only encrypted op blo
 1. Local rows carry a client-minted `client_op_id` so the server can dedupe retries and so the client can map acks back to rows.
 2. Each row carries a `server_seq` that is `NULL` until the server acks the upload. `server_seq IS NULL` is the outbox.
 
-A WAL row is *the* unit. It is what Loro exported, what gets encrypted at rest, what gets sent on the wire, what the server stores under its own seq, what gets ack-mapped, and what gets replayed on boot. There is no separate "upload parcel" abstraction.
+A oplog row is *the* unit. It is what Loro exported, what gets encrypted at rest, what gets sent on the wire, what the server stores under its own seq, what gets ack-mapped, and what gets replayed on boot. There is no separate "upload parcel" abstraction.
 
 ## Storage substrate
 
 Per account, one sqlite database.
 
 - **CLI**: `SqliteStorage` (`cli/src/storage.rs`) — a file on disk under the profile dir. Same pragmas as the server (`spec/storage.md` §Sqlite settings). Writes are synchronously durable: the trait method returns only after the `INSERT` commits.
-- **Web**: `IdbStorage` (`js/core/src/storage/idb-storage.ts`) — IndexedDB on the **main thread**, behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). No Worker, no OPFS, no sqlite-wasm. The trait is synchronous but IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror of the op log that the extern methods read/write immediately and flushes the real IDB transaction on a background promise chain; durability is signalled back out-of-band (`whenFlushed()` → the host's `notify_wal_durable`) so an `Ack` isn't shipped until the bytes are on disk. IndexedDB is **hard-required** — a session that can't open it surfaces a "Failed to start" screen rather than booting on a storage-less engine.
+- **Web**: `IdbStorage` (`js/core/src/storage/idb-storage.ts`) — IndexedDB on the **main thread**, behind a wasm-bindgen `EngineStorage` extern (`core/web/src/lib.rs`). No Worker, no OPFS, no sqlite-wasm. The trait is synchronous but IDB is async, so `IdbStorage` keeps a synchronous in-memory mirror of the op log that the extern methods read/write immediately and flushes the real IDB transaction on a background promise chain; durability is signalled back out-of-band (`whenFlushed()` → the host's `notify_oplog_durable`) so an `Ack` isn't shipped until the bytes are on disk. IndexedDB is **hard-required** — a session that can't open it surfaces a "Failed to start" screen rather than booting on a storage-less engine.
 
 The engine sees a single `LocalStorage` trait; the CLI binds a native sqlite handle, the web binds the IDB-backed extern. Storage is mandatory — there is no storage-less engine mode.
 
@@ -97,7 +97,7 @@ Remote frame:
 
 1. Decrypt and apply the frame to the live Loro doc (this is what the engine does today regardless of persistence).
 2. `INSERT INTO ops (doc_id, local_seq, client_op_id=NULL, server_seq, payload, payload_nonce, created_at)` — the encrypted bytes are the ones the server sent, stored verbatim. This insert does **not** touch the pull cursor.
-3. Separately, when the host signals durability (`SyncEngine::notify_wal_durable`) the engine advances its in-memory contiguous/durable frontier and persists the new value through `LocalStorage::write_acked_seq(doc_id, seq)` → `docs.last_acked_server_seq`. The engine is the sole authority: it passes the *contiguous* frontier (an out-of-order op above a gap does not move it), so storage never derives the cursor itself (see `spec/sync-protocol.md`).
+3. Separately, when the host signals durability (`SyncEngine::notify_oplog_durable`) the engine advances its in-memory contiguous/durable frontier and persists the new value through `LocalStorage::write_acked_seq(doc_id, seq)` → `docs.last_acked_server_seq`. The engine is the sole authority: it passes the *contiguous* frontier (an out-of-order op above a gap does not move it), so storage never derives the cursor itself (see `spec/sync-protocol.md`).
 
 Wire batching is a separate concern: the WS layer **may** pack multiple rows into one frame for throughput. Each row keeps its own `client_op_id` and gets its own `server_seq` in the ack. The storage layer does not know about batching.
 
@@ -111,7 +111,7 @@ Per doc, in a single transaction:
 That's the entire boot. The same path covers:
 
 - **Fresh account** — no snapshot row, ops table may be empty (signup-seeded built-ins arrive as the first appends).
-- **Pure-WAL recovery** — no snapshot yet, replay all ops.
+- **Pure-oplog recovery** — no snapshot yet, replay all ops.
 - **Snapshot + tail** — the common steady-state case.
 
 Pending rows (those with `server_seq IS NULL`) are skipped only if their `local_seq ≤ snapshot.up_to_local_seq` — their effects are already in the snapshot. They remain on disk for re-upload; see Outbox.
@@ -162,8 +162,8 @@ Pending rows (`server_seq IS NULL`) are never compacted. An offline client accum
 - **Crash during local append**: the row is either fully committed in sqlite or not — sqlite transaction guarantees. No torn rows.
 - **Crash between append and send**: row exists with `server_seq IS NULL`. On boot, outbox drain re-sends it. Server dedupes by `client_op_id`.
 - **Crash between send and ack**: row exists with `server_seq IS NULL`; server may already have it. On boot, outbox drain re-sends; server's recent-ids window maps the retry to the existing server row and returns the original `server_seq` in the ack.
-- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a *separate* write (`write_acked_seq`, driven by the engine on `notify_wal_durable` after the op rows are durable), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops — never ahead. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. The two writes are deliberately *not* one transaction: the cursor value is the engine's contiguous frontier (unknown at op-insert time, since out-of-order ops above a gap mustn't advance it), and the durability seam (`notify_wal_durable`) is what lets the sync engine straddle synchronous sqlite and async IDB.
-- **Crash during snapshot**: the snapshot + the ops DELETE are one transaction; either both land or neither. Pre-snapshot ops survive in full if the transaction aborted, so replay still works from the previous snapshot row (or pure-WAL if there wasn't one).
+- **Crash during remote-frame apply**: the row is either fully inserted with its `server_seq` or not — sqlite transaction guarantees. The `docs.last_acked_server_seq` cursor is persisted by a *separate* write (`write_acked_seq`, driven by the engine on `notify_oplog_durable` after the op rows are durable), so a crash after the op insert but before the cursor advance leaves the cursor *behind* the stored ops — never ahead. This self-heals: on reboot the engine re-pulls from the lower cursor and `append_remote_op` dedupes the already-stored `server_seq` rows. The two writes are deliberately *not* one transaction: the cursor value is the engine's contiguous frontier (unknown at op-insert time, since out-of-order ops above a gap mustn't advance it), and the durability seam (`notify_oplog_durable`) is what lets the sync engine straddle synchronous sqlite and async IDB.
+- **Crash during snapshot**: the snapshot + the ops DELETE are one transaction; either both land or neither. Pre-snapshot ops survive in full if the transaction aborted, so replay still works from the previous snapshot row (or pure-oplog if there wasn't one).
 
 ## Design constraints
 
@@ -192,7 +192,7 @@ Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not
 Pre-release: **no data was migrated from the old layouts** — both clients start fresh under this schema. This is deliberate (pre-release, single-user, no production data to preserve) and is the standing migration rule (see `AGENTS.md`).
 
 - **CLI**: the schema ships as a single migration file (`cli/migrations/001_init.sql`); there is no incremental migration and no legacy-bridge table. The old single-row `docs(payload)` blob is not drained.
-- **Web**: the engine op log lives in the `docs` / `ops` / `snapshots` stores of the single `airday-web` IDB database, alongside the config stores (`vault` / `device` / `prefs`). The old WAL/OPFS op data was abandoned, not drained; the v8 `web-db.ts` upgrade drops the dead pre-v7 `ops` / `snapshot_meta` stores (re-creating `ops` with the engine schema) and best-effort deletes the short-lived separate `airday-engine` database from the v7 era.
+- **Web**: the engine op log lives in the `docs` / `ops` / `snapshots` stores of the single `airday-web` IDB database, alongside the config stores (`vault` / `device` / `prefs`). The old oplog/OPFS op data was abandoned, not drained; the v8 `web-db.ts` upgrade drops the dead pre-v7 `ops` / `snapshot_meta` stores (re-creating `ops` with the engine schema) and best-effort deletes the short-lived separate `airday-engine` database from the v7 era.
 
 ## Testing
 
