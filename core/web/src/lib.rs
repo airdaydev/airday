@@ -1080,16 +1080,16 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
-    /// Plaintext full-state Loro snapshot — backs the web client's
-    /// "Export → Backup" menu item. Side-effect-free; doesn't touch
-    /// `last_pushed_vv` or the oplog frontier.
+    /// Plaintext full-state Loro snapshot — a lossless, round-trippable
+    /// backup. Currently unexposed in the UI (there's no matching import
+    /// path yet); kept for the eventual lossless restore. Side-effect-free;
+    /// doesn't touch `last_pushed_vv` or the oplog frontier.
     #[wasm_bindgen(js_name = exportSnapshot)]
     pub fn export_snapshot(&self) -> Result<Vec<u8>, JsError> {
         self.inner.doc().export_snapshot_bytes().map_err(js_err)
     }
 
-    /// Pretty-printed JSON dump — companion to `exportSnapshot`,
-    /// powers the "Export → JSON" menu item.
+    /// Pretty-printed JSON dump — powers the "Export JSON" menu item.
     #[wasm_bindgen(js_name = exportJson)]
     pub fn export_json(&self) -> String {
         self.inner.doc().export_json_string()

@@ -243,32 +243,11 @@ export function Nav(props: {
     URL.revokeObjectURL(url);
   };
 
-  // "Export → Backup": full plaintext Loro snapshot. Same bytes the
-  // engine would seal for the server, but unencrypted — anyone holding
-  // the file can replay the whole doc into a fresh `Doc::load`-style
-  // import. Date-stamped filename so repeat exports don't collide in
-  // the Downloads folder.
-  const downloadBackup = (): void => {
-    try {
-      const bytes = props.app.engine.exportSnapshot();
-      // Copy into a fresh ArrayBuffer — wasm-bindgen returns a view
-      // over the wasm linear memory, and Blob can capture-by-reference
-      // in some engines, leaving the download with a stale pointer
-      // once wasm reuses the bytes.
-      const buf = new Uint8Array(bytes.byteLength);
-      buf.set(bytes);
-      const blob = new Blob([buf], { type: "application/octet-stream" });
-      const stamp = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, `airday-${stamp}.bin`);
-    } catch (err) {
-      console.error("export backup failed:", err);
-      alert(m().nav.exportFailed);
-    }
-  };
-
-  // "Export → JSON": pretty-printed semantic dump (lists + items).
-  // Companion to the binary backup — readable in any editor, but lossy:
-  // CRDT history, ordering metadata, and undo-stack info aren't here.
+  // "Export JSON": pretty-printed semantic dump (lists + items).
+  // Readable in any editor and round-trips through Import JSON, but
+  // lossy: CRDT history, ordering metadata, and undo-stack info aren't
+  // here. (A lossless plaintext-snapshot export exists in the core —
+  // `exportSnapshot` — but stays unexposed until a matching import lands.)
   const downloadJson = (): void => {
     try {
       const json = props.app.engine.exportJson();
@@ -587,30 +566,12 @@ export function Nav(props: {
                 <kbd class="menu-shortcut">⌘⇧Z</kbd>
               </DropdownMenu.Item>
               <DropdownMenu.Separator class="dropdown-menu-separator" />
-              <DropdownMenu.Sub overlap gutter={4} shift={-4}>
-                <DropdownMenu.SubTrigger class="dropdown-menu-item dropdown-menu-subtrigger">
-                  <span>{m().nav.export}</span>
-                  <span class="dropdown-menu-chevron" aria-hidden="true">
-                    ›
-                  </span>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.SubContent class="dropdown-menu-content">
-                    <DropdownMenu.Item
-                      class="dropdown-menu-item"
-                      onSelect={() => downloadBackup()}
-                    >
-                      {m().nav.exportBackup}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      class="dropdown-menu-item"
-                      onSelect={() => downloadJson()}
-                    >
-                      {m().nav.exportJson}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Sub>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => downloadJson()}
+              >
+                {m().nav.exportJson}
+              </DropdownMenu.Item>
               <DropdownMenu.Item
                 class="dropdown-menu-item"
                 onSelect={() => {

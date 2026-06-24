@@ -2992,10 +2992,10 @@ mod tests {
     fn export_snapshot_bytes_roundtrips_through_loro_import() {
         // Backup story: bytes from `export_snapshot_bytes` reconstruct
         // the same logical state when imported into a fresh Loro doc.
-        // (`Doc::load` takes the full msgpack envelope; the user-facing
-        // backup is just the snapshot half, so we go through `LoroDoc`
-        // directly here — same path a fresh client would take to ingest
-        // an `airday-*.bin`.)
+        // (`Doc::load` takes the full msgpack envelope; the snapshot
+        // export is just the snapshot half, so we go through `LoroDoc`
+        // directly here — the path a future lossless-restore import would
+        // take. The export is currently unexposed in the UI.)
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();

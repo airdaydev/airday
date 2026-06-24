@@ -74,8 +74,6 @@ type Messages = {
     settings: string;
     website: string;
     logOut: string;
-    export: string;
-    exportBackup: string;
     exportJson: string;
     exportFailed: string;
     importJson: string;
@@ -171,11 +169,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       settings: "Ajustes",
       website: "Sitio web de Airday",
       logOut: "Cerrar sesión",
-      export: "Exportar",
-      exportBackup: "Copia de seguridad (.bin)",
-      exportJson: "JSON (.json)",
-      exportFailed: "No se pudo exportar la copia de seguridad",
-      importJson: "Importar JSON…",
+      exportJson: "Exportar JSON",
+      exportFailed: "No se pudo exportar",
+      importJson: "Importar JSON",
       importSucceeded: (items, lists) =>
         `Importado: ${items} elemento${items === 1 ? "" : "s"}, ${lists} lista${lists === 1 ? "" : "s"}`,
       importFailed: "No se pudo importar el archivo",
@@ -268,11 +264,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       settings: "Settings",
       website: "Airday website",
       logOut: "Log out",
-      export: "Export",
-      exportBackup: "Backup (.bin)",
-      exportJson: "JSON (.json)",
-      exportFailed: "Could not export backup",
-      importJson: "Import JSON…",
+      exportJson: "Export JSON",
+      exportFailed: "Could not export",
+      importJson: "Import JSON",
       importSucceeded: (items, lists) =>
         `Imported ${items} item${items === 1 ? "" : "s"}, ${lists} list${lists === 1 ? "" : "s"}`,
       importFailed: "Could not import file",
