@@ -13,10 +13,10 @@
 // tradeoff.
 //
 // One record per origin keyed at `'current'`. Web is a single-account
-// surface; logging in as a different account overwrites. The vault
-// shares the `airday-web` IndexedDB database with the WAL store; the
-// schema is owned by `./web-db.ts` so neither module's open path
-// surprises the other with a missing object store.
+// surface; logging in as a different account overwrites. The vault is
+// one store in the `airday-web` IndexedDB database; the schema (every
+// store) is owned by `./web-db.ts` so no module's open path surprises
+// another with a missing object store.
 
 import type { Dek } from "../../wasm/airday_core_web.js";
 import { STORE_VAULT, openAirdayDb } from "./web-db.ts";

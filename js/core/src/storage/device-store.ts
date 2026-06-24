@@ -1,15 +1,12 @@
 // Per-account device row — sync identity + the "last synced" stamp.
 //
-// Lives in the `airday-web` database (alongside vault + prefs), keyed
-// per account. The resume cursor used to live here too, but it's now
-// the engine's: persisted in the `airday-engine` op-log DB via
-// `IdbStorage.writeAckedSeq` (clamped to the durable contiguous
-// frontier — see `spec/local-storage.md`). This row carries only
-// identity and `lastSyncAt`, which is observability for the "Synced …"
-// status and never consulted by the sync path.
-//
-// Extracted from the now-retired `IdbWalStorage` so the engine op log
-// can move to `IdbStorage` while this row stays put.
+// Lives in the `device` store of the `airday-web` database (alongside
+// vault + prefs and the engine op log), keyed per account. The resume
+// cursor used to live here too, but it's now the engine's: persisted in
+// the `docs` store via `IdbStorage.writeAckedSeq` (clamped to the
+// durable contiguous frontier — see `spec/local-storage.md`). This row
+// carries only identity and `lastSyncAt`, which is observability for the
+// "Synced …" status and never consulted by the sync path.
 
 import { type DeviceConfig, normalizeDeviceConfig } from "./adapter.ts";
 import { openAirdayDb, STORE_DEVICE } from "./web-db.ts";

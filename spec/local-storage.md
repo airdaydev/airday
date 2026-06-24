@@ -183,7 +183,7 @@ An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VF
 
 ### Web boot + the bytes-copy gotcha
 
-Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the `airday-engine` DB (written via `writeAckedSeq`), **not** the `airday-web` `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
 
 ⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. (`idb-storage.ts` documents this inline; `roadmap.md` tracks a proposal to enforce the copy Rust-side.)
 
@@ -192,7 +192,7 @@ Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not
 Pre-release: **no data was migrated from the old layouts** — both clients start fresh under this schema. This is deliberate (pre-release, single-user, no production data to preserve) and is the standing migration rule (see `AGENTS.md`).
 
 - **CLI**: the schema ships as a single migration file (`cli/migrations/001_init.sql`); there is no incremental migration and no legacy-bridge table. The old single-row `docs(payload)` blob is not drained.
-- **Web**: the new engine store is a fresh IDB database (`airday-engine`). The old `airday-web` WAL/OPFS op data was abandoned, not drained; `web-db.ts` drops the dead `ops` / `snapshot_meta` stores on upgrade and keeps only `vault` / `device` / `prefs`.
+- **Web**: the engine op log lives in the `docs` / `ops` / `snapshots` stores of the single `airday-web` IDB database, alongside the config stores (`vault` / `device` / `prefs`). The old WAL/OPFS op data was abandoned, not drained; the v8 `web-db.ts` upgrade drops the dead pre-v7 `ops` / `snapshot_meta` stores (re-creating `ops` with the engine schema) and best-effort deletes the short-lived separate `airday-engine` database from the v7 era.
 
 ## Testing
 

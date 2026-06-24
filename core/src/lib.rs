@@ -5,7 +5,6 @@ pub mod doc;
 pub mod events;
 pub mod storage;
 pub mod sync;
-pub mod sync2;
 
 pub use crypto::*;
 pub use doc::{
@@ -18,4 +17,3 @@ pub use storage::{
     RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
 };
 pub use sync::{EngineOptions, Event, SyncEngine};
-pub use sync2::EngineOptions2;

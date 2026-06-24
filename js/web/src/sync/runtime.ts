@@ -22,7 +22,8 @@ const CLIENT_VERSION = "0.1.0";
 export type BootInfo = {
   doc: Doc;
   lastAcked: bigint;
-  /** Engine op-log store (IndexedDB `airday-engine`). Mandatory — the
+  /** Engine op-log store (the engine stores of IndexedDB `airday-web`).
+   *  Mandatory — the
    *  engine has no storage-less mode; if IDB can't be opened the boot
    *  fails hard (see `BootGate`) rather than running without local
    *  persistence. */

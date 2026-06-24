@@ -21,12 +21,12 @@
 import {
   type DocRow,
   type OpRow,
-  openEngineDb,
+  openAirdayDb,
   type SnapshotRow,
   STORE_DOCS,
   STORE_OPS,
   STORE_SNAPSHOTS,
-} from "./engine-db.ts";
+} from "./web-db.ts";
 
 /** In-memory mirror row. `clientOpId` is hex (the IDB representation);
  *  `serverSeq` is unset until ack (local) / always set (remote). */
@@ -108,10 +108,10 @@ export class IdbStorage {
     private readonly docId: string,
   ) {}
 
-  /** Open the engine DB, ensure the `docs` row, and load this doc's
+  /** Open the database, ensure the `docs` row, and load this doc's
    *  full op log + snapshot into the mirror. */
   static async open(docId: string): Promise<IdbStorage> {
-    const db = await openEngineDb();
+    const db = await openAirdayDb();
     const storage = new IdbStorage(db, docId);
     await storage.load();
     return storage;

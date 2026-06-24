@@ -10,12 +10,7 @@ export {
   type EngineBootRows,
   type OutboxRowJs,
 } from "./storage/idb-storage.ts";
-export {
-  openEngineDb,
-  _resetEngineDbForTests,
-  ENGINE_DB_NAME,
-  ENGINE_DB_VERSION,
-} from "./storage/engine-db.ts";
+export { openAirdayDb, _resetAirdayDbForTests } from "./storage/web-db.ts";
 export { getDevice, putDevice } from "./storage/device-store.ts";
 export {
   DekVault,

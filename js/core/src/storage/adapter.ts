@@ -2,9 +2,10 @@
 //
 // This is the sync identity row — account/device ids, server URL, and
 // the observability-only "last synced" stamp. On web it's persisted in
-// the `airday-web` IDB via `device-store.ts`; the engine's op log lives
-// separately in the `airday-engine` DB (`IdbStorage`). The DEK is never
-// stored here — its browser lifetime is in-memory only (see `DekVault`).
+// the `device` store of the `airday-web` IDB via `device-store.ts`,
+// alongside the engine's op log (`IdbStorage`) — one database, separate
+// stores. The DEK is never stored here — its browser lifetime is
+// in-memory only (see `DekVault`).
 
 export interface DeviceConfig {
   accountId: string;
