@@ -12,7 +12,7 @@
 //! - root container `settings` (`LoroMap`) — account-wide synced
 //!   workspace settings not owned by a specific list row.
 //!
-//! The bin is *not* a list — binned items keep their `list_id`. One
+//! Binned is a status & items keep their `list_id`. One
 //! well-known list id is *reserved*: [`LIST_MAIN`].
 //! It has **no MovableList entry** — items reference it by string id
 //! and clients render it with a hardcoded label ("Queue"). Queue always
@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::crypto::{Dek, AEAD_NONCE_LEN};
+use crate::crypto::{AEAD_NONCE_LEN, Dek};
 use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
@@ -1088,7 +1088,7 @@ impl Doc {
     }
 
     /// Encoded current oplog VersionVector. The browser WAL adapter
-    /// (`spec/idb-wal.md`) keeps the VV captured after the previous
+    /// (`spec/local-storage.md`) keeps the VV captured after the previous
     /// commit and asks for everything strictly after it on the next
     /// commit — that delta is what the WAL row stores.
     pub fn oplog_vv_bytes(&self) -> Vec<u8> {
@@ -2342,11 +2342,13 @@ mod tests {
         doc.set_item_done(&id, true).unwrap();
         let evs = doc.drain_events();
         match evs.as_slice() {
-            [AppEvent::ItemStatusChanged {
-                id: eid,
-                done_at,
-                binned_at,
-            }] => {
+            [
+                AppEvent::ItemStatusChanged {
+                    id: eid,
+                    done_at,
+                    binned_at,
+                },
+            ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some());
                 assert!(binned_at.is_none());
@@ -2364,11 +2366,13 @@ mod tests {
         doc.set_item_binned(&id, true).unwrap();
         let evs = doc.drain_events();
         match evs.as_slice() {
-            [AppEvent::ItemStatusChanged {
-                id: eid,
-                done_at,
-                binned_at,
-            }] => {
+            [
+                AppEvent::ItemStatusChanged {
+                    id: eid,
+                    done_at,
+                    binned_at,
+                },
+            ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some(), "done state must be preserved");
                 assert!(binned_at.is_some());

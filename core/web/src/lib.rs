@@ -2,21 +2,19 @@
 //!
 //! Surfaces enough of `airday-core` for a JS host to (a) round-trip a
 //! `Doc` through a storage adapter and (b) drive the sans-IO
-//! `SyncEngine` from a browser-owned `WebSocket`. The
-//! password-derivation flow still lives behind `airday-core::crypto::derive_*`
-//! and is exposed when the login worker ships.
+//! `SyncEngine` from a browser-owned `WebSocket`, (c) password/recovery derivation.
 
 use wasm_bindgen::prelude::*;
 
 use airday_core::{
-    derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
-    parse_recovery_code, AppEvent as CoreAppEvent, BootState as CoreBootState,
+    AEAD_NONCE_LEN, AppEvent as CoreAppEvent, BootState as CoreBootState,
     ClientOpId as CoreClientOpId, Dek as CoreDek, Doc as CoreDoc, DocId as CoreDocId,
     EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
     Kek as CoreKek, LocalOpRow as CoreLocalOpRow, LocalSeq as CoreLocalSeq,
     LocalStorage as CoreLocalStorage, OutboxRow as CoreOutboxRow, RemoteOpRow as CoreRemoteOpRow,
     ServerSeq as CoreServerSeq, StorageError as CoreStorageError, SyncEngine as CoreSyncEngine,
-    WrappedDek as CoreWrappedDek, AEAD_NONCE_LEN,
+    WrappedDek as CoreWrappedDek, derive_password_master, derive_recovery_master,
+    generate_recovery_code, kek_from_master, parse_recovery_code,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -294,7 +292,7 @@ impl Doc {
     // -- WAL primitives --
     //
     // These three methods back the browser local-snapshot + WAL
-    // adapter (`spec/idb-wal.md`). The JS host:
+    // adapter (`spec/local-storage.md`). The JS host:
     //   1. captures `oplogVvBytes()` after each commit,
     //   2. asks for `exportUpdatesAfter(prev_vv)` to get the delta,
     //   3. encrypts + appends it to IndexedDB,

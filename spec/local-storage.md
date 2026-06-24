@@ -11,15 +11,6 @@ The local store mirrors the server's storage shape: append-only encrypted op blo
 
 A WAL row is *the* unit. It is what Loro exported, what gets encrypted at rest, what gets sent on the wire, what the server stores under its own seq, what gets ack-mapped, and what gets replayed on boot. There is no separate "upload parcel" abstraction.
 
-## History
-
-This model replaced two earlier designs, both now removed:
-
-- The web client's **OPFS-snapshot + IDB-WAL split** (once spec'd in `spec/idb-wal.md`).
-- The CLI's **single-row `docs(payload BLOB)` table** (the original `cli/migrations/001_init.sql`; that file now holds the schema below).
-
-An earlier attempt to unify *both* platforms on sqlite-wasm + OPFS inside a SharedWorker (branch `spike/shared-worker`) was abandoned. See **Why IDB on web** below — that rationale is load-bearing, not trivia.
-
 ## Storage substrate
 
 Per account, one sqlite database.

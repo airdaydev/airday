@@ -5,11 +5,12 @@ pub mod doc;
 pub mod events;
 pub mod storage;
 pub mod sync;
+pub mod sync2;
 
 pub use crypto::*;
 pub use doc::{
     Doc, DocError, ExportItem, ExportList, ExportSettings, ImportSummary, ItemView, JsonExport,
-    ListView, SettingsView, LIST_MAIN, LIST_MAIN_NAME,
+    LIST_MAIN, LIST_MAIN_NAME, ListView, SettingsView,
 };
 pub use events::AppEvent;
 pub use storage::{
@@ -17,3 +18,4 @@ pub use storage::{
     RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
 };
 pub use sync::{EngineOptions, Event, SyncEngine};
+pub use sync2::EngineOptions2;
