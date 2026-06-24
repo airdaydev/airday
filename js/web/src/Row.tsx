@@ -15,6 +15,7 @@ import {
 } from "./caretBridge.ts";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -460,6 +461,13 @@ export function Row(props: {
             }}
             onPointerDown={(e) => {
               if (props.expanded()) e.stopPropagation();
+            }}
+            on:paste={(e) => {
+              if (!props.expanded()) return;
+              // Strip formatting: paste plain text only, so rich HTML
+              // never enters the editor (it'd render styled until the
+              // row collapses and we save `textContent`).
+              pasteAsPlainText(e);
             }}
             on:input={() => {
               // Browsers (Chrome, Firefox) leave a stray <br> behind when

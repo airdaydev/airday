@@ -19,6 +19,7 @@ import externalLinkSvg from "./icons/external-link.svg?raw";
 import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
+import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
 import type { DocApp } from "./sync/store.ts";
 
@@ -726,6 +727,13 @@ export function EditableNavLabel(props: {
         // Don't let the dnd intercept keys the contenteditable owns
         // (Cmd+A select-all, arrow caret movement, etc).
         e.stopPropagation();
+      }}
+      on:paste={(e) => {
+        if (!editing()) return;
+        // Strip formatting: paste plain text only, matching the row-text
+        // editor — the label saves `textContent`, so pasted HTML would
+        // just look styled until the rename commits.
+        pasteAsPlainText(e);
       }}
       onBlur={save}
       onClick={(e) => {
