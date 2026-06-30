@@ -63,68 +63,13 @@ All subsequent frames are interpreted under the agreed `protocol_version`. Belt-
 
 ## Ordering & ack flow
 
-**Status:** Implemented. Engine field is named `last_contiguous_seq` but currently advances to `max(seq seen)` — correct today because sqlite single-writer + single TCP connection makes gaps structurally impossible. The split between "applied" and "contiguous" only becomes load-bearing once §"Contiguity & gap handling" lands.
+**Status:** Implemented. `last_contiguous_seq` advances only over the contiguous next seq. Because per-account seqs are dense and gap-free at the server and delivered in order over a single connection, that always equals the max seq seen — so no reorder buffering or gap detection is needed. (A forward gap is structurally impossible here; the engine `debug_assert!`s against one rather than carrying recovery machinery for a case that can't arise under this deployment.)
 
 - Server orders ops by per-account `seq` of arrival. Per-account FIFO is the only ordering that matters — different accounts' streams are independent.
 - Client decrypts ops and applies via Loro **immediately on receipt**, regardless of seq contiguity. Server `seq` is a *delivery* sequence, not a *causal* one; Loro's CRDT handles real causal ordering off the encoded VV. Applying out-of-order is safe and keeps the UI responsive under replica-lag conditions.
 - Client sends `Ack { last_acked_seq: last_contiguous_seq }` — the contiguous prefix from the persisted start. Server stores in `devices.last_acked_seq`.
 - **Horizon** = `min(last_acked_seq)` across all non-revoked devices for the account. Drives the **op-blob compaction floor** (`compaction_floor_seq`): every device has every op blob at or below the horizon, so those blobs are safe for server-side GC. This is purely seq-level bookkeeping — the server doesn't see Loro VVs and doesn't need to. Time-based eviction is deliberately *not* used to advance the horizon: deleting blobs a stale device hasn't acked would force a full bootstrap on its next reconnect even when the lag is small. The user-facing escape hatch is explicit revoke via `DELETE /api/devices/:id` — revoking a stale device immediately drops it from the horizon calc, unblocking compaction. (Loro-level *shallow snapshotting* — trimming CRDT history rather than op blobs — is a separate, future concern; see §"Shallow snapshots (future)".)
 - **`OpsBroadcast` is post-commit only.** Server fans out to other devices only after the originating `PushOps` is durable in storage. Otherwise a crash between broadcast and fsync could leave peers holding ops the sender will re-push (under new seqs) on reconnect.
-
-## Contiguity & gap handling
-
-**Status:** Planned — not yet implemented. Today the engine just advances to `max(seq seen)` and acks that; every subsection below describes future work. The mechanism exists in the spec ahead of need so the safety invariant is built *before* Postgres + replicas produce a real gap, not after.
-
-Per-account `seq` is dense and gap-free at the server. Any gap the client observes in the received stream is a real signal — replica lag (most common), dropped frame, or server-side data loss (rare, catastrophic). The engine's job is to detect gaps, hold the ack at the safe boundary, fill the gap if possible, and escalate if not.
-
-### Engine state
-
-Two values per session:
-
-- `last_contiguous_seq: u64` — highest seq such that **every** seq from the persisted start through it has been received. This is the value the engine puts in `Ack` frames and persists between sessions. Advances only over contiguous arrivals.
-- `seen_above_contig: BTreeSet<u64>` — seqs received that are *above* `last_contiguous_seq + 1` (i.e., arrived before some lower seq). Tracks holes implicitly: any seq in `(last_contiguous_seq, max(seen_above_contig)]` not in the set is a hole.
-
-On each received seq `n` (from `OpsBatch` or `OpsBroadcast`):
-
-1. Apply the blob to Loro immediately. (Loro tolerates out-of-order; CRDT VV handles causality.)
-2. If `n == last_contiguous_seq + 1`, advance: `last_contiguous_seq = n`, then drain consecutive seqs from `seen_above_contig` (peel off the prefix that's now contiguous).
-3. Else if `n > last_contiguous_seq + 1`, insert into `seen_above_contig`. Mark a `pending_gap_since` timestamp if not already set.
-4. Else (`n <= last_contiguous_seq`), duplicate — discard.
-
-`Ack` is queued whenever `last_contiguous_seq` advances and exceeds `last_sent_ack`, exactly as today — the only change is the source value.
-
-### Buffer bound
-
-If `seen_above_contig.len()` exceeds `MAX_REORDER_BUFFER` (default `10_000`), the engine has accumulated too many out-of-order seqs without the gap closing. This is operationally indistinguishable from "the missing seq is never going to arrive" — escalate directly to the bootstrap path (§"Escalation"), skipping the retry tier. Prevents unbounded memory growth from a pathological upstream.
-
-### Escalation
-
-Tiered response when `last_contiguous_seq` hasn't advanced despite a non-empty `seen_above_contig`:
-
-1. **Retry (tolerate-and-poll).** After `GAP_RETRY_TIMEOUT` (default 3 s) of no advance with a non-empty buffer, re-issue `PullOps { since_seq: last_contiguous_seq }`. This re-reads from whatever replica the new request lands on; if the missing seq has since replicated, it arrives and the buffer drains. Repeat up to `GAP_RETRY_LIMIT` (default 3) times with exponential backoff (3 s, 6 s, 12 s).
-2. **Bootstrap.** If retries exhaust without closing the gap, request `PullSnapshot` and follow the snapshot bootstrap path (§"Bootstrap from snapshot"). The snapshot's `up_to_seq` covers the missing seq's payload as part of the encoded state; after applying, `last_contiguous_seq` is reset to the snapshot's `up_to_seq` and the engine resumes via `PullOps` from there. This handles "client fell far behind" and "compaction race" cases naturally.
-3. **Hard stop.** If the hole is *above* the latest snapshot's `up_to_seq` AND a direct `PullOps { since_seq: last_contiguous_seq }` against primary confirms the seq is genuinely missing from the server's `ops` table, the per-account dense-seq invariant has been violated server-side — data corruption, lost write, restored-from-stale-backup. The engine:
-   - Stops syncing (no further `Ack` / `PushOps`).
-   - Surfaces a structured error event to the host (`Event::SyncHalted { reason: "server seq gap unrecoverable", missing_seq }`).
-   - Local mutations continue to append to the doc / oplog — the client stays usable offline. Recovery is operational (server restore from backup), not protocol-level.
-
-Hosts should render the hard-stop state to the user as something like *"Sync paused — server inconsistency detected. Your changes are safe locally."* Do not silently retry; the invariant break is the point.
-
-### Bootstrap on hard catastrophe
-
-A reconnect after server-side restore-from-backup is the recovery path. The client never acked past the hole, so `since_seq = last_contiguous_seq` re-pulls from the (now restored) data and the engine resumes normally. No special "recovery mode" client logic — the existing reconnect flow *is* the recovery flow, exactly because of the contiguous-prefix discipline.
-
-### Testing
-
-Three pieces of behavior worth covering with engine-level tests (no real network needed):
-
-- **Gap fills naturally.** Deliver `[1, 2, 4]`, assert `Ack` carries 2 only. Deliver `[3]`, assert engine advances to 4 (peeling 4 from the buffer) and `Ack` now carries 4.
-- **Retry on timeout.** Deliver `[1, 2, 4]`, advance simulated clock past `GAP_RETRY_TIMEOUT`, assert engine emits a fresh `PullOps { since_seq: 2 }`.
-- **Bootstrap on exhausted retries.** Deliver `[1, 2, 4]`, advance clock past all retries, assert engine transitions to `Bootstrapping` and emits `PullSnapshot`.
-
-### Today vs future
-
-Under the current sqlite single-writer + post-commit broadcast deployment, gaps are structurally impossible — every `OpsBatch` and `OpsBroadcast` is generated from a single linear writer and delivered on a single TCP connection. `seen_above_contig` should stay empty in production today. The mechanism exists *now* so the safety invariant is enforced *before* Postgres + replicas land, not after a real gap surfaces in production. A `tracing::warn!` on first non-empty insert into `seen_above_contig` is a useful early-warning signal that something has started producing out-of-order delivery.
 
 ## Commit origin tagging
 
@@ -232,7 +177,7 @@ Until shallow snapshotting ships, the producer's snapshot blob is full-history a
 
 ## Bootstrap from snapshot
 
-**Status:** Partial. Server-prompted path (`SnapshotRequired` → `PullSnapshot` → `Snapshot` → resume `PullOps`) is implemented and covered by the `produce_then_bootstrap_round_trip` test. The client-driven entry from §"Contiguity & gap handling" escalation is planned.
+**Status:** Implemented. The server-prompted path (`SnapshotRequired` → `PullSnapshot` → `Snapshot` → resume `PullOps`) is covered by the `produce_then_bootstrap_round_trip` test. This is the only way into bootstrap — there is no client-driven entry.
 
 A device whose `since_seq` is below the latest snapshot's `compaction_floor_seq` cannot resume from ops alone — the ops it needs have been compacted. (Devices whose `since_seq` is between `compaction_floor_seq` and `up_to_seq` *can* still delta-pull, because those ops are preserved by horizon-bounded compaction.) On receiving a `PullOps` with `since_seq < compaction_floor_seq`, the server replies `SnapshotRequired { up_to_seq }` instead of `OpsBatch`. The client then:
 
@@ -243,8 +188,6 @@ A device whose `since_seq` is below the latest snapshot's `compaction_floor_seq`
 The `up_to_seq` carried by `SnapshotRequired` is informational; the authoritative value is the one returned in the `Snapshot` frame, since the latest snapshot may advance between the two round trips.
 
 `SnapshotRequired` and `Snapshot` are only valid in the bootstrap path. Up-to-date devices in steady state never receive either — `OpsBatch` / `OpsBroadcast` covers them. The `Snapshot` frame is therefore only accepted by a client in its bootstrap state, never mid-pull.
-
-**Bootstrap can also be entered client-driven**, not just in response to `SnapshotRequired`. The gap-handling escalation ladder (§"Contiguity & gap handling") transitions the engine into `Bootstrapping` and emits `PullSnapshot` directly when a hole fails to close after retries. The server-side path is the same from `PullSnapshot` onward — it doesn't care whether the bootstrap was server-prompted or client-prompted.
 
 ## Reconnect
 

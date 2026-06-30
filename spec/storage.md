@@ -79,7 +79,7 @@ CREATE TABLE snapshots (
 CREATE INDEX snapshots_doc_id_idx ON snapshots (doc_id, id DESC);
 ```
 
-`ops.seq` is per-doc, dense, and gap-free. Hole detection on the client is meaningful: a missing seq is a real loss (replica lag, dropped frame, server bug), not "another doc got that id". The composite `(doc_id, seq)` PK doubles as the per-doc ordering index — no separate index needed.
+`ops.seq` is per-doc, dense, and gap-free. The client relies on this: seqs arrive contiguous and in order over a single connection, so the engine only ever advances its frontier over the contiguous next seq (no reorder buffering). The composite `(doc_id, seq)` PK doubles as the per-doc ordering index — no separate index needed.
 
 The `doc_sequences` row for a doc is created on first `insert_ops` via `INSERT … ON CONFLICT DO UPDATE`, so signup doesn't need a separate seed step. Reads (`SELECT seq … ORDER BY seq`) never touch the counter; only writers contend on the per-doc row.
 
