@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use crate::sync::Session;
 
-use super::items::{print_json, IdArg};
+use super::items::{IdArg, print_json};
 
 #[derive(Parser, Debug)]
 pub struct BinArgs {

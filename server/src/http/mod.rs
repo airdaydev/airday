@@ -6,10 +6,10 @@ mod device_routes;
 #[cfg(feature = "bundled-web")]
 mod web;
 
-use axum::http::{header, Method};
+use axum::Router;
+use axum::http::{Method, header};
 use axum::middleware;
 use axum::routing::{any, delete, get, post};
-use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::state::AppState;

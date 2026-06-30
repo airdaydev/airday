@@ -1,4 +1,4 @@
-use airday_core::{derive_recovery_master, parse_recovery_code, random_bytes, Doc, WrappedDek};
+use airday_core::{Doc, WrappedDek, derive_recovery_master, parse_recovery_code, random_bytes};
 use airday_protocol::{
     KdfParams, PasswordResetRequest, PasswordResetResponse, PreloginRequest, PreloginResponse,
     RecoverRequest, RecoverResponse,

@@ -4,7 +4,7 @@
 //! and the same name on `Cookie:` for subsequent requests. See
 //! `spec/auth.md`.
 
-use axum::http::{header, HeaderMap, HeaderValue};
+use axum::http::{HeaderMap, HeaderValue, header};
 
 pub const COOKIE_NAME: &str = "airday_device";
 

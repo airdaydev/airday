@@ -41,9 +41,9 @@ function broadcastBytes(seq: number, blob: EncryptedBlob): Uint8Array {
 function driveToIdle(eng: SyncEngine): void {
   eng.handleConnected();
   eng.popOutbox(); // Hello
-  eng.handleServerBytes(helloAckBytes(), 0n);
+  eng.handleServerBytes(helloAckBytes());
   eng.popOutbox(); // PullOps
-  eng.handleServerBytes(emptyBatchCompleteBytes(), 0n);
+  eng.handleServerBytes(emptyBatchCompleteBytes());
   if (!eng.isIdle()) throw new Error("expected engine idle after empty pull");
 }
 
@@ -83,7 +83,7 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
     expect(decoded.ops.length).toBe(1);
 
     // Server assigns seq=1; OpsAck stamps the row and drains the outbox.
-    engine.handleServerBytes(encode({ type: "OpsAck", assigned_seqs: [1] }), 0n);
+    engine.handleServerBytes(encode({ type: "OpsAck", assigned_seqs: [1] }));
     expect(storage.ops[0]!.serverSeq).toBe(1);
     expect(storage.outbox().length).toBe(0);
     expect(engine.lastContiguousSeq()).toBe(1n);
@@ -125,7 +125,7 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
     engine.setLastLocalSeq(0);
     driveToIdle(engine);
 
-    engine.handleServerBytes(broadcastBytes(1, blob), 0n);
+    engine.handleServerBytes(broadcastBytes(1, blob));
 
     expect(storage.ops.length).toBe(1);
     expect(storage.ops[0]!.serverSeq).toBe(1);

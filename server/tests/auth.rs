@@ -6,18 +6,18 @@
 //! tests.
 
 use airday_core::{
-    derive_password_master, derive_recovery_master, generate_recovery_code, random_bytes, Dek,
-    AEAD_NONCE_LEN,
+    AEAD_NONCE_LEN, Dek, derive_password_master, derive_recovery_master, generate_recovery_code,
+    random_bytes,
 };
 use airday_protocol::{
     KdfParams, LoginRequest, LoginResponse, PasswordResetRequest, PreloginRequest,
     PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
     SignupResponse,
 };
-use airday_server::{router, AppState};
+use airday_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::sync::OnceLock;
 
 const MSGPACK: &str = "application/msgpack";

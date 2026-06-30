@@ -20,12 +20,12 @@ use airday_core::{Doc, DocId, EngineOptions, Event, SyncEngine};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::config::{ConfigError, Profile};
-use crate::keystore::{dek_from_hex, KeystoreError};
+use crate::keystore::{KeystoreError, dek_from_hex};
 use crate::storage::SqliteStorage;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -253,7 +253,7 @@ async fn drive_until_idle(ws: &mut WsStream, engine: &mut SyncEngine) -> Result<
             return Ok(());
         }
         let bytes = recv_bytes(ws).await?;
-        engine.handle_server_bytes(&bytes, monotonic_ms());
+        engine.handle_server_bytes(&bytes);
     }
 }
 
@@ -292,18 +292,6 @@ fn now_millis() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
-}
-
-/// Monotonic millis since the process started. Fed to the engine's
-/// `handle_*` methods that need a clock — the engine itself is
-/// time-free. Wall-clock skew is irrelevant; we only need
-/// non-decreasing deltas for the gap-retry timer.
-fn monotonic_ms() -> u64 {
-    use std::sync::OnceLock;
-    use std::time::Instant;
-    static EPOCH: OnceLock<Instant> = OnceLock::new();
-    let epoch = EPOCH.get_or_init(Instant::now);
-    epoch.elapsed().as_millis() as u64
 }
 
 fn ws_url(server_url: &str) -> String {

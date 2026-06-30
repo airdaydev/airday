@@ -2,10 +2,10 @@
 
 use airday_protocol::KdfParams;
 use anyhow::Context;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use uuid::Uuid;
 
-use crate::db::{now_millis, Db};
+use crate::db::{Db, now_millis};
 
 #[derive(Debug, Clone)]
 pub struct AccountRow {

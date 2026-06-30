@@ -19,7 +19,7 @@ use airday_core::{
     OutboxRow, RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
 };
 use airday_protocol::EncryptedBlob;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use uuid::Uuid;
 
 use crate::config::Profile;

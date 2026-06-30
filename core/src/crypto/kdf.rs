@@ -5,8 +5,8 @@ use hkdf::Hkdf;
 use sha2::Sha256;
 
 use super::{
-    secrets::{AuthSecret, Kek, PasswordMaster, RecoveryMaster},
     CryptoError, KdfParams, Result,
+    secrets::{AuthSecret, Kek, PasswordMaster, RecoveryMaster},
 };
 
 /// HKDF info strings. Versioned so we can rotate the derivation without

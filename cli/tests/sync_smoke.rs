@@ -24,7 +24,7 @@ use uuid::Uuid;
 mod support;
 
 use support::{
-    materialize_signup_profile, register_device, reopen_profile, signup_via_http, TestServer,
+    TestServer, materialize_signup_profile, register_device, reopen_profile, signup_via_http,
 };
 
 #[tokio::test]

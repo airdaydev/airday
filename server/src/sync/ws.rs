@@ -8,8 +8,8 @@
 use std::time::Instant;
 
 use airday_protocol::{
-    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, ServerFrame, StoredBlob,
-    PROTOCOL_VERSION,
+    ClientFrame, EncryptedBlob, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, ServerFrame,
+    StoredBlob,
 };
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Extension, Query, State};
@@ -20,10 +20,10 @@ use serde::{Deserialize, Serialize};
 use tracing::Instrument;
 use uuid::Uuid;
 
+use crate::auth::DeviceAuth;
 use crate::auth::cookie;
 use crate::auth::queries::{find_device_by_token_hash, touch_device_last_seen};
 use crate::auth::tokens::{decode_token, sha256};
-use crate::auth::DeviceAuth;
 use crate::error::ApiError;
 use crate::http::request_id::RequestId;
 use crate::state::AppState;

@@ -6,14 +6,13 @@
 //! - Encrypt every op + snapshot blob with the DEK (per-blob fresh nonce).
 
 use chacha20poly1305::{
-    aead::{Aead, KeyInit},
     XChaCha20Poly1305, XNonce,
+    aead::{Aead, KeyInit},
 };
 
 use super::{
-    random_bytes,
+    CryptoError, Result, random_bytes,
     secrets::{Dek, Kek},
-    CryptoError, Result,
 };
 
 /// 24 bytes — XChaCha20's extended nonce. Random-nonce safe up to ~2^96

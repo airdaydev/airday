@@ -7,15 +7,15 @@ use airday_protocol::{
 };
 use anyhow::Context;
 use axum::extract::State;
-use axum::http::{header, HeaderMap};
+use axum::http::{HeaderMap, header};
 
+use crate::auth::DeviceAuth;
 use crate::auth::cookie;
 use crate::auth::queries::{
-    self, create_account, create_device, create_recovery_session, find_account_by_email,
-    find_account_by_id, revoke_device, update_password, NewAccount, PasswordUpdate,
+    self, NewAccount, PasswordUpdate, create_account, create_device, create_recovery_session,
+    find_account_by_email, find_account_by_id, revoke_device, update_password,
 };
 use crate::auth::tokens::{encode_token, generate_token, sha256};
-use crate::auth::DeviceAuth;
 use crate::error::{ApiError, ApiResult};
 use crate::http::msgpack::Msgpack;
 use crate::state::AppState;

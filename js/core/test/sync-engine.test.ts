@@ -86,7 +86,7 @@ describe("transport callbacks", () => {
 
   test("handleServerBytes while disconnected surfaces an error event", () => {
     const eng = newEngine();
-    eng.handleServerBytes(new Uint8Array([0x00, 0x01]), 0n);
+    eng.handleServerBytes(new Uint8Array([0x00, 0x01]));
     const evt = eng.popEvent();
     expect(evt!.kind).toBe("error");
     expect(typeof evt!.message).toBe("string");
@@ -99,7 +99,7 @@ describe("transport callbacks", () => {
     eng.popOutbox();
     eng.popEvent();
 
-    eng.handleTimeout(0n);
+    eng.handleTimeout();
     const evt = eng.popEvent();
     expect(evt!.kind).toBe("error");
     expect(evt!.message).toContain("timed out");

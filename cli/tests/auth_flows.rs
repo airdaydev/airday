@@ -4,8 +4,8 @@ use airday_core::LIST_MAIN;
 mod support;
 
 use support::{
-    change_password, login_device, materialize_profile, recover_device, reopen_profile,
-    signup_account, TestServer, TEST_PASSWORD,
+    TEST_PASSWORD, TestServer, change_password, login_device, materialize_profile, recover_device,
+    reopen_profile, signup_account,
 };
 
 const NEW_PASSWORD: &str = "even longer correct horse";

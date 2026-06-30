@@ -1,4 +1,4 @@
-use airday_core::{generate_recovery_code, random_bytes, Dek, Doc};
+use airday_core::{Dek, Doc, generate_recovery_code, random_bytes};
 use airday_protocol::{KdfParams, RecoveryMaterial, SignupRequest, SignupResponse};
 use clap::Parser;
 use dialoguer::{Confirm, Input};

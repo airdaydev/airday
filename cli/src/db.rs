@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 const MIGRATION_001: &str = include_str!("../migrations/001_init.sql");
 

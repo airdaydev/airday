@@ -72,10 +72,9 @@ export interface SyncBridgeOpts {
 const DEFAULT_BASE_MS = 500;
 const DEFAULT_MAX_MS = 30_000;
 const DEFAULT_JITTER = 0.2;
-/** Cadence at which the bridge calls `engine.handleTimeout(now)` to
- *  drive the gap-retry timer. The retry windows are coarse (3s / 6s /
- *  12s), so 1s polling adds at most ~1s of jitter to a retry decision
- *  while keeping wake-up cost negligible. */
+/** Cadence at which the bridge calls `engine.handleTimeout()` to drive
+ *  the `Hello` handshake watchdog. 1s polling keeps wake-up cost
+ *  negligible. */
 const TICK_INTERVAL_MS = 1_000;
 
 export class SyncBridge {
@@ -98,10 +97,10 @@ export class SyncBridge {
   start(): void {
     this.connect();
     if (!this.tickTimer) {
-      // Periodic tick drives the engine's gap-retry timer. Cheap —
-      // when no hole is open, `handleTimeout` is essentially a no-op.
+      // Periodic tick drives the engine's handshake watchdog. Cheap —
+      // outside the Hello handshake, `handleTimeout` is a no-op.
       this.tickTimer = setInterval(() => {
-        this.opts.engine.handleTimeout(BigInt(Date.now()));
+        this.opts.engine.handleTimeout();
         this.pumpOutbox();
         this.drainEngineEvents();
       }, TICK_INTERVAL_MS);
@@ -179,7 +178,7 @@ export class SyncBridge {
             ? new Uint8Array(ev.data.buffer, ev.data.byteOffset, ev.data.byteLength)
             : null;
       if (!data) return; // text frames ignored
-      this.opts.engine.handleServerBytes(data, BigInt(Date.now()));
+      this.opts.engine.handleServerBytes(data);
       this.pumpOutbox();
       this.drainEngineEvents();
       this.opts.onServerFrame?.();

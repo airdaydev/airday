@@ -17,12 +17,12 @@ mod kdf;
 mod recovery;
 mod secrets;
 
-pub use aead::{WrappedDek, AEAD_NONCE_LEN};
+pub use aead::{AEAD_NONCE_LEN, WrappedDek};
 pub use kdf::{
-    derive_password_master, derive_recovery_master, kek_from_master, recovery_kek_from_master,
-    AUTH_INFO, KEK_INFO, RECOVERY_AUTH_INFO, RECOVERY_KEK_INFO,
+    AUTH_INFO, KEK_INFO, RECOVERY_AUTH_INFO, RECOVERY_KEK_INFO, derive_password_master,
+    derive_recovery_master, kek_from_master, recovery_kek_from_master,
 };
-pub use recovery::{generate_recovery_code, parse_recovery_code, RecoveryCode};
+pub use recovery::{RecoveryCode, generate_recovery_code, parse_recovery_code};
 pub use secrets::{AuthSecret, Dek, Kek, PasswordMaster, RecoveryMaster};
 
 /// Convenience re-export so callers don't need an explicit dep on

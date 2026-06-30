@@ -5,8 +5,8 @@ use airday_cli::keystore::{dek_to_hex, derive_master};
 use airday_cli::net::Client;
 use airday_cli::storage::Account;
 use airday_core::{
-    derive_password_master, derive_recovery_master, generate_recovery_code, random_bytes, Dek, Doc,
-    WrappedDek, AEAD_NONCE_LEN,
+    AEAD_NONCE_LEN, Dek, Doc, WrappedDek, derive_password_master, derive_recovery_master,
+    generate_recovery_code, random_bytes,
 };
 use airday_protocol::{
     DeviceCredential, DeviceRegistration, KdfParams, LoginRequest, LoginResponse,
@@ -14,7 +14,7 @@ use airday_protocol::{
     PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
     SignupResponse,
 };
-use airday_server::{router, AppState};
+use airday_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
 use uuid::Uuid;
 

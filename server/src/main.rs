@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use airday_server::{build_info, router, AppState, Config};
+use airday_server::{AppState, Config, build_info, router};
 use clap::Parser;
 
 #[derive(Parser, Debug)]

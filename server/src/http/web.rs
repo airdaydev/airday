@@ -5,11 +5,11 @@
 //! left to the rest of the router (the API routes) or 404s — there is no SPA
 //! fallback, so unknown paths under `/` are a plain 404.
 
+use axum::Router;
 use axum::extract::Path;
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::Router;
 use rust_embed::RustEmbed;
 
 use crate::state::AppState;

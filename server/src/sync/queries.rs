@@ -8,10 +8,10 @@
 //! is also per-doc while 1:1 holds).
 
 use airday_protocol::{EncryptedBlob, StoredBlob};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use uuid::Uuid;
 
-use crate::db::{now_millis, Db};
+use crate::db::{Db, now_millis};
 
 /// Hard caps per `OpsBatch` frame from `spec/sync-protocol.md`. The
 /// byte cap is the safety net; the count cap is the common one.

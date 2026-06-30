@@ -5,11 +5,11 @@
 //! the server is single-protocol.
 
 use axum::body::Bytes;
-use axum::extract::{rejection::BytesRejection, FromRequest, Request};
-use axum::http::{header, StatusCode};
+use axum::extract::{FromRequest, Request, rejection::BytesRejection};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 pub struct Msgpack<T>(pub T);
 

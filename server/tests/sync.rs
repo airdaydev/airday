@@ -5,22 +5,22 @@
 //! crypto material because the auth route checks shape; we use the
 //! weak Argon2 params from the auth tests so the suite stays fast.
 
-use airday_core::{derive_password_master, random_bytes, Dek};
+use airday_core::{Dek, derive_password_master, random_bytes};
 use airday_protocol::{
     ClientFrame, DeviceCredential, DeviceRegistration, EncryptedBlob, Hello, HelloAck,
-    HelloRejected, KdfParams, ServerFrame, SignupRequest, SignupResponse, StoredBlob,
-    PROTOCOL_VERSION,
+    HelloRejected, KdfParams, PROTOCOL_VERSION, ServerFrame, SignupRequest, SignupResponse,
+    StoredBlob,
 };
-use airday_server::sync::{queries, SnapshotCoordinator};
-use airday_server::{router, AppState};
+use airday_server::sync::{SnapshotCoordinator, queries};
+use airday_server::{AppState, router};
 use futures_util::{SinkExt, StreamExt};
 use http::header::AUTHORIZATION;
 use reqwest::header::CONTENT_TYPE;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::sync::OnceLock;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use uuid::Uuid;
 
 const MSGPACK: &str = "application/msgpack";

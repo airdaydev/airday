@@ -4,9 +4,9 @@ use airday_protocol::{Device, DeviceCredential, DeviceRegistration, DevicesListR
 use axum::extract::{Path, State};
 use uuid::Uuid;
 
+use crate::auth::DeviceAuth;
 use crate::auth::queries::{create_device, list_devices, revoke_device};
 use crate::auth::tokens::{encode_token, generate_token, sha256};
-use crate::auth::DeviceAuth;
 use crate::error::{ApiError, ApiResult};
 use crate::http::msgpack::Msgpack;
 use crate::state::AppState;
