@@ -47,7 +47,10 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 - Password-derivation flow exposed over the same bindings.
 
 ## Testing
-- E2E gaps vs. `spec/testing.md`: offline-mutate-then-sync, both-offline-then-converge, snapshot-threshold to fresh-device bootstrap, and recovery-flow round-trip.
+- E2E gaps vs. `spec/testing.md`:
+  - two long-lived clients observe live mutations and converge
+  - one client mutates offline, reconnects, and the other client observes the changes
+  - two clients mutate independently while offline, then reconnect and converge
 - hardening pass
 
 ## Postgresql version
