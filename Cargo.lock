@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "airday"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 dependencies = [
  "airday-core",
  "airday-protocol",
@@ -69,7 +69,7 @@ dependencies = [
 
 [[package]]
 name = "airday-core"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 dependencies = [
  "airday-protocol",
  "argon2",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "airday-core-web"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 dependencies = [
  "airday-core",
  "airday-protocol",
@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "airday-protocol"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 dependencies = [
  "serde",
  "serde_bytes",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "airday-server"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 dependencies = [
  "airday-core",
  "airday-protocol",

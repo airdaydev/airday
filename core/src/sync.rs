@@ -25,7 +25,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use airday_protocol::{
-    ClientFrame, Hello, HelloAck, HelloRejected, ServerFrame, StoredBlob, PROTOCOL_VERSION,
+    ClientFrame, Hello, HelloAck, HelloRejected, PROTOCOL_VERSION, ServerFrame, StoredBlob,
 };
 use serde::Serialize;
 
@@ -1547,11 +1547,12 @@ mod tests {
         // State still Pushing — broadcast doesn't transition.
         assert!(!eng.is_idle());
         // Peer op applied.
-        assert!(eng
-            .doc()
-            .items_in_list(LIST_MAIN, false)
-            .iter()
-            .any(|i| i.text == "peer-during-push"));
+        assert!(
+            eng.doc()
+                .items_in_list(LIST_MAIN, false)
+                .iter()
+                .any(|i| i.text == "peer-during-push")
+        );
 
         // Server acks our push with seq 2 (continuing the contiguous
         // sequence after the broadcast at seq 1).
@@ -1859,9 +1860,11 @@ mod tests {
             !frames.iter().any(|f| matches!(f, ClientFrame::Ack { .. })),
             "Ack queued before notify_oplog_durable: {frames:?}",
         );
-        assert!(frames
-            .iter()
-            .any(|f| matches!(f, ClientFrame::PullOps { since_seq: 42 })));
+        assert!(
+            frames
+                .iter()
+                .any(|f| matches!(f, ClientFrame::PullOps { since_seq: 42 }))
+        );
 
         // Host commits the snapshot → ack ships.
         eng.notify_oplog_durable(42);
@@ -1869,11 +1872,12 @@ mod tests {
         assert!(matches!(ack, ClientFrame::Ack { last_acked_seq: 42 }));
 
         // Bootstrapped item is in the doc.
-        assert!(eng
-            .doc()
-            .items_in_list(LIST_MAIN, false)
-            .iter()
-            .any(|i| i.text == "from-snapshot"));
+        assert!(
+            eng.doc()
+                .items_in_list(LIST_MAIN, false)
+                .iter()
+                .any(|i| i.text == "from-snapshot")
+        );
 
         // Finish the catch-up pull.
         eng.handle_server_bytes(
