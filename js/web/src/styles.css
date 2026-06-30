@@ -1367,6 +1367,20 @@ body {
   white-space: nowrap;
 }
 
+/* Right-hand column naming the list an item belongs to. Shrinks to its
+   content and never pushes the title — the title's flex:1 keeps it left,
+   this sits flush right. Capped so a long list name can't crowd out the
+   title. */
+.palette__item-list {
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
 .palette__empty {
   padding: 16px;
   text-align: center;

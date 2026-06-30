@@ -137,6 +137,22 @@ export function FindPalette(props: {
     props.onOpenChange(false);
   }
 
+  // Display name of the list an item lives in, for the right-hand
+  // column. The reserved `main` list isn't a `ListMeta` row — its label
+  // is the doc-level override or the localized built-in (mirrors
+  // Workspace's homeName). Lists themselves get no label. Returns "" when
+  // there's nothing to show.
+  function listLabel(item: SearchResult): string {
+    if (item.kind !== "item") return "";
+    const listId = item.listId;
+    if (!listId) return "";
+    if (listId === "main") {
+      const override = props.app.state.settings.mainName;
+      return override && override.length > 0 ? override : m().nav.home;
+    }
+    return props.app.state.listsById[listId]?.name ?? "";
+  }
+
   return (
     <Show when={props.open}>
       <Portal>
@@ -197,6 +213,11 @@ export function FindPalette(props: {
                     aria-hidden="true"
                   />
                   <span class="palette__item-name">{item.title}</span>
+                  <Show when={listLabel(item)}>
+                    {(label) => (
+                      <span class="palette__item-list">{label()}</span>
+                    )}
+                  </Show>
                 </div>
               )}
             </For>
