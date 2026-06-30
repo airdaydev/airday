@@ -1,6 +1,7 @@
 pub mod msgpack;
 pub mod request_id;
 
+mod admin_routes;
 mod auth_routes;
 mod device_routes;
 #[cfg(feature = "bundled-web")]
@@ -31,7 +32,7 @@ pub fn router(state: AppState) -> Router {
         ])
         .expose_headers([request_id::REQUEST_ID_HEADER]);
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/api/account/signup", post(auth_routes::signup))
         .route("/api/account/prelogin", post(auth_routes::prelogin))
@@ -52,6 +53,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/devices/{device_id}", delete(device_routes::revoke))
         .route("/api/sync", any(ws_handler));
+
+    if state.admin_enabled() {
+        app = app.route("/admin/stats", get(admin_routes::stats));
+    }
 
     // Serve the embedded web client when built with `--features bundled-web`.
     #[cfg(feature = "bundled-web")]

@@ -43,6 +43,10 @@ pub struct Config {
     /// the path without churning out 10k pushes.
     #[serde(default = "default_snapshot_threshold_blobs")]
     pub snapshot_threshold_blobs: u64,
+    /// Optional Argon2id PHC hash protecting the operator-only JSON API.
+    /// When absent, admin routes are not mounted.
+    #[serde(default)]
+    pub admin_password_hash: Option<String>,
 }
 
 impl Default for Config {
@@ -53,6 +57,7 @@ impl Default for Config {
             log_level: default_log_level(),
             secure_cookies: default_secure_cookies(),
             snapshot_threshold_blobs: default_snapshot_threshold_blobs(),
+            admin_password_hash: None,
         }
     }
 }
@@ -124,6 +129,9 @@ impl Config {
             config.snapshot_threshold_blobs = v
                 .parse()
                 .unwrap_or_else(|e| panic!("invalid AIRDAY_SNAPSHOT_THRESHOLD_BLOBS={v:?}: {e}"));
+        }
+        if let Ok(v) = std::env::var("AIRDAY_ADMIN_PASSWORD_HASH") {
+            config.admin_password_hash = (!v.is_empty()).then_some(v);
         }
 
         (config, source)

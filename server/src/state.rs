@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
+
 use crate::db::Db;
 use crate::sync::{SnapshotCoordinator, SyncSessions};
 
@@ -13,6 +15,31 @@ pub struct AppState {
     /// Mirror of `Config::secure_cookies`. Lives on state because the
     /// cookie helpers run from request handlers, not at startup.
     pub secure_cookies: bool,
+    admin_auth: Option<AdminAuth>,
+}
+
+#[derive(Clone)]
+struct AdminAuth {
+    password_hash: Arc<str>,
+}
+
+impl AdminAuth {
+    fn new(password_hash: impl Into<Arc<str>>) -> anyhow::Result<Self> {
+        let password_hash = password_hash.into();
+        let parsed = PasswordHash::new(&password_hash)
+            .map_err(|e| anyhow::anyhow!("invalid admin_password_hash PHC string: {e}"))?;
+        if parsed.algorithm.as_str() != "argon2id" {
+            anyhow::bail!("admin_password_hash must use Argon2id");
+        }
+        Ok(Self { password_hash })
+    }
+
+    fn verify(&self, password: &[u8]) -> bool {
+        let Ok(hash) = PasswordHash::new(&self.password_hash) else {
+            return false;
+        };
+        Argon2::default().verify_password(password, &hash).is_ok()
+    }
 }
 
 impl AppState {
@@ -23,6 +50,7 @@ impl AppState {
             sync_sessions: SyncSessions::new(),
             snapshot_coordinator: SnapshotCoordinator::new(),
             secure_cookies: true,
+            admin_auth: None,
         })
     }
 
@@ -33,6 +61,7 @@ impl AppState {
             sync_sessions: SyncSessions::new(),
             snapshot_coordinator: SnapshotCoordinator::new(),
             secure_cookies: true,
+            admin_auth: None,
         })
     }
 
@@ -44,6 +73,28 @@ impl AppState {
     pub fn with_snapshot_threshold_blobs(mut self, threshold_blobs: u64) -> Self {
         self.snapshot_coordinator = SnapshotCoordinator::with_threshold_blobs(threshold_blobs);
         self
+    }
+
+    pub fn with_admin_password_hash(
+        mut self,
+        password_hash: impl Into<Arc<str>>,
+    ) -> anyhow::Result<Self> {
+        self.admin_auth = Some(AdminAuth::new(password_hash)?);
+        Ok(self)
+    }
+
+    pub(crate) fn admin_enabled(&self) -> bool {
+        self.admin_auth.is_some()
+    }
+
+    pub(crate) async fn verify_admin_password(&self, password: &[u8]) -> bool {
+        let Some(auth) = self.admin_auth.clone() else {
+            return false;
+        };
+        let password = password.to_vec();
+        tokio::task::spawn_blocking(move || auth.verify(&password))
+            .await
+            .unwrap_or(false)
     }
 }
 

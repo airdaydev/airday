@@ -31,6 +31,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/encryption.md`](spec/encryption.md) | DEK / KEK / recovery code, wrap-states, password change |
 | [`spec/crypto.md`](spec/crypto.md) | Cryptographic primitive inventory; companion to `encryption.md` |
 | [`spec/auth.md`](spec/auth.md) | HTTP signup / login / recover, device register / revoke, token model |
+| [`spec/admin.md`](spec/admin.md) | Operator-only JSON API, authentication, deployment exposure |
 | [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |

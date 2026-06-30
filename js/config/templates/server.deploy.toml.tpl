@@ -6,3 +6,6 @@ bind = "{{ env "AIRDAY_BIND" }}"
 db = "{{ env "AIRDAY_DB_PATH" }}"
 log_level = "{{ env "AIRDAY_LOG_LEVEL" }}"
 secure_cookies = {{ env "AIRDAY_SECURE_COOKIES" }}
+{{- if env "AIRDAY_ADMIN_PASSWORD_HASH" }}
+admin_password_hash = '{{ env "AIRDAY_ADMIN_PASSWORD_HASH" }}'
+{{- end }}

@@ -16,6 +16,10 @@
           changeOrigin: true,
           ws: true,
         },
+        "/admin": {
+          target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
+          changeOrigin: true,
+        },
       },
     },
     optimizeDeps: {

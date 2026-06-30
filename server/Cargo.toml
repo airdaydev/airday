@@ -33,6 +33,7 @@ toml = { workspace = true }
 rusqlite = { workspace = true }
 tokio-rusqlite = { workspace = true }
 sha2 = { workspace = true }
+argon2 = { workspace = true }
 rand = { workspace = true }
 uuid = { workspace = true }
 hex = { workspace = true }
@@ -53,6 +54,7 @@ rust-embed = { version = "8", optional = true, features = [
 
 [dev-dependencies]
 reqwest = { workspace = true }
+serde_json = { workspace = true }
 tempfile = "3"
 tokio-tungstenite = "0.24"
 http = "1"

@@ -15,10 +15,10 @@
 {{ mustEnv "AIRDAY_HOST" }} {
 	import common_proxy
 
-	# Health + API + sync WebSocket → Rust server.
+	# Health + API + admin + sync WebSocket → Rust server.
 	# `reverse_proxy` upgrades WS automatically — no extra match needed
 	# for /api/sync.
-	@api path /healthz /api/*
+	@api path /healthz /api/* /admin/*
 	handle @api {
 		reverse_proxy 127.0.0.1:8000
 	}

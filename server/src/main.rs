@@ -1,12 +1,19 @@
+use std::io::{self, IsTerminal};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use airday_server::{AppState, Config, build_info, router};
-use clap::Parser;
+use argon2::Argon2;
+use argon2::password_hash::rand_core::OsRng;
+use argon2::password_hash::{PasswordHasher, SaltString};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(name = "airday-server", version, about = "Airday relay server")]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// Path to a TOML config file. Defaults to ./config.toml; missing file → defaults.
     #[arg(long)]
     config: Option<PathBuf>,
@@ -20,9 +27,18 @@ struct Cli {
     bind: Option<SocketAddr>,
 }
 
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Read one password line from stdin and print an Argon2id PHC hash.
+    HashAdminPassword,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    if matches!(cli.command, Some(Command::HashAdminPassword)) {
+        return hash_admin_password();
+    }
     let (mut cfg, cfg_source) = Config::load(cli.config.as_deref());
 
     if let Some(db) = cli.db {
@@ -47,10 +63,13 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let state = AppState::open(&cfg.db)
+    let mut state = AppState::open(&cfg.db)
         .await?
         .with_secure_cookies(cfg.secure_cookies)
         .with_snapshot_threshold_blobs(cfg.snapshot_threshold_blobs);
+    if let Some(password_hash) = cfg.admin_password_hash.as_deref() {
+        state = state.with_admin_password_hash(password_hash)?;
+    }
     let app = router(state);
 
     let addr = cfg.bind_addr()?;
@@ -61,5 +80,29 @@ async fn main() -> anyhow::Result<()> {
         "airday-server listening"
     );
     axum::serve(listener, app).await?;
+    Ok(())
+}
+
+fn hash_admin_password() -> anyhow::Result<()> {
+    if io::stdin().is_terminal() {
+        anyhow::bail!(
+            "refusing to read an echoed password from a terminal; pipe one password line on stdin"
+        );
+    }
+
+    let mut password = String::new();
+    io::stdin().read_line(&mut password)?;
+    while matches!(password.as_bytes().last(), Some(b'\n' | b'\r')) {
+        password.pop();
+    }
+    if password.is_empty() {
+        anyhow::bail!("admin password must not be empty");
+    }
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| anyhow::anyhow!("failed to hash admin password: {e}"))?;
+    println!("{hash}");
     Ok(())
 }
