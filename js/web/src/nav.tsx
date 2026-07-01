@@ -321,6 +321,7 @@ export function Nav(props: {
         style={{ display: "none" }}
         onChange={onImportFilePicked}
       />
+      <div class="nav-scroll">
       <div class="nav-group">
         <ContextMenu>
           <ContextMenu.Trigger
@@ -515,6 +516,7 @@ export function Nav(props: {
             onDismiss={() => setAdding(false)}
           />
         </Show>
+      </div>
       </div>
       <div class="nav-footer">
         <Show when={props.session.anonymous}>
