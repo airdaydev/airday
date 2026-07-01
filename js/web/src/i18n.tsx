@@ -86,6 +86,7 @@ type Messages = {
     createWithSpace: string;
     emptyState: string;
     notes: string;
+    hasNotes: string;
     markDone: string;
     markNotDone: string;
     duplicate: string;
@@ -182,6 +183,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       createWithSpace: "Pulsa Espacio para crear un elemento nuevo",
       emptyState: "Todavía no hay nada.",
       notes: "Notas",
+      hasNotes: "Tiene notas",
       markDone: "Marcar como hecho",
       markNotDone: "Marcar como no hecho",
       duplicate: "Duplicar",
@@ -277,6 +279,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       createWithSpace: "Press Space to create a new item",
       emptyState: "Nothing here yet.",
       notes: "Notes",
+      hasNotes: "Has notes",
       markDone: "Mark as done",
       markNotDone: "Mark as not done",
       duplicate: "Duplicate",

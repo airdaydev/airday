@@ -14,6 +14,7 @@ import {
   textareaCaretXIfOnFirstLine,
 } from "./caretBridge.ts";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
+import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
@@ -572,6 +573,15 @@ export function Row(props: {
             />
           </Show>
         </div>
+        <Show when={!props.expanded() && props.item().notes.trim().length > 0}>
+          <span
+            class="row-note-indicator"
+            role="img"
+            aria-label={m().workspace.hasNotes}
+            title={m().workspace.hasNotes}
+            innerHTML={noteSvg}
+          />
+        </Show>
         <Show when={statusTimestamp(props.item())}>
           {(ts) => (
             <span class="row-timestamp" title={new Date(ts()).toLocaleString(locale())}>

@@ -594,6 +594,19 @@ body {
   line-height: 1.3em;
 }
 
+.row-note-indicator {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  line-height: 1.3em;
+}
+
+.row-note-indicator svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+}
+
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
    makes it a scroll container, which trips the browser's caret-scroll-into-view
    while typing in the expanded row's contenteditable: text wraps below the
