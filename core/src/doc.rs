@@ -30,6 +30,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;
 
+use loro::cursor::{Cursor, Side};
 use loro::{
     Container, ExportMode, LoroDoc, LoroMap, LoroMovableList, UndoManager, ValueOrContainer,
     VersionVector,
@@ -204,6 +205,16 @@ pub struct ExportItem {
     pub binned_at: Option<i64>,
 }
 
+struct IndexedItem {
+    map: LoroMap,
+    cursor: Cursor,
+}
+
+#[derive(Default)]
+struct ItemIndex {
+    by_id: HashMap<String, IndexedItem>,
+}
+
 pub struct Doc {
     inner: LoroDoc,
     last_pushed_vv: VersionVector,
@@ -217,6 +228,10 @@ pub struct Doc {
     /// `apply_remote` carry origin `"remote"` and are filtered out by
     /// prefix — see `spec/sync-protocol.md` "Commit origin tagging".
     undo: Mutex<UndoManager>,
+    /// Disposable lookup from Airday's stable item UUID to Loro's item
+    /// container and current relative position. Rebuilt from `inner`
+    /// after imports/undo and maintained incrementally for local writes.
+    item_index: Mutex<ItemIndex>,
 }
 
 /// Configure an UndoManager bound to `inner`, excluding remote-tagged
@@ -239,11 +254,13 @@ impl Doc {
             inner.commit();
         }
         let undo = Mutex::new(make_undo_manager(&inner));
+        let item_index = Mutex::new(ItemIndex::default());
         Ok(Self {
             inner,
             last_pushed_vv: VersionVector::default(),
             events: Mutex::new(VecDeque::new()),
             undo,
+            item_index,
         })
     }
 
@@ -251,11 +268,71 @@ impl Doc {
     pub fn empty() -> Self {
         let inner = LoroDoc::new();
         let undo = Mutex::new(make_undo_manager(&inner));
+        let item_index = Mutex::new(ItemIndex::default());
         Self {
             last_pushed_vv: inner.oplog_vv(),
             inner,
             events: Mutex::new(VecDeque::new()),
             undo,
+            item_index,
+        }
+    }
+
+    fn rebuild_item_index(&self) {
+        let items = self.items();
+        let mut by_id = HashMap::<String, IndexedItem>::with_capacity(items.len());
+        for index in 0..items.len() {
+            let Some(map) = item_map_at(&items, index) else {
+                continue;
+            };
+            let Some(id) = read_string(&map, KEY_ID) else {
+                continue;
+            };
+            let Some(cursor) = items.get_cursor(index, Side::Middle) else {
+                continue;
+            };
+            by_id.insert(id, IndexedItem { map, cursor });
+        }
+        self.item_index
+            .lock()
+            .expect("item index mutex poisoned")
+            .by_id = by_id;
+    }
+
+    fn index_item_at(&self, id: String, map: LoroMap, index: usize) -> Result<(), DocError> {
+        let cursor = self
+            .items()
+            .get_cursor(index, Side::Middle)
+            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
+
+        self.item_index
+            .lock()
+            .expect("item index mutex poisoned")
+            .by_id
+            .insert(id, IndexedItem { map, cursor });
+
+        Ok(())
+    }
+
+    fn refresh_item_cursor(&self, item_id: &str, index: usize) -> Result<(), DocError> {
+        let cursor = self
+            .items()
+            .get_cursor(index, Side::Middle)
+            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        let item = guard
+            .by_id
+            .get_mut(item_id)
+            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+        item.cursor = cursor;
+        Ok(())
+    }
+
+    fn remove_indexed_items<'a>(&self, item_ids: impl IntoIterator<Item = &'a str>) {
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        for item_id in item_ids {
+            guard.by_id.remove(item_id);
         }
     }
 
@@ -298,6 +375,7 @@ impl Doc {
         let index = self
             .visible_item_index(&id)
             .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
+        self.index_item_at(id.clone(), map, index)?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -330,11 +408,12 @@ impl Doc {
         self.assert_list_exists(list_id)?;
         let items = self.items();
         let abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
-        let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
+        let (id, now, map) = self.write_new_item(&items, list_id, text, abs)?;
         self.inner.commit();
         let index = self
             .visible_item_index(&id)
             .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
+        self.index_item_at(id.clone(), map, index)?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -373,15 +452,16 @@ impl Doc {
         let mut pending = Vec::with_capacity(trimmed.len());
         for (i, text) in trimmed.iter().enumerate() {
             let abs = initial_abs + i;
-            let (id, now) = self.write_new_item(&items, list_id, text, abs)?;
-            pending.push((id.clone(), (*text).to_string(), now));
+            let (id, now, map) = self.write_new_item(&items, list_id, text, abs)?;
+            pending.push((id.clone(), (*text).to_string(), now, map));
             ids.push(id);
         }
         self.inner.commit();
-        for (id, text, now) in pending {
+        for (id, text, now, map) in pending {
             let index = self
                 .visible_item_index(&id)
                 .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
+            self.index_item_at(id.clone(), map, index)?;
             self.push_event(AppEvent::ItemAdded {
                 id,
                 list_id: list_id.to_string(),
@@ -434,11 +514,12 @@ impl Doc {
         self.assert_list_exists(target_list_id)?;
         let (idx, map) = self.find_item(item_id)?;
         let prev_list_id = read_string(&map, KEY_LIST_ID);
-        let abs = self.move_item_inner(item_id, target_list_id, target_index)?;
+        let abs = self.move_item_inner(idx, &map, target_list_id, target_index)?;
         self.inner.commit();
         let index = self
             .visible_item_index(item_id)
             .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+        self.refresh_item_cursor(item_id, index)?;
         if prev_list_id.as_deref() != Some(target_list_id) {
             self.push_event(AppEvent::ItemListChanged {
                 id: item_id.to_string(),
@@ -586,6 +667,7 @@ impl Doc {
         }
         self.items().delete(idx, 1)?;
         self.inner.commit();
+        self.remove_indexed_items(std::iter::once(item_id));
         self.push_event(AppEvent::ItemRemoved {
             id: item_id.to_string(),
         });
@@ -614,6 +696,7 @@ impl Doc {
             items.delete(idx, 1)?;
         }
         self.inner.commit();
+        self.remove_indexed_items(item_ids.iter().copied());
         self.emit_item_diffs(&pre_items);
         Ok(())
     }
@@ -636,6 +719,7 @@ impl Doc {
         }
         if !removed_ids.is_empty() {
             self.inner.commit();
+            self.remove_indexed_items(removed_ids.iter().map(String::as_str));
             for id in &removed_ids {
                 self.push_event(AppEvent::ItemRemoved { id: id.clone() });
             }
@@ -960,6 +1044,7 @@ impl Doc {
         }
 
         self.inner.commit();
+        self.rebuild_item_index();
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
 
         Ok(ImportSummary {
@@ -1124,6 +1209,7 @@ impl Doc {
     /// disk; the next push retries, and Loro / the server dedupe.
     pub fn import_oplog_updates(&mut self, plaintext: &[u8]) -> Result<(), DocError> {
         self.inner.import_with(plaintext, "remote")?;
+        self.rebuild_item_index();
         Ok(())
     }
 
@@ -1160,9 +1246,13 @@ impl Doc {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
 
-        for blob in blobs {
-            self.import_remote_blob(dek, blob)?;
-        }
+        let result = blobs
+            .into_iter()
+            .try_for_each(|blob| self.import_remote_blob(dek, blob));
+        // An import batch may have applied an earlier blob before a later
+        // blob fails, so rebuild even on the error path.
+        self.rebuild_item_index();
+        result?;
 
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         Ok(())
@@ -1204,6 +1294,7 @@ impl Doc {
             op(&mut um)?
         };
         if did {
+            self.rebuild_item_index();
             self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         }
         Ok(did)
@@ -1288,12 +1379,16 @@ impl Doc {
         let last_pushed_vv = VersionVector::decode(&envelope.last_pushed_vv)
             .map_err(|e| DocError::Loro(e.to_string()))?;
         let undo = Mutex::new(make_undo_manager(&inner));
-        Ok(Self {
+        let item_index = Mutex::new(ItemIndex::default());
+        let doc = Self {
             inner,
             last_pushed_vv,
             events: Mutex::new(VecDeque::new()),
+            item_index,
             undo,
-        })
+        };
+        doc.rebuild_item_index();
+        Ok(doc)
     }
 
     // ---------- fingerprint ----------
@@ -1358,15 +1453,26 @@ impl Doc {
     }
 
     fn find_item(&self, item_id: &str) -> Result<(usize, LoroMap), DocError> {
-        let items = self.items();
-        for i in 0..items.len() {
-            if let Some(map) = item_map_at(&items, i) {
-                if read_string(&map, KEY_ID).as_deref() == Some(item_id) {
-                    return Ok((i, map));
-                }
+        let (map, cursor) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let item = guard
+                .by_id
+                .get(item_id)
+                .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+            (item.map.clone(), item.cursor.clone())
+        };
+        let pos = self
+            .inner
+            .get_cursor_pos(&cursor)
+            .map_err(|e| DocError::Loro(format!("Cannot resolve cursor for {item_id}: {e}")))?;
+        let index = pos.current.pos;
+        if let Some(updated) = pos.update {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            if let Some(item) = guard.by_id.get_mut(item_id) {
+                item.cursor = updated;
             }
         }
-        Err(DocError::ItemNotFound(item_id.into()))
+        Ok((index, map))
     }
 
     fn find_list(&self, list_id: &str) -> Result<(usize, LoroMap), DocError> {
@@ -1399,14 +1505,15 @@ impl Doc {
     /// Materialize a new live-item LoroMap at absolute position `abs`
     /// in `items` and populate the standard keys. Caller is responsible
     /// for the surrounding `commit()` and event emission so a batch can
-    /// share both. Returns `(id, created_at)`.
+    /// share both. Returns `(id, created_at, map)` so the caller can
+    /// install the committed item in the disposable lookup index.
     fn write_new_item(
         &self,
         items: &LoroMovableList,
         list_id: &str,
         text: &str,
         abs: usize,
-    ) -> Result<(String, i64), DocError> {
+    ) -> Result<(String, i64, LoroMap), DocError> {
         let map = if abs >= items.len() {
             items.push_container(LoroMap::new())?
         } else {
@@ -1418,18 +1525,18 @@ impl Doc {
         map.insert(KEY_TEXT, text)?;
         map.insert(KEY_LIST_ID, list_id)?;
         map.insert(KEY_CREATED_AT, now)?;
-        Ok((id, now))
+        Ok((id, now, map))
     }
 
     fn move_item_inner(
         &self,
-        item_id: &str,
+        idx: usize,
+        map: &LoroMap,
         target_list_id: &str,
         target_index: usize,
     ) -> Result<usize, DocError> {
-        let (idx, map) = self.find_item(item_id)?;
         let moving_in_list_view =
-            read_i64(&map, KEY_DONE_AT).is_none() && read_i64(&map, KEY_BINNED_AT).is_none();
+            read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none();
         let items = self.items();
         let abs = absolute_index_for_list_position(
             &items,
@@ -2146,6 +2253,21 @@ mod tests {
         assert_eq!(a.live_item_ids(LIST_MAIN), vec![a2, a1]);
         assert_eq!(b.live_item_ids(LIST_MAIN), vec![b1, b2]);
         assert_ne!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn indexed_item_cursor_tracks_repeated_moves() {
+        let doc = Doc::new().unwrap();
+        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let _c = doc.add_item(LIST_MAIN, "c").unwrap();
+
+        for target in [0, 2, 0, 2, 1, 0, 2, 0, 1, 2] {
+            doc.move_item(&b, LIST_MAIN, target).unwrap();
+            let (index, map) = doc.find_item(&b).unwrap();
+            assert_eq!(index, target);
+            assert_eq!(read_string(&map, KEY_ID).as_deref(), Some(b.as_str()));
+        }
     }
 
     #[test]
@@ -3011,6 +3133,7 @@ mod tests {
         let restored = Doc {
             inner: restored_inner,
             last_pushed_vv: VersionVector::default(),
+            item_index: Mutex::new(ItemIndex::default()),
             events: Mutex::new(VecDeque::new()),
             undo,
         };
@@ -3019,6 +3142,19 @@ mod tests {
         // throughout the test suite to assert convergence — same hash
         // ⇒ same doc.
         assert_eq!(doc.fingerprint(), restored.fingerprint());
+    }
+
+    #[test]
+    fn oplog_replay_rebuilds_item_index() {
+        let source = Doc::new().unwrap();
+        let id = source.add_item(LIST_MAIN, "replayed").unwrap();
+        let updates = source.export_updates_after_bytes(&[]).unwrap();
+
+        let mut restored = Doc::empty();
+        restored.import_oplog_updates(&updates).unwrap();
+        restored.move_item(&id, LIST_MAIN, 0).unwrap();
+
+        assert_eq!(restored.get_item(&id).unwrap().text, "replayed");
     }
 
     #[test]
