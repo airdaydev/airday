@@ -114,8 +114,12 @@ type Messages = {
     email: string;
     thisDevice: string;
     lastSeen: string;
+    deviceActions: string;
+    renameDevice: string;
     revoke: string;
     revoking: string;
+    revokeDeviceConfirm: (name: string) => string;
+    failedToRenameDevice: string;
     failedToRevokeDevice: string;
     failedToLoadDevices: string;
   };
@@ -212,8 +216,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       email: "Correo",
       thisDevice: "Este dispositivo",
       lastSeen: "Última vez visto",
+      deviceActions: "Acciones del dispositivo",
+      renameDevice: "Renombrar",
       revoke: "Revocar",
       revoking: "Revocando…",
+      revokeDeviceConfirm: (name) =>
+        `¿Revocar «${name}»? Tendrá que volver a iniciar sesión para sincronizar.`,
+      failedToRenameDevice: "No se pudo renombrar el dispositivo",
       failedToRevokeDevice: "No se pudo revocar el dispositivo",
       failedToLoadDevices: "No se pudieron cargar los dispositivos",
     },
@@ -308,8 +317,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       email: "Email",
       thisDevice: "This device",
       lastSeen: "Last seen",
+      deviceActions: "Device actions",
+      renameDevice: "Rename",
       revoke: "Revoke",
       revoking: "Revoking…",
+      revokeDeviceConfirm: (name) =>
+        `Revoke “${name}”? It will need to sign in again to sync.`,
+      failedToRenameDevice: "Failed to rename device",
       failedToRevokeDevice: "Failed to revoke device",
       failedToLoadDevices: "Failed to load devices",
     },

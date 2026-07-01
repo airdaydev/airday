@@ -10,7 +10,7 @@ mod web;
 use axum::Router;
 use axum::http::{Method, header};
 use axum::middleware;
-use axum::routing::{any, delete, get, post};
+use axum::routing::{any, get, patch, post};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::state::AppState;
@@ -24,7 +24,13 @@ pub fn router(state: AppState) -> Router {
     // a hosted deployment.
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers([
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
@@ -51,7 +57,10 @@ pub fn router(state: AppState) -> Router {
             "/api/devices",
             get(device_routes::list).post(device_routes::register),
         )
-        .route("/api/devices/{device_id}", delete(device_routes::revoke))
+        .route(
+            "/api/devices/{device_id}",
+            patch(device_routes::rename).delete(device_routes::revoke),
+        )
         .route("/api/sync", any(ws_handler));
 
     if state.admin_enabled() {

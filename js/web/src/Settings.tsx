@@ -1,13 +1,83 @@
 import { Dialog } from "@kobalte/core/dialog";
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  onMount,
+  Show,
+  untrack,
+} from "solid-js";
 import { api, type Device } from "./api.ts";
+import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import type { Session } from "./Login.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import type { ThemePreference } from "./theme.ts";
 
 type Section = "general" | "account" | "devices";
+
+function DeviceNameEditor(props: {
+  name: string;
+  onSave: (name: string) => Promise<boolean>;
+  onDone: () => void;
+}) {
+  const [value, setValue] = createSignal(props.name);
+  const [saving, setSaving] = createSignal(false);
+  let inputRef!: HTMLInputElement;
+  let cancelled = false;
+
+  onMount(() => {
+    inputRef.focus();
+    inputRef.select();
+  });
+
+  const commit = async () => {
+    if (cancelled || saving()) return;
+    const name = value().trim();
+    if (!name) {
+      inputRef.focus();
+      return;
+    }
+    if (name === props.name) {
+      props.onDone();
+      return;
+    }
+    setSaving(true);
+    if (await props.onSave(name)) props.onDone();
+    else {
+      setSaving(false);
+      inputRef.focus();
+    }
+  };
+
+  return (
+    <form
+      class="device-rename-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void commit();
+      }}
+    >
+      <input
+        ref={inputRef}
+        class="device-rename-input"
+        value={value()}
+        disabled={saving()}
+        onInput={(e) => setValue(e.currentTarget.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.preventDefault();
+          e.stopPropagation();
+          cancelled = true;
+          props.onDone();
+        }}
+      />
+    </form>
+  );
+}
 
 export function Settings(props: {
   open: boolean;
@@ -25,6 +95,23 @@ export function Settings(props: {
   const [devicesError, setDevicesError] = createSignal<string | null>(null);
   const [devicesLoading, setDevicesLoading] = createSignal(false);
   const [revoking, setRevoking] = createSignal<ReadonlySet<string>>(new Set());
+  const [editingDeviceId, setEditingDeviceId] = createSignal<string | null>(null);
+
+  async function renameDevice(id: string, name: string): Promise<boolean> {
+    setDevicesError(null);
+    try {
+      await api.renameDevice(id, name);
+      setDevices((prev) =>
+        prev?.map((d) => (d.id === id ? { ...d, name } : d)) ?? prev,
+      );
+      return true;
+    } catch (e) {
+      setDevicesError(
+        e instanceof Error ? e.message : m().settings.failedToRenameDevice,
+      );
+      return false;
+    }
+  }
 
   async function revokeDevice(id: string) {
     setDevicesError(null);
@@ -249,7 +336,16 @@ export function Settings(props: {
                           <li class="device-row">
                             <div class="device-row-main">
                               <div class="device-name">
-                                {d.name}
+                                <Show
+                                  when={editingDeviceId() === d.id}
+                                  fallback={<span>{d.name}</span>}
+                                >
+                                  <DeviceNameEditor
+                                    name={d.name}
+                                    onSave={(name) => renameDevice(d.id, name)}
+                                    onDone={() => setEditingDeviceId(null)}
+                                  />
+                                </Show>
                                 <Show when={d.id === props.session.deviceId}>
                                   <span class="device-current-tag">
                                     {m().settings.thisDevice}
@@ -260,17 +356,50 @@ export function Settings(props: {
                                 {m().settings.lastSeen} {formatRelative(d.last_seen_at, locale())}
                               </div>
                             </div>
-                            <Show when={d.id !== props.session.deviceId}>
-                              <button
-                                type="button"
-                                class="device-revoke"
-                                disabled={revoking().has(d.id)}
-                                onClick={() => void revokeDevice(d.id)}
-                              >
-                                {revoking().has(d.id)
-                                  ? m().settings.revoking
-                                  : m().settings.revoke}
-                              </button>
+                            <Show when={editingDeviceId() !== d.id}>
+                              <DropdownMenu placement="bottom-end" gutter={4}>
+                                <DropdownMenu.Trigger
+                                  class="device-menu-trigger"
+                                  aria-label={`${m().settings.deviceActions}: ${d.name}`}
+                                  innerHTML={dotsVerticalSvg}
+                                />
+                                <DropdownMenu.Portal>
+                                  <DropdownMenu.Content class="dropdown-menu-content device-menu-content">
+                                    <DropdownMenu.Item
+                                      class="dropdown-menu-item"
+                                      onSelect={() => {
+                                        // Let the menu close and restore focus before
+                                        // replacing its trigger with the rename input.
+                                        requestAnimationFrame(() =>
+                                          setEditingDeviceId(d.id),
+                                        );
+                                      }}
+                                    >
+                                      {m().settings.renameDevice}
+                                    </DropdownMenu.Item>
+                                    <Show when={d.id !== props.session.deviceId}>
+                                      <DropdownMenu.Separator class="dropdown-menu-separator" />
+                                      <DropdownMenu.Item
+                                        class="dropdown-menu-item device-menu-revoke"
+                                        disabled={revoking().has(d.id)}
+                                        onSelect={() => {
+                                          if (
+                                            window.confirm(
+                                              m().settings.revokeDeviceConfirm(d.name),
+                                            )
+                                          ) {
+                                            void revokeDevice(d.id);
+                                          }
+                                        }}
+                                      >
+                                        {revoking().has(d.id)
+                                          ? m().settings.revoking
+                                          : m().settings.revoke}
+                                      </DropdownMenu.Item>
+                                    </Show>
+                                  </DropdownMenu.Content>
+                                </DropdownMenu.Portal>
+                              </DropdownMenu>
                             </Show>
                           </li>
                         )}

@@ -198,6 +198,11 @@ pub struct DeviceRegistration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceRenameRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceCredential {
     pub device_id: String,
     pub device_token: String,

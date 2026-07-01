@@ -1,11 +1,13 @@
-//! Device list / register / revoke handlers. All require bearer auth.
+//! Device list / register / rename / revoke handlers. All require bearer auth.
 
-use airday_protocol::{Device, DeviceCredential, DeviceRegistration, DevicesListResponse};
+use airday_protocol::{
+    Device, DeviceCredential, DeviceRegistration, DeviceRenameRequest, DevicesListResponse,
+};
 use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use crate::auth::DeviceAuth;
-use crate::auth::queries::{create_device, list_devices, revoke_device};
+use crate::auth::queries::{create_device, list_devices, rename_device, revoke_device};
 use crate::auth::tokens::{encode_token, generate_token, sha256};
 use crate::error::{ApiError, ApiResult};
 use crate::http::msgpack::Msgpack;
@@ -60,6 +62,25 @@ pub async fn revoke(
         .map_err(|_| ApiError::BadRequest("invalid device id".into()))?;
     let removed = revoke_device(&state.db, auth.account_id, target).await?;
     if !removed {
+        return Err(ApiError::NotFound);
+    }
+    Ok(())
+}
+
+pub async fn rename(
+    State(state): State<AppState>,
+    auth: DeviceAuth,
+    Path(device_id): Path<String>,
+    Msgpack(req): Msgpack<DeviceRenameRequest>,
+) -> ApiResult<()> {
+    let name = req.name.trim();
+    if name.is_empty() {
+        return Err(ApiError::BadRequest("name is required".into()));
+    }
+    let target = Uuid::parse_str(&device_id)
+        .map_err(|_| ApiError::BadRequest("invalid device id".into()))?;
+    let renamed = rename_device(&state.db, auth.account_id, target, name.to_owned()).await?;
+    if !renamed {
         return Err(ApiError::NotFound);
     }
     Ok(())

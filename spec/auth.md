@@ -12,6 +12,7 @@ POST   /api/account/password/change    (change password, authed by device token 
 POST   /api/account/password/reset     (set new password, authed by recovery_session_token)
 GET    /api/devices                    (list current account's devices)
 POST   /api/devices                    (register a new device)
+PATCH  /api/devices/:device_id         (rename a device)
 DELETE /api/devices/:device_id
 ```
 

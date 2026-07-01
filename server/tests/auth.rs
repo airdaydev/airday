@@ -10,9 +10,9 @@ use airday_core::{
     random_bytes,
 };
 use airday_protocol::{
-    KdfParams, LoginRequest, LoginResponse, PasswordResetRequest, PreloginRequest,
-    PreloginResponse, RecoverRequest, RecoverResponse, RecoveryMaterial, SignupRequest,
-    SignupResponse,
+    DeviceRenameRequest, DevicesListResponse, KdfParams, LoginRequest, LoginResponse,
+    PasswordResetRequest, PreloginRequest, PreloginResponse, RecoverRequest, RecoverResponse,
+    RecoveryMaterial, SignupRequest, SignupResponse,
 };
 use airday_server::{AppState, router};
 use reqwest::header::CONTENT_TYPE;
@@ -164,6 +164,7 @@ struct Account {
     server: TestServer,
     email: String,
     account_id: String,
+    device_id: String,
     device_token: String,
     dek: Dek,
     master_salt: Vec<u8>,
@@ -227,6 +228,7 @@ async fn signup(with_recovery: bool) -> Account {
         server,
         email,
         account_id: resp.account_id,
+        device_id: resp.device_id,
         device_token: resp.device_token,
         dek,
         master_salt: master_salt.to_vec(),
@@ -234,6 +236,36 @@ async fn signup(with_recovery: bool) -> Account {
         recovery_salt,
         kdf_params,
     }
+}
+
+#[tokio::test]
+async fn device_can_be_renamed() {
+    let acc = signup(false).await;
+    let bytes = rmp_serde::to_vec_named(&DeviceRenameRequest {
+        name: "  renamed device  ".into(),
+    })
+    .unwrap();
+    let response = http()
+        .patch(format!("{}/api/devices/{}", acc.server.base, acc.device_id))
+        .bearer_auth(&acc.device_token)
+        .header(CONTENT_TYPE, MSGPACK)
+        .body(bytes)
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+
+    let response = http()
+        .get(format!("{}/api/devices", acc.server.base))
+        .bearer_auth(&acc.device_token)
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let devices: DevicesListResponse =
+        rmp_serde::from_slice(&response.bytes().await.unwrap()).unwrap();
+    assert_eq!(devices.devices.len(), 1);
+    assert_eq!(devices.devices[0].name, "renamed device");
 }
 
 #[tokio::test]

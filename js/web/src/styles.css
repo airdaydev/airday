@@ -1235,8 +1235,33 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   color: var(--text);
   font-weight: 500;
+}
+
+.device-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-rename-form {
+  flex: 1;
+  min-width: 0;
+}
+
+.device-rename-input {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--link);
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  outline: none;
 }
 
 .device-current-tag {
@@ -1254,24 +1279,38 @@ body {
   color: var(--text-muted);
 }
 
-.device-revoke {
-  padding: 4px 10px;
-  border: 1px solid var(--border-input);
-  background: var(--bg-elevated);
-  color: var(--text);
+.device-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
   border-radius: 4px;
   cursor: pointer;
-  font: inherit;
-  font-size: 12px;
 }
 
-.device-revoke:hover:not(:disabled) {
+.device-menu-trigger:hover,
+.device-menu-trigger[data-expanded] {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
-.device-revoke:disabled {
-  opacity: 0.6;
-  cursor: default;
+.device-menu-trigger:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.device-menu-content {
+  z-index: 110;
+}
+
+.device-menu-revoke {
+  color: var(--error-text);
 }
 
 .palette-overlay {

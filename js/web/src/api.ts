@@ -122,6 +122,10 @@ export const api = {
     return get("/api/devices");
   },
 
+  async renameDevice(deviceId: string, name: string): Promise<void> {
+    await patch<unknown>(`/api/devices/${encodeURIComponent(deviceId)}`, { name });
+  },
+
   async deleteDevice(deviceId: string): Promise<void> {
     await del<unknown>(`/api/devices/${encodeURIComponent(deviceId)}`);
   },
@@ -133,6 +137,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 async function get<T>(path: string): Promise<T> {
   return request<T>(path, { method: "GET" });
+}
+
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "PATCH", body: encode(body) });
 }
 
 async function del<T>(path: string): Promise<T> {

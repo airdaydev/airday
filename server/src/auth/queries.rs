@@ -270,6 +270,26 @@ pub async fn revoke_device(db: &Db, account_id: Uuid, device_id: Uuid) -> anyhow
     Ok(n > 0)
 }
 
+pub async fn rename_device(
+    db: &Db,
+    account_id: Uuid,
+    device_id: Uuid,
+    name: String,
+) -> anyhow::Result<bool> {
+    let acc_bytes = account_id.as_bytes().to_vec();
+    let dev_bytes = device_id.as_bytes().to_vec();
+    let n = db
+        .call(move |c| {
+            c.execute(
+                "UPDATE devices SET name = ? WHERE id = ? AND account_id = ?",
+                params![name, dev_bytes, acc_bytes],
+            )
+        })
+        .await
+        .context("auth.queries rename_device update row")?;
+    Ok(n > 0)
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceLookup {
     pub account_id: Uuid,
