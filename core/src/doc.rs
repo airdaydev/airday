@@ -213,6 +213,9 @@ struct IndexedItem {
 #[derive(Default)]
 struct ItemIndex {
     by_id: HashMap<String, IndexedItem>,
+    /// Live item UUIDs per list, in the same relative order as the root
+    /// `items` MovableList. Done and binned items never appear here.
+    live_by_list: HashMap<String, Vec<String>>,
 }
 
 pub struct Doc {
@@ -281,6 +284,7 @@ impl Doc {
     fn rebuild_item_index(&self) {
         let items = self.items();
         let mut by_id = HashMap::<String, IndexedItem>::with_capacity(items.len());
+        let mut live_by_list = HashMap::<String, Vec<String>>::new();
         for index in 0..items.len() {
             let Some(map) = item_map_at(&items, index) else {
                 continue;
@@ -291,25 +295,36 @@ impl Doc {
             let Some(cursor) = items.get_cursor(index, Side::Middle) else {
                 continue;
             };
+            if is_in_list_view(&map)
+                && let Some(list_id) = read_string(&map, KEY_LIST_ID)
+            {
+                live_by_list.entry(list_id).or_default().push(id.clone());
+            }
             by_id.insert(id, IndexedItem { map, cursor });
         }
-        self.item_index
-            .lock()
-            .expect("item index mutex poisoned")
-            .by_id = by_id;
+        *self.item_index.lock().expect("item index mutex poisoned") = ItemIndex {
+            by_id,
+            live_by_list,
+        };
     }
 
-    fn index_item_at(&self, id: String, map: LoroMap, index: usize) -> Result<(), DocError> {
+    fn index_live_item_at(
+        &self,
+        id: String,
+        map: LoroMap,
+        index: usize,
+        list_id: &str,
+        live_index: usize,
+    ) -> Result<(), DocError> {
         let cursor = self
             .items()
             .get_cursor(index, Side::Middle)
             .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
 
-        self.item_index
-            .lock()
-            .expect("item index mutex poisoned")
-            .by_id
-            .insert(id, IndexedItem { map, cursor });
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        guard.by_id.insert(id.clone(), IndexedItem { map, cursor });
+        let live_ids = guard.live_by_list.entry(list_id.to_string()).or_default();
+        live_ids.insert(live_index.min(live_ids.len()), id);
 
         Ok(())
     }
@@ -333,7 +348,140 @@ impl Doc {
         let mut guard = self.item_index.lock().expect("item index mutex poisoned");
         for item_id in item_ids {
             guard.by_id.remove(item_id);
+            for ids in guard.live_by_list.values_mut() {
+                if let Some(index) = ids.iter().position(|id| id == item_id) {
+                    ids.remove(index);
+                    break;
+                }
+            }
         }
+        guard.live_by_list.retain(|_, ids| !ids.is_empty());
+    }
+
+    fn move_live_projection(&self, item_id: &str, target_list_id: &str, target_index: usize) {
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        for ids in guard.live_by_list.values_mut() {
+            if let Some(index) = ids.iter().position(|id| id == item_id) {
+                ids.remove(index);
+                break;
+            }
+        }
+        guard.live_by_list.retain(|_, ids| !ids.is_empty());
+        let ids = guard
+            .live_by_list
+            .entry(target_list_id.to_string())
+            .or_default();
+        ids.insert(target_index.min(ids.len()), item_id.to_string());
+    }
+
+    /// Resolve a per-list live insertion index to an absolute root-list
+    /// position. The returned live index is clamped for updating the
+    /// projection after the Loro mutation commits.
+    fn live_insertion_target(
+        &self,
+        list_id: &str,
+        target_index: usize,
+    ) -> Result<(usize, usize), DocError> {
+        let (live_index, anchor_id) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let ids = guard
+                .live_by_list
+                .get(list_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let live_index = target_index.min(ids.len());
+            (live_index, ids.get(live_index).cloned())
+        };
+        let absolute_index = match anchor_id {
+            Some(anchor_id) => self.find_item(&anchor_id)?.0,
+            None => self.items().len(),
+        };
+        Ok((absolute_index, live_index))
+    }
+
+    /// Resolve a post-move per-list live index while excluding the moving
+    /// item from the destination projection, matching the public API's
+    /// resulting-index semantics.
+    fn live_move_target(
+        &self,
+        item_id: &str,
+        target_list_id: &str,
+        target_index: usize,
+        current_idx: usize,
+    ) -> Result<usize, DocError> {
+        let anchor_id = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let ids = guard
+                .live_by_list
+                .get(target_list_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let current_live_index = ids.iter().position(|id| id == item_id);
+            let anchor_index = match current_live_index {
+                Some(current) if current <= target_index => target_index.saturating_add(1),
+                _ => target_index,
+            };
+            ids.get(anchor_index).cloned()
+        };
+
+        let Some(anchor_id) = anchor_id else {
+            return Ok(self.items().len().saturating_sub(1));
+        };
+        let anchor = self.find_item(&anchor_id)?.0;
+        Ok(if current_idx < anchor {
+            anchor.saturating_sub(1)
+        } else {
+            anchor
+        })
+    }
+
+    /// Reconcile one item's live projection membership after its status,
+    /// list, or position changes. Work is proportional to currently-live
+    /// items in the destination list, never lifetime item count.
+    fn sync_live_projection_for_item(
+        &self,
+        item_id: &str,
+        map: &LoroMap,
+        global_index: usize,
+    ) -> Result<(), DocError> {
+        let list_id = read_string(map, KEY_LIST_ID)
+            .ok_or_else(|| DocError::Invalid(format!("item {item_id} has no list_id")))?;
+        let is_live = is_in_list_view(map);
+        let candidates = if is_live {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard
+                .live_by_list
+                .get(&list_id)
+                .into_iter()
+                .flatten()
+                .filter(|id| id.as_str() != item_id)
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+
+        let mut live_index = 0usize;
+        for candidate in candidates {
+            if self.find_item(&candidate)?.0 >= global_index {
+                break;
+            }
+            live_index += 1;
+        }
+
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        for ids in guard.live_by_list.values_mut() {
+            if let Some(index) = ids.iter().position(|id| id == item_id) {
+                ids.remove(index);
+                break;
+            }
+        }
+        guard.live_by_list.retain(|_, ids| !ids.is_empty());
+        if is_live {
+            let ids = guard.live_by_list.entry(list_id).or_default();
+            ids.insert(live_index.min(ids.len()), item_id.to_string());
+        }
+        Ok(())
     }
 
     pub fn last_pushed_vv(&self) -> &VersionVector {
@@ -364,6 +512,7 @@ impl Doc {
         }
         self.assert_list_exists(list_id)?;
         let items = self.items();
+        let (index, live_index) = self.live_insertion_target(list_id, usize::MAX)?;
         let map = items.push_container(LoroMap::new())?;
         let id = new_id();
         let now = now_millis();
@@ -372,10 +521,7 @@ impl Doc {
         map.insert(KEY_LIST_ID, list_id)?;
         map.insert(KEY_CREATED_AT, now)?;
         self.inner.commit();
-        let index = self
-            .visible_item_index(&id)
-            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
-        self.index_item_at(id.clone(), map, index)?;
+        self.index_live_item_at(id.clone(), map, index, list_id, live_index)?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -407,13 +553,10 @@ impl Doc {
         }
         self.assert_list_exists(list_id)?;
         let items = self.items();
-        let abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
+        let (abs, live_index) = self.live_insertion_target(list_id, target_index)?;
         let (id, now, map) = self.write_new_item(&items, list_id, text, abs)?;
         self.inner.commit();
-        let index = self
-            .visible_item_index(&id)
-            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
-        self.index_item_at(id.clone(), map, index)?;
+        self.index_live_item_at(id.clone(), map, abs, list_id, live_index)?;
         self.push_event(AppEvent::ItemAdded {
             id: id.clone(),
             list_id: list_id.to_string(),
@@ -422,7 +565,7 @@ impl Doc {
             created_at: now,
             done_at: None,
             binned_at: None,
-            index,
+            index: abs,
         });
         Ok(id)
     }
@@ -447,7 +590,8 @@ impl Doc {
             return Ok(Vec::new());
         }
         let items = self.items();
-        let initial_abs = absolute_insertion_index_for_list_position(&items, list_id, target_index);
+        let (initial_abs, initial_live_index) =
+            self.live_insertion_target(list_id, target_index)?;
         let mut ids = Vec::with_capacity(trimmed.len());
         let mut pending = Vec::with_capacity(trimmed.len());
         for (i, text) in trimmed.iter().enumerate() {
@@ -457,11 +601,9 @@ impl Doc {
             ids.push(id);
         }
         self.inner.commit();
-        for (id, text, now, map) in pending {
-            let index = self
-                .visible_item_index(&id)
-                .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
-            self.index_item_at(id.clone(), map, index)?;
+        for (offset, (id, text, now, map)) in pending.into_iter().enumerate() {
+            let index = initial_abs + offset;
+            self.index_live_item_at(id.clone(), map, index, list_id, initial_live_index + offset)?;
             self.push_event(AppEvent::ItemAdded {
                 id,
                 list_id: list_id.to_string(),
@@ -514,12 +656,17 @@ impl Doc {
         self.assert_list_exists(target_list_id)?;
         let (idx, map) = self.find_item(item_id)?;
         let prev_list_id = read_string(&map, KEY_LIST_ID);
-        let abs = self.move_item_inner(idx, &map, target_list_id, target_index)?;
+        let moving_live_item = is_in_list_view(&map);
+        let abs = self.move_item_inner(item_id, idx, &map, target_list_id, target_index)?;
         self.inner.commit();
-        let index = self
-            .visible_item_index(item_id)
-            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-        self.refresh_item_cursor(item_id, index)?;
+        // `LoroMovableList::mov(from, to)` places the element at `to` in
+        // the resulting user-visible sequence, so `abs` is already the
+        // post-move global index. Avoid scanning every historical item to
+        // rediscover it.
+        self.refresh_item_cursor(item_id, abs)?;
+        if moving_live_item {
+            self.move_live_projection(item_id, target_list_id, target_index);
+        }
         if prev_list_id.as_deref() != Some(target_list_id) {
             self.push_event(AppEvent::ItemListChanged {
                 id: item_id.to_string(),
@@ -529,7 +676,7 @@ impl Doc {
         if abs != idx {
             self.push_event(AppEvent::ItemMoved {
                 id: item_id.to_string(),
-                index,
+                index: abs,
             });
         }
         Ok(())
@@ -538,7 +685,7 @@ impl Doc {
     /// Set or clear an item's done state. Independent of `binned` —
     /// flipping done leaves `binned_at` untouched.
     pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), DocError> {
-        let (_, map) = self.find_item(item_id)?;
+        let (index, map) = self.find_item(item_id)?;
         let prev_done = read_i64(&map, KEY_DONE_AT);
         let new_done = match (done, prev_done) {
             (true, Some(_)) => return Ok(()),
@@ -556,6 +703,7 @@ impl Doc {
         }
         let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
+        self.sync_live_projection_for_item(item_id, &map, index)?;
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at: new_done,
@@ -592,6 +740,7 @@ impl Doc {
         }
         if changed {
             self.inner.commit();
+            self.rebuild_item_index();
             self.emit_item_diffs(&pre_items);
         }
         Ok(())
@@ -601,7 +750,7 @@ impl Doc {
     /// binning a done item keeps it done; restoring (unbinning) leaves
     /// the done state alone.
     pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), DocError> {
-        let (_, map) = self.find_item(item_id)?;
+        let (index, map) = self.find_item(item_id)?;
         let prev_binned = read_i64(&map, KEY_BINNED_AT);
         let new_binned = match (binned, prev_binned) {
             (true, Some(_)) => return Ok(()),
@@ -619,6 +768,7 @@ impl Doc {
         }
         let done_at = read_i64(&map, KEY_DONE_AT);
         self.inner.commit();
+        self.sync_live_projection_for_item(item_id, &map, index)?;
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at,
@@ -655,6 +805,7 @@ impl Doc {
         }
         if changed {
             self.inner.commit();
+            self.rebuild_item_index();
             self.emit_item_diffs(&pre_items);
         }
         Ok(())
@@ -871,6 +1022,7 @@ impl Doc {
         }
         self.lists().delete(idx, 1)?;
         self.inner.commit();
+        self.rebuild_item_index();
         for id in reassigned {
             self.push_event(AppEvent::ItemListChanged {
                 id,
@@ -1487,10 +1639,6 @@ impl Doc {
         Err(DocError::ListNotFound(list_id.into()))
     }
 
-    fn visible_item_index(&self, item_id: &str) -> Option<usize> {
-        self.iter_items().position(|it| it.id == item_id)
-    }
-
     fn visible_list_index(&self, list_id: &str) -> Option<usize> {
         self.all_lists().iter().position(|l| l.id == list_id)
     }
@@ -1530,6 +1678,7 @@ impl Doc {
 
     fn move_item_inner(
         &self,
+        item_id: &str,
         idx: usize,
         map: &LoroMap,
         target_list_id: &str,
@@ -1538,13 +1687,11 @@ impl Doc {
         let moving_in_list_view =
             read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none();
         let items = self.items();
-        let abs = absolute_index_for_list_position(
-            &items,
-            target_list_id,
-            target_index,
-            idx,
-            moving_in_list_view,
-        );
+        let abs = if moving_in_list_view {
+            self.live_move_target(item_id, target_list_id, target_index, idx)?
+        } else {
+            absolute_index_for_list_position(&items, target_list_id, target_index, idx)
+        };
         map.insert(KEY_LIST_ID, target_list_id)?;
         if abs != idx {
             items.mov(idx, abs)?;
@@ -1706,35 +1853,6 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
     })
 }
 
-/// Translate "insert as the Nth visible entry of `target_list_id`"
-/// (i.e., among items that are neither done nor binned) into an
-/// absolute index suitable for `LoroMovableList::insert_container` /
-/// `push_container`. Returns `items.len()` when `target_index` is past
-/// the end so the caller can fall back to `push_container`.
-fn absolute_insertion_index_for_list_position(
-    items: &LoroMovableList,
-    target_list_id: &str,
-    target_index: usize,
-) -> usize {
-    let mut seen = 0usize;
-    for i in 0..items.len() {
-        let Some(map) = item_map_at(items, i) else {
-            continue;
-        };
-        if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
-            continue;
-        }
-        if !is_in_list_view(&map) {
-            continue;
-        }
-        if seen == target_index {
-            return i;
-        }
-        seen += 1;
-    }
-    items.len()
-}
-
 fn is_in_list_view(map: &LoroMap) -> bool {
     read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none()
 }
@@ -1748,7 +1866,6 @@ fn absolute_index_for_list_position(
     target_list_id: &str,
     target_index: usize,
     current_idx: usize,
-    moving_in_list_view: bool,
 ) -> usize {
     let mut matching = Vec::new();
     for i in 0..items.len() {
@@ -1759,11 +1876,6 @@ fn absolute_index_for_list_position(
             continue;
         };
         if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
-            continue;
-        }
-        // List-view reorders originate from the visible per-list view,
-        // so done/binned items must not consume target slots.
-        if moving_in_list_view && !is_in_list_view(&map) {
             continue;
         }
         matching.push(i);
@@ -1947,6 +2059,20 @@ fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent
 mod tests {
     use super::*;
     use crate::crypto::Dek;
+
+    fn assert_live_projection_matches_doc(doc: &Doc) {
+        let mut expected: HashMap<String, Vec<String>> = HashMap::new();
+        for item in doc.iter_items().filter(ItemView::is_in_list_view) {
+            expected.entry(item.list_id).or_default().push(item.id);
+        }
+        let actual = doc
+            .item_index
+            .lock()
+            .expect("item index mutex poisoned")
+            .live_by_list
+            .clone();
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn new_doc_has_no_persisted_lists() {
@@ -2267,7 +2393,29 @@ mod tests {
             let (index, map) = doc.find_item(&b).unwrap();
             assert_eq!(index, target);
             assert_eq!(read_string(&map, KEY_ID).as_deref(), Some(b.as_str()));
+            assert_live_projection_matches_doc(&doc);
         }
+    }
+
+    #[test]
+    fn live_projection_survives_bulk_archive_then_reorder() {
+        let doc = Doc::new().unwrap();
+        let historical = doc
+            .add_items_at(LIST_MAIN, &["old 1", "old 2", "old 3"], 0)
+            .unwrap();
+        let historical_refs: Vec<&str> = historical.iter().map(String::as_str).collect();
+        doc.set_items_done(&historical_refs, true).unwrap();
+
+        let live = doc
+            .add_items_at(LIST_MAIN, &["current 1", "current 2", "current 3"], 0)
+            .unwrap();
+        doc.move_item(&live[2], LIST_MAIN, 0).unwrap();
+
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![live[2].clone(), live[0].clone(), live[1].clone()]
+        );
+        assert_live_projection_matches_doc(&doc);
     }
 
     #[test]
