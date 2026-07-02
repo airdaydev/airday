@@ -1396,13 +1396,13 @@ impl From<CoreEvent> for EngineEvent {
 /// every other getter returns `undefined`.
 ///
 /// Variant → fields:
-/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, index
+/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, index, liveIndex?
 /// - `itemRemoved` — id
-/// - `itemMoved` — id, index
+/// - `itemMoved` — id, index, liveIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
-/// - `itemStatusChanged` — id, doneAt?, binnedAt?
-/// - `itemListChanged` — id, listId
+/// - `itemStatusChanged` — id, doneAt?, binnedAt?, liveIndex?
+/// - `itemListChanged` — id, listId, liveIndex?
 /// - `listAdded` — id, name, createdAt, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
@@ -1425,6 +1425,11 @@ pub struct AppEventJs {
     /// fall back to the localized built-in label.
     main_name: Option<String>,
     index: Option<usize>,
+    /// Position within the owning list's *live* projection (done/binned
+    /// excluded). Present on item events whenever the item is live
+    /// after the change; `undefined` otherwise. See
+    /// `airday_core::AppEvent` for per-variant semantics.
+    live_index: Option<usize>,
 }
 
 #[wasm_bindgen]
@@ -1469,6 +1474,10 @@ impl AppEventJs {
     pub fn index(&self) -> Option<usize> {
         self.index
     }
+    #[wasm_bindgen(getter, js_name = liveIndex)]
+    pub fn live_index(&self) -> Option<usize> {
+        self.live_index
+    }
     #[wasm_bindgen(getter, js_name = showListCounts)]
     pub fn show_list_counts(&self) -> Option<bool> {
         self.show_list_counts
@@ -1494,6 +1503,7 @@ impl From<CoreAppEvent> for AppEventJs {
             show_list_counts: None,
             main_name: None,
             index: None,
+            live_index: None,
         };
         match e {
             CoreAppEvent::ItemAdded {
@@ -1505,6 +1515,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 index,
+                live_index,
             } => AppEventJs {
                 kind: "itemAdded",
                 id,
@@ -1515,6 +1526,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 index: Some(index),
+                live_index,
                 ..blank
             },
             CoreAppEvent::ItemRemoved { id } => AppEventJs {
@@ -1522,10 +1534,15 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 ..blank
             },
-            CoreAppEvent::ItemMoved { id, index } => AppEventJs {
+            CoreAppEvent::ItemMoved {
+                id,
+                index,
+                live_index,
+            } => AppEventJs {
                 kind: "itemMoved",
                 id,
                 index: Some(index),
+                live_index,
                 ..blank
             },
             CoreAppEvent::ItemTextChanged { id, text } => AppEventJs {
@@ -1544,17 +1561,24 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 done_at,
                 binned_at,
+                live_index,
             } => AppEventJs {
                 kind: "itemStatusChanged",
                 id,
                 done_at,
                 binned_at,
+                live_index,
                 ..blank
             },
-            CoreAppEvent::ItemListChanged { id, list_id } => AppEventJs {
+            CoreAppEvent::ItemListChanged {
+                id,
+                list_id,
+                live_index,
+            } => AppEventJs {
                 kind: "itemListChanged",
                 id,
                 list_id: Some(list_id),
+                live_index,
                 ..blank
             },
             CoreAppEvent::ListAdded {

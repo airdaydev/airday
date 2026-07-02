@@ -127,26 +127,30 @@ export function Workspace(props: {
   // Done click within DONE_LINGER_MS of the previous extends the
   // whole chain, so a burst of clicks all leave together at the
   // latest's expiry; a click after a gap starts a fresh chain.
+  // Sourced from the store's `recentDone` capture — the live
+  // projection drops done items instantly, so this is the only record
+  // of what just left (and where it sat, for the re-insert below).
   const lingerChain = createMemo(
     (): { ids: Set<string>; expiry: number } => {
       const v = view();
       if (v.kind !== "list") return { ids: new Set(), expiry: -Infinity };
-      const done: ItemView[] = [];
-      for (const id of state.itemsOrder) {
-        const it = state.itemsById[id];
-        if (!it || it.listId !== v.id || isBinned(it) || !isDone(it)) continue;
-        done.push(it);
-      }
+      const done = app
+        .recentDone()
+        .filter((r) => {
+          if (r.listId !== v.id) return false;
+          const it = state.itemsById[r.id];
+          return it !== undefined && isDone(it) && !isBinned(it);
+        })
+        .sort((a, b) => b.doneAt - a.doneAt);
       if (done.length === 0) return { ids: new Set(), expiry: -Infinity };
-      done.sort((a, b) => b.doneAt! - a.doneAt!);
       const ids = new Set<string>();
-      let prev = done[0].doneAt!;
-      for (const it of done) {
-        if (prev - it.doneAt! >= DONE_LINGER_MS) break;
-        ids.add(it.id);
-        prev = it.doneAt!;
+      let prev = done[0].doneAt;
+      for (const r of done) {
+        if (prev - r.doneAt >= DONE_LINGER_MS) break;
+        ids.add(r.id);
+        prev = r.doneAt;
       }
-      return { ids, expiry: done[0].doneAt! + DONE_LINGER_MS };
+      return { ids, expiry: done[0].doneAt + DONE_LINGER_MS };
     },
   );
 
@@ -163,34 +167,48 @@ export function Workspace(props: {
     onCleanup(() => clearTimeout(t));
   });
 
-  // Per-view item slice. Each `state.itemsById[id]` access is a tracked
-  // path on the store proxy, so adds/removes to itemsOrder and field
-  // changes on individual items both flow through this memo without
-  // either invalidating the other.
+  // Per-view item slice. A list view reads only its own
+  // `state.listLive[id]` array, so mutations in other lists (or in
+  // Done/Bin) never invalidate it; item field edits track per-item
+  // paths independently of the ordering. Done/Bin scan `itemsById`
+  // lazily — the scan only runs while that view is active, and no
+  // list-view mutation path pays for it.
   const items = createMemo((): ItemView[] => {
     const v = view();
-    const all = state.itemsOrder
-      .map((id) => state.itemsById[id])
-      .filter((it): it is ItemView => it !== undefined);
     if (v.kind === "list") {
+      const out: ItemView[] = [];
+      for (const id of state.listLive[v.id] ?? []) {
+        const it = state.itemsById[id];
+        if (it) out.push(it);
+      }
+      // Re-insert the linger group at the positions its rows vacated:
+      // the live projection drops done items instantly, but the user
+      // should see the strike-through before the row leaves. Ascending
+      // capture-index insertion restores a top-down tick burst's
+      // original layout.
       lingerTick();
       const { ids: lingerIds, expiry } = lingerChain();
-      const groupActive = Date.now() < expiry;
-      return all.filter(
-        (it) =>
-          it.listId === v.id &&
-          !isBinned(it) &&
-          (!isDone(it) || (groupActive && lingerIds.has(it.id))),
-      );
+      if (Date.now() < expiry) {
+        const lingering = app
+          .recentDone()
+          .filter((r) => r.listId === v.id && lingerIds.has(r.id))
+          .sort((a, b) => a.index - b.index);
+        for (const r of lingering) {
+          const it = state.itemsById[r.id];
+          if (!it || !isDone(it) || isBinned(it)) continue;
+          out.splice(Math.min(r.index, out.length), 0, it);
+        }
+      }
+      return out;
     }
     if (v.kind === "done") {
       // Done view excludes binned items: a done-then-binned item lives
       // in the Bin (see context menu — Bin owns the next transition).
-      return all
+      return Object.values(state.itemsById)
         .filter((it) => isDone(it) && !isBinned(it))
         .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
     }
-    return all
+    return Object.values(state.itemsById)
       .filter(isBinned)
       .sort((a, b) => (b.binnedAt ?? 0) - (a.binnedAt ?? 0));
   });
@@ -201,29 +219,15 @@ export function Workspace(props: {
       .filter((l): l is ListView => l !== undefined),
   );
 
-  // Bin badge / visibility in the nav. Independent of `items()` so the
-  // count stays accurate while viewing any list — and so an empty Bin
-  // can hide the button without disturbing the active-view memo.
-  const binCount = createMemo((): number => {
-    let n = 0;
-    for (const id of state.itemsOrder) {
-      const it = state.itemsById[id];
-      if (it && isBinned(it)) n++;
-    }
-    return n;
-  });
-
-  // Per-list live-item counts for the nav badge. Single pass over the
-  // global items array so adding lists doesn't multiply the work; the
-  // memo invalidates whenever any item moves/changes status, which is
-  // the same trigger as `items()`. Queue's count always renders;
-  // non-Queue lists are gated by the doc-level `showListCounts` flag.
+  // Per-list live-item counts for the nav badge, read straight off the
+  // per-list projection arrays — no item scan. (The bin badge reads the
+  // store's maintained `state.binCount` directly.) Home's count always
+  // renders; non-Home lists are gated by the doc-level `showListCounts`
+  // flag.
   const liveCountsByList = createMemo((): Record<string, number> => {
     const counts: Record<string, number> = {};
-    for (const id of state.itemsOrder) {
-      const it = state.itemsById[id];
-      if (!it || !isInListView(it)) continue;
-      counts[it.listId] = (counts[it.listId] ?? 0) + 1;
+    for (const [listId, ids] of Object.entries(state.listLive)) {
+      counts[listId] = ids.length;
     }
     return counts;
   });
@@ -688,9 +692,12 @@ export function Workspace(props: {
     if (!target) return;
     ce.preventDefault();
     const draggedKeys = new Set(ce.detail.keys.map(String));
-    // Sort by current global order so multi-select drops preserve the
-    // user's visible ordering rather than landing in selection order.
-    const idsInOrder = state.itemsOrder.filter((id) => draggedKeys.has(id));
+    // Sort by the source view's visible order so multi-select drops
+    // preserve the user's visible ordering rather than landing in
+    // selection order. Dragged rows always come from the active view.
+    const idsInOrder = items()
+      .map((it) => it.id)
+      .filter((id) => draggedKeys.has(id));
     if (target.kind === "bin") {
       const toBin = idsInOrder.filter((id) => {
         const it = app.getItem(id);
@@ -814,7 +821,7 @@ export function Workspace(props: {
       <Nav
         app={app}
         lists={lists()}
-        binCount={binCount()}
+        binCount={state.binCount}
         liveCountsByList={liveCountsByList()}
         homeName={homeName()}
         showListCounts={state.settings.showListCounts}

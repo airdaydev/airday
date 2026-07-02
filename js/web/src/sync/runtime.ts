@@ -112,11 +112,16 @@ export function createWorkspaceRuntime(props: {
     }
   };
   const compact = (): void => {
-    try {
-      engine.snapshotIfFullySynced();
-    } catch (e) {
-      console.error("snapshotIfFullySynced failed:", e);
-    }
+    // TEMP(perf-probe): per-ack snapshot compaction disabled to confirm
+    // it's the whole-doc O(N) term behind mutation lag on large stores.
+    // While disabled the op-log grows unboundedly and boot replays every
+    // row — do not ship. Re-enable (with a threshold) after measuring.
+    //
+    // try {
+    //   engine.snapshotIfFullySynced();
+    // } catch (e) {
+    //   console.error("snapshotIfFullySynced failed:", e);
+    // }
   };
 
   // Persist the device row — identity + the "last synced" stamp

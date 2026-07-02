@@ -2,10 +2,17 @@
 // SolidJS `createStore` keyed by id; mutations go through the engine,
 // which emits domain-level `AppEvent`s that this layer mirrors into the
 // store via surgical `setState` calls. The store is the single source
-// of truth the UI reads from — `<For each={state.itemsOrder}>` for
-// iteration, `state.itemsById[id]` for content. Solid's proxy tracks
-// each property path independently, so a peer editing one item doesn't
-// invalidate the iteration and vice versa.
+// of truth the UI reads from — `state.listLive[listId]` for a list
+// view's iteration order, `state.itemsById[id]` for content. Solid's
+// proxy tracks each property path independently, so a peer editing one
+// item doesn't invalidate the iteration and vice versa.
+//
+// There is deliberately no global item order: each mutation touches
+// only the affected list's live array (splice at the event's
+// `liveIndex`) plus maintained counters, so dispatch cost scales with
+// the touched list, never with total items in the doc. Done/Bin views
+// derive lazily from `itemsById` (timestamp sorts), not CRDT order.
+// See spec/list-perf-plan.md.
 
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
@@ -38,13 +45,29 @@ export interface ListView {
 }
 
 export interface WorkspaceState {
-  /** Global item id order — mirrors Loro's MovableList; per-view
-   *  filters derive from this. */
-  itemsOrder: string[];
   itemsById: Record<string, ItemView>;
+  /** Per-list live order — mirrors the core's `live_by_list`
+   *  projection of Loro's MovableList. Done/binned items never appear
+   *  here; a list with no live items may be absent or hold `[]`. */
+  listLive: Record<string, string[]>;
+  /** Binned-item count, maintained incrementally so the Bin badge
+   *  never needs a global scan. */
+  binCount: number;
   listsOrder: string[];
   listsById: Record<string, ListView>;
   settings: SettingsView;
+}
+
+/** Snapshot of where an item sat in its list's live order at the
+ *  moment it was marked done. Feeds the list-view "linger" affordance
+ *  (`Workspace`), which briefly re-inserts recently-done rows at their
+ *  old position — the live projection itself drops them instantly. */
+export interface RecentDoneEntry {
+  id: string;
+  listId: string;
+  /** Live index the item occupied just before leaving the projection. */
+  index: number;
+  doneAt: number;
 }
 
 export interface SettingsView {
@@ -72,6 +95,11 @@ export interface DocApp {
    *  doc. The UI doesn't read it — Solid's store gives it granular
    *  reactivity directly. */
   version: Accessor<number>;
+  /** Rolling capture of items that just left a live list by being
+   *  marked done (local or remote). Entries are dropped when the item
+   *  is restored, binned, removed, or moved, and pruned by age; the
+   *  linger UI applies its own (shorter) expiry window on top. */
+  recentDone: Accessor<readonly RecentDoneEntry[]>;
   /** Pump the engine's AppEvent queue into the store. The WS bridge
    *  calls this after every server frame; mutation methods call it
    *  inline so local writes flow through the same dispatcher path. */
@@ -154,8 +182,9 @@ const COARSE_EVENT_KINDS = new Set([
 ]);
 
 function materializeState(events: readonly AppEventJs[]): WorkspaceState {
-  const itemsOrder: string[] = [];
   const itemsById: Record<string, ItemView> = {};
+  const listLive: Record<string, string[]> = {};
+  let binCount = 0;
   const listsOrder: string[] = [];
   const listsById: Record<string, ListView> = {};
   const settings: SettingsView = {
@@ -171,7 +200,7 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
         break;
       }
       case "itemAdded": {
-        itemsById[ev.id] = {
+        const item: ItemView = {
           id: ev.id,
           listId: ev.listId ?? "",
           text: ev.text ?? "",
@@ -180,7 +209,13 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
         };
-        itemsOrder.push(ev.id);
+        itemsById[ev.id] = item;
+        // The snapshot burst arrives in global CRDT order, so appending
+        // live ids per list reproduces each list's live projection.
+        if (isInListView(item)) {
+          (listLive[item.listId] ??= []).push(ev.id);
+        }
+        if (isBinned(item)) binCount++;
         break;
       }
       case "listAdded": {
@@ -196,8 +231,9 @@ function materializeState(events: readonly AppEventJs[]): WorkspaceState {
   }
 
   return {
-    itemsOrder,
     itemsById,
+    listLive,
+    binCount,
     listsOrder,
     listsById,
     settings,
@@ -215,8 +251,9 @@ function shouldUseCoarseProjection(events: readonly AppEventJs[]): boolean {
 
 export function createSyncedApp(engine: SyncEngine): DocApp {
   const [state, setState] = createStore<WorkspaceState>({
-    itemsOrder: [],
     itemsById: {},
+    listLive: {},
+    binCount: 0,
     listsOrder: [],
     listsById: {},
     settings: {
@@ -225,6 +262,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
   });
   const [version, setVersion] = createSignal(0);
+  const [recentDone, setRecentDone] = createSignal<readonly RecentDoneEntry[]>(
+    [],
+  );
   const search = createSearchEngine();
   let actionBatchDepth = 0;
   let flushDeferred = false;
@@ -233,9 +273,58 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   const undoStack: number[] = [];
   const redoStack: number[] = [];
 
+  // ---- listLive helpers: every write is list-local. `insertLive`
+  // removes any existing occurrence first so re-dispatch of an id
+  // (e.g. an add event for an item we already track) stays idempotent.
+  const insertLive = (
+    listId: string,
+    id: string,
+    index: number | undefined,
+  ): void => {
+    const cur = state.listLive[listId];
+    const next = cur ? cur.filter((x) => x !== id) : [];
+    next.splice(Math.min(index ?? next.length, next.length), 0, id);
+    setState("listLive", listId, next);
+  };
+  const removeLive = (listId: string, id: string): void => {
+    const cur = state.listLive[listId];
+    if (!cur || !cur.includes(id)) return;
+    setState(
+      "listLive",
+      listId,
+      cur.filter((x) => x !== id),
+    );
+  };
+  const adjustBinCount = (delta: number): void => {
+    if (delta !== 0) setState("binCount", (n) => n + delta);
+  };
+
+  // ---- recentDone (linger capture). Entries older than this are
+  // unreachable by any linger chain (Workspace's window is shorter);
+  // pruning on write keeps the array a handful of entries.
+  const RECENT_DONE_TTL_MS = 15_000;
+  const captureRecentDone = (entry: RecentDoneEntry): void => {
+    setRecentDone((prev) => [
+      ...prev.filter(
+        (e) => e.id !== entry.id && entry.doneAt - e.doneAt < RECENT_DONE_TTL_MS,
+      ),
+      entry,
+    ]);
+  };
+  const dropRecentDone = (id: string): void => {
+    setRecentDone((prev) =>
+      prev.some((e) => e.id === id) ? prev.filter((e) => e.id !== id) : prev,
+    );
+  };
+
   const dispatch = (ev: AppEventJs): void => {
     switch (ev.kind) {
       case "itemAdded": {
+        const prev = state.itemsById[ev.id];
+        if (prev) {
+          if (isInListView(prev)) removeLive(prev.listId, ev.id);
+          if (isBinned(prev)) adjustBinCount(-1);
+        }
         const item: ItemView = {
           id: ev.id,
           listId: ev.listId ?? "",
@@ -246,20 +335,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
         };
         setState("itemsById", ev.id, item);
-        const targetIndex = ev.index ?? state.itemsOrder.length;
-        setState(
-          "itemsOrder",
-          produce((order) => {
-            const cur = order.indexOf(ev.id);
-            if (cur >= 0) order.splice(cur, 1);
-            const insertAt = Math.min(targetIndex, order.length);
-            order.splice(insertAt, 0, ev.id);
-          }),
-        );
+        if (isInListView(item)) insertLive(item.listId, ev.id, ev.liveIndex);
+        if (isBinned(item)) adjustBinCount(1);
         break;
       }
       case "itemRemoved": {
-        setState("itemsOrder", (o) => o.filter((id) => id !== ev.id));
+        const prev = state.itemsById[ev.id];
+        if (!prev) break;
+        if (isInListView(prev)) removeLive(prev.listId, ev.id);
+        if (isBinned(prev)) adjustBinCount(-1);
+        dropRecentDone(ev.id);
         setState(
           "itemsById",
           produce((by) => {
@@ -269,16 +354,15 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         break;
       }
       case "itemMoved": {
-        const target = ev.index ?? 0;
-        setState(
-          "itemsOrder",
-          produce((order) => {
-            const cur = order.indexOf(ev.id);
-            if (cur < 0) return;
-            order.splice(cur, 1);
-            order.splice(Math.min(target, order.length), 0, ev.id);
-          }),
-        );
+        // Pure reordering. Any list change arrived as the preceding
+        // `itemListChanged`, so `prev.listId` is already the
+        // destination; done/binned items carry no liveIndex and their
+        // view order is timestamp-derived, so there is nothing to do.
+        const prev = state.itemsById[ev.id];
+        if (!prev) break;
+        if (isInListView(prev) && ev.liveIndex != null) {
+          insertLive(prev.listId, ev.id, ev.liveIndex);
+        }
         break;
       }
       case "itemTextChanged": {
@@ -294,18 +378,43 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         break;
       }
       case "itemStatusChanged": {
-        if (state.itemsById[ev.id]) {
-          setState("itemsById", ev.id, {
-            doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
-            binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
+        const prev = state.itemsById[ev.id];
+        if (!prev) break;
+        const wasLive = isInListView(prev);
+        const wasBinned = isBinned(prev);
+        const doneAt = ev.doneAt != null ? Number(ev.doneAt) : undefined;
+        const binnedAt = ev.binnedAt != null ? Number(ev.binnedAt) : undefined;
+        const nowLive = doneAt == null && binnedAt == null;
+        if (wasLive && doneAt != null && binnedAt == null) {
+          // Leaving the live projection by being marked done: snapshot
+          // the vacated position (before the removal below) for the
+          // linger re-insert.
+          const idx = state.listLive[prev.listId]?.indexOf(ev.id) ?? -1;
+          captureRecentDone({
+            id: ev.id,
+            listId: prev.listId,
+            index: idx >= 0 ? idx : 0,
+            doneAt,
           });
+        } else if (nowLive || binnedAt != null) {
+          dropRecentDone(ev.id);
         }
+        if (wasLive && !nowLive) removeLive(prev.listId, ev.id);
+        if (!wasLive && nowLive) insertLive(prev.listId, ev.id, ev.liveIndex);
+        setState("itemsById", ev.id, { doneAt, binnedAt });
+        adjustBinCount((binnedAt != null ? 1 : 0) - (wasBinned ? 1 : 0));
         break;
       }
       case "itemListChanged": {
-        if (state.itemsById[ev.id]) {
-          setState("itemsById", ev.id, "listId", ev.listId ?? "");
-        }
+        const prev = state.itemsById[ev.id];
+        if (!prev) break;
+        // Status is untouched by this event — membership in the live
+        // projection carries over, only the owning list changes.
+        const live = isInListView(prev);
+        if (live) removeLive(prev.listId, ev.id);
+        setState("itemsById", ev.id, "listId", ev.listId ?? "");
+        if (live) insertLive(ev.listId ?? "", ev.id, ev.liveIndex);
+        dropRecentDone(ev.id);
         break;
       }
       case "listAdded": {
@@ -330,6 +439,15 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         setState("listsOrder", (o) => o.filter((id) => id !== ev.id));
         setState(
           "listsById",
+          produce((by) => {
+            delete by[ev.id];
+          }),
+        );
+        // Core reassigns the list's items to `main` (as preceding
+        // `itemListChanged` events), so the live array is empty by now
+        // — drop the key so `listLive` doesn't accumulate dead lists.
+        setState(
+          "listLive",
           produce((by) => {
             delete by[ev.id];
           }),
@@ -445,6 +563,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     engine,
     state,
     version,
+    recentDone,
     search,
     drainEvents,
     setOnFlush(cb) {

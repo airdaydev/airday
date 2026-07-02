@@ -234,9 +234,9 @@ export function createSearchEngine(): SearchEngine {
       );
     }
 
-    for (const id of state.itemsOrder) {
-      const item: ItemView | undefined = state.itemsById[id];
-      if (!item) continue;
+    // Iteration order is irrelevant to the index — enumerate the id map
+    // directly (there is no global order array to walk; see store.ts).
+    for (const item of Object.values(state.itemsById)) {
       // Recency signal: latest state-bearing timestamp falls back to
       // createdAt for never-touched items.
       const updatedAt = item.binnedAt ?? item.doneAt ?? item.createdAt;

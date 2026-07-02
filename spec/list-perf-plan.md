@@ -3,6 +3,38 @@
 > Working design/handoff doc (not a finalized contract). Companion to the
 > "Performance note" in [`data-model.md`](data-model.md). Move/rename freely.
 
+## Status (2026-07-02)
+
+**Phase 1 landed.** Core emits `live_index` (position in the owning
+list's live projection) on `ItemAdded` / `ItemMoved` /
+`ItemStatusChanged` / `ItemListChanged`, alongside the global `index`;
+wasm surfaces it as `liveIndex`. The web store dropped `itemsOrder`
+entirely: `WorkspaceState.listLive` per-list arrays + maintained
+`binCount`, list-local dispatch, lazy Done/Bin timestamp sorts. The
+done-linger affordance survives via a store-side `recentDone` capture
+(id, listId, vacated live index, doneAt) that `Workspace.items()`
+overlays for the linger window.
+
+**Also fixed (found post-Phase-1 on a 13k-item store):** the batch
+status mutations in core (`set_items_done` / `set_items_binned` /
+`delete_binned_items`) did a full-doc materialize → `rebuild_item_index`
+→ diff on *every* call — and the web Delete-key path always routes
+through the `*Many` variants, so binning ONE item cost three O(N)
+whole-doc passes in wasm. They are now surgical below 64 ids
+(`BULK_STATUS_EVENT_THRESHOLD`, matching the store's coarse threshold)
+and fall back to rebuild+diff above it.
+
+**Known remaining O(N) per-op paths:**
+- `undo`/`redo` — full `rebuild_item_index` + state diff per step;
+  Cmd+Z on a large doc lags the same way deletes did.
+- `apply_remote` — same machinery per server frame (inherent for
+  batches; costs O(N) even for a single remote op).
+- Phase 0 item 1 (dnd order-version guard) is still **not done**: per
+  mutation the dnd layer rebuilds key→index maps 3–4× over the visible
+  list, and every scroll event rebuilds once. Only matters when the
+  *visible* list is large.
+- `delete_list` / `empty_bin` — O(N) once, rare and explicitly bulk.
+
 ## Problem
 On M1, lists feel sluggish to respond at ~5k+ items. Confirmed cause: **not DOM
 re-render, not the CRDT op** — it's JS reactivity recomputing derived state O(N

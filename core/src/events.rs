@@ -16,8 +16,10 @@ pub enum AppEvent {
     // ---------- items ----------
     /// New item appeared (local add or remote insert), or backfill on
     /// initial attach. `index` is the position in the global items
-    /// MovableList — UI layers track a single global order and filter
-    /// per view.
+    /// MovableList. `live_index` is the position within the *live*
+    /// projection of `list_id` (done/binned excluded) — `None` when the
+    /// item is not live. UI layers that keep per-list arrays splice at
+    /// `live_index`; global-order consumers use `index`.
     ItemAdded {
         id: String,
         list_id: String,
@@ -27,6 +29,7 @@ pub enum AppEvent {
         done_at: Option<i64>,
         binned_at: Option<i64>,
         index: usize,
+        live_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
     /// `binned_at` does *not* emit this — that emits
@@ -36,10 +39,15 @@ pub enum AppEvent {
     },
     /// Item changed position in the global items MovableList. Emitted
     /// for both intra-list reorders and inter-list moves; the
-    /// accompanying `ItemListChanged` (if any) carries the new list_id.
+    /// accompanying `ItemListChanged` (if any) carries the new list_id
+    /// and is emitted first. `live_index` is the item's resulting
+    /// position within its (post-move) list's live projection; `None`
+    /// when the item is done/binned, whose ordering is view-local
+    /// (timestamp sorts), not CRDT order.
     ItemMoved {
         id: String,
         index: usize,
+        live_index: Option<usize>,
     },
     ItemTextChanged {
         id: String,
@@ -52,18 +60,25 @@ pub enum AppEvent {
     /// Done/binned flags changed. The two are independent — an event is
     /// emitted whenever either timestamp transitions on/off, and the
     /// payload carries both current values so consumers can mirror state
-    /// without tracking the previous one.
+    /// without tracking the previous one. `live_index` is the item's
+    /// position within its list's live projection when the item is live
+    /// after the change (restore / un-done re-entry point); `None` when
+    /// it is done/binned (consumers drop it from the live array).
     ItemStatusChanged {
         id: String,
         done_at: Option<i64>,
         binned_at: Option<i64>,
+        live_index: Option<usize>,
     },
     /// Item's `list_id` field changed without changing position
     /// (e.g. orphan reassignment when a list is deleted), or alongside
-    /// an `ItemMoved` (cross-list drag).
+    /// an `ItemMoved` (cross-list drag). `live_index` is the item's
+    /// position within the *new* list's live projection; `None` when
+    /// the item is done/binned.
     ItemListChanged {
         id: String,
         list_id: String,
+        live_index: Option<usize>,
     },
 
     // ---------- lists ----------

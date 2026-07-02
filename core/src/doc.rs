@@ -68,6 +68,11 @@ const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
 /// (Queue) list. Absent ≡ no override; clients render the localized
 /// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
 const KEY_MAIN_NAME: &str = "main_name";
+/// Batch status mutations at/above this many ids stop emitting
+/// surgical per-item events (O(ids × touched list's live items)) and
+/// fall back to one whole-doc rebuild + diff. Matches the web store's
+/// coarse-projection threshold so both layers flip regimes together.
+const BULK_STATUS_EVENT_THRESHOLD: usize = 64;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -358,7 +363,14 @@ impl Doc {
         guard.live_by_list.retain(|_, ids| !ids.is_empty());
     }
 
-    fn move_live_projection(&self, item_id: &str, target_list_id: &str, target_index: usize) {
+    /// Returns the live index the item actually landed at (the caller's
+    /// `target_index` clamped to the destination projection).
+    fn move_live_projection(
+        &self,
+        item_id: &str,
+        target_list_id: &str,
+        target_index: usize,
+    ) -> usize {
         let mut guard = self.item_index.lock().expect("item index mutex poisoned");
         for ids in guard.live_by_list.values_mut() {
             if let Some(index) = ids.iter().position(|id| id == item_id) {
@@ -371,7 +383,9 @@ impl Doc {
             .live_by_list
             .entry(target_list_id.to_string())
             .or_default();
-        ids.insert(target_index.min(ids.len()), item_id.to_string());
+        let landed = target_index.min(ids.len());
+        ids.insert(landed, item_id.to_string());
+        landed
     }
 
     /// Resolve a per-list live insertion index to an absolute root-list
@@ -438,12 +452,13 @@ impl Doc {
     /// Reconcile one item's live projection membership after its status,
     /// list, or position changes. Work is proportional to currently-live
     /// items in the destination list, never lifetime item count.
+    /// Returns the item's resulting live index (`None` when not live).
     fn sync_live_projection_for_item(
         &self,
         item_id: &str,
         map: &LoroMap,
         global_index: usize,
-    ) -> Result<(), DocError> {
+    ) -> Result<Option<usize>, DocError> {
         let list_id = read_string(map, KEY_LIST_ID)
             .ok_or_else(|| DocError::Invalid(format!("item {item_id} has no list_id")))?;
         let is_live = is_in_list_view(map);
@@ -479,9 +494,12 @@ impl Doc {
         guard.live_by_list.retain(|_, ids| !ids.is_empty());
         if is_live {
             let ids = guard.live_by_list.entry(list_id).or_default();
-            ids.insert(live_index.min(ids.len()), item_id.to_string());
+            let landed = live_index.min(ids.len());
+            ids.insert(landed, item_id.to_string());
+            Ok(Some(landed))
+        } else {
+            Ok(None)
         }
-        Ok(())
     }
 
     pub fn last_pushed_vv(&self) -> &VersionVector {
@@ -531,6 +549,7 @@ impl Doc {
             done_at: None,
             binned_at: None,
             index,
+            live_index: Some(live_index),
         });
         Ok(id)
     }
@@ -566,6 +585,7 @@ impl Doc {
             done_at: None,
             binned_at: None,
             index: abs,
+            live_index: Some(live_index),
         });
         Ok(id)
     }
@@ -613,6 +633,7 @@ impl Doc {
                 done_at: None,
                 binned_at: None,
                 index,
+                live_index: Some(initial_live_index + offset),
             });
         }
         Ok(ids)
@@ -664,19 +685,23 @@ impl Doc {
         // post-move global index. Avoid scanning every historical item to
         // rediscover it.
         self.refresh_item_cursor(item_id, abs)?;
-        if moving_live_item {
-            self.move_live_projection(item_id, target_list_id, target_index);
-        }
+        let live_index = if moving_live_item {
+            Some(self.move_live_projection(item_id, target_list_id, target_index))
+        } else {
+            None
+        };
         if prev_list_id.as_deref() != Some(target_list_id) {
             self.push_event(AppEvent::ItemListChanged {
                 id: item_id.to_string(),
                 list_id: target_list_id.to_string(),
+                live_index,
             });
         }
         if abs != idx {
             self.push_event(AppEvent::ItemMoved {
                 id: item_id.to_string(),
                 index: abs,
+                live_index,
             });
         }
         Ok(())
@@ -703,32 +728,44 @@ impl Doc {
         }
         let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
-        self.sync_live_projection_for_item(item_id, &map, index)?;
+        let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at: new_done,
             binned_at,
+            live_index,
         });
         Ok(())
     }
 
-    /// Set or clear done state for many items in one commit.
+    /// Set or clear done state for many items in one commit. Surgical
+    /// below `BULK_STATUS_EVENT_THRESHOLD`: work is proportional to the
+    /// touched items (plus their lists' live projections), never total
+    /// doc size — a full materialize/rebuild/diff here made single-item
+    /// deletes lag at ~10k lifetime items. At/above the threshold the
+    /// per-item projection sync would exceed one whole-doc pass, so it
+    /// falls back to rebuild + diff.
     pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
-        let pre_items: Vec<ItemView> = self.iter_items().collect();
-        let mut changed = false;
-        for item_id in item_ids {
-            let (_, map) = self.find_item(item_id)?;
+        let pre_items = (item_ids.len() >= BULK_STATUS_EVENT_THRESHOLD)
+            .then(|| self.iter_items().collect::<Vec<ItemView>>());
+        // Resolve everything up front so an unknown id errors before
+        // any map is touched.
+        let maps: Vec<(&str, LoroMap)> = item_ids
+            .iter()
+            .map(|id| self.find_item(id).map(|(_, map)| (*id, map)))
+            .collect::<Result<_, _>>()?;
+        let mut changed: Vec<(&str, LoroMap, Option<i64>)> = Vec::new();
+        for (item_id, map) in maps {
             let prev_done = read_i64(&map, KEY_DONE_AT);
             let new_done = match (done, prev_done) {
                 (true, Some(_)) | (false, None) => continue,
                 (true, None) => Some(now_millis()),
                 (false, Some(_)) => None,
             };
-            changed = true;
             match new_done {
                 Some(t) => {
                     map.insert(KEY_DONE_AT, t)?;
@@ -737,11 +774,26 @@ impl Doc {
                     let _ = map.delete(KEY_DONE_AT);
                 }
             }
+            changed.push((item_id, map, new_done));
         }
-        if changed {
-            self.inner.commit();
+        if changed.is_empty() {
+            return Ok(());
+        }
+        self.inner.commit();
+        if let Some(pre) = pre_items {
             self.rebuild_item_index();
-            self.emit_item_diffs(&pre_items);
+            self.emit_item_diffs(&pre);
+            return Ok(());
+        }
+        for (item_id, map, done_at) in changed {
+            let (index, _) = self.find_item(item_id)?;
+            let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
+            self.push_event(AppEvent::ItemStatusChanged {
+                id: item_id.to_string(),
+                done_at,
+                binned_at: read_i64(&map, KEY_BINNED_AT),
+                live_index,
+            });
         }
         Ok(())
     }
@@ -768,32 +820,38 @@ impl Doc {
         }
         let done_at = read_i64(&map, KEY_DONE_AT);
         self.inner.commit();
-        self.sync_live_projection_for_item(item_id, &map, index)?;
+        let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at,
             binned_at: new_binned,
+            live_index,
         });
         Ok(())
     }
 
     /// Set or clear binned state for many items in one commit.
+    /// Surgical / bulk-fallback split for the same reason as
+    /// `set_items_done`.
     pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
-        let pre_items: Vec<ItemView> = self.iter_items().collect();
-        let mut changed = false;
-        for item_id in item_ids {
-            let (_, map) = self.find_item(item_id)?;
+        let pre_items = (item_ids.len() >= BULK_STATUS_EVENT_THRESHOLD)
+            .then(|| self.iter_items().collect::<Vec<ItemView>>());
+        let maps: Vec<(&str, LoroMap)> = item_ids
+            .iter()
+            .map(|id| self.find_item(id).map(|(_, map)| (*id, map)))
+            .collect::<Result<_, _>>()?;
+        let mut changed: Vec<(&str, LoroMap, Option<i64>)> = Vec::new();
+        for (item_id, map) in maps {
             let prev_binned = read_i64(&map, KEY_BINNED_AT);
             let new_binned = match (binned, prev_binned) {
                 (true, Some(_)) | (false, None) => continue,
                 (true, None) => Some(now_millis()),
                 (false, Some(_)) => None,
             };
-            changed = true;
             match new_binned {
                 Some(t) => {
                     map.insert(KEY_BINNED_AT, t)?;
@@ -802,11 +860,26 @@ impl Doc {
                     let _ = map.delete(KEY_BINNED_AT);
                 }
             }
+            changed.push((item_id, map, new_binned));
         }
-        if changed {
-            self.inner.commit();
+        if changed.is_empty() {
+            return Ok(());
+        }
+        self.inner.commit();
+        if let Some(pre) = pre_items {
             self.rebuild_item_index();
-            self.emit_item_diffs(&pre_items);
+            self.emit_item_diffs(&pre);
+            return Ok(());
+        }
+        for (item_id, map, binned_at) in changed {
+            let (index, _) = self.find_item(item_id)?;
+            let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
+            self.push_event(AppEvent::ItemStatusChanged {
+                id: item_id.to_string(),
+                done_at: read_i64(&map, KEY_DONE_AT),
+                binned_at,
+                live_index,
+            });
         }
         Ok(())
     }
@@ -827,12 +900,14 @@ impl Doc {
 
     /// Hard-delete the subset of binned items identified by `item_ids`
     /// in one commit. Errors if any id is not currently binned.
+    /// Surgical: the only state transition is removal, so emit
+    /// `ItemRemoved` per id directly (mirrors `empty_bin`) instead of
+    /// diffing the whole doc.
     pub fn delete_binned_items(&self, item_ids: &[&str]) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
-        let pre_items: Vec<ItemView> = self.iter_items().collect();
         let mut positions = Vec::with_capacity(item_ids.len());
         for item_id in item_ids {
             let (idx, map) = self.find_item(item_id)?;
@@ -848,7 +923,11 @@ impl Doc {
         }
         self.inner.commit();
         self.remove_indexed_items(item_ids.iter().copied());
-        self.emit_item_diffs(&pre_items);
+        for item_id in item_ids {
+            self.push_event(AppEvent::ItemRemoved {
+                id: (*item_id).to_string(),
+            });
+        }
         Ok(())
     }
 
@@ -1023,10 +1102,27 @@ impl Doc {
         self.lists().delete(idx, 1)?;
         self.inner.commit();
         self.rebuild_item_index();
+        // Live positions of the reassigned items in `main`, read once
+        // from the rebuilt projection (done/binned reassignees get None).
+        let main_positions: HashMap<String, usize> = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard
+                .live_by_list
+                .get(LIST_MAIN)
+                .map(|ids| {
+                    ids.iter()
+                        .enumerate()
+                        .map(|(i, id)| (id.clone(), i))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
         for id in reassigned {
+            let live_index = main_positions.get(&id).copied();
             self.push_event(AppEvent::ItemListChanged {
                 id,
                 list_id: LIST_MAIN.to_string(),
+                live_index,
             });
         }
         self.push_event(AppEvent::ListRemoved {
@@ -1488,7 +1584,18 @@ impl Doc {
                 index: idx,
             });
         }
+        // Walking in global order means a per-list counter yields each
+        // live item's position in its list's live projection.
+        let mut live_counters = HashMap::<String, usize>::new();
         for (idx, item) in self.iter_items().enumerate() {
+            let live_index = if item.is_in_list_view() {
+                let counter = live_counters.entry(item.list_id.clone()).or_insert(0);
+                let i = *counter;
+                *counter += 1;
+                Some(i)
+            } else {
+                None
+            };
             out.push(AppEvent::ItemAdded {
                 id: item.id,
                 list_id: item.list_id,
@@ -1498,6 +1605,7 @@ impl Doc {
                 done_at: item.done_at,
                 binned_at: item.binned_at,
                 index: idx,
+                live_index,
             });
         }
         out
@@ -1942,6 +2050,20 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
         .enumerate()
         .map(|(i, it)| (it.id.as_str(), (i, it)))
         .collect();
+    // Post-state live position per item id: walking `post` in global
+    // order with a per-list counter reproduces the live projection.
+    // Events emitted below are in ascending post order, so a consumer
+    // applying remove-then-insert-at-live_index per event converges on
+    // exactly this projection.
+    let mut live_counters = HashMap::<&str, usize>::new();
+    let mut live_pos = HashMap::<&str, usize>::with_capacity(post.len());
+    for it in post {
+        if it.is_in_list_view() {
+            let counter = live_counters.entry(it.list_id.as_str()).or_insert(0);
+            live_pos.insert(it.id.as_str(), *counter);
+            *counter += 1;
+        }
+    }
 
     for it in pre {
         if !post_by_id.contains_key(it.id.as_str()) {
@@ -1949,6 +2071,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
         }
     }
     for (post_idx, post_it) in post.iter().enumerate() {
+        let live_index = live_pos.get(post_it.id.as_str()).copied();
         match pre_by_id.get(post_it.id.as_str()) {
             None => {
                 out.push(AppEvent::ItemAdded {
@@ -1960,6 +2083,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
                     index: post_idx,
+                    live_index,
                 });
             }
             Some(&(pre_idx, pre_it)) => {
@@ -1980,18 +2104,21 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                         id: post_it.id.clone(),
                         done_at: post_it.done_at,
                         binned_at: post_it.binned_at,
+                        live_index,
                     });
                 }
                 if pre_it.list_id != post_it.list_id {
                     out.push(AppEvent::ItemListChanged {
                         id: post_it.id.clone(),
                         list_id: post_it.list_id.clone(),
+                        live_index,
                     });
                 }
                 if pre_idx != post_idx {
                     out.push(AppEvent::ItemMoved {
                         id: post_it.id.clone(),
                         index: post_idx,
+                        live_index,
                     });
                 }
             }
@@ -2072,6 +2199,55 @@ mod tests {
             .live_by_list
             .clone();
         assert_eq!(actual, expected);
+    }
+
+    /// Not a correctness test — a quick order-of-magnitude probe for
+    /// the per-mutation cost terms at a realistic lifetime-item count.
+    /// Run with:
+    ///   cargo test -p airday-core --release bench_mutation_terms_at_13k -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn bench_mutation_terms_at_13k() {
+        use std::time::Instant;
+        let dek = Dek::generate();
+        let doc = Doc::new().unwrap();
+        // ~13k lifetime items: 200 live in main, the rest done — the
+        // user-reported shape (many small lists, large Done history).
+        let texts: Vec<String> = (0..13_000).map(|i| format!("item number {i}")).collect();
+        let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+        let ids = doc.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        let done_refs: Vec<&str> = ids[..12_800].iter().map(String::as_str).collect();
+        doc.set_items_done(&done_refs, true).unwrap();
+        let _ = doc.drain_events();
+
+        let t = Instant::now();
+        let id = doc.add_item(LIST_MAIN, "one more").unwrap();
+        println!("add_item:            {:?}", t.elapsed());
+
+        let t = Instant::now();
+        doc.set_item_done(&id, true).unwrap();
+        println!("set_item_done:       {:?}", t.elapsed());
+
+        let t = Instant::now();
+        doc.set_items_binned(&[ids[12_900].as_str()], true).unwrap();
+        println!("set_items_binned(1): {:?}", t.elapsed());
+
+        let t = Instant::now();
+        let blob = doc.pending_export(&dek).unwrap();
+        println!("pending_export:      {:?} ({} bytes)", t.elapsed(), blob.map(|b| b.ciphertext.len()).unwrap_or(0));
+
+        let t = Instant::now();
+        let snap = doc.snapshot_blob(&dek).unwrap();
+        println!("snapshot_blob:       {:?} ({} bytes)", t.elapsed(), snap.ciphertext.len());
+
+        let t = Instant::now();
+        let all: Vec<ItemView> = doc.iter_items().collect();
+        println!("iter_items.collect:  {:?} ({} items)", t.elapsed(), all.len());
+
+        let t = Instant::now();
+        doc.rebuild_item_index();
+        println!("rebuild_item_index:  {:?}", t.elapsed());
+        let _ = doc.drain_events();
     }
 
     #[test]
@@ -2622,11 +2798,13 @@ mod tests {
                     id: eid,
                     done_at,
                     binned_at,
+                    live_index,
                 },
             ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some());
                 assert!(binned_at.is_none());
+                assert_eq!(*live_index, None, "done item leaves the live projection");
             }
             other => panic!("unexpected events: {other:?}"),
         }
@@ -2646,11 +2824,13 @@ mod tests {
                     id: eid,
                     done_at,
                     binned_at,
+                    live_index,
                 },
             ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some(), "done state must be preserved");
                 assert!(binned_at.is_some());
+                assert_eq!(*live_index, None);
             }
             other => panic!("unexpected events: {other:?}"),
         }
@@ -2669,9 +2849,14 @@ mod tests {
         let mut saw_removed = false;
         for ev in &evs {
             match ev {
-                AppEvent::ItemListChanged { id: eid, list_id } => {
+                AppEvent::ItemListChanged {
+                    id: eid,
+                    list_id,
+                    live_index,
+                } => {
                     assert_eq!(eid, &id);
                     assert_eq!(list_id, LIST_MAIN);
+                    assert_eq!(*live_index, Some(0), "live orphan lands in main's live projection");
                     saw_reassign = true;
                 }
                 AppEvent::ListRemoved { id: lid } => {
@@ -2878,10 +3063,66 @@ mod tests {
         let evs = doc.drain_events();
         assert!(
             evs.iter().any(
-                |e| matches!(e, AppEvent::ItemMoved { id, index } if id == &moved && *index == 0)
+                |e| matches!(e, AppEvent::ItemMoved { id, index, live_index } if id == &moved && *index == 0 && *live_index == Some(0))
             ),
-            "expected ItemMoved to absolute index 0, got {evs:?}"
+            "expected ItemMoved to absolute index 0 / live index 0, got {evs:?}"
         );
+    }
+
+    #[test]
+    fn set_items_binned_small_batch_is_surgical_and_restores_position() {
+        let doc = Doc::new().unwrap();
+        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let _ = doc.drain_events();
+
+        // Below the bulk threshold: exactly one per-item event, no
+        // whole-doc diff artifacts (which would add ItemMoved noise).
+        doc.set_items_binned(&[second.as_str()], true).unwrap();
+        let evs = doc.drain_events();
+        match evs.as_slice() {
+            [
+                AppEvent::ItemStatusChanged {
+                    id,
+                    binned_at,
+                    live_index,
+                    ..
+                },
+            ] => {
+                assert_eq!(id, &second);
+                assert!(binned_at.is_some());
+                assert_eq!(*live_index, None);
+            }
+            other => panic!("expected one surgical ItemStatusChanged, got {other:?}"),
+        }
+        assert_live_projection_matches_doc(&doc);
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![first.clone(), third.clone()]
+        );
+
+        // Restore: re-enters the live projection at its CRDT position
+        // (between first and third), and the event says so.
+        doc.set_items_binned(&[second.as_str()], false).unwrap();
+        let evs = doc.drain_events();
+        match evs.as_slice() {
+            [
+                AppEvent::ItemStatusChanged {
+                    id,
+                    binned_at,
+                    live_index,
+                    ..
+                },
+            ] => {
+                assert_eq!(id, &second);
+                assert!(binned_at.is_none());
+                assert_eq!(*live_index, Some(1));
+            }
+            other => panic!("expected one surgical ItemStatusChanged, got {other:?}"),
+        }
+        assert_live_projection_matches_doc(&doc);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![first, second, third]);
     }
 
     #[test]

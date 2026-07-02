@@ -67,7 +67,8 @@ function ConnectionStatusPopover(props: {
     }
     return s;
   };
-  const itemsCount = (): number => props.app.state.itemsOrder.length;
+  const itemsCount = (): number =>
+    Object.keys(props.app.state.itemsById).length;
   const listsCount = (): number => props.app.state.listsOrder.length;
 
   const sinceLabel = (): string | null => {
