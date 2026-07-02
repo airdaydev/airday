@@ -1,6 +1,8 @@
 //! Domain-level change events emitted by `Doc` after every commit
-//! (local mutation) or remote import. The translation from Loro's
-//! per-container diffs to these events lives in `doc::events_translator`.
+//! (local mutation) or remote import. Local mutation methods push
+//! exact events surgically; remote imports are translated from Loro's
+//! per-container diffs by `Doc::translate_remote_diffs` (with a
+//! whole-doc resync fallback for bulk/opaque frames).
 //!
 //! These are the contract between the core and every UI layer. A
 //! consumer (Solid store, SwiftUI `@Observable`, Compose `StateFlow`)

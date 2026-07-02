@@ -213,7 +213,9 @@ impl Session {
         // — which advances the durable cursor and queues an Ack. Callers
         // needing the ack on the wire (`flush`) must `send_outbox` next.
         self.engine.capture_local_ops()?;
-        self.engine.snapshot_if_fully_synced()?;
+        // CLI runs are one-shot: always fold the log when synced (the
+        // web host thresholds this instead — see `snapshot_if_fully_synced`).
+        self.engine.snapshot_if_fully_synced(1)?;
         let contiguous = self.engine.last_contiguous_seq();
         // `notify_oplog_durable` advances the engine's durable frontier and
         // persists the resume cursor itself (via the `LocalStorage`

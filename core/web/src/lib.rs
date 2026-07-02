@@ -895,11 +895,15 @@ impl SyncEngine {
     }
 
     /// Compact the op log into a fresh snapshot when fully synced
-    /// (outbox drained). No-op while unacked ops remain. Returns whether
-    /// a snapshot was written.
+    /// (outbox drained) **and** at least `min_ops` rows accumulated
+    /// past the last snapshot. Snapshot export is O(doc) — pass a real
+    /// threshold on hot pulses (per-ack) and `1` from idle hooks. No-op
+    /// while unacked ops remain. Returns whether a snapshot was written.
     #[wasm_bindgen(js_name = snapshotIfFullySynced)]
-    pub fn snapshot_if_fully_synced(&mut self) -> Result<bool, JsError> {
-        self.inner.snapshot_if_fully_synced().map_err(js_err)
+    pub fn snapshot_if_fully_synced(&mut self, min_ops: u32) -> Result<bool, JsError> {
+        self.inner
+            .snapshot_if_fully_synced(u64::from(min_ops))
+            .map_err(js_err)
     }
 
     /// Unconditionally compact every op row into a snapshot — for

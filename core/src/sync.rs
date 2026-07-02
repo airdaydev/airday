@@ -237,13 +237,21 @@ impl SyncEngine {
     }
 
     /// Compact the op log when the doc is fully synced: if the outbox
-    /// is empty (every captured op acked) and ops have advanced past
-    /// the last snapshot, write a fresh full-state snapshot at
-    /// `last_local_seq` and prune the pruned-away rows. Returns whether
-    /// a snapshot was written. No-op (`Ok(false)`) while unacked ops
-    /// remain — pruning them would drop the outbox.
-    pub fn snapshot_if_fully_synced(&mut self) -> Result<bool, StorageError> {
-        if self.last_local_seq <= self.last_snapshot_local_seq {
+    /// is empty (every captured op acked) and at least `min_ops` op
+    /// rows have accumulated past the last snapshot, write a fresh
+    /// full-state snapshot at `last_local_seq` and prune the folded
+    /// rows. Returns whether a snapshot was written. No-op (`Ok(false)`)
+    /// while unacked ops remain — pruning them would drop the outbox.
+    ///
+    /// `min_ops` is the caller's compaction policy. Snapshot export is
+    /// O(doc) (tens of ms at ~10k lifetime items, more under wasm), so
+    /// an interactive host must NOT pass a small value on its per-ack
+    /// pulse — that turns every mutation into a whole-doc export one
+    /// RTT later. Pass a threshold (web uses 250) on the hot pulse and
+    /// `1` from an idle/exit hook so short sessions still fold down.
+    /// Boot replay stays bounded by the threshold either way.
+    pub fn snapshot_if_fully_synced(&mut self, min_ops: u64) -> Result<bool, StorageError> {
+        if self.last_local_seq.0 < self.last_snapshot_local_seq.0 + min_ops.max(1) {
             return Ok(false);
         }
         if !self.storage.outbox(self.doc_id)?.is_empty() {
@@ -1096,6 +1104,31 @@ mod tests {
         assert!(eng.pop_outbox().is_none(), "second flush is a no-op");
         // Sanity: the blob really was a non-empty payload.
         assert!(!blob.ciphertext.is_empty());
+    }
+
+    #[test]
+    fn snapshot_threshold_gates_hot_pulse_but_not_idle_fold() {
+        let mut eng = fresh_engine_clean();
+        drive_to_idle(&mut eng);
+        let _ = drain_events(&mut eng);
+        let _ = drain_outbox(&mut eng);
+
+        eng.doc_mut().add_item(LIST_MAIN, "thing").unwrap();
+        eng.capture_local_ops().unwrap();
+        eng.flush();
+        let _ = eng.pop_outbox().expect("PushOps");
+        eng.handle_server_bytes(&enc(&ServerFrame::OpsAck {
+            assigned_seqs: vec![1],
+        }));
+        let _ = drain_events(&mut eng);
+
+        // Fully synced with one op past the snapshot: the hot-pulse
+        // threshold must skip, the idle fold must compact.
+        assert!(!eng.snapshot_if_fully_synced(250).unwrap());
+        assert!(eng.snapshot_if_fully_synced(1).unwrap());
+        // Nothing advanced since the fold — both are no-ops now.
+        assert!(!eng.snapshot_if_fully_synced(1).unwrap());
+        assert!(!eng.snapshot_if_fully_synced(250).unwrap());
     }
 
     #[test]

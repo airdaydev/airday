@@ -111,18 +111,30 @@ export function createWorkspaceRuntime(props: {
       console.error("captureLocalOps failed:", e);
     }
   };
-  const compact = (): void => {
-    // TEMP(perf-probe): per-ack snapshot compaction disabled to confirm
-    // it's the whole-doc O(N) term behind mutation lag on large stores.
-    // While disabled the op-log grows unboundedly and boot replays every
-    // row — do not ship. Re-enable (with a threshold) after measuring.
-    //
-    // try {
-    //   engine.snapshotIfFullySynced();
-    // } catch (e) {
-    //   console.error("snapshotIfFullySynced failed:", e);
-    // }
+  // Snapshot export is O(doc) on the main thread (tens of ms at ~10k
+  // lifetime items under wasm), and this runs on the per-ack pulse —
+  // i.e. one RTT after *every* local mutation. Unthresholded it turned
+  // each keystroke into a whole-doc export; see spec/list-perf-plan.md.
+  // So the hot pulse only folds once ≥250 op rows accumulated, and a
+  // quiet-period timer (below) folds whatever's left so short sessions
+  // don't boot into a long op-log replay.
+  const COMPACT_MIN_OPS = 250;
+  const COMPACT_IDLE_MS = 20_000;
+  const compact = (minOps: number): void => {
+    try {
+      engine.snapshotIfFullySynced(minOps);
+    } catch (e) {
+      console.error("snapshotIfFullySynced failed:", e);
+    }
   };
+  // Debounced idle fold-down: re-armed on every server round-trip, so
+  // it fires once things go quiet. minOps=1 → folds any synced ops.
+  let compactIdleTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleIdleCompact = (): void => {
+    clearTimeout(compactIdleTimer);
+    compactIdleTimer = setTimeout(() => compact(1), COMPACT_IDLE_MS);
+  };
+  onCleanup(() => clearTimeout(compactIdleTimer));
 
   // Persist the device row — identity + the "last synced" stamp
   // (observability only). The resume cursor is no longer stored here:
@@ -182,9 +194,11 @@ export function createWorkspaceRuntime(props: {
       onServerFrame: () => {
         app.drainEvents();
         // The engine already mirrored remote ops + acks into storage
-        // inside `handleServerBytes`. Compact if that drained the
+        // inside `handleServerBytes`. Compact (thresholded — this pulse
+        // fires one RTT after every mutation) if that drained the
         // outbox, then ratchet the durable cursor once the writes land.
-        compact();
+        compact(COMPACT_MIN_OPS);
+        scheduleIdleCompact();
         scheduleDurable();
         saveDeviceSoon();
       },
@@ -193,7 +207,8 @@ export function createWorkspaceRuntime(props: {
     const b = bridge;
     app.setOnFlush(() => {
       b.pumpOutbox();
-      compact();
+      compact(COMPACT_MIN_OPS);
+      scheduleIdleCompact();
       scheduleDurable();
     });
     bridge.start();
@@ -264,8 +279,10 @@ export function createWorkspaceRuntime(props: {
       // force a full-state snapshot (prune-all) instead. Best-effort.
       capture();
       try {
+        // Tab going hidden: fold everything synced regardless of the
+        // hot-pulse threshold, so the next boot replays a short log.
         if (props.session.anonymous) engine.forceSnapshot();
-        else engine.snapshotIfFullySynced();
+        else engine.snapshotIfFullySynced(1);
       } catch (e) {
         console.error("snapshot on hide failed:", e);
       }

@@ -24,16 +24,44 @@ whole-doc passes in wasm. They are now surgical below 64 ids
 (`BULK_STATUS_EVENT_THRESHOLD`, matching the store's coarse threshold)
 and fall back to rebuild+diff above it.
 
+**Snapshot-per-ack fixed:** the dominant remaining lag was persistence
+policy, not mutation paths — `snapshotIfFullySynced` ran on the
+per-ack pulse, i.e. a whole-doc Loro export + AES seal + IDB write
+(~40ms native / ~100ms wasm at 13k) one RTT after *every* mutation.
+Now thresholded: hot pulse compacts only at ≥250 op rows
+(`COMPACT_MIN_OPS`), with an idle timer (20s quiet) and the
+visibility-hidden hook folding the remainder. CLI still folds every
+run (`snapshot_if_fully_synced(1)`).
+
+**Remote frames fixed (`events_translator`, promised by the old
+`events.rs` header, now real):** `apply_remote` no longer does
+pre-collect → `rebuild_item_index` → whole-doc diff (~35ms native per
+frame — felt directly with two open tabs). A root Loro subscription
+captures Import-triggered container diffs; `Doc::translate_remote_diffs`
+turns them into surgical per-id `AppEvent`s and incremental index
+updates, using a new global-order shadow (`ItemIndex.order`) to
+resolve positional deletes. Frames touching ≥64 items, or any diff
+shape we can't translate, fall back to one whole-doc resync pass
+(`ItemRemoved` for vanished ids + idempotent `ItemAdded` refresh per
+item). Measured: **1 remote op at 13k items = ~0.7ms native** (was
+~35ms), emitting exactly one event.
+
 **Known remaining O(N) per-op paths:**
 - `undo`/`redo` — full `rebuild_item_index` + state diff per step;
-  Cmd+Z on a large doc lags the same way deletes did.
-- `apply_remote` — same machinery per server frame (inherent for
-  batches; costs O(N) even for a single remote op).
+  Cmd+Z on a large doc still lags. Could ride the same translator
+  (Loro fires diffs for undo commits too) — next candidate.
 - Phase 0 item 1 (dnd order-version guard) is still **not done**: per
   mutation the dnd layer rebuilds key→index maps 3–4× over the visible
   list, and every scroll event rebuilds once. Only matters when the
   *visible* list is large.
 - `delete_list` / `empty_bin` — O(N) once, rare and explicitly bulk.
+
+Measured terms (native M1 release, 13k lifetime items; wasm ≈2–4×):
+`add_item` 0.11ms · `set_item_done` 0.08ms · `set_items_binned(1)`
+0.14ms · `apply_remote(1 op)` 0.7ms · `snapshot_blob` 40ms ·
+`iter_items().collect()` 14ms · `rebuild_item_index` 7.6ms. Re-run via
+`cargo test -p airday-core --release bench_mutation_terms_at_13k --
+--ignored --nocapture`.
 
 ## Problem
 On M1, lists feel sluggish to respond at ~5k+ items. Confirmed cause: **not DOM
