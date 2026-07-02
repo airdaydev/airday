@@ -95,7 +95,7 @@ export function Workspace(props: {
   // target (the 28px desktop default is too tight for a thumb). Dnd's
   // cfg() reads itemHeight reactively via setConfig, so flipping this
   // signal on rotation / resize live-updates the controller.
-  const itemsMobileMq = window.matchMedia("(max-width: 768px)");
+  const itemsMobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [itemsIsMobile, setItemsIsMobile] = createSignal(itemsMobileMq.matches);
   const onItemsMqChange = (e: MediaQueryListEvent) => setItemsIsMobile(e.matches);
   itemsMobileMq.addEventListener("change", onItemsMqChange);
@@ -780,11 +780,11 @@ export function Workspace(props: {
   document.addEventListener("contextmenu", onContextMenu, true);
   onCleanup(() => document.removeEventListener("contextmenu", onContextMenu, true));
 
-  // Mobile drawer: at narrow viewports the nav and main panes both
-  // fill the viewport and slide together as one unit (push layout —
-  // see styles.css). `navOpen` is the only state; the FAB caret opens
-  // it, tapping a list / Escape closes it.
-  const mobileMq = window.matchMedia("(max-width: 768px)");
+  // Mobile drawer: at narrow viewports the nav and main panes each fill
+  // the viewport and only one shows at a time (full-screen drawer — see
+  // styles.css). `navOpen` is the only state; the FAB caret opens it,
+  // tapping a list / Escape closes it.
+  const mobileMq = window.matchMedia("(max-width: 768px) and (pointer: coarse)");
   const [isMobile, setIsMobile] = createSignal(mobileMq.matches);
   const onMqChange = (e: MediaQueryListEvent) => {
     setIsMobile(e.matches);
@@ -1020,12 +1020,9 @@ export function Workspace(props: {
             </Dnd>
           </Show>
         </Show>
-        {/* Mobile-only floating action buttons. Position-fixed inside
-            .main, but .app's mobile transform reparents the containing
-            block onto .app — so right:16px anchors to the main column's
-            right edge and left:calc(100vw + 16px) to its left edge.
-            That binding also makes the FABs slide off with main when
-            the drawer opens, which is exactly the visual we want. */}
+        {/* Mobile-only floating action buttons, fixed to the viewport.
+            They sit inside .main, so opening the full-screen drawer hides
+            them along with main (see styles.css). */}
         <button
           type="button"
           class="fab fab-back"

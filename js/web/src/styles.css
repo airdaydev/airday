@@ -138,7 +138,7 @@ body {
   outline-offset: 1px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px) and (pointer: coarse) {
   /* Bump the inherited base size on phones; chrome elements with
      explicit px sizes (section labels, chips) keep theirs. ≥16px also
      suppresses iOS Safari's auto-zoom on input focus. */
@@ -146,24 +146,31 @@ body {
     font-size: 18px;
   }
 
-  /* Push-style drawer: nav and main both fill the viewport and slide
-     together as one unit. .app is 200vw with two 100vw columns; a
-     transform on .app exposes either column.
-       Closed → translateX(-50%) shows the main column.
-       Open   → translateX(0)    shows the nav column.
-     `-50%` resolves against .app's own width (200vw → -100vw) but
-     stays a fixed computed value across viewport resizes, so the
-     transition doesn't fire mid-drag. */
+  /* Full-screen drawer: nav and main each fill the viewport, stacked in
+     the same grid cell; exactly one is shown at a time. No slide — the
+     `nav-open` flag just swaps which pane is display'd.
+       Closed → nav hidden, main fills the screen.
+       Open   → main hidden, nav fills the screen. */
   .app {
-    grid-template-columns: 100vw 100vw;
-    width: 200vw;
-    transform: translateX(-50%);
-    transition: transform 0.2s ease;
-    will-change: transform;
+    grid-template-columns: 100vw;
+    grid-template-rows: 100%;
   }
 
-  .app.nav-open {
-    transform: translateX(0);
+  .nav,
+  .main {
+    grid-area: 1 / 1;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .app.nav-open .nav {
+    display: flex;
+  }
+
+  .app.nav-open .main {
+    display: none;
   }
 
   .nav-toggle {
@@ -252,7 +259,7 @@ body {
   height: 14px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px) and (pointer: coarse) {
   .nav-item {
     height: 40px;
   }
@@ -381,11 +388,9 @@ body {
   cursor: default;
 }
 
-/* Mobile-only floating action buttons. Position-fixed inside .main,
-   but .app's mobile transform creates a containing block — so:
-     right: 16px → right edge of the main column
-     left: calc(100vw + 16px) → left edge of the main column
-   The buttons therefore "ride with" main when the drawer opens.
+/* Mobile-only floating action buttons, fixed to the viewport. They live
+   inside .main, so the full-screen drawer hides them along with main when
+   the nav is open — leaving the nav's own rows as the only tap targets.
    Liquid-glass: translucent fill + heavy backdrop blur + thin border +
    inset top highlight for the wet/specular feel. */
 .fab {
@@ -427,10 +432,7 @@ body {
 }
 
 .fab-back {
-  /* 50% of .app (which is 200vw) skips past the nav column. Using %
-     instead of 100vw keeps the computed value stable across resizes
-     so the position doesn't lag the viewport. */
-  left: calc(50% + 16px);
+  left: 16px;
 }
 
 .fab-add {
@@ -446,7 +448,7 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px) and (pointer: coarse) {
   .fab {
     display: inline-flex;
   }
