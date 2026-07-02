@@ -1,6 +1,6 @@
 # Airday
 
-[Airday](https://air.day/) is an e2ee, local-first, tasks/reminders app i.e. todo list, with conflict resolution backed by Loro.
+[Airday](https://air.day/) is an e2ee, local-first, tasks/reminders app i.e. todo list, with conflict resolution backed by Loro. It is optimised for ergonomics and frictionless capture and will work offline.
 
 ⚠️ ATTN: Airday is undergoing extensive and frequent changes, you can use it locally, but you may have to manually export and import data between updates.
 
