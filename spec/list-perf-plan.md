@@ -46,14 +46,16 @@ shape we can't translate, fall back to one whole-doc resync pass
 item). Measured: **1 remote op at 13k items = ~0.7ms native** (was
 ~35ms), emitting exactly one event.
 
+**Phase 0 item 1 done (dnd order-version guard):**
+`selection.updateOrder` no-ops on reference equality
+(`selection.ts`) — sound because `DndSource` only ever *replaces* its
+order array. Kills the per-scroll key→index Map rebuild and dedupes
+the 3–4 rebuilds per mutation down to 1.
+
 **Known remaining O(N) per-op paths:**
 - `undo`/`redo` — full `rebuild_item_index` + state diff per step;
   Cmd+Z on a large doc still lags. Could ride the same translator
   (Loro fires diffs for undo commits too) — next candidate.
-- Phase 0 item 1 (dnd order-version guard) is still **not done**: per
-  mutation the dnd layer rebuilds key→index maps 3–4× over the visible
-  list, and every scroll event rebuilds once. Only matters when the
-  *visible* list is large.
 - `delete_list` / `empty_bin` — O(N) once, rare and explicitly bulk.
 
 Measured terms (native M1 release, 13k lifetime items; wasm ≈2–4×):

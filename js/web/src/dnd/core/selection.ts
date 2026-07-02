@@ -18,6 +18,10 @@ export class DndSelection {
   private orderIndex = new Map<Key, number>();
   /** Position → key (reverse of orderIndex). */
   private indexToKey: Key[] = [];
+  /** The exact array last indexed by `updateOrder`. `DndSource` only
+   *  ever *replaces* its order array (never mutates in place), so
+   *  reference identity is a reliable "nothing changed" signal. */
+  private lastIndexedOrder: readonly Key[] | null = null;
 
   private listeners = new Set<SelectionListener>();
 
@@ -41,6 +45,13 @@ export class DndSelection {
   // ── Order management ────────────────────────────────────────────
 
   updateOrder(order: readonly Key[]): void {
+    // Order-version guard: called from several controller paths per
+    // update pass *and* from getRenderState on every scroll event —
+    // almost always with an order it has already indexed. The reference
+    // check makes those redundant calls free; only a genuinely new
+    // array pays the O(rows) rebuild. See spec/list-perf-plan.md.
+    if (order === this.lastIndexedOrder) return;
+    this.lastIndexedOrder = order;
     this.orderIndex.clear();
     this.indexToKey = [...order];
     for (let i = 0; i < order.length; i++) {
