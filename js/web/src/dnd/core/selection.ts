@@ -22,6 +22,12 @@ export class DndSelection {
    *  ever *replaces* its order array (never mutates in place), so
    *  reference identity is a reliable "nothing changed" signal. */
   private lastIndexedOrder: readonly Key[] | null = null;
+  /** Memoized `getSelectedKeySet()`. Selected keys are re-derived from
+   *  blocks × order on every render pass — during a drag that's every
+   *  pointermove, which at a 10k-row selection means a 10k Set rebuild
+   *  per frame. Invalidated by `notify()` (every block mutation ends
+   *  there — it's the listener contract) and by an order reindex. */
+  private selectedSetCache: ReadonlySet<Key> | null = null;
 
   private listeners = new Set<SelectionListener>();
 
@@ -39,6 +45,7 @@ export class DndSelection {
   }
 
   private notify(): void {
+    this.selectedSetCache = null;
     for (const cb of this.listeners) cb(this);
   }
 
@@ -52,6 +59,7 @@ export class DndSelection {
     // array pays the O(rows) rebuild. See spec/list-perf-plan.md.
     if (order === this.lastIndexedOrder) return;
     this.lastIndexedOrder = order;
+    this.selectedSetCache = null;
     this.orderIndex.clear();
     this.indexToKey = [...order];
     for (let i = 0; i < order.length; i++) {
@@ -70,6 +78,12 @@ export class DndSelection {
       if (this.keyInBlock(key, block)) return true;
     }
     return false;
+  }
+
+  /** Memoized Set view of `getSelectedKeys()` for hot `.has()` paths
+   *  (render passes, drag frames). Do not mutate. */
+  getSelectedKeySet(): ReadonlySet<Key> {
+    return (this.selectedSetCache ??= new Set(this.getSelectedKeys()));
   }
 
   /** Returns selected keys in list order. */

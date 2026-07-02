@@ -29,4 +29,30 @@ describe("DndSelection.updateOrder guard", () => {
     sel.updateOrder([...order]);
     expect(sel.getSelectedKeys()).toEqual(["a", "b", "d", "c"]);
   });
+
+  test("getSelectedKeySet memoizes until a mutation or reindex", () => {
+    const order = ["a", "b", "c"];
+    const sel = new DndSelection(order);
+    sel.selectOnly("a");
+    sel.extendActive("b");
+
+    const first = sel.getSelectedKeySet();
+    expect([...first]).toEqual(["a", "b"]);
+    // Hot path: repeated reads (per scroll/drag frame) return the
+    // cached instance.
+    expect(sel.getSelectedKeySet()).toBe(first);
+
+    // Any block mutation invalidates.
+    sel.extendActive("c");
+    const second = sel.getSelectedKeySet();
+    expect(second).not.toBe(first);
+    expect([...second]).toEqual(["a", "b", "c"]);
+
+    // A reindex invalidates too (block ranges resolve through the
+    // order), while a same-reference updateOrder does not.
+    sel.updateOrder(order);
+    expect(sel.getSelectedKeySet()).toBe(second);
+    sel.updateOrder([...order]);
+    expect(sel.getSelectedKeySet()).not.toBe(second);
+  });
 });

@@ -1,4 +1,4 @@
-import type { Key, DndRenderer } from "./types";
+import type { DndDragEventDetail, Key, DndRenderer } from "./types";
 import { DndSource } from "./source";
 import { DndSelection } from "./selection";
 import { DndVirtualization } from "./virtualization";
@@ -122,6 +122,12 @@ export class DndController {
   private draggedKeys: Key[] = [];
   private dragSet: Set<Key> = new Set();
   private collapsedOrder: Key[] = [];
+  /** Hidden render entries keeping dragged rows mounted across the
+   *  drag so their component state survives. Built ONCE at drag start
+   *  and bounded to rows that were actually mounted then (virtualized
+   *  window) — unmounted rows have no state to preserve, and a
+   *  whole-view drag can carry thousands of keys. */
+  private keepAliveItems: DndRenderItem[] = [];
   private visualIndexMap = new Map<Key, number>();
   /** Set when a drag ends so the synthetic `click` that follows mouseup
    *  is ignored. Without this, the post-drag click runs `selection.clear()`
@@ -313,7 +319,9 @@ export class DndController {
 
     const scrollTop = this.opts.host.parent.scrollTop;
     const viewportHeight = this.opts.host.parent.clientHeight;
-    const selectedKeys = new Set(this.selection.getSelectedKeys());
+    // Memoized in the selection — rebuilding a Set here is O(selection)
+    // and this method runs per scroll/drag frame.
+    const selectedKeys = this.selection.getSelectedKeySet();
 
     if (this.isDraggingFlag) {
       const visualCount = this.collapsedOrder.length;
@@ -357,23 +365,14 @@ export class DndController {
         });
       }
 
-      // Dragged items kept mounted hidden so consumer-rendered state survives.
-      const keepAlive: DndRenderItem[] = [];
-      for (const key of this.draggedKeys) {
-        keepAlive.push({
-          key,
-          index: -1,
-          top: 0,
-          height: this.cfg.itemHeight,
-          selected: false,
-          selFirst: false,
-          selLast: false,
-          expanded: false,
-          hidden: true,
-        });
-      }
-
-      return { isDragging: true, listboxHeight, items, keepAlive };
+      // Dragged rows kept mounted hidden so consumer-rendered state
+      // survives — precomputed at drag start (mounted rows only).
+      return {
+        isDragging: true,
+        listboxHeight,
+        items,
+        keepAlive: this.keepAliveItems,
+      };
     }
 
     const contentHeight = this.virtualization.getTotalHeight(order.length);
@@ -797,6 +796,27 @@ export class DndController {
     this.mouseDownKey = null;
   };
 
+  /** Snapshot which dragged rows are mounted right now (bounded by the
+   *  virtualized window) as hidden keep-alive render entries. Must run
+   *  at drag start, before the drag re-render unmounts them. */
+  private buildKeepAlive(): void {
+    this.keepAliveItems = [];
+    for (const key of this.draggedKeys) {
+      if (!this.opts.getItemElement(key)) continue;
+      this.keepAliveItems.push({
+        key,
+        index: -1,
+        top: 0,
+        height: this.cfg.itemHeight,
+        selected: false,
+        selFirst: false,
+        selLast: false,
+        expanded: false,
+        hidden: true,
+      });
+    }
+  }
+
   private startOverlayDrag(x: number, y: number): void {
     // Drag operates on uniform-height layout — collapse first.
     this.collapseForDrag();
@@ -806,6 +826,7 @@ export class DndController {
     this.draggedKeys = this.selection.getSelectedKeys();
     this.dragSet = new Set(this.draggedKeys);
     this.rebuildCollapsedOrder();
+    this.buildKeepAlive();
 
     const elements: HTMLElement[] = [];
     let grabElement: HTMLElement | null = null;
@@ -858,16 +879,45 @@ export class DndController {
   ): boolean {
     if (this.cfg.dragType !== "overlay") return false;
     if (this.draggedKeys.length === 0) return false;
-    const items = this.source
-      ? this.draggedKeys
-          .map((k) => this.source!.getItem(k))
-          .filter((i): i is unknown => i !== undefined)
-      : [];
+    // Lazy payload: this fires on every pointermove, and a
+    // whole-selection drag can carry thousands of keys — but the move
+    // handler typically only sniffs `firstItem` to classify the drag.
+    // Materialize the full arrays only if a listener actually reads
+    // them (dragend does, for `keys`).
+    const source = this.source;
+    const draggedKeys = this.draggedKeys;
+    let keysCache: Key[] | null = null;
+    let itemsCache: unknown[] | null = null;
+    const buildItems = (): unknown[] =>
+      source
+        ? draggedKeys
+            .map((k) => source.getItem(k))
+            .filter((i): i is unknown => i !== undefined)
+        : [];
+    const detail: DndDragEventDetail = {
+      x,
+      y,
+      get keys(): Key[] {
+        return (keysCache ??= [...draggedKeys]);
+      },
+      get items(): unknown[] {
+        return (itemsCache ??= buildItems());
+      },
+      get firstItem(): unknown {
+        if (itemsCache) return itemsCache[0];
+        if (!source) return undefined;
+        for (const k of draggedKeys) {
+          const it = source.getItem(k);
+          if (it !== undefined) return it;
+        }
+        return undefined;
+      },
+    };
     const event = new CustomEvent(`primavera-dnd-drag${type}`, {
       bubbles: true,
       composed: true,
       cancelable: type === "end",
-      detail: { keys: [...this.draggedKeys], items, x, y },
+      detail,
     });
     this.opts.host.host.dispatchEvent(event);
     return event.defaultPrevented;
@@ -905,6 +955,7 @@ export class DndController {
     this.draggedKeys = [];
     this.dragSet.clear();
     this.collapsedOrder = [];
+    this.keepAliveItems = [];
     this.visualIndexMap.clear();
     this.opts.host.listbox.style.overflow = "";
     this.opts.onChange();
@@ -928,6 +979,7 @@ export class DndController {
     this.draggedKeys = this.selection.getSelectedKeys();
     this.dragSet = new Set(this.draggedKeys);
     this.rebuildCollapsedOrder();
+    this.buildKeepAlive();
 
     if (!this.dragNative) {
       this.dragNative = new DndDragNative(this.renderer);
@@ -990,6 +1042,7 @@ export class DndController {
       this.draggedKeys = [];
       this.dragSet.clear();
       this.collapsedOrder = [];
+      this.keepAliveItems = [];
       this.visualIndexMap.clear();
       this.opts.host.listbox.style.overflow = "";
       this.placeholder.clear();

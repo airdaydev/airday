@@ -52,6 +52,23 @@ item). Measured: **1 remote op at 13k items = ~0.7ms native** (was
 order array. Kills the per-scroll key→index Map rebuild and dedupes
 the 3–4 rebuilds per mutation down to 1.
 
+**Large-selection drag fixed:** dragging a whole-view selection (e.g.
+10k Done rows) was O(selection) *per pointermove*, twice: (1)
+`dispatchDrag` materialized the full `keys` + `items` arrays (10k
+`getItem` calls) into every `primavera-dnd-dragmove` event, whose only
+per-move consumer reads one element to classify the drag — the detail's
+`keys`/`items` are now lazy cached getters plus a `firstItem` field,
+and `Workspace.isItemDrag` classifies via `firstItem`; (2)
+`getRenderState` rebuilt a `Set` of all selected keys per render frame
+— now memoized as `DndSelection.getSelectedKeySet()`, invalidated by
+`notify()` (every block mutation ends there) and by order reindexes;
+(3) — the big one — `keepAlive` mounted a **hidden DOM row for every
+dragged key** (10k hidden Solid components for a whole-view drag) and
+rebuilt that array on every drag frame. Now snapshotted once at drag
+start and bounded to rows that were actually *mounted* then (the
+virtualized window — unmounted rows have no component state to
+preserve, which was keepAlive's whole purpose).
+
 **Known remaining O(N) per-op paths:**
 - `undo`/`redo` — full `rebuild_item_index` + state diff per step;
   Cmd+Z on a large doc still lags. Could ride the same translator

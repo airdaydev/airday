@@ -671,15 +671,16 @@ export function Workspace(props: {
       .querySelectorAll<HTMLElement>("[data-drop-active]")
       .forEach((el) => delete el.dataset.dropActive);
   };
-  const isItemDrag = (items: readonly unknown[]): boolean =>
-    items.length > 0 &&
-    typeof items[0] === "object" &&
-    items[0] !== null &&
-    "listId" in items[0];
+  // Classify via `firstItem` — `detail.items` is a lazy getter over the
+  // whole dragged selection, and this runs on every pointermove.
+  const isItemDrag = (detail: DndDragEventDetail): boolean => {
+    const first = detail.firstItem;
+    return typeof first === "object" && first !== null && "listId" in first;
+  };
 
   const onDndDragMove = (e: Event) => {
     const ce = e as CustomEvent<DndDragEventDetail>;
-    if (!isItemDrag(ce.detail.items)) return;
+    if (!isItemDrag(ce.detail)) return;
     clearDropHighlight();
     const target = findDropTarget(ce.detail.x, ce.detail.y);
     if (target) target.el.dataset.dropActive = "";
@@ -687,7 +688,7 @@ export function Workspace(props: {
   const onDndDragEnd = (e: Event) => {
     const ce = e as CustomEvent<DndDragEventDetail>;
     clearDropHighlight();
-    if (!isItemDrag(ce.detail.items)) return;
+    if (!isItemDrag(ce.detail)) return;
     const target = findDropTarget(ce.detail.x, ce.detail.y);
     if (!target) return;
     ce.preventDefault();

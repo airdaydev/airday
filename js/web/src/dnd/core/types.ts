@@ -39,9 +39,16 @@ export interface DragContext {
   register(renderer: DndRenderer<any>, source: any): void;
 }
 
+/** Payload of `primavera-dnd-drag{start,move,end}`. `keys` and `items`
+ *  are lazy getters — a whole-selection drag can carry thousands of
+ *  entries and this event fires per pointermove, so per-move handlers
+ *  should classify the drag via `firstItem` and leave the full arrays
+ *  unread until drop time. */
 export interface DndDragEventDetail<T = unknown> {
-  keys: Key[];
-  items: T[];
+  readonly keys: Key[];
+  readonly items: T[];
+  /** First dragged item that resolves, without materializing `items`. */
+  readonly firstItem: T | undefined;
   x: number;
   y: number;
 }
