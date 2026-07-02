@@ -2,7 +2,6 @@
 - indexeddb tests? do we have an in-mem storage adapter? via playwright?
 - list deleting - orphan handling?
 - list deleting - binned first?
-- import/export
 - Due dates
 
 ## Sync & persistence
@@ -60,9 +59,6 @@ signature actually yields an owned copy, not another view. Cross-ref: `spec/loca
 
 ## CI
 - sqlite migrations
-
-## CLI
-- Sqlite storage
 
 ## Bug
 - When we click done, then edit the item, waiting for it to depart that list, it goes bad.
