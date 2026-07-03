@@ -653,12 +653,19 @@ impl Doc {
             Vec::new()
         };
 
+        // Count *all* live candidates in this list whose global index sits
+        // before ours — a set-count, not an ordered walk. An earlier
+        // version stopped at the first candidate with a `>=` index, which is
+        // only valid when `candidates` is already globally sorted. Mid-frame
+        // that assumption fails: translating a multi-item reorder mutates
+        // the projection one item at a time, so a not-yet-processed sibling
+        // can sit out of order and short-circuit the count. Counting the set
+        // is order-independent and correct at every step.
         let mut live_index = 0usize;
         for candidate in candidates {
-            if self.find_item(&candidate)?.0 >= global_index {
-                break;
+            if self.find_item(&candidate)?.0 < global_index {
+                live_index += 1;
             }
-            live_index += 1;
         }
 
         let mut guard = self.item_index.lock().expect("item index mutex poisoned");
@@ -1804,7 +1811,80 @@ impl Doc {
 
         // deleted∩inserted = positional moves; deleted−inserted = gone.
         let removed: Vec<String> = deleted.difference(&inserted).cloned().collect();
-        let moved: HashSet<String> = deleted.intersection(&inserted).cloned().collect();
+        let mut moved: HashSet<String> = deleted.intersection(&inserted).cloned().collect();
+
+        // A single moved element is a rotation: one naive remove-then-
+        // insert-at-live_index on the consumer reproduces it, and the
+        // passively-displaced items shift correctly without any event of
+        // their own. Two or more moved elements are *not* expressible that
+        // way — emitting ItemMoved for only the elements Loro recorded as
+        // moved leaves the passively-shifted items uncorrected, so a
+        // consumer applying remove+insert per event interleaves them (and
+        // our own projection, built the same way, drifts too).
+        //
+        // For an in-list reorder we keep the fast path by widening the move
+        // set to *every* item whose live position within the list changed —
+        // exactly the set `diff_items` emits — which a consumer's ascending
+        // remove+insert reconstructs exactly. Frames that aren't a clean
+        // in-list reorder (cross-list moves, or adds/removes mixed into the
+        // same frame) fail the invariants below and fall back to a
+        // whole-doc resync.
+        if moved.len() > 1 {
+            // Pure permutation only: no structural adds or removals, so the
+            // pre- and post-import lists are the same multiset.
+            if !removed.is_empty() || inserted.len() != moved.len() {
+                return Err(());
+            }
+            // Every moved element must be live and share one list. A moved
+            // element's `by_id` cursor still points at the Loro slot the
+            // `mov` vacated (phase 2 re-registers it), so resolve its map
+            // through the freshly-rebuilt shadow order, not `find_item`.
+            let items = self.items();
+            let mut list_id: Option<String> = None;
+            for id in &moved {
+                let idx = order.iter().position(|x| x == id).ok_or(())?;
+                let map = item_map_at(&items, idx).ok_or(())?;
+                if !is_in_list_view(&map) {
+                    return Err(());
+                }
+                let lid = read_string(&map, KEY_LIST_ID).ok_or(())?;
+                match &list_id {
+                    Some(seen) if seen != &lid => return Err(()),
+                    _ => list_id = Some(lid),
+                }
+            }
+            let list_id = list_id.ok_or(())?;
+            // Pristine pre-frame live order, and the post-import live order
+            // for that list. Liveness can't change in a pure reorder, so the
+            // post live order is the shadow order filtered to the pre-live
+            // set — no per-item map reads needed.
+            let pre_live: Vec<String> = {
+                let guard = self.item_index.lock().expect("item index mutex poisoned");
+                guard
+                    .live_by_list
+                    .get(&list_id)
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let pre_set: HashSet<&String> = pre_live.iter().collect();
+            if !moved.iter().all(|id| pre_set.contains(id)) {
+                return Err(());
+            }
+            let post_live: Vec<String> = order
+                .iter()
+                .filter(|id| pre_set.contains(id))
+                .cloned()
+                .collect();
+            if post_live.len() != pre_live.len() {
+                return Err(());
+            }
+            // Widen `moved` to every id whose live position shifted.
+            for (i, id) in post_live.iter().enumerate() {
+                if pre_live.get(i) != Some(id) {
+                    moved.insert(id.clone());
+                }
+            }
+        }
 
         // Resolve map-dirty containers to item ids (skipping ones that
         // were removed in the same frame — removal wins).
@@ -1822,9 +1902,12 @@ impl Doc {
             dirty_keys_by_id.entry(id).or_default().extend(keys);
         }
 
-        // Every id that needs events, with its final global index.
+        // Every id that needs events, with its final global index. The
+        // widened move set (above) may include passively-shifted items that
+        // aren't `inserted` — they need an ItemMoved too, so fold them in.
         let mut dirty_ids: HashSet<String> = inserted.clone();
         dirty_ids.extend(dirty_keys_by_id.keys().cloned());
+        dirty_ids.extend(moved.iter().cloned());
         if removed.len() + dirty_ids.len() >= DIFF_TRANSLATE_MAX_DIRTY {
             return Err(());
         }
@@ -2693,15 +2776,27 @@ mod tests {
 
         let t = Instant::now();
         let blob = doc.pending_export(&dek).unwrap();
-        println!("pending_export:      {:?} ({} bytes)", t.elapsed(), blob.map(|b| b.ciphertext.len()).unwrap_or(0));
+        println!(
+            "pending_export:      {:?} ({} bytes)",
+            t.elapsed(),
+            blob.map(|b| b.ciphertext.len()).unwrap_or(0)
+        );
 
         let t = Instant::now();
         let snap = doc.snapshot_blob(&dek).unwrap();
-        println!("snapshot_blob:       {:?} ({} bytes)", t.elapsed(), snap.ciphertext.len());
+        println!(
+            "snapshot_blob:       {:?} ({} bytes)",
+            t.elapsed(),
+            snap.ciphertext.len()
+        );
 
         let t = Instant::now();
         let all: Vec<ItemView> = doc.iter_items().collect();
-        println!("iter_items.collect:  {:?} ({} items)", t.elapsed(), all.len());
+        println!(
+            "iter_items.collect:  {:?} ({} items)",
+            t.elapsed(),
+            all.len()
+        );
 
         let t = Instant::now();
         doc.rebuild_item_index();
@@ -3363,7 +3458,11 @@ mod tests {
                 } => {
                     assert_eq!(eid, &id);
                     assert_eq!(list_id, LIST_MAIN);
-                    assert_eq!(*live_index, Some(0), "live orphan lands in main's live projection");
+                    assert_eq!(
+                        *live_index,
+                        Some(0),
+                        "live orphan lands in main's live projection"
+                    );
                     saw_reassign = true;
                 }
                 AppEvent::ListRemoved { id: lid } => {
@@ -3455,6 +3554,174 @@ mod tests {
         assert_live_projection_matches_doc(&b);
         assert_eq!(b.live_item_ids(LIST_MAIN)[0], third);
         assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    /// Replay a frame's emitted events the way the JS store does:
+    /// naive `insertLive` (remove id, splice at `live_index`) applied in
+    /// emission order to the pre-frame live projection. This is the
+    /// contract `diff_items`/`translate_captured_diffs` must satisfy — the
+    /// Rust-internal projection and Loro fingerprint can be correct while
+    /// the *emitted events* fail to converge on the consumer.
+    fn replay_live_events(pre: &[String], evs: &[AppEvent]) -> Vec<String> {
+        let mut live = pre.to_vec();
+        for ev in evs {
+            match ev {
+                AppEvent::ItemMoved { id, live_index, .. } => {
+                    if let Some(li) = live_index {
+                        live.retain(|x| x != id);
+                        live.insert((*li).min(live.len()), id.clone());
+                    }
+                }
+                AppEvent::ItemRemoved { id } => live.retain(|x| x != id),
+                _ => {}
+            }
+        }
+        live
+    }
+
+    #[test]
+    fn remote_multi_item_move_down_converges_on_consumer() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let ids: Vec<String> = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .collect();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Select the top two (a, b) and drag them below d — the exact op
+        // sequence `planReorderMoves` emits for a two-item downward move:
+        // move b to live index 3, then a to live index 2. Final order:
+        // [c, d, a, b, e].
+        let pre_live = b.live_item_ids(LIST_MAIN);
+        a.move_item(&ids[1], LIST_MAIN, 3).unwrap();
+        a.move_item(&ids[0], LIST_MAIN, 2).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+
+        let evs = b.drain_events();
+        let expected = vec![
+            ids[2].clone(),
+            ids[3].clone(),
+            ids[0].clone(),
+            ids[1].clone(),
+            ids[4].clone(),
+        ];
+        // Loro state itself always converges…
+        assert_eq!(a.live_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        // …but the emitted events must reconstruct that order on a naive
+        // consumer, and the Rust-internal projection must match the doc.
+        assert_live_projection_matches_doc(&b);
+        // An in-list reorder stays on the surgical path — no whole-doc
+        // resync — and its incremental ItemMoved events replay exactly.
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "expected surgical events, got a resync: {evs:?}"
+        );
+        assert_eq!(
+            replay_live_events(&pre_live, &evs),
+            expected,
+            "emitted events interleave on the consumer; got {evs:?}"
+        );
+    }
+
+    #[test]
+    fn remote_multi_item_move_up_converges_on_consumer() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let ids: Vec<String> = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .collect();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Select c, d and drag them to the top — `planReorderMoves`
+        // emits move c to 0, then d to 1. Final order: [c, d, a, b, e].
+        let pre_live = b.live_item_ids(LIST_MAIN);
+        a.move_item(&ids[2], LIST_MAIN, 0).unwrap();
+        a.move_item(&ids[3], LIST_MAIN, 1).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+
+        let evs = b.drain_events();
+        let expected = vec![
+            ids[2].clone(),
+            ids[3].clone(),
+            ids[0].clone(),
+            ids[1].clone(),
+            ids[4].clone(),
+        ];
+        assert_eq!(a.live_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_live_projection_matches_doc(&b);
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "expected surgical events, got a resync: {evs:?}"
+        );
+        assert_eq!(
+            replay_live_events(&pre_live, &evs),
+            expected,
+            "emitted events interleave on the consumer; got {evs:?}"
+        );
+    }
+
+    #[test]
+    fn remote_discontiguous_multi_move_converges_on_consumer() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let ids: Vec<String> = ["a", "b", "c", "d", "e", "f"]
+            .iter()
+            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .collect();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Discontiguous selection {a, c} dragged down to sit before f:
+        // move a below e, then c below e. Exercises a non-adjacent widen.
+        let pre_live = b.live_item_ids(LIST_MAIN);
+        a.move_item(&ids[0], LIST_MAIN, 3).unwrap();
+        a.move_item(&ids[2], LIST_MAIN, 4).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+
+        let evs = b.drain_events();
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_live_projection_matches_doc(&b);
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "expected surgical events, got a resync: {evs:?}"
+        );
+        assert_eq!(
+            replay_live_events(&pre_live, &evs),
+            a.live_item_ids(LIST_MAIN),
+            "emitted events interleave on the consumer; got {evs:?}"
+        );
+    }
+
+    #[test]
+    fn remote_cross_list_multi_move_falls_back_and_converges() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let other = a.add_list("Other").unwrap();
+        let m0 = a.add_item(LIST_MAIN, "m0").unwrap();
+        let m1 = a.add_item(LIST_MAIN, "m1").unwrap();
+        let _o0 = a.add_item(&other, "o0").unwrap();
+        let _o1 = a.add_item(&other, "o1").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Two items changing list in one frame isn't a pure in-list
+        // permutation — the surgical path declines and we resync.
+        a.move_item(&m0, &other, 1).unwrap();
+        a.move_item(&m1, &other, 2).unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+
+        let evs = b.drain_events();
+        assert_eq!(evs, vec![AppEvent::FullResync]);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_live_projection_matches_doc(&b);
+        assert_eq!(a.live_item_ids(&other), b.live_item_ids(&other));
+        assert_eq!(a.live_item_ids(LIST_MAIN), b.live_item_ids(LIST_MAIN));
     }
 
     #[test]
