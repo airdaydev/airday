@@ -350,6 +350,19 @@ impl Doc {
         self.inner.import_oplog_updates(plaintext).map_err(js_err)
     }
 
+    /// Replay one boot blob without rebuilding the item index. Pair every
+    /// sequence of calls with exactly one `finishOplogReplay()`.
+    #[wasm_bindgen(js_name = replayOplogUpdate)]
+    pub fn replay_oplog_update(&mut self, plaintext: &[u8]) -> Result<(), JsError> {
+        self.inner.replay_oplog_update(plaintext).map_err(js_err)
+    }
+
+    /// Complete silent local hydration and rebuild disposable indexes once.
+    #[wasm_bindgen(js_name = finishOplogReplay)]
+    pub fn finish_oplog_replay(&self) {
+        self.inner.finish_oplog_replay();
+    }
+
     // -- undo / redo --
 
     pub fn undo(&self) -> Result<bool, JsError> {
@@ -995,6 +1008,14 @@ impl SyncEngine {
             .collect()
     }
 
+    /// Compact one-shot workspace materialization for initial attach and
+    /// `fullResync`. One JSON string crosses the wasm boundary instead of
+    /// thousands of heap-allocated `AppEventJs` wrappers and cloned getters.
+    #[wasm_bindgen(js_name = workspaceSnapshotJson)]
+    pub fn workspace_snapshot_json(&self) -> String {
+        workspace_snapshot_json(self.inner.doc())
+    }
+
     // -- introspection --
 
     #[wasm_bindgen(js_name = isOnline)]
@@ -1400,6 +1421,7 @@ impl From<CoreEvent> for EngineEvent {
 /// every other getter returns `undefined`.
 ///
 /// Variant → fields:
+/// - `fullResync` — no fields; rematerialize current state once
 /// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, index, liveIndex?
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, index, liveIndex?
@@ -1510,6 +1532,10 @@ impl From<CoreAppEvent> for AppEventJs {
             live_index: None,
         };
         match e {
+            CoreAppEvent::FullResync => AppEventJs {
+                kind: "fullResync",
+                ..blank
+            },
             CoreAppEvent::ItemAdded {
                 id,
                 list_id,
@@ -1690,6 +1716,30 @@ fn items_to_json(items: &[airday_core::ItemView]) -> String {
     }
     s.push(']');
     s
+}
+
+fn workspace_snapshot_json(doc: &CoreDoc) -> String {
+    let settings = doc.get_settings();
+    let lists = doc.all_lists();
+    let items = doc.all_items();
+    let mut out = String::from("{\"settings\":");
+    out.push_str(&settings_to_json(&settings));
+    out.push_str(",\"lists\":[");
+    for (i, list) in lists.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&list_to_json(list));
+    }
+    out.push_str("],\"items\":[");
+    for (i, item) in items.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&item_to_json(item));
+    }
+    out.push_str("]}");
+    out
 }
 
 fn summary_to_json(s: &CoreImportSummary) -> String {

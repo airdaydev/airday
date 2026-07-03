@@ -183,7 +183,9 @@ An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VF
 
 ### Web boot + the bytes-copy gotcha
 
-Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → import the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) → import each replay row in `local_seq` order → `markPushed()` so the engine doesn't re-capture replayed ops. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → replay the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) and every tail row in `local_seq` order through `replayOplogUpdate` → call `finishOplogReplay()` once to build disposable indexes and clear historical events → `markPushed()` so the engine doesn't re-capture replayed ops. Rebuilding after every row is forbidden: with N items and R replay rows it turns refresh into O(N×R). The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
+
+Initial attachment is not a live mutation stream and does not trigger compaction. The web store materializes once from `workspaceSnapshotJson`; live bulk/opaque changes emit one `FullResync` control event and use the same one-shot materialization path. Search indexing follows materialization. Normal snapshot compaction is gated on the sync engine reaching steady-state `Idle`.
 
 ⚠️ Any JS-side `EngineStorage` impl that **retains** wasm-passed `&[u8]` bytes must copy them on entry (`.slice()`). wasm-bindgen hands `&[u8]` as a `Uint8Array` view into wasm linear memory valid only for that synchronous call; `IdbStorage` defers the IDB write, so without a copy it persists reused/garbage memory and the next boot fails to decrypt. This cost a real bug and is invisible to synchronous mock tests — only a real browser reload catches it. (`idb-storage.ts` documents this inline; `roadmap.md` tracks a proposal to enforce the copy Rust-side.)
 
@@ -205,6 +207,8 @@ Required cases:
 5. Crash between send and ack: re-send maps to original `server_seq` via dedupe, ack updates the row.
 6. Multiple snapshot cycles preserve replay correctness; pending rows survive across snapshots and remain in the outbox.
 7. Re-upload after the WS layer drops mid-frame works without producing duplicate server rows.
+8. Local snapshot + tail hydration builds indexes once and emits no live events.
+9. A server bootstrap snapshot is written as the local cutoff-zero baseline before its server frontier can be acknowledged; refresh replays that baseline plus every existing local row.
 
 ## Out of scope
 

@@ -1,20 +1,26 @@
 //! Domain-level change events emitted by `Doc` after every commit
 //! (local mutation) or remote import. Local mutation methods push
 //! exact events surgically; remote imports are translated from Loro's
-//! per-container diffs by `Doc::translate_remote_diffs` (with a
-//! whole-doc resync fallback for bulk/opaque frames).
+//! per-container diffs by `Doc::translate_captured_diffs`. Bulk/opaque
+//! frames emit one `FullResync` control event instead of N synthetic item
+//! events.
 //!
 //! These are the contract between the core and every UI layer. A
 //! consumer (Solid store, SwiftUI `@Observable`, Compose `StateFlow`)
 //! mirrors each event into its native reactive primitive with a
 //! surgical write — no diff or reconciliation needed at the UI layer.
 //!
-//! On first attach the consumer receives a synthetic burst representing
-//! current state (`ListAdded` / `ItemAdded` for everything that exists),
-//! then live deltas. Both flow through the same code path.
+//! Initial attachment materializes current state explicitly. After that,
+//! consumers receive live deltas or an occasional `FullResync` request.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
+    /// The doc changed by a bulk or opaque operation that is cheaper and
+    /// safer for consumers to rematerialize wholesale. This is a control
+    /// signal only: consumers fetch one current-state snapshot rather than
+    /// receiving thousands of synthetic per-item events.
+    FullResync,
+
     // ---------- items ----------
     /// New item appeared (local add or remote insert), or backfill on
     /// initial attach. `index` is the position in the global items

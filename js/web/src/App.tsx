@@ -173,8 +173,8 @@ function BootGate(props: {
   const { m } = useAppI18n();
   // Rebuild the doc from the engine op log (`spec/local-storage.md`
   // §"Web boot"), mirroring the CLI's `boot_doc`: load the snapshot (a bare
-  // Loro snapshot) and replay every op row after it via
-  // `importOplogUpdates`, then `markPushed()` so the engine's push cursor
+  // Loro snapshot) and replay every op row after it via the deferred replay
+  // API, finalize indexes once, then `markPushed()` so the engine's push cursor
   // covers the replayed ops (unacked ones re-push from the persisted
   // outbox, not `pending_export`). Fresh signups — and brand-new
   // anonymous docs with an empty store — start from `Doc.create()` so
@@ -199,13 +199,14 @@ function BootGate(props: {
       } else if (rows.snapshot || rows.replay.length > 0) {
         doc = Doc.empty();
         if (rows.snapshot) {
-          doc.importOplogUpdates(
+          doc.replayOplogUpdate(
             dek.open(new EncryptedBlob(rows.snapshot.nonce, rows.snapshot.ciphertext)),
           );
         }
         for (const r of rows.replay) {
-          doc.importOplogUpdates(dek.open(new EncryptedBlob(r.nonce, r.ciphertext)));
+          doc.replayOplogUpdate(dek.open(new EncryptedBlob(r.nonce, r.ciphertext)));
         }
+        doc.finishOplogReplay();
         doc.markPushed();
       } else if (props.session.anonymous) {
         // Brand-new (or wiped) local-only doc — seed the built-ins.

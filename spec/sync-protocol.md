@@ -183,7 +183,9 @@ A device whose `since_seq` is below the latest snapshot's `compaction_floor_seq`
 
 1. `PullSnapshot` → server returns `Snapshot { up_to_seq, blob }`.
 2. Decrypt the blob and apply it to the local doc (Loro merges — local-only commits not yet pushed are preserved automatically; CRDT op-id reconciliation handles overlap with the device's own prior contributions).
-3. `PullOps { since_seq: up_to_seq }` to catch up on any ops written after the snapshot was taken.
+3. Persist the exact encrypted blob as the local snapshot at `up_to_local_seq = 0` before advancing/acknowledging the server frontier. Cutoff zero deliberately preserves every existing local row: pending work and post-snapshot tail ops remain replayable. A later steady-state compaction produces the merged local baseline.
+4. Emit one application-level `FullResync` control event; consumers materialize current state once rather than processing one synthetic event per item.
+5. `PullOps { since_seq: up_to_seq }` to catch up on any ops written after the snapshot was taken.
 
 The `up_to_seq` carried by `SnapshotRequired` is informational; the authoritative value is the one returned in the `Snapshot` frame, since the latest snapshot may advance between the two round trips.
 

@@ -121,6 +121,10 @@ export function createWorkspaceRuntime(props: {
   const COMPACT_MIN_OPS = 250;
   const COMPACT_IDLE_MS = 20_000;
   const compact = (minOps: number): void => {
+    // Pull/bootstrap frames may install a server snapshot baseline. Do not
+    // immediately export another whole-doc snapshot while that phase is in
+    // progress; compaction starts only once catch-up reaches steady-state.
+    if (!engine.isIdle()) return;
     try {
       engine.snapshotIfFullySynced(minOps);
     } catch (e) {

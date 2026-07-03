@@ -175,68 +175,41 @@ export interface ImportSummary {
 
 const COARSE_BATCH_THRESHOLD = 64;
 const COARSE_EVENT_KINDS = new Set([
+  "itemAdded",
   "itemMoved",
   "itemRemoved",
   "itemStatusChanged",
   "itemListChanged",
 ]);
 
-function materializeState(events: readonly AppEventJs[]): WorkspaceState {
+interface WorkspaceSnapshotPayload {
+  settings: SettingsView;
+  lists: ListView[];
+  items: ItemView[];
+}
+
+function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
+  const payload = JSON.parse(engine.workspaceSnapshotJson()) as WorkspaceSnapshotPayload;
   const itemsById: Record<string, ItemView> = {};
   const listLive: Record<string, string[]> = {};
   let binCount = 0;
-  const listsOrder: string[] = [];
-  const listsById: Record<string, ListView> = {};
-  const settings: SettingsView = {
-    showListCounts: true,
-    mainName: null,
-  };
-
-  for (const ev of events) {
-    switch (ev.kind) {
-      case "settingsChanged": {
-        settings.showListCounts = ev.showListCounts ?? true;
-        settings.mainName = ev.mainName ?? null;
-        break;
-      }
-      case "itemAdded": {
-        const item: ItemView = {
-          id: ev.id,
-          listId: ev.listId ?? "",
-          text: ev.text ?? "",
-          notes: ev.notes ?? "",
-          createdAt: Number(ev.createdAt ?? 0),
-          doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
-          binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
-        };
-        itemsById[ev.id] = item;
-        // The snapshot burst arrives in global CRDT order, so appending
-        // live ids per list reproduces each list's live projection.
-        if (isInListView(item)) {
-          (listLive[item.listId] ??= []).push(ev.id);
-        }
-        if (isBinned(item)) binCount++;
-        break;
-      }
-      case "listAdded": {
-        listsById[ev.id] = {
-          id: ev.id,
-          name: ev.name ?? "",
-          createdAt: Number(ev.createdAt ?? 0),
-        };
-        listsOrder.push(ev.id);
-        break;
-      }
-    }
+  for (const item of payload.items) {
+    itemsById[item.id] = item;
+    if (isInListView(item)) (listLive[item.listId] ??= []).push(item.id);
+    if (isBinned(item)) binCount++;
   }
-
+  const listsById: Record<string, ListView> = {};
+  for (const list of payload.lists) listsById[list.id] = list;
   return {
     itemsById,
     listLive,
     binCount,
-    listsOrder,
+    listsOrder: payload.lists.map((list) => list.id),
     listsById,
-    settings,
+    settings: {
+      showListCounts: payload.settings.showListCounts ?? true,
+      mainName: payload.settings.mainName ?? null,
+    },
   };
 }
 
@@ -319,6 +292,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
 
   const dispatch = (ev: AppEventJs): void => {
     switch (ev.kind) {
+      case "fullResync":
+        // `drainEvents` handles this control event before dispatch.
+        break;
       case "itemAdded": {
         const prev = state.itemsById[ev.id];
         if (prev) {
@@ -494,14 +470,14 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       events.push(ev);
     }
     const coarse = shouldUseCoarseProjection(events);
+    const fullResync = events.some((ev) => ev.kind === "fullResync");
     // Batch so a multi-event drain (e.g. addItemsAt for a multi-line
     // paste, or a server frame applying many remote ops) shows up as
     // one reactive update — otherwise consumers like the dnd briefly
     // see the intermediate order and animate through it.
     batch(() => {
-      if (coarse) {
-        const snapshot = engine.snapshotEvents();
-        const next = materializeState(snapshot);
+      if (fullResync || coarse) {
+        const next = materializeEngineSnapshot(engine);
         setState(reconcile(next));
         // The bulk path skips per-event store dispatch, so let the
         // search engine do a wholesale rebuild from the fresh state
@@ -517,10 +493,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     });
   };
 
-  // Materialize current doc state once. Same dispatcher as the live
-  // path — no separate "load initial" code, no snapshot/diff.
-  const initialSnapshot = engine.snapshotEvents();
-  const initialState = materializeState(initialSnapshot);
+  // Initial attach is explicit materialization, not a live event replay.
+  // A single compact JSON snapshot crosses the wasm boundary and the
+  // historical event queue remains empty.
+  const initialState = materializeEngineSnapshot(engine);
   setState(reconcile(initialState));
   search.rebuild(initialState);
 

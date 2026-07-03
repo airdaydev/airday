@@ -42,8 +42,8 @@ turns them into surgical per-id `AppEvent`s and incremental index
 updates, using a new global-order shadow (`ItemIndex.order`) to
 resolve positional deletes. Frames touching ≥64 items, or any diff
 shape we can't translate, fall back to one whole-doc resync pass
-(`ItemRemoved` for vanished ids + idempotent `ItemAdded` refresh per
-item). Measured: **1 remote op at 13k items = ~0.7ms native** (was
+and one `FullResync` control event; consumers materialize current state
+once rather than receiving N synthetic item events. Measured: **1 remote op at 13k items = ~0.7ms native** (was
 ~35ms), emitting exactly one event.
 
 **Phase 0 item 1 done (dnd order-version guard):**
@@ -75,6 +75,14 @@ move undo emits one `ItemMoved`; unsupported/bulk shapes retain the whole-doc
 fallback. Reorder planning now emits at most one core move per selected row,
 instead of one move per displaced row, while the web action stack keeps the
 whole selection drag as one visible undo.
+
+**Boot/refresh follow-up landed:** local snapshot + tail hydration uses deferred
+oplog replay and builds `ItemIndex` once at completion, with no historical live
+events. Server snapshot bootstrap persists the received encrypted blob at local
+cutoff zero before advancing durability, then emits one `FullResync`. Initial
+attach and resync use one compact `workspaceSnapshotJson` crossing rather than
+thousands of wasm `AppEventJs` wrappers. Snapshot compaction is gated until the
+sync engine reaches steady-state `Idle`.
 
 **Known remaining O(N) per-op paths:**
 - Loro's own movable-list `UndoManager::undo` work still scales with document

@@ -90,14 +90,14 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
 
     // Fully synced → compaction writes a snapshot at localSeq=1 and
     // prunes the folded row.
-    const wrote = engine.snapshotIfFullySynced();
+    const wrote = engine.snapshotIfFullySynced(1);
     expect(wrote).toBe(true);
     expect(storage.snapshot).not.toBeNull();
     expect(storage.snapshot!.upToLocalSeq).toBe(1);
     expect(storage.ops.length).toBe(0);
 
     // A second compaction with nothing new is a no-op.
-    expect(engine.snapshotIfFullySynced()).toBe(false);
+    expect(engine.snapshotIfFullySynced(1)).toBe(false);
   });
 
   test("remote ops are mirrored via appendRemoteOp, never in the outbox", () => {

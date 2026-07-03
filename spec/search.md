@@ -161,6 +161,7 @@ Required behaviors by event kind:
 - `ListRemoved`: remove the list doc; rebuild any item docs that referenced that list name as context
 - `ListRenamed`: rebuild the list doc; rebuild any item docs whose `listId` references that list
 - `ItemMoved` / `ListMoved`: no token change; ordering changes are irrelevant to the index
+- `FullResync`: rebuild once from the newly materialized workspace state
 
 Implementations may do targeted updates or opportunistic small rebuilds, but they must preserve correctness.
 

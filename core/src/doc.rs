@@ -1549,6 +1549,13 @@ impl Doc {
         items.into_iter().map(|i| i.id).collect()
     }
 
+    /// Materialize every item in root CRDT order. Intended for one-shot
+    /// client attachment/resync snapshots; live mutation paths should use
+    /// `AppEvent`s instead.
+    pub fn all_items(&self) -> Vec<ItemView> {
+        self.iter_items().collect()
+    }
+
     fn iter_items(&self) -> impl Iterator<Item = ItemView> + '_ {
         let items = self.items();
         (0..items.len()).filter_map(move |i| item_map_at(&items, i).and_then(|m| item_view(&m)))
@@ -1633,17 +1640,42 @@ impl Doc {
         Ok(self.inner.export(ExportMode::updates(&vv))?)
     }
 
-    /// Apply oplog replay bytes during boot. Tagged `"remote"` so the
-    /// freshly-rebuilt UndoManager (constructed by `Doc::load`) skips
-    /// them — undo state is per-session anyway, and reloading a tab
-    /// shouldn't resurrect undoable steps.
+    /// Apply one oplog replay blob without rebuilding disposable indexes.
+    /// Boot callers replay every stored blob through this method and call
+    /// [`Doc::finish_oplog_replay`] exactly once afterward, avoiding an
+    /// O(items × replay_rows) index rebuild.
+    ///
+    /// Tagged `"remote"` so the per-session UndoManager skips historical
+    /// operations; reloading a tab must not resurrect undoable steps.
+    pub fn replay_oplog_update(&mut self, plaintext: &[u8]) -> Result<(), DocError> {
+        self.inner.import_with(plaintext, "remote")?;
+        Ok(())
+    }
+
+    /// Finalize a silent boot replay. Rebuilds the disposable item index
+    /// once after every snapshot/tail blob has landed and discards any
+    /// domain events: historical state is materialized explicitly by the
+    /// attaching UI, not presented as live mutations.
+    pub fn finish_oplog_replay(&self) {
+        self.rebuild_item_index();
+        if let Ok(mut capture) = self.diff_capture.lock() {
+            capture.mode = DiffCaptureMode::None;
+            capture.diffs.clear();
+        }
+        if let Ok(mut events) = self.events.lock() {
+            events.clear();
+        }
+    }
+
+    /// Convenience for a one-blob replay. Multi-row boot paths should use
+    /// [`Doc::replay_oplog_update`] + [`Doc::finish_oplog_replay`] instead.
     ///
     /// Does *not* advance `last_pushed_vv`. Whether the original local
     /// commit reached the server before the crash is unknowable from
     /// disk; the next push retries, and Loro / the server dedupe.
     pub fn import_oplog_updates(&mut self, plaintext: &[u8]) -> Result<(), DocError> {
-        self.inner.import_with(plaintext, "remote")?;
-        self.rebuild_item_index();
+        self.replay_oplog_update(plaintext)?;
+        self.finish_oplog_replay();
         Ok(())
     }
 
@@ -1665,9 +1697,8 @@ impl Doc {
     /// root subscription) into per-id `AppEvent`s, so a frame's cost is
     /// proportional to the ops it carries — never total doc size. Any
     /// diff shape the translator can't handle (or a bulk frame touching
-    /// ≥ `DIFF_TRANSLATE_MAX_DIRTY` items) falls back to one
-    /// whole-doc resync pass: index rebuild + `ItemRemoved` for
-    /// vanished ids + an idempotent `ItemAdded` refresh per item.
+    /// ≥ `DIFF_TRANSLATE_MAX_DIRTY` items) rebuilds the disposable index
+    /// once and emits one `FullResync` control event.
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
         self.apply_remote_batch(dek, std::iter::once(blob))
     }
@@ -1680,12 +1711,6 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        // The shadow order still reflects pre-import state — snapshot
-        // the id set cheaply so the fallback can detect removals.
-        let pre_item_ids: Vec<String> = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.order.clone()
-        };
         self.begin_diff_capture(DiffCaptureMode::Import);
 
         let result = blobs
@@ -1696,14 +1721,14 @@ impl Doc {
             // A batch may have applied earlier blobs before a later one
             // failed — resync events for whatever landed, then surface
             // the error.
-            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
+            self.emit_diff_fallback();
             return result;
         }
         if self
             .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
             .is_err()
         {
-            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
+            self.emit_diff_fallback();
         }
         Ok(())
     }
@@ -1919,54 +1944,14 @@ impl Doc {
         Ok(())
     }
 
-    /// Whole-doc resync events for frames the translator declined:
-    /// rebuild the index, emit `ItemRemoved` for ids that vanished and
-    /// an idempotent full `ItemAdded` refresh for every current item
-    /// (consumers reconcile refreshes for ids they already track).
-    /// O(doc) — the price of correctness on bulk/opaque frames only.
-    fn emit_diff_fallback(
-        &self,
-        pre_item_ids: &[String],
-        pre_lists: &[ListView],
-        pre_settings: &SettingsView,
-    ) {
+    /// Whole-doc fallback for frames the translator declined. Rebuild the
+    /// disposable index, then emit one control signal. Consumers fetch the
+    /// current snapshot once; they are never flooded with N synthetic adds.
+    fn emit_diff_fallback(&self) {
         self.rebuild_item_index();
-        {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            for id in pre_item_ids {
-                if !guard.by_id.contains_key(id) {
-                    self.push_event(AppEvent::ItemRemoved { id: id.clone() });
-                }
-            }
-        }
-        let mut emitted = Vec::new();
-        diff_settings(pre_settings, &self.get_settings(), &mut emitted);
-        diff_lists(pre_lists, &self.all_lists(), &mut emitted);
-        for ev in emitted {
-            self.push_event(ev);
-        }
-        let mut live_counters = HashMap::<String, usize>::new();
-        for (idx, item) in self.iter_items().enumerate() {
-            let live_index = if item.is_in_list_view() {
-                let counter = live_counters.entry(item.list_id.clone()).or_insert(0);
-                let i = *counter;
-                *counter += 1;
-                Some(i)
-            } else {
-                None
-            };
-            self.push_event(AppEvent::ItemAdded {
-                id: item.id,
-                list_id: item.list_id,
-                text: item.text,
-                notes: item.notes,
-                created_at: item.created_at,
-                done_at: item.done_at,
-                binned_at: item.binned_at,
-                index: idx,
-                live_index,
-            });
-        }
+        let mut events = self.events.lock().expect("events mutex poisoned");
+        events.clear();
+        events.push_back(AppEvent::FullResync);
     }
 
     // ---------- undo / redo ----------
@@ -1999,10 +1984,6 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let pre_item_ids = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.order.clone()
-        };
         self.begin_diff_capture(DiffCaptureMode::Undo);
         let result = {
             let mut um = self.undo.lock().expect("undo mutex poisoned");
@@ -2015,7 +1996,7 @@ impl Doc {
                 .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
                 .is_err()
         {
-            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
+            self.emit_diff_fallback();
         }
         Ok(did)
     }
@@ -3559,7 +3540,7 @@ mod tests {
         b.apply_remote(&dek, &blob).unwrap();
 
         let evs = b.drain_events();
-        assert!(!evs.is_empty());
+        assert_eq!(evs, vec![AppEvent::FullResync]);
         assert_live_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert!(b.live_item_ids(LIST_MAIN).is_empty());
@@ -4244,6 +4225,29 @@ mod tests {
         restored.move_item(&id, LIST_MAIN, 0).unwrap();
 
         assert_eq!(restored.get_item(&id).unwrap().text, "replayed");
+    }
+
+    #[test]
+    fn deferred_oplog_replay_rebuilds_once_and_stays_silent() {
+        let source = Doc::new().unwrap();
+        let first = source.add_item(LIST_MAIN, "first").unwrap();
+        let first_updates = source.export_updates_after_bytes(&[]).unwrap();
+        let after_first = source.oplog_vv_bytes();
+        let second = source.add_item(LIST_MAIN, "second").unwrap();
+        let second_updates = source.export_updates_after_bytes(&after_first).unwrap();
+
+        let mut restored = Doc::empty();
+        restored.replay_oplog_update(&first_updates).unwrap();
+        restored.replay_oplog_update(&second_updates).unwrap();
+        // Disposable lookups intentionally remain stale until the one
+        // explicit completion point.
+        assert!(restored.get_item(&first).is_none());
+        restored.finish_oplog_replay();
+
+        assert_eq!(restored.get_item(&first).unwrap().text, "first");
+        assert_eq!(restored.get_item(&second).unwrap().text, "second");
+        assert!(restored.drain_events().is_empty());
+        assert!(!restored.can_undo());
     }
 
     #[test]

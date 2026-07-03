@@ -623,16 +623,32 @@ impl SyncEngine {
                     self.go_disconnected();
                     return;
                 }
+                // Persist the exact encrypted server snapshot as the local
+                // boot baseline before advancing any frontier. Use local
+                // cutoff zero: the snapshot is authoritative for server
+                // history through `up_to_seq`, while every existing local
+                // row (including pending work and post-snapshot tail ops)
+                // must remain replayable. A later steady-state compaction
+                // can fold those rows into a new merged snapshot.
+                if let Err(e) = self
+                    .storage
+                    .write_snapshot(self.doc_id, LocalSeq(0), blob.clone())
+                {
+                    self.events.push_back(Event::Error(format!(
+                        "storage.write bootstrap snapshot: {e}"
+                    )));
+                    self.go_disconnected();
+                    return;
+                }
+                self.last_snapshot_local_seq = LocalSeq(0);
                 if up_to_seq > self.last_contiguous_seq {
                     self.last_contiguous_seq = up_to_seq;
                     self.events
                         .push_back(Event::FrontierAdvanced { seq: up_to_seq });
                 }
-                // Ack gated on `notify_oplog_durable` — the host needs
-                // to persist the snapshot (either by committing it
-                // directly via `commitSnapshot` or by exporting +
-                // appending the resulting delta) before we tell the
-                // server we have `up_to_seq`.
+                // The storage mirror now contains the snapshot. Ack remains
+                // gated on `notify_oplog_durable`: async hosts call it only
+                // after the queued disk transaction commits.
                 // Resume the catch-up: pull any ops written after the
                 // snapshot was taken.
                 self.state = ConnState::Pulling;
@@ -1580,7 +1596,15 @@ mod tests {
         //   ->   PullSnapshot -> Snapshot -> PullOps(since=up_to)
         //   ->   OpsBatch{complete} -> Idle
         let dek = Dek::generate();
-        let mut eng = SyncEngine::new(Doc::empty(), fake_doc_id(), dek.clone(), 0, opts(), mem());
+        let storage = std::sync::Arc::new(MemStorage::new());
+        let mut eng = SyncEngine::new(
+            Doc::empty(),
+            fake_doc_id(),
+            dek.clone(),
+            0,
+            opts(),
+            Box::new(storage.clone()),
+        );
         eng.handle_connected();
         let _ = eng.pop_outbox().unwrap();
         eng.handle_server_bytes(&enc(&HelloAck {
@@ -1603,8 +1627,25 @@ mod tests {
         });
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
             up_to_seq: 42,
-            blob: snapshot_blob,
+            blob: snapshot_blob.clone(),
         }));
+
+        // The received encrypted snapshot is the durable local baseline;
+        // no re-export is needed during bootstrap and no cursor advances
+        // before this write exists.
+        let boot = storage.boot(fake_doc_id()).unwrap();
+        let persisted = boot.snapshot.expect("bootstrap snapshot persisted");
+        assert_eq!(persisted.up_to_local_seq, LocalSeq(0));
+        assert_eq!(persisted.payload.nonce, snapshot_blob.nonce);
+        assert_eq!(persisted.payload.ciphertext, snapshot_blob.ciphertext);
+        let mut reloaded = Doc::empty();
+        reloaded.apply_remote(&dek, &persisted.payload).unwrap();
+        assert!(
+            reloaded
+                .items_in_list(LIST_MAIN, false)
+                .iter()
+                .any(|item| item.text == "from-snapshot")
+        );
 
         // Engine should have advanced its frontier and re-issued
         // PullOps. The Ack waits for the host to confirm the
