@@ -597,13 +597,13 @@ export function Row(props: {
           <Show when={!isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
               <span>{m().workspace.markDone}</span>
-              <kbd class="menu-shortcut">x</kbd>
+              <kbd class="menu-shortcut">X</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
               <span>{m().workspace.markNotDone}</span>
-              <kbd class="menu-shortcut">x</kbd>
+              <kbd class="menu-shortcut">X</kbd>
             </ContextMenu.Item>
           </Show>
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>

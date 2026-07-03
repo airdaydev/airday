@@ -1057,10 +1057,22 @@ body {
 }
 
 .menu-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1;
   color: var(--text-muted);
   letter-spacing: 0.5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dropdown-menu-item[data-disabled] .menu-shortcut {
