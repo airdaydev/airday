@@ -19,6 +19,7 @@ import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import { restoreCapturedPositions } from "./linger.ts";
 import { EditableNavLabel, Nav } from "./nav.tsx";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
@@ -182,23 +183,22 @@ export function Workspace(props: {
         const it = state.itemsById[id];
         if (it) out.push(it);
       }
-      // Re-insert the linger group at the positions its rows vacated:
-      // the live projection drops done items instantly, but the user
-      // should see the strike-through before the row leaves. Ascending
-      // capture-index insertion restores a top-down tick burst's
-      // original layout.
+      // Re-insert the linger group at the positions its rows vacated.
+      // Each index was captured after earlier Done rows had already left
+      // `listLive`, so replay the removals in reverse capture order to
+      // reconstruct the original layout.
       lingerTick();
       const { ids: lingerIds, expiry } = lingerChain();
       if (Date.now() < expiry) {
-        const lingering = app
+        const captured: Array<{ index: number; value: ItemView }> = [];
+        for (const r of app
           .recentDone()
-          .filter((r) => r.listId === v.id && lingerIds.has(r.id))
-          .sort((a, b) => a.index - b.index);
-        for (const r of lingering) {
+          .filter((r) => r.listId === v.id && lingerIds.has(r.id))) {
           const it = state.itemsById[r.id];
           if (!it || !isDone(it) || isBinned(it)) continue;
-          out.splice(Math.min(r.index, out.length), 0, it);
+          captured.push({ index: r.index, value: it });
         }
+        restoreCapturedPositions(out, captured);
       }
       return out;
     }
