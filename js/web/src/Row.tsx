@@ -612,12 +612,14 @@ export function Row(props: {
           </ContextMenu.Item>
           <Show when={isInListView(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
-              {m().workspace.duplicate}
+              <span>{m().workspace.duplicate}</span>
+              <kbd class="menu-shortcut">⌘D</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={!isBinned(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onBin}>
-              {m().workspace.moveToBin}
+              <span>{m().workspace.moveToBin}</span>
+              <kbd class="menu-shortcut">⌫</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={isBinned(props.item())}>
@@ -625,7 +627,8 @@ export function Row(props: {
               {m().common.restore}
             </ContextMenu.Item>
             <ContextMenu.Item class="context-menu-item" onSelect={onDelete}>
-              {m().common.delete}
+              <span>{m().common.delete}</span>
+              <kbd class="menu-shortcut">⌫</kbd>
             </ContextMenu.Item>
           </Show>
         </ContextMenu.Content>
