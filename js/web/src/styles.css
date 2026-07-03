@@ -991,6 +991,8 @@ body {
 .context-menu-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   padding: 6px 10px;
   border-radius: 4px;
   font-size: 13px;

@@ -22,6 +22,7 @@ import { useAppI18n } from "./i18n.tsx";
 import { EditableNavLabel, Nav } from "./nav.tsx";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
+import { planReorderMoves } from "./reorder.ts";
 import type { SearchResult } from "./search.ts";
 import { Settings } from "./Settings.tsx";
 import { useSession } from "./SessionContext.tsx";
@@ -272,31 +273,15 @@ export function Workspace(props: {
     const v = view();
     if (v.kind !== "list") return;
     const ids = items().map((it) => it.id);
-    const movedSet = new Set(op.keys.map(String));
-    const movedIds = ids.filter((id) => movedSet.has(id));
-    if (movedIds.length === 0) return;
-
-    const remaining = ids.filter((id) => !movedIds.includes(id));
-    const insertAt =
-      op.beforeKey === null
-        ? remaining.length
-        : (() => {
-            const idx = remaining.indexOf(String(op.beforeKey));
-            return idx >= 0 ? idx : remaining.length;
-          })();
-    const nextIds = [...remaining];
-    nextIds.splice(insertAt, 0, ...movedIds);
-
-    const currentIds = [...ids];
+    const moves = planReorderMoves(
+      ids,
+      op.keys.map(String),
+      op.beforeKey === null ? null : String(op.beforeKey),
+    );
+    if (moves.length === 0) return;
     app.withActionBatch(() => {
-      for (const [index, id] of nextIds.entries()) {
-        if (currentIds[index] !== id) {
-          const currentIndex = currentIds.indexOf(id);
-          if (currentIndex < 0) continue;
-          app.moveItem(id, v.id, index);
-          currentIds.splice(currentIndex, 1);
-          currentIds.splice(index, 0, id);
-        }
+      for (const move of moves) {
+        app.moveItem(move.id, v.id, move.index);
       }
     });
   };
@@ -465,6 +450,32 @@ export function Workspace(props: {
   };
   document.addEventListener("keydown", onDeleteKey);
   onCleanup(() => document.removeEventListener("keydown", onDeleteKey));
+
+  // x: toggle done on the current selection. Mirrors the row checkbox and
+  // the context menu's Mark done / Mark not done. Skip when focus is in an
+  // editable surface so a literal "x" typed into a row/AddForm lands as
+  // text. Toggle direction follows the group: any not-done → mark all done,
+  // only flip back to not-done when every selected item is already done.
+  const onToggleDoneKey = (e: KeyboardEvent) => {
+    if (e.key !== "x" && e.key !== "X") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    const visibleSet = new Set(items().map((it) => it.id));
+    const ids = selection
+      .getSelectedKeys()
+      .map(String)
+      .filter((id) => visibleSet.has(id));
+    if (ids.length === 0) return;
+    e.preventDefault();
+    const allDone = ids.every((id) => {
+      const it = app.getItem(id);
+      return it !== undefined && isDone(it);
+    });
+    app.setDoneMany(ids, !allDone);
+  };
+  document.addEventListener("keydown", onToggleDoneKey);
+  onCleanup(() => document.removeEventListener("keydown", onToggleDoneKey));
 
   // Duplicate live items as a contiguous block immediately after the
   // bottom-most source row — same shape as paste — rather than each

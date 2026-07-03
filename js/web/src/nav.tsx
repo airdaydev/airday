@@ -186,7 +186,9 @@ export function Nav(props: {
 
   // Match the items list's mobile bump so the drawer's tap targets feel
   // consistent with the main view.
-  const navMobileMq = window.matchMedia("(max-width: 768px)");
+  const navMobileMq = window.matchMedia(
+    "(max-width: 768px) and (pointer: coarse)",
+  );
   const [navIsMobile, setNavIsMobile] = createSignal(navMobileMq.matches);
   const onNavMqChange = (e: MediaQueryListEvent) => setNavIsMobile(e.matches);
   navMobileMq.addEventListener("change", onNavMqChange);

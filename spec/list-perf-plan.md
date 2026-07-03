@@ -69,10 +69,18 @@ start and bounded to rows that were actually *mounted* then (the
 virtualized window — unmounted rows have no component state to
 preserve, which was keepAlive's whole purpose).
 
+**Undo/redo follow-up landed:** Loro container diffs are now captured during
+undo/redo and use the same incremental translator as remote frames. A normal
+move undo emits one `ItemMoved`; unsupported/bulk shapes retain the whole-doc
+fallback. Reorder planning now emits at most one core move per selected row,
+instead of one move per displaced row, while the web action stack keeps the
+whole selection drag as one visible undo.
+
 **Known remaining O(N) per-op paths:**
-- `undo`/`redo` — full `rebuild_item_index` + state diff per step;
-  Cmd+Z on a large doc still lags. Could ride the same translator
-  (Loro fires diffs for undo commits too) — next candidate.
+- Loro's own movable-list `UndoManager::undo` work still scales with document
+  size; at 13k lifetime items a reloaded-doc move undo measured ~30ms native
+  while redo measured <1ms. Twenty moves undo in ~267ms native. The former
+  Airday full rebuild/diff and distance amplification are gone.
 - `delete_list` / `empty_bin` — O(N) once, rare and explicitly bulk.
 
 Measured terms (native M1 release, 13k lifetime items; wasm ≈2–4×):

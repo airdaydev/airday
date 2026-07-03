@@ -74,11 +74,10 @@ const KEY_MAIN_NAME: &str = "main_name";
 /// fall back to one whole-doc rebuild + diff. Matches the web store's
 /// coarse-projection threshold so both layers flip regimes together.
 const BULK_STATUS_EVENT_THRESHOLD: usize = 64;
-/// Remote frames touching at least this many items abandon per-item
-/// diff translation for the whole-doc resync fallback — one O(doc)
-/// pass beats per-item projection syncs on bulk frames (initial
-/// device sync, mass restores).
-const REMOTE_TRANSLATE_MAX_DIRTY: usize = 64;
+/// Captured operations touching at least this many items abandon per-item
+/// diff translation for the whole-doc resync fallback — one O(doc) pass
+/// beats per-item projection syncs for bulk imports or undo steps.
+const DIFF_TRANSLATE_MAX_DIRTY: usize = 64;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DocError {
@@ -237,14 +236,12 @@ struct ItemIndex {
     order: Vec<String>,
 }
 
-/// Owned copy of one Loro container diff captured by the root
-/// subscription during a remote import. Only `EventTriggerKind::Import`
-/// batches are recorded — local transactions and undo/redo emit their
-/// `AppEvent`s through the surgical mutation paths and must not double
-/// into this buffer.
-enum RemoteDiff {
+/// Owned copy of one Loro container diff captured while an import or
+/// undo/redo operation is in progress. Ordinary local mutations emit
+/// `AppEvent`s directly and are never captured.
+enum CapturedDiff {
     /// Root `items` MovableList structure changed (insert/delete/move).
-    Items(Vec<RemoteListItem>),
+    Items(Vec<CapturedListItem>),
     /// One item's map changed; which keys were touched.
     ItemMap {
         container: ContainerID,
@@ -260,7 +257,7 @@ enum RemoteDiff {
     Opaque,
 }
 
-enum RemoteListItem {
+enum CapturedListItem {
     Retain(usize),
     Delete(usize),
     /// Inserted (or move-target) entries. `None` for a non-container
@@ -268,7 +265,25 @@ enum RemoteListItem {
     Insert(Vec<Option<ContainerID>>),
 }
 
-fn classify_remote_diff(target: &ContainerID, path_root: Option<&ContainerID>, diff: &LoroDiff) -> RemoteDiff {
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum DiffCaptureMode {
+    #[default]
+    None,
+    Import,
+    Undo,
+}
+
+#[derive(Default)]
+struct DiffCapture {
+    mode: DiffCaptureMode,
+    diffs: Vec<CapturedDiff>,
+}
+
+fn classify_captured_diff(
+    target: &ContainerID,
+    path_root: Option<&ContainerID>,
+    diff: &LoroDiff,
+) -> CapturedDiff {
     let root_name = |cid: &ContainerID| match cid {
         ContainerID::Root { name, .. } => Some(name.to_string()),
         ContainerID::Normal { .. } => None,
@@ -276,15 +291,15 @@ fn classify_remote_diff(target: &ContainerID, path_root: Option<&ContainerID>, d
     match root_name(target) {
         Some(name) if name == ROOT_ITEMS => {
             let LoroDiff::List(items) = diff else {
-                return RemoteDiff::Opaque;
+                return CapturedDiff::Opaque;
             };
-            RemoteDiff::Items(
+            CapturedDiff::Items(
                 items
                     .iter()
                     .map(|it| match it {
-                        ListDiffItem::Retain { retain } => RemoteListItem::Retain(*retain),
-                        ListDiffItem::Delete { delete } => RemoteListItem::Delete(*delete),
-                        ListDiffItem::Insert { insert, .. } => RemoteListItem::Insert(
+                        ListDiffItem::Retain { retain } => CapturedListItem::Retain(*retain),
+                        ListDiffItem::Delete { delete } => CapturedListItem::Delete(*delete),
+                        ListDiffItem::Insert { insert, .. } => CapturedListItem::Insert(
                             insert
                                 .iter()
                                 .map(|v| match v {
@@ -297,25 +312,25 @@ fn classify_remote_diff(target: &ContainerID, path_root: Option<&ContainerID>, d
                     .collect(),
             )
         }
-        Some(name) if name == ROOT_LISTS => RemoteDiff::Lists,
-        Some(name) if name == ROOT_SETTINGS => RemoteDiff::Settings,
-        Some(_) => RemoteDiff::Opaque,
+        Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
+        Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
+        Some(_) => CapturedDiff::Opaque,
         None => {
             // Nested container: an item map or a list map. Route by the
             // root container at the head of its path.
-            let Some(root) = path_root.and_then(|r| root_name(r)) else {
-                return RemoteDiff::Opaque;
+            let Some(root) = path_root.and_then(root_name) else {
+                return CapturedDiff::Opaque;
             };
             if root == ROOT_LISTS {
-                return RemoteDiff::Lists;
+                return CapturedDiff::Lists;
             }
             if root != ROOT_ITEMS {
-                return RemoteDiff::Opaque;
+                return CapturedDiff::Opaque;
             }
             let LoroDiff::Map(m) = diff else {
-                return RemoteDiff::Opaque;
+                return CapturedDiff::Opaque;
             };
-            RemoteDiff::ItemMap {
+            CapturedDiff::ItemMap {
                 container: target.clone(),
                 keys: m.updated.keys().map(|k| k.to_string()).collect(),
             }
@@ -323,20 +338,29 @@ fn classify_remote_diff(target: &ContainerID, path_root: Option<&ContainerID>, d
     }
 }
 
-fn make_remote_diff_subscriber(
-    buffer: Arc<Mutex<Vec<RemoteDiff>>>,
+fn make_diff_subscriber(
+    capture: Arc<Mutex<DiffCapture>>,
 ) -> Arc<dyn for<'a> Fn(DiffEvent<'a>) + Send + Sync> {
     Arc::new(move |e: DiffEvent<'_>| {
-        if e.triggered_by != EventTriggerKind::Import {
-            return;
-        }
         // NOTE: Loro invokes subscribers re-entrantly from inside
         // import/commit — do not touch the doc here, only stash owned
         // data.
-        let Ok(mut buf) = buffer.lock() else { return };
+        let Ok(mut capture) = capture.lock() else {
+            return;
+        };
+        let should_capture = matches!(
+            (capture.mode, e.triggered_by),
+            (DiffCaptureMode::Import, EventTriggerKind::Import)
+                | (DiffCaptureMode::Undo, EventTriggerKind::Local)
+        );
+        if !should_capture {
+            return;
+        }
         for cd in &e.events {
             let path_root = cd.path.first().map(|(cid, _)| cid);
-            buf.push(classify_remote_diff(cd.target, path_root, &cd.diff));
+            capture
+                .diffs
+                .push(classify_captured_diff(cd.target, path_root, &cd.diff));
         }
     })
 }
@@ -358,13 +382,11 @@ pub struct Doc {
     /// container and current relative position. Rebuilt from `inner`
     /// after imports/undo and maintained incrementally for local writes.
     item_index: Mutex<ItemIndex>,
-    /// Import-triggered Loro diffs captured by `_diff_sub`, drained by
-    /// `apply_remote_batch` to translate remote ops into `AppEvent`s
-    /// without materializing the whole doc. Cleared before every import
-    /// batch; anything left over (e.g. a bootstrap snapshot import that
-    /// bypassed `apply_remote`) is discarded there.
-    remote_diffs: Arc<Mutex<Vec<RemoteDiff>>>,
-    /// Root diff subscription feeding `remote_diffs`. Dropping it
+    /// Gated Loro diff capture used by remote import and undo/redo. The
+    /// gate prevents ordinary local mutations from accumulating diffs;
+    /// callers enable it only around the operation they will translate.
+    diff_capture: Arc<Mutex<DiffCapture>>,
+    /// Root diff subscription feeding `diff_capture`. Dropping it
     /// unsubscribes, so it lives exactly as long as the doc.
     _diff_sub: Subscription,
 }
@@ -390,15 +412,15 @@ impl Doc {
         }
         let undo = Mutex::new(make_undo_manager(&inner));
         let item_index = Mutex::new(ItemIndex::default());
-        let remote_diffs = Arc::new(Mutex::new(Vec::new()));
-        let _diff_sub = inner.subscribe_root(make_remote_diff_subscriber(remote_diffs.clone()));
+        let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
+        let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Ok(Self {
             inner,
             last_pushed_vv: VersionVector::default(),
             events: Mutex::new(VecDeque::new()),
             undo,
             item_index,
-            remote_diffs,
+            diff_capture,
             _diff_sub,
         })
     }
@@ -408,17 +430,29 @@ impl Doc {
         let inner = LoroDoc::new();
         let undo = Mutex::new(make_undo_manager(&inner));
         let item_index = Mutex::new(ItemIndex::default());
-        let remote_diffs = Arc::new(Mutex::new(Vec::new()));
-        let _diff_sub = inner.subscribe_root(make_remote_diff_subscriber(remote_diffs.clone()));
+        let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
+        let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Self {
             last_pushed_vv: inner.oplog_vv(),
             inner,
             events: Mutex::new(VecDeque::new()),
             undo,
             item_index,
-            remote_diffs,
+            diff_capture,
             _diff_sub,
         }
+    }
+
+    fn begin_diff_capture(&self, mode: DiffCaptureMode) {
+        let mut capture = self.diff_capture.lock().expect("diff capture poisoned");
+        capture.diffs.clear();
+        capture.mode = mode;
+    }
+
+    fn finish_diff_capture(&self) -> Vec<CapturedDiff> {
+        let mut capture = self.diff_capture.lock().expect("diff capture poisoned");
+        capture.mode = DiffCaptureMode::None;
+        std::mem::take(&mut capture.diffs)
     }
 
     fn rebuild_item_index(&self) {
@@ -1631,7 +1665,7 @@ impl Doc {
     /// root subscription) into per-id `AppEvent`s, so a frame's cost is
     /// proportional to the ops it carries — never total doc size. Any
     /// diff shape the translator can't handle (or a bulk frame touching
-    /// ≥ `REMOTE_TRANSLATE_MAX_DIRTY` items) falls back to one
+    /// ≥ `DIFF_TRANSLATE_MAX_DIRTY` items) falls back to one
     /// whole-doc resync pass: index rebuild + `ItemRemoved` for
     /// vanished ids + an idempotent `ItemAdded` refresh per item.
     pub fn apply_remote(&mut self, dek: &Dek, blob: &EncryptedBlob) -> Result<(), DocError> {
@@ -1652,43 +1686,37 @@ impl Doc {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             guard.order.clone()
         };
-        // Discard anything a non-apply_remote import (e.g. bootstrap
-        // snapshot) left behind — it was translated or indexed by its
-        // own path.
-        self.remote_diffs.lock().expect("remote diffs poisoned").clear();
+        self.begin_diff_capture(DiffCaptureMode::Import);
 
         let result = blobs
             .into_iter()
             .try_for_each(|blob| self.import_remote_blob(dek, blob));
-        let diffs: Vec<RemoteDiff> = {
-            let mut buf = self.remote_diffs.lock().expect("remote diffs poisoned");
-            buf.drain(..).collect()
-        };
+        let diffs = self.finish_diff_capture();
         if result.is_err() {
             // A batch may have applied earlier blobs before a later one
             // failed — resync events for whatever landed, then surface
             // the error.
-            self.emit_remote_fallback(&pre_item_ids, &pre_lists, &pre_settings);
+            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
             return result;
         }
         if self
-            .translate_remote_diffs(diffs, &pre_lists, &pre_settings)
+            .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
             .is_err()
         {
-            self.emit_remote_fallback(&pre_item_ids, &pre_lists, &pre_settings);
+            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
         }
         Ok(())
     }
 
-    /// Translate captured import diffs into surgical `AppEvent`s and
+    /// Translate captured import or undo diffs into surgical `AppEvent`s and
     /// incremental index updates. Errors are not failures — they mean
     /// "this frame is beyond the fast path" and the caller falls back
-    /// to `emit_remote_fallback`. Phase 1 plans everything against a
+    /// to `emit_diff_fallback`. Phase 1 plans everything against a
     /// *clone* of the shadow order (no state touched), so an abort
     /// leaves the index coherent for the fallback's pre/post reasoning.
-    fn translate_remote_diffs(
+    fn translate_captured_diffs(
         &self,
-        diffs: Vec<RemoteDiff>,
+        diffs: Vec<CapturedDiff>,
         pre_lists: &[ListView],
         pre_settings: &SettingsView,
     ) -> Result<(), ()> {
@@ -1705,29 +1733,29 @@ impl Doc {
 
         for diff in diffs {
             match diff {
-                RemoteDiff::Opaque => return Err(()),
-                RemoteDiff::Lists => lists_dirty = true,
-                RemoteDiff::Settings => settings_dirty = true,
-                RemoteDiff::ItemMap { container, keys } => {
+                CapturedDiff::Opaque => return Err(()),
+                CapturedDiff::Lists => lists_dirty = true,
+                CapturedDiff::Settings => settings_dirty = true,
+                CapturedDiff::ItemMap { container, keys } => {
                     map_dirty.entry(container).or_default().extend(keys);
                 }
-                RemoteDiff::Items(items) => {
+                CapturedDiff::Items(items) => {
                     let mut pos = 0usize;
                     for it in items {
                         match it {
-                            RemoteListItem::Retain(n) => {
+                            CapturedListItem::Retain(n) => {
                                 pos = pos.checked_add(n).ok_or(())?;
                                 if pos > order.len() {
                                     return Err(());
                                 }
                             }
-                            RemoteListItem::Delete(n) => {
+                            CapturedListItem::Delete(n) => {
                                 if pos + n > order.len() {
                                     return Err(());
                                 }
                                 deleted.extend(order.drain(pos..pos + n));
                             }
-                            RemoteListItem::Insert(containers) => {
+                            CapturedListItem::Insert(containers) => {
                                 for cid in containers {
                                     let cid = cid.ok_or(())?;
                                     let map = self.inner.get_map(cid);
@@ -1772,7 +1800,7 @@ impl Doc {
         // Every id that needs events, with its final global index.
         let mut dirty_ids: HashSet<String> = inserted.clone();
         dirty_ids.extend(dirty_keys_by_id.keys().cloned());
-        if removed.len() + dirty_ids.len() >= REMOTE_TRANSLATE_MAX_DIRTY {
+        if removed.len() + dirty_ids.len() >= DIFF_TRANSLATE_MAX_DIRTY {
             return Err(());
         }
         let mut dirty_sorted: Vec<(usize, String)> = Vec::with_capacity(dirty_ids.len());
@@ -1896,7 +1924,7 @@ impl Doc {
     /// an idempotent full `ItemAdded` refresh for every current item
     /// (consumers reconcile refreshes for ids they already track).
     /// O(doc) — the price of correctness on bulk/opaque frames only.
-    fn emit_remote_fallback(
+    fn emit_diff_fallback(
         &self,
         pre_item_ids: &[String],
         pre_lists: &[ListView],
@@ -1945,9 +1973,9 @@ impl Doc {
 
     /// Undo the most recent eligible local commit. Remote-applied ops
     /// are filtered out by origin prefix and never enter the stack.
-    /// Returns `true` if a step was applied. Diffs state pre/post and
-    /// emits per-id `AppEvent`s the same way `apply_remote` does —
-    /// undo bypasses the per-mutation event-pushing.
+    /// Returns `true` if a step was applied. Loro's emitted container
+    /// diffs are translated into surgical `AppEvent`s; unusual or bulk
+    /// shapes retain the whole-document correctness fallback.
     pub fn undo(&self) -> Result<bool, DocError> {
         self.apply_undo_op(|um| um.undo())
     }
@@ -1969,16 +1997,25 @@ impl Doc {
     where
         F: FnOnce(&mut UndoManager) -> loro::LoroResult<bool>,
     {
-        let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let did = {
-            let mut um = self.undo.lock().expect("undo mutex poisoned");
-            op(&mut um)?
+        let pre_item_ids = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard.order.clone()
         };
-        if did {
-            self.rebuild_item_index();
-            self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
+        self.begin_diff_capture(DiffCaptureMode::Undo);
+        let result = {
+            let mut um = self.undo.lock().expect("undo mutex poisoned");
+            op(&mut um)
+        };
+        let diffs = self.finish_diff_capture();
+        let did = result?;
+        if did
+            && self
+                .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
+                .is_err()
+        {
+            self.emit_diff_fallback(&pre_item_ids, &pre_lists, &pre_settings);
         }
         Ok(did)
     }
@@ -2076,16 +2113,16 @@ impl Doc {
         let undo = Mutex::new(make_undo_manager(&inner));
         let item_index = Mutex::new(ItemIndex::default());
         // Subscribe *after* the snapshot import so the boot state
-        // doesn't land in the remote-diff buffer as one giant frame.
-        let remote_diffs = Arc::new(Mutex::new(Vec::new()));
-        let _diff_sub = inner.subscribe_root(make_remote_diff_subscriber(remote_diffs.clone()));
+        // doesn't land in the gated diff buffer as one giant frame.
+        let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
+        let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         let doc = Self {
             inner,
             last_pushed_vv,
             events: Mutex::new(VecDeque::new()),
             item_index,
             undo,
-            remote_diffs,
+            diff_capture,
             _diff_sub,
         };
         doc.rebuild_item_index();
@@ -2689,6 +2726,34 @@ mod tests {
         doc.rebuild_item_index();
         println!("rebuild_item_index:  {:?}", t.elapsed());
         let _ = doc.drain_events();
+
+        // Match a real browser session: persisted history is loaded before
+        // the user performs the move, so the UndoManager only owns the
+        // current session's action rather than the 13k-item fixture setup.
+        let saved = doc.save().unwrap();
+        let doc = Doc::load(&saved).unwrap();
+        doc.move_item(&ids[12_999], LIST_MAIN, 0).unwrap();
+        let _ = doc.drain_events();
+        let t = Instant::now();
+        assert!(doc.undo().unwrap());
+        println!("undo_move:            {:?}", t.elapsed());
+        println!("  events emitted:    {}", doc.drain_events().len());
+        let t = Instant::now();
+        assert!(doc.redo().unwrap());
+        println!("redo_move:            {:?}", t.elapsed());
+        println!("  events emitted:    {}", doc.drain_events().len());
+
+        let doc = Doc::load(&saved).unwrap();
+        for (index, id) in ids[12_980..13_000].iter().enumerate() {
+            doc.move_item(id, LIST_MAIN, index).unwrap();
+        }
+        let _ = doc.drain_events();
+        let t = Instant::now();
+        for _ in 0..20 {
+            assert!(doc.undo().unwrap());
+        }
+        println!("undo_20_moves:         {:?}", t.elapsed());
+        println!("  events emitted:    {}", doc.drain_events().len());
 
         // Remote-frame cost on a peer at the same size: one op in, how
         // long to apply + translate?
@@ -3487,7 +3552,7 @@ mod tests {
         let ids = a.add_items_at(LIST_MAIN, &refs, 0).unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
-        // 100 dirty items in one frame → over REMOTE_TRANSLATE_MAX_DIRTY.
+        // 100 dirty items in one frame → over DIFF_TRANSLATE_MAX_DIRTY.
         let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
         a.set_items_done(&id_refs, true).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -4150,16 +4215,15 @@ mod tests {
         let restored_inner = LoroDoc::new();
         restored_inner.import(&bytes).unwrap();
         let undo = Mutex::new(make_undo_manager(&restored_inner));
-        let remote_diffs = Arc::new(Mutex::new(Vec::new()));
-        let _diff_sub =
-            restored_inner.subscribe_root(make_remote_diff_subscriber(remote_diffs.clone()));
+        let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
+        let _diff_sub = restored_inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         let restored = Doc {
             inner: restored_inner,
             last_pushed_vv: VersionVector::default(),
             item_index: Mutex::new(ItemIndex::default()),
             events: Mutex::new(VecDeque::new()),
             undo,
-            remote_diffs,
+            diff_capture,
             _diff_sub,
         };
 
@@ -4215,11 +4279,41 @@ mod tests {
 
         assert!(doc.undo().unwrap());
         let evs = doc.drain_events();
-        assert!(
-            evs.iter()
-                .any(|e| matches!(e, AppEvent::ItemRemoved { id: i, .. } if i == &id)),
-            "expected an ItemRemoved event for the undone add, got {evs:?}"
-        );
+        assert_eq!(evs, vec![AppEvent::ItemRemoved { id: id.clone() }]);
+
+        assert!(doc.redo().unwrap());
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1);
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ItemAdded { id: event_id, .. } if event_id == &id
+        ));
+    }
+
+    #[test]
+    fn undo_move_emits_only_the_moved_item() {
+        let doc = Doc::new().unwrap();
+        let texts: Vec<String> = (0..200).map(|i| format!("item {i}")).collect();
+        let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+        let ids = doc.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        let _ = doc.drain_events();
+
+        let moved = ids[199].clone();
+        doc.move_item(&moved, LIST_MAIN, 0).unwrap();
+        let _ = doc.drain_events();
+        assert!(doc.undo().unwrap());
+
+        let evs = doc.drain_events();
+        assert_eq!(evs.len(), 1, "undo should be surgical: {evs:?}");
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ItemMoved {
+                id,
+                live_index: Some(199),
+                ..
+            } if id == &moved
+        ));
+        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
     }
 
     #[test]

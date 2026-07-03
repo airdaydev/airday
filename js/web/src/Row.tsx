@@ -596,16 +596,19 @@ export function Row(props: {
         <ContextMenu.Content class="context-menu-content">
           <Show when={!isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
-              {m().workspace.markDone}
+              <span>{m().workspace.markDone}</span>
+              <kbd class="menu-shortcut">x</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
-              {m().workspace.markNotDone}
+              <span>{m().workspace.markNotDone}</span>
+              <kbd class="menu-shortcut">x</kbd>
             </ContextMenu.Item>
           </Show>
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
-            {m().common.copy}
+            <span>{m().common.copy}</span>
+            <kbd class="menu-shortcut">⌘C</kbd>
           </ContextMenu.Item>
           <Show when={isInListView(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>

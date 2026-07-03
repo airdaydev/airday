@@ -13,9 +13,13 @@ Grouped movable-list reorder undo is unsafe in the current core/Loro path.
 
 For launch, reorder does **not** use core undo grouping. The grouped-undo API was removed from `airday-core` rather than left around as an attractive footgun.
 
-- Reorder still executes as plain per-item `move_item(...)` mutations.
+- Reorder still executes as plain per-item `move_item(...)` mutations, but
+  only for the selected rows. A drag's commit count is bounded by selection
+  size and does not grow with distance travelled.
 - The web app keeps a thin app-level action-batch stack that records how many plain core undo steps belong to one visible reorder action.
 - One user undo/redo for reorder replays `engine.undo()` / `engine.redo()` that many times, then renders once at the end.
+- Undo/redo captures Loro's container diffs and translates them into surgical
+  app events. Unsupported or bulk diff shapes retain a whole-doc fallback.
 
 ### Scope note
 
