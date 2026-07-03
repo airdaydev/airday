@@ -40,7 +40,7 @@ pub struct Config {
     /// the server starts asking clients to snapshot. One blob = one
     /// `PushOps` push (see `spec/sync-protocol.md` §"Terminology"), so
     /// this counts pushes, not user actions. Lower in tests to exercise
-    /// the path without churning out 10k pushes.
+    /// the path without churning out hundreds of pushes.
     #[serde(default = "default_snapshot_threshold_blobs")]
     pub snapshot_threshold_blobs: u64,
     /// Optional Argon2id PHC hash protecting the operator-only JSON API.

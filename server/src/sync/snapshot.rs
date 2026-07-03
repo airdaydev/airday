@@ -4,14 +4,16 @@ use std::time::Instant;
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use uuid::Uuid;
 
-// Default threshold: 10k *op blobs* (each is one encrypted PushOps push;
+// Default threshold: 500 *op blobs* (each is one encrypted PushOps push;
 // see `spec/sync-protocol.md` §"Terminology") since the last snapshot
-// makes a doc eligible. Operators override via
+// makes a doc eligible. Sized for a single-user doc: keeps bootstrap
+// catch-up (op replay after snapshot import) short and lets compaction
+// advance without churning full-doc snapshots. Operators override via
 // `snapshot_threshold_blobs` in the server config (or
 // `AIRDAY_SNAPSHOT_THRESHOLD_BLOBS`); JS e2e tests drop it to a handful
 // so the snapshot path runs in seconds.
 // Timeout after 5 minutes
-pub const SNAPSHOT_THRESHOLD_BLOBS: u64 = 10_000;
+pub const SNAPSHOT_THRESHOLD_BLOBS: u64 = 500;
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 struct ActiveLease {
@@ -163,8 +165,8 @@ mod tests {
         let doc_id = Uuid::now_v7();
         let now = Instant::now();
 
-        // Within default threshold (10k) — skip.
-        let decision = coord.evaluate(doc_id, 5_000, 5_000, 12_000, 12_000, 12_000, now);
+        // Within default threshold (500) — skip.
+        let decision = coord.evaluate(doc_id, 11_800, 11_800, 12_000, 12_000, 12_000, now);
         assert!(matches!(decision, Decision::Skip));
 
         // Producer not caught up — skip.
