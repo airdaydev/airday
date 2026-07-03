@@ -472,6 +472,12 @@ async fn signup_sets_device_cookie_with_expected_attributes() {
         "missing SameSite=Strict: {sc}"
     );
     assert!(sc.contains("Path=/"), "missing Path=/: {sc}");
+    // Persistent cookie, not a session cookie: mobile Safari/WebKit drops
+    // session cookies on backgrounded-tab memory reclaim (see cookie.rs).
+    assert!(
+        sc.contains("Max-Age=34560000"),
+        "expected 400-day Max-Age: {sc}"
+    );
     let _ = acc; // silence unused warning; kept to mirror style of other tests
 }
 

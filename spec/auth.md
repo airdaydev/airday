@@ -30,7 +30,7 @@ Forever tokens in both threat models. A compromised CLI host hands the attacker 
 
 ### Web (cookie transport)
 
-- Token-issuing endpoints (`signup`, `login`, `password/reset`, `POST /devices`) attach `Set-Cookie: airday_device=<token>; HttpOnly; Secure; SameSite=Strict; Path=/` alongside the response body. Body keeps the token because the CLI consumes it; web ignores the body's token field and trusts the cookie.
+- Token-issuing endpoints (`signup`, `login`, `password/reset`, `POST /devices`) attach `Set-Cookie: airday_device=<token>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=34560000` alongside the response body. Body keeps the token because the CLI consumes it; web ignores the body's token field and trusts the cookie. `Max-Age` is 400 days — the browser-honoured maximum (Chrome/Firefox/Safari clamp longer values). The token is forever-lived, so the cookie should persist as long as browsers allow; a *session* cookie (no `Max-Age`) is discarded by mobile Safari/WebKit on backgrounded-tab memory reclaim, silently de-authing the client while the server session is still valid.
 - `DeviceAuth` extractor and the WS upgrade try `Authorization: Bearer` first, fall back to the `airday_device` cookie. CLI is unaffected.
 - `POST /api/account/logout` (authed): revokes the calling device's token server-side and emits `Set-Cookie: airday_device=; Max-Age=0`. `DELETE /api/devices/:id` retains its existing semantics (revoke any device by id) and does not touch cookies.
 - Web bundle and API must share registrable domain (`SameSite=Strict` permits same-site cross-origin, e.g. `app.airday.io` → `api.airday.io`). Self-hosted instances serve their own bundle from their own domain; we do not support one web bundle pointed at arbitrary remote APIs.

@@ -8,6 +8,16 @@ use axum::http::{HeaderMap, HeaderValue, header};
 
 pub const COOKIE_NAME: &str = "airday_device";
 
+/// `Max-Age` for the device cookie: 400 days, the maximum any modern
+/// browser will honour (Chrome 104+, Firefox, Safari all clamp longer
+/// values to 400 days). The device token is forever-lived server-side
+/// (`spec/auth.md`), so the cookie carrying it should persist as long as
+/// browsers allow. Without this the cookie is a *session* cookie: desktop
+/// session-restore keeps it alive for weeks, but mobile Safari/WebKit
+/// discards session cookies (no `Max-Age`/`Expires`) when it reclaims a
+/// backgrounded tab's memory — the mobile de-auth symptom.
+const COOKIE_MAX_AGE_SECS: u64 = 400 * 24 * 60 * 60;
+
 /// `Set-Cookie` value for a freshly-issued token. `Path=/` so the cookie
 /// applies to /api/* and the WS upgrade. `secure` controls the `Secure`
 /// attribute — Chromium/Firefox treat `http://localhost` as a secure
@@ -16,7 +26,7 @@ pub const COOKIE_NAME: &str = "airday_device";
 pub fn set_cookie(token: &str, secure: bool) -> HeaderValue {
     let secure_attr = if secure { " Secure;" } else { "" };
     HeaderValue::from_str(&format!(
-        "{COOKIE_NAME}={token}; HttpOnly;{secure_attr} SameSite=Strict; Path=/"
+        "{COOKIE_NAME}={token}; HttpOnly;{secure_attr} SameSite=Strict; Path=/; Max-Age={COOKIE_MAX_AGE_SECS}"
     ))
     .expect("device token is hex; cookie value is ASCII-safe")
 }
