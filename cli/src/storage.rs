@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use airday_core::{
     BootState, ClientOpId, Dek, Doc, DocError, DocId, LocalOpRow, LocalSeq, LocalStorage,
-    OutboxRow, RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
+    OutboxRow, RemoteOpRow, ReplayRow, ServerSeq, SnapshotCutoff, SnapshotRow, StorageError,
 };
 use airday_protocol::EncryptedBlob;
 use rusqlite::{Connection, OptionalExtension, params};
@@ -201,17 +201,20 @@ impl LocalStorage for SqliteStorage {
             )
             .optional()
             .map_err(backend)?;
-        let snap_floor = snapshot.as_ref().map(|s| s.up_to_local_seq.0).unwrap_or(0);
 
+        // Replay every surviving row: `write_snapshot` already pruned the
+        // rows the snapshot contains, so there's no `local_seq` cutoff to
+        // apply here. Pending and above-frontier rows sit below the
+        // high-water and would be wrongly skipped by a prefix filter.
         let replay = {
             let mut stmt = conn
                 .prepare(
                     "SELECT local_seq, payload, payload_nonce FROM ops
-                     WHERE doc_id = ?1 AND local_seq > ?2 ORDER BY local_seq",
+                     WHERE doc_id = ?1 ORDER BY local_seq",
                 )
                 .map_err(backend)?;
             let rows = stmt
-                .query_map(params![id, snap_floor as i64], |r| {
+                .query_map(params![id], |r| {
                     Ok(ReplayRow {
                         local_seq: LocalSeq(r.get::<_, i64>(0)? as u64),
                         payload: blob_from(r.get(1)?, r.get(2)?),
@@ -354,13 +357,16 @@ impl LocalStorage for SqliteStorage {
     fn write_snapshot(
         &self,
         doc_id: DocId,
-        up_to_local_seq: LocalSeq,
+        cutoff: SnapshotCutoff,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError> {
         let mut conn = self.conn.lock().expect("SqliteStorage mutex poisoned");
         let id = doc_id.0.as_bytes().to_vec();
         let tx = conn.transaction().map_err(backend)?;
         ensure_doc(&tx, &id)?;
+        // Record the current high-water (before pruning drops the rows
+        // carrying it) so post-prune `append_*` stays monotonic.
+        let high_water = max_local_seq(&tx, &id)? as i64;
         tx.execute(
             "INSERT INTO snapshots
                (doc_id, up_to_local_seq, payload, payload_nonce, created_at)
@@ -370,19 +376,28 @@ impl LocalStorage for SqliteStorage {
                payload         = excluded.payload,
                payload_nonce   = excluded.payload_nonce,
                created_at      = excluded.created_at",
-            params![
-                id,
-                up_to_local_seq.0 as i64,
-                payload.ciphertext,
-                payload.nonce,
-            ],
+            params![id, high_water, payload.ciphertext, payload.nonce],
         )
         .map_err(backend)?;
-        tx.execute(
-            "DELETE FROM ops WHERE doc_id = ?1 AND local_seq <= ?2",
-            params![id, up_to_local_seq.0 as i64],
-        )
-        .map_err(backend)?;
+        match cutoff {
+            // Drop confirmed rows the snapshot contains; keep pending
+            // (NULL server_seq) and above-frontier rows.
+            SnapshotCutoff::ServerFrontier(frontier) => {
+                tx.execute(
+                    "DELETE FROM ops
+                     WHERE doc_id = ?1 AND server_seq IS NOT NULL AND server_seq <= ?2",
+                    params![id, frontier.0 as i64],
+                )
+                .map_err(backend)?;
+            }
+            SnapshotCutoff::LocalPrefix(up_to) => {
+                tx.execute(
+                    "DELETE FROM ops WHERE doc_id = ?1 AND local_seq <= ?2",
+                    params![id, up_to.0 as i64],
+                )
+                .map_err(backend)?;
+            }
+        }
         tx.commit().map_err(backend)?;
         Ok(())
     }
@@ -422,9 +437,10 @@ fn ensure_doc(conn: &Connection, id: &[u8]) -> Result<(), StorageError> {
 }
 
 /// `max(snapshot.up_to_local_seq, max ops.local_seq)` — the highest
-/// `local_seq` ever assigned for this doc. The snapshot term matters
-/// after compaction prunes the rows it folded in: otherwise the next
-/// `append_*` would restart `local_seq` at 1 and collide.
+/// `local_seq` ever assigned for this doc. The snapshot term (its stored
+/// high-water) matters after a prune deletes the rows carrying the max:
+/// otherwise the next `append_*` would restart `local_seq` and collide
+/// with a surviving pending row.
 fn max_local_seq(conn: &Connection, id: &[u8]) -> Result<u64, StorageError> {
     let n: i64 = conn
         .query_row(
@@ -493,9 +509,10 @@ pub fn load_doc(
     Ok(boot_doc(storage, dek, doc_id)?.0)
 }
 
-/// Write `doc`'s full state as the doc's baseline snapshot
-/// (`up_to_local_seq = 0`, prunes nothing). Used at signup / login /
-/// recover instead of the old `Profile::write_doc`.
+/// Write `doc`'s full state as the doc's baseline snapshot, pruning
+/// nothing (`LocalPrefix(0)`). Used at signup / login / recover instead
+/// of the old `Profile::write_doc`. Any seeded local ops keep their rows
+/// so they still push to the server.
 pub fn seed_snapshot(
     storage: &SqliteStorage,
     dek: &Dek,
@@ -503,6 +520,6 @@ pub fn seed_snapshot(
     doc: &Doc,
 ) -> Result<(), StorageInitError> {
     let blob = doc.snapshot_blob(dek)?;
-    storage.write_snapshot(doc_id, LocalSeq(0), blob)?;
+    storage.write_snapshot(doc_id, SnapshotCutoff::LocalPrefix(LocalSeq(0)), blob)?;
     Ok(())
 }

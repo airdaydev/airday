@@ -12,9 +12,10 @@ use airday_core::{
     EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
     Kek as CoreKek, LocalOpRow as CoreLocalOpRow, LocalSeq as CoreLocalSeq,
     LocalStorage as CoreLocalStorage, OutboxRow as CoreOutboxRow, RemoteOpRow as CoreRemoteOpRow,
-    ServerSeq as CoreServerSeq, StorageError as CoreStorageError, SyncEngine as CoreSyncEngine,
-    WrappedDek as CoreWrappedDek, derive_password_master, derive_recovery_master,
-    generate_recovery_code, kek_from_master, parse_recovery_code,
+    ServerSeq as CoreServerSeq, SnapshotCutoff as CoreSnapshotCutoff,
+    StorageError as CoreStorageError, SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek,
+    derive_password_master, derive_recovery_master, generate_recovery_code, kek_from_master,
+    parse_recovery_code,
 };
 use airday_protocol::{EncryptedBlob as CoreEncryptedBlob, KdfParams as CoreKdfParams};
 
@@ -702,10 +703,14 @@ extern "C" {
     #[wasm_bindgen(method, catch, js_name = outbox)]
     fn outbox(this: &EngineStorage) -> Result<JsValue, JsValue>;
 
+    // `cutoffKind`: 0 = local-prefix (prune local_seq <= cutoff), 1 =
+    // server-frontier (prune confirmed rows with server_seq <= cutoff).
+    // See `SnapshotCutoff`.
     #[wasm_bindgen(method, catch, js_name = writeSnapshot)]
     fn write_snapshot(
         this: &EngineStorage,
-        up_to_local_seq: f64,
+        cutoff_kind: u32,
+        cutoff: f64,
         ciphertext: &[u8],
         nonce: &[u8],
     ) -> Result<(), JsValue>;
@@ -721,7 +726,7 @@ export interface EngineStorage {
   appendRemoteOp(serverSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): number;
   ackLocalOp(clientOpId: Uint8Array, serverSeq: number): void;
   outbox(): { localSeq: number; clientOpId: Uint8Array; ciphertext: Uint8Array; nonce: Uint8Array }[];
-  writeSnapshot(upToLocalSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
+  writeSnapshot(cutoffKind: number, cutoff: number, ciphertext: Uint8Array, nonce: Uint8Array): void;
   writeAckedSeq(seq: number): void;
 }
 "#;
@@ -828,15 +833,15 @@ impl CoreLocalStorage for WebStorage {
     fn write_snapshot(
         &self,
         _doc_id: CoreDocId,
-        up_to_local_seq: CoreLocalSeq,
+        cutoff: CoreSnapshotCutoff,
         payload: CoreEncryptedBlob,
     ) -> Result<(), CoreStorageError> {
+        let (kind, value) = match cutoff {
+            CoreSnapshotCutoff::LocalPrefix(seq) => (0u32, seq.0 as f64),
+            CoreSnapshotCutoff::ServerFrontier(seq) => (1u32, seq.0 as f64),
+        };
         self.js
-            .write_snapshot(
-                up_to_local_seq.0 as f64,
-                &payload.ciphertext,
-                &payload.nonce,
-            )
+            .write_snapshot(kind, value, &payload.ciphertext, &payload.nonce)
             .map_err(jsval_err)
     }
 

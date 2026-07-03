@@ -61,6 +61,11 @@ export interface OutboxRowJs {
   nonce: Uint8Array;
 }
 
+// `writeSnapshot` cutoff kinds — must match the wasm bridge's mapping in
+// `core/web/src/lib.rs` (`SnapshotCutoff`). Kind 0 is local-prefix (the
+// else branch); kind 1 is server-frontier.
+const CUTOFF_SERVER_FRONTIER = 1;
+
 const HEX: string[] = Array.from({ length: 256 }, (_, i) =>
   i.toString(16).padStart(2, "0"),
 );
@@ -151,9 +156,12 @@ export class IdbStorage {
           createdAt: r.createdAt,
         }));
         this.snapshot = (snapReq.result as SnapshotRow) ?? null;
-        const snapFloor = this.snapshot?.upToLocalSeq ?? 0;
+        // `upToLocalSeq` is the snapshot's stored high-water, not a replay
+        // cutoff — take the max with the surviving rows so a prune that
+        // deleted the row carrying the old max doesn't reset the counter.
+        const highWater = this.snapshot?.upToLocalSeq ?? 0;
         const maxOp = rows.reduce((m, r) => Math.max(m, r.localSeq), 0);
-        this.nextLocalSeq = Math.max(snapFloor, maxOp);
+        this.nextLocalSeq = Math.max(highWater, maxOp);
         // Read the persisted resume cursor from the docs row — NOT
         // `MAX(serverSeq)` over the op log, which jumps past gaps and
         // drops after compaction (see `DocRow`). The engine is the
@@ -174,9 +182,11 @@ export class IdbStorage {
    *  assigned `localSeq`. Read straight from the mirror loaded by
    *  `open()`. */
   bootRows(): EngineBootRows {
-    const snapFloor = this.snapshot?.upToLocalSeq ?? 0;
+    // Replay every surviving row: `writeSnapshot` already pruned the rows
+    // the snapshot contains. Pending and above-frontier rows can sit below
+    // the high-water, so there's no `localSeq` cutoff to filter on here.
     const replay = this.ops
-      .filter((o) => o.localSeq > snapFloor)
+      .slice()
       .sort((a, b) => a.localSeq - b.localSeq)
       .map((o) => ({ ciphertext: o.ciphertext, nonce: o.nonce }));
     return {
@@ -270,25 +280,38 @@ export class IdbStorage {
   }
 
   writeSnapshot(
-    upToLocalSeq: number,
+    cutoffKind: number,
+    cutoff: number,
     ciphertext: Uint8Array,
     nonce: Uint8Array,
   ): void {
+    // High-water is the local counter, not the cutoff — pruning may
+    // delete the row carrying the current max localSeq, so stamp the
+    // counter to keep future appends monotonic.
     this.snapshot = {
       docId: this.docId,
-      upToLocalSeq,
+      upToLocalSeq: this.nextLocalSeq,
       ciphertext: copyBytes(ciphertext),
       nonce: copyBytes(nonce),
       createdAt: Date.now(),
     };
-    this.ops = this.ops.filter((o) => o.localSeq > upToLocalSeq);
+    // Server-frontier: drop confirmed rows the snapshot contains, keep
+    // pending (no serverSeq) and above-frontier rows. Local-prefix: drop
+    // the whole localSeq prefix (local-only docs that never sync).
+    const survives = (o: MirrorOp): boolean =>
+      cutoffKind === CUTOFF_SERVER_FRONTIER
+        ? o.serverSeq == null || o.serverSeq > cutoff
+        : o.localSeq > cutoff;
+    const pruned = this.ops.filter((o) => !survives(o));
+    this.ops = this.ops.filter(survives);
     const snap = this.snapshot;
     const docId = this.docId;
     this.enqueue([STORE_OPS, STORE_SNAPSHOTS], (tx) => {
       tx.objectStore(STORE_SNAPSHOTS).put(snap);
-      tx.objectStore(STORE_OPS).delete(
-        IDBKeyRange.bound([docId, 0], [docId, upToLocalSeq]),
-      );
+      // Delete pruned rows by primary key — the pruned set isn't a
+      // contiguous localSeq range under a server-frontier cutoff.
+      const ops = tx.objectStore(STORE_OPS);
+      for (const o of pruned) ops.delete([docId, o.localSeq]);
     });
   }
 

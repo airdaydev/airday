@@ -14,6 +14,6 @@ pub use doc::{
 pub use events::AppEvent;
 pub use storage::{
     BootState, ClientOpId, DocId, LocalOpRow, LocalSeq, LocalStorage, MemStorage, OutboxRow,
-    RemoteOpRow, ReplayRow, ServerSeq, SnapshotRow, StorageError,
+    RemoteOpRow, ReplayRow, ServerSeq, SnapshotCutoff, SnapshotRow, StorageError,
 };
 pub use sync::{EngineOptions, Event, SyncEngine};

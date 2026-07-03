@@ -106,14 +106,41 @@ pub struct ReplayRow {
     pub payload: EncryptedBlob,
 }
 
-/// The persisted snapshot, if any. `up_to_local_seq` is the highest
-/// local_seq whose effects are encoded in `payload` — any row in `ops`
-/// with `local_seq > up_to_local_seq` is replayed on boot after
-/// loading the snapshot.
+/// The persisted snapshot, if any. `up_to_local_seq` is **not** a
+/// replay cutoff — it's the local-counter high-water at the moment the
+/// snapshot was written, kept only so `append_*` keeps minting
+/// monotonic `local_seq`s after a prune deletes the rows that carried
+/// the previous maximum. Every surviving `ops` row is replayed on boot
+/// regardless of its `local_seq`; pruning (see [`SnapshotCutoff`]) has
+/// already removed exactly the rows the `payload` contains.
 #[derive(Debug, Clone)]
 pub struct SnapshotRow {
     pub up_to_local_seq: LocalSeq,
     pub payload: EncryptedBlob,
+}
+
+/// Which op rows a `write_snapshot` may delete, i.e. which rows the new
+/// snapshot `payload` provably already contains. The correct coordinate
+/// depends on whether the doc syncs:
+///
+/// - [`ServerFrontier`](SnapshotCutoff::ServerFrontier) — the snapshot is
+///   authoritative for server history through this `server_seq`. Prune
+///   every **confirmed** row (`server_seq` set) at or below it; keep
+///   pending rows (`server_seq` null — unpushed local work the snapshot
+///   can't contain) and any confirmed row above the frontier. Used for
+///   server-sent bootstrap snapshots and steady-state fully-synced
+///   compaction. `server_seq`, not `local_seq`, is the shared coordinate
+///   both sides agree on, and it's the only one that says whether an op
+///   is rolled into the snapshot.
+/// - [`LocalPrefix`](SnapshotCutoff::LocalPrefix) — prune every row at or
+///   below this `local_seq`, unconditionally. Only for local-only
+///   (anonymous) docs that never sync: their rows never get a
+///   `server_seq`, but a full-state snapshot encodes them and there is no
+///   server to push them to, so they're safe to drop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotCutoff {
+    ServerFrontier(ServerSeq),
+    LocalPrefix(LocalSeq),
 }
 
 /// Everything the engine needs at startup to reconstruct in-memory
@@ -122,9 +149,11 @@ pub struct SnapshotRow {
 pub struct BootState {
     /// Persisted snapshot, if one has been written.
     pub snapshot: Option<SnapshotRow>,
-    /// Ops with `local_seq > snapshot.up_to_local_seq` (or all ops if
-    /// `snapshot` is `None`), in ascending `local_seq` order. Engine
-    /// decrypts each and feeds the plaintext through Loro.
+    /// Every surviving `ops` row, in ascending `local_seq` order. The
+    /// snapshot (if any) already pruned the rows it contains, so the
+    /// engine replays all of these on top of the snapshot. Empty for a
+    /// fresh doc. Engine decrypts each and feeds the plaintext through
+    /// Loro.
     pub replay: Vec<ReplayRow>,
     /// Highest `local_seq` in the `ops` log. The next
     /// `append_local_op` / `append_remote_op` returns `LocalSeq(this + 1)`.
@@ -196,15 +225,16 @@ pub trait LocalStorage {
     /// in the next `PushOps`.
     fn outbox(&self, doc_id: DocId) -> Result<Vec<OutboxRow>, StorageError>;
 
-    /// Replace the snapshot row for this doc. Atomically advances the
-    /// boot starting point past `up_to_local_seq`; impls may
-    /// opportunistically prune `ops` rows with
-    /// `local_seq <= up_to_local_seq` (compaction policy is per-impl
-    /// and out of scope for the trait).
+    /// Replace the snapshot row for this doc and prune the op rows the
+    /// new `payload` provably contains, per `cutoff` (see
+    /// [`SnapshotCutoff`]). Atomically: the snapshot write and the prune
+    /// commit together. Impls must record the current local-counter
+    /// high-water as the row's `up_to_local_seq` so post-prune `append_*`
+    /// keeps `local_seq` monotonic.
     fn write_snapshot(
         &self,
         doc_id: DocId,
-        up_to_local_seq: LocalSeq,
+        cutoff: SnapshotCutoff,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError>;
 
@@ -251,10 +281,10 @@ impl<T: LocalStorage + ?Sized> LocalStorage for Arc<T> {
     fn write_snapshot(
         &self,
         doc_id: DocId,
-        up_to_local_seq: LocalSeq,
+        cutoff: SnapshotCutoff,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError> {
-        (**self).write_snapshot(doc_id, up_to_local_seq, payload)
+        (**self).write_snapshot(doc_id, cutoff, payload)
     }
     fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
         (**self).write_acked_seq(doc_id, seq)
@@ -383,15 +413,29 @@ impl LocalStorage for MemStorage {
     fn write_snapshot(
         &self,
         _doc_id: DocId,
-        up_to_local_seq: LocalSeq,
+        cutoff: SnapshotCutoff,
         payload: EncryptedBlob,
     ) -> Result<(), StorageError> {
         let mut inner = self.inner.lock().expect("MemStorage mutex poisoned");
+        // High-water is the counter, not the cutoff: pruning may delete
+        // the rows carrying the current max local_seq, so record it here
+        // to keep `append_*` monotonic.
         inner.snapshot = Some(SnapshotRow {
-            up_to_local_seq,
+            up_to_local_seq: LocalSeq(inner.next_local_seq),
             payload,
         });
-        inner.ops.retain(|r| r.local_seq > up_to_local_seq);
+        match cutoff {
+            SnapshotCutoff::ServerFrontier(frontier) => {
+                // Keep pending (no server_seq) and above-frontier rows;
+                // drop only what the snapshot demonstrably contains.
+                inner
+                    .ops
+                    .retain(|r| r.server_seq.map(|s| s > frontier).unwrap_or(true));
+            }
+            SnapshotCutoff::LocalPrefix(up_to) => {
+                inner.ops.retain(|r| r.local_seq > up_to);
+            }
+        }
         Ok(())
     }
 
@@ -503,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn write_snapshot_prunes_replay_log() {
+    fn local_prefix_snapshot_prunes_replay_log() {
         let s = MemStorage::new();
         for i in 1..=3u8 {
             s.append_local_op(
@@ -515,15 +559,69 @@ mod tests {
             )
             .unwrap();
         }
-        s.write_snapshot(doc_id(), LocalSeq(2), blob(0xff)).unwrap();
+        s.write_snapshot(
+            doc_id(),
+            SnapshotCutoff::LocalPrefix(LocalSeq(2)),
+            blob(0xff),
+        )
+        .unwrap();
 
         let boot = s.boot(doc_id()).unwrap();
         let snap = boot.snapshot.unwrap();
-        assert_eq!(snap.up_to_local_seq, LocalSeq(2));
+        // up_to_local_seq is the high-water (3 ops appended), not the cutoff.
+        assert_eq!(snap.up_to_local_seq, LocalSeq(3));
         assert_eq!(boot.replay.len(), 1);
         assert_eq!(boot.replay[0].local_seq, LocalSeq(3));
         // next_local_seq is preserved across snapshot — new ops continue
         // from where they left off.
+        assert_eq!(boot.last_local_seq, LocalSeq(3));
+    }
+
+    #[test]
+    fn server_frontier_snapshot_keeps_pending_drops_confirmed() {
+        let s = MemStorage::new();
+        // A pending local op (never acked) interleaved with confirmed ops.
+        s.append_local_op(
+            doc_id(),
+            LocalOpRow {
+                client_op_id: client_op_id(1),
+                payload: blob(1),
+            },
+        )
+        .unwrap(); // local_seq 1, server_seq NULL (pending)
+        s.append_remote_op(
+            doc_id(),
+            RemoteOpRow {
+                server_seq: ServerSeq(50),
+                payload: blob(2),
+            },
+        )
+        .unwrap(); // local_seq 2, server_seq 50
+        s.append_remote_op(
+            doc_id(),
+            RemoteOpRow {
+                server_seq: ServerSeq(80),
+                payload: blob(3),
+            },
+        )
+        .unwrap(); // local_seq 3, server_seq 80 (above frontier)
+
+        // Snapshot authoritative through server_seq 50.
+        s.write_snapshot(
+            doc_id(),
+            SnapshotCutoff::ServerFrontier(ServerSeq(50)),
+            blob(0xff),
+        )
+        .unwrap();
+
+        let boot = s.boot(doc_id()).unwrap();
+        // Confirmed row at server_seq 50 is folded in and dropped; the
+        // pending row and the above-frontier row survive and replay.
+        let surviving: Vec<u64> = boot.replay.iter().map(|r| r.local_seq.0).collect();
+        assert_eq!(surviving, vec![1, 3]);
+        // The pending row is still shippable.
+        assert_eq!(s.outbox(doc_id()).unwrap().len(), 1);
+        // High-water preserved so the next append is local_seq 4.
         assert_eq!(boot.last_local_seq, LocalSeq(3));
     }
 }

@@ -78,8 +78,9 @@ whole selection drag as one visible undo.
 
 **Boot/refresh follow-up landed:** local snapshot + tail hydration uses deferred
 oplog replay and builds `ItemIndex` once at completion, with no historical live
-events. Server snapshot bootstrap persists the received encrypted blob at local
-cutoff zero before advancing durability, then emits one `FullResync`. Initial
+events. Server snapshot bootstrap persists the received encrypted blob with a
+`ServerFrontier(up_to_seq)` cutoff (pruning the confirmed rows it contains, so
+refresh no longer replays the full history), then emits one `FullResync`. Initial
 attach and resync use one compact `workspaceSnapshotJson` crossing rather than
 thousands of wasm `AppEventJs` wrappers. Snapshot compaction is gated until the
 sync engine reaches steady-state `Idle`.

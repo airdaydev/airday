@@ -49,7 +49,7 @@ CREATE UNIQUE INDEX ops_server_seq_idx   ON ops (doc_id, server_seq)   WHERE ser
 
 CREATE TABLE snapshots (
   doc_id          BLOB PRIMARY KEY REFERENCES docs(id),
-  up_to_local_seq INTEGER NOT NULL,         -- highest local_seq folded into payload
+  up_to_local_seq INTEGER NOT NULL,         -- local-counter high-water at write time (keeps local_seq monotonic after a prune); NOT a replay cutoff
   payload         BLOB NOT NULL,            -- EncryptedBlob.ciphertext (full-state snapshot)
   payload_nonce   BLOB NOT NULL,
   created_at      INTEGER NOT NULL

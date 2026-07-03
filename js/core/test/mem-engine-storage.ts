@@ -77,9 +77,13 @@ export class MemEngineStorage {
       }));
   }
 
-  writeSnapshot(upToLocalSeq: number, ciphertext: Uint8Array, nonce: Uint8Array): void {
-    this.snapshot = { upToLocalSeq, ciphertext: copy(ciphertext), nonce: copy(nonce) };
-    this.ops = this.ops.filter((o) => o.localSeq > upToLocalSeq);
+  writeSnapshot(cutoffKind: number, cutoff: number, ciphertext: Uint8Array, nonce: Uint8Array): void {
+    // High-water = the counter, not the cutoff (see IdbStorage). Kind 1 =
+    // server-frontier (keep pending + above-frontier), else local-prefix.
+    this.snapshot = { upToLocalSeq: this.nextLocalSeq, ciphertext: copy(ciphertext), nonce: copy(nonce) };
+    this.ops = this.ops.filter((o) =>
+      cutoffKind === 1 ? o.serverSeq == null || o.serverSeq > cutoff : o.localSeq > cutoff,
+    );
   }
 }
 

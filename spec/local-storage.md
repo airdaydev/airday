@@ -45,7 +45,7 @@ CREATE UNIQUE INDEX ops_server_seq_idx   ON ops (doc_id, server_seq)   WHERE ser
 
 CREATE TABLE snapshots (
   doc_id            BLOB    NOT NULL PRIMARY KEY REFERENCES docs(id),
-  up_to_local_seq   INTEGER NOT NULL,             -- effects of ops with local_seq <= this are included
+  up_to_local_seq   INTEGER NOT NULL,             -- local-counter high-water at write time (keeps local_seq monotonic after a prune); NOT a replay cutoff
   payload           BLOB    NOT NULL,             -- encrypted Loro snapshot bytes (DEK)
   payload_nonce     BLOB    NOT NULL,
   created_at        INTEGER NOT NULL
@@ -66,7 +66,7 @@ CREATE TABLE account (
 
 Notes:
 
-- `local_seq` is the **only** ordering authority for replay. It increases monotonically as rows are appended, regardless of origin (local vs remote). The composite `(doc_id, local_seq)` PK doubles as the replay index.
+- `local_seq` is local bookkeeping only: the append/replay **order** and the `(doc_id, local_seq)` PK. It is *not* a sync coordinate and *not* a replay cutoff — pruning keys on `server_seq` (see Replay / Snapshots). It increases monotonically as rows are appended, regardless of origin (local vs remote).
 - `client_op_id` is the idempotency key on the wire. Server keeps a recent-ids dedupe window so a retried upload after a crash maps to the existing server-side row instead of creating a duplicate.
 - `server_seq` here is **the same `seq`** that the server's `ops` table assigns. On the local row it is `NULL` until the corresponding ack arrives.
 - One snapshot row per doc — `INSERT OR REPLACE` on each new snapshot. There's no need for the M=2 retention the server uses (no concurrent bootstrap reader to protect).
@@ -106,7 +106,9 @@ Wire batching is a separate concern: the WS layer **may** pack multiple rows int
 Per doc, in a single transaction:
 
 1. Read the snapshot row (if any). Decrypt → seed Loro doc.
-2. `SELECT payload, payload_nonce FROM ops WHERE doc_id = ? AND local_seq > snapshot.up_to_local_seq ORDER BY local_seq` — decrypt each and apply to the Loro doc in order.
+2. `SELECT payload, payload_nonce FROM ops WHERE doc_id = ? ORDER BY local_seq` — decrypt each and apply to the Loro doc in order.
+
+Boot replays **every surviving row**, with no `local_seq` cutoff: the snapshot write already pruned exactly the rows the payload contains (see Snapshots), so whatever remains — pending local work and any op above the snapshot's frontier — is genuinely not in the snapshot and must replay. A `local_seq > x` filter would be wrong, because a surviving pending row can sit *below* the pruned confirmed rows in local order.
 
 That's the entire boot. The same path covers:
 
@@ -114,7 +116,7 @@ That's the entire boot. The same path covers:
 - **Pure-oplog recovery** — no snapshot yet, replay all ops.
 - **Snapshot + tail** — the common steady-state case.
 
-Pending rows (those with `server_seq IS NULL`) are skipped only if their `local_seq ≤ snapshot.up_to_local_seq` — their effects are already in the snapshot. They remain on disk for re-upload; see Outbox.
+Pending rows (`server_seq IS NULL`) are the client's unpushed work; a snapshot's server frontier can never cover them, so pruning always keeps them and boot always replays them. They also stay on disk for re-upload; see Outbox.
 
 ## Outbox
 
@@ -135,25 +137,26 @@ UPDATE ops SET server_seq = ? WHERE doc_id = ? AND client_op_id = ?;
 
 ## Snapshot policy
 
-A snapshot is triggered when **either**:
+A snapshot is written in three situations, each carrying a **cutoff** (`core::SnapshotCutoff`) that says which op rows the new payload provably contains and may therefore delete:
 
-- `COUNT(ops) - snapshot.up_to_local_seq ≥ N` (default `N = 1000`), or
-- approximate encrypted-bytes-since-snapshot ≥ `B` (default `B = 5 MiB`).
+- **Steady-state compaction** (synced doc, outbox drained) and **server bootstrap** (a `Snapshot` frame received on catch-up) both use `ServerFrontier(F)`: the payload is authoritative for server history through `server_seq = F`. Prune every **confirmed** row (`server_seq` set) `≤ F`; keep pending rows (`server_seq IS NULL` — unpushed work the payload can't contain) and any confirmed row `> F`. For a server bootstrap `F = up_to_seq`; for compaction `F` is the engine's contiguous frontier (with the outbox empty, that covers every confirmed row).
+- **Local-only fold** (anonymous sessions that never sync) uses `LocalPrefix(n)`: those rows never get a `server_seq`, but a full-state payload encodes them and there is no server to push them to, so prune the whole `local_seq ≤ n` prefix.
 
-Snapshot procedure (one sqlite transaction):
+`server_seq`, not `local_seq`, is the coordinate: it's the only value that says whether an op is rolled into the snapshot. Keying the prune on `local_seq` cannot express "keep pending, drop covered" because the two interleave in local order — the mistake behind the old cutoff-zero bootstrap baseline, which pruned nothing and made every subsequent boot replay the entire history.
 
-1. Export the current Loro state for this doc.
-2. Encrypt → `(payload, payload_nonce)`.
-3. Sample `up_to = MAX(local_seq) FROM ops WHERE doc_id = ?` — the cutoff for what's reflected.
-4. `INSERT OR REPLACE INTO snapshots (doc_id, up_to_local_seq=up_to, payload, payload_nonce, created_at)`.
-5. `DELETE FROM ops WHERE doc_id = ? AND server_seq IS NOT NULL AND local_seq ≤ up_to`. **Pending rows survive.**
-6. Commit.
+Snapshot procedure (one transaction):
 
-Atomicity is sqlite's job; no double-buffering needed. Either the new snapshot + truncated ops are visible together or neither is.
+1. Export the current Loro state for this doc; encrypt → `(payload, payload_nonce)`.
+2. Record the current local-counter high-water (`MAX(local_seq)`, before pruning) as `up_to_local_seq` — bookkeeping so post-prune `append_*` stays monotonic, **not** a replay cutoff.
+3. `INSERT OR REPLACE INTO snapshots (...)`.
+4. Prune per the cutoff: `DELETE FROM ops WHERE doc_id = ? AND server_seq IS NOT NULL AND server_seq ≤ F` (`ServerFrontier`) or `... AND local_seq ≤ n` (`LocalPrefix`).
+5. Commit.
+
+Atomicity is the store's job; no double-buffering needed. Either the new snapshot + pruned ops are visible together or neither is.
 
 ## Compaction
 
-There is no separate compaction job. Step 5 of the snapshot procedure is the compaction. Run cadence: snapshot is fired by the engine (or its persistence bridge) when a write trips the threshold above; it is not synchronous with each commit.
+There is no separate compaction job. Step 4 of the snapshot procedure (the prune) is the compaction. Run cadence: snapshot is fired by the engine (or its persistence bridge) when a write trips the threshold above; it is not synchronous with each commit.
 
 Pending rows (`server_seq IS NULL`) are never compacted. An offline client accumulates them in the outbox indefinitely; on reconnect they all upload. This matches the server-side reality that the doc's history cannot be compacted past the slowest device's frontier.
 
@@ -183,7 +186,7 @@ An earlier spike (`spike/shared-worker`) ran sqlite-wasm on the OPFS-SAH-pool VF
 
 ### Web boot + the bytes-copy gotcha
 
-Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → replay the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) and every tail row in `local_seq` order through `replayOplogUpdate` → call `finishOplogReplay()` once to build disposable indexes and clear historical events → `markPushed()` so the engine doesn't re-capture replayed ops. Rebuilding after every row is forbidden: with N items and R replay rows it turns refresh into O(N×R). The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
+Web boot is **host-driven in JS** and mirrors the CLI's `boot_doc` (it does *not* use `Doc.load`): `Doc.empty()` → replay the decrypted snapshot (a bare Loro snapshot, not a `save()` envelope) and every surviving row (`bootRows`, in `local_seq` order — no cutoff filter; pruning already dropped what the snapshot contains) through `replayOplogUpdate` → call `finishOplogReplay()` once to build disposable indexes and clear historical events → `markPushed()` so the engine doesn't re-capture replayed ops. Rebuilding after every row is forbidden: with N items and R replay rows it turns refresh into O(N×R). Keeping R small is the whole reason the prune keys on `server_seq`: a server bootstrap snapshot must delete the confirmed rows it contains, or R grows to the full history and refresh freezes. The resume cursor comes from `IdbStorage.bootRows().lastAckedSeq` — the engine-persisted `docs.lastAckedServerSeq` in the engine stores of the `airday-web` DB (written via `writeAckedSeq`), **not** the `device` row (which now holds only identity + the `lastSyncAt` observability stamp) and **not** derived from the compacted op log.
 
 Initial attachment is not a live mutation stream and does not trigger compaction. The web store materializes once from `workspaceSnapshotJson`; live bulk/opaque changes emit one `FullResync` control event and use the same one-shot materialization path. Search indexing follows materialization. Normal snapshot compaction is gated on the sync engine reaching steady-state `Idle`.
 
@@ -208,7 +211,7 @@ Required cases:
 6. Multiple snapshot cycles preserve replay correctness; pending rows survive across snapshots and remain in the outbox.
 7. Re-upload after the WS layer drops mid-frame works without producing duplicate server rows.
 8. Local snapshot + tail hydration builds indexes once and emits no live events.
-9. A server bootstrap snapshot is written as the local cutoff-zero baseline before its server frontier can be acknowledged; refresh replays that baseline plus every existing local row.
+9. A server bootstrap snapshot (`ServerFrontier(up_to_seq)`) prunes every confirmed row it covers and keeps pending rows; refresh replays the baseline plus only the pending + above-frontier tail, never the full history.
 
 ## Out of scope
 

@@ -32,7 +32,8 @@ use serde::Serialize;
 use crate::crypto::Dek;
 use crate::doc::Doc;
 use crate::storage::{
-    ClientOpId, DocId, LocalOpRow, LocalSeq, LocalStorage, RemoteOpRow, ServerSeq, StorageError,
+    ClientOpId, DocId, LocalOpRow, LocalSeq, LocalStorage, RemoteOpRow, ServerSeq, SnapshotCutoff,
+    StorageError,
 };
 
 /// `Box<dyn LocalStorage>` with a `Send` bound on native targets only.
@@ -115,12 +116,12 @@ pub struct SyncEngine {
     /// Highest `local_seq` the storage has assigned for this doc.
     /// Seeded from `BootState::last_local_seq` via `set_last_local_seq`
     /// and advanced by every `append_local_op` / `append_remote_op`.
-    /// Used as the `up_to_local_seq` when `snapshot_if_fully_synced`
-    /// compacts the op log.
+    /// Drives the compaction cadence below and `force_snapshot`'s
+    /// local-prefix cutoff.
     last_local_seq: LocalSeq,
-    /// `up_to_local_seq` of the most recent snapshot we wrote, so
-    /// `snapshot_if_fully_synced` can skip writing a fresh snapshot
-    /// when nothing has advanced since the last one.
+    /// `last_local_seq` as of the most recent snapshot we wrote — a
+    /// purely local cadence anchor so `snapshot_if_fully_synced` skips
+    /// re-compacting until `min_ops` new rows land. Not a sync coordinate.
     last_snapshot_local_seq: LocalSeq,
     opts: EngineOptions,
     state: ConnState,
@@ -261,8 +262,14 @@ impl SyncEngine {
             .doc
             .snapshot_blob(&self.dek)
             .map_err(|e| StorageError::Backend(format!("snapshot_blob: {e}")))?;
-        self.storage
-            .write_snapshot(self.doc_id, self.last_local_seq, blob)?;
+        // Fully synced: prune by the server frontier we've applied. The
+        // outbox is empty, so every confirmed row is at or below it and
+        // folds away; any unpushed row (there are none here) would survive.
+        self.storage.write_snapshot(
+            self.doc_id,
+            SnapshotCutoff::ServerFrontier(ServerSeq(self.last_contiguous_seq)),
+            blob,
+        )?;
         self.last_snapshot_local_seq = self.last_local_seq;
         Ok(true)
     }
@@ -288,8 +295,14 @@ impl SyncEngine {
             .doc
             .snapshot_blob(&self.dek)
             .map_err(|e| StorageError::Backend(format!("snapshot_blob: {e}")))?;
-        self.storage
-            .write_snapshot(self.doc_id, self.last_local_seq, blob)?;
+        // Local-only: rows never get a server_seq, so prune the whole
+        // local prefix. The full-state snapshot encodes their effect and
+        // there is no server to push them to.
+        self.storage.write_snapshot(
+            self.doc_id,
+            SnapshotCutoff::LocalPrefix(self.last_local_seq),
+            blob,
+        )?;
         self.last_snapshot_local_seq = self.last_local_seq;
         Ok(true)
     }
@@ -624,23 +637,27 @@ impl SyncEngine {
                     return;
                 }
                 // Persist the exact encrypted server snapshot as the local
-                // boot baseline before advancing any frontier. Use local
-                // cutoff zero: the snapshot is authoritative for server
-                // history through `up_to_seq`, while every existing local
-                // row (including pending work and post-snapshot tail ops)
-                // must remain replayable. A later steady-state compaction
-                // can fold those rows into a new merged snapshot.
-                if let Err(e) = self
-                    .storage
-                    .write_snapshot(self.doc_id, LocalSeq(0), blob.clone())
-                {
+                // boot baseline. It's authoritative for server history
+                // through `up_to_seq`, so prune every confirmed row at or
+                // below that frontier — they're folded in. Pending local
+                // work (no server_seq) and any post-snapshot tail rows
+                // survive to be replayed/pushed. This prunes immediately,
+                // so boot never replays the whole history on top of the
+                // snapshot again.
+                if let Err(e) = self.storage.write_snapshot(
+                    self.doc_id,
+                    SnapshotCutoff::ServerFrontier(ServerSeq(up_to_seq)),
+                    blob.clone(),
+                ) {
                     self.events.push_back(Event::Error(format!(
                         "storage.write bootstrap snapshot: {e}"
                     )));
                     self.go_disconnected();
                     return;
                 }
-                self.last_snapshot_local_seq = LocalSeq(0);
+                // We just snapshotted at the current local high-water;
+                // don't let the next compaction re-fire until new ops land.
+                self.last_snapshot_local_seq = self.last_local_seq;
                 if up_to_seq > self.last_contiguous_seq {
                     self.last_contiguous_seq = up_to_seq;
                     self.events
@@ -1685,6 +1702,83 @@ mod tests {
             complete: true,
         }));
         assert!(eng.is_idle());
+    }
+
+    #[test]
+    fn bootstrap_snapshot_prunes_covered_rows_but_keeps_pending() {
+        // Regression: a device that already has a full local op log
+        // receives a server bootstrap snapshot. The snapshot is
+        // authoritative through `up_to_seq`, so every confirmed row at or
+        // below it must be pruned — otherwise every future boot replays
+        // the whole history on top of a snapshot that already contains it
+        // (the "subsequent loads freeze" bug). Unpushed local work must
+        // survive.
+        let dek = Dek::generate();
+        let storage = std::sync::Arc::new(MemStorage::new());
+        // Pre-seed a prior session's log: three confirmed rows (server
+        // seqs 40..42, all within the incoming snapshot) plus one pending
+        // local row (never pushed).
+        // The prune path never decrypts these, so dummy payloads suffice.
+        let dummy = || EncryptedBlob {
+            nonce: vec![0u8; 12],
+            ciphertext: vec![1u8, 2, 3],
+        };
+        for seq in 40..=42u64 {
+            storage
+                .append_remote_op(
+                    fake_doc_id(),
+                    RemoteOpRow {
+                        server_seq: ServerSeq(seq),
+                        payload: dummy(),
+                    },
+                )
+                .unwrap();
+        }
+        storage
+            .append_local_op(
+                fake_doc_id(),
+                LocalOpRow {
+                    client_op_id: ClientOpId(uuid::Uuid::new_v4()),
+                    payload: dummy(),
+                },
+            )
+            .unwrap(); // local_seq 4, pending
+
+        let mut eng = SyncEngine::new(
+            Doc::empty(),
+            fake_doc_id(),
+            dek.clone(),
+            0,
+            opts(),
+            Box::new(storage.clone()),
+        );
+        eng.set_last_local_seq(LocalSeq(4));
+        eng.handle_connected();
+        let _ = eng.pop_outbox().unwrap();
+        eng.handle_server_bytes(&enc(&HelloAck {
+            server_version: "s".into(),
+            protocol_version: PROTOCOL_VERSION,
+        }));
+        let _ = eng.pop_outbox().unwrap(); // PullOps
+        eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 42 }));
+        let _ = eng.pop_outbox().unwrap(); // PullSnapshot
+        let snapshot_blob = make_remote_blob(&dek, |d| {
+            d.add_item(LIST_MAIN, "from-snapshot").unwrap();
+        });
+        eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
+            up_to_seq: 42,
+            blob: snapshot_blob,
+        }));
+
+        let boot = storage.boot(fake_doc_id()).unwrap();
+        // Only the pending row survives replay — the three confirmed rows
+        // the snapshot contains are gone.
+        assert_eq!(boot.replay.len(), 1);
+        assert_eq!(boot.replay[0].local_seq, LocalSeq(4));
+        // The pending row is still shippable.
+        assert_eq!(storage.outbox(fake_doc_id()).unwrap().len(), 1);
+        // High-water preserved so the next append is local_seq 5.
+        assert_eq!(boot.last_local_seq, LocalSeq(4));
     }
 
     #[test]

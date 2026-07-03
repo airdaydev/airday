@@ -88,8 +88,9 @@ describe("engine ↔ EngineStorage (outbox-driven web path)", () => {
     expect(storage.outbox().length).toBe(0);
     expect(engine.lastContiguousSeq()).toBe(1n);
 
-    // Fully synced → compaction writes a snapshot at localSeq=1 and
-    // prunes the folded row.
+    // Fully synced → compaction folds by the server frontier (seq 1),
+    // pruning the confirmed row. The snapshot stores the local high-water
+    // (1) so future appends stay monotonic.
     const wrote = engine.snapshotIfFullySynced(1);
     expect(wrote).toBe(true);
     expect(storage.snapshot).not.toBeNull();
