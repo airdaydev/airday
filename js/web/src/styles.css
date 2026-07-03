@@ -368,11 +368,29 @@ body {
   gap: 4px;
   padding: 4px 8px;
   border: none;
-  background: var(--bg-active);
+  background: #ffffff;
   color: var(--text);
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
+  box-shadow:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0.06) 0px 0px 0px 1px inset,
+    rgba(0, 0, 0, 0.08) 0px 1px 0px 0px inset;
+}
+
+[data-theme="dark"] .add-button {
+  background: #29292f;
+  box-shadow:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(255, 255, 255, 0.02) 0px 0px 0px 1px inset,
+    rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset;
 }
 
 .add-button-icon {
