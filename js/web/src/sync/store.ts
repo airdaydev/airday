@@ -47,8 +47,9 @@ export interface ListView {
 export interface WorkspaceState {
   itemsById: Record<string, ItemView>;
   /** Per-list live order — mirrors the core's `live_by_list`
-   *  projection of Loro's MovableList. Done/binned items never appear
-   *  here; a list with no live items may be absent or hold `[]`. */
+   *  projection of the list's `order/<list-id>` container. Done/binned
+   *  items never appear here; a list with no live items may be absent
+   *  or hold `[]`. */
   listLive: Record<string, string[]>;
   /** Binned-item count, maintained incrementally so the Bin badge
    *  never needs a global scan. */

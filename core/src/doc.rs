@@ -384,18 +384,13 @@ impl ProjectionIndex {
         tail
     }
 
-    /// Resolve one list: (resolved order over all statuses, live
-    /// subset). Pure — reads only the in-memory mirrors.
-    fn project(&self, list_id: &str) -> (Vec<String>, Vec<String>) {
+    /// Resolved order of one list — visible entries in container order,
+    /// then the fallback tail; all statuses. Pure — reads only the
+    /// in-memory mirrors.
+    fn resolved(&self, list_id: &str) -> Vec<String> {
         let (mut ids, seen) = self.visible_ids(list_id);
         ids.extend(self.tail(list_id, &seen));
-        let resolved: Vec<String> = ids.iter().map(|s| (*s).to_string()).collect();
-        let live = ids
-            .iter()
-            .filter(|id| self.meta.get(**id).is_some_and(|m| m.live))
-            .map(|s| (*s).to_string())
-            .collect();
-        (resolved, live)
+        ids.into_iter().map(str::to_string).collect()
     }
 
     /// Recompute and store `list_id`'s live projection (and visible
@@ -492,7 +487,7 @@ impl ProjectionIndex {
     ) -> TargetPlan {
         let raw_len = self.raw_orders.get(list_id).map(Vec::len).unwrap_or(0);
         if !is_live {
-            let seq = self.project(list_id).0;
+            let seq = self.resolved(list_id);
             let anchor_index = match exclude.and_then(|e| seq.iter().position(|x| x == e)) {
                 Some(c) if c <= target_index => target_index.saturating_add(1),
                 _ => target_index,
@@ -1748,7 +1743,7 @@ impl Doc {
         let (idx, _) = self.find_list(list_id)?;
         let resolved = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.project(list_id).0
+            guard.resolved(list_id)
         };
         let main_order = self.order_list(LIST_MAIN);
         for item_id in &resolved {
@@ -1918,7 +1913,7 @@ impl Doc {
     pub fn items_in_list(&self, list_id: &str, include_binned: bool) -> Vec<ItemView> {
         let resolved = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.project(list_id).0
+            guard.resolved(list_id)
         };
         resolved
             .iter()
@@ -2204,7 +2199,7 @@ impl Doc {
         let mut ids: Vec<String> = Vec::new();
         for list_id in self.ordered_list_ids() {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
-            ids.extend(guard.project(&list_id).0);
+            ids.extend(guard.resolved(&list_id));
         }
         ids.into_iter().filter_map(move |id| self.get_item(&id))
     }

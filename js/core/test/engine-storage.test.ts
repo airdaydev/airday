@@ -20,7 +20,7 @@ import { Dek, Doc, EncryptedBlob, SyncEngine } from "../wasm/airday_core_web.js"
 import type { EngineStorage } from "../wasm/airday_core_web.js";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 1;
 const LIST_MAIN = "main";
 const DOC_ID = "00000000-0000-0000-0000-000000000000";
 

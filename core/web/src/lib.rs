@@ -232,7 +232,8 @@ impl Doc {
     // -- view-id helpers: order-stable id arrays that the JS store
     //    turns into per-view DnD sources --
 
-    /// Ids of `Live` items in `list_id`, in MovableList order.
+    /// Ids of `Live` items in `list_id`, in resolved per-list order
+    /// (`spec/data-model.md` "Resolved order").
     #[wasm_bindgen(js_name = liveItemIds)]
     pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
         self.inner.live_item_ids(list_id)
@@ -1439,9 +1440,9 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, index, liveIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, liveIndex?
 /// - `itemRemoved` — id
-/// - `itemMoved` — id, index, liveIndex?
+/// - `itemMoved` — id, liveIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?, liveIndex?

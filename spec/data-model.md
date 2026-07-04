@@ -242,10 +242,12 @@ This layout is a **breaking CRDT-schema change** from v1 (document-wide
 `items` MovableList), and it is a **clean break** — no in-doc migration, no
 legacy bridge, no data-carry-over guarantee while pre-release:
 
-- The sync **protocol version is bumped to 2** (`spec/sync-protocol.md`).
-  A v1 client and a v2 server (or vice versa) fail the version handshake, so
-  old and new clients can never exchange ops for the same doc.
+- The **wire protocol version stays at 1** (`spec/sync-protocol.md`): frames
+  are unchanged and op blobs are opaque to the protocol, and with a single
+  pre-release user there are no old clients to fence off at the handshake.
+  The cutover is operational: export JSON on the old build, wipe the
+  account/local databases, import on the new build. (Loro root containers
+  are typed by (name, type), so v2 code opening stray v1 bytes sees empty
+  containers rather than garbage — but don't mix them; wipe.)
 - Pre-v2 accounts, local databases, and server op logs are simply discarded
-  and re-created. (The semantic JSON export/import continues to exist as a
-  user-facing backup feature and happens to bridge the formats, but nothing
-  in the migration depends on it.)
+  and re-created.
