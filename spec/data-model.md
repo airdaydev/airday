@@ -167,12 +167,17 @@ Every mutation below forms **one Loro commit** (one undo step, one op group).
 - **Hard delete** — delete the item's key from `items`; best-effort remove
   its entries from its located order container. Entries elsewhere are
   invisible anyway (item lookup fails) and left to reconciliation.
-- **Delete list** — refuses for `main`. Every item locating to the list
-  (live, done *and* binned) is moved to `main` with a fresh placement,
-  appended to `order/main` in the deleted list's resolved order; the ListMeta
-  row is deleted. The abandoned `order/<list-id>` container remains as
-  unreachable history (root containers can't be deleted; it simply stops
-  being projected).
+- **Delete list** — refuses for `main`. Deleting a list *discards its
+  contents to the bin* rather than dumping them live into Home. Every item
+  locating to the list (live, done *and* binned) is moved to `main` with a
+  fresh placement, appended to `order/main` in the deleted list's resolved
+  order, and — unless it was already binned — marked binned with a shared
+  `binned_at` timestamp (already-binned items keep their original one). The
+  relocation to `main` gives each item a real home list for when it is later
+  restored from the bin; the bin move keeps discarded items out of every
+  live view without losing them. The ListMeta row is deleted. The abandoned
+  `order/<list-id>` container remains as unreachable history (root containers
+  can't be deleted; it simply stops being projected).
 
 ### Reconciliation
 

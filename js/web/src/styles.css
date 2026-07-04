@@ -892,6 +892,66 @@ body {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
 }
 
+.confirm-dialog {
+  position: relative;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  width: 340px;
+  max-width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+
+[data-theme="dark"] .confirm-dialog {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.confirm-dialog-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.confirm-dialog-message {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.confirm-dialog-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.confirm-dialog-cancel:hover {
+  background: var(--bg-hover);
+}
+
+.confirm-dialog-confirm.destructive {
+  border-color: transparent;
+  background: var(--error-bg);
+  color: var(--error-text);
+  font-weight: 500;
+}
+
+.confirm-dialog-confirm.destructive:hover {
+  filter: brightness(0.96);
+}
+
 .auth-dialog-title {
   margin: 0 0 4px;
   font-size: 16px;

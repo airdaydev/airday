@@ -8,6 +8,7 @@ import {
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
+import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
@@ -158,6 +159,22 @@ export function Nav(props: {
 }) {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
+  const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
+  // When a non-empty list is about to be deleted we stage it here so the
+  // ConfirmDialog can name it; null means no pending delete. Empty lists
+  // (no live items) skip the dialog and delete immediately.
+  const [pendingDeleteList, setPendingDeleteList] = createSignal<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const performDeleteList = (id: string) => {
+    // Deleting the list we're viewing would leave us on a dead view;
+    // fall back to Home first.
+    if (props.view.kind === "list" && props.view.id === id) {
+      props.setView({ kind: "list", id: "main" });
+    }
+    props.app.deleteList(id);
+  };
   // Auto-prompt anonymous users on first mount; closing dismisses for
   // the rest of the session. Becoming authed unmounts the trigger via
   // the <Show> below, so a later logout (which mints a fresh anonymous
@@ -395,11 +412,9 @@ export function Nav(props: {
                 <ContextMenu.Item
                   class="context-menu-item"
                   onSelect={() => {
-                    // Mirror the header button's destructive-action gate
-                    // (App.tsx:1503) — same confirm string, same call.
-                    if (window.confirm(m().workspace.emptyBinConfirm)) {
-                      props.app.emptyBin();
-                    }
+                    // Mirror the header button's destructive-action gate —
+                    // same in-page confirm, same call.
+                    setEmptyBinConfirmOpen(true);
                   }}
                 >
                   {m().workspace.emptyBin}
@@ -487,11 +502,14 @@ export function Nav(props: {
                         <ContextMenu.Item
                           class="context-menu-item"
                           onSelect={() => {
-                            const id = l().id;
-                            if (props.view.kind === "list" && props.view.id === id) {
-                              props.setView({ kind: "list", id: "main" });
+                            const { id, name } = l();
+                            // Confirm only when the list has visible
+                            // (live) items to lose; empty lists just go.
+                            if ((props.liveCountsByList[id] ?? 0) > 0) {
+                              setPendingDeleteList({ id, name });
+                            } else {
+                              performDeleteList(id);
                             }
-                            props.app.deleteList(id);
                           }}
                         >
                           {m().nav.deleteList}
@@ -616,6 +634,25 @@ export function Nav(props: {
           </DropdownMenu.Portal>
         </DropdownMenu>
       </div>
+      <ConfirmDialog
+        open={emptyBinConfirmOpen()}
+        onOpenChange={setEmptyBinConfirmOpen}
+        message={m().workspace.emptyBinConfirm}
+        confirmLabel={m().workspace.emptyBin}
+        onConfirm={() => props.app.emptyBin()}
+      />
+      <ConfirmDialog
+        open={pendingDeleteList() !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteList(null);
+        }}
+        message={m().nav.deleteListConfirm(pendingDeleteList()?.name ?? "")}
+        confirmLabel={m().nav.deleteList}
+        onConfirm={() => {
+          const pending = pendingDeleteList();
+          if (pending) performDeleteList(pending.id);
+        }}
+      />
     </nav>
   );
 }

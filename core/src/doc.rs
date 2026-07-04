@@ -1745,6 +1745,16 @@ impl Doc {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             guard.resolved(list_id)
         };
+        let pre_items: Vec<ItemView> = self.iter_items().collect();
+        let pre_lists: Vec<ListView> = self.all_lists();
+        let pre_settings = self.get_settings();
+        // Deleting a list discards its contents to the bin rather than
+        // dumping them live into Home: every item is relocated to `main`
+        // (so it has a real home list if later restored) and, unless it
+        // was already binned, marked binned with a shared timestamp. The
+        // location move keeps `order/main` and restore-target semantics
+        // valid without leaning on orphan fallback.
+        let binned_at = now_millis();
         let main_order = self.order_list(LIST_MAIN);
         for item_id in &resolved {
             let map = self.find_item(item_id)?;
@@ -1758,6 +1768,9 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
+            if read_i64(&map, KEY_BINNED_AT).is_none() {
+                map.insert(KEY_BINNED_AT, binned_at)?;
+            }
             main_order.push(
                 OrderEntry {
                     item_id: item_id.clone(),
@@ -1772,30 +1785,10 @@ impl Doc {
         // Rare operation; a wholesale rebuild is simpler than patching
         // two lists' shadows plus membership.
         self.rebuild_index();
-        let main_positions: HashMap<String, usize> = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard
-                .live_by_list
-                .get(LIST_MAIN)
-                .map(|ids| {
-                    ids.iter()
-                        .enumerate()
-                        .map(|(i, id)| (id.clone(), i))
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-        for id in resolved {
-            let live_index = main_positions.get(&id).copied();
-            self.push_event(AppEvent::ItemListChanged {
-                id,
-                list_id: LIST_MAIN.to_string(),
-                live_index,
-            });
-        }
-        self.push_event(AppEvent::ListRemoved {
-            id: list_id.to_string(),
-        });
+        // Emit the full pre/post state diff: each item picks up an
+        // `ItemStatusChanged` (now binned) and `ItemListChanged` (now
+        // `main`), plus the `ListRemoved` for the gone list.
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         Ok(())
     }
 
@@ -3814,17 +3807,18 @@ mod tests {
     }
 
     #[test]
-    fn delete_list_reassigns_items_to_main() {
+    fn delete_list_bins_items_and_relocates_to_main() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "milk").unwrap();
         doc.delete_list(&mylist).unwrap();
         let view = doc.get_item(&id).unwrap();
         assert_eq!(view.list_id, LIST_MAIN);
+        assert!(view.is_binned(), "deleting a list bins its items");
     }
 
     #[test]
-    fn delete_list_moves_live_done_and_binned_items_with_fresh_placements() {
+    fn delete_list_bins_live_done_and_binned_items_with_fresh_placements() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let live = doc.add_item(&mylist, "live").unwrap();
@@ -3839,15 +3833,17 @@ mod tests {
         for id in [&live, &done, &binned] {
             assert_eq!(doc.get_item(id).unwrap().list_id, LIST_MAIN);
         }
-        // Live projection: existing main item first, then the deleted
-        // list's live item appended.
-        assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
-            vec![main_existing, live.clone()]
-        );
-        // Done/binned semantics unchanged.
-        assert_eq!(doc.done_item_ids(), vec![done]);
-        assert_eq!(doc.binned_item_ids(), vec![binned]);
+        // Everything from the deleted list is now binned, so the live
+        // projection of main is unchanged (only the pre-existing item).
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![main_existing]);
+        // The formerly-done item is now done *and* binned, so it leaves
+        // the done-only view; all three land in the bin.
+        assert_eq!(doc.done_item_ids(), Vec::<String>::new());
+        let mut in_bin = doc.binned_item_ids();
+        in_bin.sort();
+        let mut expected = vec![live, done, binned];
+        expected.sort();
+        assert_eq!(in_bin, expected);
         assert_live_projection_matches_doc(&doc);
     }
 
@@ -4152,13 +4148,17 @@ mod tests {
     }
 
     #[test]
-    fn deleted_list_orphans_appear_under_main() {
+    fn deleted_list_items_land_binned_under_main() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "x").unwrap();
         doc.delete_list(&mylist).unwrap();
+        // Items are discarded to the bin: gone from every live view,
+        // relocated to main, and present in the cross-list bin view.
         assert!(doc.live_item_ids(&mylist).is_empty());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![id]);
+        assert!(doc.live_item_ids(LIST_MAIN).is_empty());
+        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
+        assert_eq!(doc.binned_item_ids(), vec![id]);
     }
 
     #[test]
@@ -4557,15 +4557,18 @@ mod tests {
     }
 
     #[test]
-    fn local_delete_list_emits_reassign_then_remove() {
+    fn local_delete_list_bins_items_and_emits_remove() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let id = doc.add_item(&other, "in other").unwrap();
         let _ = doc.drain_events();
         doc.delete_list(&other).unwrap();
         let evs = doc.drain_events();
-        // ItemListChanged for the orphan, then ListRemoved.
+        // The item is relocated to `main` (ItemListChanged) and binned
+        // (ItemStatusChanged, so it drops out of the live projection),
+        // then the list is removed (ListRemoved).
         let mut saw_reassign = false;
+        let mut saw_binned = false;
         let mut saw_removed = false;
         for ev in &evs {
             match ev {
@@ -4576,12 +4579,17 @@ mod tests {
                 } => {
                     assert_eq!(eid, &id);
                     assert_eq!(list_id, LIST_MAIN);
-                    assert_eq!(
-                        *live_index,
-                        Some(0),
-                        "live orphan lands in main's live projection"
-                    );
+                    assert_eq!(*live_index, None, "binned item is not in a live view");
                     saw_reassign = true;
+                }
+                AppEvent::ItemStatusChanged {
+                    id: eid,
+                    binned_at,
+                    ..
+                } => {
+                    assert_eq!(eid, &id);
+                    assert!(binned_at.is_some(), "item is binned");
+                    saw_binned = true;
                 }
                 AppEvent::ListRemoved { id: lid } => {
                     assert_eq!(lid, &other);
@@ -4590,7 +4598,10 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(saw_reassign && saw_removed, "events: {evs:?}");
+        assert!(
+            saw_reassign && saw_binned && saw_removed,
+            "events: {evs:?}"
+        );
     }
 
     /// Seed a peer doc `b` with `a`'s current state, mark `a` pushed,

@@ -44,6 +44,8 @@ type Messages = {
     copy: string;
     delete: string;
     restore: string;
+    cancel: string;
+    confirm: string;
   };
   auth: {
     signIn: string;
@@ -60,6 +62,7 @@ type Messages = {
     done: string;
     bin: string;
     deleteList: string;
+    deleteListConfirm: (name: string) => string;
     renameList: string;
     newList: string;
     connected: string;
@@ -143,6 +146,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       copy: "Copiar",
       delete: "Eliminar",
       restore: "Restaurar",
+      cancel: "Cancelar",
+      confirm: "Confirmar",
     },
     auth: {
       signIn: "Iniciar sesión",
@@ -159,6 +164,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       done: "Hecho",
       bin: "Papelera",
       deleteList: "Eliminar",
+      deleteListConfirm: (name) =>
+        `¿Eliminar «${name}»? Sus elementos se moverán a la papelera.`,
       renameList: "Renombrar",
       newList: "+ Nueva lista",
       connected: "Conectado",
@@ -183,7 +190,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     workspace: {
       emptyBin: "Vaciar papelera",
-      emptyBinConfirm: "¿Vaciar la papelera permanentemente?",
+      emptyBinConfirm: "¿Seguro que quieres borrar permanentemente los elementos de la papelera?",
       createWithSpace: "Pulsa Espacio para crear un elemento nuevo",
       emptyState: "Todavía no hay nada.",
       notes: "Notas",
@@ -244,6 +251,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       copy: "Copy",
       delete: "Delete",
       restore: "Restore",
+      cancel: "Cancel",
+      confirm: "Confirm",
     },
     auth: {
       signIn: "Sign in",
@@ -260,6 +269,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       done: "Done",
       bin: "Bin",
       deleteList: "Delete",
+      deleteListConfirm: (name) =>
+        `Delete “${name}”? Its items will be moved to the bin.`,
       renameList: "Rename",
       newList: "+ Add list",
       connected: "Connected",
@@ -284,7 +295,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     },
     workspace: {
       emptyBin: "Empty",
-      emptyBinConfirm: "Permanently empty the bin?",
+      emptyBinConfirm: "Are you sure you want to permanently erase items in the bin?",
       createWithSpace: "Press Space to create a new item",
       emptyState: "Nothing here yet.",
       notes: "Notes",

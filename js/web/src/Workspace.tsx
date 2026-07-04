@@ -17,6 +17,7 @@ import caretLeftSvg from "./icons/caret-left.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
+import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
@@ -76,6 +77,7 @@ export function Workspace(props: {
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   const [themePref, setThemePref] = createSignal<ThemePreference>(theme.get());
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
   const [findOpen, setFindOpen] = createSignal(false);
   const matchesKbDevice = createKbDeviceSignal();
 
@@ -895,6 +897,13 @@ export function Workspace(props: {
         session={session.session()}
         logout={session.logout}
       />
+      <ConfirmDialog
+        open={emptyBinConfirmOpen()}
+        onOpenChange={setEmptyBinConfirmOpen}
+        message={m().workspace.emptyBinConfirm}
+        confirmLabel={m().workspace.emptyBin}
+        onConfirm={() => app.emptyBin()}
+      />
       <main class="main">
         <header class="main-header">
           {/* Title group: hamburger sits flush against the title so
@@ -948,15 +957,7 @@ export function Workspace(props: {
               <button
                 type="button"
                 class="add-button"
-                onClick={() => {
-                  // Native confirm() is the cheapest "are you sure?" we
-                  // can offer; emptying the bin is destructive (items
-                  // are unrecoverable after this) so a y/n gate is
-                  // worth the dialog. No custom modal needed.
-                  if (window.confirm(m().workspace.emptyBinConfirm)) {
-                    app.emptyBin();
-                  }
-                }}
+                onClick={() => setEmptyBinConfirmOpen(true)}
               >
                 <span class="add-button-icon" innerHTML={trashSvg} />
                 <span>{m().workspace.emptyBin}</span>
