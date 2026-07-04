@@ -29,10 +29,12 @@ Server-assigned `seq` is **per-account** and **dense / gap-free**. The server bu
 
 First frame on every WS connection, before any payload exchange:
 
-- Client → Server: `Hello { client: "airday-cli", client_version: "0.1.0", supported_protocol_versions: [1] }`
-- Server → Client: `HelloAck { server_version: "0.1.0", protocol_version: 1 }` — server picks the highest version it shares with the client. If no overlap → `HelloRejected { reason }` and connection closes.
+- Client → Server: `Hello { client: "airday-cli", client_version: "0.1.0", supported_protocol_versions: [2] }`
+- Server → Client: `HelloAck { server_version: "0.1.0", protocol_version: 2 }` — server picks the highest version it shares with the client. If no overlap → `HelloRejected { reason }` and connection closes.
 
 All subsequent frames are interpreted under the agreed `protocol_version`. Belt-and-braces against breaking changes; MessagePack handles additive evolution within a version on its own.
+
+Version history: **2** = per-list order-container CRDT schema (`spec/data-model.md` "Schema versioning & compatibility"); the wire frames are unchanged from 1, but the doc layout inside the encrypted blobs is incompatible, so v1 clients must be fenced off at the handshake. **1** = original global-items-MovableList schema; retired, no longer accepted.
 
 ## Client → Server
 

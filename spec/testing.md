@@ -61,6 +61,28 @@ Use the fingerprint for E2E and property-test convergence checks instead of comp
 
 Where possible, expose a server-side "test event stream" (e.g. `--test-events <unix-socket>`) emitting `op_persisted`, `snapshot_requested`, `snapshot_uploaded`. Tests subscribe and react instead of polling.
 
-## Open questions
+## Randomised invariant testing
 
-- **Property-test the convergence guarantee** (`proptest`) — generate random scenarios consisting of (a) op streams across N simulated clients (add / move / edit / done / bin / list-create / list-delete) and (b) random partial sync events between random pairs of clients, then drain to a full sync at the end. Property: every client's final `doc_fingerprint` is equal. Loro promises logical convergence; we're stress-testing *our integration* (sync engine, frontier tracking, snapshot handoff, encryption framing) — example tests miss the interleavings that find bugs here. Worth doing once the e2e matrix is green.
+`core/tests/order_schema.rs` implements the property-test idea without a
+proptest dependency (deterministic LCG seeds, no shrinking):
+
+- `randomized_multi_peer_convergence` — N docs, a random mutation stream
+  (add / reorder / cross-list move / done / bin / delete / list churn /
+  undo / redo / reconcile) interleaved with random pairwise syncs, then a
+  full mesh sync. After **every** op it asserts the v2 projection
+  invariants (`spec/data-model.md`) through the public API *and* replays
+  the emitted `AppEvent`s into a naive consumer mirror (the JS-store
+  contract: per-list arrays, remove-then-insert at `live_index`) that
+  must never drift from the doc. Final fingerprints must converge.
+  Default 6 seeds in CI; deepen locally with
+  `AIRDAY_FUZZ_SEEDS=50 cargo test -p airday-core --test order_schema --release`.
+- `large_synthetic_history_many_peers_lists_moves_undos` — sequential
+  fresh-peer sessions booted from accumulated oplog rows doing bulk
+  adds, multi-select cross-list moves, undos and captures, then
+  save/load and snapshot-bootstrap round-trips (the retired
+  move-undo-multipeer repro shape).
+
+What this stress-tests is *our integration* (event translation,
+projection index, sync framing) — Loro already promises logical
+convergence. Transport-level randomisation (partial syncs through the
+real engine/server rather than snapshot exchange) remains open.

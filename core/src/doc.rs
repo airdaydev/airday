@@ -1,24 +1,34 @@
 //! Loro CRDT layer: typed mutations, persistence, op-stream framing,
 //! and a deterministic logical-state fingerprint.
 //!
-//! Layout matches `spec/data-model.md`:
-//! - root container `items` (`LoroMovableList`) — each entry is a
-//!   `LoroMap` with `id`, `text`, `list_id`, `created_at`, optional
-//!   `done_at`, optional `binned_at`. `done` and `binned` are
-//!   orthogonal: an item can be both. Presence of the timestamp is
-//!   the flag — there's no separate boolean.
+//! Layout matches `spec/data-model.md` (schema v2):
+//! - root container `items` (`LoroMap`) — keyed by the item's stable
+//!   UUID; each value is a child `LoroMap` with `id`, `text`,
+//!   `location`, `created_at`, optional `notes`, optional `done_at`,
+//!   optional `binned_at`. `done` and `binned` are orthogonal: an item
+//!   can be both. Presence of the timestamp is the flag — there's no
+//!   separate boolean.
 //! - root container `lists` (`LoroMovableList`) — each entry is a
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //! - root container `settings` (`LoroMap`) — account-wide synced
 //!   workspace settings not owned by a specific list row.
+//! - one root container `order/<list-id>` (`LoroMovableList`) per
+//!   logical list — **scalar entries only**, each an encoded
+//!   `"<item_id>:<placement_id>"` string. Ordering lives here;
+//!   everything else lives on the item map. There is no document-wide
+//!   item list: reordering one list touches only that list's container.
 //!
-//! Binned is a status & items keep their `list_id`. One
-//! well-known list id is *reserved*: [`LIST_MAIN`].
-//! It has **no MovableList entry** — items reference it by string id
-//! and clients render it with a hardcoded label ("Queue"). Queue always
-//! shows its live-item count in the nav; the doc-level settings map
-//! holds the user's override for whether *other* lists do (single
-//! global flag). For now main is non-renamable and non-movable.
+//! An item's `location` is a single atomic register encoding
+//! `"<list_id>:<placement_id>"`. It is authoritative for membership;
+//! an order entry is *visible* only when its placement matches the
+//! item's current location (see `spec/data-model.md` "Projection
+//! invariants"). Stale/duplicate entries left behind by concurrent
+//! cross-list moves are harmless and cleaned by [`Doc::reconcile`].
+//!
+//! Binned is a status & items keep their location. One well-known
+//! list id is *reserved*: [`LIST_MAIN`]. It has **no ListMeta row** —
+//! items reference it by string id and clients render it with a
+//! hardcoded label ("Queue").
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
 //! "what's new since the last server interaction" as a single sealed
@@ -30,11 +40,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
-use loro::cursor::{Cursor, Side};
 use loro::event::{Diff as LoroDiff, DiffEvent, ListDiffItem};
 use loro::{
-    Container, ContainerID, ContainerTrait, EventTriggerKind, ExportMode, LoroDoc, LoroMap,
-    LoroMovableList, Subscription, UndoManager, ValueOrContainer, VersionVector,
+    Container, ContainerID, EventTriggerKind, ExportMode, LoroDoc, LoroMap, LoroMovableList,
+    LoroValue, Subscription, UndoManager, ValueOrContainer, VersionVector,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -50,11 +59,18 @@ pub const LIST_MAIN_NAME: &str = "Queue";
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";
 const ROOT_SETTINGS: &str = "settings";
+/// Root-container name prefix for per-list order containers:
+/// `order/main`, `order/<list-uuid>`. The container for a deleted list
+/// is simply never projected again (root containers can't be removed).
+const ORDER_PREFIX: &str = "order/";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
 const KEY_NOTES: &str = "notes";
-const KEY_LIST_ID: &str = "list_id";
+/// Atomic location register: `"<list_id>:<placement_id>"`. Written as
+/// one scalar so list membership and placement can never be torn apart
+/// by concurrent edits. See `Location`.
+const KEY_LOCATION: &str = "location";
 const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
@@ -70,9 +86,9 @@ const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
 /// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
 const KEY_MAIN_NAME: &str = "main_name";
 /// Batch status mutations at/above this many ids stop emitting
-/// surgical per-item events (O(ids × touched list's live items)) and
-/// fall back to one whole-doc rebuild + diff. Matches the web store's
-/// coarse-projection threshold so both layers flip regimes together.
+/// surgical per-item events and fall back to one whole-doc rebuild +
+/// diff. Matches the web store's coarse-projection threshold so both
+/// layers flip regimes together.
 const BULK_STATUS_EVENT_THRESHOLD: usize = 64;
 /// Captured operations touching at least this many items abandon per-item
 /// diff translation for the whole-doc resync fallback — one O(doc) pass
@@ -120,6 +136,7 @@ impl From<loro::LoroEncodeError> for DocError {
 /// Stable view of a single item, surfaced to clients (CLI list, fingerprint).
 /// `done_at`/`binned_at` are independent: an item can be both done and
 /// binned. `done` and `binned` are derived predicates, not stored fields.
+/// `list_id` is derived from the atomic `location` register.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemView {
     pub id: String,
@@ -215,37 +232,391 @@ pub struct ExportItem {
     pub binned_at: Option<i64>,
 }
 
-struct IndexedItem {
-    map: LoroMap,
-    cursor: Cursor,
+// ---------- location / order-entry encoding ----------
+
+/// Atomic item placement: which list an item is in, and which order
+/// entry is the canonical one for it. Encoded as a single scalar string
+/// (`"<list_id>:<placement_id>"`) so both halves are written in one
+/// register op — no independently-mergeable sub-fields to conflict.
+/// `:` is reserved: ids are uuid-v7 hex or the literal `main`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Location {
+    list_id: String,
+    placement_id: String,
 }
 
-#[derive(Default)]
-struct ItemIndex {
-    by_id: HashMap<String, IndexedItem>,
-    /// Live item UUIDs per list, in the same relative order as the root
-    /// `items` MovableList. Done and binned items never appear here.
-    live_by_list: HashMap<String, Vec<String>>,
-    /// Item UUIDs in root `items` MovableList order — a positional
-    /// shadow of the whole list (live *and* done/binned). Load-bearing
-    /// for remote-diff translation: Loro list diffs express deletions
-    /// as bare counts at a position, so resolving *which* item left
-    /// requires knowing what was there. Maintained incrementally by
-    /// every local mutation and rebuilt wholesale alongside the rest of
-    /// this index.
-    order: Vec<String>,
+impl Location {
+    fn encode(&self) -> String {
+        format!("{}:{}", self.list_id, self.placement_id)
+    }
+    fn parse(s: &str) -> Option<Location> {
+        let (list_id, placement_id) = s.split_once(':')?;
+        if list_id.is_empty() {
+            return None;
+        }
+        Some(Location {
+            list_id: list_id.to_string(),
+            placement_id: placement_id.to_string(),
+        })
+    }
 }
+
+/// One element of an `order/<list-id>` container:
+/// `"<item_id>:<placement_id>"`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OrderEntry {
+    item_id: String,
+    placement_id: String,
+}
+
+impl OrderEntry {
+    fn encode(&self) -> String {
+        format!("{}:{}", self.item_id, self.placement_id)
+    }
+    fn parse(s: &str) -> Option<OrderEntry> {
+        let (item_id, placement_id) = s.split_once(':')?;
+        if item_id.is_empty() {
+            return None;
+        }
+        Some(OrderEntry {
+            item_id: item_id.to_string(),
+            placement_id: placement_id.to_string(),
+        })
+    }
+}
+
+fn order_root_name(list_id: &str) -> String {
+    format!("{ORDER_PREFIX}{list_id}")
+}
+
+// ---------- disposable projection index ----------
+
+/// Per-item slice of the state the projection needs, mirrored in
+/// memory so per-mutation work never touches Loro containers beyond
+/// the mutation itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ItemMeta {
+    list_id: String,
+    placement_id: String,
+    live: bool,
+    created_at: i64,
+}
+
+/// Resolution of a target index against a list's projection — the raw
+/// container position to write at, and (when exact) the live splice
+/// position. See [`ProjectionIndex::plan_target`].
+struct TargetPlan {
+    raw_pos: usize,
+    live_pos: Option<usize>,
+}
+
+/// Disposable in-memory mirror of everything ordering-related.
+/// Maintained incrementally by local mutations, surgically by remote
+/// diff translation, and rebuilt wholesale from the doc on boot or
+/// fallback. Never persisted.
+#[derive(Default)]
+struct ProjectionIndex {
+    /// item id → location/status slice.
+    meta: HashMap<String, ItemMeta>,
+    /// list id → item ids located there (authoritative membership).
+    members: HashMap<String, HashSet<String>>,
+    /// list id → positional mirror of `order/<list-id>`. `None` slots
+    /// keep unparseable entries position-aligned with the container.
+    raw_orders: HashMap<String, Vec<Option<OrderEntry>>>,
+    /// list id → live projection (visible entries filtered to live
+    /// items, then the deterministic fallback tail). Lists with no live
+    /// items carry no key.
+    live_by_list: HashMap<String, Vec<String>>,
+    /// list id → number of *visible* entries in that list's order
+    /// container (any status). `members(list).len() == visible` ⟺ the
+    /// list has no fallback tail — the precondition for the O(live)
+    /// splice fast paths; anything tail-adjacent falls back to a full
+    /// `refresh_live` walk. Lists with zero visible entries carry no
+    /// key.
+    visible_counts: HashMap<String, usize>,
+}
+
+impl ProjectionIndex {
+    /// Visible entry ids of `list_id` in container order (all statuses,
+    /// duplicate-guarded), borrowed — plus the visible set for the tail
+    /// computation. An entry is visible iff its item exists, its
+    /// placement matches the item's authoritative location, and no
+    /// earlier entry already claimed the item.
+    fn visible_ids<'a>(&'a self, list_id: &str) -> (Vec<&'a str>, HashSet<&'a str>) {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        for entry in self
+            .raw_orders
+            .get(list_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+            .iter()
+            .flatten()
+        {
+            let Some(m) = self.meta.get(&entry.item_id) else {
+                continue;
+            };
+            if m.list_id == list_id
+                && m.placement_id == entry.placement_id
+                && seen.insert(entry.item_id.as_str())
+            {
+                out.push(entry.item_id.as_str());
+            }
+        }
+        (out, seen)
+    }
+
+    /// Fallback tail: items located in `list_id` with no visible entry,
+    /// sorted by `(created_at, id)` so replicas agree.
+    fn tail<'a>(&'a self, list_id: &str, seen: &HashSet<&str>) -> Vec<&'a str> {
+        let mut tail: Vec<&'a str> = self
+            .members
+            .get(list_id)
+            .into_iter()
+            .flatten()
+            .filter(|id| !seen.contains(id.as_str()))
+            .map(String::as_str)
+            .collect();
+        tail.sort_by(|a, b| {
+            let (ma, mb) = (&self.meta[*a], &self.meta[*b]);
+            ma.created_at.cmp(&mb.created_at).then_with(|| a.cmp(b))
+        });
+        tail
+    }
+
+    /// Resolve one list: (resolved order over all statuses, live
+    /// subset). Pure — reads only the in-memory mirrors.
+    fn project(&self, list_id: &str) -> (Vec<String>, Vec<String>) {
+        let (mut ids, seen) = self.visible_ids(list_id);
+        ids.extend(self.tail(list_id, &seen));
+        let resolved: Vec<String> = ids.iter().map(|s| (*s).to_string()).collect();
+        let live = ids
+            .iter()
+            .filter(|id| self.meta.get(**id).is_some_and(|m| m.live))
+            .map(|s| (*s).to_string())
+            .collect();
+        (resolved, live)
+    }
+
+    /// Recompute and store `list_id`'s live projection (and visible
+    /// count); returns the projection. One walk covers both; only the
+    /// live ids are cloned, so a 13k-lifetime list with 200 live items
+    /// allocates 200 strings, not 2×13k.
+    fn refresh_live(&mut self, list_id: &str) -> Vec<String> {
+        let (live, visible) = {
+            let (ids, seen) = self.visible_ids(list_id);
+            let visible = ids.len();
+            let is_live = |id: &str| self.meta.get(id).is_some_and(|m| m.live);
+            let mut live: Vec<String> = ids
+                .into_iter()
+                .filter(|id| is_live(id))
+                .map(str::to_string)
+                .collect();
+            live.extend(
+                self.tail(list_id, &seen)
+                    .into_iter()
+                    .filter(|id| is_live(id))
+                    .map(str::to_string),
+            );
+            (live, visible)
+        };
+        if visible == 0 {
+            self.visible_counts.remove(list_id);
+        } else {
+            self.visible_counts.insert(list_id.to_string(), visible);
+        }
+        if live.is_empty() {
+            self.live_by_list.remove(list_id);
+        } else {
+            self.live_by_list.insert(list_id.to_string(), live.clone());
+        }
+        live
+    }
+
+    /// True when every item located in `list_id` is entry-backed — no
+    /// fallback tail exists, so append positions are exact without a
+    /// walk.
+    fn tail_is_empty(&self, list_id: &str) -> bool {
+        let members = self.members.get(list_id).map(HashSet::len).unwrap_or(0);
+        let visible = self.visible_counts.get(list_id).copied().unwrap_or(0);
+        members == visible
+    }
+
+    fn bump_visible(&mut self, list_id: &str, delta: isize) {
+        let cur = self.visible_counts.get(list_id).copied().unwrap_or(0) as isize;
+        let next = (cur + delta).max(0) as usize;
+        if next == 0 {
+            self.visible_counts.remove(list_id);
+        } else {
+            self.visible_counts.insert(list_id.to_string(), next);
+        }
+    }
+
+    /// Splice `id` into `list_id`'s live projection at `at`.
+    fn splice_live_in(&mut self, list_id: &str, id: &str, at: usize) {
+        let arr = self.live_by_list.entry(list_id.to_string()).or_default();
+        arr.retain(|x| x != id);
+        let at = at.min(arr.len());
+        arr.insert(at, id.to_string());
+    }
+
+    /// Remove `id` from `list_id`'s live projection.
+    fn splice_live_out(&mut self, list_id: &str, id: &str) {
+        if let Some(arr) = self.live_by_list.get_mut(list_id) {
+            arr.retain(|x| x != id);
+            if arr.is_empty() {
+                self.live_by_list.remove(list_id);
+            }
+        }
+    }
+
+    /// Resolve a caller's target index against `list_id`'s projection
+    /// (live projection for live items, full resolved order for hidden
+    /// ones), excluding `exclude` from the anchor count when the item
+    /// is being re-placed within its own list.
+    ///
+    /// `live_pos` is the exact live splice position when it can be
+    /// derived without a projection walk: `Some(target)` when the
+    /// anchor's canonical entry resolved, `Some(usize::MAX)` (append —
+    /// the splice clamps) when inserting past the end of a list with no
+    /// fallback tail, and `None` when the caller must `refresh_live`
+    /// after mutating (tail-adjacent cases). Hidden-item plans always
+    /// carry `live_pos: Some(usize::MAX)` — the live array is untouched
+    /// by hidden mutations, so no refresh is needed on their account.
+    fn plan_target(
+        &self,
+        list_id: &str,
+        target_index: usize,
+        is_live: bool,
+        exclude: Option<&str>,
+    ) -> TargetPlan {
+        let raw_len = self.raw_orders.get(list_id).map(Vec::len).unwrap_or(0);
+        if !is_live {
+            let seq = self.project(list_id).0;
+            let anchor_index = match exclude.and_then(|e| seq.iter().position(|x| x == e)) {
+                Some(c) if c <= target_index => target_index.saturating_add(1),
+                _ => target_index,
+            };
+            let raw_pos = seq
+                .get(anchor_index)
+                .and_then(|a| self.canonical_raw_pos(list_id, a))
+                .unwrap_or(raw_len);
+            return TargetPlan {
+                raw_pos,
+                live_pos: Some(usize::MAX),
+            };
+        }
+        static EMPTY: Vec<String> = Vec::new();
+        let seq = self.live_by_list.get(list_id).unwrap_or(&EMPTY);
+        let anchor_index = match exclude.and_then(|e| seq.iter().position(|x| x == e)) {
+            Some(c) if c <= target_index => target_index.saturating_add(1),
+            _ => target_index,
+        };
+        match seq.get(anchor_index) {
+            Some(anchor) => match self.canonical_raw_pos(list_id, anchor) {
+                // Inserting immediately before the anchor puts the item
+                // at exactly `target_index` (the exclude-skip above is
+                // what makes that hold for same-list re-placement too).
+                Some(ap) => TargetPlan {
+                    raw_pos: ap,
+                    live_pos: Some(target_index),
+                },
+                // Anchor lives in the fallback tail — position within
+                // the live projection needs a walk.
+                None => TargetPlan {
+                    raw_pos: raw_len,
+                    live_pos: None,
+                },
+            },
+            None => TargetPlan {
+                raw_pos: raw_len,
+                live_pos: if self.tail_is_empty(list_id) {
+                    Some(usize::MAX)
+                } else {
+                    None
+                },
+            },
+        }
+    }
+
+    /// Raw container position of the item's canonical (visible) entry.
+    fn canonical_raw_pos(&self, list_id: &str, item_id: &str) -> Option<usize> {
+        let m = self.meta.get(item_id)?;
+        if m.list_id != list_id {
+            return None;
+        }
+        self.raw_orders.get(list_id)?.iter().position(|e| {
+            e.as_ref()
+                .is_some_and(|e| e.item_id == item_id && e.placement_id == m.placement_id)
+        })
+    }
+
+    /// Every raw position holding an entry for `item_id` in `list_id`
+    /// (canonical, stale, and duplicates alike), ascending.
+    fn entry_positions(&self, list_id: &str, item_id: &str) -> Vec<usize> {
+        self.raw_orders
+            .get(list_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+            .iter()
+            .enumerate()
+            .filter_map(|(i, e)| {
+                e.as_ref()
+                    .is_some_and(|e| e.item_id == item_id)
+                    .then_some(i)
+            })
+            .collect()
+    }
+
+    fn set_meta(&mut self, id: &str, meta: ItemMeta) {
+        if let Some(old) = self.meta.get(id)
+            && old.list_id != meta.list_id
+            && let Some(s) = self.members.get_mut(&old.list_id)
+        {
+            s.remove(id);
+            if s.is_empty() {
+                self.members.remove(&old.list_id);
+            }
+        }
+        self.members
+            .entry(meta.list_id.clone())
+            .or_default()
+            .insert(id.to_string());
+        self.meta.insert(id.to_string(), meta);
+    }
+
+    fn remove_item(&mut self, id: &str) {
+        if let Some(old) = self.meta.remove(id)
+            && let Some(s) = self.members.get_mut(&old.list_id)
+        {
+            s.remove(id);
+            if s.is_empty() {
+                self.members.remove(&old.list_id);
+            }
+        }
+    }
+}
+
+// ---------- gated diff capture (remote import / undo translation) ----------
 
 /// Owned copy of one Loro container diff captured while an import or
 /// undo/redo operation is in progress. Ordinary local mutations emit
 /// `AppEvent`s directly and are never captured.
 enum CapturedDiff {
-    /// Root `items` MovableList structure changed (insert/delete/move).
-    Items(Vec<CapturedListItem>),
+    /// Root `items` map changed: item containers appeared / vanished.
+    ItemsRoot {
+        upserted: Vec<String>,
+        removed: Vec<String>,
+    },
     /// One item's map changed; which keys were touched.
     ItemMap {
         container: ContainerID,
         keys: Vec<String>,
+    },
+    /// One `order/<list-id>` container changed (insert/delete/move).
+    Order {
+        list_id: String,
+        ops: Vec<CapturedListItem>,
     },
     /// Root `lists` MovableList or one of its list maps changed. Lists
     /// are few, so translation just re-diffs them wholesale.
@@ -260,9 +631,10 @@ enum CapturedDiff {
 enum CapturedListItem {
     Retain(usize),
     Delete(usize),
-    /// Inserted (or move-target) entries. `None` for a non-container
-    /// entry, which we never produce — translation aborts on it.
-    Insert(Vec<Option<ContainerID>>),
+    /// Inserted (or move-target) scalar entries. `None` for a
+    /// non-string value, which we never produce — it lands as an
+    /// unparseable (invisible) slot rather than aborting the frame.
+    Insert(Vec<Option<String>>),
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
@@ -290,11 +662,31 @@ fn classify_captured_diff(
     };
     match root_name(target) {
         Some(name) if name == ROOT_ITEMS => {
+            let LoroDiff::Map(m) = diff else {
+                return CapturedDiff::Opaque;
+            };
+            let mut upserted = Vec::new();
+            let mut removed = Vec::new();
+            for (k, v) in m.updated.iter() {
+                match v {
+                    Some(_) => upserted.push(k.to_string()),
+                    None => removed.push(k.to_string()),
+                }
+            }
+            CapturedDiff::ItemsRoot { upserted, removed }
+        }
+        Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
+        Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
+        Some(name) => {
+            let Some(list_id) = name.strip_prefix(ORDER_PREFIX) else {
+                return CapturedDiff::Opaque;
+            };
             let LoroDiff::List(items) = diff else {
                 return CapturedDiff::Opaque;
             };
-            CapturedDiff::Items(
-                items
+            CapturedDiff::Order {
+                list_id: list_id.to_string(),
+                ops: items
                     .iter()
                     .map(|it| match it {
                         ListDiffItem::Retain { retain } => CapturedListItem::Retain(*retain),
@@ -303,18 +695,17 @@ fn classify_captured_diff(
                             insert
                                 .iter()
                                 .map(|v| match v {
-                                    ValueOrContainer::Container(c) => Some(c.id()),
-                                    ValueOrContainer::Value(_) => None,
+                                    ValueOrContainer::Value(LoroValue::String(s)) => {
+                                        Some(s.to_string())
+                                    }
+                                    _ => None,
                                 })
                                 .collect(),
                         ),
                     })
                     .collect(),
-            )
+            }
         }
-        Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
-        Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
-        Some(_) => CapturedDiff::Opaque,
         None => {
             // Nested container: an item map or a list map. Route by the
             // root container at the head of its path.
@@ -369,8 +760,8 @@ pub struct Doc {
     inner: LoroDoc,
     last_pushed_vv: VersionVector,
     /// Domain-level change events. Mutation methods push directly;
-    /// `apply_remote` does state-diff and pushes a batch. Drain via
-    /// `pop_event` / `drain_events`. Wrapped in `Mutex` so mutation
+    /// `apply_remote` does diff translation and pushes a batch. Drain
+    /// via `pop_event` / `drain_events`. Wrapped in `Mutex` so mutation
     /// methods can stay `&self` (Loro's interior-mutability shape).
     events: Mutex<VecDeque<AppEvent>>,
     /// Per-session undo/redo. Bound to the local peer at construction;
@@ -378,10 +769,10 @@ pub struct Doc {
     /// `apply_remote` carry origin `"remote"` and are filtered out by
     /// prefix — see `spec/sync-protocol.md` "Commit origin tagging".
     undo: Mutex<UndoManager>,
-    /// Disposable lookup from Airday's stable item UUID to Loro's item
-    /// container and current relative position. Rebuilt from `inner`
-    /// after imports/undo and maintained incrementally for local writes.
-    item_index: Mutex<ItemIndex>,
+    /// Disposable projection index — see [`ProjectionIndex`]. Rebuilt
+    /// from `inner` after boot replay / fallback and maintained
+    /// incrementally otherwise.
+    item_index: Mutex<ProjectionIndex>,
     /// Gated Loro diff capture used by remote import and undo/redo. The
     /// gate prevents ordinary local mutations from accumulating diffs;
     /// callers enable it only around the operation they will translate.
@@ -411,7 +802,7 @@ impl Doc {
             inner.commit();
         }
         let undo = Mutex::new(make_undo_manager(&inner));
-        let item_index = Mutex::new(ItemIndex::default());
+        let item_index = Mutex::new(ProjectionIndex::default());
         let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
         let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Ok(Self {
@@ -429,7 +820,7 @@ impl Doc {
     pub fn empty() -> Self {
         let inner = LoroDoc::new();
         let undo = Mutex::new(make_undo_manager(&inner));
-        let item_index = Mutex::new(ItemIndex::default());
+        let item_index = Mutex::new(ProjectionIndex::default());
         let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
         let _diff_sub = inner.subscribe_root(make_diff_subscriber(diff_capture.clone()));
         Self {
@@ -455,235 +846,48 @@ impl Doc {
         std::mem::take(&mut capture.diffs)
     }
 
-    fn rebuild_item_index(&self) {
+    /// Recompute the whole [`ProjectionIndex`] from the doc. O(items +
+    /// order entries); used on boot, after bulk operations, and by the
+    /// translation fallback.
+    fn rebuild_index(&self) {
+        *self.item_index.lock().expect("item index mutex poisoned") = self.compute_index();
+    }
+
+    /// Build a fresh [`ProjectionIndex`] straight from the Loro
+    /// containers, without installing it. Shared by `rebuild_index` and
+    /// the test-side "does the incremental index match the doc" check.
+    fn compute_index(&self) -> ProjectionIndex {
         let items = self.items();
-        let mut by_id = HashMap::<String, IndexedItem>::with_capacity(items.len());
-        let mut live_by_list = HashMap::<String, Vec<String>>::new();
-        let mut order = Vec::<String>::with_capacity(items.len());
-        for index in 0..items.len() {
-            let Some(map) = item_map_at(&items, index) else {
+        let mut idx = ProjectionIndex::default();
+        let keys: Vec<String> = items.keys().map(|k| k.to_string()).collect();
+        for id in keys {
+            let Some(map) = item_map_of(&items, &id) else {
                 continue;
             };
-            let Some(id) = read_string(&map, KEY_ID) else {
-                continue;
-            };
-            let Some(cursor) = items.get_cursor(index, Side::Middle) else {
-                continue;
-            };
-            if is_in_list_view(&map)
-                && let Some(list_id) = read_string(&map, KEY_LIST_ID)
-            {
-                live_by_list.entry(list_id).or_default().push(id.clone());
-            }
-            order.push(id.clone());
-            by_id.insert(id, IndexedItem { map, cursor });
+            let meta = item_meta(&map);
+            idx.members
+                .entry(meta.list_id.clone())
+                .or_default()
+                .insert(id.clone());
+            idx.meta.insert(id, meta);
         }
-        *self.item_index.lock().expect("item index mutex poisoned") = ItemIndex {
-            by_id,
-            live_by_list,
-            order,
-        };
-    }
-
-    fn index_live_item_at(
-        &self,
-        id: String,
-        map: LoroMap,
-        index: usize,
-        list_id: &str,
-        live_index: usize,
-    ) -> Result<(), DocError> {
-        let cursor = self
-            .items()
-            .get_cursor(index, Side::Middle)
-            .ok_or_else(|| DocError::ItemNotFound(id.clone()))?;
-
-        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        guard.by_id.insert(id.clone(), IndexedItem { map, cursor });
-        let at = index.min(guard.order.len());
-        guard.order.insert(at, id.clone());
-        let live_ids = guard.live_by_list.entry(list_id.to_string()).or_default();
-        live_ids.insert(live_index.min(live_ids.len()), id);
-
-        Ok(())
-    }
-
-    fn refresh_item_cursor(&self, item_id: &str, index: usize) -> Result<(), DocError> {
-        let cursor = self
-            .items()
-            .get_cursor(index, Side::Middle)
-            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-
-        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        let item = guard
-            .by_id
-            .get_mut(item_id)
-            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-        item.cursor = cursor;
-        Ok(())
-    }
-
-    fn remove_indexed_items<'a>(&self, item_ids: impl IntoIterator<Item = &'a str>) {
-        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        for item_id in item_ids {
-            guard.by_id.remove(item_id);
-            if let Some(index) = guard.order.iter().position(|id| id == item_id) {
-                guard.order.remove(index);
-            }
-            for ids in guard.live_by_list.values_mut() {
-                if let Some(index) = ids.iter().position(|id| id == item_id) {
-                    ids.remove(index);
-                    break;
-                }
-            }
+        let mut candidates: HashSet<String> = idx.members.keys().cloned().collect();
+        candidates.insert(LIST_MAIN.to_string());
+        for list in self.all_lists() {
+            candidates.insert(list.id);
         }
-        guard.live_by_list.retain(|_, ids| !ids.is_empty());
-    }
-
-    /// Returns the live index the item actually landed at (the caller's
-    /// `target_index` clamped to the destination projection).
-    fn move_live_projection(
-        &self,
-        item_id: &str,
-        target_list_id: &str,
-        target_index: usize,
-    ) -> usize {
-        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        for ids in guard.live_by_list.values_mut() {
-            if let Some(index) = ids.iter().position(|id| id == item_id) {
-                ids.remove(index);
-                break;
+        for list_id in &candidates {
+            let order = self.order_list(list_id);
+            let mut raw = Vec::with_capacity(order.len());
+            for i in 0..order.len() {
+                raw.push(scalar_entry_at(&order, i));
             }
+            idx.raw_orders.insert(list_id.clone(), raw);
         }
-        guard.live_by_list.retain(|_, ids| !ids.is_empty());
-        let ids = guard
-            .live_by_list
-            .entry(target_list_id.to_string())
-            .or_default();
-        let landed = target_index.min(ids.len());
-        ids.insert(landed, item_id.to_string());
-        landed
-    }
-
-    /// Resolve a per-list live insertion index to an absolute root-list
-    /// position. The returned live index is clamped for updating the
-    /// projection after the Loro mutation commits.
-    fn live_insertion_target(
-        &self,
-        list_id: &str,
-        target_index: usize,
-    ) -> Result<(usize, usize), DocError> {
-        let (live_index, anchor_id) = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            let ids = guard
-                .live_by_list
-                .get(list_id)
-                .map(Vec::as_slice)
-                .unwrap_or(&[]);
-            let live_index = target_index.min(ids.len());
-            (live_index, ids.get(live_index).cloned())
-        };
-        let absolute_index = match anchor_id {
-            Some(anchor_id) => self.find_item(&anchor_id)?.0,
-            None => self.items().len(),
-        };
-        Ok((absolute_index, live_index))
-    }
-
-    /// Resolve a post-move per-list live index while excluding the moving
-    /// item from the destination projection, matching the public API's
-    /// resulting-index semantics.
-    fn live_move_target(
-        &self,
-        item_id: &str,
-        target_list_id: &str,
-        target_index: usize,
-        current_idx: usize,
-    ) -> Result<usize, DocError> {
-        let anchor_id = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            let ids = guard
-                .live_by_list
-                .get(target_list_id)
-                .map(Vec::as_slice)
-                .unwrap_or(&[]);
-            let current_live_index = ids.iter().position(|id| id == item_id);
-            let anchor_index = match current_live_index {
-                Some(current) if current <= target_index => target_index.saturating_add(1),
-                _ => target_index,
-            };
-            ids.get(anchor_index).cloned()
-        };
-
-        let Some(anchor_id) = anchor_id else {
-            return Ok(self.items().len().saturating_sub(1));
-        };
-        let anchor = self.find_item(&anchor_id)?.0;
-        Ok(if current_idx < anchor {
-            anchor.saturating_sub(1)
-        } else {
-            anchor
-        })
-    }
-
-    /// Reconcile one item's live projection membership after its status,
-    /// list, or position changes. Work is proportional to currently-live
-    /// items in the destination list, never lifetime item count.
-    /// Returns the item's resulting live index (`None` when not live).
-    fn sync_live_projection_for_item(
-        &self,
-        item_id: &str,
-        map: &LoroMap,
-        global_index: usize,
-    ) -> Result<Option<usize>, DocError> {
-        let list_id = read_string(map, KEY_LIST_ID)
-            .ok_or_else(|| DocError::Invalid(format!("item {item_id} has no list_id")))?;
-        let is_live = is_in_list_view(map);
-        let candidates = if is_live {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard
-                .live_by_list
-                .get(&list_id)
-                .into_iter()
-                .flatten()
-                .filter(|id| id.as_str() != item_id)
-                .cloned()
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-
-        // Count *all* live candidates in this list whose global index sits
-        // before ours — a set-count, not an ordered walk. An earlier
-        // version stopped at the first candidate with a `>=` index, which is
-        // only valid when `candidates` is already globally sorted. Mid-frame
-        // that assumption fails: translating a multi-item reorder mutates
-        // the projection one item at a time, so a not-yet-processed sibling
-        // can sit out of order and short-circuit the count. Counting the set
-        // is order-independent and correct at every step.
-        let mut live_index = 0usize;
-        for candidate in candidates {
-            if self.find_item(&candidate)?.0 < global_index {
-                live_index += 1;
-            }
+        for list_id in &candidates {
+            idx.refresh_live(list_id);
         }
-
-        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        for ids in guard.live_by_list.values_mut() {
-            if let Some(index) = ids.iter().position(|id| id == item_id) {
-                ids.remove(index);
-                break;
-            }
-        }
-        guard.live_by_list.retain(|_, ids| !ids.is_empty());
-        if is_live {
-            let ids = guard.live_by_list.entry(list_id).or_default();
-            let landed = live_index.min(ids.len());
-            ids.insert(landed, item_id.to_string());
-            Ok(Some(landed))
-        } else {
-            Ok(None)
-        }
+        idx
     }
 
     pub fn last_pushed_vv(&self) -> &VersionVector {
@@ -708,70 +912,20 @@ impl Doc {
     // ---------- mutations: items ----------
 
     pub fn add_item(&self, list_id: &str, text: &str) -> Result<String, DocError> {
-        let text = text.trim();
-        if text.is_empty() {
-            return Err(DocError::Invalid("item text is empty".into()));
-        }
-        self.assert_list_exists(list_id)?;
-        let items = self.items();
-        let (index, live_index) = self.live_insertion_target(list_id, usize::MAX)?;
-        let map = items.push_container(LoroMap::new())?;
-        let id = new_id();
-        let now = now_millis();
-        map.insert(KEY_ID, id.as_str())?;
-        map.insert(KEY_TEXT, text)?;
-        map.insert(KEY_LIST_ID, list_id)?;
-        map.insert(KEY_CREATED_AT, now)?;
-        self.inner.commit();
-        self.index_live_item_at(id.clone(), map, index, list_id, live_index)?;
-        self.push_event(AppEvent::ItemAdded {
-            id: id.clone(),
-            list_id: list_id.to_string(),
-            text: text.to_string(),
-            notes: String::new(),
-            created_at: now,
-            done_at: None,
-            binned_at: None,
-            index,
-            live_index: Some(live_index),
-        });
-        Ok(id)
+        self.add_item_at(list_id, text, usize::MAX)
     }
 
     /// Insert a new item as the `target_index`-th live entry of
-    /// `list_id`, in a single Loro op. `target_index` past the end of
-    /// the visible live items appends. Use this in preference to
-    /// `add_item` + `move_item` whenever the caller knows the
-    /// destination — it skips the intermediate "appended at end" state
-    /// peers and the local UI would otherwise observe.
+    /// `list_id`, in a single Loro commit. `target_index` past the end
+    /// of the visible live items appends.
     pub fn add_item_at(
         &self,
         list_id: &str,
         text: &str,
         target_index: usize,
     ) -> Result<String, DocError> {
-        let text = text.trim();
-        if text.is_empty() {
-            return Err(DocError::Invalid("item text is empty".into()));
-        }
-        self.assert_list_exists(list_id)?;
-        let items = self.items();
-        let (abs, live_index) = self.live_insertion_target(list_id, target_index)?;
-        let (id, now, map) = self.write_new_item(&items, list_id, text, abs)?;
-        self.inner.commit();
-        self.index_live_item_at(id.clone(), map, abs, list_id, live_index)?;
-        self.push_event(AppEvent::ItemAdded {
-            id: id.clone(),
-            list_id: list_id.to_string(),
-            text: text.to_string(),
-            notes: String::new(),
-            created_at: now,
-            done_at: None,
-            binned_at: None,
-            index: abs,
-            live_index: Some(live_index),
-        });
-        Ok(id)
+        let ids = self.add_items_at(list_id, &[text], target_index)?;
+        Ok(ids.into_iter().next().expect("one text yields one id"))
     }
 
     /// Bulk-insert `texts` as a contiguous run of live items starting
@@ -793,21 +947,79 @@ impl Doc {
         if trimmed.is_empty() {
             return Ok(Vec::new());
         }
+        let plan = self.plan_target(list_id, target_index, true, None);
+        let raw_pos = plan.raw_pos;
         let items = self.items();
-        let (initial_abs, initial_live_index) =
-            self.live_insertion_target(list_id, target_index)?;
+        let order = self.order_list(list_id);
         let mut ids = Vec::with_capacity(trimmed.len());
-        let mut pending = Vec::with_capacity(trimmed.len());
+        let mut pending: Vec<(String, String, String, i64)> = Vec::with_capacity(trimmed.len());
         for (i, text) in trimmed.iter().enumerate() {
-            let abs = initial_abs + i;
-            let (id, now, map) = self.write_new_item(&items, list_id, text, abs)?;
-            pending.push((id.clone(), (*text).to_string(), now, map));
+            let id = new_id();
+            let placement = new_id();
+            let now = now_millis();
+            let map = items.insert_container(&id, LoroMap::new())?;
+            map.insert(KEY_ID, id.as_str())?;
+            map.insert(KEY_TEXT, *text)?;
+            map.insert(KEY_CREATED_AT, now)?;
+            map.insert(
+                KEY_LOCATION,
+                Location {
+                    list_id: list_id.to_string(),
+                    placement_id: placement.clone(),
+                }
+                .encode()
+                .as_str(),
+            )?;
+            let entry = OrderEntry {
+                item_id: id.clone(),
+                placement_id: placement.clone(),
+            }
+            .encode();
+            let at = raw_pos + i;
+            if at >= order.len() {
+                order.push(entry.as_str())?;
+            } else {
+                order.insert(at, entry.as_str())?;
+            }
+            pending.push((id.clone(), placement, (*text).to_string(), now));
             ids.push(id);
         }
         self.inner.commit();
-        for (offset, (id, text, now, map)) in pending.into_iter().enumerate() {
-            let index = initial_abs + offset;
-            self.index_live_item_at(id.clone(), map, index, list_id, initial_live_index + offset)?;
+        let live = {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            for (i, (id, placement, _, now)) in pending.iter().enumerate() {
+                guard.set_meta(
+                    id,
+                    ItemMeta {
+                        list_id: list_id.to_string(),
+                        placement_id: placement.clone(),
+                        live: true,
+                        created_at: *now,
+                    },
+                );
+                let raw = guard.raw_orders.entry(list_id.to_string()).or_default();
+                let at = (raw_pos + i).min(raw.len());
+                raw.insert(
+                    at,
+                    Some(OrderEntry {
+                        item_id: id.clone(),
+                        placement_id: placement.clone(),
+                    }),
+                );
+                guard.bump_visible(list_id, 1);
+            }
+            match plan.live_pos {
+                Some(pos) => {
+                    for (i, (id, ..)) in pending.iter().enumerate() {
+                        guard.splice_live_in(list_id, id, pos.saturating_add(i));
+                    }
+                    guard.live_by_list.get(list_id).cloned().unwrap_or_default()
+                }
+                None => guard.refresh_live(list_id),
+            }
+        };
+        for (id, _, text, now) in pending {
+            let live_index = live.iter().position(|x| x == &id);
             self.push_event(AppEvent::ItemAdded {
                 id,
                 list_id: list_id.to_string(),
@@ -816,8 +1028,7 @@ impl Doc {
                 created_at: now,
                 done_at: None,
                 binned_at: None,
-                index,
-                live_index: Some(initial_live_index + offset),
+                live_index,
             });
         }
         Ok(ids)
@@ -828,7 +1039,7 @@ impl Doc {
         if text.is_empty() {
             return Err(DocError::Invalid("item text is empty".into()));
         }
-        let (_, map) = self.find_item(item_id)?;
+        let map = self.find_item(item_id)?;
         map.insert(KEY_TEXT, text)?;
         self.inner.commit();
         self.push_event(AppEvent::ItemTextChanged {
@@ -842,7 +1053,7 @@ impl Doc {
     /// note); leading/trailing whitespace is preserved verbatim because
     /// notes are intentionally a freeform plain-text field.
     pub fn edit_item_notes(&self, item_id: &str, notes: &str) -> Result<(), DocError> {
-        let (_, map) = self.find_item(item_id)?;
+        let map = self.find_item(item_id)?;
         map.insert(KEY_NOTES, notes)?;
         self.inner.commit();
         self.push_event(AppEvent::ItemNotesChanged {
@@ -852,6 +1063,12 @@ impl Doc {
         Ok(())
     }
 
+    /// Move an item. Same-list: a `mov` on the list's order container
+    /// (placement preserved). Cross-list: fresh placement, one atomic
+    /// `location` write, entry insert in the target order, best-effort
+    /// entry removal from the source order — all in one commit (one
+    /// undo step). `target_index` addresses the live projection for
+    /// live items and the full resolved order for done/binned items.
     pub fn move_item(
         &self,
         item_id: &str,
@@ -859,51 +1076,276 @@ impl Doc {
         target_index: usize,
     ) -> Result<(), DocError> {
         self.assert_list_exists(target_list_id)?;
-        let (idx, map) = self.find_item(item_id)?;
-        let prev_list_id = read_string(&map, KEY_LIST_ID);
-        let moving_live_item = is_in_list_view(&map);
-        let abs = self.move_item_inner(item_id, idx, &map, target_list_id, target_index)?;
-        self.inner.commit();
-        // `LoroMovableList::mov(from, to)` places the element at `to` in
-        // the resulting user-visible sequence, so `abs` is already the
-        // post-move global index. Avoid scanning every historical item to
-        // rediscover it.
-        self.refresh_item_cursor(item_id, abs)?;
-        {
-            // Keep the global-order shadow in step with the mov.
-            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-            if let Some(cur) = guard.order.iter().position(|id| id == item_id) {
-                guard.order.remove(cur);
-                let at = abs.min(guard.order.len());
-                guard.order.insert(at, item_id.to_string());
-            }
-        }
-        let live_index = if moving_live_item {
-            Some(self.move_live_projection(item_id, target_list_id, target_index))
-        } else {
-            None
+        let map = self.find_item(item_id)?;
+        let (cur_list, is_live) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let m = guard
+                .meta
+                .get(item_id)
+                .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+            (m.list_id.clone(), m.live)
         };
-        if prev_list_id.as_deref() != Some(target_list_id) {
-            self.push_event(AppEvent::ItemListChanged {
-                id: item_id.to_string(),
-                list_id: target_list_id.to_string(),
-                live_index,
-            });
+        if cur_list == target_list_id {
+            self.reorder_in_list(item_id, &map, target_list_id, target_index, is_live)
+        } else {
+            self.move_across_lists(
+                item_id,
+                &map,
+                &cur_list,
+                target_list_id,
+                target_index,
+                is_live,
+            )
         }
-        if abs != idx {
-            self.push_event(AppEvent::ItemMoved {
-                id: item_id.to_string(),
-                index: abs,
-                live_index,
-            });
+    }
+
+    fn reorder_in_list(
+        &self,
+        item_id: &str,
+        map: &LoroMap,
+        list_id: &str,
+        target_index: usize,
+        is_live: bool,
+    ) -> Result<(), DocError> {
+        let (from, to, live_plan) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let Some(from) = guard.canonical_raw_pos(list_id, item_id) else {
+                // Fallback-tail item (no visible entry): re-place it
+                // with a fresh entry instead of a mov.
+                drop(guard);
+                return self.replace_entry(item_id, map, list_id, target_index, is_live);
+            };
+            // Anchor over the projection the caller's index speaks
+            // about (live for live items, full resolved order for
+            // hidden ones), excluding the moving item.
+            let plan = guard.plan_target(list_id, target_index, is_live, Some(item_id));
+            // `raw_pos` is an insert-before position; a `mov` of an
+            // earlier element shifts everything after it left by one.
+            let to = if plan.raw_pos > from {
+                plan.raw_pos.saturating_sub(1)
+            } else {
+                plan.raw_pos
+            };
+            (from, to, plan.live_pos)
+        };
+        if from == to {
+            return Ok(());
         }
+        self.order_list(list_id).mov(from, to)?;
+        self.inner.commit();
+        let live_index = {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            if let Some(raw) = guard.raw_orders.get_mut(list_id) {
+                let e = raw.remove(from);
+                raw.insert(to.min(raw.len()), e);
+            }
+            if !is_live {
+                None
+            } else {
+                match live_plan {
+                    Some(pos) => {
+                        guard.splice_live_in(list_id, item_id, pos);
+                        guard
+                            .live_by_list
+                            .get(list_id)
+                            .and_then(|arr| arr.iter().position(|x| x == item_id))
+                    }
+                    None => {
+                        let live = guard.refresh_live(list_id);
+                        live.iter().position(|x| x == item_id)
+                    }
+                }
+            }
+        };
+        self.push_event(AppEvent::ItemMoved {
+            id: item_id.to_string(),
+            live_index,
+        });
         Ok(())
     }
 
+    /// Re-place an item inside its own list with a fresh placement +
+    /// entry. Used when a same-list move targets a fallback-tail item
+    /// (its canonical entry was lost); functionally a cross-list move
+    /// whose source and target coincide.
+    fn replace_entry(
+        &self,
+        item_id: &str,
+        map: &LoroMap,
+        list_id: &str,
+        target_index: usize,
+        is_live: bool,
+    ) -> Result<(), DocError> {
+        let placement = new_id();
+        map.insert(
+            KEY_LOCATION,
+            Location {
+                list_id: list_id.to_string(),
+                placement_id: placement.clone(),
+            }
+            .encode()
+            .as_str(),
+        )?;
+        let raw_pos = self
+            .plan_target(list_id, target_index, is_live, Some(item_id))
+            .raw_pos;
+        let order = self.order_list(list_id);
+        let entry = OrderEntry {
+            item_id: item_id.to_string(),
+            placement_id: placement.clone(),
+        };
+        if raw_pos >= order.len() {
+            order.push(entry.encode().as_str())?;
+        } else {
+            order.insert(raw_pos, entry.encode().as_str())?;
+        }
+        self.inner.commit();
+        let live_index = {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            if let Some(m) = guard.meta.get_mut(item_id) {
+                m.placement_id = placement;
+            }
+            let raw = guard.raw_orders.entry(list_id.to_string()).or_default();
+            let at = raw_pos.min(raw.len());
+            raw.insert(at, Some(entry));
+            // Rare path — a full refresh also recomputes the visible
+            // count now that a tail item became entry-backed.
+            let live = guard.refresh_live(list_id);
+            if is_live {
+                live.iter().position(|x| x == item_id)
+            } else {
+                None
+            }
+        };
+        self.push_event(AppEvent::ItemMoved {
+            id: item_id.to_string(),
+            live_index,
+        });
+        Ok(())
+    }
+
+    fn move_across_lists(
+        &self,
+        item_id: &str,
+        map: &LoroMap,
+        cur_list: &str,
+        target_list_id: &str,
+        target_index: usize,
+        is_live: bool,
+    ) -> Result<(), DocError> {
+        let placement = new_id();
+        let created_at = read_i64(map, KEY_CREATED_AT).unwrap_or(0);
+        map.insert(
+            KEY_LOCATION,
+            Location {
+                list_id: target_list_id.to_string(),
+                placement_id: placement.clone(),
+            }
+            .encode()
+            .as_str(),
+        )?;
+        let (plan, src_positions, was_visible) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            (
+                guard.plan_target(target_list_id, target_index, is_live, None),
+                guard.entry_positions(cur_list, item_id),
+                guard.canonical_raw_pos(cur_list, item_id).is_some(),
+            )
+        };
+        let raw_pos = plan.raw_pos;
+        let target_order = self.order_list(target_list_id);
+        let entry = OrderEntry {
+            item_id: item_id.to_string(),
+            placement_id: placement.clone(),
+        };
+        if raw_pos >= target_order.len() {
+            target_order.push(entry.encode().as_str())?;
+        } else {
+            target_order.insert(raw_pos, entry.encode().as_str())?;
+        }
+        // Best-effort cleanup: drop every entry for this item from the
+        // source order (canonical + any stale duplicates).
+        let src_order = self.order_list(cur_list);
+        for p in src_positions.iter().rev() {
+            src_order.delete(*p, 1)?;
+        }
+        self.inner.commit();
+        let live_index = {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard.set_meta(
+                item_id,
+                ItemMeta {
+                    list_id: target_list_id.to_string(),
+                    placement_id: placement,
+                    live: is_live,
+                    created_at,
+                },
+            );
+            if let Some(raw) = guard.raw_orders.get_mut(cur_list) {
+                for p in src_positions.iter().rev() {
+                    if *p < raw.len() {
+                        raw.remove(*p);
+                    }
+                }
+            }
+            if was_visible {
+                guard.bump_visible(cur_list, -1);
+            }
+            let raw = guard
+                .raw_orders
+                .entry(target_list_id.to_string())
+                .or_default();
+            let at = raw_pos.min(raw.len());
+            raw.insert(at, Some(entry));
+            guard.bump_visible(target_list_id, 1);
+            if !is_live {
+                None
+            } else {
+                guard.splice_live_out(cur_list, item_id);
+                match plan.live_pos {
+                    Some(pos) => {
+                        guard.splice_live_in(target_list_id, item_id, pos);
+                        guard
+                            .live_by_list
+                            .get(target_list_id)
+                            .and_then(|arr| arr.iter().position(|x| x == item_id))
+                    }
+                    None => {
+                        let live = guard.refresh_live(target_list_id);
+                        live.iter().position(|x| x == item_id)
+                    }
+                }
+            }
+        };
+        self.push_event(AppEvent::ItemListChanged {
+            id: item_id.to_string(),
+            list_id: target_list_id.to_string(),
+            live_index,
+        });
+        Ok(())
+    }
+
+    /// Resolve a target index against `list_id`'s projection: the raw
+    /// container position for the entry write, plus — when derivable
+    /// without a walk — the exact live splice position. See
+    /// [`ProjectionIndex::plan_target`].
+    fn plan_target(
+        &self,
+        list_id: &str,
+        target_index: usize,
+        is_live: bool,
+        exclude: Option<&str>,
+    ) -> TargetPlan {
+        let guard = self.item_index.lock().expect("item index mutex poisoned");
+        guard.plan_target(list_id, target_index, is_live, exclude)
+    }
+
     /// Set or clear an item's done state. Independent of `binned` —
-    /// flipping done leaves `binned_at` untouched.
+    /// flipping done leaves `binned_at` untouched. Order containers are
+    /// untouched: a hidden item's entry stays in place so restore
+    /// returns it to exactly its former position.
     pub fn set_item_done(&self, item_id: &str, done: bool) -> Result<(), DocError> {
-        let (index, map) = self.find_item(item_id)?;
+        let map = self.find_item(item_id)?;
         let prev_done = read_i64(&map, KEY_DONE_AT);
         let new_done = match (done, prev_done) {
             (true, Some(_)) => return Ok(()),
@@ -921,7 +1363,7 @@ impl Doc {
         }
         let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
-        let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
+        let live_index = self.sync_item_liveness(item_id, &map);
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at: new_done,
@@ -933,69 +1375,17 @@ impl Doc {
 
     /// Set or clear done state for many items in one commit. Surgical
     /// below `BULK_STATUS_EVENT_THRESHOLD`: work is proportional to the
-    /// touched items (plus their lists' live projections), never total
-    /// doc size — a full materialize/rebuild/diff here made single-item
-    /// deletes lag at ~10k lifetime items. At/above the threshold the
-    /// per-item projection sync would exceed one whole-doc pass, so it
-    /// falls back to rebuild + diff.
+    /// touched items' lists, never total doc size. At/above the
+    /// threshold it falls back to one rebuild + diff.
     pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
-        if item_ids.is_empty() {
-            return Ok(());
-        }
-        assert_unique_item_ids(item_ids)?;
-        let pre_items = (item_ids.len() >= BULK_STATUS_EVENT_THRESHOLD)
-            .then(|| self.iter_items().collect::<Vec<ItemView>>());
-        // Resolve everything up front so an unknown id errors before
-        // any map is touched.
-        let maps: Vec<(&str, LoroMap)> = item_ids
-            .iter()
-            .map(|id| self.find_item(id).map(|(_, map)| (*id, map)))
-            .collect::<Result<_, _>>()?;
-        let mut changed: Vec<(&str, LoroMap, Option<i64>)> = Vec::new();
-        for (item_id, map) in maps {
-            let prev_done = read_i64(&map, KEY_DONE_AT);
-            let new_done = match (done, prev_done) {
-                (true, Some(_)) | (false, None) => continue,
-                (true, None) => Some(now_millis()),
-                (false, Some(_)) => None,
-            };
-            match new_done {
-                Some(t) => {
-                    map.insert(KEY_DONE_AT, t)?;
-                }
-                None => {
-                    let _ = map.delete(KEY_DONE_AT);
-                }
-            }
-            changed.push((item_id, map, new_done));
-        }
-        if changed.is_empty() {
-            return Ok(());
-        }
-        self.inner.commit();
-        if let Some(pre) = pre_items {
-            self.rebuild_item_index();
-            self.emit_item_diffs(&pre);
-            return Ok(());
-        }
-        for (item_id, map, done_at) in changed {
-            let (index, _) = self.find_item(item_id)?;
-            let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
-            self.push_event(AppEvent::ItemStatusChanged {
-                id: item_id.to_string(),
-                done_at,
-                binned_at: read_i64(&map, KEY_BINNED_AT),
-                live_index,
-            });
-        }
-        Ok(())
+        self.set_items_status(item_ids, done, KEY_DONE_AT)
     }
 
     /// Set or clear an item's binned state. Independent of `done` —
     /// binning a done item keeps it done; restoring (unbinning) leaves
     /// the done state alone.
     pub fn set_item_binned(&self, item_id: &str, binned: bool) -> Result<(), DocError> {
-        let (index, map) = self.find_item(item_id)?;
+        let map = self.find_item(item_id)?;
         let prev_binned = read_i64(&map, KEY_BINNED_AT);
         let new_binned = match (binned, prev_binned) {
             (true, Some(_)) => return Ok(()),
@@ -1013,7 +1403,7 @@ impl Doc {
         }
         let done_at = read_i64(&map, KEY_DONE_AT);
         self.inner.commit();
-        let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
+        let live_index = self.sync_item_liveness(item_id, &map);
         self.push_event(AppEvent::ItemStatusChanged {
             id: item_id.to_string(),
             done_at,
@@ -1027,49 +1417,59 @@ impl Doc {
     /// Surgical / bulk-fallback split for the same reason as
     /// `set_items_done`.
     pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
+        self.set_items_status(item_ids, binned, KEY_BINNED_AT)
+    }
+
+    fn set_items_status(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
         let pre_items = (item_ids.len() >= BULK_STATUS_EVENT_THRESHOLD)
             .then(|| self.iter_items().collect::<Vec<ItemView>>());
+        // Resolve everything up front so an unknown id errors before
+        // any map is touched.
         let maps: Vec<(&str, LoroMap)> = item_ids
             .iter()
-            .map(|id| self.find_item(id).map(|(_, map)| (*id, map)))
+            .map(|id| self.find_item(id).map(|map| (*id, map)))
             .collect::<Result<_, _>>()?;
         let mut changed: Vec<(&str, LoroMap, Option<i64>)> = Vec::new();
         for (item_id, map) in maps {
-            let prev_binned = read_i64(&map, KEY_BINNED_AT);
-            let new_binned = match (binned, prev_binned) {
+            let prev = read_i64(&map, key);
+            let new = match (on, prev) {
                 (true, Some(_)) | (false, None) => continue,
                 (true, None) => Some(now_millis()),
                 (false, Some(_)) => None,
             };
-            match new_binned {
+            match new {
                 Some(t) => {
-                    map.insert(KEY_BINNED_AT, t)?;
+                    map.insert(key, t)?;
                 }
                 None => {
-                    let _ = map.delete(KEY_BINNED_AT);
+                    let _ = map.delete(key);
                 }
             }
-            changed.push((item_id, map, new_binned));
+            changed.push((item_id, map, new));
         }
         if changed.is_empty() {
             return Ok(());
         }
         self.inner.commit();
         if let Some(pre) = pre_items {
-            self.rebuild_item_index();
+            self.rebuild_index();
             self.emit_item_diffs(&pre);
             return Ok(());
         }
-        for (item_id, map, binned_at) in changed {
-            let (index, _) = self.find_item(item_id)?;
-            let live_index = self.sync_live_projection_for_item(item_id, &map, index)?;
+        for (item_id, map, new) in changed {
+            let live_index = self.sync_item_liveness(item_id, &map);
+            let (done_at, binned_at) = if key == KEY_DONE_AT {
+                (new, read_i64(&map, KEY_BINNED_AT))
+            } else {
+                (read_i64(&map, KEY_DONE_AT), new)
+            };
             self.push_event(AppEvent::ItemStatusChanged {
                 id: item_id.to_string(),
-                done_at: read_i64(&map, KEY_DONE_AT),
+                done_at,
                 binned_at,
                 live_index,
             });
@@ -1077,77 +1477,141 @@ impl Doc {
         Ok(())
     }
 
-    pub fn delete_binned(&self, item_id: &str) -> Result<(), DocError> {
-        let (idx, map) = self.find_item(item_id)?;
-        if read_i64(&map, KEY_BINNED_AT).is_none() {
-            return Err(DocError::NotBinned);
+    /// Refresh the index after an item's done/binned flags changed.
+    /// Returns the item's live index within its list (`None` when
+    /// hidden). Hiding is an O(live) splice; a restore recomputes the
+    /// list's projection to find the re-entry position.
+    fn sync_item_liveness(&self, item_id: &str, map: &LoroMap) -> Option<usize> {
+        let live_now = is_in_list_view(map);
+        let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+        let (list_id, was_live) = {
+            let m = guard.meta.get_mut(item_id)?;
+            let was = m.live;
+            m.live = live_now;
+            (m.list_id.clone(), was)
+        };
+        if !live_now {
+            guard.splice_live_out(&list_id, item_id);
+            return None;
         }
-        self.items().delete(idx, 1)?;
-        self.inner.commit();
-        self.remove_indexed_items(std::iter::once(item_id));
-        self.push_event(AppEvent::ItemRemoved {
-            id: item_id.to_string(),
-        });
-        Ok(())
+        if was_live {
+            // live → live (no transition): position unchanged.
+            return guard
+                .live_by_list
+                .get(&list_id)
+                .and_then(|arr| arr.iter().position(|x| x == item_id));
+        }
+        let live = guard.refresh_live(&list_id);
+        live.iter().position(|x| x == item_id)
+    }
+
+    pub fn delete_binned(&self, item_id: &str) -> Result<(), DocError> {
+        self.delete_binned_items(&[item_id])
     }
 
     /// Hard-delete the subset of binned items identified by `item_ids`
     /// in one commit. Errors if any id is not currently binned.
-    /// Surgical: the only state transition is removal, so emit
-    /// `ItemRemoved` per id directly (mirrors `empty_bin`) instead of
-    /// diffing the whole doc.
+    /// Deletes the item map from `items` and best-effort removes the
+    /// item's entries from its located order container.
     pub fn delete_binned_items(&self, item_ids: &[&str]) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
-        let mut positions = Vec::with_capacity(item_ids.len());
         for item_id in item_ids {
-            let (idx, map) = self.find_item(item_id)?;
+            let map = self.find_item(item_id)?;
             if read_i64(&map, KEY_BINNED_AT).is_none() {
                 return Err(DocError::NotBinned);
             }
-            positions.push(idx);
         }
-        positions.sort_unstable();
+        self.hard_delete_items(item_ids)
+    }
+
+    /// Hard-deletes every binned item. Returns how many were removed.
+    pub fn empty_bin(&self) -> Result<usize, DocError> {
+        let binned: Vec<String> = self
+            .iter_items()
+            .filter(|i| i.is_binned())
+            .map(|i| i.id)
+            .collect();
+        if binned.is_empty() {
+            return Ok(0);
+        }
+        let refs: Vec<&str> = binned.iter().map(String::as_str).collect();
+        self.hard_delete_items(&refs)?;
+        Ok(binned.len())
+    }
+
+    /// Shared hard-delete path: remove item maps + their order entries
+    /// in one commit, then update the index and emit `ItemRemoved`s.
+    /// Callers have already validated the ids.
+    fn hard_delete_items(&self, item_ids: &[&str]) -> Result<(), DocError> {
+        // Entry positions + visibility per item, gathered before any
+        // mutation. `per_item` rows are (item_id, list_id, was_visible).
+        type PerItem = Vec<(String, String, bool)>;
+        let (per_list, per_item): (HashMap<String, Vec<usize>>, PerItem) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let mut acc: HashMap<String, Vec<usize>> = HashMap::new();
+            let mut per_item = Vec::with_capacity(item_ids.len());
+            for item_id in item_ids {
+                let Some(m) = guard.meta.get(*item_id) else {
+                    continue;
+                };
+                acc.entry(m.list_id.clone())
+                    .or_default()
+                    .extend(guard.entry_positions(&m.list_id, item_id));
+                per_item.push((
+                    (*item_id).to_string(),
+                    m.list_id.clone(),
+                    guard.canonical_raw_pos(&m.list_id, item_id).is_some(),
+                ));
+            }
+            for positions in acc.values_mut() {
+                positions.sort_unstable();
+                positions.dedup();
+            }
+            (acc, per_item)
+        };
         let items = self.items();
-        for idx in positions.into_iter().rev() {
-            items.delete(idx, 1)?;
+        for item_id in item_ids {
+            items.delete(item_id)?;
+        }
+        for (list_id, positions) in &per_list {
+            let order = self.order_list(list_id);
+            for p in positions.iter().rev() {
+                order.delete(*p, 1)?;
+            }
         }
         self.inner.commit();
-        self.remove_indexed_items(item_ids.iter().copied());
+        {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            for item_id in item_ids {
+                guard.remove_item(item_id);
+            }
+            for (list_id, positions) in &per_list {
+                if let Some(raw) = guard.raw_orders.get_mut(list_id) {
+                    for p in positions.iter().rev() {
+                        if *p < raw.len() {
+                            raw.remove(*p);
+                        }
+                    }
+                }
+            }
+            // Removals are exact: splice out of the live arrays and
+            // drop visible counts — no projection walk needed.
+            for (item_id, list_id, was_visible) in &per_item {
+                guard.splice_live_out(list_id, item_id);
+                if *was_visible {
+                    guard.bump_visible(list_id, -1);
+                }
+            }
+        }
         for item_id in item_ids {
             self.push_event(AppEvent::ItemRemoved {
                 id: (*item_id).to_string(),
             });
         }
         Ok(())
-    }
-
-    /// Hard-deletes every binned item. Walks back-to-front so deletions
-    /// don't shift indices we haven't visited yet.
-    pub fn empty_bin(&self) -> Result<usize, DocError> {
-        let items = self.items();
-        let mut removed_ids = Vec::new();
-        for idx in (0..items.len()).rev() {
-            let Some(map) = item_map_at(&items, idx) else {
-                continue;
-            };
-            if read_i64(&map, KEY_BINNED_AT).is_some() {
-                if let Some(id) = read_string(&map, KEY_ID) {
-                    removed_ids.push(id);
-                }
-                items.delete(idx, 1)?;
-            }
-        }
-        if !removed_ids.is_empty() {
-            self.inner.commit();
-            self.remove_indexed_items(removed_ids.iter().map(String::as_str));
-            for id in &removed_ids {
-                self.push_event(AppEvent::ItemRemoved { id: id.clone() });
-            }
-        }
-        Ok(removed_ids.len())
     }
 
     // ---------- mutations: lists ----------
@@ -1272,31 +1736,47 @@ impl Doc {
         Ok(())
     }
 
-    /// Refuses for the always-on `now` list. Items in the deleted
-    /// list are reassigned to `now` so nothing falls off the doc.
+    /// Refuses for the always-on `main` list. Every item locating to
+    /// the deleted list (live, done and binned) is moved to `main` with
+    /// a fresh placement, appended to `order/main` in the deleted
+    /// list's resolved order. The abandoned order container remains as
+    /// unreachable history.
     pub fn delete_list(&self, list_id: &str) -> Result<(), DocError> {
         if list_id == LIST_MAIN {
             return Err(DocError::CannotDeleteBuiltin(LIST_MAIN.into()));
         }
         let (idx, _) = self.find_list(list_id)?;
-        let items = self.items();
-        let mut reassigned: Vec<String> = Vec::new();
-        for i in 0..items.len() {
-            let Some(map) = item_map_at(&items, i) else {
-                continue;
-            };
-            if read_string(&map, KEY_LIST_ID).as_deref() == Some(list_id) {
-                map.insert(KEY_LIST_ID, LIST_MAIN)?;
-                if let Some(id) = read_string(&map, KEY_ID) {
-                    reassigned.push(id);
+        let resolved = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard.project(list_id).0
+        };
+        let main_order = self.order_list(LIST_MAIN);
+        for item_id in &resolved {
+            let map = self.find_item(item_id)?;
+            let placement = new_id();
+            map.insert(
+                KEY_LOCATION,
+                Location {
+                    list_id: LIST_MAIN.to_string(),
+                    placement_id: placement.clone(),
                 }
-            }
+                .encode()
+                .as_str(),
+            )?;
+            main_order.push(
+                OrderEntry {
+                    item_id: item_id.clone(),
+                    placement_id: placement,
+                }
+                .encode()
+                .as_str(),
+            )?;
         }
         self.lists().delete(idx, 1)?;
         self.inner.commit();
-        self.rebuild_item_index();
-        // Live positions of the reassigned items in `main`, read once
-        // from the rebuilt projection (done/binned reassignees get None).
+        // Rare operation; a wholesale rebuild is simpler than patching
+        // two lists' shadows plus membership.
+        self.rebuild_index();
         let main_positions: HashMap<String, usize> = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             guard
@@ -1310,7 +1790,7 @@ impl Doc {
                 })
                 .unwrap_or_default()
         };
-        for id in reassigned {
+        for id in resolved {
             let live_index = main_positions.get(&id).copied();
             self.push_event(AppEvent::ItemListChanged {
                 id,
@@ -1324,11 +1804,126 @@ impl Doc {
         Ok(())
     }
 
+    /// Explicit, idempotent order-entry repair (never run implicitly by
+    /// reads): removes stale and duplicate entries and materializes
+    /// real entries for fallback-tail items, in one commit. Returns the
+    /// number of repairs; `0` means the doc was clean and nothing was
+    /// committed. Visible projections are unchanged by construction, so
+    /// no events are emitted.
+    pub fn reconcile(&self) -> Result<usize, DocError> {
+        struct ListPlan {
+            stale: Vec<usize>,
+            /// (item_id, placement_id) entries to append for
+            /// fallback-tail items, in deterministic tail order.
+            append: Vec<OrderEntry>,
+        }
+        // Items with a missing/unparseable location get a fresh one
+        // written (main + new placement) plus a matching entry.
+        let mut fix_location: Vec<(String, String)> = Vec::new();
+        let mut plans: HashMap<String, ListPlan> = HashMap::new();
+        {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let mut lists: HashSet<&String> = guard.raw_orders.keys().collect();
+            lists.extend(guard.members.keys());
+            for list_id in lists {
+                let mut seen = HashSet::new();
+                let mut stale = Vec::new();
+                for (i, entry) in guard
+                    .raw_orders
+                    .get(list_id)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[])
+                    .iter()
+                    .enumerate()
+                {
+                    let visible = entry.as_ref().is_some_and(|e| {
+                        guard.meta.get(&e.item_id).is_some_and(|m| {
+                            m.list_id == *list_id && m.placement_id == e.placement_id
+                        }) && seen.insert(e.item_id.clone())
+                    });
+                    if !visible {
+                        stale.push(i);
+                    }
+                }
+                // Fallback tail in its deterministic order.
+                let mut tail: Vec<&String> = guard
+                    .members
+                    .get(list_id)
+                    .into_iter()
+                    .flatten()
+                    .filter(|id| !seen.contains(*id))
+                    .collect();
+                tail.sort_by(|a, b| {
+                    let (ma, mb) = (&guard.meta[*a], &guard.meta[*b]);
+                    ma.created_at.cmp(&mb.created_at).then_with(|| a.cmp(b))
+                });
+                let mut append = Vec::new();
+                for id in tail {
+                    let m = &guard.meta[id];
+                    if m.placement_id.is_empty() {
+                        let placement = new_id();
+                        fix_location.push((id.clone(), placement.clone()));
+                        append.push(OrderEntry {
+                            item_id: id.clone(),
+                            placement_id: placement,
+                        });
+                    } else {
+                        append.push(OrderEntry {
+                            item_id: id.clone(),
+                            placement_id: m.placement_id.clone(),
+                        });
+                    }
+                }
+                if !stale.is_empty() || !append.is_empty() {
+                    plans.insert(list_id.clone(), ListPlan { stale, append });
+                }
+            }
+        }
+        if plans.is_empty() {
+            return Ok(0);
+        }
+        let mut repairs = 0usize;
+        for (item_id, placement) in &fix_location {
+            let map = self.find_item(item_id)?;
+            map.insert(
+                KEY_LOCATION,
+                Location {
+                    list_id: LIST_MAIN.to_string(),
+                    placement_id: placement.clone(),
+                }
+                .encode()
+                .as_str(),
+            )?;
+        }
+        for (list_id, plan) in &plans {
+            let order = self.order_list(list_id);
+            for p in plan.stale.iter().rev() {
+                order.delete(*p, 1)?;
+                repairs += 1;
+            }
+            for entry in &plan.append {
+                order.push(entry.encode().as_str())?;
+                repairs += 1;
+            }
+        }
+        self.inner.commit();
+        self.rebuild_index();
+        Ok(repairs)
+    }
+
     // ---------- reads ----------
 
+    /// Items of one list in resolved order, all statuses except binned
+    /// unless `include_binned`.
     pub fn items_in_list(&self, list_id: &str, include_binned: bool) -> Vec<ItemView> {
-        self.iter_items()
-            .filter(|i| i.list_id == list_id && (include_binned || !i.is_binned()))
+        let resolved = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard.project(list_id).0
+        };
+        resolved
+            .iter()
+            .filter_map(|id| self.get_item(id))
+            .filter(|i| include_binned || !i.is_binned())
             .collect()
     }
 
@@ -1340,10 +1935,10 @@ impl Doc {
         let lists = self.lists();
         let mut out = Vec::with_capacity(lists.len());
         for i in 0..lists.len() {
-            if let Some(map) = list_map_at(&lists, i) {
-                if let Some(view) = list_view(&map) {
-                    out.push(view);
-                }
+            if let Some(map) = list_map_at(&lists, i)
+                && let Some(view) = list_view(&map)
+            {
+                out.push(view);
             }
         }
         out
@@ -1354,7 +1949,9 @@ impl Doc {
     }
 
     /// Semantic full-account export. This is intentionally a compact,
-    /// human-readable data dump rather than a CRDT/state backup.
+    /// human-readable data dump rather than a CRDT/state backup. Items
+    /// are emitted grouped per list in resolved order, so array order
+    /// carries the ordering across the export/import boundary.
     pub fn export_json(&self) -> JsonExport {
         let mut lists = Vec::with_capacity(self.lists().len() + 1);
         lists.push(ExportList {
@@ -1408,10 +2005,10 @@ impl Doc {
 
     /// Additive JSON import. Source lists are created as fresh user
     /// lists (new IDs); source items keep their text / notes /
-    /// timestamps / done-binned state but get fresh IDs and follow the
-    /// id-map: anything in the source's `main` lands in the local
-    /// `main`, builtin entries are not duplicated, and items whose
-    /// `list_id` references a list not present in the export fall
+    /// timestamps / done-binned state but get fresh IDs and placements
+    /// and follow the id-map: anything in the source's `main` lands in
+    /// the local `main`, builtin entries are not duplicated, and items
+    /// whose `list_id` references a list not present in the export fall
     /// back to `main` (same orphan handling as `delete_list`).
     /// Existing local content is untouched. All writes land in a
     /// single Loro commit; UI events are emitted via the standard
@@ -1466,10 +2063,19 @@ impl Doc {
                 .cloned()
                 .unwrap_or_else(|| LIST_MAIN.to_string());
             let new_item_id = new_id();
-            let map = items.push_container(LoroMap::new())?;
+            let placement = new_id();
+            let map = items.insert_container(&new_item_id, LoroMap::new())?;
             map.insert(KEY_ID, new_item_id.as_str())?;
             map.insert(KEY_TEXT, text)?;
-            map.insert(KEY_LIST_ID, target_list_id.as_str())?;
+            map.insert(
+                KEY_LOCATION,
+                Location {
+                    list_id: target_list_id.clone(),
+                    placement_id: placement.clone(),
+                }
+                .encode()
+                .as_str(),
+            )?;
             map.insert(KEY_CREATED_AT, src_item.created_at)?;
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
@@ -1481,11 +2087,19 @@ impl Doc {
             if let Some(t) = src_item.binned_at {
                 map.insert(KEY_BINNED_AT, t)?;
             }
+            self.order_list(&target_list_id).push(
+                OrderEntry {
+                    item_id: new_item_id,
+                    placement_id: placement,
+                }
+                .encode()
+                .as_str(),
+            )?;
             items_added += 1;
         }
 
         self.inner.commit();
-        self.rebuild_item_index();
+        self.rebuild_index();
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
 
         Ok(ImportSummary {
@@ -1504,7 +2118,7 @@ impl Doc {
     }
 
     pub fn get_item(&self, item_id: &str) -> Option<ItemView> {
-        let (_, map) = self.find_item(item_id).ok()?;
+        let map = self.find_item(item_id).ok()?;
         item_view(&map)
     }
 
@@ -1514,15 +2128,10 @@ impl Doc {
     }
 
     /// Per-list nav view: ids of items in this list that are neither
-    /// done nor binned, in MovableList order. Items whose `list_id` no
-    /// longer exists (orphaned by `delete_list`'s reassignment to
-    /// `main`) won't appear here for the deleted id by definition —
-    /// they're now under `main`.
+    /// done nor binned, in resolved order.
     pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
-        self.iter_items()
-            .filter(|i| i.list_id == list_id && i.is_in_list_view())
-            .map(|i| i.id)
-            .collect()
+        let guard = self.item_index.lock().expect("item index mutex poisoned");
+        guard.live_by_list.get(list_id).cloned().unwrap_or_default()
     }
 
     /// Cross-list "Done" view: ids of done-but-not-binned items, sorted
@@ -1556,16 +2165,48 @@ impl Doc {
         items.into_iter().map(|i| i.id).collect()
     }
 
-    /// Materialize every item in root CRDT order. Intended for one-shot
-    /// client attachment/resync snapshots; live mutation paths should use
-    /// `AppEvent`s instead.
+    /// Materialize every item in canonical walk order: `main` first,
+    /// then user lists in `lists` container order, then any orphan list
+    /// ids (sorted) — each list in its resolved order. This grouped
+    /// order is the deterministic replacement for the v1 global CRDT
+    /// order; per-list consumers reconstruct their arrays from it.
+    /// Intended for one-shot client attachment/resync snapshots; live
+    /// mutation paths should use `AppEvent`s instead.
     pub fn all_items(&self) -> Vec<ItemView> {
         self.iter_items().collect()
     }
 
+    /// Canonical list-id walk order backing `iter_items` — see
+    /// [`Doc::all_items`].
+    fn ordered_list_ids(&self) -> Vec<String> {
+        let mut out = vec![LIST_MAIN.to_string()];
+        let mut known: HashSet<String> = out.iter().cloned().collect();
+        for list in self.all_lists() {
+            if known.insert(list.id.clone()) {
+                out.push(list.id);
+            }
+        }
+        let mut orphans: Vec<String> = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            guard
+                .members
+                .keys()
+                .filter(|l| !known.contains(*l))
+                .cloned()
+                .collect()
+        };
+        orphans.sort();
+        out.extend(orphans);
+        out
+    }
+
     fn iter_items(&self) -> impl Iterator<Item = ItemView> + '_ {
-        let items = self.items();
-        (0..items.len()).filter_map(move |i| item_map_at(&items, i).and_then(|m| item_view(&m)))
+        let mut ids: Vec<String> = Vec::new();
+        for list_id in self.ordered_list_ids() {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            ids.extend(guard.project(&list_id).0);
+        }
+        ids.into_iter().filter_map(move |id| self.get_item(&id))
     }
 
     // ---------- op stream ----------
@@ -1664,7 +2305,7 @@ impl Doc {
     /// domain events: historical state is materialized explicitly by the
     /// attaching UI, not presented as live mutations.
     pub fn finish_oplog_replay(&self) {
-        self.rebuild_item_index();
+        self.rebuild_index();
         if let Ok(mut capture) = self.diff_capture.lock() {
             capture.mode = DiffCaptureMode::None;
             capture.diffs.clear();
@@ -1740,12 +2381,12 @@ impl Doc {
         Ok(())
     }
 
-    /// Translate captured import or undo diffs into surgical `AppEvent`s and
-    /// incremental index updates. Errors are not failures — they mean
-    /// "this frame is beyond the fast path" and the caller falls back
-    /// to `emit_diff_fallback`. Phase 1 plans everything against a
-    /// *clone* of the shadow order (no state touched), so an abort
-    /// leaves the index coherent for the fallback's pre/post reasoning.
+    /// Translate captured import or undo diffs into surgical `AppEvent`s
+    /// and incremental index updates. Errors are not failures — they
+    /// mean "this frame is beyond the fast path" and the caller falls
+    /// back to `emit_diff_fallback`. Phase 1 plans everything against
+    /// clones (no state touched), so an abort leaves the index coherent
+    /// for the fallback's pre/post reasoning.
     fn translate_captured_diffs(
         &self,
         diffs: Vec<CapturedDiff>,
@@ -1753,48 +2394,65 @@ impl Doc {
         pre_settings: &SettingsView,
     ) -> Result<(), ()> {
         // ---- Phase 1: plan (read-only) ----
-        let mut order: Vec<String> = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.order.clone()
-        };
-        let mut deleted = HashSet::<String>::new();
-        let mut inserted = HashSet::<String>::new();
-        let mut map_dirty = HashMap::<ContainerID, HashSet<String>>::new();
         let mut lists_dirty = false;
         let mut settings_dirty = false;
+        let mut upserts = HashSet::<String>::new();
+        let mut removals = HashSet::<String>::new();
+        let mut map_dirty = HashMap::<ContainerID, HashSet<String>>::new();
+        // list id → shadow clone with this frame's positional ops applied.
+        let mut shadows = HashMap::<String, Vec<Option<OrderEntry>>>::new();
+        // list id → item ids whose entries were (re)inserted this frame:
+        // the actively-moved candidates for minimal event emission.
+        let mut active: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut entry_churn = 0usize;
 
-        for diff in diffs {
-            match diff {
-                CapturedDiff::Opaque => return Err(()),
-                CapturedDiff::Lists => lists_dirty = true,
-                CapturedDiff::Settings => settings_dirty = true,
-                CapturedDiff::ItemMap { container, keys } => {
-                    map_dirty.entry(container).or_default().extend(keys);
-                }
-                CapturedDiff::Items(items) => {
-                    let mut pos = 0usize;
-                    for it in items {
-                        match it {
-                            CapturedListItem::Retain(n) => {
-                                pos = pos.checked_add(n).ok_or(())?;
-                                if pos > order.len() {
-                                    return Err(());
+        {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            for diff in diffs {
+                match diff {
+                    CapturedDiff::Opaque => return Err(()),
+                    CapturedDiff::Lists => lists_dirty = true,
+                    CapturedDiff::Settings => settings_dirty = true,
+                    CapturedDiff::ItemsRoot { upserted, removed } => {
+                        upserts.extend(upserted);
+                        removals.extend(removed);
+                    }
+                    CapturedDiff::ItemMap { container, keys } => {
+                        map_dirty.entry(container).or_default().extend(keys);
+                    }
+                    CapturedDiff::Order { list_id, ops } => {
+                        let shadow = shadows.entry(list_id.clone()).or_insert_with(|| {
+                            guard.raw_orders.get(&list_id).cloned().unwrap_or_default()
+                        });
+                        let mut pos = 0usize;
+                        for op in ops {
+                            match op {
+                                CapturedListItem::Retain(n) => {
+                                    pos = pos.checked_add(n).ok_or(())?;
+                                    if pos > shadow.len() {
+                                        return Err(());
+                                    }
                                 }
-                            }
-                            CapturedListItem::Delete(n) => {
-                                if pos + n > order.len() {
-                                    return Err(());
+                                CapturedListItem::Delete(n) => {
+                                    if pos + n > shadow.len() {
+                                        return Err(());
+                                    }
+                                    entry_churn += n;
+                                    shadow.drain(pos..pos + n);
                                 }
-                                deleted.extend(order.drain(pos..pos + n));
-                            }
-                            CapturedListItem::Insert(containers) => {
-                                for cid in containers {
-                                    let cid = cid.ok_or(())?;
-                                    let map = self.inner.get_map(cid);
-                                    let id = read_string(&map, KEY_ID).ok_or(())?;
-                                    order.insert(pos.min(order.len()), id.clone());
-                                    inserted.insert(id);
-                                    pos += 1;
+                                CapturedListItem::Insert(vals) => {
+                                    for v in vals {
+                                        let entry = v.as_deref().and_then(OrderEntry::parse);
+                                        if let Some(e) = &entry {
+                                            active
+                                                .entry(list_id.clone())
+                                                .or_default()
+                                                .insert(e.item_id.clone());
+                                        }
+                                        shadow.insert(pos.min(shadow.len()), entry);
+                                        pos += 1;
+                                        entry_churn += 1;
+                                    }
                                 }
                             }
                         }
@@ -1802,165 +2460,203 @@ impl Doc {
                 }
             }
         }
+        // A key both deleted and re-set within the frame coalesces to
+        // its final state in the map diff; treat re-adds as upserts.
+        removals.retain(|id| !upserts.contains(id));
 
-        // The shadow must land exactly on the post-import list, or our
-        // positional reasoning was wrong somewhere — resync.
-        if order.len() != self.items().len() {
-            return Err(());
-        }
-
-        // deleted∩inserted = positional moves; deleted−inserted = gone.
-        let removed: Vec<String> = deleted.difference(&inserted).cloned().collect();
-        let mut moved: HashSet<String> = deleted.intersection(&inserted).cloned().collect();
-
-        // A single moved element is a rotation: one naive remove-then-
-        // insert-at-live_index on the consumer reproduces it, and the
-        // passively-displaced items shift correctly without any event of
-        // their own. Two or more moved elements are *not* expressible that
-        // way — emitting ItemMoved for only the elements Loro recorded as
-        // moved leaves the passively-shifted items uncorrected, so a
-        // consumer applying remove+insert per event interleaves them (and
-        // our own projection, built the same way, drifts too).
-        //
-        // For an in-list reorder we keep the fast path by widening the move
-        // set to *every* item whose live position within the list changed —
-        // exactly the set `diff_items` emits — which a consumer's ascending
-        // remove+insert reconstructs exactly. Frames that aren't a clean
-        // in-list reorder (cross-list moves, or adds/removes mixed into the
-        // same frame) fail the invariants below and fall back to a
-        // whole-doc resync.
-        if moved.len() > 1 {
-            // Pure permutation only: no structural adds or removals, so the
-            // pre- and post-import lists are the same multiset.
-            if !removed.is_empty() || inserted.len() != moved.len() {
+        // The shadows must land exactly on the post-import containers,
+        // or our positional reasoning was wrong somewhere — resync.
+        for (list_id, shadow) in &shadows {
+            if shadow.len() != self.order_list(list_id).len() {
                 return Err(());
-            }
-            // Every moved element must be live and share one list. A moved
-            // element's `by_id` cursor still points at the Loro slot the
-            // `mov` vacated (phase 2 re-registers it), so resolve its map
-            // through the freshly-rebuilt shadow order, not `find_item`.
-            let items = self.items();
-            let mut list_id: Option<String> = None;
-            for id in &moved {
-                let idx = order.iter().position(|x| x == id).ok_or(())?;
-                let map = item_map_at(&items, idx).ok_or(())?;
-                if !is_in_list_view(&map) {
-                    return Err(());
-                }
-                let lid = read_string(&map, KEY_LIST_ID).ok_or(())?;
-                match &list_id {
-                    Some(seen) if seen != &lid => return Err(()),
-                    _ => list_id = Some(lid),
-                }
-            }
-            let list_id = list_id.ok_or(())?;
-            // Pristine pre-frame live order, and the post-import live order
-            // for that list. Liveness can't change in a pure reorder, so the
-            // post live order is the shadow order filtered to the pre-live
-            // set — no per-item map reads needed.
-            let pre_live: Vec<String> = {
-                let guard = self.item_index.lock().expect("item index mutex poisoned");
-                guard
-                    .live_by_list
-                    .get(&list_id)
-                    .cloned()
-                    .unwrap_or_default()
-            };
-            let pre_set: HashSet<&String> = pre_live.iter().collect();
-            if !moved.iter().all(|id| pre_set.contains(id)) {
-                return Err(());
-            }
-            let post_live: Vec<String> = order
-                .iter()
-                .filter(|id| pre_set.contains(id))
-                .cloned()
-                .collect();
-            if post_live.len() != pre_live.len() {
-                return Err(());
-            }
-            // Widen `moved` to every id whose live position shifted.
-            for (i, id) in post_live.iter().enumerate() {
-                if pre_live.get(i) != Some(id) {
-                    moved.insert(id.clone());
-                }
             }
         }
 
-        // Resolve map-dirty containers to item ids (skipping ones that
-        // were removed in the same frame — removal wins).
+        // Resolve map-dirty containers to item ids. Upserted ids get
+        // full-state events anyway; deleted containers are fine iff the
+        // frame also removed them.
         let mut dirty_keys_by_id = HashMap::<String, HashSet<String>>::new();
         for (cid, keys) in map_dirty {
             let map = self.inner.get_map(cid);
             let Some(id) = read_string(&map, KEY_ID) else {
-                // Deleted container (or foreign shape): fine iff this
-                // frame also removed it, otherwise bail.
                 continue;
             };
-            if deleted.contains(&id) && !inserted.contains(&id) {
+            if removals.contains(&id) || upserts.contains(&id) {
                 continue;
             }
             dirty_keys_by_id.entry(id).or_default().extend(keys);
         }
 
-        // Every id that needs events, with its final global index. The
-        // widened move set (above) may include passively-shifted items that
-        // aren't `inserted` — they need an ItemMoved too, so fold them in.
-        let mut dirty_ids: HashSet<String> = inserted.clone();
-        dirty_ids.extend(dirty_keys_by_id.keys().cloned());
-        dirty_ids.extend(moved.iter().cloned());
-        if removed.len() + dirty_ids.len() >= DIFF_TRANSLATE_MAX_DIRTY {
+        if upserts.len() + removals.len() + dirty_keys_by_id.len() + entry_churn
+            >= DIFF_TRANSLATE_MAX_DIRTY
+        {
             return Err(());
         }
-        let mut dirty_sorted: Vec<(usize, String)> = Vec::with_capacity(dirty_ids.len());
-        for id in dirty_ids {
-            let idx = order.iter().position(|x| x == &id).ok_or(())?;
-            dirty_sorted.push((idx, id));
-        }
-        dirty_sorted.sort_unstable();
 
-        // Which of the inserted ids are genuinely new (vs moved)?
-        let pre_known: HashSet<String> = {
+        // Per-item change plan: old meta from the index, new meta from
+        // the post-import doc.
+        struct Change {
+            old: Option<ItemMeta>,
+            new: Option<ItemMeta>,
+            keys: HashSet<String>,
+            brand_new: bool,
+        }
+        let mut changes = HashMap::<String, Change>::new();
+        {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
-            inserted
+            let items = self.items();
+            for id in &upserts {
+                let Some(map) = item_map_of(&items, id) else {
+                    return Err(());
+                };
+                let old = guard.meta.get(id).cloned();
+                let brand_new = old.is_none();
+                // A re-set of an existing container (undo/redo shapes)
+                // is translated as "everything may have changed".
+                let keys: HashSet<String> = if brand_new {
+                    HashSet::new()
+                } else {
+                    [
+                        KEY_TEXT,
+                        KEY_NOTES,
+                        KEY_DONE_AT,
+                        KEY_BINNED_AT,
+                        KEY_LOCATION,
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect()
+                };
+                changes.insert(
+                    id.clone(),
+                    Change {
+                        old,
+                        new: Some(item_meta(&map)),
+                        keys,
+                        brand_new,
+                    },
+                );
+            }
+            for (id, keys) in dirty_keys_by_id {
+                let Some(map) = item_map_of(&items, &id) else {
+                    return Err(());
+                };
+                changes.insert(
+                    id.clone(),
+                    Change {
+                        old: guard.meta.get(&id).cloned(),
+                        new: Some(item_meta(&map)),
+                        keys,
+                        brand_new: false,
+                    },
+                );
+            }
+            for id in &removals {
+                changes.insert(
+                    id.clone(),
+                    Change {
+                        old: guard.meta.get(id).cloned(),
+                        new: None,
+                        keys: HashSet::new(),
+                        brand_new: false,
+                    },
+                );
+            }
+        }
+
+        let mut affected: HashSet<String> = shadows.keys().cloned().collect();
+        for c in changes.values() {
+            if let Some(o) = &c.old {
+                affected.insert(o.list_id.clone());
+            }
+            if let Some(n) = &c.new {
+                affected.insert(n.list_id.clone());
+            }
+        }
+
+        // ---- Phase 2: commit index ----
+        let (pre_live, post_live) = {
+            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
+            let pre: HashMap<String, Vec<String>> = affected
                 .iter()
-                .filter(|id| guard.by_id.contains_key(*id))
-                .cloned()
-                .collect()
+                .map(|l| {
+                    (
+                        l.clone(),
+                        guard.live_by_list.get(l).cloned().unwrap_or_default(),
+                    )
+                })
+                .collect();
+            for (id, c) in &changes {
+                match &c.new {
+                    Some(m) => guard.set_meta(id, m.clone()),
+                    None => guard.remove_item(id),
+                }
+            }
+            for (l, shadow) in shadows {
+                guard.raw_orders.insert(l, shadow);
+            }
+            let mut post = HashMap::new();
+            for l in &affected {
+                post.insert(l.clone(), guard.refresh_live(l));
+            }
+            (pre, post)
         };
 
-        // ---- Phase 2: commit (index writes + events) ----
-        {
-            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.order = order;
-        }
-        if !removed.is_empty() {
-            self.remove_indexed_items(removed.iter().map(String::as_str));
-            for id in &removed {
-                self.push_event(AppEvent::ItemRemoved { id: id.clone() });
-            }
-        }
-        // Register containers + cursors for inserted ids before any
-        // projection sync — a sync in one list may walk candidates that
-        // were inserted later in the frame.
-        let items = self.items();
-        for (idx, id) in &dirty_sorted {
-            if !inserted.contains(id) {
-                continue;
-            }
-            let map = item_map_at(&items, *idx).ok_or(())?;
-            let cursor = items.get_cursor(*idx, Side::Middle).ok_or(())?;
-            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-            guard.by_id.insert(id.clone(), IndexedItem { map, cursor });
+        // ---- Phase 3: events ----
+        let view_of = |id: &str| -> Result<ItemView, ()> {
+            let map = item_map_of(&self.items(), id).ok_or(())?;
+            item_view(&map).ok_or(())
+        };
+
+        let mut removals_sorted: Vec<&String> = removals.iter().collect();
+        removals_sorted.sort();
+        for id in removals_sorted {
+            self.push_event(AppEvent::ItemRemoved { id: id.clone() });
         }
 
-        for (idx, id) in &dirty_sorted {
-            let (_, map) = self.find_item(id).map_err(|_| ())?;
-            let live_index = self
-                .sync_live_projection_for_item(id, &map, *idx)
-                .map_err(|_| ())?;
-            let view = item_view(&map).ok_or(())?;
-            let brand_new = inserted.contains(id) && !pre_known.contains(id);
-            if brand_new {
+        // Content + hidden-side events, in id order so event sequences
+        // are deterministic. Live-side positional events are emitted by
+        // the per-list walk below.
+        let mut change_ids: Vec<&String> = changes.keys().collect();
+        change_ids.sort();
+        for id in change_ids {
+            let c = &changes[id];
+            let Some(new) = &c.new else { continue };
+            let has = |k: &str| c.keys.contains(k);
+            if !c.brand_new {
+                let view = view_of(id)?;
+                if has(KEY_TEXT) {
+                    self.push_event(AppEvent::ItemTextChanged {
+                        id: id.clone(),
+                        text: view.text.clone(),
+                    });
+                }
+                if has(KEY_NOTES) {
+                    self.push_event(AppEvent::ItemNotesChanged {
+                        id: id.clone(),
+                        notes: view.notes.clone(),
+                    });
+                }
+            }
+            let left_list = c.old.as_ref().is_some_and(|o| o.list_id != new.list_id);
+            if new.live {
+                // Live cross-list movers get their leave-signal *before*
+                // any per-list walk: the consumer removes the item from
+                // the source array now (appending it to the target), so
+                // walks over the source list never reposition around a
+                // ghost. The target walk repositions the item via an
+                // ordinary `ItemMoved` candidate.
+                if !c.brand_new && has(KEY_LOCATION) && left_list {
+                    self.push_event(AppEvent::ItemListChanged {
+                        id: id.clone(),
+                        list_id: new.list_id.clone(),
+                        live_index: None,
+                    });
+                }
+                continue;
+            }
+            let view = view_of(id)?;
+            if c.brand_new {
                 self.push_event(AppEvent::ItemAdded {
                     id: view.id,
                     list_id: view.list_id,
@@ -1969,47 +2665,167 @@ impl Doc {
                     created_at: view.created_at,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
-                    index: *idx,
-                    live_index,
+                    live_index: None,
                 });
                 continue;
-            }
-            let keys = dirty_keys_by_id.get(id);
-            let has = |k: &str| keys.is_some_and(|s| s.contains(k));
-            if has(KEY_TEXT) {
-                self.push_event(AppEvent::ItemTextChanged {
-                    id: id.clone(),
-                    text: view.text.clone(),
-                });
-            }
-            if has(KEY_NOTES) {
-                self.push_event(AppEvent::ItemNotesChanged {
-                    id: id.clone(),
-                    notes: view.notes.clone(),
-                });
             }
             if has(KEY_DONE_AT) || has(KEY_BINNED_AT) {
                 self.push_event(AppEvent::ItemStatusChanged {
                     id: id.clone(),
                     done_at: view.done_at,
                     binned_at: view.binned_at,
-                    live_index,
+                    live_index: None,
                 });
             }
-            if has(KEY_LIST_ID) {
+            if has(KEY_LOCATION) && left_list {
                 self.push_event(AppEvent::ItemListChanged {
                     id: id.clone(),
-                    list_id: view.list_id.clone(),
-                    live_index,
+                    list_id: new.list_id.clone(),
+                    live_index: None,
                 });
             }
-            if moved.contains(id) {
-                self.push_event(AppEvent::ItemMoved {
-                    id: id.clone(),
-                    index: *idx,
-                    live_index,
-                });
+        }
+
+        // Per-list live walk: minimal ascending remove+insert event
+        // plan, verified by replaying it the way a naive consumer does.
+        let mut affected_sorted: Vec<&String> = affected.iter().collect();
+        affected_sorted.sort();
+        let mut planned: Vec<(usize, String, AppEvent)> = Vec::new();
+        for list in affected_sorted {
+            let pre = &pre_live[list.as_str()];
+            let post = &post_live[list.as_str()];
+            let post_set: HashSet<&String> = post.iter().collect();
+            let base: Vec<&String> = pre.iter().filter(|id| post_set.contains(id)).collect();
+            let post_pos: HashMap<&String, usize> =
+                post.iter().enumerate().map(|(i, id)| (id, i)).collect();
+
+            // Insert-type ids: not in the consumer's array yet; their
+            // typed event both inserts and positions them.
+            let mut insert_type: HashMap<&String, AppEvent> = HashMap::new();
+            for (i, id) in post.iter().enumerate() {
+                let Some(c) = changes.get(id) else { continue };
+                let Some(new) = &c.new else { continue };
+                if !new.live || new.list_id != *list {
+                    continue;
+                }
+                if c.brand_new {
+                    let view = view_of(id)?;
+                    insert_type.insert(
+                        id,
+                        AppEvent::ItemAdded {
+                            id: view.id,
+                            list_id: view.list_id,
+                            text: view.text,
+                            notes: view.notes,
+                            created_at: view.created_at,
+                            done_at: view.done_at,
+                            binned_at: view.binned_at,
+                            live_index: Some(i),
+                        },
+                    );
+                    continue;
+                }
+                // Hidden→live restores insert here. Cross-list movers
+                // are *not* insert-type: their pre-walk leave-signal
+                // `ItemListChanged` already appended them to this list
+                // on the consumer, so an `ItemMoved` candidate
+                // repositions them like any other id.
+                let shown = c.old.as_ref().is_some_and(|o| !o.live);
+                if shown && (c.keys.contains(KEY_DONE_AT) || c.keys.contains(KEY_BINNED_AT)) {
+                    let view = view_of(id)?;
+                    insert_type.insert(
+                        id,
+                        AppEvent::ItemStatusChanged {
+                            id: id.clone(),
+                            done_at: view.done_at,
+                            binned_at: view.binned_at,
+                            live_index: Some(i),
+                        },
+                    );
+                }
             }
+
+            // Candidate move set: start minimal (this frame's actively
+            // re-inserted entries), widen to every position-changed id
+            // if the minimal replay doesn't reconstruct the post state.
+            // The simulation models the consumer exactly: one
+            // remove-then-insert-at-live_index per event, applied
+            // sequentially in emission (ascending post) order.
+            let simulate = |cands: &HashSet<&String>| -> bool {
+                let mut arr: Vec<&String> = base
+                    .iter()
+                    .filter(|id| !insert_type.contains_key(**id))
+                    .copied()
+                    .collect();
+                let mut ops: Vec<(usize, &String)> = insert_type
+                    .keys()
+                    .copied()
+                    .chain(cands.iter().copied())
+                    .filter_map(|id| post_pos.get(id).map(|p| (*p, id)))
+                    .collect();
+                ops.sort_unstable();
+                ops.dedup();
+                for (p, id) in ops {
+                    arr.retain(|x| *x != id);
+                    arr.insert(p.min(arr.len()), id);
+                }
+                arr.len() == post.len() && arr.iter().zip(post.iter()).all(|(a, b)| *a == b)
+            };
+
+            let minimal: HashSet<&String> = active
+                .get(list.as_str())
+                .into_iter()
+                .flatten()
+                .filter(|id| post_set.contains(*id) && !insert_type.contains_key(*id))
+                .collect();
+            let candidates = if simulate(&minimal) {
+                minimal
+            } else {
+                // Widen to every id whose surviving-relative position
+                // changed; ascending remove+insert of that whole set is
+                // the proven reconstruction. Bail to FullResync when
+                // the event volume would exceed the surgical budget or
+                // the replay still doesn't line up.
+                let base_pos: HashMap<&String, usize> =
+                    base.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+                let mut widened = HashSet::new();
+                for (i, id) in post.iter().enumerate() {
+                    if insert_type.contains_key(id) {
+                        continue;
+                    }
+                    if base_pos.get(id).copied() != Some(i) {
+                        widened.insert(id);
+                    }
+                }
+                if widened.len() + planned.len() >= DIFF_TRANSLATE_MAX_DIRTY {
+                    return Err(());
+                }
+                if !simulate(&widened) {
+                    return Err(());
+                }
+                widened
+            };
+
+            for (i, id) in post.iter().enumerate() {
+                if let Some(ev) = insert_type.remove(id) {
+                    planned.push((i, list.clone(), ev));
+                } else if candidates.contains(id) {
+                    planned.push((
+                        i,
+                        list.clone(),
+                        AppEvent::ItemMoved {
+                            id: id.clone(),
+                            live_index: Some(i),
+                        },
+                    ));
+                }
+            }
+        }
+        if planned.len() + removals.len() >= DIFF_TRANSLATE_MAX_DIRTY {
+            return Err(());
+        }
+        for (_, _, ev) in planned {
+            self.push_event(ev);
         }
 
         if lists_dirty || settings_dirty {
@@ -2031,7 +2847,7 @@ impl Doc {
     /// disposable index, then emit one control signal. Consumers fetch the
     /// current snapshot once; they are never flooded with N synthetic adds.
     fn emit_diff_fallback(&self) {
-        self.rebuild_item_index();
+        self.rebuild_index();
         let mut events = self.events.lock().expect("events mutex poisoned");
         events.clear();
         events.push_back(AppEvent::FullResync);
@@ -2120,10 +2936,10 @@ impl Doc {
                 index: idx,
             });
         }
-        // Walking in global order means a per-list counter yields each
-        // live item's position in its list's live projection.
+        // Walking the canonical grouped order means a per-list counter
+        // yields each live item's position in its list's live projection.
         let mut live_counters = HashMap::<String, usize>::new();
-        for (idx, item) in self.iter_items().enumerate() {
+        for item in self.iter_items() {
             let live_index = if item.is_in_list_view() {
                 let counter = live_counters.entry(item.list_id.clone()).or_insert(0);
                 let i = *counter;
@@ -2140,7 +2956,6 @@ impl Doc {
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
-                index: idx,
                 live_index,
             });
         }
@@ -2175,7 +2990,7 @@ impl Doc {
         let last_pushed_vv = VersionVector::decode(&envelope.last_pushed_vv)
             .map_err(|e| DocError::Loro(e.to_string()))?;
         let undo = Mutex::new(make_undo_manager(&inner));
-        let item_index = Mutex::new(ItemIndex::default());
+        let item_index = Mutex::new(ProjectionIndex::default());
         // Subscribe *after* the snapshot import so the boot state
         // doesn't land in the gated diff buffer as one giant frame.
         let diff_capture = Arc::new(Mutex::new(DiffCapture::default()));
@@ -2189,7 +3004,7 @@ impl Doc {
             diff_capture,
             _diff_sub,
         };
-        doc.rebuild_item_index();
+        doc.rebuild_index();
         Ok(doc)
     }
 
@@ -2198,7 +3013,10 @@ impl Doc {
     /// Logical-state hash. Stable across replicas at logical equality;
     /// used for convergence assertions in tests. Snapshot bytes are
     /// *not* stable (Loro stores per-replica metadata), so we hash a
-    /// canonical serialization of the visible item / list state.
+    /// canonical serialization of the visible item / list state. Items
+    /// are hashed in the canonical grouped walk (`all_items`) so each
+    /// list's resolved order — including hidden items' restore
+    /// positions — is part of the hash.
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
         let settings = self.get_settings();
@@ -2224,7 +3042,7 @@ impl Doc {
             hash_str(&mut hasher, &l.name);
             hasher.update(l.created_at.to_be_bytes());
         }
-        // Items: walk by MovableList order for the same reason.
+        // Items: canonical grouped walk order.
         let items: Vec<ItemView> = self.iter_items().collect();
         hasher.update(b"I");
         hasher.update((items.len() as u32).to_be_bytes());
@@ -2242,8 +3060,8 @@ impl Doc {
 
     // ---------- private ----------
 
-    fn items(&self) -> LoroMovableList {
-        self.inner.get_movable_list(ROOT_ITEMS)
+    fn items(&self) -> LoroMap {
+        self.inner.get_map(ROOT_ITEMS)
     }
 
     fn lists(&self) -> LoroMovableList {
@@ -2254,36 +3072,32 @@ impl Doc {
         self.inner.get_map(ROOT_SETTINGS)
     }
 
-    fn find_item(&self, item_id: &str) -> Result<(usize, LoroMap), DocError> {
-        let (map, cursor) = {
+    fn order_list(&self, list_id: &str) -> LoroMovableList {
+        self.inner
+            .get_movable_list(order_root_name(list_id).as_str())
+    }
+
+    /// Item container lookup, gated on the disposable index so a doc
+    /// mid-boot-replay reports "not found" until `finish_oplog_replay`
+    /// materializes state (deliberate: see the deferred-replay test).
+    fn find_item(&self, item_id: &str) -> Result<LoroMap, DocError> {
+        {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
-            let item = guard
-                .by_id
-                .get(item_id)
-                .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-            (item.map.clone(), item.cursor.clone())
-        };
-        let pos = self
-            .inner
-            .get_cursor_pos(&cursor)
-            .map_err(|e| DocError::Loro(format!("Cannot resolve cursor for {item_id}: {e}")))?;
-        let index = pos.current.pos;
-        if let Some(updated) = pos.update {
-            let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-            if let Some(item) = guard.by_id.get_mut(item_id) {
-                item.cursor = updated;
+            if !guard.meta.contains_key(item_id) {
+                return Err(DocError::ItemNotFound(item_id.to_string()));
             }
         }
-        Ok((index, map))
+        item_map_of(&self.items(), item_id)
+            .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))
     }
 
     fn find_list(&self, list_id: &str) -> Result<(usize, LoroMap), DocError> {
         let lists = self.lists();
         for i in 0..lists.len() {
-            if let Some(map) = list_map_at(&lists, i) {
-                if read_string(&map, KEY_ID).as_deref() == Some(list_id) {
-                    return Ok((i, map));
-                }
+            if let Some(map) = list_map_at(&lists, i)
+                && read_string(&map, KEY_ID).as_deref() == Some(list_id)
+            {
+                return Ok((i, map));
             }
         }
         Err(DocError::ListNotFound(list_id.into()))
@@ -2298,55 +3112,6 @@ impl Doc {
             return Ok(());
         }
         self.find_list(list_id).map(|_| ())
-    }
-
-    /// Materialize a new live-item LoroMap at absolute position `abs`
-    /// in `items` and populate the standard keys. Caller is responsible
-    /// for the surrounding `commit()` and event emission so a batch can
-    /// share both. Returns `(id, created_at, map)` so the caller can
-    /// install the committed item in the disposable lookup index.
-    fn write_new_item(
-        &self,
-        items: &LoroMovableList,
-        list_id: &str,
-        text: &str,
-        abs: usize,
-    ) -> Result<(String, i64, LoroMap), DocError> {
-        let map = if abs >= items.len() {
-            items.push_container(LoroMap::new())?
-        } else {
-            items.insert_container(abs, LoroMap::new())?
-        };
-        let id = new_id();
-        let now = now_millis();
-        map.insert(KEY_ID, id.as_str())?;
-        map.insert(KEY_TEXT, text)?;
-        map.insert(KEY_LIST_ID, list_id)?;
-        map.insert(KEY_CREATED_AT, now)?;
-        Ok((id, now, map))
-    }
-
-    fn move_item_inner(
-        &self,
-        item_id: &str,
-        idx: usize,
-        map: &LoroMap,
-        target_list_id: &str,
-        target_index: usize,
-    ) -> Result<usize, DocError> {
-        let moving_in_list_view =
-            read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none();
-        let items = self.items();
-        let abs = if moving_in_list_view {
-            self.live_move_target(item_id, target_list_id, target_index, idx)?
-        } else {
-            absolute_index_for_list_position(&items, target_list_id, target_index, idx)
-        };
-        map.insert(KEY_LIST_ID, target_list_id)?;
-        if abs != idx {
-            items.mov(idx, abs)?;
-        }
-        Ok(abs)
     }
 
     fn emit_item_diffs(&self, pre_items: &[ItemView]) {
@@ -2423,19 +3188,19 @@ fn assert_unique_item_ids(item_ids: &[&str]) -> Result<(), DocError> {
 }
 
 fn seed_builtins(doc: &LoroDoc) -> Result<bool, DocError> {
-    // `LIST_MAIN` is a *reserved id*, not a MovableList entry — items
+    // `LIST_MAIN` is a *reserved id*, not a ListMeta row — items
     // reference it as the string "main" and clients render its label
-    // client-side (until we add a meta CRDT for things like a custom
-    // name). There are no persisted user-list seeds, but we still
-    // materialise the user-list root container so fresh docs keep the
-    // same top-level shape. Do the same for doc-level settings.
+    // client-side. Touch the root containers so fresh docs keep the
+    // same top-level shape; no ops are emitted for untouched roots.
+    let _ = doc.get_map(ROOT_ITEMS);
     let _ = doc.get_movable_list(ROOT_LISTS);
     let _ = doc.get_map(ROOT_SETTINGS);
+    let _ = doc.get_movable_list(order_root_name(LIST_MAIN).as_str());
     Ok(false)
 }
 
-fn item_map_at(items: &LoroMovableList, idx: usize) -> Option<LoroMap> {
-    match items.get(idx)? {
+fn item_map_of(items: &LoroMap, item_id: &str) -> Option<LoroMap> {
+    match items.get(item_id)? {
         ValueOrContainer::Container(Container::Map(m)) => Some(m),
         _ => None,
     }
@@ -2444,6 +3209,16 @@ fn item_map_at(items: &LoroMovableList, idx: usize) -> Option<LoroMap> {
 fn list_map_at(lists: &LoroMovableList, idx: usize) -> Option<LoroMap> {
     match lists.get(idx)? {
         ValueOrContainer::Container(Container::Map(m)) => Some(m),
+        _ => None,
+    }
+}
+
+fn scalar_entry_at(order: &LoroMovableList, idx: usize) -> Option<OrderEntry> {
+    match order.get(idx)? {
+        ValueOrContainer::Value(v) => v
+            .into_string()
+            .ok()
+            .and_then(|s| OrderEntry::parse(s.as_ref())),
         _ => None,
     }
 }
@@ -2480,15 +3255,33 @@ fn settings_view(map: &LoroMap) -> SettingsView {
     }
 }
 
+/// Location/status slice used by the projection index. Items with a
+/// missing or unparseable `location` deterministically project into
+/// `main`'s fallback tail (empty placement never matches an entry) so
+/// data is never hidden by a bad register.
+fn item_meta(map: &LoroMap) -> ItemMeta {
+    let (list_id, placement_id) = read_string(map, KEY_LOCATION)
+        .and_then(|s| Location::parse(&s))
+        .map(|l| (l.list_id, l.placement_id))
+        .unwrap_or_else(|| (LIST_MAIN.to_string(), String::new()));
+    ItemMeta {
+        list_id,
+        placement_id,
+        live: is_in_list_view(map),
+        created_at: read_i64(map, KEY_CREATED_AT).unwrap_or(0),
+    }
+}
+
 fn item_view(map: &LoroMap) -> Option<ItemView> {
+    let location = read_string(map, KEY_LOCATION)
+        .and_then(|s| Location::parse(&s))
+        .map(|l| l.list_id)
+        .unwrap_or_else(|| LIST_MAIN.to_string());
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
-        // Pre-notes items don't have the key — default to empty so old
-        // snapshots load and items added before the migration round-trip
-        // through `get_item` cleanly.
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
-        list_id: read_string(map, KEY_LIST_ID)?,
+        list_id: location,
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
@@ -2505,43 +3298,6 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
 
 fn is_in_list_view(map: &LoroMap) -> bool {
     read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none()
-}
-
-/// Walk the items list and translate "the Nth entry in `target_list`"
-/// into the corresponding absolute index. `current_idx` is excluded
-/// from the count so move-to-current-position is a no-op rather than
-/// off-by-one.
-fn absolute_index_for_list_position(
-    items: &LoroMovableList,
-    target_list_id: &str,
-    target_index: usize,
-    current_idx: usize,
-) -> usize {
-    let mut matching = Vec::new();
-    for i in 0..items.len() {
-        if i == current_idx {
-            continue;
-        }
-        let Some(map) = item_map_at(items, i) else {
-            continue;
-        };
-        if read_string(&map, KEY_LIST_ID).as_deref() != Some(target_list_id) {
-            continue;
-        }
-        matching.push(i);
-    }
-    let Some(&anchor) = matching.get(target_index) else {
-        return items.len().saturating_sub(1);
-    };
-    // `target_index` is expressed in the post-move filtered view, but
-    // Loro expects an absolute destination in the pre-move list. When
-    // the item is moving forward, removing it shifts the anchor left by
-    // one, so adjust the absolute index back into the current list.
-    if current_idx < anchor {
-        anchor.saturating_sub(1)
-    } else {
-        anchor
-    }
 }
 
 fn hash_str(hasher: &mut Sha256, s: &str) {
@@ -2577,10 +3333,11 @@ fn new_id() -> String {
 }
 
 /// Diff two ordered slices of `ItemView` by id and emit `AppEvent`s for
-/// the transitions a UI store needs to mirror. Used by `apply_remote`
-/// where Loro applies a possibly-large batch of peer ops in one go and
-/// the cheapest path to per-id deltas is "snapshot before, snapshot
-/// after, walk both maps once."
+/// the transitions a UI store needs to mirror. Both slices are in the
+/// canonical grouped walk order (`all_items`), so walking `post` with a
+/// per-list counter reproduces each list's live projection. Used by
+/// bulk local mutations and `import_json`, where the cheapest path to
+/// per-id deltas is "snapshot before, snapshot after, walk both once."
 fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
     let pre_by_id: HashMap<&str, (usize, &ItemView)> = pre
         .iter()
@@ -2592,11 +3349,10 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
         .enumerate()
         .map(|(i, it)| (it.id.as_str(), (i, it)))
         .collect();
-    // Post-state live position per item id: walking `post` in global
-    // order with a per-list counter reproduces the live projection.
-    // Events emitted below are in ascending post order, so a consumer
-    // applying remove-then-insert-at-live_index per event converges on
-    // exactly this projection.
+    // Post-state live position per item id. Events emitted below are in
+    // ascending post order, so a consumer applying
+    // remove-then-insert-at-live_index per event converges on exactly
+    // this projection.
     let mut live_counters = HashMap::<&str, usize>::new();
     let mut live_pos = HashMap::<&str, usize>::with_capacity(post.len());
     for it in post {
@@ -2624,7 +3380,6 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     created_at: post_it.created_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
-                    index: post_idx,
                     live_index,
                 });
             }
@@ -2659,7 +3414,6 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                 if pre_idx != post_idx {
                     out.push(AppEvent::ItemMoved {
                         id: post_it.id.clone(),
-                        index: post_idx,
                         live_index,
                     });
                 }
@@ -2729,18 +3483,24 @@ mod tests {
     use super::*;
     use crate::crypto::Dek;
 
+    /// The incremental index must always agree with a from-scratch
+    /// recompute off the Loro containers.
     fn assert_live_projection_matches_doc(doc: &Doc) {
-        let mut expected: HashMap<String, Vec<String>> = HashMap::new();
-        let mut expected_order: Vec<String> = Vec::new();
-        for item in doc.iter_items() {
-            expected_order.push(item.id.clone());
-            if item.is_in_list_view() {
-                expected.entry(item.list_id).or_default().push(item.id);
-            }
-        }
+        let fresh = doc.compute_index();
         let guard = doc.item_index.lock().expect("item index mutex poisoned");
-        assert_eq!(guard.live_by_list, expected, "live_by_list out of sync");
-        assert_eq!(guard.order, expected_order, "order shadow out of sync");
+        assert_eq!(
+            guard.live_by_list, fresh.live_by_list,
+            "live_by_list out of sync with doc"
+        );
+        assert_eq!(
+            guard.raw_orders, fresh.raw_orders,
+            "raw order shadow out of sync with doc"
+        );
+        assert_eq!(guard.meta, fresh.meta, "item meta out of sync with doc");
+        assert_eq!(
+            guard.visible_counts, fresh.visible_counts,
+            "visible-entry counts out of sync with doc"
+        );
     }
 
     /// Not a correctness test — a quick order-of-magnitude probe for
@@ -2799,8 +3559,8 @@ mod tests {
         );
 
         let t = Instant::now();
-        doc.rebuild_item_index();
-        println!("rebuild_item_index:  {:?}", t.elapsed());
+        doc.rebuild_index();
+        println!("rebuild_index:       {:?}", t.elapsed());
         let _ = doc.drain_events();
 
         // Match a real browser session: persisted history is loaded before
@@ -2854,8 +3614,8 @@ mod tests {
 
     #[test]
     fn new_doc_has_no_persisted_lists() {
-        // Main is a reserved id with no MovableList entry, and there
-        // are no seeded user lists.
+        // Main is a reserved id with no ListMeta row, and there are no
+        // seeded user lists.
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
         assert!(lists.is_empty());
@@ -2863,13 +3623,62 @@ mod tests {
     }
 
     #[test]
-    fn add_item_to_main_works_without_movable_list_entry() {
+    fn add_item_to_main_works_without_list_meta_row() {
         // `LIST_MAIN` is virtual — items can address it even though
-        // no MovableList entry exists for it.
+        // no ListMeta row exists for it.
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "milk").unwrap();
         assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
         assert_eq!(doc.live_item_ids(LIST_MAIN), vec![id]);
+    }
+
+    #[test]
+    fn no_document_wide_item_movable_list_remains() {
+        // Success criterion for the v2 schema: `items` is a map keyed
+        // by item id, ordering lives in per-list order containers, and
+        // the old global MovableList root never materializes.
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let b = doc.add_item(&other, "b").unwrap();
+
+        assert!(doc.items().get(&a).is_some());
+        assert!(doc.items().get(&b).is_some());
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        assert_eq!(doc.order_list(&other).len(), 1);
+        // The v1 root (`items` as a MovableList) is a different
+        // container type entirely and stays empty.
+        assert_eq!(doc.inner.get_movable_list(ROOT_ITEMS).len(), 0);
+    }
+
+    #[test]
+    fn reordering_one_list_does_not_touch_other_order_containers() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let o1 = doc.add_item(&other, "o1").unwrap();
+        let o2 = doc.add_item(&other, "o2").unwrap();
+
+        let other_before: Vec<Option<OrderEntry>> = {
+            let order = doc.order_list(&other);
+            (0..order.len())
+                .map(|i| scalar_entry_at(&order, i))
+                .collect()
+        };
+        let vv_before = doc.oplog_vv();
+
+        doc.move_item(&a, LIST_MAIN, 1).unwrap();
+
+        let other_after: Vec<Option<OrderEntry>> = {
+            let order = doc.order_list(&other);
+            (0..order.len())
+                .map(|i| scalar_entry_at(&order, i))
+                .collect()
+        };
+        assert_eq!(other_before, other_after);
+        assert_eq!(doc.live_item_ids(&other), vec![o1, o2]);
+        assert!(doc.oplog_vv() != vv_before, "the reorder itself committed");
     }
 
     #[test]
@@ -2951,6 +3760,27 @@ mod tests {
     }
 
     #[test]
+    fn status_flips_do_not_touch_order_containers() {
+        // Decision pinned by spec/data-model.md: done/binned are pure
+        // item-map writes; the entry stays where it is so restore is
+        // exact-position for free.
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let order_len_before = doc.order_list(LIST_MAIN).len();
+
+        doc.set_item_done(&b, true).unwrap();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+
+        doc.set_item_done(&b, false).unwrap();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b, c]);
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
     fn empty_bin_removes_only_binned() {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "keep").unwrap();
@@ -2976,7 +3806,20 @@ mod tests {
     }
 
     #[test]
-    fn delete_list_reassigns_items_to_now() {
+    fn hard_delete_removes_order_entries() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        doc.set_item_binned(&b, true).unwrap();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 2);
+        doc.delete_binned(&b).unwrap();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a]);
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
+    fn delete_list_reassigns_items_to_main() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "milk").unwrap();
@@ -2986,7 +3829,35 @@ mod tests {
     }
 
     #[test]
-    fn delete_now_refused() {
+    fn delete_list_moves_live_done_and_binned_items_with_fresh_placements() {
+        let doc = Doc::new().unwrap();
+        let mylist = doc.add_list("Errands").unwrap();
+        let live = doc.add_item(&mylist, "live").unwrap();
+        let done = doc.add_item(&mylist, "done").unwrap();
+        let binned = doc.add_item(&mylist, "binned").unwrap();
+        doc.set_item_done(&done, true).unwrap();
+        doc.set_item_binned(&binned, true).unwrap();
+        let main_existing = doc.add_item(LIST_MAIN, "already here").unwrap();
+
+        doc.delete_list(&mylist).unwrap();
+
+        for id in [&live, &done, &binned] {
+            assert_eq!(doc.get_item(id).unwrap().list_id, LIST_MAIN);
+        }
+        // Live projection: existing main item first, then the deleted
+        // list's live item appended.
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![main_existing, live.clone()]
+        );
+        // Done/binned semantics unchanged.
+        assert_eq!(doc.done_item_ids(), vec![done]);
+        assert_eq!(doc.binned_item_ids(), vec![binned]);
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
+    fn delete_main_refused() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
             doc.delete_list(LIST_MAIN).unwrap_err(),
@@ -3091,6 +3962,7 @@ mod tests {
         let bytes = doc.save().unwrap();
         let restored = Doc::load(&bytes).unwrap();
         assert_eq!(restored.get_item(&id).unwrap().text, "persisted");
+        assert_eq!(restored.fingerprint(), doc.fingerprint());
     }
 
     #[test]
@@ -3126,16 +3998,14 @@ mod tests {
         assert!(a.get_item(&item_b).is_some());
 
         assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_live_projection_matches_doc(&a);
+        assert_live_projection_matches_doc(&b);
     }
 
     #[test]
     fn fingerprint_diverges_when_state_diverges() {
         let mut a = Doc::new().unwrap();
         let mut b = Doc::new().unwrap();
-        // Independently-initialised docs have the same logical state
-        // (built-in lists with the same ids; created_at differs by
-        // wall-clock millis but the test doesn't pin equal docs — it
-        // just shows that adding-and-not-syncing diverges).
         let _ = a.add_item(LIST_MAIN, "A only").unwrap();
         let _ = b.add_item(LIST_MAIN, "B only").unwrap();
         a.mark_pushed();
@@ -3160,7 +4030,7 @@ mod tests {
     }
 
     #[test]
-    fn indexed_item_cursor_tracks_repeated_moves() {
+    fn repeated_moves_keep_index_in_sync() {
         let doc = Doc::new().unwrap();
         let _a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
@@ -3168,11 +4038,48 @@ mod tests {
 
         for target in [0, 2, 0, 2, 1, 0, 2, 0, 1, 2] {
             doc.move_item(&b, LIST_MAIN, target).unwrap();
-            let (index, map) = doc.find_item(&b).unwrap();
-            assert_eq!(index, target);
-            assert_eq!(read_string(&map, KEY_ID).as_deref(), Some(b.as_str()));
+            assert_eq!(
+                doc.live_item_ids(LIST_MAIN).iter().position(|id| id == &b),
+                Some(target)
+            );
             assert_live_projection_matches_doc(&doc);
         }
+    }
+
+    #[test]
+    fn cross_list_move_preserves_identity_and_content() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let id = doc.add_item(LIST_MAIN, "wandering").unwrap();
+        doc.edit_item_notes(&id, "some notes").unwrap();
+        let before = doc.get_item(&id).unwrap();
+
+        doc.move_item(&id, &other, 0).unwrap();
+        let after = doc.get_item(&id).unwrap();
+
+        assert_eq!(after.id, before.id);
+        assert_eq!(after.text, before.text);
+        assert_eq!(after.notes, before.notes);
+        assert_eq!(after.created_at, before.created_at);
+        assert_eq!(after.list_id, other);
+        assert_eq!(doc.live_item_ids(&other), vec![id]);
+        assert!(doc.live_item_ids(LIST_MAIN).is_empty());
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
+    fn cross_list_move_removes_source_entry_best_effort() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        doc.move_item(&id, &other, 0).unwrap();
+        assert_eq!(
+            doc.order_list(LIST_MAIN).len(),
+            0,
+            "source order entry cleaned up"
+        );
+        assert_eq!(doc.order_list(&other).len(), 1);
     }
 
     #[test]
@@ -3205,13 +4112,13 @@ mod tests {
     }
 
     #[test]
-    fn live_item_ids_match_movable_list_order() {
+    fn live_item_ids_match_order_container() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
         let c = doc.add_item(LIST_MAIN, "c").unwrap();
-        // Items in another list must not leak into now's view.
+        // Items in another list must not leak into main's view.
         let _h = doc.add_item(&other, "h").unwrap();
         // Done/binned items must not leak into the live view.
         doc.set_item_done(&b, true).unwrap();
@@ -3250,14 +4157,11 @@ mod tests {
     }
 
     #[test]
-    fn deleted_list_orphans_appear_under_now() {
+    fn deleted_list_orphans_appear_under_main() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "x").unwrap();
         doc.delete_list(&mylist).unwrap();
-        // The user's view of the deleted list has been reassigned: the
-        // item now appears under `now`'s live view, and the deleted
-        // list's live view is empty.
         assert!(doc.live_item_ids(&mylist).is_empty());
         assert_eq!(doc.live_item_ids(LIST_MAIN), vec![id]);
     }
@@ -3322,7 +4226,7 @@ mod tests {
     #[test]
     fn get_list_meta_returns_view() {
         let doc = Doc::new().unwrap();
-        // Main has no MovableList entry, so no metadata in the doc —
+        // Main has no ListMeta row, so no metadata in the doc —
         // clients render its label themselves.
         assert!(doc.get_list_meta(LIST_MAIN).is_none());
         assert!(doc.get_list_meta("nope").is_none());
@@ -3341,14 +4245,205 @@ mod tests {
         assert!(matches!(err, DocError::Crypto(_)));
     }
 
+    // ---------- stale / duplicate / missing order entries ----------
+
+    /// Concurrent cross-list moves of the same item: both replicas
+    /// insert an entry into a different order container; the item's
+    /// atomic location register picks one winner and the loser's entry
+    /// goes stale. Exactly one visible item, on both replicas.
+    #[test]
+    fn concurrent_cross_list_moves_converge_to_one_visible_item() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let list_x = a.add_list("X").unwrap();
+        let list_y = a.add_list("Y").unwrap();
+        let id = a.add_item(LIST_MAIN, "contested").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+
+        // Concurrent: A moves it to X, B moves it to Y.
+        a.move_item(&id, &list_x, 0).unwrap();
+        b.move_item(&id, &list_y, 0).unwrap();
+        let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
+        b.mark_pushed();
+        a.apply_remote(&dek, &blob_b).unwrap();
+        b.apply_remote(&dek, &blob_a).unwrap();
+
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        let winner = a.get_item(&id).unwrap().list_id;
+        assert!(winner == list_x || winner == list_y);
+        let visible_in = |d: &Doc| {
+            [LIST_MAIN, list_x.as_str(), list_y.as_str()]
+                .iter()
+                .filter(|l| d.live_item_ids(l).contains(&id))
+                .count()
+        };
+        assert_eq!(visible_in(&a), 1, "exactly one visible copy on A");
+        assert_eq!(visible_in(&b), 1, "exactly one visible copy on B");
+        assert_live_projection_matches_doc(&a);
+        assert_live_projection_matches_doc(&b);
+    }
+
+    /// Concurrent reorder on one replica and status change on another
+    /// must merge cleanly: the order mov and the status flip touch
+    /// disjoint containers.
+    #[test]
+    fn concurrent_reorder_and_status_change_converge() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let ids: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .collect();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+
+        a.move_item(&ids[3], LIST_MAIN, 0).unwrap();
+        b.set_item_done(&ids[1], true).unwrap();
+        let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
+        b.mark_pushed();
+        a.apply_remote(&dek, &blob_b).unwrap();
+        b.apply_remote(&dek, &blob_a).unwrap();
+
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_eq!(
+            a.live_item_ids(LIST_MAIN),
+            vec![ids[3].clone(), ids[0].clone(), ids[2].clone()]
+        );
+        assert!(a.get_item(&ids[1]).unwrap().is_done());
+        assert_live_projection_matches_doc(&a);
+        assert_live_projection_matches_doc(&b);
+    }
+
+    /// A hand-crafted stale entry (placement mismatch) must never make
+    /// the item visible, and a duplicate entry must not double it.
+    #[test]
+    fn stale_and_duplicate_entries_are_invisible() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+
+        // Duplicate of a's canonical entry + a stale entry with a bogus
+        // placement + an entry for a nonexistent item.
+        let a_placement = {
+            let guard = doc.item_index.lock().unwrap();
+            guard.meta[&a].placement_id.clone()
+        };
+        let order = doc.order_list(LIST_MAIN);
+        order
+            .push(
+                OrderEntry {
+                    item_id: a.clone(),
+                    placement_id: a_placement,
+                }
+                .encode()
+                .as_str(),
+            )
+            .unwrap();
+        order
+            .push(
+                OrderEntry {
+                    item_id: b.clone(),
+                    placement_id: "bogus".to_string(),
+                }
+                .encode()
+                .as_str(),
+            )
+            .unwrap();
+        order.push("no-such-item:whatever").unwrap();
+        doc.inner.commit();
+        doc.rebuild_index();
+
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b]);
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 5);
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    /// An item whose canonical entry is missing entirely still projects
+    /// — appended deterministically after entry-backed items — and
+    /// `reconcile` materializes a real entry without changing the
+    /// visible order.
+    #[test]
+    fn missing_entry_falls_back_deterministically_and_reconciles() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+
+        // Simulate a lost entry: delete b's canonical entry directly.
+        let b_pos = {
+            let guard = doc.item_index.lock().unwrap();
+            guard.canonical_raw_pos(LIST_MAIN, &b).unwrap()
+        };
+        doc.order_list(LIST_MAIN).delete(b_pos, 1).unwrap();
+        doc.inner.commit();
+        doc.rebuild_index();
+
+        // b is not hidden: it lands in the fallback tail (after the
+        // entry-backed items, created_at/id order).
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![a.clone(), c.clone(), b.clone()]
+        );
+
+        // Reads must not have mutated anything.
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 2);
+
+        // Reconcile materializes b's entry; visible order unchanged.
+        let repairs = doc.reconcile().unwrap();
+        assert!(repairs >= 1, "expected at least one repair");
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 3);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c, b]);
+        assert_live_projection_matches_doc(&doc);
+        // Second run is a no-op.
+        assert_eq!(doc.reconcile().unwrap(), 0);
+    }
+
+    #[test]
+    fn reconcile_removes_stale_and_duplicate_entries() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a_placement = {
+            let guard = doc.item_index.lock().unwrap();
+            guard.meta[&a].placement_id.clone()
+        };
+        let order = doc.order_list(LIST_MAIN);
+        order
+            .push(
+                OrderEntry {
+                    item_id: a.clone(),
+                    placement_id: a_placement,
+                }
+                .encode()
+                .as_str(),
+            )
+            .unwrap();
+        order.push("ghost:stale").unwrap();
+        doc.inner.commit();
+        doc.rebuild_index();
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 3);
+
+        let repairs = doc.reconcile().unwrap();
+        assert_eq!(repairs, 2);
+        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a]);
+        assert_eq!(doc.reconcile().unwrap(), 0);
+        assert_live_projection_matches_doc(&doc);
+    }
+
     // ---------- AppEvent tests ----------
 
     #[test]
     fn local_add_item_emits_item_added() {
         let doc = Doc::new().unwrap();
-        // Drain any seed events from Doc::new (currently none — seeds
-        // happen before the queue is observable from outside, but
-        // future-proof the test against that changing).
         let _ = doc.drain_events();
         let id = doc.add_item(LIST_MAIN, "milk").unwrap();
         let evs = doc.drain_events();
@@ -3360,7 +4455,7 @@ mod tests {
                 text,
                 done_at,
                 binned_at,
-                index,
+                live_index,
                 ..
             } => {
                 assert_eq!(eid, &id);
@@ -3368,7 +4463,7 @@ mod tests {
                 assert_eq!(text, "milk");
                 assert!(done_at.is_none());
                 assert!(binned_at.is_none());
-                assert_eq!(*index, 0);
+                assert_eq!(*live_index, Some(0));
             }
             other => panic!("expected ItemAdded, got {other:?}"),
         }
@@ -3439,6 +4534,34 @@ mod tests {
     }
 
     #[test]
+    fn local_cross_list_move_emits_list_changed_with_live_index() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let anchor = doc.add_item(&other, "anchor").unwrap();
+        let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
+        let _ = doc.drain_events();
+
+        doc.move_item(&moved, &other, 1).unwrap();
+
+        let evs = doc.drain_events();
+        match evs.as_slice() {
+            [
+                AppEvent::ItemListChanged {
+                    id,
+                    list_id,
+                    live_index,
+                },
+            ] => {
+                assert_eq!(id, &moved);
+                assert_eq!(list_id, &other);
+                assert_eq!(*live_index, Some(1));
+            }
+            other_evs => panic!("expected one ItemListChanged, got {other_evs:?}"),
+        }
+        assert_eq!(doc.live_item_ids(&other), vec![anchor, moved]);
+    }
+
+    #[test]
     fn local_delete_list_emits_reassign_then_remove() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
@@ -3501,7 +4624,7 @@ mod tests {
         b.apply_remote(&dek, &blob).unwrap();
 
         // Exactly one precise event — a fallback resync would instead
-        // emit an ItemAdded refresh per item.
+        // emit a FullResync control signal.
         let evs = b.drain_events();
         match evs.as_slice() {
             [
@@ -3538,15 +4661,8 @@ mod tests {
 
         let evs = b.drain_events();
         match evs.as_slice() {
-            [
-                AppEvent::ItemMoved {
-                    id,
-                    index,
-                    live_index,
-                },
-            ] => {
+            [AppEvent::ItemMoved { id, live_index }] => {
                 assert_eq!(id, &third);
-                assert_eq!(*index, 0);
                 assert_eq!(*live_index, Some(0));
             }
             other => panic!("expected surgical ItemMoved, got {other:?}"),
@@ -3557,26 +4673,92 @@ mod tests {
     }
 
     /// Replay a frame's emitted events the way the JS store does:
-    /// naive `insertLive` (remove id, splice at `live_index`) applied in
-    /// emission order to the pre-frame live projection. This is the
-    /// contract `diff_items`/`translate_captured_diffs` must satisfy — the
-    /// Rust-internal projection and Loro fingerprint can be correct while
-    /// the *emitted events* fail to converge on the consumer.
-    fn replay_live_events(pre: &[String], evs: &[AppEvent]) -> Vec<String> {
-        let mut live = pre.to_vec();
+    /// naive per-list arrays, remove-then-insert at `live_index`,
+    /// applied in emission order. This is the contract the translator
+    /// must satisfy — the Rust-internal projection and Loro fingerprint
+    /// can be correct while the *emitted events* fail to converge on
+    /// the consumer.
+    fn replay_live_events(
+        pre: &HashMap<String, Vec<String>>,
+        evs: &[AppEvent],
+    ) -> HashMap<String, Vec<String>> {
+        let mut live = pre.clone();
+        let remove_everywhere = |live: &mut HashMap<String, Vec<String>>, id: &str| {
+            for arr in live.values_mut() {
+                arr.retain(|x| x != id);
+            }
+        };
+        let insert_at =
+            |live: &mut HashMap<String, Vec<String>>, list: &str, id: &str, at: usize| {
+                let arr = live.entry(list.to_string()).or_default();
+                arr.insert(at.min(arr.len()), id.to_string());
+            };
         for ev in evs {
             match ev {
-                AppEvent::ItemMoved { id, live_index, .. } => {
+                AppEvent::ItemAdded {
+                    id,
+                    list_id,
+                    live_index,
+                    ..
+                } => {
+                    remove_everywhere(&mut live, id);
                     if let Some(li) = live_index {
-                        live.retain(|x| x != id);
-                        live.insert((*li).min(live.len()), id.clone());
+                        insert_at(&mut live, list_id, id, *li);
                     }
                 }
-                AppEvent::ItemRemoved { id } => live.retain(|x| x != id),
+                AppEvent::ItemMoved { id, live_index } => {
+                    if let Some(li) = live_index {
+                        // The store knows the item's list; the test
+                        // replayer finds it by membership.
+                        let list = live
+                            .iter()
+                            .find(|(_, arr)| arr.iter().any(|x| x == id))
+                            .map(|(l, _)| l.clone());
+                        if let Some(list) = list {
+                            remove_everywhere(&mut live, id);
+                            insert_at(&mut live, &list, id, *li);
+                        }
+                    }
+                }
+                AppEvent::ItemListChanged {
+                    id,
+                    list_id,
+                    live_index,
+                } => {
+                    // Store semantics: a live item moves lists — remove
+                    // from the old array and insert into the new one at
+                    // `live_index`, *appending* when absent. A hidden
+                    // item only changes its list field.
+                    let was_live = live.values().any(|arr| arr.iter().any(|x| x == id));
+                    remove_everywhere(&mut live, id);
+                    if was_live {
+                        let at = live_index.unwrap_or(usize::MAX);
+                        insert_at(&mut live, list_id, id, at);
+                    }
+                }
+                AppEvent::ItemStatusChanged { id, live_index, .. } => {
+                    // A status event either hides the item (None) or
+                    // re-inserts it at its list position. The replayer
+                    // needs the list; the store reads it off its item
+                    // mirror, the test gets it from the final doc — so
+                    // status re-entries are handled by the caller
+                    // passing docs whose lists are stable. For pure
+                    // reorder/move tests this arm only hides.
+                    if live_index.is_none() {
+                        remove_everywhere(&mut live, id);
+                    }
+                }
+                AppEvent::ItemRemoved { id } => remove_everywhere(&mut live, id),
                 _ => {}
             }
         }
+        live.retain(|_, arr| !arr.is_empty());
         live
+    }
+
+    fn live_state(doc: &Doc) -> HashMap<String, Vec<String>> {
+        let guard = doc.item_index.lock().unwrap();
+        guard.live_by_list.clone()
     }
 
     #[test]
@@ -3593,7 +4775,7 @@ mod tests {
         // sequence `planReorderMoves` emits for a two-item downward move:
         // move b to live index 3, then a to live index 2. Final order:
         // [c, d, a, b, e].
-        let pre_live = b.live_item_ids(LIST_MAIN);
+        let pre_live = live_state(&b);
         a.move_item(&ids[1], LIST_MAIN, 3).unwrap();
         a.move_item(&ids[0], LIST_MAIN, 2).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -3607,20 +4789,18 @@ mod tests {
             ids[1].clone(),
             ids[4].clone(),
         ];
-        // Loro state itself always converges…
         assert_eq!(a.live_item_ids(LIST_MAIN), expected);
         assert_eq!(a.fingerprint(), b.fingerprint());
-        // …but the emitted events must reconstruct that order on a naive
-        // consumer, and the Rust-internal projection must match the doc.
         assert_live_projection_matches_doc(&b);
-        // An in-list reorder stays on the surgical path — no whole-doc
-        // resync — and its incremental ItemMoved events replay exactly.
         assert!(
             !evs.contains(&AppEvent::FullResync),
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs),
+            replay_live_events(&pre_live, &evs)
+                .get(LIST_MAIN)
+                .cloned()
+                .unwrap_or_default(),
             expected,
             "emitted events interleave on the consumer; got {evs:?}"
         );
@@ -3638,7 +4818,7 @@ mod tests {
 
         // Select c, d and drag them to the top — `planReorderMoves`
         // emits move c to 0, then d to 1. Final order: [c, d, a, b, e].
-        let pre_live = b.live_item_ids(LIST_MAIN);
+        let pre_live = live_state(&b);
         a.move_item(&ids[2], LIST_MAIN, 0).unwrap();
         a.move_item(&ids[3], LIST_MAIN, 1).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -3660,7 +4840,10 @@ mod tests {
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs),
+            replay_live_events(&pre_live, &evs)
+                .get(LIST_MAIN)
+                .cloned()
+                .unwrap_or_default(),
             expected,
             "emitted events interleave on the consumer; got {evs:?}"
         );
@@ -3678,7 +4861,7 @@ mod tests {
 
         // Discontiguous selection {a, c} dragged down to sit before f:
         // move a below e, then c below e. Exercises a non-adjacent widen.
-        let pre_live = b.live_item_ids(LIST_MAIN);
+        let pre_live = live_state(&b);
         a.move_item(&ids[0], LIST_MAIN, 3).unwrap();
         a.move_item(&ids[2], LIST_MAIN, 4).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -3692,14 +4875,20 @@ mod tests {
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs),
+            replay_live_events(&pre_live, &evs)
+                .get(LIST_MAIN)
+                .cloned()
+                .unwrap_or_default(),
             a.live_item_ids(LIST_MAIN),
             "emitted events interleave on the consumer; got {evs:?}"
         );
     }
 
+    /// Two items changing lists in one frame is surgical in the v2
+    /// schema (cross-list moves are ordinary register writes + entry
+    /// ops), where v1 had to fall back to a whole-doc resync.
     #[test]
-    fn remote_cross_list_multi_move_falls_back_and_converges() {
+    fn remote_cross_list_multi_move_is_surgical_and_converges() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let other = a.add_list("Other").unwrap();
@@ -3709,19 +4898,30 @@ mod tests {
         let _o1 = a.add_item(&other, "o1").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
-        // Two items changing list in one frame isn't a pure in-list
-        // permutation — the surgical path declines and we resync.
+        let pre_live = live_state(&b);
         a.move_item(&m0, &other, 1).unwrap();
         a.move_item(&m1, &other, 2).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &blob).unwrap();
 
         let evs = b.drain_events();
-        assert_eq!(evs, vec![AppEvent::FullResync]);
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "expected surgical events, got a resync: {evs:?}"
+        );
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_live_projection_matches_doc(&b);
         assert_eq!(a.live_item_ids(&other), b.live_item_ids(&other));
         assert_eq!(a.live_item_ids(LIST_MAIN), b.live_item_ids(LIST_MAIN));
+        let replayed = replay_live_events(&pre_live, &evs);
+        assert_eq!(
+            replayed.get(other.as_str()).cloned().unwrap_or_default(),
+            b.live_item_ids(&other)
+        );
+        assert_eq!(
+            replayed.get(LIST_MAIN).cloned().unwrap_or_default(),
+            b.live_item_ids(LIST_MAIN)
+        );
     }
 
     #[test]
@@ -3747,14 +4947,10 @@ mod tests {
     }
 
     #[test]
-    fn remote_cross_list_move_translates_list_changed_then_moved() {
+    fn remote_cross_list_move_translates_to_list_changed() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let other = a.add_list("Other").unwrap();
-        // Global order: roamer, anchor1, anchor2. Sending roamer to
-        // `other` *between* the anchors forces a real `mov` op — a
-        // move to the head of `other` would be a pure list_id change
-        // (global position unchanged, no ItemMoved anywhere).
         let roamer = a.add_item(LIST_MAIN, "roamer").unwrap();
         let _anchor1 = a.add_item(&other, "anchor1").unwrap();
         let _anchor2 = a.add_item(&other, "anchor2").unwrap();
@@ -3765,6 +4961,8 @@ mod tests {
         b.apply_remote(&dek, &blob).unwrap();
 
         let evs = b.drain_events();
+        // Leave-signal first (consumer moves the item to the target
+        // list, appended), then the positional correction.
         match evs.as_slice() {
             [
                 AppEvent::ItemListChanged {
@@ -3775,16 +4973,15 @@ mod tests {
                 AppEvent::ItemMoved {
                     id: mid,
                     live_index: li2,
-                    ..
                 },
             ] => {
                 assert_eq!(lid, &roamer);
                 assert_eq!(mid, &roamer);
                 assert_eq!(list_id, &other);
-                assert_eq!(*li1, Some(1));
+                assert_eq!(*li1, None, "leave-signal carries no position");
                 assert_eq!(*li2, Some(1));
             }
-            other_evs => panic!("expected ListChanged + Moved, got {other_evs:?}"),
+            other_evs => panic!("expected ItemListChanged + ItemMoved, got {other_evs:?}"),
         }
         assert_live_projection_matches_doc(&b);
         assert_eq!(b.live_item_ids(&other)[1], roamer);
@@ -3826,7 +5023,7 @@ mod tests {
         let evs = b.drain_events();
 
         // Should include ItemAdded for the peer item. Main has no
-        // MovableList entry, so no ListAdded is emitted for it.
+        // ListMeta row, so no ListAdded is emitted for it.
         assert!(
             !evs.iter()
                 .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_MAIN)),
@@ -3973,7 +5170,7 @@ mod tests {
     }
 
     #[test]
-    fn add_item_at_emits_item_added_with_absolute_index() {
+    fn add_item_at_emits_item_added_with_live_index() {
         let doc = Doc::new().unwrap();
         let _a = doc.add_item(LIST_MAIN, "a").unwrap();
         let _b = doc.add_item(LIST_MAIN, "b").unwrap();
@@ -3982,16 +5179,16 @@ mod tests {
         let evs = doc.drain_events();
         assert_eq!(evs.len(), 1);
         match &evs[0] {
-            AppEvent::ItemAdded { id, index, .. } => {
+            AppEvent::ItemAdded { id, live_index, .. } => {
                 assert_eq!(id, &mid);
-                assert_eq!(*index, 1);
+                assert_eq!(*live_index, Some(1));
             }
             other => panic!("expected ItemAdded, got {other:?}"),
         }
     }
 
     #[test]
-    fn local_move_item_emits_destination_absolute_index() {
+    fn local_move_item_emits_destination_live_index() {
         let doc = Doc::new().unwrap();
         let first = doc.add_item(LIST_MAIN, "first").unwrap();
         let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
@@ -4007,9 +5204,9 @@ mod tests {
         let evs = doc.drain_events();
         assert!(
             evs.iter().any(
-                |e| matches!(e, AppEvent::ItemMoved { id, index, live_index } if id == &moved && *index == 0 && *live_index == Some(0))
+                |e| matches!(e, AppEvent::ItemMoved { id, live_index } if id == &moved && *live_index == Some(0))
             ),
-            "expected ItemMoved to absolute index 0 / live index 0, got {evs:?}"
+            "expected ItemMoved to live index 0, got {evs:?}"
         );
     }
 
@@ -4046,8 +5243,9 @@ mod tests {
             vec![first.clone(), third.clone()]
         );
 
-        // Restore: re-enters the live projection at its CRDT position
-        // (between first and third), and the event says so.
+        // Restore: re-enters the live projection at its former position
+        // (between first and third — the entry never moved), and the
+        // event says so.
         doc.set_items_binned(&[second.as_str()], false).unwrap();
         let evs = doc.drain_events();
         match evs.as_slice() {
@@ -4130,23 +5328,23 @@ mod tests {
     }
 
     #[test]
-    fn add_items_at_emits_one_event_per_item_with_increasing_indices() {
+    fn add_items_at_emits_one_event_per_item_with_increasing_live_indices() {
         let doc = Doc::new().unwrap();
         let _a = doc.add_item(LIST_MAIN, "a").unwrap();
         let _b = doc.add_item(LIST_MAIN, "b").unwrap();
         let _ = doc.drain_events();
         let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 1).unwrap();
         let evs = doc.drain_events();
-        let added: Vec<(String, usize)> = evs
+        let added: Vec<(String, Option<usize>)> = evs
             .iter()
             .filter_map(|e| match e {
-                AppEvent::ItemAdded { id, index, .. } => Some((id.clone(), *index)),
+                AppEvent::ItemAdded { id, live_index, .. } => Some((id.clone(), *live_index)),
                 _ => None,
             })
             .collect();
         assert_eq!(added.len(), 2);
-        assert_eq!(added[0], (ids[0].clone(), 1));
-        assert_eq!(added[1], (ids[1].clone(), 2));
+        assert_eq!(added[0], (ids[0].clone(), Some(1)));
+        assert_eq!(added[1], (ids[1].clone(), Some(2)));
     }
 
     #[test]
@@ -4299,6 +5497,33 @@ mod tests {
     }
 
     #[test]
+    fn import_json_preserves_per_list_order() {
+        let src = Doc::new().unwrap();
+        let l = src.add_list("Ordered").unwrap();
+        let x = src.add_item(&l, "x").unwrap();
+        let _y = src.add_item(&l, "y").unwrap();
+        let _z = src.add_item(&l, "z").unwrap();
+        // Reorder so array order != creation order.
+        src.move_item(&x, &l, 2).unwrap();
+        let src_texts: Vec<String> = src
+            .items_in_list(&l, true)
+            .into_iter()
+            .map(|i| i.text)
+            .collect();
+        assert_eq!(src_texts, vec!["y", "z", "x"]);
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&src.export_json()).unwrap();
+        let dst_list = dst.all_lists()[0].id.clone();
+        let dst_texts: Vec<String> = dst
+            .items_in_list(&dst_list, true)
+            .into_iter()
+            .map(|i| i.text)
+            .collect();
+        assert_eq!(dst_texts, src_texts, "array order carries the ordering");
+    }
+
+    #[test]
     fn import_json_is_additive_existing_content_untouched() {
         let dst = Doc::new().unwrap();
         let local_list = dst.add_list("LocalKeep").unwrap();
@@ -4447,10 +5672,6 @@ mod tests {
     fn export_snapshot_bytes_roundtrips_through_loro_import() {
         // Backup story: bytes from `export_snapshot_bytes` reconstruct
         // the same logical state when imported into a fresh Loro doc.
-        // (`Doc::load` takes the full msgpack envelope; the snapshot
-        // export is just the snapshot half, so we go through `LoroDoc`
-        // directly here — the path a future lossless-restore import would
-        // take. The export is currently unexposed in the UI.)
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
@@ -4468,12 +5689,13 @@ mod tests {
         let restored = Doc {
             inner: restored_inner,
             last_pushed_vv: VersionVector::default(),
-            item_index: Mutex::new(ItemIndex::default()),
+            item_index: Mutex::new(ProjectionIndex::default()),
             events: Mutex::new(VecDeque::new()),
             undo,
             diff_capture,
             _diff_sub,
         };
+        restored.rebuild_index();
 
         // Fingerprint is the canonical "logical-equality" hash used
         // throughout the test suite to assert convergence — same hash
@@ -4581,10 +5803,41 @@ mod tests {
             AppEvent::ItemMoved {
                 id,
                 live_index: Some(199),
-                ..
             } if id == &moved
         ));
         assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+    }
+
+    #[test]
+    fn undo_redo_round_trips_cross_list_move() {
+        let doc = Doc::new().unwrap();
+        let other = doc.add_list("Other").unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let o = doc.add_item(&other, "o").unwrap();
+        let _ = doc.drain_events();
+
+        // Cross-list move is one commit — one undo step.
+        doc.move_item(&b, &other, 1).unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+        assert_eq!(doc.live_item_ids(&other), vec![o.clone(), b.clone()]);
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(
+            doc.live_item_ids(LIST_MAIN),
+            vec![a.clone(), b.clone(), c.clone()],
+            "undo restores the item to its former position in the source list"
+        );
+        assert_eq!(doc.live_item_ids(&other), vec![o.clone()]);
+        assert_eq!(doc.get_item(&b).unwrap().list_id, LIST_MAIN);
+        assert_live_projection_matches_doc(&doc);
+
+        assert!(doc.redo().unwrap());
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c]);
+        assert_eq!(doc.live_item_ids(&other), vec![o, b.clone()]);
+        assert_eq!(doc.get_item(&b).unwrap().list_id, other);
+        assert_live_projection_matches_doc(&doc);
     }
 
     #[test]

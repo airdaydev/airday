@@ -10,7 +10,12 @@ use serde::{Deserialize, Serialize};
 
 /// Current wire protocol version. Bump on breaking change; for purely
 /// additive evolution rely on MessagePack's tagged-map semantics.
-pub const PROTOCOL_VERSION: u32 = 1;
+///
+/// v2: per-list order-container CRDT schema (`spec/data-model.md`).
+/// The frames are unchanged from v1, but the doc layout inside the
+/// encrypted blobs is incompatible, so v1 clients are fenced off at
+/// the handshake. v1 (global items MovableList) is retired.
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Encrypted op or snapshot payload. Server-side these are opaque
 /// blobs — only the client (with the DEK) can decrypt.

@@ -99,6 +99,33 @@ Measured terms (native M1 release, 13k lifetime items; wasm ≈2–4×):
 `cargo test -p airday-core --release bench_mutation_terms_at_13k --
 --ignored --nocapture`.
 
+### v2 per-list order schema (2026-07-04)
+
+The document-wide `items` MovableList is gone (`spec/data-model.md`
+schema v2): item identity lives in a root `items` map, ordering in
+per-list `order/<list-id>` containers of scalar entries, membership in
+an atomic `location` register. Structural consequences for perf:
+
+- Reordering one list never touches another list's container — small
+  lists no longer pay for `main`'s 13k-entry history on any path.
+- Cross-list moves are register writes + scalar entry ops, not `mov`s
+  on a giant container; the multi-peer move/undo wasm traps
+  (`loro-bug/`) are no longer reachable through this path.
+- Hot mutations are O(live) in-memory splices, gated by per-list
+  visible-entry counts; restores and remote frames recompute one list's
+  projection (O(that list's lifetime entries), pure memory).
+
+Same bench, same shape (13k lifetime, 200 live in main): `add_item`
+0.17ms · `set_item_done` 0.011ms · `set_items_binned(1)` 0.009ms ·
+`apply_remote(1 op)` 5.2ms · `snapshot_blob` 59ms · `iter_items
+().collect()` 19ms · `rebuild_index` 15ms · reloaded-doc move undo
+21ms (was ~30ms) / redo 2.4ms / 20-move undo 67ms (was ~267ms).
+`apply_remote`, `snapshot_blob` and the whole-doc walks regressed
+2–7×; all are per-frame or rare paths (not per-keystroke) and the
+13k-in-one-list shape is their worst case. Follow-up candidates:
+single-walk translation refresh, interning ids in the projection
+index.
+
 ## Problem
 On M1, lists feel sluggish to respond at ~5k+ items. Confirmed cause: **not DOM
 re-render, not the CRDT op** — it's JS reactivity recomputing derived state O(N

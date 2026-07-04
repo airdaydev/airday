@@ -23,11 +23,11 @@ pub enum AppEvent {
 
     // ---------- items ----------
     /// New item appeared (local add or remote insert), or backfill on
-    /// initial attach. `index` is the position in the global items
-    /// MovableList. `live_index` is the position within the *live*
+    /// initial attach. `live_index` is the position within the *live*
     /// projection of `list_id` (done/binned excluded) — `None` when the
     /// item is not live. UI layers that keep per-list arrays splice at
-    /// `live_index`; global-order consumers use `index`.
+    /// `live_index`. There is no global item order in the v2 schema, so
+    /// there is no doc-wide index.
     ItemAdded {
         id: String,
         list_id: String,
@@ -36,7 +36,6 @@ pub enum AppEvent {
         created_at: i64,
         done_at: Option<i64>,
         binned_at: Option<i64>,
-        index: usize,
         live_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
@@ -45,16 +44,14 @@ pub enum AppEvent {
     ItemRemoved {
         id: String,
     },
-    /// Item changed position in the global items MovableList. Emitted
-    /// for both intra-list reorders and inter-list moves; the
-    /// accompanying `ItemListChanged` (if any) carries the new list_id
-    /// and is emitted first. `live_index` is the item's resulting
-    /// position within its (post-move) list's live projection; `None`
-    /// when the item is done/binned, whose ordering is view-local
-    /// (timestamp sorts), not CRDT order.
+    /// Item changed position within its list's order (an in-list
+    /// reorder, or a passive shift caused by a neighbour's move).
+    /// Cross-list moves emit `ItemListChanged` instead. `live_index` is
+    /// the item's resulting position within its list's live projection;
+    /// `None` when the item is done/binned, whose ordering is
+    /// view-local (timestamp sorts), not CRDT order.
     ItemMoved {
         id: String,
-        index: usize,
         live_index: Option<usize>,
     },
     ItemTextChanged {

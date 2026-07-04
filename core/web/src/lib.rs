@@ -167,6 +167,12 @@ impl Doc {
         self.inner.empty_bin().map_err(js_err)
     }
 
+    /// Explicit stale/duplicate/missing order-entry repair. Returns the
+    /// number of repairs (0 = doc was clean, nothing committed).
+    pub fn reconcile(&self) -> Result<usize, JsError> {
+        self.inner.reconcile().map_err(js_err)
+    }
+
     // -- mutations: lists --
 
     #[wasm_bindgen(js_name = addList)]
@@ -1239,6 +1245,12 @@ impl SyncEngine {
         self.inner.doc().empty_bin().map_err(js_err)
     }
 
+    /// Explicit stale/duplicate/missing order-entry repair. Returns the
+    /// number of repairs (0 = doc was clean, nothing committed).
+    pub fn reconcile(&self) -> Result<usize, JsError> {
+        self.inner.doc().reconcile().map_err(js_err)
+    }
+
     // -- mutations: lists --
 
     #[wasm_bindgen(js_name = addList)]
@@ -1455,6 +1467,9 @@ pub struct AppEventJs {
     /// label; `None` (or absent on non-`settingsChanged` events) means
     /// fall back to the localized built-in label.
     main_name: Option<String>,
+    /// List-event ordering position (`listAdded` / `listMoved`). Item
+    /// events no longer carry a doc-wide index in the v2 schema — use
+    /// `live_index`.
     index: Option<usize>,
     /// Position within the owning list's *live* projection (done/binned
     /// excluded). Present on item events whenever the item is live
@@ -1549,7 +1564,6 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at,
                 done_at,
                 binned_at,
-                index,
                 live_index,
             } => AppEventJs {
                 kind: "itemAdded",
@@ -1560,7 +1574,6 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at: Some(created_at),
                 done_at,
                 binned_at,
-                index: Some(index),
                 live_index,
                 ..blank
             },
@@ -1569,14 +1582,9 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 ..blank
             },
-            CoreAppEvent::ItemMoved {
-                id,
-                index,
-                live_index,
-            } => AppEventJs {
+            CoreAppEvent::ItemMoved { id, live_index } => AppEventJs {
                 kind: "itemMoved",
                 id,
-                index: Some(index),
                 live_index,
                 ..blank
             },
