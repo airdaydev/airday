@@ -1,19 +1,8 @@
-import {
-  createEffect,
-  on,
-  onCleanup,
-  onMount,
-  Show,
-} from "solid-js";
+import { createEffect, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DndSelection } from "./dnd/solid";
-import {
-  caretXIfOnLastLine,
-  focusEditableLastLineAtX,
-  focusTextareaFirstLineAtX,
-  textareaCaretXIfOnFirstLine,
-} from "./caretBridge.ts";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
+import externalLinkSvg from "./icons/external-link.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
@@ -39,90 +28,6 @@ export const isDraftId = (id: string): boolean => id.startsWith(DRAFT_ID_PREFIX)
 // the Done view.
 function statusTimestamp(it: ItemView): number | undefined {
   return it.binnedAt ?? it.doneAt;
-}
-
-// Free-form notes editor. Mounted only while the row is expanded; on
-// unmount (i.e. on collapse) we flush the current text back through
-// `editItemNotes` if it differs from the model. Live peer changes during
-// edit are intentionally ignored — last-collapse-wins, matching how the
-// row-text editor behaves while expanded. A textarea (rather than a
-// contenteditable div) so newline round-trips are byte-faithful and we
-// don't have to fight browser-inserted <div>/<br> markup.
-function NotesField(props: {
-  item: () => ItemView;
-  app: DocApp;
-  /** Optional holder used only on the draft path: NotesField stashes
-   *  its textarea value here on unmount so the Row's collapse effect
-   *  can read it after the <Show> has already torn the textarea down. */
-  draftNotesRef?: { current: string };
-}) {
-  const { m } = useAppI18n();
-  let ref!: HTMLTextAreaElement;
-  const initial = props.item().notes;
-  // Match content height so the field grows with the note instead of
-  // showing an internal scrollbar. Run after each input so paste / type
-  // / delete all stay in sync.
-  const autosize = () => {
-    ref.style.height = "auto";
-    ref.style.height = `${ref.scrollHeight}px`;
-  };
-  onMount(() => {
-    ref.value = initial;
-    autosize();
-  });
-  onCleanup(() => {
-    // Drafts have no engine record yet; stash the value in the holder
-    // so the Row's collapse effect can hand it to `settleDraft`, which
-    // applies it via `editItemNotes` on the freshly created item id.
-    if (isDraftId(props.item().id)) {
-      if (props.draftNotesRef) props.draftNotesRef.current = ref.value;
-      return;
-    }
-    const next = ref.value;
-    if (next !== props.item().notes) {
-      props.app.editItemNotes(props.item().id, next);
-    }
-  });
-  return (
-    <textarea
-      ref={ref}
-      class="row-notes"
-      placeholder={m().workspace.notes}
-      rows={1}
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-      onInput={autosize}
-      on:keydown={(e) => {
-        // Native (non-delegated) so the bubble order is textarea → dnd
-        // listbox; otherwise the listbox would intercept arrows / Cmd+A
-        // before we see them. Escape stays uncaught so it can collapse
-        // the row through the dnd's handler.
-        if (
-          e.key === "ArrowUp" &&
-          !e.shiftKey &&
-          !e.altKey &&
-          !e.metaKey &&
-          !e.ctrlKey &&
-          !e.isComposing
-        ) {
-          const ta = e.currentTarget as HTMLTextAreaElement;
-          const x = textareaCaretXIfOnFirstLine(ta);
-          if (x !== null) {
-            const editable = ta
-              .closest(".row")
-              ?.querySelector<HTMLElement>(".row-text");
-            if (editable) {
-              e.preventDefault();
-              e.stopPropagation();
-              focusEditableLastLineAtX(editable, x);
-              return;
-            }
-          }
-        }
-        if (e.key !== "Escape") e.stopPropagation();
-      }}
-    />
-  );
 }
 
 // Render `text` into `el`, replacing existing children, with http(s) URLs
@@ -192,18 +97,18 @@ export function Row(props: {
   /** Called by a draft row from its collapse effect with the trimmed
    *  edit text and the notes textarea contents. Empty text means drop
    *  the draft; non-empty means the workspace should commit it as a
-   *  real item (and apply notes as a follow-up). `chain` is true when
-   *  the collapse was driven by Enter — the workspace re-opens a fresh
-   *  draft so capture continues until Escape / blur / empty-Enter. */
-  onDraftSettle?: (text: string, notes: string, chain: boolean) => void;
+   *  real item. `chain` is true when the collapse was driven by Enter —
+   *  the workspace re-opens a fresh draft so capture continues until
+   *  Escape / blur / empty-Enter. */
+  onDraftSettle?: (text: string, chain: boolean) => void;
+  /** Open this item in the detail dialog. */
+  onOpen?: (id: string) => void;
+  /** When true (mobile), a plain tap on the row opens the dialog instead
+   *  of only selecting — inline editing is unpleasant on touch. */
+  openOnTap?: () => boolean;
 }) {
   const { m, locale } = useAppI18n();
   let textRef!: HTMLSpanElement;
-  // Holder for the draft path: NotesField writes its textarea value
-  // here on unmount, while the textarea still exists in the DOM. The
-  // collapse effect below reads it after Solid has torn down the Show
-  // (so a `querySelector(".row-notes")` would already return null).
-  const draftNotesRef = { current: "" };
   // Captured by dblclick before the row expands so we can place the caret
   // where the user pointed instead of selecting all. Captured pre-expand
   // because layout may shift once the row becomes editable.
@@ -271,11 +176,7 @@ export function Row(props: {
           // workspace, which decides commit (addItemAt) vs drop. Skip the
           // editItemText path — there's no item to edit.
           if (isDraftId(props.item().id)) {
-            // NotesField has already unmounted by the time this effect
-            // runs (the <Show> wrapping it tears down synchronously);
-            // read the value it stashed in draftNotesRef during its
-            // onCleanup instead of querying the now-detached textarea.
-            props.onDraftSettle?.(next, draftNotesRef.current, chain);
+            props.onDraftSettle?.(next, chain);
             // When chaining, the workspace will open a fresh draft and
             // its expand effect will steal focus to the new row's
             // contentEditable; bouncing focus to the listbox here would
@@ -423,6 +324,17 @@ export function Row(props: {
           if (props.expanded()) return;
           captureDblClickCaret(e);
         }}
+        on:click={(e) => {
+          // Mobile: a plain tap opens the detail dialog. Selection still
+          // happens via the dnd's own touch handling; we just add the
+          // open. Skip drafts, expanded rows, and taps that land on their
+          // own controls (checkbox, links, the open/note buttons).
+          if (!props.openOnTap?.()) return;
+          if (props.expanded() || isDraftId(props.item().id)) return;
+          const t = e.target as HTMLElement | null;
+          if (t?.closest("input, a, button")) return;
+          props.onOpen?.(props.item().id);
+        }}
       >
         <input
           type="checkbox"
@@ -535,51 +447,39 @@ export function Row(props: {
                 );
                 return;
               }
-              // ArrowDown on the last visual line jumps to the notes
-              // textarea below, landing at the matching X. On any other
-              // line, fall through to the browser's default (caret moves
-              // down within the editable).
-              if (
-                e.key === "ArrowDown" &&
-                !e.shiftKey &&
-                !e.altKey &&
-                !e.metaKey &&
-                !e.ctrlKey &&
-                !e.isComposing
-              ) {
-                const editable = e.currentTarget as HTMLElement;
-                const x = caretXIfOnLastLine(editable);
-                if (x !== null) {
-                  const notes = editable
-                    .closest(".row")
-                    ?.querySelector<HTMLTextAreaElement>(".row-notes");
-                  if (notes) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    focusTextareaFirstLineAtX(notes, x);
-                    return;
-                  }
-                }
-              }
               // Don't let the dnd intercept keys the contenteditable owns.
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
-          <Show when={props.expanded()}>
-            <NotesField
-              item={props.item}
-              app={props.app}
-              draftNotesRef={draftNotesRef}
-            />
-          </Show>
         </div>
         <Show when={!props.expanded() && props.item().notes.trim().length > 0}>
-          <span
+          <button
+            type="button"
+            tabIndex={-1}
             class="row-note-indicator"
-            role="img"
             aria-label={m().workspace.hasNotes}
             title={m().workspace.hasNotes}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onOpen?.(props.item().id);
+            }}
             innerHTML={noteSvg}
+          />
+        </Show>
+        <Show when={!props.expanded()}>
+          <button
+            type="button"
+            tabIndex={-1}
+            class="row-open-btn"
+            aria-label={m().workspace.openTask}
+            title={m().workspace.openTask}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onOpen?.(props.item().id);
+            }}
+            innerHTML={externalLinkSvg}
           />
         </Show>
         <Show when={statusTimestamp(props.item())}>
@@ -594,6 +494,15 @@ export function Row(props: {
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
+          <Show when={isInListView(props.item())}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={() => props.onOpen?.(props.item().id)}
+            >
+              <span>{m().common.open}</span>
+              <kbd class="menu-shortcut">⌘↵</kbd>
+            </ContextMenu.Item>
+          </Show>
           <Show when={!isDone(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkDone}>
               <span>{m().workspace.markDone}</span>

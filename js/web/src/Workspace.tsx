@@ -28,6 +28,7 @@ import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
 import type { SearchResult } from "./search.ts";
 import { Settings } from "./Settings.tsx";
+import { TaskDialog } from "./TaskDialog.tsx";
 import { useSession } from "./SessionContext.tsx";
 import {
   isBinned,
@@ -80,6 +81,19 @@ export function Workspace(props: {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
   const [findOpen, setFindOpen] = createSignal(false);
+  // The item currently opened in the detail dialog, or null when closed.
+  const [openItemId, setOpenItemId] = createSignal<string | null>(null);
+  // UI-only mirror of the title being edited in the dialog: the list row
+  // reflects it live while typing, but nothing is written to the engine
+  // until the dialog flushes on close (so no op-per-keystroke). Cleared
+  // whenever the dialog closes, via any path.
+  const [liveEdit, setLiveEdit] = createSignal<{
+    id: string;
+    text: string;
+  } | null>(null);
+  createEffect(() => {
+    if (openItemId() === null) setLiveEdit(null);
+  });
   const matchesKbDevice = createKbDeviceSignal();
 
   // Draft state: a transient ItemView injected into dndItems but not into
@@ -325,7 +339,7 @@ export function Workspace(props: {
   // we open a fresh draft below the new item so capture continues. An
   // empty Enter still ends the chain (it falls through to the cancel
   // path below).
-  const settleDraft = (text: string, notes: string, chain: boolean) => {
+  const settleDraft = (text: string, chain: boolean) => {
     const d = draft();
     if (!d) return;
     setDraft(null);
@@ -346,11 +360,8 @@ export function Workspace(props: {
       return;
     }
     const newId = app.addItemAt(d.listId, text, d.insertIndex);
-    // Notes are persisted as a follow-up edit because the draft has no
-    // engine record while the user is typing — `editItemNotes` on a
-    // draft id would no-op. Skip the call for empty notes (the new
-    // item starts with `notes: ""` already).
-    if (notes) app.editItemNotes(newId, notes);
+    // Notes are no longer captured inline — a new item starts noteless and
+    // the user adds notes later by opening it in the detail dialog.
     // The store dispatch that adds the new item runs before this
     // microtask, so by then `selection.updateOrder` has already seen
     // the new id and the selection anchor is valid. When chaining,
@@ -601,6 +612,20 @@ export function Workspace(props: {
     dndHandle.setExpanded(top);
   };
   onGlobalKey(onEnterExpand);
+
+  // Cmd/Ctrl+Enter: open the topmost selected item in the detail dialog.
+  // Plain Enter stays inline quick-edit (onEnterExpand above); the modifier
+  // "promotes" it to the full task view.
+  const onOpenKey = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.altKey || e.shiftKey) return;
+    const top = selection.getSelectionTop();
+    if (top === null) return;
+    e.preventDefault();
+    setOpenItemId(String(top));
+  };
+  onGlobalKey(onOpenKey);
 
   // Space: shortcut for the Add button — start a draft below the topmost
   // selection, same as a click. startDraft already gates on list view and
@@ -882,6 +907,18 @@ export function Workspace(props: {
         confirmLabel={m().workspace.emptyBin}
         onConfirm={() => app.emptyBin()}
       />
+      <TaskDialog
+        itemId={openItemId}
+        setItemId={setOpenItemId}
+        app={app}
+        homeName={homeName}
+        lists={lists}
+        onClosed={() => dndHandle?.focus()}
+        onLiveText={(text) => {
+          const id = openItemId();
+          if (id) setLiveEdit({ id, text });
+        }}
+      />
       <main class="main">
         <header class="main-header">
           {/* Title group: hamburger sits flush against the title so
@@ -995,18 +1032,31 @@ export function Workspace(props: {
               reorder={view().kind === "list"}
               onReorder={onReorder}
             >
-              {(item, expanded) => (
-                <Row
-                  item={item}
-                  expanded={expanded}
-                  app={app}
-                  selection={selection}
-                  viewKind={view().kind}
-                  duplicateBlock={duplicateBlock}
-                  copyBlock={copyBlock}
-                  onDraftSettle={settleDraft}
-                />
-              )}
+              {(item, expanded) => {
+                // Overlay the dialog's in-progress title onto its row so the
+                // list mirrors the edit live. Only the edited row's object is
+                // swapped (others pass through by reference); the list is
+                // virtualized, so this recomputes for visible rows only.
+                const shownItem = createMemo(() => {
+                  const ov = liveEdit();
+                  const it = item();
+                  return ov && ov.id === it.id ? { ...it, text: ov.text } : it;
+                });
+                return (
+                  <Row
+                    item={shownItem}
+                    expanded={expanded}
+                    app={app}
+                    selection={selection}
+                    viewKind={view().kind}
+                    duplicateBlock={duplicateBlock}
+                    copyBlock={copyBlock}
+                    onDraftSettle={settleDraft}
+                    onOpen={(id) => setOpenItemId(id)}
+                    openOnTap={itemsIsMobile}
+                  />
+                );
+              }}
             </Dnd>
           </Show>
         </Show>

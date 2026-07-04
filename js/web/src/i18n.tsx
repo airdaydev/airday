@@ -46,6 +46,7 @@ type Messages = {
     restore: string;
     cancel: string;
     confirm: string;
+    open: string;
   };
   auth: {
     signIn: string;
@@ -94,6 +95,8 @@ type Messages = {
     markNotDone: string;
     duplicate: string;
     moveToBin: string;
+    openTask: string;
+    moveToList: string;
   };
   find: {
     placeholder: string;
@@ -148,6 +151,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       restore: "Restaurar",
       cancel: "Cancelar",
       confirm: "Confirmar",
+      open: "Abrir",
     },
     auth: {
       signIn: "Iniciar sesión",
@@ -199,6 +203,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Marcar como no hecho",
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
+      openTask: "Abrir tarea",
+      moveToList: "Mover a la lista",
     },
     find: {
       placeholder: "Buscar",
@@ -253,6 +259,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       restore: "Restore",
       cancel: "Cancel",
       confirm: "Confirm",
+      open: "Open",
     },
     auth: {
       signIn: "Sign in",
@@ -304,6 +311,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Mark as not done",
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
+      openTask: "Open task",
+      moveToList: "Move to list",
     },
     find: {
       placeholder: "Find",

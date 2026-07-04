@@ -22,12 +22,21 @@ export function ConfirmDialog(props: {
 }) {
   const { m } = useAppI18n();
   trackOverlay(() => props.open);
+  let confirmRef: HTMLButtonElement | undefined;
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange} modal>
       <Dialog.Portal>
         <Dialog.Overlay class="dialog-overlay" />
         <div class="dialog-positioner">
-          <Dialog.Content class="confirm-dialog">
+          <Dialog.Content
+            class="confirm-dialog"
+            onOpenAutoFocus={(e) => {
+              // Kobalte focuses the first tabbable (Cancel, on the left);
+              // put focus on the confirm button instead so Enter confirms.
+              e.preventDefault();
+              requestAnimationFrame(() => confirmRef?.focus());
+            }}
+          >
             <Show when={props.title}>
               <Dialog.Title class="confirm-dialog-title">
                 {props.title}
@@ -45,6 +54,7 @@ export function ConfirmDialog(props: {
                 {props.cancelLabel ?? m().common.cancel}
               </button>
               <button
+                ref={confirmRef}
                 type="button"
                 class="confirm-dialog-btn confirm-dialog-confirm"
                 classList={{ destructive: props.destructive !== false }}

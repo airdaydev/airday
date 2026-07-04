@@ -595,31 +595,6 @@ body {
   color: var(--text-empty);
 }
 
-.row-notes {
-  /* Reset the textarea's UA chrome so it sits flush in the row body
-     like the row-text contenteditable above it. Height is set
-     imperatively from JS to match content (auto-grow). */
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  resize: none;
-  outline: none;
-  font: inherit;
-  color: inherit;
-  line-height: 1.3em;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  cursor: text;
-}
-
-.row-notes::placeholder {
-  color: var(--text-empty);
-}
-
 .row-timestamp {
   flex-shrink: 0;
   color: var(--text-faint);
@@ -628,17 +603,53 @@ body {
   line-height: 1.3em;
 }
 
-.row-note-indicator {
+/* Note badge and the open affordance are buttons (they open the detail
+   dialog), so reset the UA button chrome to sit flush like the old span. */
+.row-note-indicator,
+.row-open-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
   display: inline-flex;
   flex-shrink: 0;
   color: var(--text-faint);
   line-height: 1.3em;
+  cursor: pointer;
 }
 
-.row-note-indicator svg {
+.row-note-indicator svg,
+.row-open-btn svg {
   width: 14px;
   height: 14px;
   margin-top: 1px;
+}
+
+.row-note-indicator:hover,
+.row-open-btn:hover {
+  color: var(--text);
+}
+
+/* The open affordance only appears on hover / when the row is selected —
+   it's a discoverability hint, not persistent chrome. Kept in the layout
+   (visibility, not display) so rows don't reflow on hover. */
+.row-open-btn {
+  visibility: hidden;
+}
+
+.row:hover .row-open-btn,
+[aria-selected="true"] .row .row-open-btn {
+  visibility: visible;
+}
+
+/* Touch devices have no hover and open on tap anyway — hide the icon so it
+   doesn't eat a tap target. */
+@media (pointer: coarse) {
+  .row-open-btn {
+    display: none;
+  }
 }
 
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
@@ -1192,6 +1203,14 @@ body {
   padding: 24px;
 }
 
+/* Sit the task dialog in the upper third rather than dead-centre. Only
+   the task dialog — other dialogs stay centred. The top padding wins over
+   the base `padding: 24px` for the top edge; sides/bottom keep 24px. */
+.dialog-positioner:has(.task-dialog) {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
 .settings-dialog {
   display: grid;
   grid-template-columns: 180px 1fr;
@@ -1216,6 +1235,294 @@ body {
 
 [data-theme="dark"] .settings-dialog {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+/* Task detail dialog — the "open task" surface. Modelled on the shared
+   elevated-card treatment; becomes a full-screen sheet on small touch
+   screens (see the media query below). */
+.task-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(780px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+[data-theme="dark"] .task-dialog {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.task-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-dialog-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* The ⋮ menu is portaled to <body>; lift it above the dialog overlay /
+   positioner (z-index 100 / 101) so it doesn't render behind the dialog —
+   same fix as .device-menu-content in Settings. */
+.task-dialog-menu-content {
+  z-index: 110;
+}
+
+.task-dialog-header-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.task-dialog-list {
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-dialog-created {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.task-dialog-close {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.task-dialog-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Body splits into a fixed left gutter (checkbox only) and a content
+   column that holds the title and everything below it, so the title,
+   notes, metadata and actions all share one left edge — the checkbox
+   sits outside that edge, in the gutter. */
+.task-dialog-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.task-dialog-gutter {
+  flex-shrink: 0;
+  width: 16px;
+}
+
+.task-dialog-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Checkbox mirrors the list-row checkbox, sized up to sit against the
+   18px title. `top` nudges it onto the title's first-line optical centre. */
+.task-dialog-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  top: 10px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--border-input);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.task-dialog-check:hover {
+  border-color: var(--text-muted);
+}
+
+.task-dialog-check:checked {
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+[data-theme="dark"] .task-dialog-check:checked {
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M3.5 8.5l3 3 6-6' stroke='%23e5e5e5' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+.task-dialog-check:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.task-dialog-title {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font: inherit;
+  font-size: 2em;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.task-dialog-title[data-done] {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.task-dialog-notes {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 3em;
+  margin: 0;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  resize: none;
+  outline: none;
+  font: inherit;
+  line-height: 1.4;
+  color: var(--text);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.task-dialog-notes::placeholder {
+  color: var(--text-empty);
+}
+
+.task-dialog-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.task-dialog-meta-row {
+  display: flex;
+  gap: 8px;
+}
+
+.task-dialog-meta-label {
+  flex-shrink: 0;
+  width: 72px;
+  color: var(--text-faint);
+}
+
+.task-dialog-move {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.task-dialog-move select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.task-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.task-dialog-actions-spacer {
+  flex: 1;
+}
+
+.task-dialog-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.task-dialog-btn:hover {
+  background: var(--bg-hover);
+}
+
+.task-dialog-btn.destructive {
+  border-color: transparent;
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.task-dialog-btn.destructive:hover {
+  filter: brightness(0.96);
+  background: var(--error-bg);
+}
+
+/* Full-screen sheet on small touch screens: the dialog fills the viewport
+   (the positioner's padding is dropped) so the on-screen keyboard has room
+   and the task reads as its own page — the mobile "tap opens the task"
+   model. */
+@media (max-width: 768px) and (pointer: coarse) {
+  .dialog-positioner:has(.task-dialog) {
+    padding: 0;
+  }
+
+  .task-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 .settings-sidebar {
