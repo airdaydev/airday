@@ -603,10 +603,9 @@ body {
   line-height: 1.3em;
 }
 
-/* Note badge and the open affordance are buttons (they open the detail
-   dialog), so reset the UA button chrome to sit flush like the old span. */
-.row-note-indicator,
-.row-open-btn {
+/* The note badge is a button (it opens the detail dialog), so reset the
+   UA button chrome to sit flush like the old span. */
+.row-note-indicator {
   appearance: none;
   -webkit-appearance: none;
   padding: 0;
@@ -620,36 +619,14 @@ body {
   cursor: pointer;
 }
 
-.row-note-indicator svg,
-.row-open-btn svg {
+.row-note-indicator svg {
   width: 14px;
   height: 14px;
   margin-top: 1px;
 }
 
-.row-note-indicator:hover,
-.row-open-btn:hover {
+.row-note-indicator:hover {
   color: var(--text);
-}
-
-/* The open affordance only appears on hover / when the row is selected —
-   it's a discoverability hint, not persistent chrome. Kept in the layout
-   (visibility, not display) so rows don't reflow on hover. */
-.row-open-btn {
-  visibility: hidden;
-}
-
-.row:hover .row-open-btn,
-[aria-selected="true"] .row .row-open-btn {
-  visibility: visible;
-}
-
-/* Touch devices have no hover and open on tap anyway — hide the icon so it
-   doesn't eat a tap target. */
-@media (pointer: coarse) {
-  .row-open-btn {
-    display: none;
-  }
 }
 
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
@@ -1284,22 +1261,106 @@ body {
 
 .task-dialog-header-meta {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   min-width: 0;
 }
 
+/* The list name is the Select trigger — styled as inline text with a
+   small caret, gaining a hover/open background so it reads as clickable. */
 .task-dialog-list {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: 8em;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--text-muted);
-  white-space: nowrap;
+  font: inherit;
+  cursor: pointer;
+}
+
+.task-dialog-list:hover,
+.task-dialog-list[data-expanded] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.task-dialog-list-value {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-dialog-list-caret {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.task-dialog-list-caret svg {
+  width: 12px;
+  height: 12px;
 }
 
 .task-dialog-created {
   flex-shrink: 0;
   color: var(--text-faint);
+}
+
+.select-content {
+  min-width: 160px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  outline: none;
+  /* Above the dialog overlay/positioner (100/101) — this Select only ever
+     opens inside the task dialog. */
+  z-index: 110;
+}
+
+[data-theme="dark"] .select-content {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.select-listbox {
+  max-height: 260px;
+  overflow-y: auto;
+  outline: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.select-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.select-item[data-highlighted] {
+  background: var(--bg-active);
+}
+
+.select-item[data-selected] {
+  font-weight: 600;
 }
 
 .task-dialog-close {
@@ -1398,8 +1459,8 @@ body {
   resize: none;
   outline: none;
   font: inherit;
-  font-size: 2em;
-  font-weight: 600;
+  font-size: 1.75em;
+  font-weight: 500;
   line-height: 1.3;
   color: var(--text);
   overflow: hidden;
@@ -1450,24 +1511,6 @@ body {
   flex-shrink: 0;
   width: 72px;
   color: var(--text-faint);
-}
-
-.task-dialog-move {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.task-dialog-move select {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid var(--border-input);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
 }
 
 .task-dialog-actions {

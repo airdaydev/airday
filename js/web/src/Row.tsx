@@ -2,7 +2,6 @@ import { createEffect, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DndSelection } from "./dnd/solid";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
-import externalLinkSvg from "./icons/external-link.svg?raw";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
@@ -465,21 +464,6 @@ export function Row(props: {
               props.onOpen?.(props.item().id);
             }}
             innerHTML={noteSvg}
-          />
-        </Show>
-        <Show when={!props.expanded()}>
-          <button
-            type="button"
-            tabIndex={-1}
-            class="row-open-btn"
-            aria-label={m().workspace.openTask}
-            title={m().workspace.openTask}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onOpen?.(props.item().id);
-            }}
-            innerHTML={externalLinkSvg}
           />
         </Show>
         <Show when={statusTimestamp(props.item())}>

@@ -8,7 +8,9 @@
 
 import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { Select } from "@kobalte/core/select";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
@@ -16,11 +18,14 @@ import { trackOverlay } from "./overlay.ts";
 import {
   isBinned,
   isDone,
-  isInListView,
   type DocApp,
   type ItemView,
   type ListView,
 } from "./sync/store.ts";
+
+// One entry in the header's move-to-list Select: the reserved `main` list
+// plus every user list, `{ id, name }`.
+type ListOption = { id: string; name: string };
 
 export function TaskDialog(props: {
   /** The open item's id, or null when closed. */
@@ -51,6 +56,18 @@ export function TaskDialog(props: {
   createEffect(() => {
     if (props.itemId() !== null && !item()) props.setItemId(null);
   });
+
+  // Move-to-list options: Home (main) followed by every user list.
+  const listOptions = createMemo<ListOption[]>(() => [
+    { id: "main", name: props.homeName() },
+    ...props.lists().map((l) => ({ id: l.id, name: l.name })),
+  ]);
+  const moveItemToList = (targetId: string, currentListId: string) => {
+    const id = props.itemId();
+    if (!id || targetId === currentListId) return;
+    const idx = props.app.state.listLive[targetId]?.length ?? 0;
+    props.app.moveItem(id, targetId, idx);
+  };
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
@@ -145,12 +162,46 @@ export function TaskDialog(props: {
                 <>
                   <header class="task-dialog-header">
                     <div class="task-dialog-header-meta">
-                      <span class="task-dialog-list">
-                        {it().listId === "main"
-                          ? props.homeName()
-                          : (props.lists().find((l) => l.id === it().listId)
-                              ?.name ?? it().listId)}
-                      </span>
+                      <Select<ListOption>
+                        placement="bottom-start"
+                        gutter={4}
+                        options={listOptions()}
+                        optionValue="id"
+                        optionTextValue="name"
+                        value={
+                          listOptions().find((o) => o.id === it().listId) ??
+                          null
+                        }
+                        onChange={(opt) => {
+                          if (opt) moveItemToList(opt.id, it().listId);
+                        }}
+                        itemComponent={(iprops) => (
+                          <Select.Item item={iprops.item} class="select-item">
+                            <Select.ItemLabel>
+                              {iprops.item.rawValue.name}
+                            </Select.ItemLabel>
+                          </Select.Item>
+                        )}
+                      >
+                        <Select.Trigger
+                          class="task-dialog-list"
+                          aria-label={m().workspace.moveToList}
+                        >
+                          <Select.Value<ListOption> class="task-dialog-list-value">
+                            {(state) => state.selectedOption()?.name}
+                          </Select.Value>
+                          <span
+                            class="task-dialog-list-caret"
+                            aria-hidden="true"
+                            innerHTML={caretSortSvg}
+                          />
+                        </Select.Trigger>
+                        <Select.Portal>
+                          <Select.Content class="select-content task-dialog-menu-content">
+                            <Select.Listbox class="select-listbox" />
+                          </Select.Content>
+                        </Select.Portal>
+                      </Select>
                       <span class="task-dialog-created">
                         {formatRelative(it().createdAt, nowMs(), locale())}
                       </span>
@@ -299,29 +350,6 @@ export function TaskDialog(props: {
                         </div>
                       </Show>
                     </div>
-                  </Show>
-
-                  <Show when={isInListView(it())}>
-                    <label class="task-dialog-move">
-                      <span class="task-dialog-meta-label">
-                        {m().workspace.moveToList}
-                      </span>
-                      <select
-                        value={it().listId}
-                        onChange={(e) => {
-                          const target = e.currentTarget.value;
-                          if (target === it().listId) return;
-                          const idx =
-                            props.app.state.listLive[target]?.length ?? 0;
-                          props.app.moveItem(it().id, target, idx);
-                        }}
-                      >
-                        <option value="main">{props.homeName()}</option>
-                        <For each={props.lists()}>
-                          {(l) => <option value={l.id}>{l.name}</option>}
-                        </For>
-                      </select>
-                    </label>
                   </Show>
 
                   <Show when={isBinned(it())}>

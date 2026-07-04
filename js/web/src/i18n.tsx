@@ -95,7 +95,6 @@ type Messages = {
     markNotDone: string;
     duplicate: string;
     moveToBin: string;
-    openTask: string;
     moveToList: string;
   };
   find: {
@@ -203,7 +202,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Marcar como no hecho",
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
-      openTask: "Abrir tarea",
       moveToList: "Mover a la lista",
     },
     find: {
@@ -311,7 +309,6 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markNotDone: "Mark as not done",
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
-      openTask: "Open task",
       moveToList: "Move to list",
     },
     find: {
