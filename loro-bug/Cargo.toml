@@ -1,0 +1,13 @@
+# Standalone reproduction crate — intentionally NOT part of the airday
+# workspace (see the empty [workspace] table below) so it can pin its own
+# loro version and be copied verbatim into an upstream issue.
+[package]
+name = "loro-import-hang-repro"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+loro = "=1.13.6"
+
+[workspace]
