@@ -15,6 +15,7 @@ import {
 import { api, ApiError, type LoginResponse } from "./api.ts";
 import { dekVault } from "./sync/dekVault.ts";
 import { useAppI18n } from "./i18n.tsx";
+import { trackOverlay } from "./overlay.ts";
 
 export interface Session {
   /** Local-only session with no server account behind it. The web client
@@ -141,6 +142,7 @@ export function AuthDialog(props: {
   initialMode?: "login" | "signup";
 }) {
   const { m } = useAppI18n();
+  trackOverlay(() => props.open);
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange} modal>
       <Dialog.Portal>

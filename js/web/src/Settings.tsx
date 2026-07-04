@@ -14,6 +14,7 @@ import { api, type Device } from "./api.ts";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import type { Session } from "./Login.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import { trackOverlay } from "./overlay.ts";
 import type { ThemePreference } from "./theme.ts";
 
 type Section = "general" | "account" | "devices";
@@ -90,6 +91,7 @@ export function Settings(props: {
   logout: () => void;
 }) {
   const { m, language, setLanguage, locale } = useAppI18n();
+  trackOverlay(() => props.open);
   const [section, setSection] = createSignal<Section>("general");
   const [devices, setDevices] = createSignal<Device[] | null>(null);
   const [devicesError, setDevicesError] = createSignal<string | null>(null);

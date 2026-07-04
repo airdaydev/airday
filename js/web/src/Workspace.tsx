@@ -22,6 +22,7 @@ import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
 import { EditableNavLabel, Nav } from "./nav.tsx";
+import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
@@ -368,6 +369,7 @@ export function Workspace(props: {
   // If any rows are selected, insert immediately after the last-selected one;
   // otherwise append.
   const onPaste = (e: ClipboardEvent) => {
+    if (isOverlayOpen()) return;
     const v = view();
     if (v.kind !== "list") return;
     const target = e.target as Element | null;
@@ -403,8 +405,6 @@ export function Workspace(props: {
   // the AddForm, row edit, and list rename keep their native behaviour.
   const onDeleteKey = (e: KeyboardEvent) => {
     if (e.key !== "Delete" && e.key !== "Backspace") return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const v = view();
     const visibleIds = items().map((it) => it.id);
     const visibleSet = new Set(visibleIds);
@@ -450,8 +450,7 @@ export function Workspace(props: {
       queueMicrotask(() => selection.selectOnly(target));
     }
   };
-  document.addEventListener("keydown", onDeleteKey);
-  onCleanup(() => document.removeEventListener("keydown", onDeleteKey));
+  onGlobalKey(onDeleteKey);
 
   // x: toggle done on the current selection. Mirrors the row checkbox and
   // the context menu's Mark done / Mark not done. Skip when focus is in an
@@ -461,8 +460,6 @@ export function Workspace(props: {
   const onToggleDoneKey = (e: KeyboardEvent) => {
     if (e.key !== "x" && e.key !== "X") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const visibleSet = new Set(items().map((it) => it.id));
     const ids = selection
       .getSelectedKeys()
@@ -476,8 +473,7 @@ export function Workspace(props: {
     });
     app.setDoneMany(ids, !allDone);
   };
-  document.addEventListener("keydown", onToggleDoneKey);
-  onCleanup(() => document.removeEventListener("keydown", onToggleDoneKey));
+  onGlobalKey(onToggleDoneKey);
 
   // Duplicate live items as a contiguous block immediately after the
   // bottom-most source row — same shape as paste — rather than each
@@ -545,15 +541,12 @@ export function Workspace(props: {
     if (e.key !== "d" && e.key !== "D") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.shiftKey || e.altKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const ids = selection.getSelectedKeys().map(String);
     if (ids.length === 0) return;
     e.preventDefault();
     duplicateBlock(ids);
   };
-  document.addEventListener("keydown", onDuplicateKey);
-  onCleanup(() => document.removeEventListener("keydown", onDuplicateKey));
+  onGlobalKey(onDuplicateKey);
 
   // Cmd/Ctrl+C: copy the current selection through copyBlock. Skipped
   // when focus is in an editable surface so the browser's native copy
@@ -564,8 +557,6 @@ export function Workspace(props: {
     if (e.key !== "c" && e.key !== "C") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.shiftKey || e.altKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
     const ids = selection.getSelectedKeys().map(String);
@@ -573,8 +564,7 @@ export function Workspace(props: {
     e.preventDefault();
     copyBlock(ids);
   };
-  document.addEventListener("keydown", onCopyKey);
-  onCleanup(() => document.removeEventListener("keydown", onCopyKey));
+  onGlobalKey(onCopyKey);
 
   // Cmd/Ctrl+Z (undo) and Cmd/Ctrl+Shift+Z (redo). Skipped when focus
   // is in an editable surface so the browser's native text-undo handles
@@ -585,13 +575,10 @@ export function Workspace(props: {
     if (e.key !== "z" && e.key !== "Z") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.altKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const did = e.shiftKey ? app.redo() : app.undo();
     if (did) e.preventDefault();
   };
-  document.addEventListener("keydown", onUndoRedoKey);
-  onCleanup(() => document.removeEventListener("keydown", onUndoRedoKey));
+  onGlobalKey(onUndoRedoKey);
 
   // Enter: expand the topmost selected row, or collapse the expanded row
   // (collapse runs the save effect in Row). The expanded-row's
@@ -602,8 +589,6 @@ export function Workspace(props: {
   const onEnterExpand = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     if (!dndHandle) return;
     if (dndHandle.getExpanded() !== null) {
       e.preventDefault();
@@ -615,8 +600,7 @@ export function Workspace(props: {
     e.preventDefault();
     dndHandle.setExpanded(top);
   };
-  document.addEventListener("keydown", onEnterExpand);
-  onCleanup(() => document.removeEventListener("keydown", onEnterExpand));
+  onGlobalKey(onEnterExpand);
 
   // Space: shortcut for the Add button — start a draft below the topmost
   // selection, same as a click. startDraft already gates on list view and
@@ -624,15 +608,12 @@ export function Workspace(props: {
   const onSpaceAdd = (e: KeyboardEvent) => {
     if (e.key !== " ") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     if (view().kind !== "list") return;
     if (draft() !== null) return;
     e.preventDefault();
     startDraft();
   };
-  document.addEventListener("keydown", onSpaceAdd);
-  onCleanup(() => document.removeEventListener("keydown", onSpaceAdd));
+  onGlobalKey(onSpaceAdd);
 
   // [ / ]: cycle between lists in nav order (Home, then user lists),
   // wrapping at both ends. Done / Bin don't participate — they're
@@ -642,8 +623,6 @@ export function Workspace(props: {
   const onBracketNavigate = (e: KeyboardEvent) => {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const target = e.target as Element | null;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const ids = ["main", ...lists().map((l) => l.id)];
     const v = view();
     const idx = v.kind === "list" ? ids.indexOf(v.id) : -1;
@@ -657,8 +636,7 @@ export function Workspace(props: {
     e.preventDefault();
     setView({ kind: "list", id: next });
   };
-  document.addEventListener("keydown", onBracketNavigate);
-  onCleanup(() => document.removeEventListener("keydown", onBracketNavigate));
+  onGlobalKey(onBracketNavigate);
 
   // Drag items into a list nav button to move them to that list as the
   // first items, or onto Bin to status-bin them. Discriminate from the

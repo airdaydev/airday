@@ -15,6 +15,7 @@ import { Portal } from "solid-js/web";
 import type { DocApp } from "./sync/store.ts";
 import type { SearchResult } from "./search.ts";
 import { useAppI18n } from "./i18n.tsx";
+import { isOverlayOpen, trackOverlay } from "./overlay.ts";
 
 export function FindPalette(props: {
   app: DocApp;
@@ -23,6 +24,7 @@ export function FindPalette(props: {
   onSelect?: (result: SearchResult) => void;
 }) {
   const { m } = useAppI18n();
+  trackOverlay(() => props.open);
   const [searchInput, setSearchInput] = createSignal("");
   const [searchFilter, setSearchFilter] = createSignal("");
   const [selectedIndex, setSelectedIndex] = createSignal(0);
@@ -34,6 +36,10 @@ export function FindPalette(props: {
   // Require exactly one of meta/ctrl and no shift/alt so OS shortcuts
   // layered on top (e.g. macOS Cmd+Ctrl+F fullscreen) pass through.
   const onGlobalKeyDown = (e: KeyboardEvent) => {
+    // Don't open on top of another modal (Settings, a confirm dialog).
+    // The palette itself counts as open here, but that only blocks a
+    // redundant re-open while it's already up.
+    if (isOverlayOpen()) return;
     if (e.code !== "KeyF") return;
     if (e.shiftKey || e.altKey) return;
     if (e.metaKey === e.ctrlKey) return;
