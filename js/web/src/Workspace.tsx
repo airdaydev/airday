@@ -28,6 +28,7 @@ import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
 import type { SearchResult } from "./search.ts";
 import { Settings } from "./Settings.tsx";
+import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
 import { TaskDialog } from "./TaskDialog.tsx";
 import { useSession } from "./SessionContext.tsx";
 import {
@@ -81,6 +82,7 @@ export function Workspace(props: {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [emptyBinConfirmOpen, setEmptyBinConfirmOpen] = createSignal(false);
   const [findOpen, setFindOpen] = createSignal(false);
+  const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // The item currently opened in the detail dialog, or null when closed.
   const [openItemId, setOpenItemId] = createSignal<string | null>(null);
   // UI-only mirror of the title being edited in the dialog: the list row
@@ -91,8 +93,14 @@ export function Workspace(props: {
     id: string;
     text: string;
   } | null>(null);
+  // Which field the dialog focuses on open — the note badge opens to notes,
+  // everything else to the title. Reset to title whenever the dialog closes.
+  const [openFocus, setOpenFocus] = createSignal<"title" | "notes">("title");
   createEffect(() => {
-    if (openItemId() === null) setLiveEdit(null);
+    if (openItemId() === null) {
+      setLiveEdit(null);
+      setOpenFocus("title");
+    }
   });
   const matchesKbDevice = createKbDeviceSignal();
 
@@ -627,6 +635,17 @@ export function Workspace(props: {
   };
   onGlobalKey(onOpenKey);
 
+  // ? opens the keyboard-shortcut cheat sheet. `?` is Shift+/, so shift is
+  // expected; bail on the other modifiers. onGlobalKey already skips it
+  // while typing or when another overlay is open.
+  const onHelpKey = (e: KeyboardEvent) => {
+    if (e.key !== "?") return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    e.preventDefault();
+    setShortcutsOpen(true);
+  };
+  onGlobalKey(onHelpKey);
+
   // Space: shortcut for the Add button — start a draft below the topmost
   // selection, same as a click. startDraft already gates on list view and
   // an open draft, so the handler just guards modifiers and editable focus.
@@ -879,6 +898,7 @@ export function Workspace(props: {
         lastSyncAt={session.lastSyncAt()}
         logout={session.logout}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
         onSession={session.swapSession}
       />
       <FindPalette
@@ -913,11 +933,16 @@ export function Workspace(props: {
         app={app}
         homeName={homeName}
         lists={lists}
+        focusField={openFocus}
         onClosed={() => dndHandle?.focus()}
         onLiveText={(text) => {
           const id = openItemId();
           if (id) setLiveEdit({ id, text });
         }}
+      />
+      <ShortcutsDialog
+        open={shortcutsOpen()}
+        onOpenChange={setShortcutsOpen}
       />
       <main class="main">
         <header class="main-header">
@@ -1052,7 +1077,10 @@ export function Workspace(props: {
                     duplicateBlock={duplicateBlock}
                     copyBlock={copyBlock}
                     onDraftSettle={settleDraft}
-                    onOpen={(id) => setOpenItemId(id)}
+                    onOpen={(id, focus) => {
+                      if (focus) setOpenFocus(focus);
+                      setOpenItemId(id);
+                    }}
                     openOnTap={itemsIsMobile}
                   />
                 );

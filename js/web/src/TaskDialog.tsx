@@ -35,6 +35,8 @@ export function TaskDialog(props: {
   /** Resolved display name for the reserved `main` list. */
   homeName: () => string;
   lists: () => ListView[];
+  /** Which field to focus on open (default title). */
+  focusField?: () => "title" | "notes";
   /** Called as the dialog closes so the owner can restore focus (to the
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
@@ -135,6 +137,13 @@ export function TaskDialog(props: {
         <div class="dialog-positioner">
           <Dialog.Content
             class="task-dialog"
+            onKeyDown={(e) => {
+              // Cmd/Ctrl+Enter anywhere in the dialog = save & close.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                close();
+              }
+            }}
             onCloseAutoFocus={(e) => {
               // Kobalte would restore focus to whatever opened the dialog
               // (a row's open icon, the note badge, …). Take over and send
@@ -149,7 +158,8 @@ export function TaskDialog(props: {
               // the load effect that fills the title value.
               e.preventDefault();
               requestAnimationFrame(() => {
-                const el = titleRef;
+                const el =
+                  props.focusField?.() === "notes" ? notesRef : titleRef;
                 if (!el) return;
                 el.focus();
                 const end = el.value.length;
@@ -266,6 +276,20 @@ export function TaskDialog(props: {
                         props.onLiveText?.(v);
                       }}
                       onKeyDown={(e) => {
+                        // Enter commits & closes (the title is one line);
+                        // Shift+Enter still inserts a newline.
+                        if (
+                          e.key === "Enter" &&
+                          !e.shiftKey &&
+                          !e.metaKey &&
+                          !e.ctrlKey &&
+                          !e.altKey &&
+                          !e.isComposing
+                        ) {
+                          e.preventDefault();
+                          close();
+                          return;
+                        }
                         // ArrowDown at the very end of the title drops into
                         // the notes field (caret at its start).
                         if (

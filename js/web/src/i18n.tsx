@@ -97,6 +97,21 @@ type Messages = {
     moveToBin: string;
     moveToList: string;
   };
+  shortcuts: {
+    title: string;
+    newItem: string;
+    editItem: string;
+    openItem: string;
+    toggleDone: string;
+    duplicate: string;
+    copy: string;
+    undo: string;
+    redo: string;
+    bin: string;
+    switchList: string;
+    find: string;
+    showShortcuts: string;
+  };
   find: {
     placeholder: string;
     noMatches: string;
@@ -204,6 +219,21 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
     },
+    shortcuts: {
+      title: "Atajos de teclado",
+      newItem: "Nuevo elemento",
+      editItem: "Editar elemento",
+      openItem: "Abrir elemento",
+      toggleDone: "Marcar como hecho",
+      duplicate: "Duplicar",
+      copy: "Copiar",
+      undo: "Deshacer",
+      redo: "Rehacer",
+      bin: "Mover a la papelera",
+      switchList: "Cambiar de lista",
+      find: "Buscar",
+      showShortcuts: "Mostrar atajos",
+    },
     find: {
       placeholder: "Buscar",
       noMatches: "Sin resultados",
@@ -310,6 +340,21 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
+    },
+    shortcuts: {
+      title: "Keyboard shortcuts",
+      newItem: "New item",
+      editItem: "Edit item",
+      openItem: "Open item",
+      toggleDone: "Toggle done",
+      duplicate: "Duplicate",
+      copy: "Copy",
+      undo: "Undo",
+      redo: "Redo",
+      bin: "Move to bin",
+      switchList: "Switch list",
+      find: "Find",
+      showShortcuts: "Show shortcuts",
     },
     find: {
       placeholder: "Find",

@@ -155,6 +155,7 @@ export function Nav(props: {
   lastSyncAt: number | null;
   logout: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
   onSession: (s: Session) => void;
 }) {
   const { m } = useAppI18n();
@@ -605,6 +606,13 @@ export function Nav(props: {
                 }}
               >
                 {m().nav.importJson}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                class="dropdown-menu-item"
+                onSelect={() => props.onOpenShortcuts()}
+              >
+                <span>{m().shortcuts.title}</span>
+                <kbd class="menu-shortcut">?</kbd>
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 class="dropdown-menu-item"

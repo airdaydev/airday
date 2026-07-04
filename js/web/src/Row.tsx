@@ -100,8 +100,9 @@ export function Row(props: {
    *  the workspace re-opens a fresh draft so capture continues until
    *  Escape / blur / empty-Enter. */
   onDraftSettle?: (text: string, chain: boolean) => void;
-  /** Open this item in the detail dialog. */
-  onOpen?: (id: string) => void;
+  /** Open this item in the detail dialog. `focus` picks which field the
+   *  dialog lands the caret in — the note badge opens straight to notes. */
+  onOpen?: (id: string, focus?: "notes") => void;
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
@@ -461,7 +462,7 @@ export function Row(props: {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              props.onOpen?.(props.item().id);
+              props.onOpen?.(props.item().id, "notes");
             }}
             innerHTML={noteSvg}
           />
