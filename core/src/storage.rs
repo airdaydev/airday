@@ -34,6 +34,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
+use crate::crypto::Dek;
+use crate::doc::{Doc, DocError};
+
 // ---------- newtypes ----------
 
 /// Server-assigned doc identifier. UUID v7 bytes; matches
@@ -289,6 +292,74 @@ impl<T: LocalStorage + ?Sized> LocalStorage for Arc<T> {
     fn write_acked_seq(&self, doc_id: DocId, seq: ServerSeq) -> Result<(), StorageError> {
         (**self).write_acked_seq(doc_id, seq)
     }
+}
+
+// ---------- boot / seed / load glue ----------
+
+/// Failure reconstructing (or seeding) a live `Doc` from a `LocalStorage`.
+/// Wraps the two error sources these helpers touch — the storage backend
+/// and Loro import/export — so callers get one `?`-able error.
+#[derive(Debug, thiserror::Error)]
+pub enum BootError {
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+    #[error(transparent)]
+    Doc(#[from] DocError),
+}
+
+/// Reconstruct the live `Doc` from persisted state: load the snapshot
+/// (if any) and replay every op past it. `apply_remote_batch` decrypts
+/// and imports each blob and advances `last_pushed_vv` to cover them,
+/// so the returned doc reports `has_pending_ops() == false` — every
+/// stored op is already captured. Returns the doc, the storage's
+/// `last_local_seq` (for `SyncEngine::set_last_local_seq`), and the
+/// persisted resume cursor `last_acked_server_seq` (for `SyncEngine::new`).
+///
+/// A doc the storage has never seen yields `BootState::default()`, so the
+/// result is a fresh empty `Doc` — the first-boot happy path.
+pub fn boot_doc<S: LocalStorage + ?Sized>(
+    storage: &S,
+    dek: &Dek,
+    doc_id: DocId,
+) -> Result<(Doc, LocalSeq, ServerSeq), BootError> {
+    let boot = storage.boot(doc_id)?;
+    let mut doc = Doc::empty();
+    let mut blobs: Vec<EncryptedBlob> = Vec::with_capacity(1 + boot.replay.len());
+    if let Some(snap) = boot.snapshot {
+        blobs.push(snap.payload);
+    }
+    blobs.extend(boot.replay.into_iter().map(|r| r.payload));
+    if !blobs.is_empty() {
+        doc.apply_remote_batch(dek, blobs.iter())?;
+    }
+    // Replaying historical state shouldn't surface as live UI changes —
+    // drop the AppEvents the import emitted.
+    while doc.pop_event().is_some() {}
+    Ok((doc, boot.last_local_seq, boot.last_acked_server_seq))
+}
+
+/// As [`boot_doc`], but discards the cursors — for read-only callers.
+pub fn load_doc<S: LocalStorage + ?Sized>(
+    storage: &S,
+    dek: &Dek,
+    doc_id: DocId,
+) -> Result<Doc, BootError> {
+    Ok(boot_doc(storage, dek, doc_id)?.0)
+}
+
+/// Write `doc`'s full state as the doc's baseline snapshot, pruning
+/// nothing (`LocalPrefix(0)`). Used at signup / login / recover to lay
+/// down an initial snapshot. Any seeded local ops keep their rows so they
+/// still push to the server.
+pub fn seed_snapshot<S: LocalStorage + ?Sized>(
+    storage: &S,
+    dek: &Dek,
+    doc_id: DocId,
+    doc: &Doc,
+) -> Result<(), BootError> {
+    let blob = doc.snapshot_blob(dek)?;
+    storage.write_snapshot(doc_id, SnapshotCutoff::LocalPrefix(LocalSeq(0)), blob)?;
+    Ok(())
 }
 
 // ---------- in-memory impl ----------

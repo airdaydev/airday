@@ -1,0 +1,26 @@
+[package]
+name = "airday-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "airday_ffi"
+# staticlib ships in the XCFramework; cdylib exists so uniffi's
+# library-mode bindgen has a host artifact to read metadata from.
+crate-type = ["staticlib", "cdylib"]
+
+# Standard uniffi bindgen entry point (proc-macro / library mode — no UDL).
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
+[dependencies]
+airday-core = { path = "../../core" }
+airday-storage-sqlite = { path = "../../crates/storage-sqlite" }
+uniffi = { version = "0.32", features = ["cli"] }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

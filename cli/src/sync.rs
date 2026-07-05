@@ -39,7 +39,9 @@ pub enum SyncError {
     #[error(transparent)]
     Doc(#[from] airday_core::DocError),
     #[error(transparent)]
-    StorageInit(#[from] crate::storage::StorageInitError),
+    Db(#[from] crate::storage::DbError),
+    #[error(transparent)]
+    Boot(#[from] airday_core::BootError),
     #[error("storage: {0}")]
     Storage(#[from] airday_core::StorageError),
     #[error("ws: {0}")]

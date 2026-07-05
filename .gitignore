@@ -27,5 +27,12 @@ deploy/rendered/
 # wasm-pack output for js/core (built via `bun run build:wasm`)
 js/core/wasm/
 
+# Apple build outputs (produced by `bun run build:apple`)
+apple/AirdayCore/AirdayCoreFFI.xcframework/
+apple/AirdayCore/Sources/AirdayCore/Generated/
+# SwiftPM / Xcode local state
+.build/
+**/xcuserdata/
+
 # vim
 *.swp

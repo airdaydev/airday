@@ -15,6 +15,7 @@ path = "src/lib.rs"
 [dependencies]
 airday-protocol = { path = "../crates/protocol" }
 airday-core = { path = "../core" }
+airday-storage-sqlite = { path = "../crates/storage-sqlite" }
 tokio = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
