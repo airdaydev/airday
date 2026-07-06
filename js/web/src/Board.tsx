@@ -54,7 +54,7 @@ const H_SCROLL_STEP = 14;
 export function Board(props: {
   app: DocApp;
   listId: string;
-  onOpen: (id: string, focus?: "notes") => void;
+  onOpen: (id: string, focus?: "notes", caret?: number) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -487,7 +487,7 @@ function BoardColumn(props: {
   onReorder: (op: DndOp<ItemView>) => void;
   /** Open the new-item dialog targeting this column. */
   onAddItem: () => void;
-  onOpen: (id: string, focus?: "notes") => void;
+  onOpen: (id: string, focus?: "notes", caret?: number) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;

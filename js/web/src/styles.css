@@ -274,6 +274,10 @@ body {
   background: var(--bg-active);
 }
 
+[data-theme="dark"] .nav-item[data-active] {
+  color: #fff;
+}
+
 .nav-item[data-drop-active] {
   background: var(--dnd-select-bg);
 }
@@ -814,6 +818,50 @@ body {
 
 .theme-segment[data-checked] .theme-segment-control {
   color: var(--text);
+}
+
+/* Board/list view-mode switcher: a dots trigger in the header opening a
+   popover with an icon-only segmented control (reusing .theme-segment*). */
+.view-mode-trigger {
+  padding: 4px 6px;
+}
+
+.view-mode-popover {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  outline: none;
+  z-index: 60;
+}
+
+.view-mode-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-mode-icon {
+  display: inline-flex;
+}
+
+.view-mode-icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .settings-switch {

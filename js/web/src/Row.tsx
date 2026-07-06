@@ -5,7 +5,7 @@ import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
-import { locateOffsetInLinkified, setLinkifiedText } from "./linkify.ts";
+import { setLinkifiedText } from "./linkify.ts";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -46,8 +46,10 @@ export function Row(props: {
    *  Escape / blur / empty-Enter. */
   onDraftSettle?: (text: string, chain: boolean) => void;
   /** Open this item in the detail dialog. `focus` picks which field the
-   *  dialog lands the caret in — the note badge opens straight to notes. */
-  onOpen?: (id: string, focus?: "notes") => void;
+   *  dialog lands the caret in — the note badge opens straight to notes.
+   *  `caret` is a title character offset (from a double-click) so the dialog
+   *  lands the caret where the user pointed instead of at the end. */
+  onOpen?: (id: string, focus?: "notes", caret?: number) => void;
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
@@ -57,10 +59,6 @@ export function Row(props: {
 }) {
   const { m, locale } = useAppI18n();
   let textRef!: HTMLSpanElement;
-  // Captured by dblclick before the row expands so we can place the caret
-  // where the user pointed instead of selecting all. Captured pre-expand
-  // because layout may shift once the row becomes editable.
-  let dblClickCaret: { node: Node; offset: number } | null = null;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
   // it so the workspace can tell Enter-commit from Escape/blur and chain
@@ -76,20 +74,10 @@ export function Row(props: {
       props.expanded,
       (now, prev) => {
         if (!prev && now) {
-          const caret = dblClickCaret;
-          dblClickCaret = null;
-          // Resolve the dblclick caret to an absolute char offset *before*
-          // linkifying, since the captured text node is about to be
-          // detached. Pre-linkify the row has a single text node, so its
-          // offset is already the absolute char position.
-          let charOffset: number | null = null;
-          if (caret) {
-            if (caret.node === textRef) {
-              charOffset = textRef.textContent?.length ?? 0;
-            } else if (textRef.contains(caret.node)) {
-              charOffset = caret.offset;
-            }
-          }
+          // Inline expansion is now only reached via Cmd+Enter / a new draft
+          // (double-click opens the dialog instead), so the caret always
+          // lands at the end of the text — typing appends rather than
+          // overwriting a select-all.
           // Swap plain text for linkified anchors so URLs become clickable
           // while the row is editable. The collapse path & mirror effect
           // restore plain text, so anchors only exist in expanded rows.
@@ -98,24 +86,14 @@ export function Row(props: {
             textRef.focus();
             const sel = window.getSelection();
             const range = document.createRange();
-            if (charOffset !== null) {
-              const pos = locateOffsetInLinkified(textRef, charOffset);
-              range.setStart(pos.node, pos.offset);
-              range.collapse(true);
-            } else {
-              // No dblclick caret (e.g. expanded via Enter): drop the cursor
-              // at the end of the text so typing appends rather than
-              // overwriting a select-all.
-              range.selectNodeContents(textRef);
-              range.collapse(false);
-            }
+            range.selectNodeContents(textRef);
+            range.collapse(false);
             sel?.removeAllRanges();
             sel?.addRange(range);
           });
           return;
         }
         if (prev && !now) {
-          dblClickCaret = null;
           const chain = chainOnSettle;
           chainOnSettle = false;
           const next = (textRef.textContent ?? "").trim();
@@ -151,7 +129,12 @@ export function Row(props: {
     ),
   );
 
-  const captureDblClickCaret = (e: MouseEvent) => {
+  // Absolute character offset in the row's (plain, pre-linkify) text under
+  // the pointer — handed to the dialog so a double-click lands its title
+  // caret exactly where the user pointed. The collapsed row holds a single
+  // text node, so a hit-tested node offset is already the char position; a
+  // hit outside the text (row padding) snaps to the end.
+  const dblClickCharOffset = (e: MouseEvent): number => {
     type CPFP = (
       x: number,
       y: number,
@@ -175,14 +158,11 @@ export function Row(props: {
         offset = range.startOffset;
       }
     }
-    if (node && textRef.contains(node)) {
-      dblClickCaret = { node, offset };
-      return;
+    const len = textRef.textContent?.length ?? 0;
+    if (node && node !== textRef && textRef.contains(node)) {
+      return Math.min(offset, len);
     }
-    // Click landed outside the text span — typically the row's padding
-    // above or below the text. Snap to the end of the text instead of
-    // falling through to select-all.
-    dblClickCaret = { node: textRef, offset: textRef.childNodes.length };
+    return len;
   };
 
   // Mirror the model into the DOM while not expanded. While expanded
@@ -264,13 +244,18 @@ export function Row(props: {
         data-binned={isBinned(props.item()) ? "" : undefined}
         data-expanded={props.expanded() ? "" : undefined}
         on:dblclick={(e) => {
-          // Listen at the row level (not the text span) so dblclicks in
-          // the row's padding above/below the text still capture a caret.
-          // Native (non-delegated) so it runs in the bubble phase before
-          // the dnd listbox's dblclick handler triggers expansion — once
-          // the row expands, contentEditable flips and layout may shift.
-          if (props.expanded()) return;
-          captureDblClickCaret(e);
+          // Double-click opens the detail dialog with its title caret placed
+          // where the user pointed. Listen at the row level (not the text
+          // span) so double-clicks in the row's padding still resolve a
+          // caret. Native (non-delegated) + stopPropagation so it runs in
+          // the bubble phase and suppresses the dnd listbox's own dblclick
+          // (which would otherwise start an inline expansion). Drafts and
+          // any already-expanded row keep their inline editor.
+          if (props.expanded() || isDraftId(props.item().id)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const caret = dblClickCharOffset(e);
+          props.onOpen?.(props.item().id, undefined, caret);
         }}
         on:click={(e) => {
           // Mobile: a plain tap opens the detail dialog. Selection still

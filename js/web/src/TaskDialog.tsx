@@ -16,6 +16,7 @@ import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
+  locateOffsetInLinkified,
   openLinkOnClick,
   placeCaretAtEnd,
   placeCaretAtStart,
@@ -50,6 +51,9 @@ export function TaskDialog(props: {
   lists: () => ListView[];
   /** Which field to focus on open (default title). */
   focusField?: () => "title" | "notes";
+  /** Title character offset to land the caret at on open (from a
+   *  double-click); null/undefined → caret at the end of the title. */
+  caret?: () => number | null;
   /** Called as the dialog closes so the owner can restore focus (to the
    *  list). Fires from Kobalte's close-auto-focus hook, which we take over
    *  to steer focus back to the listbox instead of the trigger. */
@@ -298,14 +302,29 @@ export function TaskDialog(props: {
             }}
             onOpenAutoFocus={(e) => {
               // Kobalte would focus the first tabbable (the close button);
-              // take over and land the caret at the end of the title so the
-              // user can start typing/editing immediately. rAF defers past
-              // the load effect that fills the title value.
+              // take over and land the caret. rAF defers past the load
+              // effect that linkifies the title value.
               e.preventDefault();
               requestAnimationFrame(() => {
-                const el =
-                  props.focusField?.() === "notes" ? notesRef : titleRef;
-                if (el) placeCaretAtEnd(el);
+                const toNotes = props.focusField?.() === "notes";
+                const el = toNotes ? notesRef : titleRef;
+                if (!el) return;
+                // A double-click passes a title caret offset — place it
+                // exactly where the user pointed (mapped through the
+                // linkified anchors); otherwise land at the end.
+                const caret = toNotes ? null : (props.caret?.() ?? null);
+                if (caret === null) {
+                  placeCaretAtEnd(el);
+                  return;
+                }
+                el.focus();
+                const pos = locateOffsetInLinkified(el, caret);
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.setStart(pos.node, pos.offset);
+                range.collapse(true);
+                sel?.removeAllRanges();
+                sel?.addRange(range);
               });
             }}
           >

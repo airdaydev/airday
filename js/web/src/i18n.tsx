@@ -111,6 +111,11 @@ type Messages = {
     defaultColumn: string;
     moveToColumn: string;
     addItem: string;
+    /** Accessible name for the list/board view-mode segmented control. */
+    viewMode: string;
+    /** Short segment labels for that control. */
+    list: string;
+    board: string;
   };
   shortcuts: {
     title: string;
@@ -246,6 +251,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       defaultColumn: "Pendiente",
       moveToColumn: "Mover a la columna",
       addItem: "Añadir elemento",
+      viewMode: "Modo de vista",
+      list: "Lista",
+      board: "Tablero",
     },
     shortcuts: {
       title: "Atajos de teclado",
@@ -378,9 +386,12 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       deleteColumn: "Delete column",
       moveLeft: "Move left",
       moveRight: "Move right",
-      defaultColumn: "To do",
+      defaultColumn: "Backlog",
       moveToColumn: "Move to column",
       addItem: "Add item",
+      viewMode: "View mode",
+      list: "List",
+      board: "Board",
     },
     shortcuts: {
       title: "Keyboard shortcuts",

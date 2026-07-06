@@ -13,7 +13,12 @@ import {
   type DndOp,
 } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
+import { Popover } from "@kobalte/core/popover";
+import { SegmentedControl } from "@kobalte/core/segmented-control";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
+import cardStackSvg from "./icons/card-stack.svg?raw";
+import listBulletSvg from "./icons/list-bullet.svg?raw";
+import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
@@ -131,6 +136,10 @@ export function Workspace(props: {
   // Which field the dialog focuses on open — the note badge opens to notes,
   // everything else to the title. Reset to title whenever the dialog closes.
   const [openFocus, setOpenFocus] = createSignal<"title" | "notes">("title");
+  // Title caret offset for the dialog when opened by a double-click, so it
+  // lands where the user pointed; null (→ caret at end) otherwise. Reset
+  // whenever the dialog closes.
+  const [openCaret, setOpenCaret] = createSignal<number | null>(null);
   // Which lists render as a board. Persisted per browser (not synced).
   const [boardLists, setBoardLists] = createSignal<Record<string, boolean>>(
     loadBoardPrefs(),
@@ -153,6 +162,7 @@ export function Workspace(props: {
     if (openItemId() === null) {
       setLiveEdit(null);
       setOpenFocus("title");
+      setOpenCaret(null);
     }
   });
   const matchesKbDevice = createKbDeviceSignal();
@@ -1045,6 +1055,7 @@ export function Workspace(props: {
         homeName={homeName}
         lists={lists}
         focusField={openFocus}
+        caret={openCaret}
         onClosed={() => dndHandle?.focus()}
         onLiveText={(text) => {
           const id = openItemId();
@@ -1120,20 +1131,62 @@ export function Workspace(props: {
               </button>
             </Show>
             <Show when={view().kind === "list"}>
-              <button
-                type="button"
-                class="add-button"
-                onClick={() => {
-                  const v = view();
-                  if (v.kind === "list") toggleBoard(v.id);
-                }}
-              >
-                <span>
-                  {boardListId() !== null
-                    ? m().board.viewAsList
-                    : m().board.viewAsBoard}
-                </span>
-              </button>
+              <Popover placement="bottom-end" gutter={6}>
+                <Popover.Trigger
+                  class="add-button view-mode-trigger"
+                  aria-label={
+                    boardListId() !== null
+                      ? m().board.viewAsBoard
+                      : m().board.viewAsList
+                  }
+                  innerHTML={dotsVerticalSvg}
+                />
+                <Popover.Portal>
+                  <Popover.Content class="view-mode-popover">
+                    <SegmentedControl
+                      class="theme-segmented"
+                      aria-label={m().board.viewMode}
+                      value={boardListId() !== null ? "board" : "list"}
+                      onChange={(value) => {
+                        const v = view();
+                        if (v.kind !== "list") return;
+                        const wantBoard = value === "board";
+                        if (wantBoard !== (boardListId() !== null)) {
+                          toggleBoard(v.id);
+                        }
+                      }}
+                    >
+                      <SegmentedControl.Indicator class="theme-segment-indicator" />
+                      <SegmentedControl.Item value="list" class="theme-segment">
+                        <SegmentedControl.ItemInput />
+                        <SegmentedControl.ItemControl class="theme-segment-control">
+                          <SegmentedControl.ItemLabel class="view-mode-label">
+                            <span
+                              class="view-mode-icon"
+                              aria-hidden="true"
+                              innerHTML={listBulletSvg}
+                            />
+                            <span>{m().board.list}</span>
+                          </SegmentedControl.ItemLabel>
+                        </SegmentedControl.ItemControl>
+                      </SegmentedControl.Item>
+                      <SegmentedControl.Item value="board" class="theme-segment">
+                        <SegmentedControl.ItemInput />
+                        <SegmentedControl.ItemControl class="theme-segment-control">
+                          <SegmentedControl.ItemLabel class="view-mode-label">
+                            <span
+                              class="view-mode-icon"
+                              aria-hidden="true"
+                              innerHTML={cardStackSvg}
+                            />
+                            <span>{m().board.board}</span>
+                          </SegmentedControl.ItemLabel>
+                        </SegmentedControl.ItemControl>
+                      </SegmentedControl.Item>
+                    </SegmentedControl>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover>
             </Show>
             <Show when={view().kind === "list"}>
               <button
@@ -1221,8 +1274,9 @@ export function Workspace(props: {
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}
-                        onOpen={(id, focus) => {
+                        onOpen={(id, focus, caret) => {
                           if (focus) setOpenFocus(focus);
+                          if (caret != null) setOpenCaret(caret);
                           setOpenItemId(id);
                         }}
                         openOnTap={itemsIsMobile}
@@ -1238,8 +1292,9 @@ export function Workspace(props: {
             <Board
               app={app}
               listId={listId}
-              onOpen={(id, focus) => {
+              onOpen={(id, focus, caret) => {
                 if (focus) setOpenFocus(focus);
+                if (caret != null) setOpenCaret(caret);
                 setOpenItemId(id);
               }}
               openOnTap={itemsIsMobile}
