@@ -21,7 +21,7 @@ import {
   Show,
 } from "solid-js";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
+import { Dnd, DndSelection, type DndImperative, type DndOp } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
@@ -35,10 +35,12 @@ import type { ColumnView, DocApp, ItemView } from "./sync/store.ts";
  *  group maps — a column id can never be the empty string. */
 const DEFAULT_COL = "";
 
-/** Fixed card height — must match the `itemHeight` passed to each
- *  column's Dnd; cross-column drops divide by it to derive the
- *  insertion index from the pointer's y. */
-const CARD_HEIGHT = 28;
+/** Fixed card height — the `itemHeight` passed to each column's Dnd. The
+ *  foreign-drag preview (placeholder/nudge) and its insertion-slot math
+ *  live in the Dnd controller now; the board only needs this to size the
+ *  cards uniformly. Board cards are taller than list rows so the title can
+ *  wrap to two lines (see `.board-col-dnd .row-text` in styles.css). */
+const CARD_HEIGHT = 84;
 
 /** Pointer-driven horizontal autoscroll for the board strip. */
 const H_SCROLL_EDGE = 48;
@@ -51,6 +53,8 @@ export function Board(props: {
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
+  /** Open the new-item dialog targeting a column (`null` = default). */
+  onAddItem: (listId: string, columnId: string | null) => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
@@ -151,6 +155,63 @@ export function Board(props: {
     });
   };
 
+  // Live Dnd handles per column (keyed by colKey), registered by each
+  // BoardColumn on mount. The cross-column drag listener drives the
+  // hovered foreign column's placeholder/nudge/autoscroll preview through
+  // these and reads back the previewed insertion slot at drop time — so
+  // the drop lands exactly where the preview showed. This is the shared
+  // "DragContext": the board is the context coordinating its columns.
+  const columnHandles = new Map<string, DndImperative>();
+  const registerHandle = (colKey: string, handle: DndImperative | null) => {
+    if (handle) columnHandles.set(colKey, handle);
+    else columnHandles.delete(colKey);
+  };
+  const clearAllForeignHover = () => {
+    for (const h of columnHandles.values()) h.clearForeignHover();
+  };
+
+  // One selection model per column, owned by the board (keyed by the
+  // stable colKey) so a column remount doesn't drop its selection and so
+  // the cross-column drop below can make the moved rows the target
+  // column's new selection. Cross-column multi-select still isn't
+  // supported — each column's Dnd owns its own order.
+  const columnSelections = new Map<string, DndSelection>();
+  const selectionFor = (colKey: string): DndSelection => {
+    let s = columnSelections.get(colKey);
+    if (!s) {
+      s = new DndSelection();
+      columnSelections.set(colKey, s);
+    }
+    return s;
+  };
+
+  // After a cross-column drop, make the dropped rows the target column's
+  // selection. The mutation is applied synchronously but the moved rows
+  // only appear in the target's member list once the reactive graph
+  // settles, so we stage the request and apply it when the rows have
+  // actually landed (their order is then known, so the block ranges are
+  // correct regardless of effect timing).
+  const [pendingSelect, setPendingSelect] = createSignal<{
+    colKey: string;
+    ids: string[];
+  } | null>(null);
+  createEffect(() => {
+    const p = pendingSelect();
+    if (!p) return;
+    const members = membersByColumn().get(p.colKey);
+    if (!members) return;
+    const memberIds = members.map((it) => it.id);
+    const present = new Set(memberIds);
+    if (!p.ids.every((id) => present.has(id))) return;
+    const sel = columnSelections.get(p.colKey);
+    if (sel) {
+      sel.updateOrder(memberIds);
+      sel.setSelectedKeys(p.ids);
+      columnHandles.get(p.colKey)?.focus();
+    }
+    setPendingSelect(null);
+  });
+
   // Foreign-drop wiring (see dnd/spec.md "Foreign drop zones"). The
   // workspace's own nav/bin drop listener coexists: hit-tests are
   // disjoint, and this one only consumes drops landing on a *different*
@@ -186,51 +247,66 @@ export function Board(props: {
     }
     clearColumnHighlight();
     const el = findColumnAt(ce.detail.x, ce.detail.y);
-    if (!el) return;
-    const colKey = el.dataset.dropColumnId ?? DEFAULT_COL;
     const keys = ce.detail.keys.map(String);
-    if (keys.every((k) => resolvedColumnOf(k) === colKey)) return;
-    el.dataset.dropActive = "";
+    // The hovered column is a *foreign* drop target only when it's a
+    // different column from where the dragged rows currently live.
+    const targetCol =
+      el &&
+      !keys.every(
+        (k) => resolvedColumnOf(k) === (el.dataset.dropColumnId ?? DEFAULT_COL),
+      )
+        ? (el.dataset.dropColumnId ?? DEFAULT_COL)
+        : null;
+    // Preview the drop in the hovered foreign column; clear every other
+    // column (including the source, whose own controller suppresses its
+    // placeholder/nudge once the pointer leaves its bounds).
+    for (const [colKey, handle] of columnHandles) {
+      if (colKey === targetCol) handle.setForeignHover(ce.detail.x, ce.detail.y);
+      else handle.clearForeignHover();
+    }
+    if (targetCol !== null && el) el.dataset.dropActive = "";
   };
   const onDragEnd = (e: Event) => {
     const ce = e as CustomEvent<DndDragEventDetail>;
     clearColumnHighlight();
-    if (!isItemDrag(ce.detail)) return;
+    if (!isItemDrag(ce.detail)) {
+      clearAllForeignHover();
+      return;
+    }
     const el = findColumnAt(ce.detail.x, ce.detail.y);
-    if (!el) return;
-    const colKey = el.dataset.dropColumnId ?? DEFAULT_COL;
+    const colKey = el ? (el.dataset.dropColumnId ?? DEFAULT_COL) : null;
     const keys = ce.detail.keys.map(String);
-    // Same-column drop → the source column's internal reorder owns it.
-    if (keys.every((k) => resolvedColumnOf(k) === colKey)) return;
+    // Same-column (or off-board) drop → the source column's internal
+    // reorder owns it; nothing to consume here.
+    if (colKey === null || keys.every((k) => resolvedColumnOf(k) === colKey)) {
+      clearAllForeignHover();
+      return;
+    }
     ce.preventDefault();
+    // The target column's preview computed the exact insertion slot — read
+    // it back so the drop lands where the placeholder was. `foreignIdx` is
+    // a slot in that column's member order (0..count); >= count (or null,
+    // if the pointer never registered a hover) means tail append.
+    const foreignIdx = columnHandles.get(colKey)?.getForeignHoverIndex() ?? null;
+    clearAllForeignHover();
     // Preserve the source column's visible order for multi-row drops.
     const live = state.listLive[props.listId] ?? [];
     const keySet = new Set(keys);
     const inOrder = live.filter((id) => keySet.has(id));
     if (inOrder.length === 0) return;
-    // Positional drop: the pointer's y inside the target column's
-    // scroll container picks the in-column insertion slot; below the
-    // last card (or with no survivors) it's a tail append. No
-    // placeholder preview yet — that needs the shared-DragContext work
-    // (dnd/spec.md TODO).
     const memberIds = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
     const remaining = memberIds.filter((id) => !keySet.has(id));
-    let anchor: string | null | undefined;
-    const parentEl = el.querySelector<HTMLElement>(".dnd-parent");
-    if (parentEl && remaining.length > 0) {
-      const rect = parentEl.getBoundingClientRect();
-      const slot = Math.max(
-        0,
-        Math.floor((ce.detail.y - rect.top + parentEl.scrollTop) / CARD_HEIGHT),
-      );
-      anchor =
-        slot < remaining.length
-          ? remaining[slot]
-          : planAnchor(memberIds, keySet, null);
-    } else {
-      anchor = planAnchor(memberIds, keySet, null);
-    }
+    const anchor =
+      foreignIdx !== null && foreignIdx < remaining.length
+        ? remaining[foreignIdx]
+        : planAnchor(memberIds, keySet, null);
+    // The dragged rows all share one source column (cross-column
+    // multi-select isn't supported); clear its now-stale selection, then
+    // stage the moved rows to become the target column's selection.
+    const sourceCols = new Set(keys.map((k) => resolvedColumnOf(k)));
     dropIntoColumn(colKey, inOrder, anchor);
+    for (const c of sourceCols) columnSelections.get(c)?.clear();
+    setPendingSelect({ colKey, ids: inOrder });
   };
   document.addEventListener("primavera-dnd-dragmove", onDragMove);
   document.addEventListener("primavera-dnd-dragend", onDragEnd);
@@ -261,9 +337,12 @@ export function Board(props: {
         listId={props.listId}
         colKey={DEFAULT_COL}
         name={defaultName()}
+        selection={selectionFor(DEFAULT_COL)}
         members={() => membersByColumn().get(DEFAULT_COL) ?? []}
         onRename={(name) => app.setDefaultColumnName(props.listId, name)}
         onReorder={(op) => reorderWithin(DEFAULT_COL, op)}
+        onAddItem={() => props.onAddItem(props.listId, null)}
+        registerHandle={registerHandle}
         onOpen={props.onOpen}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
@@ -276,11 +355,14 @@ export function Board(props: {
             listId={props.listId}
             colKey={col.id}
             name={col.name}
+            selection={selectionFor(col.id)}
             members={() => membersByColumn().get(col.id) ?? []}
             onRename={(name) => {
               if (name.length > 0) app.renameColumn(props.listId, col.id, name);
             }}
             onReorder={(op) => reorderWithin(col.id, op)}
+            onAddItem={() => props.onAddItem(props.listId, col.id)}
+            registerHandle={registerHandle}
             onOpen={props.onOpen}
             openOnTap={props.openOnTap}
             duplicateBlock={props.duplicateBlock}
@@ -337,13 +419,20 @@ function BoardColumn(props: {
   /** Column id, or `DEFAULT_COL` for the implicit default column. */
   colKey: string;
   name: string;
+  /** Selection model for this column, owned by the board. */
+  selection: DndSelection;
   members: () => ItemView[];
   onRename: (name: string) => void;
   onReorder: (op: DndOp<ItemView>) => void;
+  /** Open the new-item dialog targeting this column. */
+  onAddItem: () => void;
   onOpen: (id: string, focus?: "notes") => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
+  /** Publish this column's Dnd handle to the board so the cross-column
+   *  drag listener can drive its foreign-drop preview. */
+  registerHandle: (colKey: string, handle: DndImperative | null) => void;
   /** User columns only — the default column can't move or be deleted. */
   menu?: {
     moveLeft?: () => void;
@@ -353,27 +442,12 @@ function BoardColumn(props: {
 }) {
   const { m } = useAppI18n();
   const app = props.app;
-  // Per-column selection: cross-column multi-select isn't supported —
-  // each Dnd owns its own order and the models would fight over one
-  // shared handle.
-  const selection = new DndSelection();
+  // Selection is owned by the board (per column) — see Board.selectionFor.
+  const selection = props.selection;
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   createEffect(() => setDndItems(props.members()));
+  onCleanup(() => props.registerHandle(props.colKey, null));
   let startRename: (() => void) | undefined;
-
-  let addInput: HTMLInputElement | undefined;
-  const commitAdd = () => {
-    const text = addInput?.value.trim() ?? "";
-    if (text.length === 0) return;
-    if (addInput) addInput.value = "";
-    if (props.colKey === DEFAULT_COL) {
-      // Appends to the list end with no register — the default column's
-      // tail by construction.
-      app.addItem(props.listId, text);
-    } else {
-      app.addItemInColumn(props.listId, props.colKey, text);
-    }
-  };
 
   return (
     <section class="board-col" data-drop-column-id={props.colKey}>
@@ -385,6 +459,13 @@ function BoardColumn(props: {
           registerStart={(fn) => (startRename = fn)}
         />
         <span class="board-col-count">{props.members().length}</span>
+        <button
+          type="button"
+          class="board-col-add-btn"
+          aria-label={m().board.addItem}
+          onClick={() => props.onAddItem()}
+          innerHTML={plusSvg}
+        />
         <DropdownMenu>
           <DropdownMenu.Trigger
             class="board-col-menu-trigger"
@@ -439,6 +520,7 @@ function BoardColumn(props: {
       <div class="board-col-body">
         <Dnd
           class="board-col-dnd"
+          ref={(h) => props.registerHandle(props.colKey, h)}
           items={dndItems()}
           setItems={setDndItems}
           getKey={(it) => it.id}
@@ -459,23 +541,11 @@ function BoardColumn(props: {
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}
               openOnTap={props.openOnTap}
+              showCreated
             />
           )}
         </Dnd>
       </div>
-      <form
-        class="board-col-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          commitAdd();
-        }}
-      >
-        <input
-          ref={addInput}
-          class="board-col-add-input"
-          placeholder={m().common.add}
-        />
-      </form>
     </section>
   );
 }

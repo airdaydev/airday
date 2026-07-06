@@ -27,6 +27,16 @@ export interface DndImperative {
   scrollToKey(key: Key): void;
   /** Move keyboard focus to the listbox so arrow/Enter/Space act on it. */
   focus(): void;
+  /** Preview a foreign drag (from another Dnd) hovering this list as a
+   *  drop target: placeholder + nudge + vertical autoscroll. Pass the
+   *  pointer's viewport coordinates. */
+  setForeignHover(clientX: number, clientY: number): void;
+  /** Clear any foreign-drag preview on this list. */
+  clearForeignHover(): void;
+  /** Insertion slot the foreign-drag preview last showed (0..count, where
+   *  count means append past the last item), or null when no foreign drag
+   *  is over this list. Read at drop time so the drop lands where previewed. */
+  getForeignHoverIndex(): number | null;
 }
 
 export interface DndProps<T> {
@@ -225,6 +235,9 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       getSelection: () => controller!.getSelection(),
       scrollToKey: (k) => controller!.scrollToKey(k),
       focus: () => listboxEl.focus(),
+      setForeignHover: (x, y) => controller!.setForeignHover(x, y),
+      clearForeignHover: () => controller!.clearForeignHover(),
+      getForeignHoverIndex: () => controller!.getForeignHoverIndex(),
     });
 
     setVersion((v) => v + 1);

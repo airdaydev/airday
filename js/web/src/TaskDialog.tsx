@@ -14,6 +14,14 @@ import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import {
+  collapsedCaretOffset,
+  openLinkOnClick,
+  placeCaretAtEnd,
+  placeCaretAtStart,
+  setLinkifiedText,
+} from "./linkify.ts";
+import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { trackOverlay } from "./overlay.ts";
 import {
   isBinned,
@@ -31,6 +39,11 @@ export function TaskDialog(props: {
   /** The open item's id, or null when closed. */
   itemId: () => string | null;
   setItemId: (id: string | null) => void;
+  /** New-item mode: a target column to capture into (`columnId: null` = the
+   *  list's default column / list view). Mutually exclusive with `itemId`;
+   *  nothing is written until a non-empty title is committed on close. */
+  newItem?: () => { listId: string; columnId: string | null } | null;
+  setNewItem?: (v: null) => void;
   app: DocApp;
   /** Resolved display name for the reserved `main` list. */
   homeName: () => string;
@@ -47,7 +60,15 @@ export function TaskDialog(props: {
   onLiveText?: (text: string) => void;
 }) {
   const { m, locale } = useAppI18n();
-  trackOverlay(() => props.itemId() !== null);
+
+  const newItemTarget = createMemo(() => props.newItem?.() ?? null);
+  const isNew = createMemo(
+    () => props.itemId() === null && newItemTarget() !== null,
+  );
+  const open = createMemo(
+    () => props.itemId() !== null || newItemTarget() !== null,
+  );
+  trackOverlay(open);
 
   const item = createMemo<ItemView | undefined>(() => {
     const id = props.itemId();
@@ -71,62 +92,182 @@ export function TaskDialog(props: {
     props.app.moveItem(id, targetId, idx);
   };
 
+  // Display name of the list a new item is being captured into.
+  const newItemListName = createMemo((): string => {
+    const nw = newItemTarget();
+    if (!nw) return "";
+    return listOptions().find((o) => o.id === nw.listId)?.name ?? nw.listId;
+  });
+
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
-  let titleRef: HTMLTextAreaElement | undefined;
-  let notesRef: HTMLTextAreaElement | undefined;
+  // The title and notes editors are contenteditable (not textareas) so that
+  // http(s) URLs render as clickable anchors, matching the row quick-entry
+  // editor. Their content is set imperatively from the buffers on load — it
+  // is never value-bound, so reactive updates can't clobber a live caret.
+  let titleRef: HTMLDivElement | undefined;
+  let notesRef: HTMLDivElement | undefined;
 
   // Which id the buffers currently hold. A plain var (not a signal): it's
   // written from the load effect, never read reactively.
   let loadedId: string | null = null;
 
-  // Match textarea height to content so notes grow instead of scrolling.
-  const autosize = (el?: HTMLTextAreaElement) => {
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+  // Read the plain text out of a contenteditable editor, stripping the stray
+  // <br> browsers leave behind when the last character is deleted so the
+  // :empty placeholder returns.
+  const editorText = (el?: HTMLDivElement): string => {
+    if (!el) return "";
+    if (el.textContent === "" && el.firstChild) el.replaceChildren();
+    return el.textContent ?? "";
   };
 
-  // Write the current buffers back to `id` if they differ. Empty title is
-  // ignored (keep the existing text), mirroring the inline editor.
+  // Push a buffer value into a contenteditable editor as linkified content.
+  const loadEditor = (el: HTMLDivElement | undefined, value: string) => {
+    if (el) setLinkifiedText(el, value);
+  };
+
+  // Write the current editor contents back to `id` if they differ. Empty
+  // title is ignored (keep the existing text), mirroring the inline editor.
   const flush = (id: string | null) => {
     if (!id) return;
     const it = props.app.state.itemsById[id];
     if (!it) return;
-    const t = text().trim();
+    const t = editorText(titleRef).trim();
     if (t && t !== it.text) props.app.editItemText(id, t);
-    if (notes() !== it.notes) props.app.editItemNotes(id, notes());
+    const n = editorText(notesRef);
+    if (n !== it.notes) props.app.editItemNotes(id, n);
   };
 
-  // Load buffers when the open item changes. No flush here — every
-  // transition that swaps the id (step / close) flushes explicitly first.
+  // Load the buffers and the editor DOM when the open target changes (an
+  // item, or a fresh new-item capture). Content is set imperatively — never
+  // value-bound — so reactive re-renders can't clobber a live caret. No
+  // flush here; every transition that swaps the target flushes first.
   createEffect(() => {
     const id = props.itemId();
-    if (id === loadedId) return;
+    const nw = newItemTarget();
+    const key = id ?? (nw ? "new" : null);
+    if (key === null || key === loadedId) return;
     const it = id ? props.app.state.itemsById[id] : undefined;
-    setText(it?.text ?? "");
-    setNotes(it?.notes ?? "");
-    loadedId = id;
+    const t = it?.text ?? "";
+    const n = it?.notes ?? "";
+    setText(t);
+    setNotes(n);
+    loadedId = key;
+    // The editors mount when the dialog opens; defer so their refs exist,
+    // then push — but only if this target is still the one showing.
+    queueMicrotask(() => {
+      const curId = props.itemId();
+      const curKey = curId ?? (props.newItem?.() ? "new" : null);
+      if (curKey !== key) return;
+      loadEditor(titleRef, t);
+      loadEditor(notesRef, n);
+    });
   });
 
-  // Re-fit the textareas after a load (stepping swaps the text under us).
+  // The editors unmount on close; forget the loaded target so reopening the
+  // same item re-pushes its content into the freshly mounted editors.
   createEffect(() => {
-    text();
-    autosize(titleRef);
+    if (!open()) loadedId = null;
   });
-  createEffect(() => {
-    notes();
-    autosize(notesRef);
-  });
+
+  // Commit new-item mode: create the item in its target column (default
+  // column when `columnId` is null) iff the title is non-empty, then close.
+  const commitNew = () => {
+    const nw = newItemTarget();
+    if (nw) {
+      const t = editorText(titleRef).trim();
+      if (t) {
+        const id = nw.columnId
+          ? props.app.addItemInColumn(nw.listId, nw.columnId, t)
+          : props.app.addItem(nw.listId, t);
+        const n = editorText(notesRef);
+        if (n.trim()) props.app.editItemNotes(id, n);
+      }
+    }
+    props.setNewItem?.(null);
+  };
 
   const close = () => {
+    if (isNew()) {
+      commitNew();
+      return;
+    }
     flush(loadedId);
     props.setItemId(null);
   };
 
+  // Title/notes keyboard nav, shared by the edit and new-item forms. The
+  // editors are contenteditable, so "caret at start/end" is derived from
+  // the collapsed selection offset rather than textarea selection props.
+  const onTitleKeyDown = (e: KeyboardEvent) => {
+    // Enter commits & closes (the title is one line); Shift+Enter is left
+    // to the browser, but the title never wraps to multiple lines in use.
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.isComposing
+    ) {
+      e.preventDefault();
+      close();
+      return;
+    }
+    // ArrowDown at the very end of the title drops into the notes field.
+    if (
+      e.key !== "ArrowDown" ||
+      e.shiftKey ||
+      e.altKey ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.isComposing ||
+      !titleRef ||
+      !notesRef
+    )
+      return;
+    const off = collapsedCaretOffset(titleRef);
+    if (off === null || off !== (titleRef.textContent?.length ?? 0)) return;
+    e.preventDefault();
+    placeCaretAtStart(notesRef);
+  };
+  const onNotesKeyDown = (e: KeyboardEvent) => {
+    // Plain Enter inserts a real newline character (kept as text so
+    // textContent round-trips on save), instead of the default block split.
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.isComposing
+    ) {
+      e.preventDefault();
+      document.execCommand("insertText", false, "\n");
+      setNotes(editorText(notesRef));
+      return;
+    }
+    // ArrowUp at the very start of the notes jumps back up to the title.
+    if (
+      e.key !== "ArrowUp" ||
+      e.shiftKey ||
+      e.altKey ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.isComposing ||
+      !titleRef ||
+      !notesRef
+    )
+      return;
+    const off = collapsedCaretOffset(notesRef);
+    if (off === null || off !== 0) return;
+    e.preventDefault();
+    placeCaretAtEnd(titleRef);
+  };
+
   return (
     <Dialog
-      open={props.itemId() !== null}
+      open={open()}
       onOpenChange={(o) => {
         if (!o) close();
       }}
@@ -160,13 +301,64 @@ export function TaskDialog(props: {
               requestAnimationFrame(() => {
                 const el =
                   props.focusField?.() === "notes" ? notesRef : titleRef;
-                if (!el) return;
-                el.focus();
-                const end = el.value.length;
-                el.setSelectionRange(end, end);
+                if (el) placeCaretAtEnd(el);
               });
             }}
           >
+            <Show when={isNew()}>
+              <header class="task-dialog-header">
+                <div class="task-dialog-header-meta">
+                  <span class="task-dialog-list-value">
+                    {newItemListName()}
+                  </span>
+                </div>
+                <div class="task-dialog-header-actions">
+                  <Dialog.CloseButton
+                    class="task-dialog-close"
+                    aria-label={m().common.close}
+                  >
+                    ✕
+                  </Dialog.CloseButton>
+                </div>
+              </header>
+              <div class="task-dialog-body">
+                <div class="task-dialog-gutter" />
+                <div class="task-dialog-content">
+                  <div
+                    ref={(el) => {
+                      titleRef = el;
+                      // Set the literal attribute value (not Solid's folded
+                      // valueless `contenteditable`) so the workspace's
+                      // `[contenteditable="true"]` shortcut guard matches.
+                      el.setAttribute("contenteditable", "true");
+                      setLinkifiedText(el, text());
+                    }}
+                    class="task-dialog-title"
+                    role="textbox"
+                    data-placeholder={m().board.addItem}
+                    onInput={() => setText(editorText(titleRef))}
+                    onKeyDown={onTitleKeyDown}
+                    onPaste={pasteAsPlainText}
+                    onClick={(e) => openLinkOnClick(e, titleRef)}
+                  />
+                  <div
+                    ref={(el) => {
+                      notesRef = el;
+                      el.setAttribute("contenteditable", "true");
+                      setLinkifiedText(el, notes());
+                    }}
+                    class="task-dialog-notes"
+                    role="textbox"
+                    aria-multiline="true"
+                    data-placeholder={m().workspace.notes}
+                    onInput={() => setNotes(editorText(notesRef))}
+                    onKeyDown={onNotesKeyDown}
+                    onPaste={pasteAsPlainText}
+                    onClick={(e) => openLinkOnClick(e, notesRef)}
+                  />
+                </div>
+              </div>
+            </Show>
             <Show when={item()}>
               {(it) => (
                 <>
@@ -260,95 +452,39 @@ export function TaskDialog(props: {
                       />
                     </div>
                     <div class="task-dialog-content">
-                      <textarea
+                      <div
                         ref={(el) => {
                           titleRef = el;
-                          autosize(el);
+                          el.setAttribute("contenteditable", "true");
+                          setLinkifiedText(el, text());
                         }}
                         class="task-dialog-title"
-                      rows={1}
-                      value={text()}
+                      role="textbox"
                       data-done={isDone(it()) ? "" : undefined}
-                      onInput={(e) => {
-                        const v = e.currentTarget.value;
+                      onInput={() => {
+                        const v = editorText(titleRef);
                         setText(v);
-                        autosize(e.currentTarget);
                         props.onLiveText?.(v);
                       }}
-                      onKeyDown={(e) => {
-                        // Enter commits & closes (the title is one line);
-                        // Shift+Enter still inserts a newline.
-                        if (
-                          e.key === "Enter" &&
-                          !e.shiftKey &&
-                          !e.metaKey &&
-                          !e.ctrlKey &&
-                          !e.altKey &&
-                          !e.isComposing
-                        ) {
-                          e.preventDefault();
-                          close();
-                          return;
-                        }
-                        // ArrowDown at the very end of the title drops into
-                        // the notes field (caret at its start).
-                        if (
-                          e.key !== "ArrowDown" ||
-                          e.shiftKey ||
-                          e.altKey ||
-                          e.metaKey ||
-                          e.ctrlKey ||
-                          e.isComposing
-                        )
-                          return;
-                        const ta = e.currentTarget;
-                        const end = ta.value.length;
-                        if (
-                          ta.selectionStart !== end ||
-                          ta.selectionEnd !== end
-                        )
-                          return;
-                        e.preventDefault();
-                        notesRef?.focus();
-                        notesRef?.setSelectionRange(0, 0);
-                      }}
+                      onKeyDown={onTitleKeyDown}
+                      onPaste={pasteAsPlainText}
+                      onClick={(e) => openLinkOnClick(e, titleRef)}
                     />
 
-                  <textarea
+                  <div
                     ref={(el) => {
                       notesRef = el;
-                      autosize(el);
+                      el.setAttribute("contenteditable", "true");
+                      setLinkifiedText(el, notes());
                     }}
                     class="task-dialog-notes"
-                    placeholder={m().workspace.notes}
-                    rows={1}
-                    value={notes()}
-                    onInput={(e) => {
-                      setNotes(e.currentTarget.value);
-                      autosize(e.currentTarget);
-                    }}
-                    onKeyDown={(e) => {
-                      // ArrowUp at the very start of the notes jumps back up
-                      // to the title (caret at its end).
-                      if (
-                        e.key !== "ArrowUp" ||
-                        e.shiftKey ||
-                        e.altKey ||
-                        e.metaKey ||
-                        e.ctrlKey ||
-                        e.isComposing
-                      )
-                        return;
-                      const ta = e.currentTarget;
-                      if (ta.selectionStart !== 0 || ta.selectionEnd !== 0)
-                        return;
-                      e.preventDefault();
-                      const t = titleRef;
-                      if (!t) return;
-                      t.focus();
-                      const end = t.value.length;
-                      t.setSelectionRange(end, end);
-                    }}
+                    role="textbox"
+                    aria-multiline="true"
+                    data-placeholder={m().workspace.notes}
+                    onInput={() => setNotes(editorText(notesRef))}
+                    onKeyDown={onNotesKeyDown}
+                    onPaste={pasteAsPlainText}
+                    onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
 
                   <Show when={isDone(it()) || isBinned(it())}>

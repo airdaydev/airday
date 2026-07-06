@@ -188,6 +188,19 @@ export class DndSelection {
     this.notify();
   }
 
+  /** Replace the selection with exactly `keys` — one block per key, then
+   *  merge coalesces adjacent ones into ranges. The order must already be
+   *  indexed (call `updateOrder` first if it might be stale). Used by the
+   *  board to make just-dropped rows the target column's selection. */
+  setSelectedKeys(keys: readonly Key[]): void {
+    this.blocks = keys.map((k) => ({ anchor: k, to: k }));
+    this.active = this.blocks.length
+      ? this.blocks[this.blocks.length - 1]
+      : null;
+    this.merge();
+    this.notify();
+  }
+
   selectAll(): void {
     if (this.indexToKey.length === 0) return;
     const block: Block = {

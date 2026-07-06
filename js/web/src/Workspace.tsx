@@ -100,6 +100,12 @@ export function Workspace(props: {
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // The item currently opened in the detail dialog, or null when closed.
   const [openItemId, setOpenItemId] = createSignal<string | null>(null);
+  // New-item capture target for the detail dialog (board "+" buttons), or
+  // null when not capturing. Mutually exclusive with `openItemId`.
+  const [newItemTarget, setNewItemTarget] = createSignal<{
+    listId: string;
+    columnId: string | null;
+  } | null>(null);
   // UI-only mirror of the title being edited in the dialog: the list row
   // reflects it live while typing, but nothing is written to the engine
   // until the dialog flushes on close (so no op-per-keystroke). Cleared
@@ -964,6 +970,8 @@ export function Workspace(props: {
       <TaskDialog
         itemId={openItemId}
         setItemId={setOpenItemId}
+        newItem={newItemTarget}
+        setNewItem={setNewItemTarget}
         app={app}
         homeName={homeName}
         lists={lists}
@@ -1070,9 +1078,9 @@ export function Workspace(props: {
                   startDraft();
                 }}
                 disabled={draft() !== null}
+                aria-label={m().common.add}
               >
                 <span class="add-button-icon" innerHTML={plusSvg} />
-                <span>{m().common.add}</span>
               </button>
             </Show>
           </div>
@@ -1155,6 +1163,9 @@ export function Workspace(props: {
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}
+              onAddItem={(listId, columnId) =>
+                setNewItemTarget({ listId, columnId })
+              }
             />
           )}
         </Show>

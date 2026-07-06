@@ -1487,22 +1487,19 @@ body {
 }
 
 .task-dialog-title {
-  appearance: none;
-  -webkit-appearance: none;
   width: 100%;
   margin: 0;
   padding: 0;
-  border: 0;
   background: transparent;
-  resize: none;
   outline: none;
   font: inherit;
   font-size: 1.75em;
   font-weight: 500;
   line-height: 1.3;
   color: var(--text);
-  overflow: hidden;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+  cursor: text;
 }
 
 .task-dialog-title[data-done] {
@@ -1511,25 +1508,32 @@ body {
 }
 
 .task-dialog-notes {
-  appearance: none;
-  -webkit-appearance: none;
   width: 100%;
   min-height: 3em;
   margin: 0;
   padding: 8px 0;
-  border: none;
   background: none;
-  resize: none;
   outline: none;
   font: inherit;
   line-height: 1.4;
   color: var(--text);
-  overflow: hidden;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+  cursor: text;
 }
 
-.task-dialog-notes::placeholder {
+.task-dialog-title:empty::before,
+.task-dialog-notes:empty::before {
+  content: attr(data-placeholder);
   color: var(--text-empty);
+  pointer-events: none;
+}
+
+.task-dialog-title a,
+.task-dialog-notes a {
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .task-dialog-meta {
@@ -2006,7 +2010,8 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.board-col-menu-trigger {
+.board-col-menu-trigger,
+.board-col-add-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2019,8 +2024,14 @@ body {
   cursor: pointer;
 }
 
-.board-col-menu-trigger:hover {
+.board-col-menu-trigger:hover,
+.board-col-add-btn:hover {
   background: var(--bg-hover);
+}
+
+.board-col-add-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .board-col-body {
@@ -2040,12 +2051,49 @@ body {
   padding: 0 6px 6px;
 }
 
-.board-col-add {
-  padding: 6px;
-  border-top: 1px solid var(--border-row);
+/* Board cards are taller than list rows (CARD_HEIGHT in Board.tsx), so the
+   title wraps to two lines instead of the list view's single ellipsized
+   line. Skip expanded (inline-editing) cards so the editor can grow. */
+.board-col-dnd .row:not([data-expanded]) .row-text {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.board-col-add-input,
+/* Stretch the card body to the full card height so the created date can
+   sit in the bottom-left corner (below the wrapped title). */
+.board-col-dnd .row-body {
+  align-self: stretch;
+}
+
+.row-created {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card feel: each dnd slot is CARD_HEIGHT tall, but the row sits shorter so
+   the column background shows through below it as an inter-card gutter.
+   Rounded corners + a hairline border finish the card. */
+.board-col-dnd .row {
+  height: calc(100% - 0.25em);
+  border: 1px solid var(--border-row);
+  border-radius: 8px;
+}
+
+/* The dnd stylesheet paints the selection highlight on the full-height slot
+   (`[data-selected]`), which on the board would bleed into the gutter and
+   join adjacent cards. Suppress it here and let `[aria-selected] .row`
+   (already scoped to the card) carry the selection instead. */
+.board-col-dnd [data-selected] {
+  background: transparent;
+}
+
 .board-add-col-input {
   width: 100%;
   box-sizing: border-box;
@@ -2058,7 +2106,6 @@ body {
   outline: none;
 }
 
-.board-col-add-input::placeholder,
 .board-add-col-input::placeholder {
   color: var(--text-empty);
 }

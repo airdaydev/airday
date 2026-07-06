@@ -5,6 +5,7 @@ import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
+import { locateOffsetInLinkified, setLinkifiedText } from "./linkify.ts";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -29,62 +30,6 @@ function statusTimestamp(it: ItemView): number | undefined {
   return it.binnedAt ?? it.doneAt;
 }
 
-// Render `text` into `el`, replacing existing children, with http(s) URLs
-// wrapped in <a target="_blank"> anchors. Trailing punctuation that isn't
-// part of the URL (.,;:!?)]}'") is left as plain text. Used by Row only
-// while the row is expanded so URLs become clickable in edit mode;
-// el.textContent still returns the plain string for save-back.
-const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
-const URL_TRAIL_RE = /[.,;:!?)\]}'"]+$/;
-function setLinkifiedText(el: HTMLElement, text: string) {
-  el.replaceChildren();
-  if (!text) return;
-  URL_RE.lastIndex = 0;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = URL_RE.exec(text)) !== null) {
-    let url = match[0];
-    const trail = url.match(URL_TRAIL_RE);
-    if (trail) url = url.slice(0, url.length - trail[0].length);
-    if (!url) continue;
-    if (match.index > lastIndex) {
-      el.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-    }
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.textContent = url;
-    el.appendChild(a);
-    lastIndex = match.index + url.length;
-  }
-  if (lastIndex < text.length) {
-    el.appendChild(document.createTextNode(text.slice(lastIndex)));
-  }
-}
-
-// Translate an absolute character offset within el's plain text into a
-// (node, offset) pair that can be fed to Range.setStart, walking through
-// linkified anchors. Used after swapping plain text for linkified content
-// to preserve the dblclick caret position the user pointed at.
-function locateOffsetInLinkified(
-  el: HTMLElement,
-  charOffset: number,
-): { node: Node; offset: number } {
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let remaining = charOffset;
-  let last: Text | null = null;
-  let n: Node | null;
-  while ((n = walker.nextNode())) {
-    const t = n as Text;
-    if (remaining <= t.data.length) return { node: t, offset: remaining };
-    remaining -= t.data.length;
-    last = t;
-  }
-  if (last) return { node: last, offset: last.data.length };
-  return { node: el, offset: el.childNodes.length };
-}
-
 export function Row(props: {
   item: () => ItemView;
   expanded: () => boolean;
@@ -106,6 +51,9 @@ export function Row(props: {
   /** When true (mobile), a plain tap on the row opens the dialog instead
    *  of only selecting — inline editing is unpleasant on touch. */
   openOnTap?: () => boolean;
+  /** Board cards show the item's created date in their bottom-left corner
+   *  (list rows don't). */
+  showCreated?: boolean;
 }) {
   const { m, locale } = useAppI18n();
   let textRef!: HTMLSpanElement;
@@ -451,6 +399,14 @@ export function Row(props: {
               if (e.key !== "Escape") e.stopPropagation();
             }}
           />
+          <Show when={props.showCreated && !props.expanded()}>
+            <span
+              class="row-created"
+              title={new Date(props.item().createdAt).toLocaleString(locale())}
+            >
+              {formatRelative(props.item().createdAt, nowMs(), locale())}
+            </span>
+          </Show>
         </div>
         <Show when={!props.expanded() && props.item().notes.trim().length > 0}>
           <button

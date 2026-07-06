@@ -129,6 +129,17 @@ export class DndController {
    *  whole-view drag can carry thousands of keys. */
   private keepAliveItems: DndRenderItem[] = [];
   private visualIndexMap = new Map<Key, number>();
+
+  // Foreign-drag preview state — a drag originating in ANOTHER Dnd
+  // instance is hovering this list as a drop target (see Board.tsx's
+  // cross-column drop). This controller renders a placeholder + nudge +
+  // vertical autoscroll for that drag WITHOUT owning it; the host
+  // consumer commits the actual drop. Null when no foreign drag is over
+  // this list. `foreignPointer` is retained so autoscroll (which moves
+  // content under a stationary pointer) can re-derive the slot on scroll.
+  private foreignHoverIndex: number | null = null;
+  private foreignPointer: { x: number; y: number } | null = null;
+
   /** Set when a drag ends so the synthetic `click` that follows mouseup
    *  is ignored. Without this, the post-drag click runs `selection.clear()`
    *  (when clearOnClickOutside is on and the click lands on the listbox)
@@ -285,6 +296,75 @@ export class DndController {
     return this.isDraggingFlag;
   }
 
+  // ── Foreign-drag preview ────────────────────────────────────────
+  //
+  // A drag that started in another Dnd instance is hovering this list as
+  // a drop target. These previews reuse the same placeholder/nudge/
+  // autoscroll machinery as an own-drag, but over the full (uncollapsed)
+  // order — this list doesn't own the dragged rows, so nothing is hidden.
+  // The host consumer (e.g. Board) drives these from its own drag
+  // listener and reads getForeignHoverIndex() at drop time.
+
+  /** Preview a foreign drag hovering this list. Computes the insertion
+   *  slot from the pointer, shows the placeholder, nudges items, and
+   *  drives vertical autoscroll. No-op on non-reorderable lists or while
+   *  this list is itself the drag source. */
+  setForeignHover(clientX: number, clientY: number): void {
+    if (!this.source || !this.cfg.reorder) return;
+    // This list owns the drag — it runs its own hover, not a foreign one.
+    if (this.isDraggingFlag) return;
+    this.foreignPointer = { x: clientX, y: clientY };
+    const idx = this.computeForeignIndex(clientY);
+    const changed = idx !== this.foreignHoverIndex;
+    this.foreignHoverIndex = idx;
+    this.updateForeignPlaceholder();
+    this.autoscroll.confine = this.cfg.confineAutoscroll;
+    this.autoscroll.update(clientX, clientY);
+    // Placeholder moves via direct DOM; only the nudge needs a re-render,
+    // and only when the target slot actually changes.
+    if (changed) this.opts.onChange();
+  }
+
+  /** Tear down any foreign-drag preview (placeholder, nudge, autoscroll). */
+  clearForeignHover(): void {
+    if (this.foreignHoverIndex === null && this.foreignPointer === null) return;
+    this.foreignHoverIndex = null;
+    this.foreignPointer = null;
+    this.placeholder.clear();
+    this.autoscroll.stop();
+    this.opts.onChange();
+  }
+
+  /** The insertion slot the foreign-drag preview last showed — a slot in
+   *  this list's order (0..count, where count means append past the last
+   *  item), or null when no foreign drag is over this list. The host reads
+   *  this at drop time so the drop lands exactly where the placeholder was. */
+  getForeignHoverIndex(): number | null {
+    return this.foreignHoverIndex;
+  }
+
+  private computeForeignIndex(clientY: number): number {
+    const parent = this.opts.host.parent;
+    const rect = parent.getBoundingClientRect();
+    const order = this.source!.getOrder();
+    const y = clientY - rect.top + parent.scrollTop;
+    return Math.max(
+      0,
+      Math.min(Math.floor(y / this.cfg.itemHeight), order.length),
+    );
+  }
+
+  private updateForeignPlaceholder(): void {
+    if (!this.cfg.reorder || this.foreignHoverIndex === null) {
+      this.placeholder.clear();
+      return;
+    }
+    const y =
+      this.foreignHoverIndex * this.cfg.itemHeight -
+      this.opts.host.parent.scrollTop;
+    this.placeholder.renderPlaceholder(y);
+  }
+
   /**
    * Compute the render state for the host. The host iterates `items` to
    * render the visible list; if the host wants to preserve consumer state
@@ -375,7 +455,17 @@ export class DndController {
       };
     }
 
-    const contentHeight = this.virtualization.getTotalHeight(order.length);
+    // A foreign drag hovering this list previews an insertion: extend the
+    // list by one slot and shift items at/after the hover index down —
+    // the same nudge as an own-drag, but over the full (uncollapsed) order.
+    const foreignHoverIndex = this.foreignHoverIndex;
+    const foreignNudge =
+      foreignHoverIndex !== null && this.cfg.reorder && this.cfg.nudge;
+    const nudgeExtra = foreignNudge ? 1 : 0;
+
+    const contentHeight = this.virtualization.getTotalHeight(
+      order.length + nudgeExtra,
+    );
     const listboxHeight = this.cfg.fillHeight
       ? Math.max(contentHeight, this.cfg.itemHeight)
       : contentHeight;
@@ -383,7 +473,7 @@ export class DndController {
     const range = this.virtualization.calculateRange(
       scrollTop,
       viewportHeight,
-      order.length,
+      order.length + nudgeExtra,
     );
 
     const items: DndRenderItem[] = [];
@@ -401,10 +491,15 @@ export class DndController {
         selFirst = !prevKey || !selectedKeys.has(prevKey);
         selLast = !nextKey || !selectedKeys.has(nextKey);
       }
+      const baseTop = this.virtualization.getItemTop(i);
+      const top =
+        foreignNudge && i >= foreignHoverIndex!
+          ? baseTop + this.cfg.itemHeight
+          : baseTop;
       items.push({
         key,
         index: i,
-        top: this.virtualization.getItemTop(i),
+        top,
         height: this.virtualization.getItemHeight(i),
         selected: isSelected,
         selFirst,
@@ -490,11 +585,16 @@ export class DndController {
 
   /** Host wires this to parent.addEventListener("scroll"). */
   onScroll = (): void => {
-    this.opts.onChange();
     if (this.isDraggingFlag) {
       this.updateHoverIndex();
       this.updatePlaceholder();
+    } else if (this.foreignHoverIndex !== null && this.foreignPointer !== null) {
+      // Foreign-drag autoscroll moves content under a stationary pointer —
+      // re-derive the target slot and reposition the placeholder.
+      this.foreignHoverIndex = this.computeForeignIndex(this.foreignPointer.y);
+      this.updateForeignPlaceholder();
     }
+    this.opts.onChange();
   };
 
   scrollToKey(key: Key): void {

@@ -56,3 +56,33 @@ describe("DndSelection.updateOrder guard", () => {
     expect(sel.getSelectedKeySet()).not.toBe(second);
   });
 });
+
+describe("DndSelection.setSelectedKeys", () => {
+  test("replaces the selection with exactly the given keys", () => {
+    const order = ["a", "b", "c", "d", "e"];
+    const sel = new DndSelection(order);
+    sel.selectOnly("a");
+    // The board makes just-dropped rows the target column's selection.
+    sel.setSelectedKeys(["c", "d"]);
+    expect(sel.getSelectedKeys()).toEqual(["c", "d"]);
+  });
+
+  test("coalesces adjacent keys and keeps non-adjacent ones separate", () => {
+    const order = ["a", "b", "c", "d", "e"];
+    const sel = new DndSelection(order);
+    // Passed out of order and non-contiguous: merge sorts by position and
+    // coalesces only b+c, leaving e as its own block.
+    sel.setSelectedKeys(["c", "e", "b"]);
+    expect(sel.getSelectedKeys()).toEqual(["b", "c", "e"]);
+    const s = sel.getSelection();
+    expect(s.blocks.length).toBe(2);
+  });
+
+  test("empty keys clears the selection", () => {
+    const sel = new DndSelection(["a", "b"]);
+    sel.selectOnly("a");
+    sel.setSelectedKeys([]);
+    expect(sel.hasSelection()).toBe(false);
+    expect(sel.getActiveBlock()).toBeNull();
+  });
+});

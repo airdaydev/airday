@@ -110,6 +110,7 @@ type Messages = {
      *  hasn't renamed it. */
     defaultColumn: string;
     moveToColumn: string;
+    addItem: string;
   };
   shortcuts: {
     title: string;
@@ -244,6 +245,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveRight: "Mover a la derecha",
       defaultColumn: "Pendiente",
       moveToColumn: "Mover a la columna",
+      addItem: "Añadir elemento",
     },
     shortcuts: {
       title: "Atajos de teclado",
@@ -378,6 +380,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveRight: "Move right",
       defaultColumn: "To do",
       moveToColumn: "Move to column",
+      addItem: "Add item",
     },
     shortcuts: {
       title: "Keyboard shortcuts",
