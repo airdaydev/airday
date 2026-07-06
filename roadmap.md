@@ -2,6 +2,8 @@
 - indexeddb smoke tests? do we have an in-mem storage adapter? via playwright?
 - Due dates
 - list deleting - orphan handling - not really an issue we need to resolve yet, they'll sit there and can be recovered later through a resolution mechanism or an orphaned container
+- another one - we probably want to remove 'done' items positions in the main lists!
+- bug: mark multiple items as done then mark one of those as not done and list position changes!
 
 ## Sync & persistence
 - Report catch-up volume in `HelloAck` so clients can show progress and we can observe snapshot-vs-tail sync weight.

@@ -485,7 +485,7 @@ export function Row(props: {
               onSelect={() => props.onOpen?.(props.item().id)}
             >
               <span>{m().common.open}</span>
-              <kbd class="menu-shortcut">⌘↵</kbd>
+              <kbd class="menu-shortcut">↵</kbd>
             </ContextMenu.Item>
           </Show>
           <Show when={!isDone(props.item())}>

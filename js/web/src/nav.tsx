@@ -223,8 +223,8 @@ export function Nav(props: {
   // Enter on a keyboard-focused user list opens it. The Dnd listbox owns
   // arrow-key navigation and updates navSelection's top key as the user
   // moves; we just translate that into a setView. stopPropagation keeps the
-  // document-level onEnterExpand (App.tsx:1273) from also firing and
-  // expanding whatever's selected in the main list.
+  // document-level onOpenKey from also firing and opening whatever's
+  // selected in the main list.
   const onNavKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;

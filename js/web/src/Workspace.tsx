@@ -599,15 +599,30 @@ export function Workspace(props: {
   };
   onGlobalKey(onUndoRedoKey);
 
-  // Enter: expand the topmost selected row, or collapse the expanded row
-  // (collapse runs the save effect in Row). The expanded-row's
-  // contenteditable owns Enter while editing — it dispatches an Escape to
-  // drive collapse — so the editable-surface guard below keeps us from
-  // double-handling there.
   let dndHandle: DndImperative | null = null;
-  const onEnterExpand = (e: KeyboardEvent) => {
+
+  // Enter: open the topmost selected item in the detail dialog. The dialog
+  // owns Enter while open (commits & closes), and onGlobalKey's overlay /
+  // editable-surface guards keep this from firing there.
+  const onOpenKey = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const top = selection.getSelectionTop();
+    if (top === null) return;
+    e.preventDefault();
+    setOpenItemId(String(top));
+  };
+  onGlobalKey(onOpenKey);
+
+  // Cmd/Ctrl+Enter: inline "quick edit" — expand the topmost selected row for
+  // editing, or collapse the expanded row (collapse runs the save effect in
+  // Row). The expanded row's contenteditable owns Enter while editing — it
+  // dispatches an Escape to drive collapse — so the editable-surface guard
+  // keeps us from double-handling there.
+  const onQuickEdit = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.altKey || e.shiftKey) return;
     if (!dndHandle) return;
     if (dndHandle.getExpanded() !== null) {
       e.preventDefault();
@@ -619,21 +634,7 @@ export function Workspace(props: {
     e.preventDefault();
     dndHandle.setExpanded(top);
   };
-  onGlobalKey(onEnterExpand);
-
-  // Cmd/Ctrl+Enter: open the topmost selected item in the detail dialog.
-  // Plain Enter stays inline quick-edit (onEnterExpand above); the modifier
-  // "promotes" it to the full task view.
-  const onOpenKey = (e: KeyboardEvent) => {
-    if (e.key !== "Enter") return;
-    if (!(e.metaKey || e.ctrlKey)) return;
-    if (e.altKey || e.shiftKey) return;
-    const top = selection.getSelectionTop();
-    if (top === null) return;
-    e.preventDefault();
-    setOpenItemId(String(top));
-  };
-  onGlobalKey(onOpenKey);
+  onGlobalKey(onQuickEdit);
 
   // ? opens the keyboard-shortcut cheat sheet. `?` is Shift+/, so shift is
   // expected; bail on the other modifiers. onGlobalKey already skips it
