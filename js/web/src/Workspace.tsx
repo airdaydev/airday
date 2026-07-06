@@ -106,10 +106,14 @@ export function Workspace(props: {
     listId: string;
     columnId: string | null;
   } | null>(null);
-  // Id of an item to select and scroll into view in the board — set after
-  // a board "+" capture or a find-palette pick that lands on a board list.
-  // Handed to the Board, which clears it once it lands the selection.
-  const [boardRevealId, setBoardRevealId] = createSignal<string | null>(null);
+  // Ids to select + scroll into view in the board once they land in their
+  // column (a "+" capture, a duplicated block, or a find-palette pick that
+  // lands on a board list). A list so a multi-item duplicate selects the
+  // whole block, not just one. Handed to the Board, which clears it once it
+  // lands the selection.
+  const [boardRevealIds, setBoardRevealIds] = createSignal<string[] | null>(
+    null,
+  );
   // The board's active column selection (or null), published up by Board so
   // the global item shortcuts act on it in board view — the workspace-level
   // `selection` below only ever holds the flat list view's selection.
@@ -565,18 +569,47 @@ export function Workspace(props: {
     if (v.kind !== "list") return;
     const visible = items().map((it) => it.id);
     const sourceSet = new Set(sourceIds);
-    const sourcesInOrder: { idx: number; text: string }[] = [];
+    // Only inherit a column register that actually resolves to a live column
+    // of this list — a stale/default register is left off so the clone falls
+    // to the default column (and `setItemColumn` never rejects an unknown id).
+    const validCols = new Set(
+      (state.columnsByList[v.id] ?? []).map((c) => c.id),
+    );
+    const sourcesInOrder: {
+      idx: number;
+      text: string;
+      column: string | undefined;
+    }[] = [];
     visible.forEach((id, idx) => {
       if (!sourceSet.has(id)) return;
       const it = app.getItem(id);
       if (!it || !isInListView(it)) return;
-      sourcesInOrder.push({ idx, text: it.text });
+      const column =
+        it.column && validCols.has(it.column) ? it.column : undefined;
+      sourcesInOrder.push({ idx, text: it.text, column });
     });
     if (sourcesInOrder.length === 0) return;
     const insertAt = sourcesInOrder[sourcesInOrder.length - 1].idx + 1;
     const texts = sourcesInOrder.map((s) => s.text);
-    const newIds = app.addItemsAt(v.id, texts, insertAt);
+    // Create the block, then copy each source's (valid) column register onto
+    // its clone in one undo step, so a dupe made inside a board column lands
+    // in that column instead of the default one. setItemColumn with no index
+    // keeps the clone's just-assigned linear position.
+    const newIds = app.withActionBatch(() => {
+      const ids = app.addItemsAt(v.id, texts, insertAt);
+      ids.forEach((id, i) => {
+        const col = sourcesInOrder[i]?.column;
+        if (col) app.setItemColumn(id, col);
+      });
+      return ids;
+    });
     if (newIds.length === 0) return;
+    if (boardListId() !== null) {
+      // On the board, hand the whole clone block to the reveal path so it
+      // becomes the active column selection and scrolls into view.
+      setBoardRevealIds(newIds);
+      return;
+    }
     // Wait for the dnd's source to absorb the new ids — selectOnly on a
     // key the order map doesn't yet know about leaves it visually
     // unselected.
@@ -866,7 +899,7 @@ export function Workspace(props: {
     // mounted — hand the id to the Board's reveal path (select + scroll in
     // the resolved column) instead of the list-view scroll below.
     if (target.kind === "list" && boardLists()[target.id]) {
-      setBoardRevealId(r.id);
+      setBoardRevealIds([r.id]);
       return;
     }
     setTimeout(() => {
@@ -1020,7 +1053,7 @@ export function Workspace(props: {
         onCreated={(id) => {
           // Only board view has a card to reveal; list-view capture keeps
           // its own draft/focus flow.
-          if (boardListId() !== null) setBoardRevealId(id);
+          if (boardListId() !== null) setBoardRevealIds([id]);
         }}
       />
       <ShortcutsDialog
@@ -1215,8 +1248,8 @@ export function Workspace(props: {
               onAddItem={(listId, columnId) =>
                 setNewItemTarget({ listId, columnId })
               }
-              revealId={boardRevealId}
-              clearReveal={() => setBoardRevealId(null)}
+              revealIds={boardRevealIds}
+              clearReveal={() => setBoardRevealIds(null)}
               onActiveSelectionChange={setBoardSelection}
             />
           )}

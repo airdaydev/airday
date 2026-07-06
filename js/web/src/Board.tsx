@@ -60,10 +60,11 @@ export function Board(props: {
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Open the new-item dialog targeting a column (`null` = default). */
   onAddItem: (listId: string, columnId: string | null) => void;
-  /** Id of a just-created item to select and scroll into view once it
-   *  lands in its resolved column; `null` when nothing pending. */
-  revealId?: () => string | null;
-  /** Called by the board once it has revealed `revealId`. */
+  /** Ids to select and scroll into view once they land in their (shared)
+   *  resolved column — a "+" capture, a duplicated block, or a find pick;
+   *  `null` when nothing pending. */
+  revealIds?: () => string[] | null;
+  /** Called by the board once it has revealed `revealIds`. */
   clearReveal?: () => void;
   /** Publishes the board's active (most recently populated) column
    *  selection, or `null` when nothing is selected, so the workspace's
@@ -257,13 +258,18 @@ export function Board(props: {
   // above then selects, focuses, and scrolls it into view. Waits for the
   // reactive graph to settle (the item may not be projected yet).
   createEffect(() => {
-    const id = props.revealId?.() ?? null;
-    if (!id) return;
-    if (!state.itemsById[id]) return;
-    const colKey = resolvedColumnOf(id);
+    const ids = props.revealIds?.() ?? null;
+    if (!ids || ids.length === 0) return;
+    // The revealed ids share a column (a duplicated block, or a single
+    // item); resolve it from the first and wait until every id has landed
+    // there before staging them all as that column's selection.
+    if (!state.itemsById[ids[0]]) return;
+    const colKey = resolvedColumnOf(ids[0]);
     const members = membersByColumn().get(colKey);
-    if (!members?.some((it) => it.id === id)) return;
-    setPendingSelect({ colKey, ids: [id] });
+    if (!members) return;
+    const present = new Set(members.map((it) => it.id));
+    if (!ids.every((id) => present.has(id))) return;
+    setPendingSelect({ colKey, ids });
     props.clearReveal?.();
   });
 
