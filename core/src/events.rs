@@ -36,6 +36,9 @@ pub enum AppEvent {
         created_at: i64,
         done_at: Option<i64>,
         binned_at: Option<i64>,
+        /// Raw board-column register (`spec/kanban.md`); consumers
+        /// resolve valid-or-default against the list's column defs.
+        column: Option<String>,
         live_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
@@ -75,6 +78,15 @@ pub enum AppEvent {
         binned_at: Option<i64>,
         live_index: Option<usize>,
     },
+    /// Item's board-column register changed (`spec/kanban.md`). The
+    /// payload is the raw register value after the write — `None` when
+    /// cleared (default column). Consumers resolve valid-or-default
+    /// against the item's list's column defs; a same-commit reorder
+    /// arrives as a separate `ItemMoved`.
+    ItemColumnChanged {
+        id: String,
+        column: Option<String>,
+    },
     /// Item's `list_id` field changed without changing position
     /// (e.g. orphan reassignment when a list is deleted), or alongside
     /// an `ItemMoved` (cross-list drag). `live_index` is the item's
@@ -103,6 +115,39 @@ pub enum AppEvent {
     ListRenamed {
         id: String,
         name: String,
+    },
+
+    // ---------- board columns (spec/kanban.md) ----------
+    /// A column def appeared in `columns/<list_id>`. `index` is the
+    /// position among user columns — the implicit default column is
+    /// pinned first and never counted.
+    ColumnAdded {
+        list_id: String,
+        id: String,
+        name: String,
+        created_at: i64,
+        index: usize,
+    },
+    ColumnRemoved {
+        list_id: String,
+        id: String,
+    },
+    ColumnMoved {
+        list_id: String,
+        id: String,
+        index: usize,
+    },
+    ColumnRenamed {
+        list_id: String,
+        id: String,
+        name: String,
+    },
+    /// The implicit default column's display-name override changed for
+    /// one list (`main` included — storage differs, the event doesn't).
+    /// `None` means clients fall back to the localized built-in label.
+    DefaultColumnRenamed {
+        list_id: String,
+        name: Option<String>,
     },
 
     // ---------- workspace settings ----------

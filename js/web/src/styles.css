@@ -1944,3 +1944,145 @@ body {
   font-size: 13px;
   color: var(--text-faint);
 }
+
+/* ---------- Kanban board (spec/kanban.md) ---------- */
+
+.board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0 12px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.board-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 0 0 272px;
+  width: 272px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-nav);
+}
+
+.board-col[data-drop-active] {
+  background: var(--dnd-select-bg);
+}
+
+.board-col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 6px 12px;
+}
+
+.board-col-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  border-radius: 4px;
+}
+
+.board-col-name[contenteditable="true"] {
+  white-space: pre-wrap;
+  box-shadow: 0 0 0 1px var(--border-input);
+  background: var(--bg-elevated);
+  padding: 0 4px;
+}
+
+.board-col-count {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-col-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.board-col-menu-trigger:hover {
+  background: var(--bg-hover);
+}
+
+.board-col-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-col-dnd {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-col-dnd .dnd-parent {
+  padding: 0 6px 6px;
+}
+
+.board-col-add {
+  padding: 6px;
+  border-top: 1px solid var(--border-row);
+}
+
+.board-col-add-input,
+.board-add-col-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  outline: none;
+}
+
+.board-col-add-input::placeholder,
+.board-add-col-input::placeholder {
+  color: var(--text-empty);
+}
+
+.board-add-col {
+  flex: 0 0 200px;
+  width: 200px;
+}
+
+.board-add-col-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border-input);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.board-add-col-button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

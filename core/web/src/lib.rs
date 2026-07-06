@@ -205,6 +205,73 @@ impl Doc {
         self.inner.set_main_name(name).map_err(js_err)
     }
 
+    // ---------- board columns (spec/kanban.md) ----------
+
+    #[wasm_bindgen(js_name = addColumn)]
+    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, JsError> {
+        self.inner.add_column(list_id, name).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = renameColumn)]
+    pub fn rename_column(&self, list_id: &str, column_id: &str, name: &str) -> Result<(), JsError> {
+        self.inner
+            .rename_column(list_id, column_id, name)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = moveColumn)]
+    pub fn move_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        target_index: usize,
+    ) -> Result<(), JsError> {
+        self.inner
+            .move_column(list_id, column_id, target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = deleteColumn)]
+    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), JsError> {
+        self.inner.delete_column(list_id, column_id).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = setDefaultColumnName)]
+    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), JsError> {
+        self.inner
+            .set_default_column_name(list_id, name)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = setItemColumn)]
+    pub fn set_item_column(
+        &self,
+        item_id: &str,
+        column_id: Option<String>,
+        target_index: Option<usize>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .set_item_column(item_id, column_id.as_deref(), target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = addItemInColumn)]
+    pub fn add_item_in_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        text: &str,
+    ) -> Result<String, JsError> {
+        self.inner
+            .add_item_in_column(list_id, column_id, text)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = columnsOfJson)]
+    pub fn columns_of_json(&self, list_id: &str) -> String {
+        columns_to_json(&self.inner.columns_of(list_id))
+    }
+
     // -- reads (return JSON for now; replace with serde-wasm-bindgen
     //    structured returns once a real consumer needs them) --
 
@@ -1287,6 +1354,81 @@ impl SyncEngine {
         self.inner.doc().set_main_name(name).map_err(js_err)
     }
 
+    // ---------- board columns (spec/kanban.md) ----------
+
+    #[wasm_bindgen(js_name = addColumn)]
+    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, JsError> {
+        self.inner.doc().add_column(list_id, name).map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = renameColumn)]
+    pub fn rename_column(&self, list_id: &str, column_id: &str, name: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .rename_column(list_id, column_id, name)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = moveColumn)]
+    pub fn move_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        target_index: usize,
+    ) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .move_column(list_id, column_id, target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = deleteColumn)]
+    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .delete_column(list_id, column_id)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = setDefaultColumnName)]
+    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_default_column_name(list_id, name)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = setItemColumn)]
+    pub fn set_item_column(
+        &self,
+        item_id: &str,
+        column_id: Option<String>,
+        target_index: Option<usize>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_item_column(item_id, column_id.as_deref(), target_index)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = addItemInColumn)]
+    pub fn add_item_in_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        text: &str,
+    ) -> Result<String, JsError> {
+        self.inner
+            .doc()
+            .add_item_in_column(list_id, column_id, text)
+            .map_err(js_err)
+    }
+
+    #[wasm_bindgen(js_name = columnsOfJson)]
+    pub fn columns_of_json(&self, list_id: &str) -> String {
+        columns_to_json(&self.inner.doc().columns_of(list_id))
+    }
+
     // -- undo / redo --
 
     pub fn undo(&self) -> Result<bool, JsError> {
@@ -1440,17 +1582,23 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, liveIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, column?, liveIndex?
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, liveIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?, liveIndex?
+/// - `itemColumnChanged` — id, column? (undefined = default column)
 /// - `itemListChanged` — id, listId, liveIndex?
 /// - `listAdded` — id, name, createdAt, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
+/// - `columnAdded` — id (column id), listId, name, createdAt, index
+/// - `columnRemoved` — id, listId
+/// - `columnMoved` — id, listId, index
+/// - `columnRenamed` — id, listId, name
+/// - `defaultColumnRenamed` — listId (in `id` too), name? (undefined = built-in label)
 /// - `settingsChanged` — showListCounts, mainName?
 #[wasm_bindgen]
 pub struct AppEventJs {
@@ -1460,6 +1608,9 @@ pub struct AppEventJs {
     text: Option<String>,
     notes: Option<String>,
     name: Option<String>,
+    /// Raw board-column register value (`itemAdded` /
+    /// `itemColumnChanged`); resolve valid-or-default client-side.
+    column: Option<String>,
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
@@ -1533,6 +1684,10 @@ impl AppEventJs {
     pub fn main_name(&self) -> Option<String> {
         self.main_name.clone()
     }
+    #[wasm_bindgen(getter)]
+    pub fn column(&self) -> Option<String> {
+        self.column.clone()
+    }
 }
 
 impl From<CoreAppEvent> for AppEventJs {
@@ -1544,6 +1699,7 @@ impl From<CoreAppEvent> for AppEventJs {
             text: None,
             notes: None,
             name: None,
+            column: None,
             created_at: None,
             done_at: None,
             binned_at: None,
@@ -1565,6 +1721,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at,
                 done_at,
                 binned_at,
+                column,
                 live_index,
             } => AppEventJs {
                 kind: "itemAdded",
@@ -1575,6 +1732,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at: Some(created_at),
                 done_at,
                 binned_at,
+                column,
                 live_index,
                 ..blank
             },
@@ -1612,6 +1770,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 live_index,
+                ..blank
+            },
+            CoreAppEvent::ItemColumnChanged { id, column } => AppEventJs {
+                kind: "itemColumnChanged",
+                id,
+                column,
                 ..blank
             },
             CoreAppEvent::ItemListChanged {
@@ -1655,6 +1819,48 @@ impl From<CoreAppEvent> for AppEventJs {
                 name: Some(name),
                 ..blank
             },
+            CoreAppEvent::ColumnAdded {
+                list_id,
+                id,
+                name,
+                created_at,
+                index,
+            } => AppEventJs {
+                kind: "columnAdded",
+                id,
+                list_id: Some(list_id),
+                name: Some(name),
+                created_at: Some(created_at),
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ColumnRemoved { list_id, id } => AppEventJs {
+                kind: "columnRemoved",
+                id,
+                list_id: Some(list_id),
+                ..blank
+            },
+            CoreAppEvent::ColumnMoved { list_id, id, index } => AppEventJs {
+                kind: "columnMoved",
+                id,
+                list_id: Some(list_id),
+                index: Some(index),
+                ..blank
+            },
+            CoreAppEvent::ColumnRenamed { list_id, id, name } => AppEventJs {
+                kind: "columnRenamed",
+                id,
+                list_id: Some(list_id),
+                name: Some(name),
+                ..blank
+            },
+            CoreAppEvent::DefaultColumnRenamed { list_id, name } => AppEventJs {
+                kind: "defaultColumnRenamed",
+                id: list_id.clone(),
+                list_id: Some(list_id),
+                name,
+                ..blank
+            },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
                 main_name,
@@ -1671,18 +1877,45 @@ impl From<CoreAppEvent> for AppEventJs {
 // ---------- private helpers ----------
 
 fn list_to_json(l: &airday_core::ListView) -> String {
-    format!(
-        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
+    let mut s = format!(
+        "{{\"id\":{},\"name\":{},\"createdAt\":{}",
         json_string(&l.id),
         json_string(&l.name),
         l.created_at,
-    )
+    );
+    if let Some(n) = &l.default_column_name {
+        s.push_str(",\"defaultColumnName\":");
+        s.push_str(&json_string(n));
+    }
+    s.push('}');
+    s
+}
+
+fn columns_to_json(cols: &[airday_core::ColumnView]) -> String {
+    let mut s = String::from("[");
+    for (i, c) in cols.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!(
+            "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
+            json_string(&c.id),
+            json_string(&c.name),
+            c.created_at,
+        ));
+    }
+    s.push(']');
+    s
 }
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(n) = &s.main_name {
         out.push_str(",\"mainName\":");
+        out.push_str(&json_string(n));
+    }
+    if let Some(n) = &s.main_default_column_name {
+        out.push_str(",\"mainDefaultColumnName\":");
         out.push_str(&json_string(n));
     }
     out.push('}');
@@ -1716,6 +1949,10 @@ fn item_to_json(it: &airday_core::ItemView) -> String {
     if let Some(t) = it.binned_at {
         s.push_str(&format!(",\"binnedAt\":{t}"));
     }
+    if let Some(c) = &it.column {
+        s.push_str(",\"column\":");
+        s.push_str(&json_string(c));
+    }
     s.push('}');
     s
 }
@@ -1745,7 +1982,26 @@ fn workspace_snapshot_json(doc: &CoreDoc) -> String {
         }
         out.push_str(&list_to_json(list));
     }
-    out.push_str("],\"items\":[");
+    // Board-column defs per list, keyed by list id; lists without
+    // columns are omitted (`main` included only when it has some).
+    out.push_str("],\"columns\":{");
+    let mut first = true;
+    let mut column_list_ids = vec![airday_core::LIST_MAIN.to_string()];
+    column_list_ids.extend(lists.iter().map(|l| l.id.clone()));
+    for list_id in &column_list_ids {
+        let cols = doc.columns_of(list_id);
+        if cols.is_empty() {
+            continue;
+        }
+        if !first {
+            out.push(',');
+        }
+        first = false;
+        out.push_str(&json_string(list_id));
+        out.push(':');
+        out.push_str(&columns_to_json(&cols));
+    }
+    out.push_str("},\"items\":[");
     for (i, item) in items.iter().enumerate() {
         if i > 0 {
             out.push(',');

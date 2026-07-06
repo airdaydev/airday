@@ -63,6 +63,10 @@ const ROOT_SETTINGS: &str = "settings";
 /// `order/main`, `order/<list-uuid>`. The container for a deleted list
 /// is simply never projected again (root containers can't be removed).
 const ORDER_PREFIX: &str = "order/";
+/// Root-container name prefix for per-list board-column defs
+/// (`spec/kanban.md`): `columns/main`, `columns/<list-uuid>`. Same
+/// abandonment story as order containers when a list is deleted.
+const COLUMNS_PREFIX: &str = "columns/";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
@@ -71,6 +75,12 @@ const KEY_NOTES: &str = "notes";
 /// one scalar so list membership and placement can never be torn apart
 /// by concurrent edits. See `Location`.
 const KEY_LOCATION: &str = "location";
+/// Board-column grouping register (`spec/kanban.md`). Optional column
+/// id; absent — or naming no existing column of the item's current
+/// list — resolves to the implicit default column. Written on its own,
+/// never folded into `location`: the resolution rule makes a lost race
+/// against a cross-list move harmless.
+const KEY_COLUMN: &str = "column";
 const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
@@ -85,6 +95,12 @@ const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
 /// (Queue) list. Absent ≡ no override; clients render the localized
 /// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
 const KEY_MAIN_NAME: &str = "main_name";
+/// Optional display-name override for a user list's implicit default
+/// board column — lives on the ListMeta map (`spec/kanban.md`).
+const KEY_DEFAULT_COLUMN_NAME: &str = "default_column_name";
+/// Same override for the reserved `main` list, which has no ListMeta
+/// row — lives on the doc-level settings map.
+const KEY_MAIN_DEFAULT_COLUMN_NAME: &str = "main_default_column_name";
 /// Batch status mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
@@ -103,6 +119,8 @@ pub enum DocError {
     ItemNotFound(String),
     #[error("list not found: {0}")]
     ListNotFound(String),
+    #[error("column not found: {0}")]
+    ColumnNotFound(String),
     #[error("can't delete the built-in list `{0}`")]
     CannotDeleteBuiltin(String),
     #[error("can't move the built-in list `{0}`")]
@@ -143,6 +161,10 @@ pub struct ItemView {
     pub text: String,
     pub notes: String,
     pub list_id: String,
+    /// Raw board-column register (`spec/kanban.md`). Consumers resolve
+    /// valid-or-default against the list's column defs; the core never
+    /// interprets it for projection.
+    pub column: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -166,6 +188,17 @@ pub struct ListView {
     pub id: String,
     pub name: String,
     pub created_at: i64,
+    /// Display-name override for the implicit default board column;
+    /// `None` means clients render the localized built-in label.
+    pub default_column_name: Option<String>,
+}
+
+/// One board-column def from `columns/<list-id>` (`spec/kanban.md`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnView {
+    pub id: String,
+    pub name: String,
+    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -178,6 +211,10 @@ pub struct SettingsView {
     /// display name. `None` (or absent in storage) means clients render
     /// the localized built-in label.
     pub main_name: Option<String>,
+    /// Default-board-column name override for `main` — the ListMeta-less
+    /// twin of `ListView::default_column_name`. Surfaced to clients via
+    /// `DefaultColumnRenamed`, not `SettingsChanged`.
+    pub main_default_column_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +255,21 @@ pub struct ExportList {
     pub name: String,
     pub created_at: Option<i64>,
     pub builtin: bool,
+    /// Default-board-column name override (`spec/kanban.md`). Skipped
+    /// when unset to keep pre-kanban dumps byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_column_name: Option<String>,
+    /// Board-column defs in board order. Skipped when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub columns: Vec<ExportColumn>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportColumn {
+    pub id: String,
+    pub name: String,
+    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,6 +279,9 @@ pub struct ExportItem {
     pub text: String,
     pub notes: String,
     pub list_id: String,
+    /// Raw board-column register. Skipped when unset.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub column: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -287,6 +342,10 @@ impl OrderEntry {
 
 fn order_root_name(list_id: &str) -> String {
     format!("{ORDER_PREFIX}{list_id}")
+}
+
+fn columns_root_name(list_id: &str) -> String {
+    format!("{COLUMNS_PREFIX}{list_id}")
 }
 
 // ---------- disposable projection index ----------
@@ -616,6 +675,10 @@ enum CapturedDiff {
     /// Root `lists` MovableList or one of its list maps changed. Lists
     /// are few, so translation just re-diffs them wholesale.
     Lists,
+    /// One list's `columns/<list-id>` container (or a column entry map)
+    /// changed. Columns are few, so translation re-diffs that list's
+    /// defs wholesale against the pre-state.
+    Columns { list_id: String },
     /// Doc-level settings map changed.
     Settings,
     /// A diff shape we don't translate — forces the full-resync
@@ -673,6 +736,11 @@ fn classify_captured_diff(
         Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
         Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
         Some(name) => {
+            if let Some(list_id) = name.strip_prefix(COLUMNS_PREFIX) {
+                return CapturedDiff::Columns {
+                    list_id: list_id.to_string(),
+                };
+            }
             let Some(list_id) = name.strip_prefix(ORDER_PREFIX) else {
                 return CapturedDiff::Opaque;
             };
@@ -709,6 +777,11 @@ fn classify_captured_diff(
             };
             if root == ROOT_LISTS {
                 return CapturedDiff::Lists;
+            }
+            if let Some(list_id) = root.strip_prefix(COLUMNS_PREFIX) {
+                return CapturedDiff::Columns {
+                    list_id: list_id.to_string(),
+                };
             }
             if root != ROOT_ITEMS {
                 return CapturedDiff::Opaque;
@@ -934,6 +1007,31 @@ impl Doc {
         texts: &[&str],
         target_index: usize,
     ) -> Result<Vec<String>, DocError> {
+        self.add_items_at_impl(list_id, texts, target_index, None)
+    }
+
+    /// Board quick-capture: append a new item to `list_id` with its
+    /// column register set to `column_id`, one commit. The item lands at
+    /// the end of the list's linear order (and therefore at the end of
+    /// its column).
+    pub fn add_item_in_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        text: &str,
+    ) -> Result<String, DocError> {
+        self.find_column(list_id, column_id)?;
+        let ids = self.add_items_at_impl(list_id, &[text], usize::MAX, Some(column_id))?;
+        Ok(ids.into_iter().next().expect("one text yields one id"))
+    }
+
+    fn add_items_at_impl(
+        &self,
+        list_id: &str,
+        texts: &[&str],
+        target_index: usize,
+        column: Option<&str>,
+    ) -> Result<Vec<String>, DocError> {
         let trimmed: Vec<&str> = texts.iter().map(|t| t.trim()).collect();
         if trimmed.iter().any(|t| t.is_empty()) {
             return Err(DocError::Invalid("item text is empty".into()));
@@ -965,6 +1063,9 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
+            if let Some(col) = column {
+                map.insert(KEY_COLUMN, col)?;
+            }
             let entry = OrderEntry {
                 item_id: id.clone(),
                 placement_id: placement.clone(),
@@ -1023,6 +1124,7 @@ impl Doc {
                 created_at: now,
                 done_at: None,
                 binned_at: None,
+                column: column.map(str::to_string),
                 live_index,
             });
         }
@@ -1239,6 +1341,14 @@ impl Doc {
             .encode()
             .as_str(),
         )?;
+        // Column ids are per-list: best-effort clear the register so the
+        // item lands in the target's default column. Losing this to a
+        // concurrent write is harmless — a wrong-list id resolves to
+        // default anyway (`spec/kanban.md`).
+        let cleared_column = read_string(map, KEY_COLUMN).is_some();
+        if cleared_column {
+            let _ = map.delete(KEY_COLUMN);
+        }
         let (plan, src_positions, was_visible) = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             (
@@ -1317,6 +1427,12 @@ impl Doc {
             list_id: target_list_id.to_string(),
             live_index,
         });
+        if cleared_column {
+            self.push_event(AppEvent::ItemColumnChanged {
+                id: item_id.to_string(),
+                column: None,
+            });
+        }
         Ok(())
     }
 
@@ -1748,6 +1864,7 @@ impl Doc {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
+        let pre_columns = self.all_columns();
         // Deleting a list discards its contents to the bin rather than
         // dumping them live into Home: every item is relocated to `main`
         // (so it has a real home list if later restored) and, unless it
@@ -1771,6 +1888,11 @@ impl Doc {
             if read_i64(&map, KEY_BINNED_AT).is_none() {
                 map.insert(KEY_BINNED_AT, binned_at)?;
             }
+            // The register named a column of the dying list; clear it
+            // while we're already writing the map (`spec/kanban.md`).
+            if read_string(&map, KEY_COLUMN).is_some() {
+                let _ = map.delete(KEY_COLUMN);
+            }
             main_order.push(
                 OrderEntry {
                     item_id: item_id.clone(),
@@ -1788,7 +1910,213 @@ impl Doc {
         // Emit the full pre/post state diff: each item picks up an
         // `ItemStatusChanged` (now binned) and `ItemListChanged` (now
         // `main`), plus the `ListRemoved` for the gone list.
-        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings, &pre_columns);
+        Ok(())
+    }
+
+    // ---------- mutations: board columns (spec/kanban.md) ----------
+
+    /// Board-column defs of `list_id` in board order. The implicit
+    /// default column is not an entry — it is always first and cannot
+    /// be listed, moved, or deleted.
+    pub fn columns_of(&self, list_id: &str) -> Vec<ColumnView> {
+        let cols = self.columns_list(list_id);
+        let mut out = Vec::with_capacity(cols.len());
+        for i in 0..cols.len() {
+            if let Some(map) = list_map_at(&cols, i)
+                && let Some(view) = column_view(&map)
+            {
+                out.push(view);
+            }
+        }
+        out
+    }
+
+    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, DocError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(DocError::Invalid("column name is empty".into()));
+        }
+        self.assert_list_exists(list_id)?;
+        let id = new_id();
+        let now = now_millis();
+        let map = self.columns_list(list_id).push_container(LoroMap::new())?;
+        map.insert(KEY_ID, id.as_str())?;
+        map.insert(KEY_NAME, name)?;
+        map.insert(KEY_CREATED_AT, now)?;
+        self.inner.commit();
+        let index = self
+            .columns_of(list_id)
+            .iter()
+            .position(|c| c.id == id)
+            .unwrap_or(0);
+        self.push_event(AppEvent::ColumnAdded {
+            list_id: list_id.to_string(),
+            id: id.clone(),
+            name: name.to_string(),
+            created_at: now,
+            index,
+        });
+        Ok(id)
+    }
+
+    pub fn rename_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        name: &str,
+    ) -> Result<(), DocError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(DocError::Invalid("column name is empty".into()));
+        }
+        let (_, map) = self.find_column(list_id, column_id)?;
+        map.insert(KEY_NAME, name)?;
+        self.inner.commit();
+        self.push_event(AppEvent::ColumnRenamed {
+            list_id: list_id.to_string(),
+            id: column_id.to_string(),
+            name: name.to_string(),
+        });
+        Ok(())
+    }
+
+    /// `target_index` addresses user columns only (the implicit default
+    /// is pinned first and not an entry).
+    pub fn move_column(
+        &self,
+        list_id: &str,
+        column_id: &str,
+        target_index: usize,
+    ) -> Result<(), DocError> {
+        let cols = self.columns_list(list_id);
+        let (from, _) = self.find_column(list_id, column_id)?;
+        let to = target_index.min(cols.len().saturating_sub(1));
+        if from == to {
+            return Ok(());
+        }
+        cols.mov(from, to)?;
+        self.inner.commit();
+        let index = self
+            .columns_of(list_id)
+            .iter()
+            .position(|c| c.id == column_id)
+            .ok_or_else(|| DocError::ColumnNotFound(column_id.to_string()))?;
+        self.push_event(AppEvent::ColumnMoved {
+            list_id: list_id.to_string(),
+            id: column_id.to_string(),
+            index,
+        });
+        Ok(())
+    }
+
+    /// Delete a column def. Member items' registers are deliberately
+    /// left in place: a non-resolving register renders in the default
+    /// column, and undoing the delete restores the grouping intact
+    /// (`spec/kanban.md`).
+    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), DocError> {
+        let (idx, _) = self.find_column(list_id, column_id)?;
+        self.columns_list(list_id).delete(idx, 1)?;
+        self.inner.commit();
+        self.push_event(AppEvent::ColumnRemoved {
+            list_id: list_id.to_string(),
+            id: column_id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Set or clear the display-name override of `list_id`'s implicit
+    /// default column. ListMeta key for user lists, settings key for the
+    /// reserved `main`; same trim / delete-on-empty / no-op contract as
+    /// `set_main_name`.
+    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), DocError> {
+        let trimmed = name.trim();
+        let next: Option<String> = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+        if list_id == LIST_MAIN {
+            let settings = self.settings_map();
+            let current =
+                read_string(&settings, KEY_MAIN_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty());
+            if current == next {
+                return Ok(());
+            }
+            match &next {
+                Some(s) => settings.insert(KEY_MAIN_DEFAULT_COLUMN_NAME, s.as_str())?,
+                None => settings.delete(KEY_MAIN_DEFAULT_COLUMN_NAME)?,
+            }
+        } else {
+            let (_, map) = self.find_list(list_id)?;
+            let current = read_string(&map, KEY_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty());
+            if current == next {
+                return Ok(());
+            }
+            match &next {
+                Some(s) => map.insert(KEY_DEFAULT_COLUMN_NAME, s.as_str())?,
+                None => map.delete(KEY_DEFAULT_COLUMN_NAME)?,
+            }
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::DefaultColumnRenamed {
+            list_id: list_id.to_string(),
+            name: next,
+        });
+        Ok(())
+    }
+
+    /// Set or clear an item's board-column register, optionally applying
+    /// a same-list reorder in the same commit (one undo step). `None`
+    /// targets the implicit default column (clears the key).
+    /// `target_index` addresses the list's live projection exactly like
+    /// `move_item`; without it the item keeps its linear position.
+    pub fn set_item_column(
+        &self,
+        item_id: &str,
+        column_id: Option<&str>,
+        target_index: Option<usize>,
+    ) -> Result<(), DocError> {
+        let map = self.find_item(item_id)?;
+        let (cur_list, is_live) = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            let m = guard
+                .meta
+                .get(item_id)
+                .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
+            (m.list_id.clone(), m.live)
+        };
+        if let Some(col) = column_id {
+            self.find_column(&cur_list, col)?;
+        }
+        let changed = read_string(&map, KEY_COLUMN).as_deref() != column_id;
+        if !changed && target_index.is_none() {
+            return Ok(());
+        }
+        if changed {
+            match column_id {
+                Some(col) => {
+                    map.insert(KEY_COLUMN, col)?;
+                }
+                None => {
+                    let _ = map.delete(KEY_COLUMN);
+                }
+            }
+        }
+        if let Some(ti) = target_index {
+            // Commits register + mov together (one undo step) and emits
+            // the `ItemMoved`.
+            self.reorder_in_list(item_id, &map, &cur_list, ti, is_live)?;
+        }
+        // Flushes the register write when the reorder early-returned
+        // (from == to) or none was requested; a no-op otherwise.
+        self.inner.commit();
+        if changed {
+            self.push_event(AppEvent::ItemColumnChanged {
+                id: item_id.to_string(),
+                column: column_id.map(str::to_string),
+            });
+        }
         Ok(())
     }
 
@@ -1941,18 +2269,33 @@ impl Doc {
     /// are emitted grouped per list in resolved order, so array order
     /// carries the ordering across the export/import boundary.
     pub fn export_json(&self) -> JsonExport {
+        let export_columns = |list_id: &str| -> Vec<ExportColumn> {
+            self.columns_of(list_id)
+                .into_iter()
+                .map(|c| ExportColumn {
+                    id: c.id,
+                    name: c.name,
+                    created_at: c.created_at,
+                })
+                .collect()
+        };
+        let s = self.get_settings();
         let mut lists = Vec::with_capacity(self.lists().len() + 1);
         lists.push(ExportList {
             id: LIST_MAIN.to_string(),
             name: LIST_MAIN_NAME.to_string(),
             created_at: None,
             builtin: true,
+            default_column_name: s.main_default_column_name.clone(),
+            columns: export_columns(LIST_MAIN),
         });
         lists.extend(self.all_lists().into_iter().map(|list| ExportList {
+            columns: export_columns(&list.id),
             id: list.id,
             name: list.name,
             created_at: Some(list.created_at),
             builtin: false,
+            default_column_name: list.default_column_name,
         }));
 
         let items = self
@@ -1962,13 +2305,13 @@ impl Doc {
                 text: item.text,
                 notes: item.notes,
                 list_id: item.list_id,
+                column: item.column,
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
             })
             .collect();
 
-        let s = self.get_settings();
         JsonExport {
             version: 1,
             settings: ExportSettings {
@@ -2012,12 +2355,18 @@ impl Doc {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
+        let pre_columns = self.all_columns();
 
         let mut id_map: HashMap<String, String> = HashMap::new();
         id_map.insert(LIST_MAIN.to_string(), LIST_MAIN.to_string());
 
         let lists = self.lists();
         let mut lists_added: usize = 0;
+        // source column id → fresh local column id. Column ids are
+        // uuids, so one global map can't collide across lists. Builtin
+        // rows never contribute (their metadata isn't imported), so a
+        // register pointing at a builtin's column drops to default.
+        let mut column_id_map: HashMap<String, String> = HashMap::new();
         for src_list in &export.lists {
             if src_list.builtin || src_list.id == LIST_MAIN {
                 id_map.insert(src_list.id.clone(), LIST_MAIN.to_string());
@@ -2033,6 +2382,27 @@ impl Doc {
             map.insert(KEY_ID, new_list_id.as_str())?;
             map.insert(KEY_NAME, name)?;
             map.insert(KEY_CREATED_AT, created_at)?;
+            if let Some(dcn) = src_list
+                .default_column_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                map.insert(KEY_DEFAULT_COLUMN_NAME, dcn)?;
+            }
+            let cols = self.columns_list(&new_list_id);
+            for src_col in &src_list.columns {
+                let col_name = src_col.name.trim();
+                if col_name.is_empty() {
+                    continue;
+                }
+                let new_col_id = new_id();
+                let col_map = cols.push_container(LoroMap::new())?;
+                col_map.insert(KEY_ID, new_col_id.as_str())?;
+                col_map.insert(KEY_NAME, col_name)?;
+                col_map.insert(KEY_CREATED_AT, src_col.created_at)?;
+                column_id_map.insert(src_col.id.clone(), new_col_id);
+            }
             id_map.insert(src_list.id.clone(), new_list_id);
             lists_added += 1;
         }
@@ -2065,6 +2435,12 @@ impl Doc {
                 .as_str(),
             )?;
             map.insert(KEY_CREATED_AT, src_item.created_at)?;
+            // Register maps through to the freshly created column; an
+            // unmapped one (unknown column, or the item fell back to
+            // `main`) is dropped — the item lands in the default column.
+            if let Some(new_col) = src_item.column.as_ref().and_then(|c| column_id_map.get(c)) {
+                map.insert(KEY_COLUMN, new_col.as_str())?;
+            }
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
                 map.insert(KEY_NOTES, notes)?;
@@ -2088,7 +2464,7 @@ impl Doc {
 
         self.inner.commit();
         self.rebuild_index();
-        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings, &pre_columns);
 
         Ok(ImportSummary {
             lists_added,
@@ -2347,6 +2723,7 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
+        let pre_columns = self.all_columns();
         self.begin_diff_capture(DiffCaptureMode::Import);
 
         let result = blobs
@@ -2361,7 +2738,7 @@ impl Doc {
             return result;
         }
         if self
-            .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
+            .translate_captured_diffs(diffs, &pre_lists, &pre_settings, &pre_columns)
             .is_err()
         {
             self.emit_diff_fallback();
@@ -2380,10 +2757,12 @@ impl Doc {
         diffs: Vec<CapturedDiff>,
         pre_lists: &[ListView],
         pre_settings: &SettingsView,
+        pre_columns: &HashMap<String, Vec<ColumnView>>,
     ) -> Result<(), ()> {
         // ---- Phase 1: plan (read-only) ----
         let mut lists_dirty = false;
         let mut settings_dirty = false;
+        let mut columns_dirty = HashSet::<String>::new();
         let mut upserts = HashSet::<String>::new();
         let mut removals = HashSet::<String>::new();
         let mut map_dirty = HashMap::<ContainerID, HashSet<String>>::new();
@@ -2401,6 +2780,9 @@ impl Doc {
                     CapturedDiff::Opaque => return Err(()),
                     CapturedDiff::Lists => lists_dirty = true,
                     CapturedDiff::Settings => settings_dirty = true,
+                    CapturedDiff::Columns { list_id } => {
+                        columns_dirty.insert(list_id);
+                    }
                     CapturedDiff::ItemsRoot { upserted, removed } => {
                         upserts.extend(upserted);
                         removals.extend(removed);
@@ -2510,6 +2892,7 @@ impl Doc {
                         KEY_DONE_AT,
                         KEY_BINNED_AT,
                         KEY_LOCATION,
+                        KEY_COLUMN,
                     ]
                     .into_iter()
                     .map(str::to_string)
@@ -2625,6 +3008,12 @@ impl Doc {
                         notes: view.notes.clone(),
                     });
                 }
+                if has(KEY_COLUMN) {
+                    self.push_event(AppEvent::ItemColumnChanged {
+                        id: id.clone(),
+                        column: view.column.clone(),
+                    });
+                }
             }
             let left_list = c.old.as_ref().is_some_and(|o| o.list_id != new.list_id);
             if new.live {
@@ -2653,6 +3042,7 @@ impl Doc {
                     created_at: view.created_at,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
+                    column: view.column,
                     live_index: None,
                 });
                 continue;
@@ -2708,6 +3098,7 @@ impl Doc {
                             created_at: view.created_at,
                             done_at: view.done_at,
                             binned_at: view.binned_at,
+                            column: view.column,
                             live_index: Some(i),
                         },
                     );
@@ -2816,13 +3207,19 @@ impl Doc {
             self.push_event(ev);
         }
 
-        if lists_dirty || settings_dirty {
+        if lists_dirty || settings_dirty || !columns_dirty.is_empty() {
             let mut emitted = Vec::new();
             if settings_dirty {
                 diff_settings(pre_settings, &self.get_settings(), &mut emitted);
             }
             if lists_dirty {
                 diff_lists(pre_lists, &self.all_lists(), &mut emitted);
+            }
+            let mut dirty_column_lists: Vec<&String> = columns_dirty.iter().collect();
+            dirty_column_lists.sort();
+            for list_id in dirty_column_lists {
+                let pre = pre_columns.get(list_id).map(Vec::as_slice).unwrap_or(&[]);
+                diff_columns(list_id, pre, &self.columns_of(list_id), &mut emitted);
             }
             for ev in emitted {
                 self.push_event(ev);
@@ -2871,6 +3268,7 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
+        let pre_columns = self.all_columns();
         self.begin_diff_capture(DiffCaptureMode::Undo);
         let result = {
             let mut um = self.undo.lock().expect("undo mutex poisoned");
@@ -2880,7 +3278,7 @@ impl Doc {
         let did = result?;
         if did
             && self
-                .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
+                .translate_captured_diffs(diffs, &pre_lists, &pre_settings, &pre_columns)
                 .is_err()
         {
             self.emit_diff_fallback();
@@ -2916,13 +3314,36 @@ impl Doc {
             show_list_counts: s.show_list_counts,
             main_name: s.main_name,
         });
-        for (idx, list) in self.all_lists().into_iter().enumerate() {
+        let lists = self.all_lists();
+        for (idx, list) in lists.iter().enumerate() {
             out.push(AppEvent::ListAdded {
-                id: list.id,
-                name: list.name,
+                id: list.id.clone(),
+                name: list.name.clone(),
                 created_at: list.created_at,
                 index: idx,
             });
+        }
+        // Board columns: defs for `main` + every list in nav order,
+        // then default-column name overrides where set.
+        let mut column_lists: Vec<(String, Option<String>)> =
+            vec![(LIST_MAIN.to_string(), s.main_default_column_name.clone())];
+        column_lists.extend(lists.into_iter().map(|l| (l.id, l.default_column_name)));
+        for (list_id, default_name) in column_lists {
+            for (idx, col) in self.columns_of(&list_id).into_iter().enumerate() {
+                out.push(AppEvent::ColumnAdded {
+                    list_id: list_id.clone(),
+                    id: col.id,
+                    name: col.name,
+                    created_at: col.created_at,
+                    index: idx,
+                });
+            }
+            if default_name.is_some() {
+                out.push(AppEvent::DefaultColumnRenamed {
+                    list_id,
+                    name: default_name,
+                });
+            }
         }
         // Walking the canonical grouped order means a per-list counter
         // yields each live item's position in its list's live projection.
@@ -2944,6 +3365,7 @@ impl Doc {
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
+                column: item.column,
                 live_index,
             });
         }
@@ -3020,6 +3442,7 @@ impl Doc {
             }
             None => hasher.update([0u8]),
         }
+        hash_opt_str(&mut hasher, settings.main_default_column_name.as_deref());
         // Lists: walk by stored order because ordering is part of the
         // logical state surfaced to users.
         let lists = self.all_lists();
@@ -3029,6 +3452,21 @@ impl Doc {
             hash_str(&mut hasher, &l.id);
             hash_str(&mut hasher, &l.name);
             hasher.update(l.created_at.to_be_bytes());
+            hash_opt_str(&mut hasher, l.default_column_name.as_deref());
+        }
+        // Board-column defs: `main` first, then user lists in container
+        // order — id, name, created_at in board order per list.
+        hasher.update(b"C");
+        let mut column_list_ids = vec![LIST_MAIN.to_string()];
+        column_list_ids.extend(lists.iter().map(|l| l.id.clone()));
+        for list_id in &column_list_ids {
+            let cols = self.columns_of(list_id);
+            hasher.update((cols.len() as u32).to_be_bytes());
+            for c in &cols {
+                hash_str(&mut hasher, &c.id);
+                hash_str(&mut hasher, &c.name);
+                hasher.update(c.created_at.to_be_bytes());
+            }
         }
         // Items: canonical grouped walk order.
         let items: Vec<ItemView> = self.iter_items().collect();
@@ -3039,6 +3477,7 @@ impl Doc {
             hash_str(&mut hasher, &i.text);
             hash_str(&mut hasher, &i.notes);
             hash_str(&mut hasher, &i.list_id);
+            hash_opt_str(&mut hasher, i.column.as_deref());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
@@ -3063,6 +3502,36 @@ impl Doc {
     fn order_list(&self, list_id: &str) -> LoroMovableList {
         self.inner
             .get_movable_list(order_root_name(list_id).as_str())
+    }
+
+    fn columns_list(&self, list_id: &str) -> LoroMovableList {
+        self.inner
+            .get_movable_list(columns_root_name(list_id).as_str())
+    }
+
+    fn find_column(&self, list_id: &str, column_id: &str) -> Result<(usize, LoroMap), DocError> {
+        let cols = self.columns_list(list_id);
+        for i in 0..cols.len() {
+            if let Some(map) = list_map_at(&cols, i)
+                && read_string(&map, KEY_ID).as_deref() == Some(column_id)
+            {
+                return Ok((i, map));
+            }
+        }
+        Err(DocError::ColumnNotFound(column_id.into()))
+    }
+
+    /// Column defs per list for every known list (`main` + `lists`
+    /// rows), keyed by list id. Pre-state capture for wholesale column
+    /// re-diffs — lists and columns are both few.
+    fn all_columns(&self) -> HashMap<String, Vec<ColumnView>> {
+        let mut out = HashMap::new();
+        out.insert(LIST_MAIN.to_string(), self.columns_of(LIST_MAIN));
+        for list in self.all_lists() {
+            let cols = self.columns_of(&list.id);
+            out.insert(list.id, cols);
+        }
+        out
     }
 
     /// Item container lookup, gated on the disposable index so a doc
@@ -3139,13 +3608,23 @@ impl Doc {
         pre_items: &[ItemView],
         pre_lists: &[ListView],
         pre_settings: &SettingsView,
+        pre_columns: &HashMap<String, Vec<ColumnView>>,
     ) {
         let post_items: Vec<ItemView> = self.iter_items().collect();
         let post_lists: Vec<ListView> = self.all_lists();
         let post_settings = self.get_settings();
+        let post_columns = self.all_columns();
         let mut emitted = Vec::new();
         diff_settings(pre_settings, &post_settings, &mut emitted);
         diff_lists(pre_lists, &post_lists, &mut emitted);
+        // Lists absent from `post` (deleted) are dropped wholesale by
+        // consumers via `ListRemoved` — only diff surviving lists' defs.
+        let mut column_lists: Vec<&String> = post_columns.keys().collect();
+        column_lists.sort();
+        for list_id in column_lists {
+            let pre = pre_columns.get(list_id).map(Vec::as_slice).unwrap_or(&[]);
+            diff_columns(list_id, pre, &post_columns[list_id], &mut emitted);
+        }
         diff_items(pre_items, &post_items, &mut emitted);
         if !emitted.is_empty() {
             let mut q = self.events.lock().expect("events mutex poisoned");
@@ -3240,6 +3719,8 @@ fn settings_view(map: &LoroMap) -> SettingsView {
         // empty input, but a caller that bypassed it shouldn't surface
         // a confusing blank label.
         main_name: read_string(map, KEY_MAIN_NAME).filter(|s| !s.is_empty()),
+        main_default_column_name: read_string(map, KEY_MAIN_DEFAULT_COLUMN_NAME)
+            .filter(|s| !s.is_empty()),
     }
 }
 
@@ -3270,6 +3751,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         text: read_string(map, KEY_TEXT)?,
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
+        column: read_string(map, KEY_COLUMN).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
@@ -3278,6 +3760,15 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
 
 fn list_view(map: &LoroMap) -> Option<ListView> {
     Some(ListView {
+        id: read_string(map, KEY_ID)?,
+        name: read_string(map, KEY_NAME)?,
+        created_at: read_i64(map, KEY_CREATED_AT)?,
+        default_column_name: read_string(map, KEY_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty()),
+    })
+}
+
+fn column_view(map: &LoroMap) -> Option<ColumnView> {
+    Some(ColumnView {
         id: read_string(map, KEY_ID)?,
         name: read_string(map, KEY_NAME)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
@@ -3291,6 +3782,16 @@ fn is_in_list_view(map: &LoroMap) -> bool {
 fn hash_str(hasher: &mut Sha256, s: &str) {
     hasher.update((s.len() as u32).to_be_bytes());
     hasher.update(s.as_bytes());
+}
+
+fn hash_opt_str(hasher: &mut Sha256, v: Option<&str>) {
+    match v {
+        Some(s) => {
+            hasher.update([1u8]);
+            hash_str(hasher, s);
+        }
+        None => hasher.update([0u8]),
+    }
 }
 
 fn hash_opt_i64(hasher: &mut Sha256, v: Option<i64>) {
@@ -3368,6 +3869,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     created_at: post_it.created_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
+                    column: post_it.column.clone(),
                     live_index,
                 });
             }
@@ -3382,6 +3884,12 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ItemNotesChanged {
                         id: post_it.id.clone(),
                         notes: post_it.notes.clone(),
+                    });
+                }
+                if pre_it.column != post_it.column {
+                    out.push(AppEvent::ItemColumnChanged {
+                        id: post_it.id.clone(),
+                        column: post_it.column.clone(),
                     });
                 }
                 if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {
@@ -3438,12 +3946,24 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     created_at: post_l.created_at,
                     index: post_idx,
                 });
+                if post_l.default_column_name.is_some() {
+                    out.push(AppEvent::DefaultColumnRenamed {
+                        list_id: post_l.id.clone(),
+                        name: post_l.default_column_name.clone(),
+                    });
+                }
             }
             Some(&(pre_idx, pre_l)) => {
                 if pre_l.name != post_l.name {
                     out.push(AppEvent::ListRenamed {
                         id: post_l.id.clone(),
                         name: post_l.name.clone(),
+                    });
+                }
+                if pre_l.default_column_name != post_l.default_column_name {
+                    out.push(AppEvent::DefaultColumnRenamed {
+                        list_id: post_l.id.clone(),
+                        name: post_l.default_column_name.clone(),
                     });
                 }
                 if pre_idx != post_idx {
@@ -3457,11 +3977,72 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
     }
 }
 
+/// Diff two ordered slices of `ColumnView` for one list's
+/// `columns/<list-id>` container. Mirror of `diff_lists`.
+fn diff_columns(list_id: &str, pre: &[ColumnView], post: &[ColumnView], out: &mut Vec<AppEvent>) {
+    let pre_by_id: HashMap<&str, (usize, &ColumnView)> = pre
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.id.as_str(), (i, c)))
+        .collect();
+    let post_by_id: HashMap<&str, (usize, &ColumnView)> = post
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.id.as_str(), (i, c)))
+        .collect();
+
+    for c in pre {
+        if !post_by_id.contains_key(c.id.as_str()) {
+            out.push(AppEvent::ColumnRemoved {
+                list_id: list_id.to_string(),
+                id: c.id.clone(),
+            });
+        }
+    }
+    for (post_idx, post_c) in post.iter().enumerate() {
+        match pre_by_id.get(post_c.id.as_str()) {
+            None => {
+                out.push(AppEvent::ColumnAdded {
+                    list_id: list_id.to_string(),
+                    id: post_c.id.clone(),
+                    name: post_c.name.clone(),
+                    created_at: post_c.created_at,
+                    index: post_idx,
+                });
+            }
+            Some(&(pre_idx, pre_c)) => {
+                if pre_c.name != post_c.name {
+                    out.push(AppEvent::ColumnRenamed {
+                        list_id: list_id.to_string(),
+                        id: post_c.id.clone(),
+                        name: post_c.name.clone(),
+                    });
+                }
+                if pre_idx != post_idx {
+                    out.push(AppEvent::ColumnMoved {
+                        list_id: list_id.to_string(),
+                        id: post_c.id.clone(),
+                        index: post_idx,
+                    });
+                }
+            }
+        }
+    }
+}
+
 fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent>) {
-    if pre != post {
+    if pre.show_list_counts != post.show_list_counts || pre.main_name != post.main_name {
         out.push(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
             main_name: post.main_name.clone(),
+        });
+    }
+    // `main`'s default-column override rides the settings map but is
+    // surfaced through the per-list event, same as user lists.
+    if pre.main_default_column_name != post.main_default_column_name {
+        out.push(AppEvent::DefaultColumnRenamed {
+            list_id: LIST_MAIN.to_string(),
+            name: post.main_default_column_name.clone(),
         });
     }
 }
@@ -4178,6 +4759,8 @@ mod tests {
                 name: LIST_MAIN_NAME.to_string(),
                 created_at: None,
                 builtin: true,
+                default_column_name: None,
+                columns: Vec::new(),
             }
         );
         assert_eq!(export.lists[1].id, errands);
@@ -4583,9 +5166,7 @@ mod tests {
                     saw_reassign = true;
                 }
                 AppEvent::ItemStatusChanged {
-                    id: eid,
-                    binned_at,
-                    ..
+                    id: eid, binned_at, ..
                 } => {
                     assert_eq!(eid, &id);
                     assert!(binned_at.is_some(), "item is binned");
@@ -4598,10 +5179,7 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(
-            saw_reassign && saw_binned && saw_removed,
-            "events: {evs:?}"
-        );
+        assert!(saw_reassign && saw_binned && saw_removed, "events: {evs:?}");
     }
 
     /// Seed a peer doc `b` with `a`'s current state, mark `a` pushed,
@@ -5576,12 +6154,15 @@ mod tests {
                 name: LIST_MAIN_NAME.to_string(),
                 created_at: None,
                 builtin: true,
+                default_column_name: None,
+                columns: Vec::new(),
             }],
             items: vec![ExportItem {
                 id: "orphan-id".to_string(),
                 text: "stranded".to_string(),
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
+                column: None,
                 created_at: 1_700_000_000_000,
                 done_at: None,
                 binned_at: None,
@@ -5924,5 +6505,450 @@ mod tests {
             !b.can_undo(),
             "remote ops still must not be undoable after local undo"
         );
+    }
+
+    // ---------- board columns (spec/kanban.md) ----------
+
+    #[test]
+    fn column_crud_and_views() {
+        let doc = Doc::new().unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let _ = doc.drain_events();
+
+        let c1 = doc.add_column(&l, "Doing").unwrap();
+        let c2 = doc.add_column(&l, "Done-ish").unwrap();
+        assert_eq!(
+            doc.columns_of(&l)
+                .iter()
+                .map(|c| c.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![c1.as_str(), c2.as_str()]
+        );
+
+        doc.rename_column(&l, &c1, "In progress").unwrap();
+        assert_eq!(doc.columns_of(&l)[0].name, "In progress");
+
+        doc.move_column(&l, &c1, 1).unwrap();
+        assert_eq!(doc.columns_of(&l)[1].id, c1);
+
+        doc.delete_column(&l, &c2).unwrap();
+        assert_eq!(doc.columns_of(&l).len(), 1);
+
+        let evs = doc.drain_events();
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ColumnAdded { list_id, name, index: 0, .. }
+                if list_id == &l && name == "Doing"
+        ));
+        assert!(matches!(
+            &evs[1],
+            AppEvent::ColumnAdded { name, index: 1, .. } if name == "Done-ish"
+        ));
+        assert!(matches!(
+            &evs[2],
+            AppEvent::ColumnRenamed { id, name, .. } if id == &c1 && name == "In progress"
+        ));
+        assert!(matches!(
+            &evs[3],
+            AppEvent::ColumnMoved { id, index: 1, .. } if id == &c1
+        ));
+        assert!(matches!(
+            &evs[4],
+            AppEvent::ColumnRemoved { id, .. } if id == &c2
+        ));
+
+        // Empty / whitespace names are rejected; unknown ids error.
+        assert!(doc.add_column(&l, "   ").is_err());
+        assert!(doc.rename_column(&l, &c1, "").is_err());
+        assert!(doc.rename_column(&l, "nope", "x").is_err());
+        assert!(doc.add_column("no-such-list", "x").is_err());
+    }
+
+    #[test]
+    fn main_supports_columns_without_a_listmeta_row() {
+        let doc = Doc::new().unwrap();
+        let c = doc.add_column(LIST_MAIN, "Later").unwrap();
+        assert_eq!(doc.columns_of(LIST_MAIN)[0].id, c);
+
+        doc.set_default_column_name(LIST_MAIN, "Now").unwrap();
+        assert_eq!(
+            doc.get_settings().main_default_column_name.as_deref(),
+            Some("Now")
+        );
+        doc.set_default_column_name(LIST_MAIN, "  ").unwrap();
+        assert_eq!(doc.get_settings().main_default_column_name, None);
+    }
+
+    #[test]
+    fn default_column_name_roundtrip_on_user_list() {
+        let doc = Doc::new().unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let _ = doc.drain_events();
+
+        doc.set_default_column_name(&l, "Backlog").unwrap();
+        assert_eq!(
+            doc.get_list_meta(&l)
+                .unwrap()
+                .default_column_name
+                .as_deref(),
+            Some("Backlog")
+        );
+        // No-op save emits no phantom event.
+        doc.set_default_column_name(&l, "Backlog").unwrap();
+        doc.set_default_column_name(&l, "").unwrap();
+        assert_eq!(doc.get_list_meta(&l).unwrap().default_column_name, None);
+
+        let evs = doc.drain_events();
+        assert_eq!(
+            evs,
+            vec![
+                AppEvent::DefaultColumnRenamed {
+                    list_id: l.clone(),
+                    name: Some("Backlog".into())
+                },
+                AppEvent::DefaultColumnRenamed {
+                    list_id: l.clone(),
+                    name: None
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn set_item_column_writes_register_and_optionally_reorders() {
+        let doc = Doc::new().unwrap();
+        // Seed main so the incremental index carries the same (empty)
+        // main shadow a fresh recompute materializes.
+        let _seed = doc.add_item(LIST_MAIN, "seed").unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let col = doc.add_column(&l, "Doing").unwrap();
+        let a = doc.add_item(&l, "a").unwrap();
+        let b = doc.add_item(&l, "b").unwrap();
+        let c = doc.add_item(&l, "c").unwrap();
+        let _ = doc.drain_events();
+
+        // Register-only: linear position untouched.
+        doc.set_item_column(&c, Some(&col), None).unwrap();
+        assert_eq!(doc.get_item(&c).unwrap().column.as_deref(), Some(&*col));
+        assert_eq!(doc.live_item_ids(&l), vec![a.clone(), b.clone(), c.clone()]);
+        let evs = doc.drain_events();
+        assert_eq!(
+            evs,
+            vec![AppEvent::ItemColumnChanged {
+                id: c.clone(),
+                column: Some(col.clone())
+            }]
+        );
+
+        // Register + reorder in one commit → one undo step.
+        doc.set_item_column(&a, Some(&col), Some(2)).unwrap();
+        assert_eq!(doc.get_item(&a).unwrap().column.as_deref(), Some(&*col));
+        assert_eq!(doc.live_item_ids(&l), vec![b.clone(), c.clone(), a.clone()]);
+        let evs = doc.drain_events();
+        assert!(evs.contains(&AppEvent::ItemColumnChanged {
+            id: a.clone(),
+            column: Some(col.clone())
+        }));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ItemMoved { id, live_index: Some(2) } if id == &a
+        )));
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.get_item(&a).unwrap().column, None);
+        assert_eq!(doc.live_item_ids(&l), vec![a.clone(), b.clone(), c.clone()]);
+
+        // Back to default clears the key.
+        doc.set_item_column(&c, None, None).unwrap();
+        assert_eq!(doc.get_item(&c).unwrap().column, None);
+
+        // Pure no-op emits nothing.
+        let _ = doc.drain_events();
+        doc.set_item_column(&c, None, None).unwrap();
+        assert!(doc.drain_events().is_empty());
+
+        // Unknown column of the item's current list is rejected.
+        assert!(doc.set_item_column(&c, Some("nope"), None).is_err());
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
+    fn add_item_in_column_appends_with_register() {
+        let doc = Doc::new().unwrap();
+        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
+        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _ = doc.drain_events();
+
+        let b = doc.add_item_in_column(LIST_MAIN, &col, "b").unwrap();
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b.clone()]);
+        assert_eq!(doc.get_item(&b).unwrap().column.as_deref(), Some(&*col));
+        let evs = doc.drain_events();
+        assert!(matches!(
+            &evs[0],
+            AppEvent::ItemAdded { id, column: Some(c), .. } if id == &b && c == &col
+        ));
+
+        assert!(doc.add_item_in_column(LIST_MAIN, "nope", "x").is_err());
+    }
+
+    #[test]
+    fn cross_list_move_clears_column_register() {
+        let doc = Doc::new().unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let col = doc.add_column(&l, "Doing").unwrap();
+        let id = doc.add_item(&l, "a").unwrap();
+        doc.set_item_column(&id, Some(&col), None).unwrap();
+        let _ = doc.drain_events();
+
+        doc.move_item(&id, LIST_MAIN, 0).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().column, None);
+        let evs = doc.drain_events();
+        assert!(evs.contains(&AppEvent::ItemColumnChanged {
+            id: id.clone(),
+            column: None
+        }));
+
+        // Undo restores list *and* grouping in one step.
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.get_item(&id).unwrap().list_id, l);
+        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
+        assert_live_projection_matches_doc(&doc);
+    }
+
+    #[test]
+    fn delete_column_leaves_registers_and_undo_restores_grouping() {
+        let doc = Doc::new().unwrap();
+        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
+        let id = doc.add_item(LIST_MAIN, "a").unwrap();
+        doc.set_item_column(&id, Some(&col), None).unwrap();
+        let _ = doc.drain_events();
+
+        doc.delete_column(LIST_MAIN, &col).unwrap();
+        // Register untouched — the def is gone, so clients resolve the
+        // item to the default column.
+        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
+        assert!(doc.columns_of(LIST_MAIN).is_empty());
+
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.columns_of(LIST_MAIN).len(), 1);
+        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
+    }
+
+    #[test]
+    fn delete_list_clears_column_registers_of_relocated_items() {
+        let doc = Doc::new().unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let col = doc.add_column(&l, "Doing").unwrap();
+        let id = doc.add_item(&l, "a").unwrap();
+        doc.set_item_column(&id, Some(&col), None).unwrap();
+
+        doc.delete_list(&l).unwrap();
+        let item = doc.get_item(&id).unwrap();
+        assert_eq!(item.list_id, LIST_MAIN);
+        assert!(item.is_binned());
+        assert_eq!(item.column, None);
+    }
+
+    #[test]
+    fn column_ops_converge_across_replicas() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
+        let item = a.add_item(LIST_MAIN, "x").unwrap();
+        a.set_item_column(&item, Some(&col), None).unwrap();
+        a.set_default_column_name(LIST_MAIN, "Now").unwrap();
+
+        let mut b = Doc::empty();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        b.apply_remote(&dek, &blob).unwrap();
+
+        assert_eq!(b.columns_of(LIST_MAIN).len(), 1);
+        assert_eq!(b.get_item(&item).unwrap().column.as_deref(), Some(&*col));
+        assert_eq!(a.fingerprint(), b.fingerprint());
+
+        // Concurrent column changes: LWW on the register, no data loss.
+        let col_b = b.add_column(LIST_MAIN, "Blocked").unwrap();
+        b.set_item_column(&item, Some(&col_b), None).unwrap();
+        a.set_item_column(&item, None, None).unwrap();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
+        b.mark_pushed();
+        let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        a.apply_remote(&dek, &blob_b).unwrap();
+        b.apply_remote(&dek, &blob_a).unwrap();
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_eq!(
+            a.get_item(&item).unwrap().column,
+            b.get_item(&item).unwrap().column
+        );
+    }
+
+    #[test]
+    fn remote_column_ops_translate_to_surgical_events() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let item = a.add_item(LIST_MAIN, "x").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = b.drain_events();
+
+        // Column def churn + a register write, shipped as one frame.
+        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
+        a.set_item_column(&item, Some(&col), None).unwrap();
+        a.set_default_column_name(LIST_MAIN, "Now").unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        b.apply_remote(&dek, &frame).unwrap();
+
+        let evs = b.drain_events();
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "column frame should translate surgically, got {evs:?}"
+        );
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ColumnAdded { id, index: 0, .. } if id == &col
+        )));
+        assert!(evs.contains(&AppEvent::ItemColumnChanged {
+            id: item.clone(),
+            column: Some(col.clone())
+        }));
+        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
+            list_id: LIST_MAIN.to_string(),
+            name: Some("Now".into())
+        }));
+
+        // Rename translates; a column added *and* deleted within the
+        // same frame nets out of the wholesale pre/post diff — the
+        // consumer never learns it existed.
+        let col2 = a.add_column(LIST_MAIN, "Later").unwrap();
+        a.rename_column(LIST_MAIN, &col, "In progress").unwrap();
+        a.delete_column(LIST_MAIN, &col2).unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        b.apply_remote(&dek, &frame).unwrap();
+        let evs = b.drain_events();
+        assert!(!evs.contains(&AppEvent::FullResync));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ColumnRenamed { id, name, .. } if id == &col && name == "In progress"
+        )));
+        assert!(!evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ColumnAdded { id, .. } | AppEvent::ColumnRemoved { id, .. } if id == &col2
+        )));
+        assert_eq!(
+            b.columns_of(LIST_MAIN)
+                .iter()
+                .map(|c| c.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["In progress"]
+        );
+        assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn snapshot_events_include_columns_and_default_names() {
+        let doc = Doc::new().unwrap();
+        let l = doc.add_list("Project").unwrap();
+        let c_main = doc.add_column(LIST_MAIN, "Doing").unwrap();
+        let c_l = doc.add_column(&l, "Review").unwrap();
+        doc.set_default_column_name(&l, "Backlog").unwrap();
+        doc.set_default_column_name(LIST_MAIN, "Now").unwrap();
+        let id = doc.add_item_in_column(LIST_MAIN, &c_main, "x").unwrap();
+
+        let evs = doc.snapshot_events();
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ColumnAdded { list_id, id, .. }
+                if list_id == LIST_MAIN && id == &c_main
+        )));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ColumnAdded { list_id, id, .. } if list_id == &l && id == &c_l
+        )));
+        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
+            list_id: LIST_MAIN.to_string(),
+            name: Some("Now".into())
+        }));
+        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
+            list_id: l.clone(),
+            name: Some("Backlog".into())
+        }));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            AppEvent::ItemAdded { id: i, column: Some(c), .. } if i == &id && c == &c_main
+        )));
+    }
+
+    #[test]
+    fn json_roundtrip_carries_columns_and_registers() {
+        let src = Doc::new().unwrap();
+        let l = src.add_list("Project").unwrap();
+        let col = src.add_column(&l, "Doing").unwrap();
+        src.set_default_column_name(&l, "Backlog").unwrap();
+        let item = src.add_item(&l, "grouped").unwrap();
+        src.set_item_column(&item, Some(&col), None).unwrap();
+        // A register for main's (never-exported-as-user-list) column
+        // survives export but drops on import: main metadata is not
+        // imported, so the register can't map.
+        let main_col = src.add_column(LIST_MAIN, "MainCol").unwrap();
+        let main_item = src
+            .add_item_in_column(LIST_MAIN, &main_col, "ungrouped")
+            .unwrap();
+
+        let json = src.export_json_string();
+        let dst = Doc::new().unwrap();
+        let summary = dst.import_json_str(&json).unwrap();
+        assert_eq!(summary.lists_added, 1);
+
+        let new_list = dst.all_lists()[0].clone();
+        assert_eq!(new_list.default_column_name.as_deref(), Some("Backlog"));
+        let cols = dst.columns_of(&new_list.id);
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].name, "Doing");
+        assert_ne!(cols[0].id, col, "imported column ids must be fresh");
+
+        let imported: Vec<ItemView> = dst.iter_items().collect();
+        let grouped = imported.iter().find(|i| i.text == "grouped").unwrap();
+        assert_eq!(grouped.column.as_deref(), Some(cols[0].id.as_str()));
+        let ungrouped = imported.iter().find(|i| i.text == "ungrouped").unwrap();
+        assert_eq!(
+            ungrouped.column, None,
+            "register into main's columns drops to default on import"
+        );
+        let _ = main_item;
+    }
+
+    #[test]
+    fn fingerprint_covers_column_state() {
+        let a = Doc::new().unwrap();
+        let b = Doc::new().unwrap();
+        let base_a = a.fingerprint();
+
+        // Column defs alone diverge the hash.
+        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
+        assert_ne!(a.fingerprint(), b.fingerprint());
+        let _ = b;
+
+        // Register alone diverges the hash.
+        let c = Doc::new().unwrap();
+        let d = Doc::new().unwrap();
+        // Same text/list; only the register differs — but ids differ
+        // per-doc, so compare each doc against itself over time instead.
+        let id = c.add_item(LIST_MAIN, "x").unwrap();
+        let col_c = c.add_column(LIST_MAIN, "Doing").unwrap();
+        let before = c.fingerprint();
+        c.set_item_column(&id, Some(&col_c), None).unwrap();
+        assert_ne!(c.fingerprint(), before);
+        let _ = (d, base_a, col);
+
+        // Default-name override diverges the hash.
+        let e = Doc::new().unwrap();
+        let before = e.fingerprint();
+        e.set_default_column_name(LIST_MAIN, "Now").unwrap();
+        assert_ne!(e.fingerprint(), before);
     }
 }

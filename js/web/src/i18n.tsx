@@ -97,6 +97,20 @@ type Messages = {
     moveToBin: string;
     moveToList: string;
   };
+  board: {
+    viewAsBoard: string;
+    viewAsList: string;
+    addColumn: string;
+    columnNamePlaceholder: string;
+    renameColumn: string;
+    deleteColumn: string;
+    moveLeft: string;
+    moveRight: string;
+    /** Built-in label for the implicit default column when the user
+     *  hasn't renamed it. */
+    defaultColumn: string;
+    moveToColumn: string;
+  };
   shortcuts: {
     title: string;
     newItem: string;
@@ -219,6 +233,18 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
     },
+    board: {
+      viewAsBoard: "Vista de tablero",
+      viewAsList: "Vista de lista",
+      addColumn: "Añadir columna",
+      columnNamePlaceholder: "Nombre de la columna",
+      renameColumn: "Renombrar columna",
+      deleteColumn: "Eliminar columna",
+      moveLeft: "Mover a la izquierda",
+      moveRight: "Mover a la derecha",
+      defaultColumn: "Pendiente",
+      moveToColumn: "Mover a la columna",
+    },
     shortcuts: {
       title: "Atajos de teclado",
       newItem: "Nuevo elemento",
@@ -340,6 +366,18 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
+    },
+    board: {
+      viewAsBoard: "Board view",
+      viewAsList: "List view",
+      addColumn: "Add column",
+      columnNamePlaceholder: "Column name",
+      renameColumn: "Rename column",
+      deleteColumn: "Delete column",
+      moveLeft: "Move left",
+      moveRight: "Move right",
+      defaultColumn: "To do",
+      moveToColumn: "Move to column",
     },
     shortcuts: {
       title: "Keyboard shortcuts",

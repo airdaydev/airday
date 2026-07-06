@@ -27,6 +27,10 @@ export interface ItemView {
   text: string;
   notes: string;
   listId: string;
+  /** Raw board-column register (`spec/kanban.md`). Resolve
+   *  valid-or-default against `columnsByList[listId]` — a value that
+   *  names no existing column of the item's list means default. */
+  column?: string;
   createdAt: number;
   doneAt?: number;
   binnedAt?: number;
@@ -44,6 +48,14 @@ export interface ListView {
   createdAt: number;
 }
 
+/** One board-column def of a list (`spec/kanban.md`). The default
+ *  column is implicit — never an entry here. */
+export interface ColumnView {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface WorkspaceState {
   itemsById: Record<string, ItemView>;
   /** Per-list live order — mirrors the core's `live_by_list`
@@ -56,6 +68,14 @@ export interface WorkspaceState {
   binCount: number;
   listsOrder: string[];
   listsById: Record<string, ListView>;
+  /** Board-column defs per list in board order; lists with no
+   *  user-created columns are absent. Keyed by list id (`main`
+   *  included). */
+  columnsByList: Record<string, ColumnView[]>;
+  /** Display-name override for each list's implicit default column.
+   *  Absent = localized built-in label. Uniform for `main` and user
+   *  lists (storage differs core-side; this map doesn't care). */
+  defaultColumnNames: Record<string, string>;
   settings: SettingsView;
 }
 
@@ -153,6 +173,24 @@ export interface DocApp {
   /** Set or clear the user-chosen display name for the reserved
    *  `main` (Queue) list. Passing `""` clears the override. */
   setMainName(name: string): void;
+  // Board columns (spec/kanban.md)
+  addColumn(listId: string, name: string): string;
+  renameColumn(listId: string, columnId: string, name: string): void;
+  /** `index` addresses user columns only — the implicit default column
+   *  is pinned first and not an entry. */
+  moveColumn(listId: string, columnId: string, index: number): void;
+  /** Members fall to the default column visually; their registers are
+   *  left intact so undo restores the grouping. */
+  deleteColumn(listId: string, columnId: string): void;
+  /** Set or clear (via `""`) the implicit default column's display
+   *  name. Works for `main` and user lists alike. */
+  setDefaultColumnName(listId: string, name: string): void;
+  /** Move an item to a column (`null` = default). `indexInList`, when
+   *  given, applies a same-list reorder in the same commit and
+   *  addresses the list's live projection like `moveItem`. */
+  setItemColumn(id: string, columnId: string | null, indexInList?: number): void;
+  /** Board quick-capture: append to the list with the register set. */
+  addItemInColumn(listId: string, columnId: string, text: string): string;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -184,8 +222,9 @@ const COARSE_EVENT_KINDS = new Set([
 ]);
 
 interface WorkspaceSnapshotPayload {
-  settings: SettingsView;
-  lists: ListView[];
+  settings: SettingsView & { mainDefaultColumnName?: string };
+  lists: (ListView & { defaultColumnName?: string })[];
+  columns?: Record<string, ColumnView[]>;
   items: ItemView[];
 }
 
@@ -200,13 +239,24 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
     if (isBinned(item)) binCount++;
   }
   const listsById: Record<string, ListView> = {};
-  for (const list of payload.lists) listsById[list.id] = list;
+  const defaultColumnNames: Record<string, string> = {};
+  if (payload.settings.mainDefaultColumnName != null) {
+    defaultColumnNames["main"] = payload.settings.mainDefaultColumnName;
+  }
+  for (const list of payload.lists) {
+    listsById[list.id] = { id: list.id, name: list.name, createdAt: list.createdAt };
+    if (list.defaultColumnName != null) {
+      defaultColumnNames[list.id] = list.defaultColumnName;
+    }
+  }
   return {
     itemsById,
     listLive,
     binCount,
     listsOrder: payload.lists.map((list) => list.id),
     listsById,
+    columnsByList: payload.columns ?? {},
+    defaultColumnNames,
     settings: {
       showListCounts: payload.settings.showListCounts ?? true,
       mainName: payload.settings.mainName ?? null,
@@ -230,6 +280,8 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     binCount: 0,
     listsOrder: [],
     listsById: {},
+    columnsByList: {},
+    defaultColumnNames: {},
     settings: {
       showListCounts: true,
       mainName: null,
@@ -307,6 +359,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           listId: ev.listId ?? "",
           text: ev.text ?? "",
           notes: ev.notes ?? "",
+          column: ev.column ?? undefined,
           createdAt: Number(ev.createdAt ?? 0),
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
@@ -382,6 +435,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         adjustBinCount((binnedAt != null ? 1 : 0) - (wasBinned ? 1 : 0));
         break;
       }
+      case "itemColumnChanged": {
+        if (state.itemsById[ev.id]) {
+          setState("itemsById", ev.id, "column", ev.column ?? undefined);
+        }
+        break;
+      }
       case "itemListChanged": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
@@ -429,6 +488,18 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
             delete by[ev.id];
           }),
         );
+        setState(
+          "columnsByList",
+          produce((by) => {
+            delete by[ev.id];
+          }),
+        );
+        setState(
+          "defaultColumnNames",
+          produce((by) => {
+            delete by[ev.id];
+          }),
+        );
         break;
       }
       case "listMoved": {
@@ -447,6 +518,71 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "listRenamed": {
         if (state.listsById[ev.id]) {
           setState("listsById", ev.id, "name", ev.name ?? "");
+        }
+        break;
+      }
+      case "columnAdded": {
+        const listId = ev.listId ?? "";
+        const col: ColumnView = {
+          id: ev.id,
+          name: ev.name ?? "",
+          createdAt: Number(ev.createdAt ?? 0),
+        };
+        const cur = state.columnsByList[listId] ?? [];
+        const next = cur.filter((c) => c.id !== ev.id);
+        next.splice(Math.min(ev.index ?? next.length, next.length), 0, col);
+        setState("columnsByList", listId, next);
+        break;
+      }
+      case "columnRemoved": {
+        const listId = ev.listId ?? "";
+        const cur = state.columnsByList[listId];
+        if (!cur) break;
+        const next = cur.filter((c) => c.id !== ev.id);
+        if (next.length === 0) {
+          setState(
+            "columnsByList",
+            produce((by) => {
+              delete by[listId];
+            }),
+          );
+        } else {
+          setState("columnsByList", listId, next);
+        }
+        break;
+      }
+      case "columnMoved": {
+        const listId = ev.listId ?? "";
+        const cur = state.columnsByList[listId];
+        if (!cur) break;
+        const moving = cur.find((c) => c.id === ev.id);
+        if (!moving) break;
+        const next = cur.filter((c) => c.id !== ev.id);
+        next.splice(Math.min(ev.index ?? next.length, next.length), 0, moving);
+        setState("columnsByList", listId, next);
+        break;
+      }
+      case "columnRenamed": {
+        const listId = ev.listId ?? "";
+        const idx = (state.columnsByList[listId] ?? []).findIndex(
+          (c) => c.id === ev.id,
+        );
+        if (idx >= 0) {
+          setState("columnsByList", listId, idx, "name", ev.name ?? "");
+        }
+        break;
+      }
+      case "defaultColumnRenamed": {
+        const listId = ev.listId ?? "";
+        if (ev.name != null && ev.name !== "") {
+          setState("defaultColumnNames", listId, ev.name);
+        } else {
+          setState(
+            "defaultColumnNames",
+            produce((by) => {
+              delete by[listId];
+            }),
+          );
         }
         break;
       }
@@ -620,6 +756,27 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setMainName(name) {
       mutate(() => engine.setMainName(name));
+    },
+    addColumn(listId, name) {
+      return mutate(() => engine.addColumn(listId, name));
+    },
+    renameColumn(listId, columnId, name) {
+      mutate(() => engine.renameColumn(listId, columnId, name));
+    },
+    moveColumn(listId, columnId, index) {
+      mutate(() => engine.moveColumn(listId, columnId, index));
+    },
+    deleteColumn(listId, columnId) {
+      mutate(() => engine.deleteColumn(listId, columnId));
+    },
+    setDefaultColumnName(listId, name) {
+      mutate(() => engine.setDefaultColumnName(listId, name));
+    },
+    setItemColumn(id, columnId, indexInList) {
+      mutate(() => engine.setItemColumn(id, columnId ?? undefined, indexInList));
+    },
+    addItemInColumn(listId, columnId, text) {
+      return mutate(() => engine.addItemInColumn(listId, columnId, text));
     },
     undo() {
       const steps = undoStack.pop();

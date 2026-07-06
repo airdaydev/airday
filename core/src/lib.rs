@@ -8,8 +8,8 @@ pub mod sync;
 
 pub use crypto::*;
 pub use doc::{
-    Doc, DocError, ExportItem, ExportList, ExportSettings, ImportSummary, ItemView, JsonExport,
-    LIST_MAIN, LIST_MAIN_NAME, ListView, SettingsView,
+    ColumnView, Doc, DocError, ExportColumn, ExportItem, ExportList, ExportSettings, ImportSummary,
+    ItemView, JsonExport, LIST_MAIN, LIST_MAIN_NAME, ListView, SettingsView,
 };
 pub use events::AppEvent;
 pub use storage::{

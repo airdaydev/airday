@@ -17,6 +17,7 @@ import caretLeftSvg from "./icons/caret-left.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
+import { Board } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
@@ -50,6 +51,20 @@ const DONE_LINGER_MS = 3_000;
 // Module-level so the OS-preference listener is registered exactly
 // once for the lifetime of the page.
 const theme = createTheme();
+
+// Per-list board-mode toggle. A purely local view preference (the same
+// account may want a board on desktop and a flat list on a phone), so
+// it lives in localStorage rather than the synced doc or the IDB prefs
+// row — see spec/kanban.md "Client (web) contract".
+const BOARD_PREF_KEY = "airday:board-lists";
+function loadBoardPrefs(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(BOARD_PREF_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
 
 // Heuristic for "user has a real keyboard + precise pointer" — i.e. the
 // shortcut hints are worth showing. Reactive: an iPad gaining a Magic
@@ -96,6 +111,24 @@ export function Workspace(props: {
   // Which field the dialog focuses on open — the note badge opens to notes,
   // everything else to the title. Reset to title whenever the dialog closes.
   const [openFocus, setOpenFocus] = createSignal<"title" | "notes">("title");
+  // Which lists render as a board. Persisted per browser (not synced).
+  const [boardLists, setBoardLists] = createSignal<Record<string, boolean>>(
+    loadBoardPrefs(),
+  );
+  const boardListId = createMemo((): string | null => {
+    const v = view();
+    return v.kind === "list" && boardLists()[v.id] ? v.id : null;
+  });
+  const toggleBoard = (listId: string) => {
+    const next = { ...boardLists(), [listId]: !boardLists()[listId] };
+    if (!next[listId]) delete next[listId];
+    setBoardLists(next);
+    try {
+      localStorage.setItem(BOARD_PREF_KEY, JSON.stringify(next));
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
   createEffect(() => {
     if (openItemId() === null) {
       setLiveEdit(null);
@@ -1008,6 +1041,22 @@ export function Workspace(props: {
               <button
                 type="button"
                 class="add-button"
+                onClick={() => {
+                  const v = view();
+                  if (v.kind === "list") toggleBoard(v.id);
+                }}
+              >
+                <span>
+                  {boardListId() !== null
+                    ? m().board.viewAsList
+                    : m().board.viewAsBoard}
+                </span>
+              </button>
+            </Show>
+            <Show when={view().kind === "list" && boardListId() === null}>
+              <button
+                type="button"
+                class="add-button"
                 onClick={(e) => {
                   // The dnd controller has a document-level click listener
                   // that collapses any expansion when a click lands outside
@@ -1029,65 +1078,85 @@ export function Workspace(props: {
           </div>
         </header>
         <Show
-          when={dndItems().length > 0}
+          keyed
+          when={boardListId()}
           fallback={
-            <div class="dnd-host empty">
-              {view().kind === "list" && matchesKbDevice()
-                ? m().workspace.createWithSpace
-                : m().workspace.emptyState}
-            </div>
+            <Show
+              when={dndItems().length > 0}
+              fallback={
+                <div class="dnd-host empty">
+                  {view().kind === "list" && matchesKbDevice()
+                    ? m().workspace.createWithSpace
+                    : m().workspace.emptyState}
+                </div>
+              }
+            >
+              <Show keyed when={dndRevision()}>
+                <Dnd
+                  class="dnd-host"
+                  ref={(h) => (dndHandle = h)}
+                  items={dndItems()}
+                  setItems={setDndItems}
+                  getKey={(it) => it.id}
+                  selection={selection}
+                  expandedKey={expandedKey()}
+                  onExpandedChange={(k) =>
+                    setExpandedKey(k == null ? null : String(k))
+                  }
+                  itemHeight={itemsIsMobile() ? 40 : 28}
+                  expandable
+                  clearOnClickOutside
+                  fillHeight
+                  autofocus
+                  reorder={view().kind === "list"}
+                  onReorder={onReorder}
+                >
+                  {(item, expanded) => {
+                    // Overlay the dialog's in-progress title onto its row so the
+                    // list mirrors the edit live. Only the edited row's object is
+                    // swapped (others pass through by reference); the list is
+                    // virtualized, so this recomputes for visible rows only.
+                    const shownItem = createMemo(() => {
+                      const ov = liveEdit();
+                      const it = item();
+                      return ov && ov.id === it.id ? { ...it, text: ov.text } : it;
+                    });
+                    return (
+                      <Row
+                        item={shownItem}
+                        expanded={expanded}
+                        app={app}
+                        selection={selection}
+                        viewKind={view().kind}
+                        duplicateBlock={duplicateBlock}
+                        copyBlock={copyBlock}
+                        onDraftSettle={settleDraft}
+                        onOpen={(id, focus) => {
+                          if (focus) setOpenFocus(focus);
+                          setOpenItemId(id);
+                        }}
+                        openOnTap={itemsIsMobile}
+                      />
+                    );
+                  }}
+                </Dnd>
+              </Show>
+            </Show>
           }
         >
-          <Show keyed when={dndRevision()}>
-            <Dnd
-              class="dnd-host"
-              ref={(h) => (dndHandle = h)}
-              items={dndItems()}
-              setItems={setDndItems}
-              getKey={(it) => it.id}
-              selection={selection}
-              expandedKey={expandedKey()}
-              onExpandedChange={(k) =>
-                setExpandedKey(k == null ? null : String(k))
-              }
-              itemHeight={itemsIsMobile() ? 40 : 28}
-              expandable
-              clearOnClickOutside
-              fillHeight
-              autofocus
-              reorder={view().kind === "list"}
-              onReorder={onReorder}
-            >
-              {(item, expanded) => {
-                // Overlay the dialog's in-progress title onto its row so the
-                // list mirrors the edit live. Only the edited row's object is
-                // swapped (others pass through by reference); the list is
-                // virtualized, so this recomputes for visible rows only.
-                const shownItem = createMemo(() => {
-                  const ov = liveEdit();
-                  const it = item();
-                  return ov && ov.id === it.id ? { ...it, text: ov.text } : it;
-                });
-                return (
-                  <Row
-                    item={shownItem}
-                    expanded={expanded}
-                    app={app}
-                    selection={selection}
-                    viewKind={view().kind}
-                    duplicateBlock={duplicateBlock}
-                    copyBlock={copyBlock}
-                    onDraftSettle={settleDraft}
-                    onOpen={(id, focus) => {
-                      if (focus) setOpenFocus(focus);
-                      setOpenItemId(id);
-                    }}
-                    openOnTap={itemsIsMobile}
-                  />
-                );
+          {(listId) => (
+            <Board
+              app={app}
+              listId={listId}
+              onOpen={(id, focus) => {
+                if (focus) setOpenFocus(focus);
+                setOpenItemId(id);
               }}
-            </Dnd>
-          </Show>
+              openOnTap={itemsIsMobile}
+              duplicateBlock={duplicateBlock}
+              copyBlock={copyBlock}
+            />
+          )}
         </Show>
         {/* Mobile-only floating action buttons, fixed to the viewport.
             They sit inside .main, so opening the full-screen drawer hides
@@ -1099,7 +1168,7 @@ export function Workspace(props: {
           onClick={() => setNavOpen(true)}
           innerHTML={caretLeftSvg}
         />
-        <Show when={view().kind === "list"}>
+        <Show when={view().kind === "list" && boardListId() === null}>
           <button
             type="button"
             class="fab fab-add"

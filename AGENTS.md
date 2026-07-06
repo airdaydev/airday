@@ -35,6 +35,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
+| [`spec/kanban.md`](spec/kanban.md) | Board view: per-item column register, column defs, implicit default column |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
