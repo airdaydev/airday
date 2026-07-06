@@ -43,9 +43,9 @@ const DEFAULT_COL = "";
 const CARD_HEIGHT = 84;
 
 /** Px gutter below each card within its fixed slot — mirrors the card's
- *  `height: calc(100% - 0.25em)` (0.25em = 4px at the 16px root) so the drop
- *  placeholder lines up with the cards. Passed to each column's Dnd. */
-const CARD_GAP = 4;
+ *  `height: calc(100% - 6px)` so the drop placeholder lines up with the
+ *  cards. Passed to each column's Dnd. */
+const CARD_GAP = 6;
 
 /** Pointer-driven horizontal autoscroll for the board strip. */
 const H_SCROLL_EDGE = 48;

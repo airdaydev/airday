@@ -32,7 +32,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
 [data-theme="dark"] {
   --bg: #111113;
   --bg-elevated: #1a1a1c;
-  --bg-nav: #161618;
+  --bg-nav: #0b0b0b;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
   --text: #e5e5e5;
@@ -85,7 +85,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 240px 1fr;
   height: 100%;
 }
 
@@ -99,7 +99,8 @@ body {
 }
 
 [data-theme="dark"] .nav {
-  border-right-color: #1f1f1f;
+  border-right-color: #141414;
+  color: var(--text-muted);
 }
 
 /* Groups scroll; the footer stays pinned to the bottom. Horizontal padding
@@ -108,7 +109,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 8px;
+  padding: 0 12px;
 }
 
 /* Hamburger lives in the main header, hidden on desktop. */
@@ -2082,7 +2083,7 @@ body {
    the column background shows through below it as an inter-card gutter.
    Rounded corners + a hairline border finish the card. */
 .board-col-dnd .row {
-  height: calc(100% - 0.25em);
+  height: calc(100% - 6px);
   border: 1px solid var(--border-row);
   border-radius: 8px;
 }
