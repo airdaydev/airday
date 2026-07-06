@@ -58,6 +58,9 @@ export function TaskDialog(props: {
    *  mirrors the edit live — without a sync op per keystroke. The real
    *  write still happens once, via the close/flush path. */
   onLiveText?: (text: string) => void;
+  /** Fires with the id of a freshly committed new item, so the caller can
+   *  select/scroll to it (used by the board's "+" capture). */
+  onCreated?: (id: string) => void;
 }) {
   const { m, locale } = useAppI18n();
 
@@ -182,6 +185,7 @@ export function TaskDialog(props: {
           : props.app.addItem(nw.listId, t);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
+        props.onCreated?.(id);
       }
     }
     props.setNewItem?.(null);

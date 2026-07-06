@@ -55,6 +55,11 @@ export function Board(props: {
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Open the new-item dialog targeting a column (`null` = default). */
   onAddItem: (listId: string, columnId: string | null) => void;
+  /** Id of a just-created item to select and scroll into view once it
+   *  lands in its resolved column; `null` when nothing pending. */
+  revealId?: () => string | null;
+  /** Called by the board once it has revealed `revealId`. */
+  clearReveal?: () => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
@@ -207,9 +212,28 @@ export function Board(props: {
     if (sel) {
       sel.updateOrder(memberIds);
       sel.setSelectedKeys(p.ids);
-      columnHandles.get(p.colKey)?.focus();
+      const handle = columnHandles.get(p.colKey);
+      handle?.focus();
+      // Scroll the (last) selected card into view — after a board "+"
+      // capture the new card may be below the fold in a tall column.
+      if (p.ids.length > 0) handle?.scrollToKey(p.ids[p.ids.length - 1]);
     }
     setPendingSelect(null);
+  });
+
+  // Reveal a just-created item (board "+" capture): once it lands in its
+  // resolved column, stage it as that column's selection — the effect
+  // above then selects, focuses, and scrolls it into view. Waits for the
+  // reactive graph to settle (the item may not be projected yet).
+  createEffect(() => {
+    const id = props.revealId?.() ?? null;
+    if (!id) return;
+    if (!state.itemsById[id]) return;
+    const colKey = resolvedColumnOf(id);
+    const members = membersByColumn().get(colKey);
+    if (!members?.some((it) => it.id === id)) return;
+    setPendingSelect({ colKey, ids: [id] });
+    props.clearReveal?.();
   });
 
   // Foreign-drop wiring (see dnd/spec.md "Foreign drop zones"). The

@@ -106,6 +106,10 @@ export function Workspace(props: {
     listId: string;
     columnId: string | null;
   } | null>(null);
+  // Id of an item just created via the board "+" capture, handed to the
+  // Board so it can select and scroll the new card into view. Cleared by
+  // the Board once it lands the selection.
+  const [boardCreatedId, setBoardCreatedId] = createSignal<string | null>(null);
   // UI-only mirror of the title being edited in the dialog: the list row
   // reflects it live while typing, but nothing is written to the engine
   // until the dialog flushes on close (so no op-per-keystroke). Cleared
@@ -981,6 +985,11 @@ export function Workspace(props: {
           const id = openItemId();
           if (id) setLiveEdit({ id, text });
         }}
+        onCreated={(id) => {
+          // Only board view has a card to reveal; list-view capture keeps
+          // its own draft/focus flow.
+          if (boardListId() !== null) setBoardCreatedId(id);
+        }}
       />
       <ShortcutsDialog
         open={shortcutsOpen()}
@@ -1061,7 +1070,7 @@ export function Workspace(props: {
                 </span>
               </button>
             </Show>
-            <Show when={view().kind === "list" && boardListId() === null}>
+            <Show when={view().kind === "list"}>
               <button
                 type="button"
                 class="add-button"
@@ -1075,9 +1084,17 @@ export function Workspace(props: {
                   // since it registers eagerly during render; the dnd's
                   // listener registers later in onMount).
                   e.stopImmediatePropagation();
-                  startDraft();
+                  const boardId = boardListId();
+                  if (boardId !== null) {
+                    // Board view has no inline draft flow; capture a new item
+                    // into the implicit default column (top of the list),
+                    // mirroring the board's own default-column "+".
+                    setNewItemTarget({ listId: boardId, columnId: null });
+                  } else {
+                    startDraft();
+                  }
                 }}
-                disabled={draft() !== null}
+                disabled={boardListId() === null && draft() !== null}
                 aria-label={m().common.add}
               >
                 <span class="add-button-icon" innerHTML={plusSvg} />
@@ -1166,6 +1183,8 @@ export function Workspace(props: {
               onAddItem={(listId, columnId) =>
                 setNewItemTarget({ listId, columnId })
               }
+              revealId={boardCreatedId}
+              clearReveal={() => setBoardCreatedId(null)}
             />
           )}
         </Show>

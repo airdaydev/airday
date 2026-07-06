@@ -2054,7 +2054,13 @@ body {
 /* Board cards are taller than list rows (CARD_HEIGHT in Board.tsx), so the
    title wraps to two lines instead of the list view's single ellipsized
    line. Skip expanded (inline-editing) cards so the editor can grow. */
-.board-col-dnd .row:not([data-expanded]) .row-text {
+/* Board cards never inline-edit (the board's Dnd has expansion disabled), so
+   the title always clamps to two lines. The second selector outranks
+   `.row[data-expanded] .row-text` (the inline-edit pre-wrap style) which
+   Kobalte's context menu would otherwise trigger by setting `data-expanded`
+   on the row while its menu is open — spilling long titles out of the card. */
+.board-col-dnd .row-text,
+.board-col-dnd .row[data-expanded] .row-text {
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2092,6 +2098,16 @@ body {
    (already scoped to the card) carry the selection instead. */
 .board-col-dnd [data-selected] {
   background: transparent;
+}
+
+/* The drop placeholder is sized to the full slot height (itemHeight); give
+   it the same bottom gutter as the cards so the drop preview lines up with
+   them instead of overshooting into the next card's space. The gutter is a
+   transparent bottom border (background clipped to the padding box) so the
+   placeholder's footprint still matches the slot. */
+.board-col-dnd .dnd-drop-placeholder {
+  border-bottom: 0.25em solid transparent;
+  background-clip: padding-box;
 }
 
 .board-add-col-input {
