@@ -31,6 +31,9 @@ export interface DndControllerConfig {
   arrowNavigate: boolean;
   clearOnClickOutside: boolean;
   fillHeight: boolean;
+  /** Px shaved off the bottom of the drop placeholder so it matches gapped
+   *  cards (the board); defaults to 0 (flush list view) when omitted. */
+  placeholderGap?: number;
 }
 
 export interface DndControllerHost {
@@ -176,7 +179,11 @@ export class DndController {
     this.cfg = { ...opts.config };
 
     this.virtualization = new DndVirtualization(this.cfg.itemHeight, this.cfg.overscan);
-    this.placeholder = new DndPlaceholder(this.cfg.itemHeight, BORDER_RADIUS_PX);
+    this.placeholder = new DndPlaceholder(
+      this.cfg.itemHeight,
+      BORDER_RADIUS_PX,
+      this.cfg.placeholderGap ?? 0,
+    );
     this.autoscroll = new DndAutoscroll(
       this.opts.host.parent,
       this.cfg.autoscrollBuffer,
@@ -258,6 +265,9 @@ export class DndController {
 
     if (patch.itemHeight !== undefined) {
       this.virtualization.setItemHeight(patch.itemHeight);
+    }
+    if (patch.itemHeight !== undefined || patch.placeholderGap !== undefined) {
+      this.placeholder.setSize(this.cfg.itemHeight, this.cfg.placeholderGap ?? 0);
     }
     if (patch.overscan !== undefined) {
       this.virtualization.setOverscan(patch.overscan);

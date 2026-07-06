@@ -53,6 +53,9 @@ export interface DndProps<T> {
   /** Optional consumer-owned selection model. */
   selection?: DndSelection;
   itemHeight?: number;
+  /** Px shaved off the bottom of the drop placeholder so it matches gapped
+   *  cards (the board); defaults to 0 for the flush list view. */
+  placeholderGap?: number;
   expandable?: boolean;
   overscan?: number;
   confineAutoscroll?: boolean;
@@ -120,6 +123,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
 
   const cfg = (): DndControllerConfig => ({
     itemHeight: props.itemHeight ?? 32,
+    placeholderGap: props.placeholderGap ?? 0,
     overscan: props.overscan ?? 2,
     dragType: props.dragType ?? "overlay",
     roundedSelect: props.roundedSelect ?? true,

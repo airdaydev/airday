@@ -42,6 +42,11 @@ const DEFAULT_COL = "";
  *  wrap to two lines (see `.board-col-dnd .row-text` in styles.css). */
 const CARD_HEIGHT = 84;
 
+/** Px gutter below each card within its fixed slot — mirrors the card's
+ *  `height: calc(100% - 0.25em)` (0.25em = 4px at the 16px root) so the drop
+ *  placeholder lines up with the cards. Passed to each column's Dnd. */
+const CARD_GAP = 4;
+
 /** Pointer-driven horizontal autoscroll for the board strip. */
 const H_SCROLL_EDGE = 48;
 const H_SCROLL_STEP = 14;
@@ -60,6 +65,10 @@ export function Board(props: {
   revealId?: () => string | null;
   /** Called by the board once it has revealed `revealId`. */
   clearReveal?: () => void;
+  /** Publishes the board's active (most recently populated) column
+   *  selection, or `null` when nothing is selected, so the workspace's
+   *  global item shortcuts can act on it. */
+  onActiveSelectionChange?: (sel: DndSelection | null) => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
@@ -180,15 +189,37 @@ export function Board(props: {
   // the cross-column drop below can make the moved rows the target
   // column's new selection. Cross-column multi-select still isn't
   // supported — each column's Dnd owns its own order.
+  //
+  // The board also tracks which column's selection is "active" (the most
+  // recently populated one) and publishes it upward, so the workspace's
+  // global item shortcuts (Enter/open, x/done, ⌫/bin, ⌘C, ⌘D) act on the
+  // board selection just as they do on the list view's single selection.
   const columnSelections = new Map<string, DndSelection>();
+  const [activeSelection, setActiveSelection] =
+    createSignal<DndSelection | null>(null);
   const selectionFor = (colKey: string): DndSelection => {
     let s = columnSelections.get(colKey);
     if (!s) {
-      s = new DndSelection();
-      columnSelections.set(colKey, s);
+      const sel = new DndSelection();
+      sel.onChange(() => {
+        if (sel.hasSelection()) {
+          // Selecting in one column is board-wide single selection: drop any
+          // stale highlight in the other columns and become the active one.
+          for (const other of columnSelections.values()) {
+            if (other !== sel && other.hasSelection()) other.clear();
+          }
+          setActiveSelection(sel);
+        } else if (activeSelection() === sel) {
+          setActiveSelection(null);
+        }
+      });
+      columnSelections.set(colKey, sel);
+      s = sel;
     }
     return s;
   };
+  createEffect(() => props.onActiveSelectionChange?.(activeSelection()));
+  onCleanup(() => props.onActiveSelectionChange?.(null));
 
   // After a cross-column drop, make the dropped rows the target column's
   // selection. The mutation is applied synchronously but the moved rows
@@ -550,6 +581,7 @@ function BoardColumn(props: {
           getKey={(it) => it.id}
           selection={selection}
           itemHeight={CARD_HEIGHT}
+          placeholderGap={CARD_GAP}
           fillHeight
           reorder
           onReorder={props.onReorder}

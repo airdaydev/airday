@@ -1966,15 +1966,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  flex: 0 0 272px;
-  width: 272px;
-  border: 1px solid var(--border);
+  flex: 0 0 320px;
+  width: 320px;
   border-radius: 10px;
   background: var(--bg-nav);
-}
-
-.board-col[data-drop-active] {
-  background: var(--dnd-select-bg);
 }
 
 .board-col-header {
@@ -1985,7 +1980,7 @@ body {
 }
 
 .board-col-name {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
@@ -2005,6 +2000,7 @@ body {
 }
 
 .board-col-count {
+  margin-right: auto;
   font-size: 12px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
@@ -2080,7 +2076,6 @@ body {
   margin-top: auto;
   font-size: 11px;
   color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
 }
 
 /* Card feel: each dnd slot is CARD_HEIGHT tall, but the row sits shorter so
@@ -2100,15 +2095,6 @@ body {
   background: transparent;
 }
 
-/* The drop placeholder is sized to the full slot height (itemHeight); give
-   it the same bottom gutter as the cards so the drop preview lines up with
-   them instead of overshooting into the next card's space. The gutter is a
-   transparent bottom border (background clipped to the padding box) so the
-   placeholder's footprint still matches the slot. */
-.board-col-dnd .dnd-drop-placeholder {
-  border-bottom: 0.25em solid transparent;
-  background-clip: padding-box;
-}
 
 .board-add-col-input {
   width: 100%;

@@ -106,10 +106,16 @@ export function Workspace(props: {
     listId: string;
     columnId: string | null;
   } | null>(null);
-  // Id of an item just created via the board "+" capture, handed to the
-  // Board so it can select and scroll the new card into view. Cleared by
-  // the Board once it lands the selection.
-  const [boardCreatedId, setBoardCreatedId] = createSignal<string | null>(null);
+  // Id of an item to select and scroll into view in the board — set after
+  // a board "+" capture or a find-palette pick that lands on a board list.
+  // Handed to the Board, which clears it once it lands the selection.
+  const [boardRevealId, setBoardRevealId] = createSignal<string | null>(null);
+  // The board's active column selection (or null), published up by Board so
+  // the global item shortcuts act on it in board view — the workspace-level
+  // `selection` below only ever holds the flat list view's selection.
+  const [boardSelection, setBoardSelection] = createSignal<DndSelection | null>(
+    null,
+  );
   // UI-only mirror of the title being edited in the dialog: the list row
   // reflects it live while typing, but nothing is written to the engine
   // until the dialog flushes on close (so no op-per-keystroke). Cleared
@@ -191,6 +197,12 @@ export function Workspace(props: {
       { defer: true },
     ),
   );
+
+  // The selection the global item shortcuts act on: the board's active
+  // column selection in board view (or null when nothing's selected there),
+  // otherwise the flat list view's single selection. Handlers bail on null.
+  const actionSelection = (): DndSelection | null =>
+    boardListId() !== null ? boardSelection() : selection;
 
   // Linger group for the active list view: the unbroken chain of
   // recently-done items walking back from the latest click. A new
@@ -467,10 +479,12 @@ export function Workspace(props: {
   // the AddForm, row edit, and list rename keep their native behaviour.
   const onDeleteKey = (e: KeyboardEvent) => {
     if (e.key !== "Delete" && e.key !== "Backspace") return;
+    const sel = actionSelection();
+    if (!sel) return;
     const v = view();
     const visibleIds = items().map((it) => it.id);
     const visibleSet = new Set(visibleIds);
-    const ids = selection
+    const ids = sel
       .getSelectedKeys()
       .map(String)
       .filter((id) => visibleSet.has(id));
@@ -503,13 +517,16 @@ export function Workspace(props: {
     }
     if (v.kind === "bin") app.deleteBinnedMany(ids);
     else app.setBinnedMany(ids, true);
-    if (nextId === null) {
-      selection.clear();
+    // The survivor is chosen in list order, which on the board may sit in a
+    // different column than the active selection — so only re-select in the
+    // flat list view; on the board just drop the (now-removed) selection.
+    if (nextId === null || boardListId() !== null) {
+      sel.clear();
     } else {
       const target = nextId;
       // Wait for the dnd source to absorb the removals before
       // selecting — matches onDuplicate/onPaste.
-      queueMicrotask(() => selection.selectOnly(target));
+      queueMicrotask(() => sel.selectOnly(target));
     }
   };
   onGlobalKey(onDeleteKey);
@@ -522,8 +539,10 @@ export function Workspace(props: {
   const onToggleDoneKey = (e: KeyboardEvent) => {
     if (e.key !== "x" && e.key !== "X") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const sel = actionSelection();
+    if (!sel) return;
     const visibleSet = new Set(items().map((it) => it.id));
-    const ids = selection
+    const ids = sel
       .getSelectedKeys()
       .map(String)
       .filter((id) => visibleSet.has(id));
@@ -603,7 +622,7 @@ export function Workspace(props: {
     if (e.key !== "d" && e.key !== "D") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.shiftKey || e.altKey) return;
-    const ids = selection.getSelectedKeys().map(String);
+    const ids = actionSelection()?.getSelectedKeys().map(String) ?? [];
     if (ids.length === 0) return;
     e.preventDefault();
     duplicateBlock(ids);
@@ -619,9 +638,9 @@ export function Workspace(props: {
     if (e.key !== "c" && e.key !== "C") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.shiftKey || e.altKey) return;
-    const sel = window.getSelection();
-    if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
-    const ids = selection.getSelectedKeys().map(String);
+    const winSel = window.getSelection();
+    if (winSel && !winSel.isCollapsed && winSel.toString().length > 0) return;
+    const ids = actionSelection()?.getSelectedKeys().map(String) ?? [];
     if (ids.length === 0) return;
     e.preventDefault();
     copyBlock(ids);
@@ -650,7 +669,8 @@ export function Workspace(props: {
   const onOpenKey = (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const top = selection.getSelectionTop();
+    const sel = actionSelection();
+    const top = sel?.getSelectionTop() ?? null;
     if (top === null) return;
     e.preventDefault();
     setOpenItemId(String(top));
@@ -666,6 +686,9 @@ export function Workspace(props: {
     if (e.key !== "Enter") return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.altKey || e.shiftKey) return;
+    // List-view only: the board has no inline edit and `dndHandle` points at
+    // the (now-unmounted) list Dnd while a board is showing.
+    if (boardListId() !== null) return;
     if (!dndHandle) return;
     if (dndHandle.getExpanded() !== null) {
       e.preventDefault();
@@ -697,6 +720,8 @@ export function Workspace(props: {
     if (e.key !== " ") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     if (view().kind !== "list") return;
+    // The board captures via its column "+" buttons, not an inline draft.
+    if (boardListId() !== null) return;
     if (draft() !== null) return;
     e.preventDefault();
     startDraft();
@@ -837,6 +862,13 @@ export function Workspace(props: {
           ? { kind: "done" }
           : { kind: "list", id: r.listId || "main" };
     setView(target);
+    // If the destination list renders as a board, the list-view Dnd isn't
+    // mounted — hand the id to the Board's reveal path (select + scroll in
+    // the resolved column) instead of the list-view scroll below.
+    if (target.kind === "list" && boardLists()[target.id]) {
+      setBoardRevealId(r.id);
+      return;
+    }
     setTimeout(() => {
       selection.selectOnly(r.id);
       dndHandle?.scrollToKey(r.id);
@@ -988,7 +1020,7 @@ export function Workspace(props: {
         onCreated={(id) => {
           // Only board view has a card to reveal; list-view capture keeps
           // its own draft/focus flow.
-          if (boardListId() !== null) setBoardCreatedId(id);
+          if (boardListId() !== null) setBoardRevealId(id);
         }}
       />
       <ShortcutsDialog
@@ -1183,8 +1215,9 @@ export function Workspace(props: {
               onAddItem={(listId, columnId) =>
                 setNewItemTarget({ listId, columnId })
               }
-              revealId={boardCreatedId}
-              clearReveal={() => setBoardCreatedId(null)}
+              revealId={boardRevealId}
+              clearReveal={() => setBoardRevealId(null)}
+              onActiveSelectionChange={setBoardSelection}
             />
           )}
         </Show>
