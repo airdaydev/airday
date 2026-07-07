@@ -31,6 +31,10 @@ export interface ItemView {
    *  valid-or-default against `columnsByList[listId]` — a value that
    *  names no existing column of the item's list means default. */
   column?: string;
+  /** Optional date-only due date as a raw `YYYY-MM-DD` string (floating
+   *  local calendar date — never parse it with `new Date("YYYY-MM-DD")`,
+   *  which reads as UTC midnight). Absent means no due date. */
+  dueOn?: string;
   createdAt: number;
   doneAt?: number;
   binnedAt?: number;
@@ -151,6 +155,10 @@ export interface DocApp {
   /** Set the free-form notes string. Empty clears it; whitespace is
    *  preserved verbatim. */
   editItemNotes(id: string, notes: string): void;
+  /** Set (`YYYY-MM-DD`) or clear (`null`) an item's date-only due date.
+   *  The value is a floating local calendar date; a malformed string is
+   *  rejected by the core. */
+  setItemDueOn(id: string, dueOn: string | null): void;
   /** Set or clear an item's done flag. Independent of binned. */
   setDone(id: string, done: boolean): void;
   setDoneMany(ids: string[], done: boolean): void;
@@ -360,6 +368,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           text: ev.text ?? "",
           notes: ev.notes ?? "",
           column: ev.column ?? undefined,
+          dueOn: ev.dueOn ?? undefined,
           createdAt: Number(ev.createdAt ?? 0),
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
@@ -438,6 +447,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemColumnChanged": {
         if (state.itemsById[ev.id]) {
           setState("itemsById", ev.id, "column", ev.column ?? undefined);
+        }
+        break;
+      }
+      case "itemDueChanged": {
+        if (state.itemsById[ev.id]) {
+          setState("itemsById", ev.id, "dueOn", ev.dueOn ?? undefined);
         }
         break;
       }
@@ -702,6 +717,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     editItemNotes(id, notes) {
       mutate(() => engine.editItemNotes(id, notes));
+    },
+    setItemDueOn(id, dueOn) {
+      mutate(() => engine.setItemDueOn(id, dueOn ?? undefined));
     },
     setDone(id, done) {
       mutate(() => engine.setItemDone(id, done));

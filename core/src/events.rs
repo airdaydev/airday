@@ -39,6 +39,9 @@ pub enum AppEvent {
         /// Raw board-column register (`spec/kanban.md`); consumers
         /// resolve valid-or-default against the list's column defs.
         column: Option<String>,
+        /// Date-only due date (`YYYY-MM-DD`) or `None`. Floating local
+        /// calendar date — consumers format without timezone conversion.
+        due_on: Option<String>,
         live_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
@@ -64,6 +67,14 @@ pub enum AppEvent {
     ItemNotesChanged {
         id: String,
         notes: String,
+    },
+    /// Item's date-only due date changed. The payload is the raw
+    /// `YYYY-MM-DD` value after the write — `None` when cleared. The
+    /// value is a floating local calendar date; consumers format it
+    /// locally without timezone conversion.
+    ItemDueChanged {
+        id: String,
+        due_on: Option<String>,
     },
     /// Done/binned flags changed. The two are independent — an event is
     /// emitted whenever either timestamp transitions on/off, and the

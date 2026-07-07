@@ -34,6 +34,7 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | `notes` | string | optional richer text; empty string when absent in simple clients |
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
 | `column` | string? | board-column grouping register; absent or non-resolving ≡ default column — see [`spec/kanban.md`](kanban.md) |
+| `due_on` | string? | optional **date-only** due date, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no due date; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
 | `created_at` | i64 | unix millis (client clock) |
 | `done_at` | i64? | set when status → Done |
 | `binned_at` | i64? | set when status → Binned |
@@ -234,6 +235,9 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
   entry delete+insert). One commit either way.
 - `set_item_status(item_id, status)` where `status` is the API-level concept `Live | Done | Binned`, implemented by mutating `done_at` / `binned_at`
 - `edit_item_text(item_id, text)`
+- `set_item_due_on(item_id, due_on)` — `Some(date)` validates a `YYYY-MM-DD`
+  calendar date and writes the `due_on` register; `None` deletes the key. One
+  commit. Rejects malformed dates with `Invalid`.
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
 - `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Queue lists" flag. Queue's count is always visible (subject to count > 0) and is not gated by this.

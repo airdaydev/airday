@@ -1,0 +1,113 @@
+// Due-date coverage across the two JS layers the feature touches:
+//  - the workspace store hydrates `dueOn` from the initial ItemAdded
+//    burst and patches it on live itemDueChanged events;
+//  - `formatDueBadge` produces the spec's overdue/today/tomorrow/weekday/
+//    compact-date labels from local date parts.
+
+import { expect, test, describe } from "bun:test";
+
+import { Dek, Doc, SyncEngine } from "@airday/core/wasm";
+import type { EngineStorage } from "@airday/core/wasm";
+import { MemEngineStorage } from "../../core/test/mem-engine-storage.ts";
+import { createSyncedApp } from "../src/sync/store.ts";
+import {
+  addDaysToStamp,
+  formatDueBadge,
+  localDateStamp,
+  todayStamp,
+} from "../src/format.tsx";
+
+const DOC_ID = "00000000-0000-0000-0000-000000000000";
+
+function engineFrom(doc: Doc): SyncEngine {
+  return new SyncEngine(
+    doc,
+    DOC_ID,
+    Dek.generate(),
+    0n,
+    "test",
+    "0",
+    new MemEngineStorage() as unknown as EngineStorage,
+  );
+}
+
+describe("store dueOn", () => {
+  test("hydrates dueOn from the attach burst", () => {
+    const doc = Doc.create();
+    const id = doc.addItem("main", "with a due date");
+    doc.setItemDueOn(id, "2026-07-15");
+
+    const app = createSyncedApp(engineFrom(doc));
+    expect(app.state.itemsById[id]?.dueOn).toBe("2026-07-15");
+  });
+
+  test("patches dueOn on set, then clears it", () => {
+    const doc = Doc.create();
+    const id = doc.addItem("main", "task");
+    const app = createSyncedApp(engineFrom(doc));
+    expect(app.state.itemsById[id]?.dueOn).toBeUndefined();
+
+    app.setItemDueOn(id, "2026-12-01");
+    expect(app.state.itemsById[id]?.dueOn).toBe("2026-12-01");
+
+    app.setItemDueOn(id, null);
+    expect(app.state.itemsById[id]?.dueOn).toBeUndefined();
+  });
+});
+
+describe("date-part helpers", () => {
+  test("localDateStamp / todayStamp use local calendar parts", () => {
+    // 2026-03-09, well clear of any midnight edge — same day locally.
+    const d = new Date(2026, 2, 9, 13, 30);
+    expect(localDateStamp(d)).toBe("2026-03-09");
+    expect(todayStamp(d.getTime())).toBe("2026-03-09");
+  });
+
+  test("addDaysToStamp crosses a month boundary", () => {
+    expect(addDaysToStamp("2026-01-31", 1)).toBe("2026-02-01");
+    expect(addDaysToStamp("2026-03-01", -1)).toBe("2026-02-28");
+  });
+});
+
+describe("formatDueBadge", () => {
+  const labels = { overdue: "Overdue", today: "Today", tomorrow: "Tomorrow" };
+  const today = "2026-07-07"; // a Tuesday
+
+  test("before today is overdue", () => {
+    expect(formatDueBadge("2026-07-06", today, labels, "en-US")).toEqual({
+      label: "Overdue",
+      urgency: "overdue",
+    });
+    expect(formatDueBadge("2020-01-01", today, labels, "en-US")?.urgency).toBe(
+      "overdue",
+    );
+  });
+
+  test("today and tomorrow", () => {
+    expect(formatDueBadge(today, today, labels, "en-US")).toEqual({
+      label: "Today",
+      urgency: "today",
+    });
+    expect(formatDueBadge("2026-07-08", today, labels, "en-US")).toEqual({
+      label: "Tomorrow",
+      urgency: "future",
+    });
+  });
+
+  test("within the next 7 days shows a weekday", () => {
+    // 2026-07-10 is a Friday.
+    const r = formatDueBadge("2026-07-10", today, labels, "en-US");
+    expect(r?.urgency).toBe("future");
+    expect(r?.label).toBe("Fri");
+  });
+
+  test("further out shows a compact date", () => {
+    const r = formatDueBadge("2026-07-20", today, labels, "en-US");
+    expect(r?.urgency).toBe("future");
+    expect(r?.label).toBe("Jul 20");
+  });
+
+  test("null on a malformed stamp", () => {
+    expect(formatDueBadge("nope", today, labels, "en-US")).toBeNull();
+  });
+});

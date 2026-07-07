@@ -1585,6 +1585,63 @@ body {
   cursor: pointer;
 }
 
+/* Due-date control row: a label above the native date picker + its
+   Today / Tomorrow / Clear quick actions. */
+.task-dialog-due {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.task-dialog-due-label {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.task-dialog-due-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-dialog-due-input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.task-dialog-due-input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+.task-dialog-due-btn {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.task-dialog-due-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.task-dialog-due-btn:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
 .task-dialog-meta {
   display: flex;
   flex-direction: column;
@@ -2015,7 +2072,7 @@ body {
   display: flex;
   align-items: stretch;
   gap: 10px;
-  padding: 0 12px 12px;
+  padding: 8px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -2027,7 +2084,7 @@ body {
   flex: 0 0 320px;
   width: 320px;
   border-radius: 10px;
-  background: var(--bg-nav);
+  background: color-mix(in srgb, var(--bg-nav) 50%, var(--bg));
 }
 
 .board-col-header {
@@ -2131,9 +2188,55 @@ body {
 }
 
 .row-created {
-  margin-top: auto;
   font-size: 11px;
   color: var(--text-faint);
+}
+
+/* Board-card footer: pins the created date + due badge to the bottom of
+   the stretched card body (row-created lost its own margin-top:auto). */
+.row-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Compact due-date pill. `data-tone` carries the urgency color role:
+   overdue = danger, today = accent, future = neutral, muted = done/binned
+   (no urgency). Shared by list rows and board cards. */
+.due-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1.3em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--border-row);
+}
+
+.due-badge[data-tone="overdue"] {
+  color: var(--error-text);
+  background: var(--error-bg);
+}
+
+.due-badge[data-tone="today"] {
+  color: var(--link);
+  background: color-mix(in srgb, var(--link) 14%, transparent);
+}
+
+.due-badge[data-tone="future"] {
+  color: var(--text-muted);
+  background: var(--border-row);
+}
+
+.due-badge[data-tone="muted"] {
+  color: var(--text-faint);
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* Card feel: each dnd slot is CARD_HEIGHT tall, but the row sits shorter so

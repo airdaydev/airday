@@ -117,6 +117,15 @@ impl Doc {
         self.inner.edit_item_notes(item_id, notes).map_err(js_err)
     }
 
+    /// Set (`Some`) or clear (`None`) an item's date-only due date. The
+    /// value must be a `YYYY-MM-DD` calendar date or the call rejects.
+    #[wasm_bindgen(js_name = setItemDueOn)]
+    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<String>) -> Result<(), JsError> {
+        self.inner
+            .set_item_due_on(item_id, due_on.as_deref())
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveItem)]
     pub fn move_item(
         &self,
@@ -1253,6 +1262,16 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    /// Set (`Some`) or clear (`None`) an item's date-only due date. The
+    /// value must be a `YYYY-MM-DD` calendar date or the call rejects.
+    #[wasm_bindgen(js_name = setItemDueOn)]
+    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<String>) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_item_due_on(item_id, due_on.as_deref())
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveItem)]
     pub fn move_item(
         &self,
@@ -1582,11 +1601,12 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, column?, liveIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, column?, dueOn?, liveIndex?
 /// - `itemRemoved` — id
 /// - `itemMoved` — id, liveIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
+/// - `itemDueChanged` — id, dueOn? (undefined = no due date)
 /// - `itemStatusChanged` — id, doneAt?, binnedAt?, liveIndex?
 /// - `itemColumnChanged` — id, column? (undefined = default column)
 /// - `itemListChanged` — id, listId, liveIndex?
@@ -1611,6 +1631,9 @@ pub struct AppEventJs {
     /// Raw board-column register value (`itemAdded` /
     /// `itemColumnChanged`); resolve valid-or-default client-side.
     column: Option<String>,
+    /// Date-only due date `YYYY-MM-DD` (`itemAdded` / `itemDueChanged`);
+    /// `None` means no due date.
+    due_on: Option<String>,
     created_at: Option<i64>,
     done_at: Option<i64>,
     binned_at: Option<i64>,
@@ -1688,6 +1711,10 @@ impl AppEventJs {
     pub fn column(&self) -> Option<String> {
         self.column.clone()
     }
+    #[wasm_bindgen(getter, js_name = dueOn)]
+    pub fn due_on(&self) -> Option<String> {
+        self.due_on.clone()
+    }
 }
 
 impl From<CoreAppEvent> for AppEventJs {
@@ -1700,6 +1727,7 @@ impl From<CoreAppEvent> for AppEventJs {
             notes: None,
             name: None,
             column: None,
+            due_on: None,
             created_at: None,
             done_at: None,
             binned_at: None,
@@ -1722,6 +1750,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 column,
+                due_on,
                 live_index,
             } => AppEventJs {
                 kind: "itemAdded",
@@ -1733,6 +1762,7 @@ impl From<CoreAppEvent> for AppEventJs {
                 done_at,
                 binned_at,
                 column,
+                due_on,
                 live_index,
                 ..blank
             },
@@ -1757,6 +1787,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 kind: "itemNotesChanged",
                 id,
                 notes: Some(notes),
+                ..blank
+            },
+            CoreAppEvent::ItemDueChanged { id, due_on } => AppEventJs {
+                kind: "itemDueChanged",
+                id,
+                due_on,
                 ..blank
             },
             CoreAppEvent::ItemStatusChanged {
@@ -1952,6 +1988,10 @@ fn item_to_json(it: &airday_core::ItemView) -> String {
     if let Some(c) = &it.column {
         s.push_str(",\"column\":");
         s.push_str(&json_string(c));
+    }
+    if let Some(d) = &it.due_on {
+        s.push_str(",\"dueOn\":");
+        s.push_str(&json_string(d));
     }
     s.push('}');
     s

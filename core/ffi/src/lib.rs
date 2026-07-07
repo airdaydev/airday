@@ -287,7 +287,10 @@ mod tests {
 
             // Live view: "first" + done "second"; binned "third" excluded.
             let main = store.items_in_list("main".into());
-            assert_eq!(main.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(), ["first", "second"]);
+            assert_eq!(
+                main.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),
+                ["first", "second"]
+            );
         } // drop: no explicit close; storage was synchronously durable.
 
         let store = AirdayStore::open(dir_str, dek).unwrap();
@@ -297,7 +300,10 @@ mod tests {
             ["first", "second"],
             "non-binned items (done included) replay from disk"
         );
-        let done = main.iter().find(|i| i.id == done_id).expect("done item present");
+        let done = main
+            .iter()
+            .find(|i| i.id == done_id)
+            .expect("done item present");
         assert!(done.done_at.is_some(), "done status survived reopen");
 
         let groceries = store.items_in_list(list_id);

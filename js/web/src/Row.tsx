@@ -1,6 +1,7 @@
 import { createEffect, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DndSelection } from "./dnd/solid";
+import { DueBadge } from "./DueBadge.tsx";
 import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
@@ -385,14 +386,32 @@ export function Row(props: {
             }}
           />
           <Show when={props.showCreated && !props.expanded()}>
-            <span
-              class="row-created"
-              title={new Date(props.item().createdAt).toLocaleString(locale())}
-            >
-              {formatRelative(props.item().createdAt, nowMs(), locale())}
-            </span>
+            <div class="row-footer">
+              <span
+                class="row-created"
+                title={new Date(props.item().createdAt).toLocaleString(locale())}
+              >
+                {formatRelative(props.item().createdAt, nowMs(), locale())}
+              </span>
+              <Show when={props.item().dueOn}>
+                {(due) => (
+                  <DueBadge
+                    dueOn={due()}
+                    muted={isDone(props.item()) || isBinned(props.item())}
+                  />
+                )}
+              </Show>
+            </div>
           </Show>
         </div>
+        <Show when={!props.showCreated && !props.expanded() && props.item().dueOn}>
+          {(due) => (
+            <DueBadge
+              dueOn={due()}
+              muted={isDone(props.item()) || isBinned(props.item())}
+            />
+          )}
+        </Show>
         <Show when={!props.expanded() && props.item().notes.trim().length > 0}>
           <button
             type="button"

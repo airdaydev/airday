@@ -81,6 +81,12 @@ const KEY_LOCATION: &str = "location";
 /// never folded into `location`: the resolution rule makes a lost race
 /// against a cross-list move harmless.
 const KEY_COLUMN: &str = "column";
+/// Optional date-only due date: a floating local calendar date in
+/// `YYYY-MM-DD` format (no time, no timezone). Absent ≡ no due date;
+/// the mutation deletes the key when cleared. Written on its own scalar
+/// register; malformed values never reach the doc (validated in
+/// `set_item_due_on`).
+const KEY_DUE_ON: &str = "due_on";
 const KEY_NAME: &str = "name";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
@@ -165,6 +171,10 @@ pub struct ItemView {
     /// valid-or-default against the list's column defs; the core never
     /// interprets it for projection.
     pub column: Option<String>,
+    /// Optional date-only due date — a floating local calendar date in
+    /// `YYYY-MM-DD` format. `None` ≡ no due date. The core stores and
+    /// echoes the raw string; it never parses it into a timestamp.
+    pub due_on: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -282,6 +292,10 @@ pub struct ExportItem {
     /// Raw board-column register. Skipped when unset.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub column: Option<String>,
+    /// Date-only due date (`YYYY-MM-DD`). Skipped when unset to keep
+    /// pre-due-date dumps byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub due_on: Option<String>,
     pub created_at: i64,
     pub done_at: Option<i64>,
     pub binned_at: Option<i64>,
@@ -1125,6 +1139,7 @@ impl Doc {
                 done_at: None,
                 binned_at: None,
                 column: column.map(str::to_string),
+                due_on: None,
                 live_index,
             });
         }
@@ -1156,6 +1171,32 @@ impl Doc {
         self.push_event(AppEvent::ItemNotesChanged {
             id: item_id.to_string(),
             notes: notes.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Set or clear an item's date-only due date. `Some(date)` validates
+    /// a `YYYY-MM-DD` calendar date and writes the `due_on` register;
+    /// `None` deletes the key. One Loro commit. Malformed dates are
+    /// rejected with `Invalid` and never touch the doc. The stored value
+    /// is a floating local calendar date — the core never converts it to
+    /// a timestamp.
+    pub fn set_item_due_on(&self, item_id: &str, due_on: Option<&str>) -> Result<(), DocError> {
+        let normalized = match due_on {
+            Some(raw) => Some(parse_due_on(raw)?),
+            None => None,
+        };
+        let map = self.find_item(item_id)?;
+        match &normalized {
+            Some(date) => map.insert(KEY_DUE_ON, date.as_str())?,
+            None => {
+                let _ = map.delete(KEY_DUE_ON);
+            }
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::ItemDueChanged {
+            id: item_id.to_string(),
+            due_on: normalized,
         });
         Ok(())
     }
@@ -2306,6 +2347,7 @@ impl Doc {
                 notes: item.notes,
                 list_id: item.list_id,
                 column: item.column,
+                due_on: item.due_on,
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
@@ -2440,6 +2482,16 @@ impl Doc {
             // `main`) is dropped — the item lands in the default column.
             if let Some(new_col) = src_item.column.as_ref().and_then(|c| column_id_map.get(c)) {
                 map.insert(KEY_COLUMN, new_col.as_str())?;
+            }
+            // Carry a well-formed due date through; a malformed one in a
+            // hand-edited export is silently dropped rather than aborting
+            // the whole import.
+            if let Some(date) = src_item
+                .due_on
+                .as_deref()
+                .and_then(|d| parse_due_on(d).ok())
+            {
+                map.insert(KEY_DUE_ON, date.as_str())?;
             }
             let notes = src_item.notes.trim();
             if !notes.is_empty() {
@@ -3014,6 +3066,12 @@ impl Doc {
                         column: view.column.clone(),
                     });
                 }
+                if has(KEY_DUE_ON) {
+                    self.push_event(AppEvent::ItemDueChanged {
+                        id: id.clone(),
+                        due_on: view.due_on.clone(),
+                    });
+                }
             }
             let left_list = c.old.as_ref().is_some_and(|o| o.list_id != new.list_id);
             if new.live {
@@ -3043,6 +3101,7 @@ impl Doc {
                     done_at: view.done_at,
                     binned_at: view.binned_at,
                     column: view.column,
+                    due_on: view.due_on,
                     live_index: None,
                 });
                 continue;
@@ -3099,6 +3158,7 @@ impl Doc {
                             done_at: view.done_at,
                             binned_at: view.binned_at,
                             column: view.column,
+                            due_on: view.due_on,
                             live_index: Some(i),
                         },
                     );
@@ -3366,6 +3426,7 @@ impl Doc {
                 done_at: item.done_at,
                 binned_at: item.binned_at,
                 column: item.column,
+                due_on: item.due_on,
                 live_index,
             });
         }
@@ -3478,6 +3539,7 @@ impl Doc {
             hash_str(&mut hasher, &i.notes);
             hash_str(&mut hasher, &i.list_id);
             hash_opt_str(&mut hasher, i.column.as_deref());
+            hash_opt_str(&mut hasher, i.due_on.as_deref());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
@@ -3741,6 +3803,49 @@ fn item_meta(map: &LoroMap) -> ItemMeta {
     }
 }
 
+/// Validate a date-only due date and return it normalized. Accepts
+/// exactly `YYYY-MM-DD` (4-digit year, 2-digit month, 2-digit day) that
+/// names a real calendar day (month 1–12, day within the month's length,
+/// leap years honored). Leading/trailing whitespace is trimmed before
+/// checking. Any other shape — a time component, unix millis, a
+/// single-digit field, an out-of-range day — is rejected. The value is a
+/// floating local date; no timezone is applied.
+fn parse_due_on(raw: &str) -> Result<String, DocError> {
+    let s = raw.trim();
+    let bytes = s.as_bytes();
+    let invalid = || DocError::Invalid(format!("due date must be YYYY-MM-DD: {raw:?}"));
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return Err(invalid());
+    }
+    let digits = |from: usize, to: usize| -> Option<u32> {
+        let part = &s[from..to];
+        if part.bytes().all(|b| b.is_ascii_digit()) {
+            part.parse::<u32>().ok()
+        } else {
+            None
+        }
+    };
+    let (year, month, day) = match (digits(0, 4), digits(5, 7), digits(8, 10)) {
+        (Some(y), Some(m), Some(d)) => (y, m, d),
+        _ => return Err(invalid()),
+    };
+    if !(1..=12).contains(&month) || day < 1 {
+        return Err(invalid());
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => unreachable!(),
+    };
+    if day > days_in_month {
+        return Err(invalid());
+    }
+    Ok(s.to_string())
+}
+
 fn item_view(map: &LoroMap) -> Option<ItemView> {
     let location = read_string(map, KEY_LOCATION)
         .and_then(|s| Location::parse(&s))
@@ -3752,6 +3857,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
         column: read_string(map, KEY_COLUMN).filter(|s| !s.is_empty()),
+        due_on: read_string(map, KEY_DUE_ON).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
         binned_at: read_i64(map, KEY_BINNED_AT),
@@ -3870,6 +3976,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
                     column: post_it.column.clone(),
+                    due_on: post_it.due_on.clone(),
                     live_index,
                 });
             }
@@ -3890,6 +3997,12 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     out.push(AppEvent::ItemColumnChanged {
                         id: post_it.id.clone(),
                         column: post_it.column.clone(),
+                    });
+                }
+                if pre_it.due_on != post_it.due_on {
+                    out.push(AppEvent::ItemDueChanged {
+                        id: post_it.id.clone(),
+                        due_on: post_it.due_on.clone(),
                     });
                 }
                 if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {
@@ -6081,6 +6194,144 @@ mod tests {
     }
 
     #[test]
+    fn set_and_clear_item_due_on() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "pay rent").unwrap();
+        let _ = doc.drain_events();
+
+        doc.set_item_due_on(&id, Some("2026-07-15")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().due_on.as_deref(),
+            Some("2026-07-15")
+        );
+        assert_eq!(
+            doc.drain_events(),
+            vec![AppEvent::ItemDueChanged {
+                id: id.clone(),
+                due_on: Some("2026-07-15".into()),
+            }]
+        );
+
+        // Whitespace is trimmed before storage.
+        doc.set_item_due_on(&id, Some("  2026-08-01  ")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().due_on.as_deref(),
+            Some("2026-08-01")
+        );
+        let _ = doc.drain_events();
+
+        // Clearing deletes the key.
+        doc.set_item_due_on(&id, None).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().due_on, None);
+        assert_eq!(
+            doc.drain_events(),
+            vec![AppEvent::ItemDueChanged {
+                id: id.clone(),
+                due_on: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn set_item_due_on_rejects_malformed_dates() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item(LIST_MAIN, "task").unwrap();
+        let _ = doc.drain_events();
+
+        for bad in [
+            "2026-7-15",        // single-digit month
+            "2026-13-01",       // month out of range
+            "2026-02-30",       // day out of range for February
+            "2026-00-10",       // zero month
+            "2026-01-00",       // zero day
+            "07/15/2026",       // wrong separators
+            "2026-07-15T00:00", // has a time component
+            "1752566400000",    // unix millis
+            "not-a-date",
+            "",
+        ] {
+            let err = doc.set_item_due_on(&id, Some(bad)).unwrap_err();
+            assert!(
+                matches!(err, DocError::Invalid(_)),
+                "expected Invalid for {bad:?}, got {err:?}"
+            );
+        }
+        // Nothing was written and no event fired.
+        assert_eq!(doc.get_item(&id).unwrap().due_on, None);
+        assert!(doc.drain_events().is_empty());
+
+        // A leap day in a leap year is accepted.
+        doc.set_item_due_on(&id, Some("2028-02-29")).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().due_on.as_deref(),
+            Some("2028-02-29")
+        );
+        // The same day in a non-leap year is rejected.
+        assert!(doc.set_item_due_on(&id, Some("2027-02-29")).is_err());
+    }
+
+    #[test]
+    fn export_import_preserves_due_on() {
+        let src = Doc::new().unwrap();
+        let a = src.add_item(LIST_MAIN, "with due").unwrap();
+        let _b = src.add_item(LIST_MAIN, "no due").unwrap();
+        src.set_item_due_on(&a, Some("2026-09-30")).unwrap();
+
+        let export = src.export_json();
+        // The raw dump carries the string.
+        assert!(
+            export
+                .items
+                .iter()
+                .any(|i| i.due_on.as_deref() == Some("2026-09-30"))
+        );
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let imported: Vec<ItemView> = dst.iter_items().collect();
+        let with_due = imported.iter().find(|i| i.text == "with due").unwrap();
+        let no_due = imported.iter().find(|i| i.text == "no due").unwrap();
+        assert_eq!(with_due.due_on.as_deref(), Some("2026-09-30"));
+        assert_eq!(no_due.due_on, None);
+    }
+
+    #[test]
+    fn due_on_converges_between_peers() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let id = a.add_item(LIST_MAIN, "sync me").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = a.drain_events();
+        let _ = b.drain_events();
+
+        // Set a due date on a, ship the frame to b.
+        a.set_item_due_on(&id, Some("2026-11-05")).unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &frame).unwrap();
+
+        assert_eq!(
+            b.get_item(&id).unwrap().due_on.as_deref(),
+            Some("2026-11-05")
+        );
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        // b's consumer learns via a surgical ItemDueChanged event.
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ItemDueChanged { id: eid, due_on: Some(d) } if eid == &id && d == "2026-11-05"
+        )));
+
+        // Clearing also converges.
+        a.set_item_due_on(&id, None).unwrap();
+        let frame = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &frame).unwrap();
+        assert_eq!(b.get_item(&id).unwrap().due_on, None);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
     fn import_json_preserves_per_list_order() {
         let src = Doc::new().unwrap();
         let l = src.add_list("Ordered").unwrap();
@@ -6163,6 +6414,7 @@ mod tests {
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
                 column: None,
+                due_on: None,
                 created_at: 1_700_000_000_000,
                 done_at: None,
                 binned_at: None,

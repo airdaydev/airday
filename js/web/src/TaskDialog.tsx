@@ -12,7 +12,13 @@ import { Select } from "@kobalte/core/select";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
-import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
+import {
+  addDaysToStamp,
+  formatDoneStamp,
+  formatRelative,
+  nowMs,
+  todayStamp,
+} from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import {
   collapsedCaretOffset,
@@ -509,6 +515,56 @@ export function TaskDialog(props: {
                     onPaste={pasteAsPlainText}
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
+
+                  <div class="task-dialog-due">
+                    <span class="task-dialog-due-label">{m().due.label}</span>
+                    <div class="task-dialog-due-controls">
+                      {/* Native date picker — its value is already a raw
+                          YYYY-MM-DD string, exactly what the register
+                          stores. Empty value clears the due date. */}
+                      <input
+                        type="date"
+                        class="task-dialog-due-input"
+                        value={it().dueOn ?? ""}
+                        onChange={(e) =>
+                          props.app.setItemDueOn(
+                            it().id,
+                            e.currentTarget.value || null,
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        class="task-dialog-due-btn"
+                        onClick={() =>
+                          props.app.setItemDueOn(it().id, todayStamp(nowMs()))
+                        }
+                      >
+                        {m().due.today}
+                      </button>
+                      <button
+                        type="button"
+                        class="task-dialog-due-btn"
+                        onClick={() =>
+                          props.app.setItemDueOn(
+                            it().id,
+                            addDaysToStamp(todayStamp(nowMs()), 1),
+                          )
+                        }
+                      >
+                        {m().due.tomorrow}
+                      </button>
+                      <Show when={it().dueOn}>
+                        <button
+                          type="button"
+                          class="task-dialog-due-btn"
+                          onClick={() => props.app.setItemDueOn(it().id, null)}
+                        >
+                          {m().due.clear}
+                        </button>
+                      </Show>
+                    </div>
+                  </div>
 
                   <Show when={isDone(it()) || isBinned(it())}>
                     <div class="task-dialog-meta">

@@ -117,6 +117,18 @@ type Messages = {
     list: string;
     board: string;
   };
+  due: {
+    /** Section label / accessible name for the due-date control. */
+    label: string;
+    /** Badge label when the due date is before today. */
+    overdue: string;
+    /** Badge + quick-action label for today's date. */
+    today: string;
+    /** Badge + quick-action label for tomorrow's date. */
+    tomorrow: string;
+    /** Quick action that removes the due date. */
+    clear: string;
+  };
   shortcuts: {
     title: string;
     newItem: string;
@@ -256,6 +268,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       list: "Lista",
       board: "Tablero",
     },
+    due: {
+      label: "Fecha de vencimiento",
+      overdue: "Vencido",
+      today: "Hoy",
+      tomorrow: "Mañana",
+      clear: "Borrar",
+    },
     shortcuts: {
       title: "Atajos de teclado",
       newItem: "Nuevo elemento",
@@ -394,6 +413,13 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewMode: "View mode",
       list: "List",
       board: "Board",
+    },
+    due: {
+      label: "Due date",
+      overdue: "Overdue",
+      today: "Today",
+      tomorrow: "Tomorrow",
+      clear: "Clear",
     },
     shortcuts: {
       title: "Keyboard shortcuts",
