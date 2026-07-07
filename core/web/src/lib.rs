@@ -276,6 +276,21 @@ impl Doc {
             .map_err(js_err)
     }
 
+    /// Insert a new item at `target_index` in the list's linear live order
+    /// with its column set to `column_id` (`undefined` = default column).
+    #[wasm_bindgen(js_name = addItemInColumnAt)]
+    pub fn add_item_in_column_at(
+        &self,
+        list_id: &str,
+        column_id: Option<String>,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .add_item_in_column_at(list_id, column_id.as_deref(), text, target_index)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = columnsOfJson)]
     pub fn columns_of_json(&self, list_id: &str) -> String {
         columns_to_json(&self.inner.columns_of(list_id))
@@ -1440,6 +1455,22 @@ impl SyncEngine {
         self.inner
             .doc()
             .add_item_in_column(list_id, column_id, text)
+            .map_err(js_err)
+    }
+
+    /// Insert a new item at `target_index` in the list's linear live order
+    /// with its column set to `column_id` (`undefined` = default column).
+    #[wasm_bindgen(js_name = addItemInColumnAt)]
+    pub fn add_item_in_column_at(
+        &self,
+        list_id: &str,
+        column_id: Option<String>,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .doc()
+            .add_item_in_column_at(list_id, column_id.as_deref(), text, target_index)
             .map_err(js_err)
     }
 

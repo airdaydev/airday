@@ -1039,6 +1039,27 @@ impl Doc {
         Ok(ids.into_iter().next().expect("one text yields one id"))
     }
 
+    /// Board quick-capture at a position: insert a new item as the
+    /// `target_index`-th live entry of `list_id` with its column register
+    /// set to `column_id` (`None` = the implicit default column), one
+    /// commit. `target_index` addresses the list's linear live
+    /// projection — the same index space as `add_item_at` — so inserting
+    /// right after a card lands the new item directly below it within that
+    /// card's column (column order is the linear order filtered).
+    pub fn add_item_in_column_at(
+        &self,
+        list_id: &str,
+        column_id: Option<&str>,
+        text: &str,
+        target_index: usize,
+    ) -> Result<String, DocError> {
+        if let Some(c) = column_id {
+            self.find_column(list_id, c)?;
+        }
+        let ids = self.add_items_at_impl(list_id, &[text], target_index, column_id)?;
+        Ok(ids.into_iter().next().expect("one text yields one id"))
+    }
+
     fn add_items_at_impl(
         &self,
         list_id: &str,
@@ -6940,6 +6961,40 @@ mod tests {
         ));
 
         assert!(doc.add_item_in_column(LIST_MAIN, "nope", "x").is_err());
+    }
+
+    #[test]
+    fn add_item_in_column_at_inserts_below_anchor() {
+        let doc = Doc::new().unwrap();
+        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
+        // Two cards in `col`, one in the default column.
+        let a = doc.add_item_in_column(LIST_MAIN, &col, "a").unwrap();
+        let b = doc.add_item_in_column(LIST_MAIN, &col, "b").unwrap();
+        let d = doc.add_item(LIST_MAIN, "d").unwrap();
+        let _ = doc.drain_events();
+
+        // Insert "c" directly below "a" (linear index of a + 1), in `col`.
+        let a_idx = doc
+            .live_item_ids(LIST_MAIN)
+            .iter()
+            .position(|id| id == &a)
+            .unwrap();
+        let c = doc
+            .add_item_in_column_at(LIST_MAIN, Some(&col), "c", a_idx + 1)
+            .unwrap();
+        assert_eq!(doc.get_item(&c).unwrap().column.as_deref(), Some(&*col));
+        // Linear order: a, c, b, d — c landed right after a.
+        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c.clone(), b, d]);
+
+        // A None column inserts into the default column at the given index.
+        let top = doc.add_item_in_column_at(LIST_MAIN, None, "top", 0).unwrap();
+        assert_eq!(doc.get_item(&top).unwrap().column, None);
+        assert_eq!(doc.live_item_ids(LIST_MAIN)[0], top);
+
+        // Unknown column still rejects.
+        assert!(doc
+            .add_item_in_column_at(LIST_MAIN, Some("nope"), "x", 0)
+            .is_err());
     }
 
     #[test]

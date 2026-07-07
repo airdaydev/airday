@@ -199,6 +199,15 @@ export interface DocApp {
   setItemColumn(id: string, columnId: string | null, indexInList?: number): void;
   /** Board quick-capture: append to the list with the register set. */
   addItemInColumn(listId: string, columnId: string, text: string): string;
+  /** Board quick-capture at a position: insert at `indexInList` (the
+   *  list's linear live projection, like `moveItem`) with the column
+   *  register set to `columnId` (`null` = default column). One commit. */
+  addItemInColumnAt(
+    listId: string,
+    columnId: string | null,
+    text: string,
+    indexInList: number,
+  ): string;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -792,6 +801,16 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setItemColumn(id, columnId, indexInList) {
       mutate(() => engine.setItemColumn(id, columnId ?? undefined, indexInList));
+    },
+    addItemInColumnAt(listId, columnId, text, indexInList) {
+      return mutate(() =>
+        engine.addItemInColumnAt(
+          listId,
+          columnId ?? undefined,
+          text,
+          indexInList,
+        ),
+      );
     },
     addItemInColumn(listId, columnId, text) {
       return mutate(() => engine.addItemInColumn(listId, columnId, text));

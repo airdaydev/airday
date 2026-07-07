@@ -110,6 +110,10 @@ export function Workspace(props: {
   const [newItemTarget, setNewItemTarget] = createSignal<{
     listId: string;
     columnId: string | null;
+    /** Linear live-projection index to insert at (Space capture below a
+     *  selected board card, or at the top). Omitted for "+" captures,
+     *  which append to the column. */
+    index?: number;
   } | null>(null);
   // Ids to select + scroll into view in the board once they land in their
   // column (a "+" capture, a duplicated block, or a find-palette pick that
@@ -764,15 +768,44 @@ export function Workspace(props: {
   };
   onGlobalKey(onHelpKey);
 
-  // Space: shortcut for the Add button — start a draft below the topmost
-  // selection, same as a click. startDraft already gates on list view and
-  // an open draft, so the handler just guards modifiers and editable focus.
+  // Space: shortcut for the Add button. In the list view it starts an
+  // inline draft below the topmost selection. In a board it opens the
+  // new-item dialog (boards capture via the dialog, not an inline draft),
+  // placing the new card just below the selected card in its column — or
+  // at the top of the default column when nothing is selected.
   const onSpaceAdd = (e: KeyboardEvent) => {
     if (e.key !== " ") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     if (view().kind !== "list") return;
-    // The board captures via its column "+" buttons, not an inline draft.
-    if (boardListId() !== null) return;
+
+    const boardId = boardListId();
+    if (boardId !== null) {
+      e.preventDefault();
+      const top = actionSelection()?.getSelectionTop() ?? null;
+      const anchor = top !== null ? app.getItem(String(top)) : undefined;
+      if (anchor && isInListView(anchor)) {
+        // Below the selected card, in its resolved column. A register
+        // naming a deleted column falls back to the default column so the
+        // core's find_column check can't reject it.
+        const cols = app.state.columnsByList[boardId] ?? [];
+        const columnId =
+          anchor.column && cols.some((c) => c.id === anchor.column)
+            ? anchor.column
+            : null;
+        const linear = app.state.listLive[boardId] ?? [];
+        const at = linear.indexOf(anchor.id);
+        setNewItemTarget({
+          listId: boardId,
+          columnId,
+          index: at >= 0 ? at + 1 : 0,
+        });
+      } else {
+        // Nothing selected: top of the default column.
+        setNewItemTarget({ listId: boardId, columnId: null, index: 0 });
+      }
+      return;
+    }
+
     if (draft() !== null) return;
     e.preventDefault();
     startDraft();

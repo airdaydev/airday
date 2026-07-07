@@ -48,8 +48,14 @@ export function TaskDialog(props: {
   setItemId: (id: string | null) => void;
   /** New-item mode: a target column to capture into (`columnId: null` = the
    *  list's default column / list view). Mutually exclusive with `itemId`;
-   *  nothing is written until a non-empty title is committed on close. */
-  newItem?: () => { listId: string; columnId: string | null } | null;
+   *  nothing is written until a non-empty title is committed on close.
+   *  `index`, when set, inserts at that position in the list's linear live
+   *  projection (Space capture below a board card); omitted appends. */
+  newItem?: () => {
+    listId: string;
+    columnId: string | null;
+    index?: number;
+  } | null;
   setNewItem?: (v: null) => void;
   app: DocApp;
   /** Resolved display name for the reserved `main` list. */
@@ -190,9 +196,12 @@ export function TaskDialog(props: {
     if (nw) {
       const t = editorText(titleRef).trim();
       if (t) {
-        const id = nw.columnId
-          ? props.app.addItemInColumn(nw.listId, nw.columnId, t)
-          : props.app.addItem(nw.listId, t);
+        const id =
+          nw.index != null
+            ? props.app.addItemInColumnAt(nw.listId, nw.columnId, t, nw.index)
+            : nw.columnId
+              ? props.app.addItemInColumn(nw.listId, nw.columnId, t)
+              : props.app.addItem(nw.listId, t);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
         props.onCreated?.(id);
