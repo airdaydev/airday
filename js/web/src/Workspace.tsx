@@ -22,7 +22,7 @@ import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
-import { Board } from "./Board.tsx";
+import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
@@ -705,6 +705,14 @@ export function Workspace(props: {
   onGlobalKey(onUndoRedoKey);
 
   let dndHandle: DndImperative | null = null;
+  let boardHandle: BoardImperative | null = null;
+  // Restore keyboard focus after the detail dialog closes: the board (many
+  // column listboxes) and the list view (one) each expose their own handle;
+  // only one is mounted at a time.
+  const restoreItemsFocus = () => {
+    if (boardListId() !== null) boardHandle?.focusActive();
+    else dndHandle?.focus();
+  };
 
   // Enter: open the topmost selected item in the detail dialog. The dialog
   // owns Enter while open (commits & closes), and onGlobalKey's overlay /
@@ -1061,7 +1069,7 @@ export function Workspace(props: {
         lists={lists}
         focusField={openFocus}
         caret={openCaret}
-        onClosed={() => dndHandle?.focus()}
+        onClosed={restoreItemsFocus}
         onLiveText={(text) => {
           const id = openItemId();
           if (id) setLiveEdit({ id, text });
@@ -1311,6 +1319,7 @@ export function Workspace(props: {
               revealIds={boardRevealIds}
               clearReveal={() => setBoardRevealIds(null)}
               onActiveSelectionChange={setBoardSelection}
+              ref={(h) => (boardHandle = h)}
             />
           )}
         </Show>

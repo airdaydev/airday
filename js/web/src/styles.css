@@ -91,7 +91,7 @@ body {
 
 .nav {
   background: var(--bg-nav);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid #efefef;
   padding: 8px 0 0;
   overflow: hidden;
   display: flex;

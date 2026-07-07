@@ -35,6 +35,11 @@ import type { ColumnView, DocApp, ItemView } from "./sync/store.ts";
  *  group maps — a column id can never be the empty string. */
 const DEFAULT_COL = "";
 
+/** Imperative handle the workspace holds to steer focus back into the
+ *  board (e.g. after the detail dialog closes), mirroring the list view's
+ *  `DndImperative.focus`. */
+export type BoardImperative = { focusActive: () => void };
+
 /** Fixed card height — the `itemHeight` passed to each column's Dnd. The
  *  foreign-drag preview (placeholder/nudge) and its insertion-slot math
  *  live in the Dnd controller now; the board only needs this to size the
@@ -70,6 +75,9 @@ export function Board(props: {
    *  selection, or `null` when nothing is selected, so the workspace's
    *  global item shortcuts can act on it. */
   onActiveSelectionChange?: (sel: DndSelection | null) => void;
+  /** Receives an imperative handle so the workspace can restore keyboard
+   *  focus to the active column (e.g. after the detail dialog closes). */
+  ref?: (h: BoardImperative) => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
@@ -440,6 +448,20 @@ export function Board(props: {
       return;
     }
   };
+  // Restore keyboard focus to the column that currently owns the active
+  // selection (its Dnd listbox is what up/down nav is bound to). Used after
+  // the detail dialog closes so board nav resumes where it left off.
+  const focusActiveColumn = (): void => {
+    const active = activeSelection();
+    if (!active) return;
+    for (const [colKey, sel] of columnSelections) {
+      if (sel !== active) continue;
+      columnHandles.get(colKey)?.focus();
+      return;
+    }
+  };
+  props.ref?.({ focusActive: focusActiveColumn });
+
   const onBoardKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
