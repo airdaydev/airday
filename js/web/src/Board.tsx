@@ -369,11 +369,19 @@ export function Board(props: {
     for (const c of sourceCols) columnSelections.get(c)?.clear();
     setPendingSelect({ colKey, ids: inOrder });
   };
+  // Escape mid-drag: the source column tears its own drag down; here we just
+  // drop any cross-column placeholder preview the drag had painted.
+  const onDragCancel = () => {
+    clearColumnHighlight();
+    clearAllForeignHover();
+  };
   document.addEventListener("primavera-dnd-dragmove", onDragMove);
   document.addEventListener("primavera-dnd-dragend", onDragEnd);
+  document.addEventListener("primavera-dnd-dragcancel", onDragCancel);
   onCleanup(() => {
     document.removeEventListener("primavera-dnd-dragmove", onDragMove);
     document.removeEventListener("primavera-dnd-dragend", onDragEnd);
+    document.removeEventListener("primavera-dnd-dragcancel", onDragCancel);
   });
 
   let boardRef: HTMLDivElement | undefined;

@@ -558,6 +558,7 @@ export class DndController {
     document.removeEventListener("click", this.onDocumentClick);
     document.removeEventListener("mousemove", this.onDocMouseMove);
     document.removeEventListener("mouseup", this.onDocMouseUp);
+    document.removeEventListener("keydown", this.onDocKeyDown, true);
 
     this.autoscroll.stop();
     if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
@@ -906,6 +907,58 @@ export class DndController {
     this.mouseDownKey = null;
   };
 
+  /** Document-level keydown active only while an overlay/touch drag is in
+   *  flight — Escape aborts the drag. Native drags rely on the browser's
+   *  own Escape-cancel (a cancelled native drag fires `dragend` with no
+   *  drop, so nothing commits). */
+  private onDocKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape" || !this.isDraggingFlag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.cancelDrag();
+  };
+
+  /** Abort the in-flight overlay/touch drag: tear the drag down exactly as
+   *  `endDrag` does but commit no reorder, and tell foreign drop targets
+   *  (e.g. the board's other columns) to drop their placeholder previews. */
+  private cancelDrag(): void {
+    if (!this.isDraggingFlag) return;
+    // An overlay drag keeps its document mouse listeners live between
+    // pointermoves; drop them so the trailing mouseup doesn't re-run endDrag.
+    document.removeEventListener("mousemove", this.onDocMouseMove);
+    document.removeEventListener("mouseup", this.onDocMouseUp);
+    this.touch.cancel();
+
+    // Foreign previews live on OTHER controllers, driven by the host from
+    // this drag's move events — only the host can clear them.
+    this.dispatchDrag("cancel", 0, 0);
+
+    this.dragOverlay.stop();
+    this.autoscroll.stop();
+    this.placeholder.clear();
+
+    this.suppressNextClick = true;
+    this.mouseDownPos = null;
+    this.mouseDownKey = null;
+    this.resetDragState();
+    this.opts.onChange();
+  }
+
+  /** Reset all per-drag state to the idle baseline. Shared by the commit
+   *  (endDrag), cancel (cancelDrag), and native-drag teardown paths. */
+  private resetDragState(): void {
+    this.isDraggingFlag = false;
+    this.hoverIndex = null;
+    this.lastPointerPos = null;
+    this.draggedKeys = [];
+    this.dragSet.clear();
+    this.collapsedOrder = [];
+    this.keepAliveItems = [];
+    this.visualIndexMap.clear();
+    this.opts.host.listbox.style.overflow = "";
+    document.removeEventListener("keydown", this.onDocKeyDown, true);
+  }
+
   /** Snapshot which dragged rows are mounted right now (bounded by the
    *  virtualized window) as hidden keep-alive render entries. Must run
    *  at drag start, before the drag re-render unmounts them. */
@@ -979,11 +1032,16 @@ export class DndController {
       this.opts.host.parent.scrollTop = Math.max(0, maxScroll);
     }
 
+    // Escape cancels the drag. Listen at the document (capture) so it fires
+    // regardless of where focus landed, and pre-empts other Escape handlers
+    // (dialog close, etc.) while a drag is in flight.
+    document.addEventListener("keydown", this.onDocKeyDown, true);
+
     this.dispatchDrag("start", x, y);
   }
 
   private dispatchDrag(
-    type: "start" | "move" | "end",
+    type: "start" | "move" | "end" | "cancel",
     x: number,
     y: number,
   ): boolean {
@@ -1059,15 +1117,7 @@ export class DndController {
     }
 
     if (this.isDraggingFlag) this.suppressNextClick = true;
-    this.isDraggingFlag = false;
-    this.hoverIndex = null;
-    this.lastPointerPos = null;
-    this.draggedKeys = [];
-    this.dragSet.clear();
-    this.collapsedOrder = [];
-    this.keepAliveItems = [];
-    this.visualIndexMap.clear();
-    this.opts.host.listbox.style.overflow = "";
+    this.resetDragState();
     this.opts.onChange();
   }
 
@@ -1147,14 +1197,7 @@ export class DndController {
     this.autoscroll.stop();
 
     if (this.isDraggingFlag) {
-      this.isDraggingFlag = false;
-      this.hoverIndex = null;
-      this.draggedKeys = [];
-      this.dragSet.clear();
-      this.collapsedOrder = [];
-      this.keepAliveItems = [];
-      this.visualIndexMap.clear();
-      this.opts.host.listbox.style.overflow = "";
+      this.resetDragState();
       this.placeholder.clear();
       this.opts.onChange();
     }
