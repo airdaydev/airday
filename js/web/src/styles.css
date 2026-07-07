@@ -1646,7 +1646,8 @@ body {
    and the task reads as its own page — the mobile "tap opens the task"
    model. */
 @media (max-width: 768px) and (pointer: coarse) {
-  .dialog-positioner:has(.task-dialog) {
+  .dialog-positioner:has(.task-dialog),
+  .dialog-positioner:has(.settings-dialog) {
     padding: 0;
   }
 
@@ -1656,6 +1657,14 @@ body {
     max-height: 100%;
     border: 0;
     border-radius: 0;
+  }
+
+  .settings-dialog {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    grid-template-columns: 120px 1fr;
   }
 }
 

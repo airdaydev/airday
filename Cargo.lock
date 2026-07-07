@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "airday"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-core",
  "airday-protocol",
@@ -70,7 +70,7 @@ dependencies = [
 
 [[package]]
 name = "airday-core"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-protocol",
  "argon2",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "airday-core-web"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-core",
  "airday-protocol",
@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "airday-ffi"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-core",
  "airday-storage-sqlite",
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "airday-protocol"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "serde",
  "serde_bytes",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "airday-server"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-core",
  "airday-protocol",
@@ -166,7 +166,7 @@ dependencies = [
 
 [[package]]
 name = "airday-storage-sqlite"
-version = "0.0.1-alpha.7"
+version = "0.0.1-alpha.8"
 dependencies = [
  "airday-core",
  "airday-protocol",
