@@ -28,6 +28,7 @@ export function ShortcutsDialog(props: {
       { label: s.redo, key: "⌘⇧Z" },
       { label: s.bin, key: "⌫" },
       { label: s.switchList, key: "[ ]" },
+      { label: s.switchColumn, key: "← →" },
       { label: s.find, key: "⌘F" },
       { label: s.showShortcuts, key: "?" },
     ];

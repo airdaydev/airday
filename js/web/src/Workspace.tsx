@@ -771,26 +771,31 @@ export function Workspace(props: {
   };
   onGlobalKey(onSpaceAdd);
 
-  // [ / ]: cycle between lists in nav order (Home, then user lists),
-  // wrapping at both ends. Done / Bin don't participate — they're
-  // cross-cutting views, not lists. From a non-list view, ] goes to
-  // the first list and [ to the last, so the bracket pair always
-  // re-enters the list set.
+  // [ / ]: cycle through the nav views in top-to-bottom order — Home, Done,
+  // Bin, then the user lists (Bin only earns a slot while it holds items,
+  // matching its nav visibility). Wraps at both ends. From a view that
+  // isn't in the sequence (e.g. an emptied Bin), ] enters at the top and
+  // [ at the bottom, so the bracket pair always re-enters the set.
+  const viewKey = (v: ViewKey) => (v.kind === "list" ? `list:${v.id}` : v.kind);
   const onBracketNavigate = (e: KeyboardEvent) => {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    const ids = ["main", ...lists().map((l) => l.id)];
-    const v = view();
-    const idx = v.kind === "list" ? ids.indexOf(v.id) : -1;
+    const seq: ViewKey[] = [
+      { kind: "list", id: "main" },
+      { kind: "done" },
+      ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
+      ...lists().map((l): ViewKey => ({ kind: "list", id: l.id })),
+    ];
+    const idx = seq.findIndex((s) => viewKey(s) === viewKey(view()));
     const step = e.key === "]" ? 1 : -1;
-    let next: string;
-    if (idx === -1) {
-      next = step === 1 ? ids[0]! : ids[ids.length - 1]!;
-    } else {
-      next = ids[(idx + step + ids.length) % ids.length]!;
-    }
+    const nextIdx =
+      idx === -1
+        ? step === 1
+          ? 0
+          : seq.length - 1
+        : (idx + step + seq.length) % seq.length;
     e.preventDefault();
-    setView({ kind: "list", id: next });
+    setView(seq[nextIdx]!);
   };
   onGlobalKey(onBracketNavigate);
 

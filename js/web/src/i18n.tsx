@@ -129,6 +129,7 @@ type Messages = {
     redo: string;
     bin: string;
     switchList: string;
+    switchColumn: string;
     find: string;
     showShortcuts: string;
   };
@@ -266,7 +267,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       undo: "Deshacer",
       redo: "Rehacer",
       bin: "Mover a la papelera",
-      switchList: "Cambiar de lista",
+      switchList: "Cambiar de vista",
+      switchColumn: "Cambiar de columna",
       find: "Buscar",
       showShortcuts: "Mostrar atajos",
     },
@@ -404,7 +406,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       undo: "Undo",
       redo: "Redo",
       bin: "Move to bin",
-      switchList: "Switch list",
+      switchList: "Switch view",
+      switchColumn: "Switch column",
       find: "Find",
       showShortcuts: "Show shortcuts",
     },

@@ -5,7 +5,7 @@
 :root {
   --bg: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-nav: #f8f5f5;
+  --bg-nav: #f7f7f7;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
   --text: #1a1a1a;
@@ -2041,7 +2041,7 @@ body {
   flex: 0 1 auto;
   min-width: 0;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;

@@ -399,8 +399,63 @@ export function Board(props: {
     app.addColumn(props.listId, name);
   };
 
+  // ArrowLeft / ArrowRight: hop the selection to the nearest column in that
+  // direction that holds cards, keeping the same vertical slot (clamped to
+  // the target column's length). Columns render default-first, then user
+  // columns in order. No wrap — left/right is spatial. Empty columns are
+  // skipped (nothing to land on); with nothing selected, → enters at the
+  // first non-empty column and ← at the last.
+  const orderedColKeys = (): string[] => [
+    DEFAULT_COL,
+    ...columns().map((c) => c.id),
+  ];
+  const jumpColumn = (dir: -1 | 1): void => {
+    const order = orderedColKeys();
+    const active = activeSelection();
+    // Locate the active column and the caret's vertical slot within it.
+    let curIdx = dir === 1 ? -1 : order.length;
+    let curPos = 0;
+    if (active) {
+      for (const [colKey, sel] of columnSelections) {
+        if (sel !== active) continue;
+        curIdx = order.indexOf(colKey);
+        const ids = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+        const top = active.getSelectionTop();
+        curPos = top != null ? Math.max(0, ids.indexOf(String(top))) : 0;
+        break;
+      }
+    }
+    for (let i = curIdx + dir; i >= 0 && i < order.length; i += dir) {
+      const colKey = order[i];
+      const ids = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+      if (ids.length === 0) continue;
+      const key = ids[Math.min(curPos, ids.length - 1)];
+      const sel = selectionFor(colKey);
+      sel.updateOrder(ids);
+      // Selecting here clears the other columns via selectionFor's onChange.
+      sel.selectOnly(key);
+      const handle = columnHandles.get(colKey);
+      handle?.focus();
+      handle?.scrollToKey(key);
+      return;
+    }
+  };
+  const onBoardKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const target = e.target as Element | null;
+    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    e.preventDefault();
+    jumpColumn(e.key === "ArrowRight" ? 1 : -1);
+  };
+
   return (
-    <div class="board" role="group" ref={boardRef}>
+    <div
+      class="board"
+      role="group"
+      ref={boardRef}
+      onKeyDown={onBoardKeyDown}
+    >
       <BoardColumn
         app={app}
         listId={props.listId}
@@ -412,6 +467,7 @@ export function Board(props: {
         onReorder={(op) => reorderWithin(DEFAULT_COL, op)}
         onAddItem={() => props.onAddItem(props.listId, null)}
         registerHandle={registerHandle}
+        autofocus
         onOpen={props.onOpen}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
@@ -502,6 +558,10 @@ function BoardColumn(props: {
   /** Publish this column's Dnd handle to the board so the cross-column
    *  drag listener can drive its foreign-drop preview. */
   registerHandle: (colKey: string, handle: DndImperative | null) => void;
+  /** Focus this column's listbox on mount, so arrow-key nav works the
+   *  moment the board opens — the first column claims it (matches how the
+   *  list view autofocuses). Only one column should set this. */
+  autofocus?: boolean;
   /** User columns only — the default column can't move or be deleted. */
   menu?: {
     moveLeft?: () => void;
@@ -598,6 +658,7 @@ function BoardColumn(props: {
           placeholderGap={CARD_GAP}
           fillHeight
           reorder
+          autofocus={props.autofocus}
           onReorder={props.onReorder}
         >
           {(item, expanded) => (
