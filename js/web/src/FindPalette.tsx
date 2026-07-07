@@ -31,18 +31,28 @@ export function FindPalette(props: {
   let inputRef: HTMLInputElement | undefined;
   let listRef: HTMLDivElement | undefined;
 
-  // Global Cmd/Ctrl+F shortcut. preventDefault to suppress the browser's
-  // native page-find UI — we own this binding while the app is mounted.
-  // Require exactly one of meta/ctrl and no shift/alt so OS shortcuts
-  // layered on top (e.g. macOS Cmd+Ctrl+F fullscreen) pass through.
+  // Global open shortcuts. preventDefault to suppress the browser's native
+  // page-find UI — we own these bindings while the app is mounted.
+  //   Cmd/Ctrl+F: require exactly one of meta/ctrl and no shift/alt so OS
+  //     shortcuts layered on top (e.g. macOS Cmd+Ctrl+F fullscreen) pass
+  //     through. Safe to fire even while typing.
+  //   `/`: bare key, so it must not steal a literal slash typed into a row
+  //     or input — skip when focus sits in an editable surface.
   const onGlobalKeyDown = (e: KeyboardEvent) => {
     // Don't open on top of another modal (Settings, a confirm dialog).
     // The palette itself counts as open here, but that only blocks a
     // redundant re-open while it's already up.
     if (isOverlayOpen()) return;
-    if (e.code !== "KeyF") return;
-    if (e.shiftKey || e.altKey) return;
-    if (e.metaKey === e.ctrlKey) return;
+    if (e.code === "KeyF") {
+      if (e.shiftKey || e.altKey) return;
+      if (e.metaKey === e.ctrlKey) return;
+    } else if (e.key === "/") {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as Element | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    } else {
+      return;
+    }
     if (e.cancelable) e.preventDefault();
     props.onOpenChange(true);
   };

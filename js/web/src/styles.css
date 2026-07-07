@@ -1129,6 +1129,13 @@ body {
   pointer-events: none;
 }
 
+/* Trailing chevron on a submenu trigger (Due date ›). */
+.menu-sub-arrow {
+  color: var(--text-faint);
+  font-size: 15px;
+  line-height: 1;
+}
+
 .dropdown-menu-content {
   min-width: 160px;
   padding: 4px;
@@ -1265,6 +1272,12 @@ body {
   padding: 5px 0;
   font-size: 13px;
   color: var(--text);
+}
+
+.shortcuts-dialog-keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Sit the task dialog in the upper third rather than dead-centre. Only

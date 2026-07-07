@@ -128,6 +128,8 @@ type Messages = {
     tomorrow: string;
     /** Quick action that removes the due date. */
     clear: string;
+    /** Context-menu action that removes the due date. */
+    remove: string;
   };
   shortcuts: {
     title: string;
@@ -274,6 +276,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       today: "Hoy",
       tomorrow: "Mañana",
       clear: "Borrar",
+      remove: "Quitar fecha",
     },
     shortcuts: {
       title: "Atajos de teclado",
@@ -420,6 +423,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       today: "Today",
       tomorrow: "Tomorrow",
       clear: "Clear",
+      remove: "Remove date",
     },
     shortcuts: {
       title: "Keyboard shortcuts",

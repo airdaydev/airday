@@ -15,7 +15,7 @@ export function ShortcutsDialog(props: {
   const { m } = useAppI18n();
   trackOverlay(() => props.open);
 
-  const rows = (): { label: string; key: string }[] => {
+  const rows = (): { label: string; key: string | string[] }[] => {
     const s = m().shortcuts;
     return [
       { label: s.newItem, key: "Space" },
@@ -29,7 +29,7 @@ export function ShortcutsDialog(props: {
       { label: s.bin, key: "⌫" },
       { label: s.switchList, key: "[ ]" },
       { label: s.switchColumn, key: "← →" },
-      { label: s.find, key: "⌘F" },
+      { label: s.find, key: ["⌘F", "/"] },
       { label: s.showShortcuts, key: "?" },
     ];
   };
@@ -48,7 +48,11 @@ export function ShortcutsDialog(props: {
                 {(r) => (
                   <div class="shortcuts-dialog-row">
                     <span>{r.label}</span>
-                    <kbd class="menu-shortcut">{r.key}</kbd>
+                    <span class="shortcuts-dialog-keys">
+                      <For each={Array.isArray(r.key) ? r.key : [r.key]}>
+                        {(k) => <kbd class="menu-shortcut">{k}</kbd>}
+                      </For>
+                    </span>
                   </div>
                 )}
               </For>

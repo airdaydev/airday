@@ -1,8 +1,15 @@
-import { createEffect, on, Show } from "solid-js";
+import { createEffect, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DndSelection } from "./dnd/solid";
+import { trackOverlay } from "./overlay.ts";
 import { DueBadge } from "./DueBadge.tsx";
-import { formatDoneStamp, formatRelative, nowMs } from "./format.tsx";
+import {
+  addDaysToStamp,
+  formatDoneStamp,
+  formatRelative,
+  nowMs,
+  todayStamp,
+} from "./format.tsx";
 import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
@@ -59,6 +66,10 @@ export function Row(props: {
   showCreated?: boolean;
 }) {
   const { m, locale } = useAppI18n();
+  // Open state of this row's context menu, mirrored into the shared
+  // overlay count so global keyboard shortcuts stand down while it's up.
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  trackOverlay(menuOpen);
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -230,7 +241,21 @@ export function Row(props: {
   const onCopy = () => {
     props.copyBlock(targetIds());
   };
+  // Due-date actions apply to the whole target set (the selection when the
+  // row is part of it, else this row alone), matching the done/bin actions.
+  const onDueTomorrow = () => {
+    const stamp = addDaysToStamp(todayStamp(nowMs()), 1);
+    for (const id of targetIds()) props.app.setItemDueOn(id, stamp);
+  };
+  const onDueRemove = () => {
+    for (const id of targetIds()) props.app.setItemDueOn(id, null);
+  };
   const onOpenChange = (open: boolean) => {
+    // Register the menu in the shared overlay count so the workspace's
+    // document-level shortcuts (Enter → open dialog, x → done, …) go inert
+    // while it's open — otherwise pressing Enter to pick a menu item also
+    // triggers the list's Enter handler behind it.
+    setMenuOpen(open);
     if (!open) return;
     const id = props.item().id;
     if (!props.selection.isSelected(id)) {
@@ -459,6 +484,34 @@ export function Row(props: {
               <span>{m().workspace.markNotDone}</span>
               <kbd class="menu-shortcut">X</kbd>
             </ContextMenu.Item>
+          </Show>
+          <Show when={!isBinned(props.item())}>
+            <ContextMenu.Sub gutter={4}>
+              <ContextMenu.SubTrigger class="context-menu-item">
+                <span>{m().due.label}</span>
+                <span class="menu-sub-arrow" aria-hidden="true">
+                  ›
+                </span>
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent class="context-menu-content">
+                  <Show when={props.item().dueOn}>
+                    <ContextMenu.Item
+                      class="context-menu-item"
+                      onSelect={onDueRemove}
+                    >
+                      <span>{m().due.remove}</span>
+                    </ContextMenu.Item>
+                  </Show>
+                  <ContextMenu.Item
+                    class="context-menu-item"
+                    onSelect={onDueTomorrow}
+                  >
+                    <span>{m().due.tomorrow}</span>
+                  </ContextMenu.Item>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub>
           </Show>
           <ContextMenu.Item class="context-menu-item" onSelect={onCopy}>
             <span>{m().common.copy}</span>
