@@ -60,6 +60,7 @@ export function Board(props: {
   app: DocApp;
   listId: string;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
+  onSetDue: (ids: readonly string[], initial: string | null) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -491,6 +492,7 @@ export function Board(props: {
         registerHandle={registerHandle}
         autofocus
         onOpen={props.onOpen}
+        onSetDue={props.onSetDue}
         openOnTap={props.openOnTap}
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
@@ -511,6 +513,7 @@ export function Board(props: {
             onAddItem={() => props.onAddItem(props.listId, col.id)}
             registerHandle={registerHandle}
             onOpen={props.onOpen}
+            onSetDue={props.onSetDue}
             openOnTap={props.openOnTap}
             duplicateBlock={props.duplicateBlock}
             copyBlock={props.copyBlock}
@@ -574,6 +577,7 @@ function BoardColumn(props: {
   /** Open the new-item dialog targeting this column. */
   onAddItem: () => void;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
+  onSetDue: (ids: readonly string[], initial: string | null) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
@@ -693,6 +697,7 @@ function BoardColumn(props: {
               duplicateBlock={props.duplicateBlock}
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}
+              onSetDue={props.onSetDue}
               openOnTap={props.openOnTap}
               showCreated
             />

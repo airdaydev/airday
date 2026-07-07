@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@airday/core": "workspace:*",
+    "@corvu/calendar": "^0.1.2",
     "@kobalte/core": "^0.13.11",
     "@msgpack/msgpack": "^3.0.0",
     "solid-js": "^1.9.3"

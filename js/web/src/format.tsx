@@ -88,7 +88,7 @@ export function addDaysToStamp(stamp: string, n: number): string {
 
 // Parse `YYYY-MM-DD` into a local-midnight Date via explicit parts.
 // Returns null for anything that isn't a well-formed stamp.
-function parseLocalDateParts(stamp: string): Date | null {
+export function parseLocalDateParts(stamp: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(stamp);
   if (!m) return null;
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));

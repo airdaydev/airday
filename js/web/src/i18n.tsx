@@ -130,6 +130,12 @@ type Messages = {
     clear: string;
     /** Context-menu action that removes the due date. */
     remove: string;
+    /** Context-menu action that opens the calendar to pick a date. */
+    setDate: string;
+    /** Accessible label for the calendar's previous-month button. */
+    prevMonth: string;
+    /** Accessible label for the calendar's next-month button. */
+    nextMonth: string;
   };
   shortcuts: {
     title: string;
@@ -277,6 +283,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       tomorrow: "Mañana",
       clear: "Borrar",
       remove: "Quitar fecha",
+      setDate: "Elegir fecha…",
+      prevMonth: "Mes anterior",
+      nextMonth: "Mes siguiente",
     },
     shortcuts: {
       title: "Atajos de teclado",
@@ -424,6 +433,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       tomorrow: "Tomorrow",
       clear: "Clear",
       remove: "Remove date",
+      setDate: "Set date…",
+      prevMonth: "Previous month",
+      nextMonth: "Next month",
     },
     shortcuts: {
       title: "Keyboard shortcuts",

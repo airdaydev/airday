@@ -24,6 +24,7 @@ import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
 import { Board, type BoardImperative } from "./Board.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
+import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
@@ -105,6 +106,17 @@ export function Workspace(props: {
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // The item currently opened in the detail dialog, or null when closed.
   const [openItemId, setOpenItemId] = createSignal<string | null>(null);
+  // Shared due-date calendar, opened from a row/board context menu's "Set
+  // date". Holds the target item ids and the stamp to seed the calendar
+  // with (the clicked row's current due date, or null); one modal serves
+  // every row rather than mounting a Dialog per row.
+  const [dueTarget, setDueTarget] = createSignal<{
+    ids: readonly string[];
+    initial: string | null;
+  } | null>(null);
+  const openDueCalendar = (ids: readonly string[], initial: string | null) => {
+    if (ids.length > 0) setDueTarget({ ids, initial });
+  };
   // New-item capture target for the detail dialog (board "+" buttons), or
   // null when not capturing. Mutually exclusive with `openItemId`.
   const [newItemTarget, setNewItemTarget] = createSignal<{
@@ -1113,6 +1125,17 @@ export function Workspace(props: {
           if (boardListId() !== null) setBoardRevealIds([id]);
         }}
       />
+      <DueCalendarDialog
+        open={() => dueTarget() !== null}
+        setOpen={(o) => {
+          if (!o) setDueTarget(null);
+        }}
+        value={() => dueTarget()?.initial ?? null}
+        onPick={(stamp) => {
+          const t = dueTarget();
+          if (t) for (const id of t.ids) app.setItemDueOn(id, stamp);
+        }}
+      />
       <ShortcutsDialog
         open={shortcutsOpen()}
         onOpenChange={setShortcutsOpen}
@@ -1325,6 +1348,7 @@ export function Workspace(props: {
                           if (caret != null) setOpenCaret(caret);
                           setOpenItemId(id);
                         }}
+                        onSetDue={openDueCalendar}
                         openOnTap={itemsIsMobile}
                       />
                     );
@@ -1343,6 +1367,7 @@ export function Workspace(props: {
                 if (caret != null) setOpenCaret(caret);
                 setOpenItemId(id);
               }}
+              onSetDue={openDueCalendar}
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}

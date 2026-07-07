@@ -10,6 +10,7 @@ import { Dialog } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Select } from "@kobalte/core/select";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { DueField } from "./DueField.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import {
@@ -120,6 +121,10 @@ export function TaskDialog(props: {
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
+  // Due-date calendar popover open state, plus a handle the header ⋮ menu's
+  // "Set date" item calls to open it (registered by DueField on mount).
+  const [dueCalOpen, setDueCalOpen] = createSignal(false);
+  let openDueCalendar: (() => void) | undefined;
   // The title and notes editors are contenteditable (not textareas) so that
   // http(s) URLs render as clickable anchors, matching the row quick-entry
   // editor. Their content is set imperatively from the buffers on load — it
@@ -456,6 +461,53 @@ export function TaskDialog(props: {
                           />
                           <DropdownMenu.Portal>
                             <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+                              <DropdownMenu.Sub gutter={4}>
+                                <DropdownMenu.SubTrigger class="dropdown-menu-item">
+                                  <span>{m().due.label}</span>
+                                  <span class="menu-sub-arrow" aria-hidden="true">
+                                    ›
+                                  </span>
+                                </DropdownMenu.SubTrigger>
+                                <DropdownMenu.Portal>
+                                  <DropdownMenu.SubContent class="dropdown-menu-content task-dialog-menu-content">
+                                    <Show when={it().dueOn}>
+                                      <DropdownMenu.Item
+                                        class="dropdown-menu-item"
+                                        onSelect={() =>
+                                          props.app.setItemDueOn(it().id, null)
+                                        }
+                                      >
+                                        <span>{m().due.remove}</span>
+                                      </DropdownMenu.Item>
+                                    </Show>
+                                    <DropdownMenu.Item
+                                      class="dropdown-menu-item"
+                                      onSelect={() => {
+                                        // The calendar is a modal dialog, so
+                                        // it won't self-dismiss on the menu's
+                                        // focus-restore; rAF just defers the
+                                        // open past the menu teardown.
+                                        requestAnimationFrame(() =>
+                                          openDueCalendar?.(),
+                                        );
+                                      }}
+                                    >
+                                      <span>{m().due.setDate}</span>
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      class="dropdown-menu-item"
+                                      onSelect={() =>
+                                        props.app.setItemDueOn(
+                                          it().id,
+                                          addDaysToStamp(todayStamp(nowMs()), 1),
+                                        )
+                                      }
+                                    >
+                                      <span>{m().due.tomorrow}</span>
+                                    </DropdownMenu.Item>
+                                  </DropdownMenu.SubContent>
+                                </DropdownMenu.Portal>
+                              </DropdownMenu.Sub>
                               <DropdownMenu.Item
                                 class="dropdown-menu-item"
                                 onSelect={() => {
@@ -525,55 +577,19 @@ export function TaskDialog(props: {
                     onClick={(e) => openLinkOnClick(e, notesRef)}
                   />
 
-                  <div class="task-dialog-due">
-                    <span class="task-dialog-due-label">{m().due.label}</span>
-                    <div class="task-dialog-due-controls">
-                      {/* Native date picker — its value is already a raw
-                          YYYY-MM-DD string, exactly what the register
-                          stores. Empty value clears the due date. */}
-                      <input
-                        type="date"
-                        class="task-dialog-due-input"
-                        value={it().dueOn ?? ""}
-                        onChange={(e) =>
-                          props.app.setItemDueOn(
-                            it().id,
-                            e.currentTarget.value || null,
-                          )
-                        }
-                      />
-                      <button
-                        type="button"
-                        class="task-dialog-due-btn"
-                        onClick={() =>
-                          props.app.setItemDueOn(it().id, todayStamp(nowMs()))
-                        }
-                      >
-                        {m().due.today}
-                      </button>
-                      <button
-                        type="button"
-                        class="task-dialog-due-btn"
-                        onClick={() =>
-                          props.app.setItemDueOn(
-                            it().id,
-                            addDaysToStamp(todayStamp(nowMs()), 1),
-                          )
-                        }
-                      >
-                        {m().due.tomorrow}
-                      </button>
-                      <Show when={it().dueOn}>
-                        <button
-                          type="button"
-                          class="task-dialog-due-btn"
-                          onClick={() => props.app.setItemDueOn(it().id, null)}
-                        >
-                          {m().due.clear}
-                        </button>
-                      </Show>
-                    </div>
-                  </div>
+                  {/* Due-date badge that opens the calendar modal; the
+                      header ⋮ menu's "Set date" also drives it. Renders
+                      nothing (no phantom gap) until a due date is set. */}
+                  <DueField
+                    dueOn={() => it().dueOn ?? null}
+                    muted={() => isDone(it()) || isBinned(it())}
+                    onChange={(stamp) =>
+                      props.app.setItemDueOn(it().id, stamp)
+                    }
+                    open={dueCalOpen}
+                    setOpen={setDueCalOpen}
+                    registerOpen={(fn) => (openDueCalendar = fn)}
+                  />
 
                   <Show when={isDone(it()) || isBinned(it())}>
                     <div class="task-dialog-meta">

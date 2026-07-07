@@ -64,6 +64,9 @@ export function Row(props: {
   /** Board cards show the item's created date in their bottom-left corner
    *  (list rows don't). */
   showCreated?: boolean;
+  /** Open the shared calendar modal to set a due date on the target set.
+   *  `initial` seeds the calendar (this row's current due date, or null). */
+  onSetDue?: (ids: readonly string[], initial: string | null) => void;
 }) {
   const { m, locale } = useAppI18n();
   // Open state of this row's context menu, mirrored into the shared
@@ -249,6 +252,9 @@ export function Row(props: {
   };
   const onDueRemove = () => {
     for (const id of targetIds()) props.app.setItemDueOn(id, null);
+  };
+  const onSetDate = () => {
+    props.onSetDue?.(targetIds(), props.item().dueOn ?? null);
   };
   const onOpenChange = (open: boolean) => {
     // Register the menu in the shared overlay count so the workspace's
@@ -501,6 +507,14 @@ export function Row(props: {
                       onSelect={onDueRemove}
                     >
                       <span>{m().due.remove}</span>
+                    </ContextMenu.Item>
+                  </Show>
+                  <Show when={props.onSetDue}>
+                    <ContextMenu.Item
+                      class="context-menu-item"
+                      onSelect={onSetDate}
+                    >
+                      <span>{m().due.setDate}</span>
                     </ContextMenu.Item>
                   </Show>
                   <ContextMenu.Item

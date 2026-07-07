@@ -1600,59 +1600,141 @@ body {
 
 /* Due-date control row: a label above the native date picker + its
    Today / Tomorrow / Clear quick actions. */
-.task-dialog-due {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.task-dialog-due-label {
-  font-size: 13px;
-  color: var(--text-faint);
-}
-
-.task-dialog-due-controls {
-  display: flex;
-  flex-wrap: wrap;
+/* The badge that opens the calendar modal. Only rendered once a due date
+   is set (setting one from scratch goes through the ⋮ menu), so the margin
+   lives here rather than on a wrapper that would leave a phantom gap when
+   unset. Button reset so the DueBadge inside keeps its own look. */
+.task-dialog-due-trigger {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-
-.task-dialog-due-input {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-input);
-  border-radius: 6px;
-  padding: 4px 8px;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
   outline: none;
 }
 
-.task-dialog-due-input:focus-visible {
+.task-dialog-due-trigger:focus-visible {
   outline: 2px solid var(--link);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
-.task-dialog-due-btn {
-  font: inherit;
+/* ---------- calendar dialog (@corvu/calendar) ---------- */
+/* Nested modal opened from the task dialog, so its overlay / positioner sit
+   above the task dialog's (z-index 100 / 101). */
+.due-dialog-overlay {
+  z-index: 120;
+}
+
+.due-dialog-positioner {
+  z-index: 121;
+}
+
+.due-dialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  outline: none;
+  color: var(--text);
+}
+
+[data-theme="dark"] .due-dialog {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.calendar-label {
   font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+  line-height: 1;
   color: var(--text-muted);
   background: transparent;
-  border: 1px solid var(--border-input);
+  border: none;
   border-radius: 6px;
-  padding: 4px 10px;
   cursor: pointer;
 }
 
-.task-dialog-due-btn:hover {
+.calendar-nav:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.task-dialog-due-btn:focus-visible {
+.calendar-table {
+  border-collapse: collapse;
+}
+
+.calendar-headcell {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  padding: 2px 0;
+  text-align: center;
+}
+
+.calendar-cell {
+  padding: 1px;
+  text-align: center;
+}
+
+.calendar-cell-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.calendar-cell-trigger:hover {
+  background: var(--bg-hover);
+}
+
+.calendar-cell-trigger[data-today] {
+  font-weight: 700;
+  color: var(--link);
+}
+
+.calendar-cell-trigger[data-selected] {
+  background: var(--link);
+  color: #fff;
+}
+
+.calendar-cell-trigger[data-disabled] {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.calendar-cell-trigger:focus-visible {
   outline: 2px solid var(--link);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .task-dialog-meta {
