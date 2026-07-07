@@ -256,8 +256,8 @@ body {
 }
 
 .nav-item-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 @media (max-width: 768px) and (pointer: coarse) {
@@ -2221,33 +2221,33 @@ body {
    (no urgency). Shared by list rows and board cards. */
 .due-badge {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 12px;
   line-height: 1.3em;
   padding: 1px 6px;
   border-radius: 4px;
   white-space: nowrap;
   color: var(--text-muted);
-  background: var(--border-row);
+  background: transparent;
+  border: 1px solid var(--border-row);
 }
 
-.due-badge[data-tone="overdue"] {
-  color: var(--error-text);
-  background: var(--error-bg);
+.due-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.due-badge[data-tone="today"] {
-  color: var(--link);
-  background: color-mix(in srgb, var(--link) 14%, transparent);
-}
-
-.due-badge[data-tone="future"] {
-  color: var(--text-muted);
-  background: var(--border-row);
+.due-badge-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 .due-badge[data-tone="muted"] {
   color: var(--text-faint);
-  background: transparent;
+  border-color: transparent;
   padding-left: 0;
   padding-right: 0;
 }
@@ -2259,6 +2259,16 @@ body {
   height: calc(100% - 6px);
   border: 1px solid var(--border-row);
   border-radius: 8px;
+}
+
+[data-theme="dark"] .board-col-dnd .row {
+  background: #19191b;
+}
+
+/* Keep the selection highlight winning over the card bg above (its
+   selector out-specifies the shared `[aria-selected] .row` rule). */
+[data-theme="dark"] .board-col-dnd [aria-selected="true"] .row {
+  background: var(--dnd-select-bg);
 }
 
 /* The dnd stylesheet paints the selection highlight on the full-height slot

@@ -17,6 +17,7 @@ import cloudOffSvg from "./icons/cloud-off.svg?raw";
 import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import externalLinkSvg from "./icons/external-link.svg?raw";
+import fileSvg from "./icons/file.svg?raw";
 import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
@@ -466,6 +467,7 @@ export function Nav(props: {
                     data-drop-list-id={l().id}
                     onClick={(e) => onNavItemClick(e, l().id)}
                   >
+                    <span class="nav-item-icon" innerHTML={fileSvg} />
                     <EditableNavLabel
                       name={l().name}
                       onSave={(name) => props.app.renameList(l().id, name)}

@@ -1,5 +1,6 @@
 import { createMemo, Show } from "solid-js";
 import { formatDueBadge, nowMs, todayStamp } from "./format.tsx";
+import timerSvg from "./icons/timer.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 
 // Compact due-date badge shared by list rows and board cards. Reads the
@@ -30,6 +31,7 @@ export function DueBadge(props: { dueOn: string; muted?: boolean }) {
           data-tone={tone()}
           title={`${m().due.label}: ${props.dueOn}`}
         >
+          <span class="due-badge-icon" innerHTML={timerSvg} />
           {i().label}
         </span>
       )}
