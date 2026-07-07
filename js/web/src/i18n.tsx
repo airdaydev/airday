@@ -132,6 +132,8 @@ type Messages = {
     remove: string;
     /** Context-menu action that opens the calendar to pick a date. */
     setDate: string;
+    /** Title of the calendar modal. */
+    dialogTitle: string;
     /** Accessible label for the calendar's previous-month button. */
     prevMonth: string;
     /** Accessible label for the calendar's next-month button. */
@@ -284,6 +286,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       clear: "Borrar",
       remove: "Quitar fecha",
       setDate: "Elegir fecha…",
+      dialogTitle: "Establecer fecha de vencimiento",
       prevMonth: "Mes anterior",
       nextMonth: "Mes siguiente",
     },
@@ -434,6 +437,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       clear: "Clear",
       remove: "Remove date",
       setDate: "Set date…",
+      dialogTitle: "Set due date",
       prevMonth: "Previous month",
       nextMonth: "Next month",
     },

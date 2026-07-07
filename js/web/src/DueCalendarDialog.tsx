@@ -6,7 +6,7 @@
 
 import Calendar from "@corvu/calendar";
 import { Dialog } from "@kobalte/core/dialog";
-import { createMemo, For } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import { localDateStamp, parseLocalDateParts } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 
@@ -15,9 +15,12 @@ export function DueCalendarDialog(props: {
   setOpen: (v: boolean) => void;
   /** Currently-set stamp to preselect / open the calendar on, or null. */
   value: () => string | null;
-  /** Fired with the picked `YYYY-MM-DD` (never null — clearing lives in the
-   *  menus); the dialog closes itself after. */
+  /** Fired with the picked `YYYY-MM-DD` (never null — removal is the button
+   *  below); the dialog closes itself after. */
   onPick: (stamp: string) => void;
+  /** Clear the due date. When provided and a date is set, a "Remove date"
+   *  button shows at the bottom of the dialog. */
+  onRemove?: () => void;
 }) {
   const { m, locale } = useAppI18n();
 
@@ -42,6 +45,9 @@ export function DueCalendarDialog(props: {
         <Dialog.Overlay class="dialog-overlay due-dialog-overlay" />
         <div class="dialog-positioner due-dialog-positioner">
           <Dialog.Content class="due-dialog">
+            <Dialog.Title class="due-dialog-title">
+              {m().due.dialogTitle}
+            </Dialog.Title>
             <Calendar
               mode="single"
               value={value()}
@@ -108,6 +114,20 @@ export function DueCalendarDialog(props: {
                 </>
               )}
             </Calendar>
+            <Show when={props.onRemove && props.value()}>
+              <div class="due-dialog-footer">
+                <button
+                  type="button"
+                  class="due-dialog-remove"
+                  onClick={() => {
+                    props.onRemove?.();
+                    props.setOpen(false);
+                  }}
+                >
+                  {m().due.remove}
+                </button>
+              </div>
+            </Show>
           </Dialog.Content>
         </div>
       </Dialog.Portal>

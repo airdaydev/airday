@@ -43,6 +43,7 @@ export function DueField(props: {
         setOpen={props.setOpen}
         value={props.dueOn}
         onPick={props.onChange}
+        onRemove={() => props.onChange(null)}
       />
     </>
   );

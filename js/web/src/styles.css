@@ -608,32 +608,6 @@ body {
   line-height: 1.3em;
 }
 
-/* The note badge is a button (it opens the detail dialog), so reset the
-   UA button chrome to sit flush like the old span. */
-.row-note-indicator {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  background: transparent;
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--text-faint);
-  line-height: 1.3em;
-  cursor: pointer;
-}
-
-.row-note-indicator svg {
-  width: 14px;
-  height: 14px;
-  margin-top: 1px;
-}
-
-.row-note-indicator:hover {
-  color: var(--text);
-}
-
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
    makes it a scroll container, which trips the browser's caret-scroll-into-view
    while typing in the expanded row's contenteditable: text wraps below the
@@ -1644,6 +1618,42 @@ body {
 
 [data-theme="dark"] .due-dialog {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.due-dialog-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.due-dialog-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-row);
+}
+
+.due-dialog-remove {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.due-dialog-remove:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.due-dialog-remove:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
 }
 
 .calendar-header {

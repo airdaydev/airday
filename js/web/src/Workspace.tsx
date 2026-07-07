@@ -1135,6 +1135,10 @@ export function Workspace(props: {
           const t = dueTarget();
           if (t) for (const id of t.ids) app.setItemDueOn(id, stamp);
         }}
+        onRemove={() => {
+          const t = dueTarget();
+          if (t) for (const id of t.ids) app.setItemDueOn(id, null);
+        }}
       />
       <ShortcutsDialog
         open={shortcutsOpen()}

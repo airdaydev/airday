@@ -10,7 +10,6 @@ import {
   nowMs,
   todayStamp,
 } from "./format.tsx";
-import noteSvg from "./icons/note.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { setLinkifiedText } from "./linkify.ts";
@@ -442,21 +441,6 @@ export function Row(props: {
               muted={isDone(props.item()) || isBinned(props.item())}
             />
           )}
-        </Show>
-        <Show when={!props.expanded() && props.item().notes.trim().length > 0}>
-          <button
-            type="button"
-            tabIndex={-1}
-            class="row-note-indicator"
-            aria-label={m().workspace.hasNotes}
-            title={m().workspace.hasNotes}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onOpen?.(props.item().id, "notes");
-            }}
-            innerHTML={noteSvg}
-          />
         </Show>
         <Show when={statusTimestamp(props.item())}>
           {(ts) => (
