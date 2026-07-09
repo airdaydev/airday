@@ -13,15 +13,15 @@
   "dependencies": {
     "@airday/core": "workspace:*",
     "@corvu/calendar": "^0.1.2",
-    "@kobalte/core": "^0.13.11",
-    "@msgpack/msgpack": "^3.0.0",
-    "solid-js": "^1.9.3"
+    "@kobalte/core": "^0.13.12",
+    "@msgpack/msgpack": "^3.1.3",
+    "solid-js": "^1.9.14"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5",
-    "vite": "^7.3.1",
-    "vite-plugin-solid": "^2.11.0",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite": "^8.1.4",
+    "vite-plugin-solid": "^2.11.12",
+    "vite-plugin-wasm": "^3.6.0"
   }
 }
