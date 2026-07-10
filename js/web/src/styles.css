@@ -2241,7 +2241,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 6px 6px 12px;
+  padding: 8px 6px 16px 12px;
 }
 
 .board-col-name {
@@ -2400,6 +2400,7 @@ body {
 
 [data-theme="dark"] .board-col-dnd .row {
   background: #19191b;
+  border-color: #1f1f1f;
 }
 
 /* Keep the selection highlight winning over the card bg above (its
