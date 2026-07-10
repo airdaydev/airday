@@ -39,6 +39,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
+| [`spec/pwa-plan.md`](spec/pwa-plan.md) | PWA conversion plan: manifest, service worker, `/api/session` probe |
 | [`spec/testing.md`](spec/testing.md) | Integration test pattern, CLI driver |
 
 ## Build & run
