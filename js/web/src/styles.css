@@ -3,8 +3,9 @@
  * flex/grid. */
 
 :root {
-  --bg: #ffffff;
+  --bg: #f9f9f9;
   --bg-elevated: #ffffff;
+  --surface: #ffffff;
   --bg-nav: #f7f7f7;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: #e5e7eb;
@@ -13,6 +14,7 @@
   --text-faint: #888;
   --text-empty: #999;
   --border: #e5e5e5;
+  --border-surface: #dcdcdc;
   --border-input: #d4d4d4;
   --border-row: #efefef;
   --link: #2563eb;
@@ -30,8 +32,9 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
 }
 
 [data-theme="dark"] {
-  --bg: #111113;
+  --bg: #08080a;
   --bg-elevated: #1a1a1c;
+  --surface: #0e0e0e;
   --bg-nav: #0b0b0b;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: #2a2a2e;
@@ -40,6 +43,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
   --text-faint: #777;
   --text-empty: #666;
   --border: #2a2a2a;
+  --border-surface: #1f1f1f;
   --border-input: #333;
   --border-row: #222;
   --link: #60a5fa;
@@ -90,8 +94,7 @@ body {
 }
 
 .nav {
-  background: var(--bg-nav);
-  border-right: 1px solid #efefef;
+  background: transparent;
   padding: 8px 0 0;
   overflow: hidden;
   display: flex;
@@ -99,7 +102,6 @@ body {
 }
 
 [data-theme="dark"] .nav {
-  border-right-color: #141414;
   color: var(--text-muted);
 }
 
@@ -158,8 +160,21 @@ body {
   }
 
   .nav,
-  .main {
+  .content {
     grid-area: 1 / 1;
+  }
+
+  /* Full-screen drawer: undo the desktop floating-surface treatment. The
+     footer is desktop-only — the account/sync widget lives in the nav
+     drawer's footer on mobile instead. */
+  .main {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .footer {
+    display: none;
   }
 
   .nav {
@@ -170,7 +185,7 @@ body {
     display: flex;
   }
 
-  .app.nav-open .main {
+  .app.nav-open .content {
     display: none;
   }
 
@@ -191,13 +206,22 @@ body {
   gap: 8px;
 }
 
+/* Pushes the account/sync widget to the far right of the nav footer,
+   opposite the menu trigger (mobile only — desktop shows it in the app
+   footer instead). */
+.nav-footer-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .nav-menu-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   padding: 6px;
-  margin-left: auto;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -330,12 +354,37 @@ body {
   pointer-events: none;
 }
 
+/* Right-hand column: the main surface fills the available height and a
+   thin footer strip sits below it on the darker body background. */
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .main {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
   overflow-y: scroll;
+  margin: 8px 8px 0 0;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 0.5px solid var(--border-surface);
+}
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px 0 0;
 }
 
 .main-header {
@@ -373,7 +422,7 @@ body {
   gap: 4px;
   padding: 4px 8px;
   border: none;
-  background: #ffffff;
+  background: transparent;
   color: var(--text);
   border-radius: 4px;
   cursor: pointer;
@@ -388,7 +437,7 @@ body {
 }
 
 [data-theme="dark"] .add-button {
-  background: #29292f;
+  background: transparent;
   box-shadow:
     rgba(0, 0, 0, 0) 0px 0px 0px 0px,
     rgba(0, 0, 0, 0) 0px 0px 0px 0px,
@@ -510,16 +559,12 @@ body {
   gap: 8px;
   padding: 6px;
   height: 100%;
-  background: var(--bg-elevated);
+  background: var(--surface);
   transition: 0.2s opacity;
 }
 
 .dnd-host[data-expanded] .row:not([data-expanded]) {
   opacity: 0.5;
-}
-
-[data-theme="dark"] .row {
-  background: var(--bg);
 }
 
 [aria-selected="true"] .row {
@@ -2264,7 +2309,7 @@ body {
 }
 
 .board-col-dnd .dnd-parent {
-  padding: 0 6px 6px;
+  padding: 0 8px 6px;
 }
 
 /* Board cards are taller than list rows (CARD_HEIGHT in Board.tsx), so the

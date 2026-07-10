@@ -28,7 +28,7 @@ import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
-import { EditableNavLabel, Nav } from "./nav.tsx";
+import { EditableNavLabel, Nav, StatusSlot } from "./nav.tsx";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
 import type { ViewKey } from "./prefs.ts";
 import { Row, DRAFT_ID_PREFIX } from "./Row.tsx";
@@ -1077,6 +1077,7 @@ export function Workspace(props: {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onSession={session.swapSession}
+        isMobile={isMobile()}
       />
       <FindPalette
         app={app}
@@ -1144,6 +1145,7 @@ export function Workspace(props: {
         open={shortcutsOpen()}
         onOpenChange={setShortcutsOpen}
       />
+      <div class="content">
       <main class="main">
         <header class="main-header">
           {/* Title group: hamburger sits flush against the title so
@@ -1411,6 +1413,21 @@ export function Workspace(props: {
           />
         </Show>
       </main>
+      {/* Desktop-only footer strip below the main surface; the account /
+          sync widget sits at its far right. On mobile this is hidden and
+          the widget lives in the nav drawer's footer instead. */}
+      <footer class="footer">
+        <Show when={!isMobile()}>
+          <StatusSlot
+            app={app}
+            online={session.online()}
+            lastSyncAt={session.lastSyncAt()}
+            session={session.session()}
+            onSession={session.swapSession}
+          />
+        </Show>
+      </footer>
+      </div>
     </div>
   );
 }

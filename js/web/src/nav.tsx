@@ -134,6 +134,55 @@ function ConnectionStatusPopover(props: {
   );
 }
 
+/** The account/sync widget: a sign-in prompt while anonymous, the
+ *  connection-status popover once authed. Lives at the far-right of the
+ *  desktop footer, or in the nav drawer's footer on mobile — rendered in
+ *  exactly one of those places at a time (guarded by the caller's mobile
+ *  check), so its auto-open-on-mount auth dialog fires only once. */
+export function StatusSlot(props: {
+  app: DocApp;
+  online: boolean;
+  lastSyncAt: number | null;
+  session: Session;
+  onSession: (s: Session) => void;
+}) {
+  const { m } = useAppI18n();
+  // Auto-prompt anonymous users on first mount; closing dismisses for the
+  // rest of the session. The whole workspace remounts on session swap
+  // (App's keyed <Show>), so a logout re-inits this to `true` and
+  // re-prompts.
+  const [authOpen, setAuthOpen] = createSignal(props.session.anonymous);
+  const handleSession = (s: Session) => {
+    setAuthOpen(false);
+    props.onSession(s);
+  };
+  return (
+    <>
+      <Show when={props.session.anonymous}>
+        <button
+          type="button"
+          class="signin-button"
+          onClick={() => setAuthOpen(true)}
+        >
+          {m().auth.signIn}
+        </button>
+        <AuthDialog
+          open={authOpen()}
+          onOpenChange={setAuthOpen}
+          onSession={handleSession}
+        />
+      </Show>
+      <Show when={!props.session.anonymous}>
+        <ConnectionStatusPopover
+          app={props.app}
+          online={props.online}
+          lastSyncAt={props.lastSyncAt}
+        />
+      </Show>
+    </>
+  );
+}
+
 export function Nav(props: {
   app: DocApp;
   lists: { id: string; name: string }[];
@@ -158,6 +207,9 @@ export function Nav(props: {
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
   onSession: (s: Session) => void;
+  /** On mobile the drawer keeps the account/sync widget in its own
+   *  footer (desktop hoists it to the app footer instead). */
+  isMobile: boolean;
 }) {
   const { m } = useAppI18n();
   const [adding, setAdding] = createSignal(false);
@@ -176,15 +228,6 @@ export function Nav(props: {
       props.setView({ kind: "list", id: "main" });
     }
     props.app.deleteList(id);
-  };
-  // Auto-prompt anonymous users on first mount; closing dismisses for
-  // the rest of the session. Becoming authed unmounts the trigger via
-  // the <Show> below, so a later logout (which mints a fresh anonymous
-  // session) will re-open it on the next mount.
-  const [authOpen, setAuthOpen] = createSignal(props.session.anonymous);
-  const handleSession = (s: Session) => {
-    setAuthOpen(false);
-    props.onSession(s);
   };
   const [name, setName] = createSignal("");
   const submit = (e: Event) => {
@@ -543,27 +586,6 @@ export function Nav(props: {
       </div>
       </div>
       <div class="nav-footer">
-        <Show when={props.session.anonymous}>
-          <button
-            type="button"
-            class="signin-button"
-            onClick={() => setAuthOpen(true)}
-          >
-            {m().auth.signIn}
-          </button>
-          <AuthDialog
-            open={authOpen()}
-            onOpenChange={setAuthOpen}
-            onSession={handleSession}
-          />
-        </Show>
-        <Show when={!props.session.anonymous}>
-          <ConnectionStatusPopover
-            app={props.app}
-            online={props.online}
-            lastSyncAt={props.lastSyncAt}
-          />
-        </Show>
         <DropdownMenu>
           <DropdownMenu.Trigger
             class="nav-menu-trigger"
@@ -643,6 +665,17 @@ export function Nav(props: {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu>
+        <Show when={props.isMobile}>
+          <div class="nav-footer-status">
+            <StatusSlot
+              app={props.app}
+              online={props.online}
+              lastSyncAt={props.lastSyncAt}
+              session={props.session}
+              onSession={props.onSession}
+            />
+          </div>
+        </Show>
       </div>
       <ConfirmDialog
         open={emptyBinConfirmOpen()}
