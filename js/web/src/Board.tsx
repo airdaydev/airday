@@ -23,17 +23,30 @@ import {
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Dnd, DndSelection, type DndImperative, type DndOp } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
+import checkSvg from "./icons/check.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
 import { EditableNavLabel } from "./nav.tsx";
 import { Row } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
-import type { ColumnView, DocApp, ItemView } from "./sync/store.ts";
+import {
+  isBinned,
+  isDone,
+  type ColumnView,
+  type DocApp,
+  type ItemView,
+} from "./sync/store.ts";
 
 /** Sentinel key for the implicit default column in DOM attributes and
  *  group maps — a column id can never be the empty string. */
 const DEFAULT_COL = "";
+
+/** Sentinel key for the pinned virtual "Done" column. Real column ids are
+ *  uuid-v7 hex, so this can never collide; the leading NUL keeps it out of
+ *  any user-typed value too. Not a real column def — it groups the list's
+ *  done items by lifecycle, not by a `column` register. */
+const DONE_COL = "\0done";
 
 /** Imperative handle the workspace holds to steer focus back into the
  *  board (e.g. after the detail dialog closes), mirroring the list view's
@@ -72,6 +85,9 @@ export function Board(props: {
   revealIds?: () => string[] | null;
   /** Called by the board once it has revealed `revealIds`. */
   clearReveal?: () => void;
+  /** Whether the pinned virtual Done column is shown (local per-list
+   *  preference owned by the workspace). Defaults to shown when absent. */
+  showDoneColumn?: () => boolean;
   /** Publishes the board's active (most recently populated) column
    *  selection, or `null` when nothing is selected, so the workspace's
    *  global item shortcuts can act on it. */
@@ -114,6 +130,43 @@ export function Board(props: {
     const it = state.itemsById[id];
     if (!it?.column) return DEFAULT_COL;
     return columns().some((c) => c.id === it.column) ? it.column : DEFAULT_COL;
+  };
+
+  // Members of the pinned Done column: this list's done-but-not-binned
+  // items, newest-done first — the same slice (and sort) the list view's
+  // Done filter and the global Done view use. Not order-container backed:
+  // the board's linear projection only covers live items, so this is a
+  // timestamp scan of `itemsById` scoped to the list. Runs only while a
+  // board is mounted.
+  const doneMembers = createMemo((): ItemView[] => {
+    const out: ItemView[] = [];
+    for (const it of Object.values(state.itemsById)) {
+      if (it.listId === props.listId && isDone(it) && !isBinned(it)) {
+        out.push(it);
+      }
+    }
+    out.sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
+    return out;
+  });
+
+  // Resolve any column key (including the Done sentinel) to its member
+  // list — the Done column draws from `doneMembers`, every other from the
+  // live partition.
+  const membersOf = (colKey: string): ItemView[] =>
+    colKey === DONE_COL
+      ? doneMembers()
+      : (membersByColumn().get(colKey) ?? []);
+
+  // Whether the pinned Done column is rendered (workspace preference).
+  const doneVisible = (): boolean => props.showDoneColumn?.() ?? true;
+
+  // Which column a dragged card currently lives in. A done card's home is
+  // the Done column regardless of its (preserved) `column` register, so
+  // drops back onto its own column no-op and drops elsewhere un-done it.
+  const sourceColOf = (id: string): string => {
+    const it = state.itemsById[id];
+    if (it && isDone(it) && !isBinned(it)) return DONE_COL;
+    return resolvedColumnOf(id);
   };
 
   // End-of-column drops have no `beforeKey`; anchor on the first live
@@ -244,9 +297,7 @@ export function Board(props: {
   createEffect(() => {
     const p = pendingSelect();
     if (!p) return;
-    const members = membersByColumn().get(p.colKey);
-    if (!members) return;
-    const memberIds = members.map((it) => it.id);
+    const memberIds = membersOf(p.colKey).map((it) => it.id);
     const present = new Set(memberIds);
     if (!p.ids.every((id) => present.has(id))) return;
     const sel = columnSelections.get(p.colKey);
@@ -323,7 +374,7 @@ export function Board(props: {
     const targetCol =
       el &&
       !keys.every(
-        (k) => resolvedColumnOf(k) === (el.dataset.dropColumnId ?? DEFAULT_COL),
+        (k) => sourceColOf(k) === (el.dataset.dropColumnId ?? DEFAULT_COL),
       )
         ? (el.dataset.dropColumnId ?? DEFAULT_COL)
         : null;
@@ -347,8 +398,9 @@ export function Board(props: {
     const colKey = el ? (el.dataset.dropColumnId ?? DEFAULT_COL) : null;
     const keys = ce.detail.keys.map(String);
     // Same-column (or off-board) drop → the source column's internal
-    // reorder owns it; nothing to consume here.
-    if (colKey === null || keys.every((k) => resolvedColumnOf(k) === colKey)) {
+    // reorder owns it; nothing to consume here. (Done→Done lands here too:
+    // the Done column has no linear order, so a drop within it is a no-op.)
+    if (colKey === null || keys.every((k) => sourceColOf(k) === colKey)) {
       clearAllForeignHover();
       return;
     }
@@ -359,22 +411,49 @@ export function Board(props: {
     // if the pointer never registered a hover) means tail append.
     const foreignIdx = columnHandles.get(colKey)?.getForeignHoverIndex() ?? null;
     clearAllForeignHover();
-    // Preserve the source column's visible order for multi-row drops.
-    const live = state.listLive[props.listId] ?? [];
+    // A drag carries rows from exactly one source column (cross-column
+    // multi-select isn't supported), so it's all-live or all-done. Order
+    // live rows by the list's linear order; done rows by newest-done.
     const keySet = new Set(keys);
-    const inOrder = live.filter((id) => keySet.has(id));
+    const live = state.listLive[props.listId] ?? [];
+    const fromLive = live.filter((id) => keySet.has(id));
+    const sourceIsDone = fromLive.length === 0;
+    const inOrder = sourceIsDone
+      ? doneMembers()
+          .map((it) => it.id)
+          .filter((id) => keySet.has(id))
+      : fromLive;
     if (inOrder.length === 0) return;
-    const memberIds = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
-    const remaining = memberIds.filter((id) => !keySet.has(id));
-    const anchor =
-      foreignIdx !== null && foreignIdx < remaining.length
-        ? remaining[foreignIdx]
-        : planAnchor(memberIds, keySet, null);
-    // The dragged rows all share one source column (cross-column
-    // multi-select isn't supported); clear its now-stale selection, then
-    // stage the moved rows to become the target column's selection.
-    const sourceCols = new Set(keys.map((k) => resolvedColumnOf(k)));
-    dropIntoColumn(colKey, inOrder, anchor);
+
+    if (colKey === DONE_COL) {
+      // Drop into Done → mark the (live) rows done. Their `column`
+      // register is preserved, so un-doning later returns them to their
+      // column (spec/kanban.md: done items keep their register).
+      app.setDoneMany(inOrder, true);
+    } else if (sourceIsDone) {
+      // Drop a done row onto a live column → un-done it and regroup. Its
+      // order entry was preserved, so it reappears at its former linear
+      // slot; precise vertical placement within the column is out of
+      // scope here (the register write is what moves it between columns).
+      const targetCol = colKey === DEFAULT_COL ? null : colKey;
+      app.withActionBatch(() => {
+        app.setDoneMany(inOrder, false);
+        for (const id of inOrder) app.setItemColumn(id, targetCol);
+      });
+    } else {
+      // Live → live cross-column drop (unchanged): register write +
+      // linear placement before the previewed anchor.
+      const memberIds = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+      const remaining = memberIds.filter((id) => !keySet.has(id));
+      const anchor =
+        foreignIdx !== null && foreignIdx < remaining.length
+          ? remaining[foreignIdx]
+          : planAnchor(memberIds, keySet, null);
+      dropIntoColumn(colKey, inOrder, anchor);
+    }
+    // Clear the source column's now-stale selection, then stage the moved
+    // rows to become the target column's selection once they land.
+    const sourceCols = new Set(keys.map((k) => sourceColOf(k)));
     for (const c of sourceCols) columnSelections.get(c)?.clear();
     setPendingSelect({ colKey, ids: inOrder });
   };
@@ -417,6 +496,7 @@ export function Board(props: {
   const orderedColKeys = (): string[] => [
     DEFAULT_COL,
     ...columns().map((c) => c.id),
+    ...(doneVisible() ? [DONE_COL] : []),
   ];
   const jumpColumn = (dir: -1 | 1): void => {
     const order = orderedColKeys();
@@ -428,7 +508,7 @@ export function Board(props: {
       for (const [colKey, sel] of columnSelections) {
         if (sel !== active) continue;
         curIdx = order.indexOf(colKey);
-        const ids = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+        const ids = membersOf(colKey).map((it) => it.id);
         const top = active.getSelectionTop();
         curPos = top != null ? Math.max(0, ids.indexOf(String(top))) : 0;
         break;
@@ -436,7 +516,7 @@ export function Board(props: {
     }
     for (let i = curIdx + dir; i >= 0 && i < order.length; i += dir) {
       const colKey = order[i];
-      const ids = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+      const ids = membersOf(colKey).map((it) => it.id);
       if (ids.length === 0) continue;
       const key = ids[Math.min(curPos, ids.length - 1)];
       const sel = selectionFor(colKey);
@@ -559,6 +639,31 @@ export function Board(props: {
           />
         </Show>
       </div>
+      {/* Pinned virtual Done column: this list's done items, newest first.
+          A drop target (drag a card in to mark it done) and a drag source
+          (drag a card out to un-done it), but never internally reordered —
+          it has no linear order of its own. Toggled by a per-list
+          preference from the view-mode popover. */}
+      <Show when={doneVisible()}>
+        <BoardColumn
+          app={app}
+          listId={props.listId}
+          colKey={DONE_COL}
+          variant="done"
+          name={m().board.doneColumn}
+          selection={selectionFor(DONE_COL)}
+          members={() => doneMembers()}
+          onRename={() => {}}
+          onReorder={() => {}}
+          onAddItem={() => {}}
+          registerHandle={registerHandle}
+          onOpen={props.onOpen}
+          onSetDue={props.onSetDue}
+          openOnTap={props.openOnTap}
+          duplicateBlock={props.duplicateBlock}
+          copyBlock={props.copyBlock}
+        />
+      </Show>
     </div>
   );
 }
@@ -594,9 +699,14 @@ function BoardColumn(props: {
     moveRight?: () => void;
     delete: () => void;
   };
+  /** `"done"` renders the pinned virtual Done column: a fixed label (no
+   *  rename), no add/menu affordances, and no internal reorder — its cards
+   *  are lifecycle-grouped and timestamp-sorted, not order-container backed. */
+  variant?: "done";
 }) {
   const { m } = useAppI18n();
   const app = props.app;
+  const isDoneCol = props.variant === "done";
   // Selection is owned by the board (per column) — see Board.selectionFor.
   const selection = props.selection;
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
@@ -605,15 +715,34 @@ function BoardColumn(props: {
   let startRename: (() => void) | undefined;
 
   return (
-    <section class="board-col" data-drop-column-id={props.colKey}>
+    <section
+      class="board-col"
+      classList={{ "board-col-done": isDoneCol }}
+      data-drop-column-id={props.colKey}
+    >
       <header class="board-col-header">
-        <EditableNavLabel
-          class="board-col-name"
-          name={props.name}
-          onSave={props.onRename}
-          registerStart={(fn) => (startRename = fn)}
-        />
+        <Show
+          when={!isDoneCol}
+          fallback={
+            <span class="board-col-name board-col-name-fixed">
+              <span
+                class="board-col-done-icon"
+                aria-hidden="true"
+                innerHTML={checkSvg}
+              />
+              {props.name}
+            </span>
+          }
+        >
+          <EditableNavLabel
+            class="board-col-name"
+            name={props.name}
+            onSave={props.onRename}
+            registerStart={(fn) => (startRename = fn)}
+          />
+        </Show>
         <span class="board-col-count">{props.members().length}</span>
+        <Show when={!isDoneCol}>
         <button
           type="button"
           class="board-col-add-btn"
@@ -671,6 +800,7 @@ function BoardColumn(props: {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu>
+        </Show>
       </header>
       <div class="board-col-body">
         <Dnd
@@ -683,7 +813,7 @@ function BoardColumn(props: {
           itemHeight={CARD_HEIGHT}
           placeholderGap={CARD_GAP}
           fillHeight
-          reorder
+          reorder={!isDoneCol}
           autofocus={props.autofocus}
           onReorder={props.onReorder}
         >
@@ -693,7 +823,7 @@ function BoardColumn(props: {
               expanded={expanded}
               app={app}
               selection={selection}
-              viewKind="list"
+              viewKind={isDoneCol ? "done" : "list"}
               duplicateBlock={props.duplicateBlock}
               copyBlock={props.copyBlock}
               onOpen={props.onOpen}

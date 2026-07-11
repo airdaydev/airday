@@ -15,10 +15,11 @@ import {
 import type { DndDragEventDetail } from "./dnd";
 import { Popover } from "@kobalte/core/popover";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
+import { Switch } from "@kobalte/core/switch";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
-import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import trashSvg from "./icons/trash.svg?raw";
@@ -66,6 +67,19 @@ const BOARD_PREF_KEY = "airday:board-lists";
 function loadBoardPrefs(): Record<string, boolean> {
   try {
     const raw = localStorage.getItem(BOARD_PREF_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Per-list "hide the board's Done column" preference. Same local-only
+// storage rationale as BOARD_PREF_KEY. Stores only the lists where the
+// column is hidden — absent ≡ shown, so boards default to showing Done.
+const DONE_HIDE_PREF_KEY = "airday:board-done-hidden";
+function loadDoneHidePrefs(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(DONE_HIDE_PREF_KEY);
     return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
   } catch {
     return {};
@@ -170,6 +184,22 @@ export function Workspace(props: {
     setBoardLists(next);
     try {
       localStorage.setItem(BOARD_PREF_KEY, JSON.stringify(next));
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+  // Which boards hide their Done column. Absent ≡ shown.
+  const [doneHidden, setDoneHidden] = createSignal<Record<string, boolean>>(
+    loadDoneHidePrefs(),
+  );
+  const showDoneColumn = (listId: string): boolean => !doneHidden()[listId];
+  const setShowDoneColumn = (listId: string, show: boolean) => {
+    const next = { ...doneHidden() };
+    if (show) delete next[listId];
+    else next[listId] = true;
+    setDoneHidden(next);
+    try {
+      localStorage.setItem(DONE_HIDE_PREF_KEY, JSON.stringify(next));
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
@@ -1214,7 +1244,7 @@ export function Workspace(props: {
                       ? m().board.viewAsBoard
                       : m().board.viewAsList
                   }
-                  innerHTML={dotsVerticalSvg}
+                  innerHTML={mixerHzSvg}
                 />
                 <Popover.Portal>
                   <Popover.Content class="view-mode-popover">
@@ -1259,6 +1289,25 @@ export function Workspace(props: {
                         </SegmentedControl.ItemControl>
                       </SegmentedControl.Item>
                     </SegmentedControl>
+                    <Show when={boardListId()}>
+                      {(listId) => (
+                        <Switch
+                          class="done-switch"
+                          checked={showDoneColumn(listId())}
+                          onChange={(checked) =>
+                            setShowDoneColumn(listId(), checked)
+                          }
+                        >
+                          <Switch.Label class="done-switch-label">
+                            {m().board.showDoneColumn}
+                          </Switch.Label>
+                          <Switch.Input class="done-switch-input" />
+                          <Switch.Control class="done-switch-control">
+                            <Switch.Thumb class="done-switch-thumb" />
+                          </Switch.Control>
+                        </Switch>
+                      )}
+                    </Show>
                   </Popover.Content>
                 </Popover.Portal>
               </Popover>
@@ -1383,6 +1432,7 @@ export function Workspace(props: {
               revealIds={boardRevealIds}
               clearReveal={() => setBoardRevealIds(null)}
               onActiveSelectionChange={setBoardSelection}
+              showDoneColumn={() => showDoneColumn(listId)}
               ref={(h) => (boardHandle = h)}
             />
           )}

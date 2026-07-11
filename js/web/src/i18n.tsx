@@ -116,6 +116,10 @@ type Messages = {
     /** Short segment labels for that control. */
     list: string;
     board: string;
+    /** Header label for the pinned virtual "done" board column. */
+    doneColumn: string;
+    /** Switch label (view-mode popover) toggling the Done column on/off. */
+    showDoneColumn: string;
   };
   due: {
     /** Section label / accessible name for the due-date control. */
@@ -277,6 +281,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewMode: "Modo de vista",
       list: "Lista",
       board: "Tablero",
+      doneColumn: "Hecho",
+      showDoneColumn: "Columna Hecho",
     },
     due: {
       label: "Fecha de vencimiento",
@@ -428,6 +434,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewMode: "View mode",
       list: "List",
       board: "Board",
+      doneColumn: "Done",
+      showDoneColumn: "Done column",
     },
     due: {
       label: "Due date",

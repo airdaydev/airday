@@ -871,6 +871,69 @@ body {
   height: 15px;
 }
 
+/* Done-column toggle in the view-mode popover. Kobalte Switch, sized at
+   50% of the component's default (44×24 track / 20px thumb → 22×12 / 10px).
+   The track is padded 1px, so the 10px thumb travels 22 − 2 − 10 = 10px. */
+.done-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.done-switch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.done-switch-control {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  width: 22px;
+  height: 12px;
+  padding: 1px;
+  border-radius: 999px;
+  background: var(--border-input);
+  transition: background 150ms ease;
+}
+
+.done-switch[data-checked] .done-switch-control {
+  background: var(--link);
+}
+
+.done-switch-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 150ms ease;
+}
+
+.done-switch[data-checked] .done-switch-thumb {
+  transform: translateX(10px);
+}
+
+/* Keyboard focus ring on the hidden input's sibling control. */
+.done-switch-input:focus-visible + .done-switch-control {
+  box-shadow: 0 0 0 2px var(--dnd-select-bg);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -2293,6 +2356,37 @@ body {
 .board-col-add-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* Pinned virtual Done column: visually recessed vs. the working columns
+   and tagged so its drop target reads without a placeholder preview (it
+   runs reorder-off, so there is none). */
+.board-col-done {
+  background: color-mix(in srgb, var(--bg-nav) 28%, var(--bg));
+}
+
+.board-col-name-fixed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+}
+
+.board-col-done-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+
+.board-col-done-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Drop-target highlight. Live columns also render a placeholder preview;
+   the Done column relies on this alone. */
+.board-col[data-drop-active] {
+  box-shadow: inset 0 0 0 2px var(--dnd-select-bg);
 }
 
 .board-col-body {
