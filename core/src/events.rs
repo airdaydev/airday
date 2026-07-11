@@ -23,11 +23,11 @@ pub enum AppEvent {
 
     // ---------- items ----------
     /// New item appeared (local add or remote insert), or backfill on
-    /// initial attach. `live_index` is the position within the *live*
-    /// projection of `list_id` (done/binned excluded) — `None` when the
-    /// item is not live. UI layers that keep per-list arrays splice at
-    /// `live_index`. There is no global item order in the v2 schema, so
-    /// there is no doc-wide index.
+    /// initial attach. `open_index` is the position within the *Open*
+    /// projection of `list_id` (Backlog + Live, i.e. done/binned excluded)
+    /// — `None` when the item is not open. UI layers that keep per-list
+    /// Open arrays splice at `open_index`. There is no global item order
+    /// in the v2 schema, so there is no doc-wide index.
     ItemAdded {
         id: String,
         list_id: String,
@@ -36,13 +36,14 @@ pub enum AppEvent {
         created_at: i64,
         done_at: Option<i64>,
         binned_at: Option<i64>,
-        /// Raw board-column register (`spec/kanban.md`); consumers
-        /// resolve valid-or-default against the list's column defs.
-        column: Option<String>,
+        /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false`
+        /// ≡ Backlog. Combined with `done_at`/`binned_at` (precedence
+        /// Binned > Done > Live > Backlog) it resolves the item's lane.
+        live: bool,
         /// Date-only due date (`YYYY-MM-DD`) or `None`. Floating local
         /// calendar date — consumers format without timezone conversion.
         due_on: Option<String>,
-        live_index: Option<usize>,
+        open_index: Option<usize>,
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
     /// `binned_at` does *not* emit this — that emits
@@ -52,13 +53,13 @@ pub enum AppEvent {
     },
     /// Item changed position within its list's order (an in-list
     /// reorder, or a passive shift caused by a neighbour's move).
-    /// Cross-list moves emit `ItemListChanged` instead. `live_index` is
-    /// the item's resulting position within its list's live projection;
+    /// Cross-list moves emit `ItemListChanged` instead. `open_index` is
+    /// the item's resulting position within its list's Open projection;
     /// `None` when the item is done/binned, whose ordering is
     /// view-local (timestamp sorts), not CRDT order.
     ItemMoved {
         id: String,
-        live_index: Option<usize>,
+        open_index: Option<usize>,
     },
     ItemTextChanged {
         id: String,
@@ -76,37 +77,32 @@ pub enum AppEvent {
         id: String,
         due_on: Option<String>,
     },
-    /// Done/binned flags changed. The two are independent — an event is
-    /// emitted whenever either timestamp transitions on/off, and the
-    /// payload carries both current values so consumers can mirror state
-    /// without tracking the previous one. `live_index` is the item's
-    /// position within its list's live projection when the item is live
-    /// after the change (restore / un-done re-entry point); `None` when
-    /// it is done/binned (consumers drop it from the live array).
+    /// Lifecycle changed (`spec/data-model.md`). The three stored fields
+    /// are independent — an event is emitted whenever any of `live`,
+    /// `done_at` or `binned_at` transitions, and the payload carries all
+    /// current values so consumers can resolve the lane by precedence
+    /// (Binned > Done > Live > Backlog) without rereading the doc.
+    /// `open_index` is the item's position within its list's Open
+    /// projection when the item is open after the change (restore /
+    /// un-done re-entry point, or a Backlog↔Live flip that keeps it in
+    /// place); `None` when it is done/binned (consumers drop it from the
+    /// Open array).
     ItemLifecycleChanged {
         id: String,
+        live: bool,
         done_at: Option<i64>,
         binned_at: Option<i64>,
-        live_index: Option<usize>,
-    },
-    /// Item's board-column register changed (`spec/kanban.md`). The
-    /// payload is the raw register value after the write — `None` when
-    /// cleared (default column). Consumers resolve valid-or-default
-    /// against the item's list's column defs; a same-commit reorder
-    /// arrives as a separate `ItemMoved`.
-    ItemColumnChanged {
-        id: String,
-        column: Option<String>,
+        open_index: Option<usize>,
     },
     /// Item's `list_id` field changed without changing position
     /// (e.g. orphan reassignment when a list is deleted), or alongside
-    /// an `ItemMoved` (cross-list drag). `live_index` is the item's
-    /// position within the *new* list's live projection; `None` when
+    /// an `ItemMoved` (cross-list drag). `open_index` is the item's
+    /// position within the *new* list's Open projection; `None` when
     /// the item is done/binned.
     ItemListChanged {
         id: String,
         list_id: String,
-        live_index: Option<usize>,
+        open_index: Option<usize>,
     },
 
     // ---------- lists ----------
@@ -128,47 +124,14 @@ pub enum AppEvent {
         name: String,
     },
 
-    // ---------- board columns (spec/kanban.md) ----------
-    /// A column def appeared in `columns/<list_id>`. `index` is the
-    /// position among user columns — the implicit default column is
-    /// pinned first and never counted.
-    ColumnAdded {
-        list_id: String,
-        id: String,
-        name: String,
-        created_at: i64,
-        index: usize,
-    },
-    ColumnRemoved {
-        list_id: String,
-        id: String,
-    },
-    ColumnMoved {
-        list_id: String,
-        id: String,
-        index: usize,
-    },
-    ColumnRenamed {
-        list_id: String,
-        id: String,
-        name: String,
-    },
-    /// The implicit default column's display-name override changed for
-    /// one list (`main` included — storage differs, the event doesn't).
-    /// `None` means clients fall back to the localized built-in label.
-    DefaultColumnRenamed {
-        list_id: String,
-        name: Option<String>,
-    },
-
     // ---------- workspace settings ----------
     /// Doc-level synced settings changed. The payload carries the
     /// current known value for each surfaced field so consumers can
     /// mirror a small settings object with a single write.
     SettingsChanged {
-        /// When true, clients render each non-Queue list's live-item
-        /// count in the nav (subject to the count > 0 gate). Queue
-        /// always shows its count regardless. Single global flag —
+        /// When true, clients render each non-Queue list's open-item
+        /// count (Backlog + Live) in the nav (subject to the count > 0
+        /// gate). Queue always shows its count regardless. Single global flag —
         /// there is no per-list override.
         show_list_counts: bool,
         /// `None` when the user hasn't overridden Queue's display name;

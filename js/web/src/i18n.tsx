@@ -100,25 +100,17 @@ type Messages = {
   board: {
     viewAsBoard: string;
     viewAsList: string;
-    addColumn: string;
-    columnNamePlaceholder: string;
-    renameColumn: string;
-    deleteColumn: string;
-    moveLeft: string;
-    moveRight: string;
-    /** Built-in label for the implicit default column when the user
-     *  hasn't renamed it. */
-    defaultColumn: string;
-    moveToColumn: string;
+    /** Header labels for the three fixed board lanes (spec/board.md). */
+    backlogLane: string;
+    liveLane: string;
+    doneLane: string;
     addItem: string;
     /** Accessible name for the list/board view-mode segmented control. */
     viewMode: string;
     /** Short segment labels for that control. */
     list: string;
     board: string;
-    /** Header label for the pinned virtual "done" board column. */
-    doneColumn: string;
-    /** Switch label (view-mode popover) toggling the Done column on/off. */
+    /** Switch label (view-mode popover) toggling the Done lane on/off. */
     showDoneColumn: string;
   };
   due: {
@@ -155,7 +147,7 @@ type Messages = {
     redo: string;
     bin: string;
     switchList: string;
-    switchColumn: string;
+    switchLane: string;
     find: string;
     showShortcuts: string;
   };
@@ -269,20 +261,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     board: {
       viewAsBoard: "Vista de tablero",
       viewAsList: "Vista de lista",
-      addColumn: "Añadir columna",
-      columnNamePlaceholder: "Nombre de la columna",
-      renameColumn: "Renombrar columna",
-      deleteColumn: "Eliminar columna",
-      moveLeft: "Mover a la izquierda",
-      moveRight: "Mover a la derecha",
-      defaultColumn: "Pendiente",
-      moveToColumn: "Mover a la columna",
+      backlogLane: "Pendiente",
+      liveLane: "En curso",
+      doneLane: "Hecho",
       addItem: "Añadir elemento",
       viewMode: "Modo de vista",
       list: "Lista",
       board: "Tablero",
-      doneColumn: "Hecho",
-      showDoneColumn: "Columna Hecho",
+      showDoneColumn: "Carril Hecho",
     },
     due: {
       label: "Fecha de vencimiento",
@@ -308,7 +294,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       redo: "Rehacer",
       bin: "Mover a la papelera",
       switchList: "Cambiar de vista",
-      switchColumn: "Cambiar de columna",
+      switchLane: "Cambiar de carril",
       find: "Buscar",
       showShortcuts: "Mostrar atajos",
     },
@@ -422,20 +408,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     board: {
       viewAsBoard: "Board view",
       viewAsList: "List view",
-      addColumn: "Add column",
-      columnNamePlaceholder: "Column name",
-      renameColumn: "Rename column",
-      deleteColumn: "Delete column",
-      moveLeft: "Move left",
-      moveRight: "Move right",
-      defaultColumn: "Backlog",
-      moveToColumn: "Move to column",
+      backlogLane: "Backlog",
+      liveLane: "Live",
+      doneLane: "Done",
       addItem: "Add item",
       viewMode: "View mode",
       list: "List",
       board: "Board",
-      doneColumn: "Done",
-      showDoneColumn: "Done column",
+      showDoneColumn: "Done lane",
     },
     due: {
       label: "Due date",
@@ -461,7 +441,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       redo: "Redo",
       bin: "Move to bin",
       switchList: "Switch view",
-      switchColumn: "Switch column",
+      switchLane: "Switch lane",
       find: "Find",
       showShortcuts: "Show shortcuts",
     },

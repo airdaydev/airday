@@ -9,7 +9,7 @@ fn move_item_to_same_visible_slot_is_noop() {
 
     doc.move_item(&b, LIST_MAIN, 1).unwrap();
 
-    assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b, c]);
+    assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b, c]);
 }
 
 #[test]
@@ -22,7 +22,7 @@ fn move_item_down_uses_resulting_visible_index() {
 
     doc.move_item(&b, LIST_MAIN, 2).unwrap();
 
-    assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c, b, d]);
+    assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c, b, d]);
 }
 
 #[test]
@@ -37,20 +37,20 @@ fn undo_redo_roundtrips_reorder_with_hidden_items() {
 
     doc.move_item(&a, LIST_MAIN, 2).unwrap();
     doc.move_item(&b, &other, 0).unwrap();
-    let expected_main = doc.live_item_ids(LIST_MAIN);
-    let expected_other = doc.live_item_ids(&other);
+    let expected_main = doc.open_item_ids(LIST_MAIN);
+    let expected_other = doc.open_item_ids(&other);
 
     while doc.can_undo() {
         assert!(doc.undo().unwrap());
     }
-    assert!(doc.live_item_ids(LIST_MAIN).is_empty());
-    assert!(doc.live_item_ids(&other).is_empty());
+    assert!(doc.open_item_ids(LIST_MAIN).is_empty());
+    assert!(doc.open_item_ids(&other).is_empty());
 
     while doc.can_redo() {
         assert!(doc.redo().unwrap());
     }
-    assert_eq!(doc.live_item_ids(LIST_MAIN), expected_main);
-    assert_eq!(doc.live_item_ids(&other), expected_other);
-    assert_eq!(doc.live_item_ids(LIST_MAIN), vec![c, a]);
-    assert_eq!(doc.live_item_ids(&other), vec![b]);
+    assert_eq!(doc.open_item_ids(LIST_MAIN), expected_main);
+    assert_eq!(doc.open_item_ids(&other), expected_other);
+    assert_eq!(doc.open_item_ids(LIST_MAIN), vec![c, a]);
+    assert_eq!(doc.open_item_ids(&other), vec![b]);
 }

@@ -4,10 +4,13 @@
 //! Layout matches `spec/data-model.md` (schema v2):
 //! - root container `items` (`LoroMap`) — keyed by the item's stable
 //!   UUID; each value is a child `LoroMap` with `id`, `text`,
-//!   `location`, `created_at`, optional `notes`, optional `done_at`,
-//!   optional `binned_at`. `done` and `binned` are orthogonal: an item
-//!   can be both. Presence of the timestamp is the flag — there's no
-//!   separate boolean.
+//!   `location`, `created_at`, optional `notes`, optional `live`,
+//!   optional `done_at`, optional `binned_at`. The lifecycle
+//!   (`spec/data-model.md`) is derived from these three fields by
+//!   precedence Binned > Done > Live > Backlog; they are independent
+//!   (an item can carry `done_at`, `binned_at` and `live` at once).
+//!   Presence of a timestamp is the done/binned flag; `live` (absent ≡
+//!   Backlog, `true` ≡ Live) is the underlying open state they mask.
 //! - root container `lists` (`LoroMovableList`) — each entry is a
 //!   `LoroMap` with `id`, `name`, `created_at`.
 //! - root container `settings` (`LoroMap`) — account-wide synced
@@ -63,10 +66,6 @@ const ROOT_SETTINGS: &str = "settings";
 /// `order/main`, `order/<list-uuid>`. The container for a deleted list
 /// is simply never projected again (root containers can't be removed).
 const ORDER_PREFIX: &str = "order/";
-/// Root-container name prefix for per-list board-column defs
-/// (`spec/kanban.md`): `columns/main`, `columns/<list-uuid>`. Same
-/// abandonment story as order containers when a list is deleted.
-const COLUMNS_PREFIX: &str = "columns/";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
@@ -75,12 +74,11 @@ const KEY_NOTES: &str = "notes";
 /// one scalar so list membership and placement can never be torn apart
 /// by concurrent edits. See `Location`.
 const KEY_LOCATION: &str = "location";
-/// Board-column grouping register (`spec/kanban.md`). Optional column
-/// id; absent — or naming no existing column of the item's current
-/// list — resolves to the implicit default column. Written on its own,
-/// never folded into `location`: the resolution rule makes a lost race
-/// against a cross-list move harmless.
-const KEY_COLUMN: &str = "column";
+/// Lifecycle flag (`spec/data-model.md`): absent or `false` ≡ Backlog,
+/// `true` ≡ Live. Independent of `done_at`/`binned_at`, which mask it.
+/// Written only when `true` and deleted when cleared, so Backlog items
+/// (the default) carry no key.
+const KEY_LIVE: &str = "live";
 /// Optional date-only due date: a floating local calendar date in
 /// `YYYY-MM-DD` format (no time, no timezone). Absent ≡ no due date;
 /// the mutation deletes the key when cleared. Written on its own scalar
@@ -101,12 +99,6 @@ const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
 /// (Queue) list. Absent ≡ no override; clients render the localized
 /// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
 const KEY_MAIN_NAME: &str = "main_name";
-/// Optional display-name override for a user list's implicit default
-/// board column — lives on the ListMeta map (`spec/kanban.md`).
-const KEY_DEFAULT_COLUMN_NAME: &str = "default_column_name";
-/// Same override for the reserved `main` list, which has no ListMeta
-/// row — lives on the doc-level settings map.
-const KEY_MAIN_DEFAULT_COLUMN_NAME: &str = "main_default_column_name";
 /// Batch lifecycle mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
@@ -125,8 +117,6 @@ pub enum DocError {
     ItemNotFound(String),
     #[error("list not found: {0}")]
     ListNotFound(String),
-    #[error("column not found: {0}")]
-    ColumnNotFound(String),
     #[error("can't delete the built-in list `{0}`")]
     CannotDeleteBuiltin(String),
     #[error("can't move the built-in list `{0}`")]
@@ -157,9 +147,22 @@ impl From<loro::LoroEncodeError> for DocError {
     }
 }
 
+/// Derived four-state lifecycle of an item (`spec/data-model.md`),
+/// resolved from the stored `live` flag plus `done_at` / `binned_at`
+/// timestamps by precedence **Binned > Done > Live > Backlog**. The
+/// persisted representation is those three independent fields; this enum
+/// is the API-level view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemLifecycle {
+    Backlog,
+    Live,
+    Done,
+    Binned,
+}
+
 /// Stable view of a single item, surfaced to clients (CLI list, fingerprint).
-/// `done_at`/`binned_at` are independent: an item can be both done and
-/// binned. `done` and `binned` are derived predicates, not stored fields.
+/// `live`, `done_at` and `binned_at` are independent stored fields; the
+/// displayed [`ItemLifecycle`] is derived from them by precedence.
 /// `list_id` is derived from the atomic `location` register.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemView {
@@ -167,10 +170,10 @@ pub struct ItemView {
     pub text: String,
     pub notes: String,
     pub list_id: String,
-    /// Raw board-column register (`spec/kanban.md`). Consumers resolve
-    /// valid-or-default against the list's column defs; the core never
-    /// interprets it for projection.
-    pub column: Option<String>,
+    /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false` ≡
+    /// Backlog. Masked by `done_at`/`binned_at` when those are set; it is
+    /// the underlying open state revealed by un-done / restore.
+    pub live: bool,
     /// Optional date-only due date — a floating local calendar date in
     /// `YYYY-MM-DD` format. `None` ≡ no due date. The core stores and
     /// echoes the raw string; it never parses it into a timestamp.
@@ -187,9 +190,22 @@ impl ItemView {
     pub fn is_binned(&self) -> bool {
         self.binned_at.is_some()
     }
-    /// Visible in a per-list view: neither done nor binned.
-    pub fn is_in_list_view(&self) -> bool {
+    /// Open (visible in a per-list view): neither done nor binned. The
+    /// Open projection of a list is its Backlog + Live items.
+    pub fn is_open(&self) -> bool {
         !self.is_done() && !self.is_binned()
+    }
+    /// Resolved lifecycle by precedence Binned > Done > Live > Backlog.
+    pub fn lifecycle(&self) -> ItemLifecycle {
+        if self.is_binned() {
+            ItemLifecycle::Binned
+        } else if self.is_done() {
+            ItemLifecycle::Done
+        } else if self.live {
+            ItemLifecycle::Live
+        } else {
+            ItemLifecycle::Backlog
+        }
     }
 }
 
@@ -198,33 +214,19 @@ pub struct ListView {
     pub id: String,
     pub name: String,
     pub created_at: i64,
-    /// Display-name override for the implicit default board column;
-    /// `None` means clients render the localized built-in label.
-    pub default_column_name: Option<String>,
-}
-
-/// One board-column def from `columns/<list-id>` (`spec/kanban.md`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ColumnView {
-    pub id: String,
-    pub name: String,
-    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SettingsView {
-    /// When true, clients render each non-Queue list's live-item count
-    /// in the nav (subject to the count > 0 gate). Queue's count is
-    /// always shown regardless. Single global flag; default false.
+    /// When true, clients render each non-Queue list's open-item count
+    /// (Backlog + Live) in the nav (subject to the count > 0 gate).
+    /// Queue's count is always shown regardless. Single global flag;
+    /// default false.
     pub show_list_counts: bool,
     /// User-chosen override for the reserved `main` (Queue) list's
     /// display name. `None` (or absent in storage) means clients render
     /// the localized built-in label.
     pub main_name: Option<String>,
-    /// Default-board-column name override for `main` — the ListMeta-less
-    /// twin of `ListView::default_column_name`. Surfaced to clients via
-    /// `DefaultColumnRenamed`, not `SettingsChanged`.
-    pub main_default_column_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -265,21 +267,6 @@ pub struct ExportList {
     pub name: String,
     pub created_at: Option<i64>,
     pub builtin: bool,
-    /// Default-board-column name override (`spec/kanban.md`). Skipped
-    /// when unset to keep pre-kanban dumps byte-identical.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub default_column_name: Option<String>,
-    /// Board-column defs in board order. Skipped when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub columns: Vec<ExportColumn>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportColumn {
-    pub id: String,
-    pub name: String,
-    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,9 +276,11 @@ pub struct ExportItem {
     pub text: String,
     pub notes: String,
     pub list_id: String,
-    /// Raw board-column register. Skipped when unset.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub column: Option<String>,
+    /// Lifecycle flag (`spec/data-model.md`): `true` ≡ Live. Skipped when
+    /// `false`/Backlog to keep the default-case JSON minimal and stay
+    /// byte-compatible with pre-lifecycle dumps.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub live: bool,
     /// Date-only due date (`YYYY-MM-DD`). Skipped when unset to keep
     /// pre-due-date dumps byte-identical.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -358,10 +347,6 @@ fn order_root_name(list_id: &str) -> String {
     format!("{ORDER_PREFIX}{list_id}")
 }
 
-fn columns_root_name(list_id: &str) -> String {
-    format!("{COLUMNS_PREFIX}{list_id}")
-}
-
 // ---------- disposable projection index ----------
 
 /// Per-item slice of the state the projection needs, mirrored in
@@ -371,16 +356,16 @@ fn columns_root_name(list_id: &str) -> String {
 struct ItemMeta {
     list_id: String,
     placement_id: String,
-    live: bool,
+    open: bool,
     created_at: i64,
 }
 
 /// Resolution of a target index against a list's projection — the raw
-/// container position to write at, and (when exact) the live splice
+/// container position to write at, and (when exact) the open splice
 /// position. See [`ProjectionIndex::plan_target`].
 struct TargetPlan {
     raw_pos: usize,
-    live_pos: Option<usize>,
+    open_pos: Option<usize>,
 }
 
 /// Disposable in-memory mirror of everything ordering-related.
@@ -396,15 +381,15 @@ struct ProjectionIndex {
     /// list id → positional mirror of `order/<list-id>`. `None` slots
     /// keep unparseable entries position-aligned with the container.
     raw_orders: HashMap<String, Vec<Option<OrderEntry>>>,
-    /// list id → live projection (visible entries filtered to live
-    /// items, then the deterministic fallback tail). Lists with no live
+    /// list id → open projection (visible entries filtered to open
+    /// items, then the deterministic fallback tail). Lists with no open
     /// items carry no key.
-    live_by_list: HashMap<String, Vec<String>>,
+    open_by_list: HashMap<String, Vec<String>>,
     /// list id → number of *visible* entries in that list's order
     /// container (any lifecycle). `members(list).len() == visible` ⟺ the
-    /// list has no fallback tail — the precondition for the O(live)
+    /// list has no fallback tail — the precondition for the O(open)
     /// splice fast paths; anything tail-adjacent falls back to a full
-    /// `refresh_live` walk. Lists with zero visible entries carry no
+    /// `refresh_open` walk. Lists with zero visible entries carry no
     /// key.
     visible_counts: HashMap<String, usize>,
 }
@@ -466,39 +451,39 @@ impl ProjectionIndex {
         ids.into_iter().map(str::to_string).collect()
     }
 
-    /// Recompute and store `list_id`'s live projection (and visible
+    /// Recompute and store `list_id`'s open projection (and visible
     /// count); returns the projection. One walk covers both; only the
-    /// live ids are cloned, so a 13k-lifetime list with 200 live items
+    /// open ids are cloned, so a 13k-lifetime list with 200 open items
     /// allocates 200 strings, not 2×13k.
-    fn refresh_live(&mut self, list_id: &str) -> Vec<String> {
-        let (live, visible) = {
+    fn refresh_open(&mut self, list_id: &str) -> Vec<String> {
+        let (open, visible) = {
             let (ids, seen) = self.visible_ids(list_id);
             let visible = ids.len();
-            let is_live = |id: &str| self.meta.get(id).is_some_and(|m| m.live);
-            let mut live: Vec<String> = ids
+            let is_open = |id: &str| self.meta.get(id).is_some_and(|m| m.open);
+            let mut open: Vec<String> = ids
                 .into_iter()
-                .filter(|id| is_live(id))
+                .filter(|id| is_open(id))
                 .map(str::to_string)
                 .collect();
-            live.extend(
+            open.extend(
                 self.tail(list_id, &seen)
                     .into_iter()
-                    .filter(|id| is_live(id))
+                    .filter(|id| is_open(id))
                     .map(str::to_string),
             );
-            (live, visible)
+            (open, visible)
         };
         if visible == 0 {
             self.visible_counts.remove(list_id);
         } else {
             self.visible_counts.insert(list_id.to_string(), visible);
         }
-        if live.is_empty() {
-            self.live_by_list.remove(list_id);
+        if open.is_empty() {
+            self.open_by_list.remove(list_id);
         } else {
-            self.live_by_list.insert(list_id.to_string(), live.clone());
+            self.open_by_list.insert(list_id.to_string(), open.clone());
         }
-        live
+        open
     }
 
     /// True when every item located in `list_id` is entry-backed — no
@@ -520,46 +505,46 @@ impl ProjectionIndex {
         }
     }
 
-    /// Splice `id` into `list_id`'s live projection at `at`.
-    fn splice_live_in(&mut self, list_id: &str, id: &str, at: usize) {
-        let arr = self.live_by_list.entry(list_id.to_string()).or_default();
+    /// Splice `id` into `list_id`'s open projection at `at`.
+    fn splice_open_in(&mut self, list_id: &str, id: &str, at: usize) {
+        let arr = self.open_by_list.entry(list_id.to_string()).or_default();
         arr.retain(|x| x != id);
         let at = at.min(arr.len());
         arr.insert(at, id.to_string());
     }
 
-    /// Remove `id` from `list_id`'s live projection.
-    fn splice_live_out(&mut self, list_id: &str, id: &str) {
-        if let Some(arr) = self.live_by_list.get_mut(list_id) {
+    /// Remove `id` from `list_id`'s open projection.
+    fn splice_open_out(&mut self, list_id: &str, id: &str) {
+        if let Some(arr) = self.open_by_list.get_mut(list_id) {
             arr.retain(|x| x != id);
             if arr.is_empty() {
-                self.live_by_list.remove(list_id);
+                self.open_by_list.remove(list_id);
             }
         }
     }
 
     /// Resolve a caller's target index against `list_id`'s projection
-    /// (live projection for live items, full resolved order for hidden
+    /// (open projection for open items, full resolved order for hidden
     /// ones), excluding `exclude` from the anchor count when the item
     /// is being re-placed within its own list.
     ///
-    /// `live_pos` is the exact live splice position when it can be
+    /// `open_pos` is the exact open splice position when it can be
     /// derived without a projection walk: `Some(target)` when the
     /// anchor's canonical entry resolved, `Some(usize::MAX)` (append —
     /// the splice clamps) when inserting past the end of a list with no
-    /// fallback tail, and `None` when the caller must `refresh_live`
+    /// fallback tail, and `None` when the caller must `refresh_open`
     /// after mutating (tail-adjacent cases). Hidden-item plans always
-    /// carry `live_pos: Some(usize::MAX)` — the live array is untouched
+    /// carry `open_pos: Some(usize::MAX)` — the open array is untouched
     /// by hidden mutations, so no refresh is needed on their account.
     fn plan_target(
         &self,
         list_id: &str,
         target_index: usize,
-        is_live: bool,
+        is_open: bool,
         exclude: Option<&str>,
     ) -> TargetPlan {
         let raw_len = self.raw_orders.get(list_id).map(Vec::len).unwrap_or(0);
-        if !is_live {
+        if !is_open {
             let seq = self.resolved(list_id);
             let anchor_index = match exclude.and_then(|e| seq.iter().position(|x| x == e)) {
                 Some(c) if c <= target_index => target_index.saturating_add(1),
@@ -571,11 +556,11 @@ impl ProjectionIndex {
                 .unwrap_or(raw_len);
             return TargetPlan {
                 raw_pos,
-                live_pos: Some(usize::MAX),
+                open_pos: Some(usize::MAX),
             };
         }
         static EMPTY: Vec<String> = Vec::new();
-        let seq = self.live_by_list.get(list_id).unwrap_or(&EMPTY);
+        let seq = self.open_by_list.get(list_id).unwrap_or(&EMPTY);
         let anchor_index = match exclude.and_then(|e| seq.iter().position(|x| x == e)) {
             Some(c) if c <= target_index => target_index.saturating_add(1),
             _ => target_index,
@@ -587,18 +572,18 @@ impl ProjectionIndex {
                 // what makes that hold for same-list re-placement too).
                 Some(ap) => TargetPlan {
                     raw_pos: ap,
-                    live_pos: Some(target_index),
+                    open_pos: Some(target_index),
                 },
                 // Anchor lives in the fallback tail — position within
-                // the live projection needs a walk.
+                // the open projection needs a walk.
                 None => TargetPlan {
                     raw_pos: raw_len,
-                    live_pos: None,
+                    open_pos: None,
                 },
             },
             None => TargetPlan {
                 raw_pos: raw_len,
-                live_pos: if self.tail_is_empty(list_id) {
+                open_pos: if self.tail_is_empty(list_id) {
                     Some(usize::MAX)
                 } else {
                     None
@@ -689,10 +674,6 @@ enum CapturedDiff {
     /// Root `lists` MovableList or one of its list maps changed. Lists
     /// are few, so translation just re-diffs them wholesale.
     Lists,
-    /// One list's `columns/<list-id>` container (or a column entry map)
-    /// changed. Columns are few, so translation re-diffs that list's
-    /// defs wholesale against the pre-state.
-    Columns { list_id: String },
     /// Doc-level settings map changed.
     Settings,
     /// A diff shape we don't translate — forces the full-resync
@@ -750,11 +731,6 @@ fn classify_captured_diff(
         Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
         Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
         Some(name) => {
-            if let Some(list_id) = name.strip_prefix(COLUMNS_PREFIX) {
-                return CapturedDiff::Columns {
-                    list_id: list_id.to_string(),
-                };
-            }
             let Some(list_id) = name.strip_prefix(ORDER_PREFIX) else {
                 return CapturedDiff::Opaque;
             };
@@ -791,11 +767,6 @@ fn classify_captured_diff(
             };
             if root == ROOT_LISTS {
                 return CapturedDiff::Lists;
-            }
-            if let Some(list_id) = root.strip_prefix(COLUMNS_PREFIX) {
-                return CapturedDiff::Columns {
-                    list_id: list_id.to_string(),
-                };
             }
             if root != ROOT_ITEMS {
                 return CapturedDiff::Opaque;
@@ -967,7 +938,7 @@ impl Doc {
             idx.raw_orders.insert(list_id.clone(), raw);
         }
         for list_id in &candidates {
-            idx.refresh_live(list_id);
+            idx.refresh_open(list_id);
         }
         idx
     }
@@ -997,9 +968,9 @@ impl Doc {
         self.add_item_at(list_id, text, usize::MAX)
     }
 
-    /// Insert a new item as the `target_index`-th live entry of
+    /// Insert a new item as the `target_index`-th open entry of
     /// `list_id`, in a single Loro commit. `target_index` past the end
-    /// of the visible live items appends.
+    /// of the visible open items appends.
     pub fn add_item_at(
         &self,
         list_id: &str,
@@ -1010,7 +981,7 @@ impl Doc {
         Ok(ids.into_iter().next().expect("one text yields one id"))
     }
 
-    /// Bulk-insert `texts` as a contiguous run of live items starting
+    /// Bulk-insert `texts` as a contiguous run of open items starting
     /// at the `target_index`-th visible position of `list_id`. All
     /// inserts land in a single Loro commit (one outbound op group).
     /// Validation is upfront: any empty-after-trim entry rejects the
@@ -1021,42 +992,28 @@ impl Doc {
         texts: &[&str],
         target_index: usize,
     ) -> Result<Vec<String>, DocError> {
-        self.add_items_at_impl(list_id, texts, target_index, None)
+        self.add_items_at_impl(list_id, texts, target_index, false)
     }
 
-    /// Board quick-capture: append a new item to `list_id` with its
-    /// column register set to `column_id`, one commit. The item lands at
-    /// the end of the list's linear order (and therefore at the end of
-    /// its column).
-    pub fn add_item_in_column(
-        &self,
-        list_id: &str,
-        column_id: &str,
-        text: &str,
-    ) -> Result<String, DocError> {
-        self.find_column(list_id, column_id)?;
-        let ids = self.add_items_at_impl(list_id, &[text], usize::MAX, Some(column_id))?;
-        Ok(ids.into_iter().next().expect("one text yields one id"))
+    /// Board Live-lane quick-capture: append a new **Live** item to
+    /// `list_id`, one commit. New items are otherwise Backlog; this sets
+    /// the `live` flag in the same commit so the item materializes
+    /// directly in the Live lane (`spec/board.md`).
+    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, DocError> {
+        self.add_item_live_at(list_id, text, usize::MAX)
     }
 
-    /// Board quick-capture at a position: insert a new item as the
-    /// `target_index`-th live entry of `list_id` with its column register
-    /// set to `column_id` (`None` = the implicit default column), one
-    /// commit. `target_index` addresses the list's linear live
-    /// projection — the same index space as `add_item_at` — so inserting
-    /// right after a card lands the new item directly below it within that
-    /// card's column (column order is the linear order filtered).
-    pub fn add_item_in_column_at(
+    /// Board Live-lane quick-capture at a position: insert a new Live
+    /// item as the `target_index`-th open entry of `list_id`, one commit.
+    /// `target_index` addresses the list's Open projection — the same
+    /// index space as `add_item_at`.
+    pub fn add_item_live_at(
         &self,
         list_id: &str,
-        column_id: Option<&str>,
         text: &str,
         target_index: usize,
     ) -> Result<String, DocError> {
-        if let Some(c) = column_id {
-            self.find_column(list_id, c)?;
-        }
-        let ids = self.add_items_at_impl(list_id, &[text], target_index, column_id)?;
+        let ids = self.add_items_at_impl(list_id, &[text], target_index, true)?;
         Ok(ids.into_iter().next().expect("one text yields one id"))
     }
 
@@ -1065,7 +1022,7 @@ impl Doc {
         list_id: &str,
         texts: &[&str],
         target_index: usize,
-        column: Option<&str>,
+        live: bool,
     ) -> Result<Vec<String>, DocError> {
         let trimmed: Vec<&str> = texts.iter().map(|t| t.trim()).collect();
         if trimmed.iter().any(|t| t.is_empty()) {
@@ -1098,8 +1055,8 @@ impl Doc {
                 .encode()
                 .as_str(),
             )?;
-            if let Some(col) = column {
-                map.insert(KEY_COLUMN, col)?;
+            if live {
+                map.insert(KEY_LIVE, true)?;
             }
             let entry = OrderEntry {
                 item_id: id.clone(),
@@ -1116,7 +1073,7 @@ impl Doc {
             ids.push(id);
         }
         self.inner.commit();
-        let live = {
+        let open = {
             let mut guard = self.item_index.lock().expect("item index mutex poisoned");
             for (i, (id, placement, _, now)) in pending.iter().enumerate() {
                 guard.set_meta(
@@ -1124,7 +1081,7 @@ impl Doc {
                     ItemMeta {
                         list_id: list_id.to_string(),
                         placement_id: placement.clone(),
-                        live: true,
+                        open: true,
                         created_at: *now,
                     },
                 );
@@ -1139,18 +1096,18 @@ impl Doc {
                 );
                 guard.bump_visible(list_id, 1);
             }
-            match plan.live_pos {
+            match plan.open_pos {
                 Some(pos) => {
                     for (i, (id, ..)) in pending.iter().enumerate() {
-                        guard.splice_live_in(list_id, id, pos.saturating_add(i));
+                        guard.splice_open_in(list_id, id, pos.saturating_add(i));
                     }
-                    guard.live_by_list.get(list_id).cloned().unwrap_or_default()
+                    guard.open_by_list.get(list_id).cloned().unwrap_or_default()
                 }
-                None => guard.refresh_live(list_id),
+                None => guard.refresh_open(list_id),
             }
         };
         for (id, _, text, now) in pending {
-            let live_index = live.iter().position(|x| x == &id);
+            let open_index = open.iter().position(|x| x == &id);
             self.push_event(AppEvent::ItemAdded {
                 id,
                 list_id: list_id.to_string(),
@@ -1159,9 +1116,9 @@ impl Doc {
                 created_at: now,
                 done_at: None,
                 binned_at: None,
-                column: column.map(str::to_string),
+                live,
                 due_on: None,
-                live_index,
+                open_index,
             });
         }
         Ok(ids)
@@ -1226,8 +1183,8 @@ impl Doc {
     /// (placement preserved). Cross-list: fresh placement, one atomic
     /// `location` write, entry insert in the target order, best-effort
     /// entry removal from the source order — all in one commit (one
-    /// undo step). `target_index` addresses the live projection for
-    /// live items and the full resolved order for done/binned items.
+    /// undo step). `target_index` addresses the open projection for
+    /// open items and the full resolved order for done/binned items.
     pub fn move_item(
         &self,
         item_id: &str,
@@ -1236,16 +1193,16 @@ impl Doc {
     ) -> Result<(), DocError> {
         self.assert_list_exists(target_list_id)?;
         let map = self.find_item(item_id)?;
-        let (cur_list, is_live) = {
+        let (cur_list, is_open) = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             let m = guard
                 .meta
                 .get(item_id)
                 .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-            (m.list_id.clone(), m.live)
+            (m.list_id.clone(), m.open)
         };
         if cur_list == target_list_id {
-            self.reorder_in_list(item_id, &map, target_list_id, target_index, is_live)
+            self.reorder_in_list(item_id, &map, target_list_id, target_index, is_open)
         } else {
             self.move_across_lists(
                 item_id,
@@ -1253,7 +1210,7 @@ impl Doc {
                 &cur_list,
                 target_list_id,
                 target_index,
-                is_live,
+                is_open,
             )
         }
     }
@@ -1264,20 +1221,20 @@ impl Doc {
         map: &LoroMap,
         list_id: &str,
         target_index: usize,
-        is_live: bool,
+        is_open: bool,
     ) -> Result<(), DocError> {
-        let (from, to, live_plan) = {
+        let (from, to, open_plan) = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             let Some(from) = guard.canonical_raw_pos(list_id, item_id) else {
                 // Fallback-tail item (no visible entry): re-place it
                 // with a fresh entry instead of a mov.
                 drop(guard);
-                return self.replace_entry(item_id, map, list_id, target_index, is_live);
+                return self.replace_entry(item_id, map, list_id, target_index, is_open);
             };
             // Anchor over the projection the caller's index speaks
-            // about (live for live items, full resolved order for
+            // about (open for open items, full resolved order for
             // hidden ones), excluding the moving item.
-            let plan = guard.plan_target(list_id, target_index, is_live, Some(item_id));
+            let plan = guard.plan_target(list_id, target_index, is_open, Some(item_id));
             // `raw_pos` is an insert-before position; a `mov` of an
             // earlier element shifts everything after it left by one.
             let to = if plan.raw_pos > from {
@@ -1285,40 +1242,40 @@ impl Doc {
             } else {
                 plan.raw_pos
             };
-            (from, to, plan.live_pos)
+            (from, to, plan.open_pos)
         };
         if from == to {
             return Ok(());
         }
         self.order_list(list_id).mov(from, to)?;
         self.inner.commit();
-        let live_index = {
+        let open_index = {
             let mut guard = self.item_index.lock().expect("item index mutex poisoned");
             if let Some(raw) = guard.raw_orders.get_mut(list_id) {
                 let e = raw.remove(from);
                 raw.insert(to.min(raw.len()), e);
             }
-            if !is_live {
+            if !is_open {
                 None
             } else {
-                match live_plan {
+                match open_plan {
                     Some(pos) => {
-                        guard.splice_live_in(list_id, item_id, pos);
+                        guard.splice_open_in(list_id, item_id, pos);
                         guard
-                            .live_by_list
+                            .open_by_list
                             .get(list_id)
                             .and_then(|arr| arr.iter().position(|x| x == item_id))
                     }
                     None => {
-                        let live = guard.refresh_live(list_id);
-                        live.iter().position(|x| x == item_id)
+                        let open = guard.refresh_open(list_id);
+                        open.iter().position(|x| x == item_id)
                     }
                 }
             }
         };
         self.push_event(AppEvent::ItemMoved {
             id: item_id.to_string(),
-            live_index,
+            open_index,
         });
         Ok(())
     }
@@ -1333,7 +1290,7 @@ impl Doc {
         map: &LoroMap,
         list_id: &str,
         target_index: usize,
-        is_live: bool,
+        is_open: bool,
     ) -> Result<(), DocError> {
         let placement = new_id();
         map.insert(
@@ -1346,7 +1303,7 @@ impl Doc {
             .as_str(),
         )?;
         let raw_pos = self
-            .plan_target(list_id, target_index, is_live, Some(item_id))
+            .plan_target(list_id, target_index, is_open, Some(item_id))
             .raw_pos;
         let order = self.order_list(list_id);
         let entry = OrderEntry {
@@ -1359,7 +1316,7 @@ impl Doc {
             order.insert(raw_pos, entry.encode().as_str())?;
         }
         self.inner.commit();
-        let live_index = {
+        let open_index = {
             let mut guard = self.item_index.lock().expect("item index mutex poisoned");
             if let Some(m) = guard.meta.get_mut(item_id) {
                 m.placement_id = placement;
@@ -1369,16 +1326,16 @@ impl Doc {
             raw.insert(at, Some(entry));
             // Rare path — a full refresh also recomputes the visible
             // count now that a tail item became entry-backed.
-            let live = guard.refresh_live(list_id);
-            if is_live {
-                live.iter().position(|x| x == item_id)
+            let open = guard.refresh_open(list_id);
+            if is_open {
+                open.iter().position(|x| x == item_id)
             } else {
                 None
             }
         };
         self.push_event(AppEvent::ItemMoved {
             id: item_id.to_string(),
-            live_index,
+            open_index,
         });
         Ok(())
     }
@@ -1390,7 +1347,7 @@ impl Doc {
         cur_list: &str,
         target_list_id: &str,
         target_index: usize,
-        is_live: bool,
+        is_open: bool,
     ) -> Result<(), DocError> {
         let placement = new_id();
         let created_at = read_i64(map, KEY_CREATED_AT).unwrap_or(0);
@@ -1403,18 +1360,12 @@ impl Doc {
             .encode()
             .as_str(),
         )?;
-        // Column ids are per-list: best-effort clear the register so the
-        // item lands in the target's default column. Losing this to a
-        // concurrent write is harmless — a wrong-list id resolves to
-        // default anyway (`spec/kanban.md`).
-        let cleared_column = read_string(map, KEY_COLUMN).is_some();
-        if cleared_column {
-            let _ = map.delete(KEY_COLUMN);
-        }
+        // The `live` lifecycle flag is list-agnostic and rides along with
+        // the item across lists (`spec/data-model.md`); nothing to clear.
         let (plan, src_positions, was_visible) = {
             let guard = self.item_index.lock().expect("item index mutex poisoned");
             (
-                guard.plan_target(target_list_id, target_index, is_live, None),
+                guard.plan_target(target_list_id, target_index, is_open, None),
                 guard.entry_positions(cur_list, item_id),
                 guard.canonical_raw_pos(cur_list, item_id).is_some(),
             )
@@ -1437,14 +1388,14 @@ impl Doc {
             src_order.delete(*p, 1)?;
         }
         self.inner.commit();
-        let live_index = {
+        let open_index = {
             let mut guard = self.item_index.lock().expect("item index mutex poisoned");
             guard.set_meta(
                 item_id,
                 ItemMeta {
                     list_id: target_list_id.to_string(),
                     placement_id: placement,
-                    live: is_live,
+                    open: is_open,
                     created_at,
                 },
             );
@@ -1465,21 +1416,21 @@ impl Doc {
             let at = raw_pos.min(raw.len());
             raw.insert(at, Some(entry));
             guard.bump_visible(target_list_id, 1);
-            if !is_live {
+            if !is_open {
                 None
             } else {
-                guard.splice_live_out(cur_list, item_id);
-                match plan.live_pos {
+                guard.splice_open_out(cur_list, item_id);
+                match plan.open_pos {
                     Some(pos) => {
-                        guard.splice_live_in(target_list_id, item_id, pos);
+                        guard.splice_open_in(target_list_id, item_id, pos);
                         guard
-                            .live_by_list
+                            .open_by_list
                             .get(target_list_id)
                             .and_then(|arr| arr.iter().position(|x| x == item_id))
                     }
                     None => {
-                        let live = guard.refresh_live(target_list_id);
-                        live.iter().position(|x| x == item_id)
+                        let open = guard.refresh_open(target_list_id);
+                        open.iter().position(|x| x == item_id)
                     }
                 }
             }
@@ -1487,30 +1438,24 @@ impl Doc {
         self.push_event(AppEvent::ItemListChanged {
             id: item_id.to_string(),
             list_id: target_list_id.to_string(),
-            live_index,
+            open_index,
         });
-        if cleared_column {
-            self.push_event(AppEvent::ItemColumnChanged {
-                id: item_id.to_string(),
-                column: None,
-            });
-        }
         Ok(())
     }
 
     /// Resolve a target index against `list_id`'s projection: the raw
     /// container position for the entry write, plus — when derivable
-    /// without a walk — the exact live splice position. See
+    /// without a walk — the exact open splice position. See
     /// [`ProjectionIndex::plan_target`].
     fn plan_target(
         &self,
         list_id: &str,
         target_index: usize,
-        is_live: bool,
+        is_open: bool,
         exclude: Option<&str>,
     ) -> TargetPlan {
         let guard = self.item_index.lock().expect("item index mutex poisoned");
-        guard.plan_target(list_id, target_index, is_live, exclude)
+        guard.plan_target(list_id, target_index, is_open, exclude)
     }
 
     /// Set or clear an item's done state. Independent of `binned` —
@@ -1536,12 +1481,13 @@ impl Doc {
         }
         let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
-        let live_index = self.sync_item_liveness(item_id, &map);
+        let open_index = self.sync_item_openness(item_id, &map);
         self.push_event(AppEvent::ItemLifecycleChanged {
             id: item_id.to_string(),
+            live: read_live(&map),
             done_at: new_done,
             binned_at,
-            live_index,
+            open_index,
         });
         Ok(())
     }
@@ -1551,7 +1497,7 @@ impl Doc {
     /// touched items' lists, never total doc size. At/above the
     /// threshold it falls back to one rebuild + diff.
     pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
-        self.set_items_lifecycle(item_ids, done, KEY_DONE_AT)
+        self.set_items_timestamp(item_ids, done, KEY_DONE_AT)
     }
 
     /// Set or clear an item's binned state. Independent of `done` —
@@ -1576,12 +1522,13 @@ impl Doc {
         }
         let done_at = read_i64(&map, KEY_DONE_AT);
         self.inner.commit();
-        let live_index = self.sync_item_liveness(item_id, &map);
+        let open_index = self.sync_item_openness(item_id, &map);
         self.push_event(AppEvent::ItemLifecycleChanged {
             id: item_id.to_string(),
+            live: read_live(&map),
             done_at,
             binned_at: new_binned,
-            live_index,
+            open_index,
         });
         Ok(())
     }
@@ -1590,10 +1537,70 @@ impl Doc {
     /// Surgical / bulk-fallback split for the same reason as
     /// `set_items_done`.
     pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
-        self.set_items_lifecycle(item_ids, binned, KEY_BINNED_AT)
+        self.set_items_timestamp(item_ids, binned, KEY_BINNED_AT)
     }
 
-    fn set_items_lifecycle(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
+    /// Move one item to a target [`ItemLifecycle`] in a single commit,
+    /// writing the stored `live` / `done_at` / `binned_at` fields per the
+    /// transition table in `spec/data-model.md`. This is the primitive the
+    /// board uses; `set_item_done` / `set_item_binned` are convenience
+    /// wrappers for the toggle cases (and preserve un-done / restore
+    /// masking semantics that this method does not).
+    pub fn set_item_lifecycle(
+        &self,
+        item_id: &str,
+        lifecycle: ItemLifecycle,
+    ) -> Result<(), DocError> {
+        self.set_items_lifecycle(&[item_id], lifecycle)
+    }
+
+    /// Bulk [`set_item_lifecycle`]: move many items to the same target
+    /// lifecycle in one commit. Surgical below
+    /// `BULK_LIFECYCLE_EVENT_THRESHOLD`, rebuild+diff at/above it.
+    pub fn set_items_lifecycle(
+        &self,
+        item_ids: &[&str],
+        lifecycle: ItemLifecycle,
+    ) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        assert_unique_item_ids(item_ids)?;
+        let pre_items = (item_ids.len() >= BULK_LIFECYCLE_EVENT_THRESHOLD)
+            .then(|| self.iter_items().collect::<Vec<ItemView>>());
+        let maps: Vec<(&str, LoroMap)> = item_ids
+            .iter()
+            .map(|id| self.find_item(id).map(|map| (*id, map)))
+            .collect::<Result<_, _>>()?;
+        let mut changed: Vec<(&str, LoroMap)> = Vec::new();
+        for (item_id, map) in maps {
+            if apply_lifecycle(&map, lifecycle)? {
+                changed.push((item_id, map));
+            }
+        }
+        if changed.is_empty() {
+            return Ok(());
+        }
+        self.inner.commit();
+        if let Some(pre) = pre_items {
+            self.rebuild_index();
+            self.emit_item_diffs(&pre);
+            return Ok(());
+        }
+        for (item_id, map) in changed {
+            let open_index = self.sync_item_openness(item_id, &map);
+            self.push_event(AppEvent::ItemLifecycleChanged {
+                id: item_id.to_string(),
+                live: read_live(&map),
+                done_at: read_i64(&map, KEY_DONE_AT),
+                binned_at: read_i64(&map, KEY_BINNED_AT),
+                open_index,
+            });
+        }
+        Ok(())
+    }
+
+    fn set_items_timestamp(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
@@ -1634,7 +1641,7 @@ impl Doc {
             return Ok(());
         }
         for (item_id, map, new) in changed {
-            let live_index = self.sync_item_liveness(item_id, &map);
+            let open_index = self.sync_item_openness(item_id, &map);
             let (done_at, binned_at) = if key == KEY_DONE_AT {
                 (new, read_i64(&map, KEY_BINNED_AT))
             } else {
@@ -1642,40 +1649,41 @@ impl Doc {
             };
             self.push_event(AppEvent::ItemLifecycleChanged {
                 id: item_id.to_string(),
+                live: read_live(&map),
                 done_at,
                 binned_at,
-                live_index,
+                open_index,
             });
         }
         Ok(())
     }
 
     /// Refresh the index after an item's done/binned flags changed.
-    /// Returns the item's live index within its list (`None` when
-    /// hidden). Hiding is an O(live) splice; a restore recomputes the
+    /// Returns the item's open index within its list (`None` when
+    /// hidden). Hiding is an O(open) splice; a restore recomputes the
     /// list's projection to find the re-entry position.
-    fn sync_item_liveness(&self, item_id: &str, map: &LoroMap) -> Option<usize> {
-        let live_now = is_in_list_view(map);
+    fn sync_item_openness(&self, item_id: &str, map: &LoroMap) -> Option<usize> {
+        let open_now = is_open(map);
         let mut guard = self.item_index.lock().expect("item index mutex poisoned");
-        let (list_id, was_live) = {
+        let (list_id, was_open) = {
             let m = guard.meta.get_mut(item_id)?;
-            let was = m.live;
-            m.live = live_now;
+            let was = m.open;
+            m.open = open_now;
             (m.list_id.clone(), was)
         };
-        if !live_now {
-            guard.splice_live_out(&list_id, item_id);
+        if !open_now {
+            guard.splice_open_out(&list_id, item_id);
             return None;
         }
-        if was_live {
-            // live → live (no transition): position unchanged.
+        if was_open {
+            // open → open (no transition): position unchanged.
             return guard
-                .live_by_list
+                .open_by_list
                 .get(&list_id)
                 .and_then(|arr| arr.iter().position(|x| x == item_id));
         }
-        let live = guard.refresh_live(&list_id);
-        live.iter().position(|x| x == item_id)
+        let open = guard.refresh_open(&list_id);
+        open.iter().position(|x| x == item_id)
     }
 
     pub fn delete_binned(&self, item_id: &str) -> Result<(), DocError> {
@@ -1770,10 +1778,10 @@ impl Doc {
                     }
                 }
             }
-            // Removals are exact: splice out of the live arrays and
+            // Removals are exact: splice out of the open arrays and
             // drop visible counts — no projection walk needed.
             for (item_id, list_id, was_visible) in &per_item {
-                guard.splice_live_out(list_id, item_id);
+                guard.splice_open_out(list_id, item_id);
                 if *was_visible {
                     guard.bump_visible(list_id, -1);
                 }
@@ -1910,7 +1918,7 @@ impl Doc {
     }
 
     /// Refuses for the always-on `main` list. Every item locating to
-    /// the deleted list (live, done and binned) is moved to `main` with
+    /// the deleted list (open, done and binned) is moved to `main` with
     /// a fresh placement, appended to `order/main` in the deleted
     /// list's resolved order. The abandoned order container remains as
     /// unreachable history.
@@ -1926,7 +1934,6 @@ impl Doc {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let pre_columns = self.all_columns();
         // Deleting a list discards its contents to the bin rather than
         // dumping them live into Home: every item is relocated to `main`
         // (so it has a real home list if later restored) and, unless it
@@ -1950,11 +1957,6 @@ impl Doc {
             if read_i64(&map, KEY_BINNED_AT).is_none() {
                 map.insert(KEY_BINNED_AT, binned_at)?;
             }
-            // The register named a column of the dying list; clear it
-            // while we're already writing the map (`spec/kanban.md`).
-            if read_string(&map, KEY_COLUMN).is_some() {
-                let _ = map.delete(KEY_COLUMN);
-            }
             main_order.push(
                 OrderEntry {
                     item_id: item_id.clone(),
@@ -1972,213 +1974,7 @@ impl Doc {
         // Emit the full pre/post state diff: each item picks up an
         // `ItemLifecycleChanged` (now binned) and `ItemListChanged` (now
         // `main`), plus the `ListRemoved` for the gone list.
-        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings, &pre_columns);
-        Ok(())
-    }
-
-    // ---------- mutations: board columns (spec/kanban.md) ----------
-
-    /// Board-column defs of `list_id` in board order. The implicit
-    /// default column is not an entry — it is always first and cannot
-    /// be listed, moved, or deleted.
-    pub fn columns_of(&self, list_id: &str) -> Vec<ColumnView> {
-        let cols = self.columns_list(list_id);
-        let mut out = Vec::with_capacity(cols.len());
-        for i in 0..cols.len() {
-            if let Some(map) = list_map_at(&cols, i)
-                && let Some(view) = column_view(&map)
-            {
-                out.push(view);
-            }
-        }
-        out
-    }
-
-    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, DocError> {
-        let name = name.trim();
-        if name.is_empty() {
-            return Err(DocError::Invalid("column name is empty".into()));
-        }
-        self.assert_list_exists(list_id)?;
-        let id = new_id();
-        let now = now_millis();
-        let map = self.columns_list(list_id).push_container(LoroMap::new())?;
-        map.insert(KEY_ID, id.as_str())?;
-        map.insert(KEY_NAME, name)?;
-        map.insert(KEY_CREATED_AT, now)?;
-        self.inner.commit();
-        let index = self
-            .columns_of(list_id)
-            .iter()
-            .position(|c| c.id == id)
-            .unwrap_or(0);
-        self.push_event(AppEvent::ColumnAdded {
-            list_id: list_id.to_string(),
-            id: id.clone(),
-            name: name.to_string(),
-            created_at: now,
-            index,
-        });
-        Ok(id)
-    }
-
-    pub fn rename_column(
-        &self,
-        list_id: &str,
-        column_id: &str,
-        name: &str,
-    ) -> Result<(), DocError> {
-        let name = name.trim();
-        if name.is_empty() {
-            return Err(DocError::Invalid("column name is empty".into()));
-        }
-        let (_, map) = self.find_column(list_id, column_id)?;
-        map.insert(KEY_NAME, name)?;
-        self.inner.commit();
-        self.push_event(AppEvent::ColumnRenamed {
-            list_id: list_id.to_string(),
-            id: column_id.to_string(),
-            name: name.to_string(),
-        });
-        Ok(())
-    }
-
-    /// `target_index` addresses user columns only (the implicit default
-    /// is pinned first and not an entry).
-    pub fn move_column(
-        &self,
-        list_id: &str,
-        column_id: &str,
-        target_index: usize,
-    ) -> Result<(), DocError> {
-        let cols = self.columns_list(list_id);
-        let (from, _) = self.find_column(list_id, column_id)?;
-        let to = target_index.min(cols.len().saturating_sub(1));
-        if from == to {
-            return Ok(());
-        }
-        cols.mov(from, to)?;
-        self.inner.commit();
-        let index = self
-            .columns_of(list_id)
-            .iter()
-            .position(|c| c.id == column_id)
-            .ok_or_else(|| DocError::ColumnNotFound(column_id.to_string()))?;
-        self.push_event(AppEvent::ColumnMoved {
-            list_id: list_id.to_string(),
-            id: column_id.to_string(),
-            index,
-        });
-        Ok(())
-    }
-
-    /// Delete a column def. Member items' registers are deliberately
-    /// left in place: a non-resolving register renders in the default
-    /// column, and undoing the delete restores the grouping intact
-    /// (`spec/kanban.md`).
-    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), DocError> {
-        let (idx, _) = self.find_column(list_id, column_id)?;
-        self.columns_list(list_id).delete(idx, 1)?;
-        self.inner.commit();
-        self.push_event(AppEvent::ColumnRemoved {
-            list_id: list_id.to_string(),
-            id: column_id.to_string(),
-        });
-        Ok(())
-    }
-
-    /// Set or clear the display-name override of `list_id`'s implicit
-    /// default column. ListMeta key for user lists, settings key for the
-    /// reserved `main`; same trim / delete-on-empty / no-op contract as
-    /// `set_main_name`.
-    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), DocError> {
-        let trimmed = name.trim();
-        let next: Option<String> = if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        };
-        if list_id == LIST_MAIN {
-            let settings = self.settings_map();
-            let current =
-                read_string(&settings, KEY_MAIN_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty());
-            if current == next {
-                return Ok(());
-            }
-            match &next {
-                Some(s) => settings.insert(KEY_MAIN_DEFAULT_COLUMN_NAME, s.as_str())?,
-                None => settings.delete(KEY_MAIN_DEFAULT_COLUMN_NAME)?,
-            }
-        } else {
-            let (_, map) = self.find_list(list_id)?;
-            let current = read_string(&map, KEY_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty());
-            if current == next {
-                return Ok(());
-            }
-            match &next {
-                Some(s) => map.insert(KEY_DEFAULT_COLUMN_NAME, s.as_str())?,
-                None => map.delete(KEY_DEFAULT_COLUMN_NAME)?,
-            }
-        }
-        self.inner.commit();
-        self.push_event(AppEvent::DefaultColumnRenamed {
-            list_id: list_id.to_string(),
-            name: next,
-        });
-        Ok(())
-    }
-
-    /// Set or clear an item's board-column register, optionally applying
-    /// a same-list reorder in the same commit (one undo step). `None`
-    /// targets the implicit default column (clears the key).
-    /// `target_index` addresses the list's live projection exactly like
-    /// `move_item`; without it the item keeps its linear position.
-    pub fn set_item_column(
-        &self,
-        item_id: &str,
-        column_id: Option<&str>,
-        target_index: Option<usize>,
-    ) -> Result<(), DocError> {
-        let map = self.find_item(item_id)?;
-        let (cur_list, is_live) = {
-            let guard = self.item_index.lock().expect("item index mutex poisoned");
-            let m = guard
-                .meta
-                .get(item_id)
-                .ok_or_else(|| DocError::ItemNotFound(item_id.to_string()))?;
-            (m.list_id.clone(), m.live)
-        };
-        if let Some(col) = column_id {
-            self.find_column(&cur_list, col)?;
-        }
-        let changed = read_string(&map, KEY_COLUMN).as_deref() != column_id;
-        if !changed && target_index.is_none() {
-            return Ok(());
-        }
-        if changed {
-            match column_id {
-                Some(col) => {
-                    map.insert(KEY_COLUMN, col)?;
-                }
-                None => {
-                    let _ = map.delete(KEY_COLUMN);
-                }
-            }
-        }
-        if let Some(ti) = target_index {
-            // Commits register + mov together (one undo step) and emits
-            // the `ItemMoved`.
-            self.reorder_in_list(item_id, &map, &cur_list, ti, is_live)?;
-        }
-        // Flushes the register write when the reorder early-returned
-        // (from == to) or none was requested; a no-op otherwise.
-        self.inner.commit();
-        if changed {
-            self.push_event(AppEvent::ItemColumnChanged {
-                id: item_id.to_string(),
-                column: column_id.map(str::to_string),
-            });
-        }
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         Ok(())
     }
 
@@ -2331,16 +2127,6 @@ impl Doc {
     /// are emitted grouped per list in resolved order, so array order
     /// carries the ordering across the export/import boundary.
     pub fn export_json(&self) -> JsonExport {
-        let export_columns = |list_id: &str| -> Vec<ExportColumn> {
-            self.columns_of(list_id)
-                .into_iter()
-                .map(|c| ExportColumn {
-                    id: c.id,
-                    name: c.name,
-                    created_at: c.created_at,
-                })
-                .collect()
-        };
         let s = self.get_settings();
         let mut lists = Vec::with_capacity(self.lists().len() + 1);
         lists.push(ExportList {
@@ -2348,16 +2134,12 @@ impl Doc {
             name: LIST_MAIN_NAME.to_string(),
             created_at: None,
             builtin: true,
-            default_column_name: s.main_default_column_name.clone(),
-            columns: export_columns(LIST_MAIN),
         });
         lists.extend(self.all_lists().into_iter().map(|list| ExportList {
-            columns: export_columns(&list.id),
             id: list.id,
             name: list.name,
             created_at: Some(list.created_at),
             builtin: false,
-            default_column_name: list.default_column_name,
         }));
 
         let items = self
@@ -2367,7 +2149,7 @@ impl Doc {
                 text: item.text,
                 notes: item.notes,
                 list_id: item.list_id,
-                column: item.column,
+                live: item.live,
                 due_on: item.due_on,
                 created_at: item.created_at,
                 done_at: item.done_at,
@@ -2418,18 +2200,12 @@ impl Doc {
         let pre_items: Vec<ItemView> = self.iter_items().collect();
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let pre_columns = self.all_columns();
 
         let mut id_map: HashMap<String, String> = HashMap::new();
         id_map.insert(LIST_MAIN.to_string(), LIST_MAIN.to_string());
 
         let lists = self.lists();
         let mut lists_added: usize = 0;
-        // source column id → fresh local column id. Column ids are
-        // uuids, so one global map can't collide across lists. Builtin
-        // rows never contribute (their metadata isn't imported), so a
-        // register pointing at a builtin's column drops to default.
-        let mut column_id_map: HashMap<String, String> = HashMap::new();
         for src_list in &export.lists {
             if src_list.builtin || src_list.id == LIST_MAIN {
                 id_map.insert(src_list.id.clone(), LIST_MAIN.to_string());
@@ -2445,27 +2221,6 @@ impl Doc {
             map.insert(KEY_ID, new_list_id.as_str())?;
             map.insert(KEY_NAME, name)?;
             map.insert(KEY_CREATED_AT, created_at)?;
-            if let Some(dcn) = src_list
-                .default_column_name
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            {
-                map.insert(KEY_DEFAULT_COLUMN_NAME, dcn)?;
-            }
-            let cols = self.columns_list(&new_list_id);
-            for src_col in &src_list.columns {
-                let col_name = src_col.name.trim();
-                if col_name.is_empty() {
-                    continue;
-                }
-                let new_col_id = new_id();
-                let col_map = cols.push_container(LoroMap::new())?;
-                col_map.insert(KEY_ID, new_col_id.as_str())?;
-                col_map.insert(KEY_NAME, col_name)?;
-                col_map.insert(KEY_CREATED_AT, src_col.created_at)?;
-                column_id_map.insert(src_col.id.clone(), new_col_id);
-            }
             id_map.insert(src_list.id.clone(), new_list_id);
             lists_added += 1;
         }
@@ -2498,11 +2253,10 @@ impl Doc {
                 .as_str(),
             )?;
             map.insert(KEY_CREATED_AT, src_item.created_at)?;
-            // Register maps through to the freshly created column; an
-            // unmapped one (unknown column, or the item fell back to
-            // `main`) is dropped — the item lands in the default column.
-            if let Some(new_col) = src_item.column.as_ref().and_then(|c| column_id_map.get(c)) {
-                map.insert(KEY_COLUMN, new_col.as_str())?;
+            // Lifecycle flag rides along; a missing/false `live` (Backlog,
+            // and any legacy column-era dump) leaves the key unset.
+            if src_item.live {
+                map.insert(KEY_LIVE, true)?;
             }
             // Carry a well-formed due date through; a malformed one in a
             // hand-edited export is silently dropped rather than aborting
@@ -2537,7 +2291,7 @@ impl Doc {
 
         self.inner.commit();
         self.rebuild_index();
-        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings, &pre_columns);
+        self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
 
         Ok(ImportSummary {
             lists_added,
@@ -2566,9 +2320,9 @@ impl Doc {
 
     /// Per-list nav view: ids of items in this list that are neither
     /// done nor binned, in resolved order.
-    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
+    pub fn open_item_ids(&self, list_id: &str) -> Vec<String> {
         let guard = self.item_index.lock().expect("item index mutex poisoned");
-        guard.live_by_list.get(list_id).cloned().unwrap_or_default()
+        guard.open_by_list.get(list_id).cloned().unwrap_or_default()
     }
 
     /// Cross-list "Done" view: ids of done-but-not-binned items, sorted
@@ -2607,7 +2361,7 @@ impl Doc {
     /// ids (sorted) — each list in its resolved order. This grouped
     /// order is the deterministic replacement for the v1 global CRDT
     /// order; per-list consumers reconstruct their arrays from it.
-    /// Intended for one-shot client attachment/resync snapshots; live
+    /// Intended for one-shot client attachment/resync snapshots; open
     /// mutation paths should use `AppEvent`s instead.
     pub fn all_items(&self) -> Vec<ItemView> {
         self.iter_items().collect()
@@ -2796,7 +2550,6 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let pre_columns = self.all_columns();
         self.begin_diff_capture(DiffCaptureMode::Import);
 
         let result = blobs
@@ -2811,7 +2564,7 @@ impl Doc {
             return result;
         }
         if self
-            .translate_captured_diffs(diffs, &pre_lists, &pre_settings, &pre_columns)
+            .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
             .is_err()
         {
             self.emit_diff_fallback();
@@ -2830,12 +2583,10 @@ impl Doc {
         diffs: Vec<CapturedDiff>,
         pre_lists: &[ListView],
         pre_settings: &SettingsView,
-        pre_columns: &HashMap<String, Vec<ColumnView>>,
     ) -> Result<(), ()> {
         // ---- Phase 1: plan (read-only) ----
         let mut lists_dirty = false;
         let mut settings_dirty = false;
-        let mut columns_dirty = HashSet::<String>::new();
         let mut upserts = HashSet::<String>::new();
         let mut removals = HashSet::<String>::new();
         let mut map_dirty = HashMap::<ContainerID, HashSet<String>>::new();
@@ -2853,9 +2604,6 @@ impl Doc {
                     CapturedDiff::Opaque => return Err(()),
                     CapturedDiff::Lists => lists_dirty = true,
                     CapturedDiff::Settings => settings_dirty = true,
-                    CapturedDiff::Columns { list_id } => {
-                        columns_dirty.insert(list_id);
-                    }
                     CapturedDiff::ItemsRoot { upserted, removed } => {
                         upserts.extend(upserted);
                         removals.extend(removed);
@@ -2965,7 +2713,7 @@ impl Doc {
                         KEY_DONE_AT,
                         KEY_BINNED_AT,
                         KEY_LOCATION,
-                        KEY_COLUMN,
+                        KEY_LIVE,
                     ]
                     .into_iter()
                     .map(str::to_string)
@@ -3019,14 +2767,14 @@ impl Doc {
         }
 
         // ---- Phase 2: commit index ----
-        let (pre_live, post_live) = {
+        let (pre_open, post_open) = {
             let mut guard = self.item_index.lock().expect("item index mutex poisoned");
             let pre: HashMap<String, Vec<String>> = affected
                 .iter()
                 .map(|l| {
                     (
                         l.clone(),
-                        guard.live_by_list.get(l).cloned().unwrap_or_default(),
+                        guard.open_by_list.get(l).cloned().unwrap_or_default(),
                     )
                 })
                 .collect();
@@ -3041,7 +2789,7 @@ impl Doc {
             }
             let mut post = HashMap::new();
             for l in &affected {
-                post.insert(l.clone(), guard.refresh_live(l));
+                post.insert(l.clone(), guard.refresh_open(l));
             }
             (pre, post)
         };
@@ -3081,21 +2829,32 @@ impl Doc {
                         notes: view.notes.clone(),
                     });
                 }
-                if has(KEY_COLUMN) {
-                    self.push_event(AppEvent::ItemColumnChanged {
-                        id: id.clone(),
-                        column: view.column.clone(),
-                    });
-                }
                 if has(KEY_DUE_ON) {
                     self.push_event(AppEvent::ItemDueChanged {
                         id: id.clone(),
                         due_on: view.due_on.clone(),
                     });
                 }
+                // A Backlog↔Live flip (the `live` register alone) on an
+                // item that stays open changes its lane but not its order,
+                // so the per-list walk emits nothing for it — surface the
+                // lifecycle here. When done/binned also changed this frame,
+                // the lifecycle event is emitted by those paths instead.
+                if has(KEY_LIVE) && new.open && !(has(KEY_DONE_AT) || has(KEY_BINNED_AT)) {
+                    let open_index = post_open
+                        .get(&new.list_id)
+                        .and_then(|arr| arr.iter().position(|x| x == id));
+                    self.push_event(AppEvent::ItemLifecycleChanged {
+                        id: id.clone(),
+                        live: view.live,
+                        done_at: view.done_at,
+                        binned_at: view.binned_at,
+                        open_index,
+                    });
+                }
             }
             let left_list = c.old.as_ref().is_some_and(|o| o.list_id != new.list_id);
-            if new.live {
+            if new.open {
                 // Live cross-list movers get their leave-signal *before*
                 // any per-list walk: the consumer removes the item from
                 // the source array now (appending it to the target), so
@@ -3106,7 +2865,7 @@ impl Doc {
                     self.push_event(AppEvent::ItemListChanged {
                         id: id.clone(),
                         list_id: new.list_id.clone(),
-                        live_index: None,
+                        open_index: None,
                     });
                 }
                 continue;
@@ -3121,37 +2880,38 @@ impl Doc {
                     created_at: view.created_at,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
-                    column: view.column,
+                    live: view.live,
                     due_on: view.due_on,
-                    live_index: None,
+                    open_index: None,
                 });
                 continue;
             }
-            if has(KEY_DONE_AT) || has(KEY_BINNED_AT) {
+            if has(KEY_DONE_AT) || has(KEY_BINNED_AT) || has(KEY_LIVE) {
                 self.push_event(AppEvent::ItemLifecycleChanged {
                     id: id.clone(),
+                    live: view.live,
                     done_at: view.done_at,
                     binned_at: view.binned_at,
-                    live_index: None,
+                    open_index: None,
                 });
             }
             if has(KEY_LOCATION) && left_list {
                 self.push_event(AppEvent::ItemListChanged {
                     id: id.clone(),
                     list_id: new.list_id.clone(),
-                    live_index: None,
+                    open_index: None,
                 });
             }
         }
 
-        // Per-list live walk: minimal ascending remove+insert event
+        // Per-list open walk: minimal ascending remove+insert event
         // plan, verified by replaying it the way a naive consumer does.
         let mut affected_sorted: Vec<&String> = affected.iter().collect();
         affected_sorted.sort();
         let mut planned: Vec<(usize, String, AppEvent)> = Vec::new();
         for list in affected_sorted {
-            let pre = &pre_live[list.as_str()];
-            let post = &post_live[list.as_str()];
+            let pre = &pre_open[list.as_str()];
+            let post = &post_open[list.as_str()];
             let post_set: HashSet<&String> = post.iter().collect();
             let base: Vec<&String> = pre.iter().filter(|id| post_set.contains(id)).collect();
             let post_pos: HashMap<&String, usize> =
@@ -3163,7 +2923,7 @@ impl Doc {
             for (i, id) in post.iter().enumerate() {
                 let Some(c) = changes.get(id) else { continue };
                 let Some(new) = &c.new else { continue };
-                if !new.live || new.list_id != *list {
+                if !new.open || new.list_id != *list {
                     continue;
                 }
                 if c.brand_new {
@@ -3178,28 +2938,29 @@ impl Doc {
                             created_at: view.created_at,
                             done_at: view.done_at,
                             binned_at: view.binned_at,
-                            column: view.column,
+                            live: view.live,
                             due_on: view.due_on,
-                            live_index: Some(i),
+                            open_index: Some(i),
                         },
                     );
                     continue;
                 }
-                // Hidden→live restores insert here. Cross-list movers
+                // Hidden→open restores insert here. Cross-list movers
                 // are *not* insert-type: their pre-walk leave-signal
                 // `ItemListChanged` already appended them to this list
                 // on the consumer, so an `ItemMoved` candidate
                 // repositions them like any other id.
-                let shown = c.old.as_ref().is_some_and(|o| !o.live);
+                let shown = c.old.as_ref().is_some_and(|o| !o.open);
                 if shown && (c.keys.contains(KEY_DONE_AT) || c.keys.contains(KEY_BINNED_AT)) {
                     let view = view_of(id)?;
                     insert_type.insert(
                         id,
                         AppEvent::ItemLifecycleChanged {
                             id: id.clone(),
+                            live: view.live,
                             done_at: view.done_at,
                             binned_at: view.binned_at,
-                            live_index: Some(i),
+                            open_index: Some(i),
                         },
                     );
                 }
@@ -3209,7 +2970,7 @@ impl Doc {
             // re-inserted entries), widen to every position-changed id
             // if the minimal replay doesn't reconstruct the post state.
             // The simulation models the consumer exactly: one
-            // remove-then-insert-at-live_index per event, applied
+            // remove-then-insert-at-open_index per event, applied
             // sequentially in emission (ascending post) order.
             let simulate = |cands: &HashSet<&String>| -> bool {
                 let mut arr: Vec<&String> = base
@@ -3275,7 +3036,7 @@ impl Doc {
                         list.clone(),
                         AppEvent::ItemMoved {
                             id: id.clone(),
-                            live_index: Some(i),
+                            open_index: Some(i),
                         },
                     ));
                 }
@@ -3288,19 +3049,13 @@ impl Doc {
             self.push_event(ev);
         }
 
-        if lists_dirty || settings_dirty || !columns_dirty.is_empty() {
+        if lists_dirty || settings_dirty {
             let mut emitted = Vec::new();
             if settings_dirty {
                 diff_settings(pre_settings, &self.get_settings(), &mut emitted);
             }
             if lists_dirty {
                 diff_lists(pre_lists, &self.all_lists(), &mut emitted);
-            }
-            let mut dirty_column_lists: Vec<&String> = columns_dirty.iter().collect();
-            dirty_column_lists.sort();
-            for list_id in dirty_column_lists {
-                let pre = pre_columns.get(list_id).map(Vec::as_slice).unwrap_or(&[]);
-                diff_columns(list_id, pre, &self.columns_of(list_id), &mut emitted);
             }
             for ev in emitted {
                 self.push_event(ev);
@@ -3349,7 +3104,6 @@ impl Doc {
     {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
-        let pre_columns = self.all_columns();
         self.begin_diff_capture(DiffCaptureMode::Undo);
         let result = {
             let mut um = self.undo.lock().expect("undo mutex poisoned");
@@ -3359,7 +3113,7 @@ impl Doc {
         let did = result?;
         if did
             && self
-                .translate_captured_diffs(diffs, &pre_lists, &pre_settings, &pre_columns)
+                .translate_captured_diffs(diffs, &pre_lists, &pre_settings)
                 .is_err()
         {
             self.emit_diff_fallback();
@@ -3404,34 +3158,12 @@ impl Doc {
                 index: idx,
             });
         }
-        // Board columns: defs for `main` + every list in nav order,
-        // then default-column name overrides where set.
-        let mut column_lists: Vec<(String, Option<String>)> =
-            vec![(LIST_MAIN.to_string(), s.main_default_column_name.clone())];
-        column_lists.extend(lists.into_iter().map(|l| (l.id, l.default_column_name)));
-        for (list_id, default_name) in column_lists {
-            for (idx, col) in self.columns_of(&list_id).into_iter().enumerate() {
-                out.push(AppEvent::ColumnAdded {
-                    list_id: list_id.clone(),
-                    id: col.id,
-                    name: col.name,
-                    created_at: col.created_at,
-                    index: idx,
-                });
-            }
-            if default_name.is_some() {
-                out.push(AppEvent::DefaultColumnRenamed {
-                    list_id,
-                    name: default_name,
-                });
-            }
-        }
         // Walking the canonical grouped order means a per-list counter
-        // yields each live item's position in its list's live projection.
-        let mut live_counters = HashMap::<String, usize>::new();
+        // yields each open item's position in its list's open projection.
+        let mut open_counters = HashMap::<String, usize>::new();
         for item in self.iter_items() {
-            let live_index = if item.is_in_list_view() {
-                let counter = live_counters.entry(item.list_id.clone()).or_insert(0);
+            let open_index = if item.is_open() {
+                let counter = open_counters.entry(item.list_id.clone()).or_insert(0);
                 let i = *counter;
                 *counter += 1;
                 Some(i)
@@ -3446,9 +3178,9 @@ impl Doc {
                 created_at: item.created_at,
                 done_at: item.done_at,
                 binned_at: item.binned_at,
-                column: item.column,
+                live: item.live,
                 due_on: item.due_on,
-                live_index,
+                open_index,
             });
         }
         out
@@ -3524,7 +3256,6 @@ impl Doc {
             }
             None => hasher.update([0u8]),
         }
-        hash_opt_str(&mut hasher, settings.main_default_column_name.as_deref());
         // Lists: walk by stored order because ordering is part of the
         // logical state surfaced to users.
         let lists = self.all_lists();
@@ -3534,21 +3265,6 @@ impl Doc {
             hash_str(&mut hasher, &l.id);
             hash_str(&mut hasher, &l.name);
             hasher.update(l.created_at.to_be_bytes());
-            hash_opt_str(&mut hasher, l.default_column_name.as_deref());
-        }
-        // Board-column defs: `main` first, then user lists in container
-        // order — id, name, created_at in board order per list.
-        hasher.update(b"C");
-        let mut column_list_ids = vec![LIST_MAIN.to_string()];
-        column_list_ids.extend(lists.iter().map(|l| l.id.clone()));
-        for list_id in &column_list_ids {
-            let cols = self.columns_of(list_id);
-            hasher.update((cols.len() as u32).to_be_bytes());
-            for c in &cols {
-                hash_str(&mut hasher, &c.id);
-                hash_str(&mut hasher, &c.name);
-                hasher.update(c.created_at.to_be_bytes());
-            }
         }
         // Items: canonical grouped walk order.
         let items: Vec<ItemView> = self.iter_items().collect();
@@ -3559,7 +3275,8 @@ impl Doc {
             hash_str(&mut hasher, &i.text);
             hash_str(&mut hasher, &i.notes);
             hash_str(&mut hasher, &i.list_id);
-            hash_opt_str(&mut hasher, i.column.as_deref());
+            // Lifecycle flag is part of logical state (`spec/data-model.md`).
+            hasher.update([i.live as u8]);
             hash_opt_str(&mut hasher, i.due_on.as_deref());
             hasher.update(i.created_at.to_be_bytes());
             hash_opt_i64(&mut hasher, i.done_at);
@@ -3585,36 +3302,6 @@ impl Doc {
     fn order_list(&self, list_id: &str) -> LoroMovableList {
         self.inner
             .get_movable_list(order_root_name(list_id).as_str())
-    }
-
-    fn columns_list(&self, list_id: &str) -> LoroMovableList {
-        self.inner
-            .get_movable_list(columns_root_name(list_id).as_str())
-    }
-
-    fn find_column(&self, list_id: &str, column_id: &str) -> Result<(usize, LoroMap), DocError> {
-        let cols = self.columns_list(list_id);
-        for i in 0..cols.len() {
-            if let Some(map) = list_map_at(&cols, i)
-                && read_string(&map, KEY_ID).as_deref() == Some(column_id)
-            {
-                return Ok((i, map));
-            }
-        }
-        Err(DocError::ColumnNotFound(column_id.into()))
-    }
-
-    /// Column defs per list for every known list (`main` + `lists`
-    /// rows), keyed by list id. Pre-state capture for wholesale column
-    /// re-diffs — lists and columns are both few.
-    fn all_columns(&self) -> HashMap<String, Vec<ColumnView>> {
-        let mut out = HashMap::new();
-        out.insert(LIST_MAIN.to_string(), self.columns_of(LIST_MAIN));
-        for list in self.all_lists() {
-            let cols = self.columns_of(&list.id);
-            out.insert(list.id, cols);
-        }
-        out
     }
 
     /// Item container lookup, gated on the disposable index so a doc
@@ -3691,23 +3378,13 @@ impl Doc {
         pre_items: &[ItemView],
         pre_lists: &[ListView],
         pre_settings: &SettingsView,
-        pre_columns: &HashMap<String, Vec<ColumnView>>,
     ) {
         let post_items: Vec<ItemView> = self.iter_items().collect();
         let post_lists: Vec<ListView> = self.all_lists();
         let post_settings = self.get_settings();
-        let post_columns = self.all_columns();
         let mut emitted = Vec::new();
         diff_settings(pre_settings, &post_settings, &mut emitted);
         diff_lists(pre_lists, &post_lists, &mut emitted);
-        // Lists absent from `post` (deleted) are dropped wholesale by
-        // consumers via `ListRemoved` — only diff surviving lists' defs.
-        let mut column_lists: Vec<&String> = post_columns.keys().collect();
-        column_lists.sort();
-        for list_id in column_lists {
-            let pre = pre_columns.get(list_id).map(Vec::as_slice).unwrap_or(&[]);
-            diff_columns(list_id, pre, &post_columns[list_id], &mut emitted);
-        }
         diff_items(pre_items, &post_items, &mut emitted);
         if !emitted.is_empty() {
             let mut q = self.events.lock().expect("events mutex poisoned");
@@ -3802,8 +3479,6 @@ fn settings_view(map: &LoroMap) -> SettingsView {
         // empty input, but a caller that bypassed it shouldn't surface
         // a confusing blank label.
         main_name: read_string(map, KEY_MAIN_NAME).filter(|s| !s.is_empty()),
-        main_default_column_name: read_string(map, KEY_MAIN_DEFAULT_COLUMN_NAME)
-            .filter(|s| !s.is_empty()),
     }
 }
 
@@ -3819,7 +3494,7 @@ fn item_meta(map: &LoroMap) -> ItemMeta {
     ItemMeta {
         list_id,
         placement_id,
-        live: is_in_list_view(map),
+        open: is_open(map),
         created_at: read_i64(map, KEY_CREATED_AT).unwrap_or(0),
     }
 }
@@ -3877,7 +3552,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
         text: read_string(map, KEY_TEXT)?,
         notes: read_string(map, KEY_NOTES).unwrap_or_default(),
         list_id: location,
-        column: read_string(map, KEY_COLUMN).filter(|s| !s.is_empty()),
+        live: read_live(map),
         due_on: read_string(map, KEY_DUE_ON).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
         done_at: read_i64(map, KEY_DONE_AT),
@@ -3890,19 +3565,69 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
         id: read_string(map, KEY_ID)?,
         name: read_string(map, KEY_NAME)?,
         created_at: read_i64(map, KEY_CREATED_AT)?,
-        default_column_name: read_string(map, KEY_DEFAULT_COLUMN_NAME).filter(|s| !s.is_empty()),
     })
 }
 
-fn column_view(map: &LoroMap) -> Option<ColumnView> {
-    Some(ColumnView {
-        id: read_string(map, KEY_ID)?,
-        name: read_string(map, KEY_NAME)?,
-        created_at: read_i64(map, KEY_CREATED_AT)?,
-    })
+/// The item's stored lifecycle flag: `true` ≡ Live, absent/`false` ≡
+/// Backlog (`spec/data-model.md`). Independent of `done_at`/`binned_at`.
+fn read_live(map: &LoroMap) -> bool {
+    read_bool(map, KEY_LIVE).unwrap_or(false)
 }
 
-fn is_in_list_view(map: &LoroMap) -> bool {
+/// Apply a target [`ItemLifecycle`] to an item map by writing the stored
+/// `live` / `done_at` / `binned_at` fields per the transition table
+/// (`spec/data-model.md`). Returns whether any field changed; does not
+/// commit. A timestamp the transition *sets* is written as `now` only
+/// when absent, so re-applying Done/Binned keeps the original timestamp.
+fn apply_lifecycle(map: &LoroMap, lifecycle: ItemLifecycle) -> Result<bool, DocError> {
+    let cur_live = read_live(map);
+    let cur_done = read_i64(map, KEY_DONE_AT);
+    let cur_binned = read_i64(map, KEY_BINNED_AT);
+    let (want_live, want_done, want_binned): (bool, Option<i64>, Option<i64>) = match lifecycle {
+        ItemLifecycle::Backlog => (false, None, None),
+        ItemLifecycle::Live => (true, None, None),
+        ItemLifecycle::Done => (cur_live, Some(cur_done.unwrap_or_else(now_millis)), None),
+        ItemLifecycle::Binned => (
+            cur_live,
+            cur_done,
+            Some(cur_binned.unwrap_or_else(now_millis)),
+        ),
+    };
+    let mut changed = false;
+    if want_live != cur_live {
+        if want_live {
+            map.insert(KEY_LIVE, true)?;
+        } else {
+            let _ = map.delete(KEY_LIVE);
+        }
+        changed = true;
+    }
+    if want_done != cur_done {
+        match want_done {
+            Some(t) => {
+                map.insert(KEY_DONE_AT, t)?;
+            }
+            None => {
+                let _ = map.delete(KEY_DONE_AT);
+            }
+        }
+        changed = true;
+    }
+    if want_binned != cur_binned {
+        match want_binned {
+            Some(t) => {
+                map.insert(KEY_BINNED_AT, t)?;
+            }
+            None => {
+                let _ = map.delete(KEY_BINNED_AT);
+            }
+        }
+        changed = true;
+    }
+    Ok(changed)
+}
+
+fn is_open(map: &LoroMap) -> bool {
     read_i64(map, KEY_DONE_AT).is_none() && read_i64(map, KEY_BINNED_AT).is_none()
 }
 
@@ -3951,7 +3676,7 @@ fn new_id() -> String {
 /// Diff two ordered slices of `ItemView` by id and emit `AppEvent`s for
 /// the transitions a UI store needs to mirror. Both slices are in the
 /// canonical grouped walk order (`all_items`), so walking `post` with a
-/// per-list counter reproduces each list's live projection. Used by
+/// per-list counter reproduces each list's open projection. Used by
 /// bulk local mutations and `import_json`, where the cheapest path to
 /// per-id deltas is "snapshot before, snapshot after, walk both once."
 fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
@@ -3965,16 +3690,16 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
         .enumerate()
         .map(|(i, it)| (it.id.as_str(), (i, it)))
         .collect();
-    // Post-state live position per item id. Events emitted below are in
+    // Post-state open position per item id. Events emitted below are in
     // ascending post order, so a consumer applying
-    // remove-then-insert-at-live_index per event converges on exactly
+    // remove-then-insert-at-open_index per event converges on exactly
     // this projection.
-    let mut live_counters = HashMap::<&str, usize>::new();
-    let mut live_pos = HashMap::<&str, usize>::with_capacity(post.len());
+    let mut open_counters = HashMap::<&str, usize>::new();
+    let mut open_pos = HashMap::<&str, usize>::with_capacity(post.len());
     for it in post {
-        if it.is_in_list_view() {
-            let counter = live_counters.entry(it.list_id.as_str()).or_insert(0);
-            live_pos.insert(it.id.as_str(), *counter);
+        if it.is_open() {
+            let counter = open_counters.entry(it.list_id.as_str()).or_insert(0);
+            open_pos.insert(it.id.as_str(), *counter);
             *counter += 1;
         }
     }
@@ -3985,7 +3710,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
         }
     }
     for (post_idx, post_it) in post.iter().enumerate() {
-        let live_index = live_pos.get(post_it.id.as_str()).copied();
+        let open_index = open_pos.get(post_it.id.as_str()).copied();
         match pre_by_id.get(post_it.id.as_str()) {
             None => {
                 out.push(AppEvent::ItemAdded {
@@ -3996,9 +3721,9 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     created_at: post_it.created_at,
                     done_at: post_it.done_at,
                     binned_at: post_it.binned_at,
-                    column: post_it.column.clone(),
+                    live: post_it.live,
                     due_on: post_it.due_on.clone(),
-                    live_index,
+                    open_index,
                 });
             }
             Some(&(pre_idx, pre_it)) => {
@@ -4014,37 +3739,35 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                         notes: post_it.notes.clone(),
                     });
                 }
-                if pre_it.column != post_it.column {
-                    out.push(AppEvent::ItemColumnChanged {
-                        id: post_it.id.clone(),
-                        column: post_it.column.clone(),
-                    });
-                }
                 if pre_it.due_on != post_it.due_on {
                     out.push(AppEvent::ItemDueChanged {
                         id: post_it.id.clone(),
                         due_on: post_it.due_on.clone(),
                     });
                 }
-                if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {
+                if pre_it.live != post_it.live
+                    || pre_it.done_at != post_it.done_at
+                    || pre_it.binned_at != post_it.binned_at
+                {
                     out.push(AppEvent::ItemLifecycleChanged {
                         id: post_it.id.clone(),
+                        live: post_it.live,
                         done_at: post_it.done_at,
                         binned_at: post_it.binned_at,
-                        live_index,
+                        open_index,
                     });
                 }
                 if pre_it.list_id != post_it.list_id {
                     out.push(AppEvent::ItemListChanged {
                         id: post_it.id.clone(),
                         list_id: post_it.list_id.clone(),
-                        live_index,
+                        open_index,
                     });
                 }
                 if pre_idx != post_idx {
                     out.push(AppEvent::ItemMoved {
                         id: post_it.id.clone(),
-                        live_index,
+                        open_index,
                     });
                 }
             }
@@ -4080,12 +3803,6 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                     created_at: post_l.created_at,
                     index: post_idx,
                 });
-                if post_l.default_column_name.is_some() {
-                    out.push(AppEvent::DefaultColumnRenamed {
-                        list_id: post_l.id.clone(),
-                        name: post_l.default_column_name.clone(),
-                    });
-                }
             }
             Some(&(pre_idx, pre_l)) => {
                 if pre_l.name != post_l.name {
@@ -4094,68 +3811,9 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                         name: post_l.name.clone(),
                     });
                 }
-                if pre_l.default_column_name != post_l.default_column_name {
-                    out.push(AppEvent::DefaultColumnRenamed {
-                        list_id: post_l.id.clone(),
-                        name: post_l.default_column_name.clone(),
-                    });
-                }
                 if pre_idx != post_idx {
                     out.push(AppEvent::ListMoved {
                         id: post_l.id.clone(),
-                        index: post_idx,
-                    });
-                }
-            }
-        }
-    }
-}
-
-/// Diff two ordered slices of `ColumnView` for one list's
-/// `columns/<list-id>` container. Mirror of `diff_lists`.
-fn diff_columns(list_id: &str, pre: &[ColumnView], post: &[ColumnView], out: &mut Vec<AppEvent>) {
-    let pre_by_id: HashMap<&str, (usize, &ColumnView)> = pre
-        .iter()
-        .enumerate()
-        .map(|(i, c)| (c.id.as_str(), (i, c)))
-        .collect();
-    let post_by_id: HashMap<&str, (usize, &ColumnView)> = post
-        .iter()
-        .enumerate()
-        .map(|(i, c)| (c.id.as_str(), (i, c)))
-        .collect();
-
-    for c in pre {
-        if !post_by_id.contains_key(c.id.as_str()) {
-            out.push(AppEvent::ColumnRemoved {
-                list_id: list_id.to_string(),
-                id: c.id.clone(),
-            });
-        }
-    }
-    for (post_idx, post_c) in post.iter().enumerate() {
-        match pre_by_id.get(post_c.id.as_str()) {
-            None => {
-                out.push(AppEvent::ColumnAdded {
-                    list_id: list_id.to_string(),
-                    id: post_c.id.clone(),
-                    name: post_c.name.clone(),
-                    created_at: post_c.created_at,
-                    index: post_idx,
-                });
-            }
-            Some(&(pre_idx, pre_c)) => {
-                if pre_c.name != post_c.name {
-                    out.push(AppEvent::ColumnRenamed {
-                        list_id: list_id.to_string(),
-                        id: post_c.id.clone(),
-                        name: post_c.name.clone(),
-                    });
-                }
-                if pre_idx != post_idx {
-                    out.push(AppEvent::ColumnMoved {
-                        list_id: list_id.to_string(),
-                        id: post_c.id.clone(),
                         index: post_idx,
                     });
                 }
@@ -4171,14 +3829,6 @@ fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent
             main_name: post.main_name.clone(),
         });
     }
-    // `main`'s default-column override rides the settings map but is
-    // surfaced through the per-list event, same as user lists.
-    if pre.main_default_column_name != post.main_default_column_name {
-        out.push(AppEvent::DefaultColumnRenamed {
-            list_id: LIST_MAIN.to_string(),
-            name: post.main_default_column_name.clone(),
-        });
-    }
 }
 
 #[cfg(test)]
@@ -4188,12 +3838,12 @@ mod tests {
 
     /// The incremental index must always agree with a from-scratch
     /// recompute off the Loro containers.
-    fn assert_live_projection_matches_doc(doc: &Doc) {
+    fn assert_open_projection_matches_doc(doc: &Doc) {
         let fresh = doc.compute_index();
         let guard = doc.item_index.lock().expect("item index mutex poisoned");
         assert_eq!(
-            guard.live_by_list, fresh.live_by_list,
-            "live_by_list out of sync with doc"
+            guard.open_by_list, fresh.open_by_list,
+            "open_by_list out of sync with doc"
         );
         assert_eq!(
             guard.raw_orders, fresh.raw_orders,
@@ -4216,7 +3866,7 @@ mod tests {
         use std::time::Instant;
         let dek = Dek::generate();
         let doc = Doc::new().unwrap();
-        // ~13k lifetime items: 200 live in main, the rest done — the
+        // ~13k lifetime items: 200 open in main, the rest done — the
         // user-reported shape (many small lists, large Done history).
         let texts: Vec<String> = (0..13_000).map(|i| format!("item number {i}")).collect();
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
@@ -4332,7 +3982,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "milk").unwrap();
         assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![id]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
     }
 
     #[test]
@@ -4380,7 +4030,7 @@ mod tests {
                 .collect()
         };
         assert_eq!(other_before, other_after);
-        assert_eq!(doc.live_item_ids(&other), vec![o1, o2]);
+        assert_eq!(doc.open_item_ids(&other), vec![o1, o2]);
         assert!(doc.oplog_vv() != vv_before, "the reorder itself committed");
     }
 
@@ -4475,12 +4125,12 @@ mod tests {
 
         doc.set_item_done(&b, true).unwrap();
         assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
 
         doc.set_item_done(&b, false).unwrap();
         assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b, c]);
-        assert_live_projection_matches_doc(&doc);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b, c]);
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
@@ -4517,8 +4167,8 @@ mod tests {
         assert_eq!(doc.order_list(LIST_MAIN).len(), 2);
         doc.delete_binned(&b).unwrap();
         assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a]);
-        assert_live_projection_matches_doc(&doc);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a]);
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
@@ -4533,10 +4183,10 @@ mod tests {
     }
 
     #[test]
-    fn delete_list_bins_live_done_and_binned_items_with_fresh_placements() {
+    fn delete_list_bins_open_done_and_binned_items_with_fresh_placements() {
         let doc = Doc::new().unwrap();
         let mylist = doc.add_list("Errands").unwrap();
-        let live = doc.add_item(&mylist, "live").unwrap();
+        let open = doc.add_item(&mylist, "live").unwrap();
         let done = doc.add_item(&mylist, "done").unwrap();
         let binned = doc.add_item(&mylist, "binned").unwrap();
         doc.set_item_done(&done, true).unwrap();
@@ -4545,21 +4195,21 @@ mod tests {
 
         doc.delete_list(&mylist).unwrap();
 
-        for id in [&live, &done, &binned] {
+        for id in [&open, &done, &binned] {
             assert_eq!(doc.get_item(id).unwrap().list_id, LIST_MAIN);
         }
-        // Everything from the deleted list is now binned, so the live
+        // Everything from the deleted list is now binned, so the open
         // projection of main is unchanged (only the pre-existing item).
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![main_existing]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![main_existing]);
         // The formerly-done item is now done *and* binned, so it leaves
         // the done-only view; all three land in the bin.
         assert_eq!(doc.done_item_ids(), Vec::<String>::new());
         let mut in_bin = doc.binned_item_ids();
         in_bin.sort();
-        let mut expected = vec![live, done, binned];
+        let mut expected = vec![open, done, binned];
         expected.sort();
         assert_eq!(in_bin, expected);
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
@@ -4704,8 +4354,8 @@ mod tests {
         assert!(a.get_item(&item_b).is_some());
 
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert_live_projection_matches_doc(&a);
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&a);
+        assert_open_projection_matches_doc(&b);
     }
 
     #[test]
@@ -4730,8 +4380,8 @@ mod tests {
 
         a.move_item(&a1, LIST_MAIN, 1).unwrap();
 
-        assert_eq!(a.live_item_ids(LIST_MAIN), vec![a2, a1]);
-        assert_eq!(b.live_item_ids(LIST_MAIN), vec![b1, b2]);
+        assert_eq!(a.open_item_ids(LIST_MAIN), vec![a2, a1]);
+        assert_eq!(b.open_item_ids(LIST_MAIN), vec![b1, b2]);
         assert_ne!(a.fingerprint(), b.fingerprint());
     }
 
@@ -4745,10 +4395,10 @@ mod tests {
         for target in [0, 2, 0, 2, 1, 0, 2, 0, 1, 2] {
             doc.move_item(&b, LIST_MAIN, target).unwrap();
             assert_eq!(
-                doc.live_item_ids(LIST_MAIN).iter().position(|id| id == &b),
+                doc.open_item_ids(LIST_MAIN).iter().position(|id| id == &b),
                 Some(target)
             );
-            assert_live_projection_matches_doc(&doc);
+            assert_open_projection_matches_doc(&doc);
         }
     }
 
@@ -4768,9 +4418,9 @@ mod tests {
         assert_eq!(after.notes, before.notes);
         assert_eq!(after.created_at, before.created_at);
         assert_eq!(after.list_id, other);
-        assert_eq!(doc.live_item_ids(&other), vec![id]);
-        assert!(doc.live_item_ids(LIST_MAIN).is_empty());
-        assert_live_projection_matches_doc(&doc);
+        assert_eq!(doc.open_item_ids(&other), vec![id]);
+        assert!(doc.open_item_ids(LIST_MAIN).is_empty());
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
@@ -4789,7 +4439,7 @@ mod tests {
     }
 
     #[test]
-    fn live_projection_survives_bulk_archive_then_reorder() {
+    fn open_projection_survives_bulk_archive_then_reorder() {
         let doc = Doc::new().unwrap();
         let historical = doc
             .add_items_at(LIST_MAIN, &["old 1", "old 2", "old 3"], 0)
@@ -4797,28 +4447,28 @@ mod tests {
         let historical_refs: Vec<&str> = historical.iter().map(String::as_str).collect();
         doc.set_items_done(&historical_refs, true).unwrap();
 
-        let live = doc
+        let open = doc
             .add_items_at(LIST_MAIN, &["current 1", "current 2", "current 3"], 0)
             .unwrap();
-        doc.move_item(&live[2], LIST_MAIN, 0).unwrap();
+        doc.move_item(&open[2], LIST_MAIN, 0).unwrap();
 
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
-            vec![live[2].clone(), live[0].clone(), live[1].clone()]
+            doc.open_item_ids(LIST_MAIN),
+            vec![open[2].clone(), open[0].clone(), open[1].clone()]
         );
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
     fn view_helpers_empty_doc() {
         let doc = Doc::new().unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), Vec::<String>::new());
+        assert_eq!(doc.open_item_ids(LIST_MAIN), Vec::<String>::new());
         assert_eq!(doc.done_item_ids(), Vec::<String>::new());
         assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
 
     #[test]
-    fn live_item_ids_match_order_container() {
+    fn open_item_ids_match_order_container() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
@@ -4826,12 +4476,12 @@ mod tests {
         let c = doc.add_item(LIST_MAIN, "c").unwrap();
         // Items in another list must not leak into main's view.
         let _h = doc.add_item(&other, "h").unwrap();
-        // Done/binned items must not leak into the live view.
+        // Done/binned items must not leak into the open view.
         doc.set_item_done(&b, true).unwrap();
         let d = doc.add_item(LIST_MAIN, "d").unwrap();
         doc.set_item_binned(&d, true).unwrap();
 
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c]);
     }
 
     #[test]
@@ -4868,10 +4518,10 @@ mod tests {
         let mylist = doc.add_list("Errands").unwrap();
         let id = doc.add_item(&mylist, "x").unwrap();
         doc.delete_list(&mylist).unwrap();
-        // Items are discarded to the bin: gone from every live view,
+        // Items are discarded to the bin: gone from every open view,
         // relocated to main, and present in the cross-list bin view.
-        assert!(doc.live_item_ids(&mylist).is_empty());
-        assert!(doc.live_item_ids(LIST_MAIN).is_empty());
+        assert!(doc.open_item_ids(&mylist).is_empty());
+        assert!(doc.open_item_ids(LIST_MAIN).is_empty());
         assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
         assert_eq!(doc.binned_item_ids(), vec![id]);
     }
@@ -4893,8 +4543,6 @@ mod tests {
                 name: LIST_MAIN_NAME.to_string(),
                 created_at: None,
                 builtin: true,
-                default_column_name: None,
-                columns: Vec::new(),
             }
         );
         assert_eq!(export.lists[1].id, errands);
@@ -4922,7 +4570,7 @@ mod tests {
     }
 
     #[test]
-    fn move_live_item_uses_visible_target_index() {
+    fn move_open_item_uses_visible_target_index() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let hidden = doc.add_item(&other, "hidden").unwrap();
@@ -4932,7 +4580,7 @@ mod tests {
 
         doc.move_item(&moved, &other, 1).unwrap();
 
-        assert_eq!(doc.live_item_ids(&other), vec![anchor, moved]);
+        assert_eq!(doc.open_item_ids(&other), vec![anchor, moved]);
     }
 
     #[test]
@@ -4991,13 +4639,13 @@ mod tests {
         let visible_in = |d: &Doc| {
             [LIST_MAIN, list_x.as_str(), list_y.as_str()]
                 .iter()
-                .filter(|l| d.live_item_ids(l).contains(&id))
+                .filter(|l| d.open_item_ids(l).contains(&id))
                 .count()
         };
         assert_eq!(visible_in(&a), 1, "exactly one visible copy on A");
         assert_eq!(visible_in(&b), 1, "exactly one visible copy on B");
-        assert_live_projection_matches_doc(&a);
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&a);
+        assert_open_projection_matches_doc(&b);
     }
 
     /// Concurrent reorder on one replica and lifecycle change on another
@@ -5027,12 +4675,12 @@ mod tests {
 
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_eq!(
-            a.live_item_ids(LIST_MAIN),
+            a.open_item_ids(LIST_MAIN),
             vec![ids[3].clone(), ids[0].clone(), ids[2].clone()]
         );
         assert!(a.get_item(&ids[1]).unwrap().is_done());
-        assert_live_projection_matches_doc(&a);
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&a);
+        assert_open_projection_matches_doc(&b);
     }
 
     /// A hand-crafted stale entry (placement mismatch) must never make
@@ -5074,9 +4722,9 @@ mod tests {
         doc.inner.commit();
         doc.rebuild_index();
 
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b]);
         assert_eq!(doc.order_list(LIST_MAIN).len(), 5);
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
     }
 
     /// An item whose canonical entry is missing entirely still projects
@@ -5102,7 +4750,7 @@ mod tests {
         // b is not hidden: it lands in the fallback tail (after the
         // entry-backed items, created_at/id order).
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![a.clone(), c.clone(), b.clone()]
         );
 
@@ -5113,8 +4761,8 @@ mod tests {
         let repairs = doc.reconcile().unwrap();
         assert!(repairs >= 1, "expected at least one repair");
         assert_eq!(doc.order_list(LIST_MAIN).len(), 3);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c, b]);
-        assert_live_projection_matches_doc(&doc);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c, b]);
+        assert_open_projection_matches_doc(&doc);
         // Second run is a no-op.
         assert_eq!(doc.reconcile().unwrap(), 0);
     }
@@ -5146,9 +4794,9 @@ mod tests {
         let repairs = doc.reconcile().unwrap();
         assert_eq!(repairs, 2);
         assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a]);
         assert_eq!(doc.reconcile().unwrap(), 0);
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
     }
 
     // ---------- AppEvent tests ----------
@@ -5167,7 +4815,7 @@ mod tests {
                 text,
                 done_at,
                 binned_at,
-                live_index,
+                open_index,
                 ..
             } => {
                 assert_eq!(eid, &id);
@@ -5175,7 +4823,7 @@ mod tests {
                 assert_eq!(text, "milk");
                 assert!(done_at.is_none());
                 assert!(binned_at.is_none());
-                assert_eq!(*live_index, Some(0));
+                assert_eq!(*open_index, Some(0));
             }
             other => panic!("expected ItemAdded, got {other:?}"),
         }
@@ -5207,13 +4855,14 @@ mod tests {
                     id: eid,
                     done_at,
                     binned_at,
-                    live_index,
+                    open_index,
+                    ..
                 },
             ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some());
                 assert!(binned_at.is_none());
-                assert_eq!(*live_index, None, "done item leaves the live projection");
+                assert_eq!(*open_index, None, "done item leaves the open projection");
             }
             other => panic!("unexpected events: {other:?}"),
         }
@@ -5233,20 +4882,21 @@ mod tests {
                     id: eid,
                     done_at,
                     binned_at,
-                    live_index,
+                    open_index,
+                    ..
                 },
             ] => {
                 assert_eq!(eid, &id);
                 assert!(done_at.is_some(), "done state must be preserved");
                 assert!(binned_at.is_some());
-                assert_eq!(*live_index, None);
+                assert_eq!(*open_index, None);
             }
             other => panic!("unexpected events: {other:?}"),
         }
     }
 
     #[test]
-    fn local_cross_list_move_emits_list_changed_with_live_index() {
+    fn local_cross_list_move_emits_list_changed_with_open_index() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let anchor = doc.add_item(&other, "anchor").unwrap();
@@ -5261,16 +4911,16 @@ mod tests {
                 AppEvent::ItemListChanged {
                     id,
                     list_id,
-                    live_index,
+                    open_index,
                 },
             ] => {
                 assert_eq!(id, &moved);
                 assert_eq!(list_id, &other);
-                assert_eq!(*live_index, Some(1));
+                assert_eq!(*open_index, Some(1));
             }
             other_evs => panic!("expected one ItemListChanged, got {other_evs:?}"),
         }
-        assert_eq!(doc.live_item_ids(&other), vec![anchor, moved]);
+        assert_eq!(doc.open_item_ids(&other), vec![anchor, moved]);
     }
 
     #[test]
@@ -5282,7 +4932,7 @@ mod tests {
         doc.delete_list(&other).unwrap();
         let evs = doc.drain_events();
         // The item is relocated to `main` (ItemListChanged) and binned
-        // (ItemLifecycleChanged, so it drops out of the live projection),
+        // (ItemLifecycleChanged, so it drops out of the open projection),
         // then the list is removed (ListRemoved).
         let mut saw_reassign = false;
         let mut saw_binned = false;
@@ -5292,11 +4942,11 @@ mod tests {
                 AppEvent::ItemListChanged {
                     id: eid,
                     list_id,
-                    live_index,
+                    open_index,
                 } => {
                     assert_eq!(eid, &id);
                     assert_eq!(list_id, LIST_MAIN);
-                    assert_eq!(*live_index, None, "binned item is not in a live view");
+                    assert_eq!(*open_index, None, "binned item is not in a open view");
                     saw_reassign = true;
                 }
                 AppEvent::ItemLifecycleChanged {
@@ -5350,22 +5000,23 @@ mod tests {
                     id,
                     done_at,
                     binned_at,
-                    live_index,
+                    open_index,
+                    ..
                 },
             ] => {
                 assert_eq!(id, &first);
                 assert!(done_at.is_some());
                 assert!(binned_at.is_none());
-                assert_eq!(*live_index, None);
+                assert_eq!(*open_index, None);
             }
             other => panic!("expected surgical ItemLifecycleChanged, got {other:?}"),
         }
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
     #[test]
-    fn remote_move_translates_to_item_moved_with_live_index() {
+    fn remote_move_translates_to_item_moved_with_open_index() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let _first = a.add_item(LIST_MAIN, "first").unwrap();
@@ -5379,36 +5030,36 @@ mod tests {
 
         let evs = b.drain_events();
         match evs.as_slice() {
-            [AppEvent::ItemMoved { id, live_index }] => {
+            [AppEvent::ItemMoved { id, open_index }] => {
                 assert_eq!(id, &third);
-                assert_eq!(*live_index, Some(0));
+                assert_eq!(*open_index, Some(0));
             }
             other => panic!("expected surgical ItemMoved, got {other:?}"),
         }
-        assert_live_projection_matches_doc(&b);
-        assert_eq!(b.live_item_ids(LIST_MAIN)[0], third);
+        assert_open_projection_matches_doc(&b);
+        assert_eq!(b.open_item_ids(LIST_MAIN)[0], third);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
     /// Replay a frame's emitted events the way the JS store does:
-    /// naive per-list arrays, remove-then-insert at `live_index`,
+    /// naive per-list arrays, remove-then-insert at `open_index`,
     /// applied in emission order. This is the contract the translator
     /// must satisfy — the Rust-internal projection and Loro fingerprint
     /// can be correct while the *emitted events* fail to converge on
     /// the consumer.
-    fn replay_live_events(
+    fn replay_open_events(
         pre: &HashMap<String, Vec<String>>,
         evs: &[AppEvent],
     ) -> HashMap<String, Vec<String>> {
-        let mut live = pre.clone();
-        let remove_everywhere = |live: &mut HashMap<String, Vec<String>>, id: &str| {
-            for arr in live.values_mut() {
+        let mut open = pre.clone();
+        let remove_everywhere = |open: &mut HashMap<String, Vec<String>>, id: &str| {
+            for arr in open.values_mut() {
                 arr.retain(|x| x != id);
             }
         };
         let insert_at =
-            |live: &mut HashMap<String, Vec<String>>, list: &str, id: &str, at: usize| {
-                let arr = live.entry(list.to_string()).or_default();
+            |open: &mut HashMap<String, Vec<String>>, list: &str, id: &str, at: usize| {
+                let arr = open.entry(list.to_string()).or_default();
                 arr.insert(at.min(arr.len()), id.to_string());
             };
         for ev in evs {
@@ -5416,45 +5067,45 @@ mod tests {
                 AppEvent::ItemAdded {
                     id,
                     list_id,
-                    live_index,
+                    open_index,
                     ..
                 } => {
-                    remove_everywhere(&mut live, id);
-                    if let Some(li) = live_index {
-                        insert_at(&mut live, list_id, id, *li);
+                    remove_everywhere(&mut open, id);
+                    if let Some(li) = open_index {
+                        insert_at(&mut open, list_id, id, *li);
                     }
                 }
-                AppEvent::ItemMoved { id, live_index } => {
-                    if let Some(li) = live_index {
+                AppEvent::ItemMoved { id, open_index } => {
+                    if let Some(li) = open_index {
                         // The store knows the item's list; the test
                         // replayer finds it by membership.
-                        let list = live
+                        let list = open
                             .iter()
                             .find(|(_, arr)| arr.iter().any(|x| x == id))
                             .map(|(l, _)| l.clone());
                         if let Some(list) = list {
-                            remove_everywhere(&mut live, id);
-                            insert_at(&mut live, &list, id, *li);
+                            remove_everywhere(&mut open, id);
+                            insert_at(&mut open, &list, id, *li);
                         }
                     }
                 }
                 AppEvent::ItemListChanged {
                     id,
                     list_id,
-                    live_index,
+                    open_index,
                 } => {
-                    // Store semantics: a live item moves lists — remove
+                    // Store semantics: a open item moves lists — remove
                     // from the old array and insert into the new one at
-                    // `live_index`, *appending* when absent. A hidden
+                    // `open_index`, *appending* when absent. A hidden
                     // item only changes its list field.
-                    let was_live = live.values().any(|arr| arr.iter().any(|x| x == id));
-                    remove_everywhere(&mut live, id);
-                    if was_live {
-                        let at = live_index.unwrap_or(usize::MAX);
-                        insert_at(&mut live, list_id, id, at);
+                    let was_open = open.values().any(|arr| arr.iter().any(|x| x == id));
+                    remove_everywhere(&mut open, id);
+                    if was_open {
+                        let at = open_index.unwrap_or(usize::MAX);
+                        insert_at(&mut open, list_id, id, at);
                     }
                 }
-                AppEvent::ItemLifecycleChanged { id, live_index, .. } => {
+                AppEvent::ItemLifecycleChanged { id, open_index, .. } => {
                     // A lifecycle event either hides the item (None) or
                     // re-inserts it at its list position. The replayer
                     // needs the list; the store reads it off its item
@@ -5462,21 +5113,21 @@ mod tests {
                     // lifecycle re-entries are handled by the caller
                     // passing docs whose lists are stable. For pure
                     // reorder/move tests this arm only hides.
-                    if live_index.is_none() {
-                        remove_everywhere(&mut live, id);
+                    if open_index.is_none() {
+                        remove_everywhere(&mut open, id);
                     }
                 }
-                AppEvent::ItemRemoved { id } => remove_everywhere(&mut live, id),
+                AppEvent::ItemRemoved { id } => remove_everywhere(&mut open, id),
                 _ => {}
             }
         }
-        live.retain(|_, arr| !arr.is_empty());
-        live
+        open.retain(|_, arr| !arr.is_empty());
+        open
     }
 
-    fn live_state(doc: &Doc) -> HashMap<String, Vec<String>> {
+    fn open_state(doc: &Doc) -> HashMap<String, Vec<String>> {
         let guard = doc.item_index.lock().unwrap();
-        guard.live_by_list.clone()
+        guard.open_by_list.clone()
     }
 
     #[test]
@@ -5491,9 +5142,9 @@ mod tests {
 
         // Select the top two (a, b) and drag them below d — the exact op
         // sequence `planReorderMoves` emits for a two-item downward move:
-        // move b to live index 3, then a to live index 2. Final order:
+        // move b to open index 3, then a to open index 2. Final order:
         // [c, d, a, b, e].
-        let pre_live = live_state(&b);
+        let pre_open = open_state(&b);
         a.move_item(&ids[1], LIST_MAIN, 3).unwrap();
         a.move_item(&ids[0], LIST_MAIN, 2).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -5507,15 +5158,15 @@ mod tests {
             ids[1].clone(),
             ids[4].clone(),
         ];
-        assert_eq!(a.live_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.open_item_ids(LIST_MAIN), expected);
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert!(
             !evs.contains(&AppEvent::FullResync),
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs)
+            replay_open_events(&pre_open, &evs)
                 .get(LIST_MAIN)
                 .cloned()
                 .unwrap_or_default(),
@@ -5536,7 +5187,7 @@ mod tests {
 
         // Select c, d and drag them to the top — `planReorderMoves`
         // emits move c to 0, then d to 1. Final order: [c, d, a, b, e].
-        let pre_live = live_state(&b);
+        let pre_open = open_state(&b);
         a.move_item(&ids[2], LIST_MAIN, 0).unwrap();
         a.move_item(&ids[3], LIST_MAIN, 1).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -5550,15 +5201,15 @@ mod tests {
             ids[1].clone(),
             ids[4].clone(),
         ];
-        assert_eq!(a.live_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.open_item_ids(LIST_MAIN), expected);
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert!(
             !evs.contains(&AppEvent::FullResync),
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs)
+            replay_open_events(&pre_open, &evs)
                 .get(LIST_MAIN)
                 .cloned()
                 .unwrap_or_default(),
@@ -5579,7 +5230,7 @@ mod tests {
 
         // Discontiguous selection {a, c} dragged down to sit before f:
         // move a below e, then c below e. Exercises a non-adjacent widen.
-        let pre_live = live_state(&b);
+        let pre_open = open_state(&b);
         a.move_item(&ids[0], LIST_MAIN, 3).unwrap();
         a.move_item(&ids[2], LIST_MAIN, 4).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -5587,17 +5238,17 @@ mod tests {
 
         let evs = b.drain_events();
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert!(
             !evs.contains(&AppEvent::FullResync),
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(
-            replay_live_events(&pre_live, &evs)
+            replay_open_events(&pre_open, &evs)
                 .get(LIST_MAIN)
                 .cloned()
                 .unwrap_or_default(),
-            a.live_item_ids(LIST_MAIN),
+            a.open_item_ids(LIST_MAIN),
             "emitted events interleave on the consumer; got {evs:?}"
         );
     }
@@ -5616,7 +5267,7 @@ mod tests {
         let _o1 = a.add_item(&other, "o1").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
-        let pre_live = live_state(&b);
+        let pre_open = open_state(&b);
         a.move_item(&m0, &other, 1).unwrap();
         a.move_item(&m1, &other, 2).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
@@ -5628,17 +5279,17 @@ mod tests {
             "expected surgical events, got a resync: {evs:?}"
         );
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert_live_projection_matches_doc(&b);
-        assert_eq!(a.live_item_ids(&other), b.live_item_ids(&other));
-        assert_eq!(a.live_item_ids(LIST_MAIN), b.live_item_ids(LIST_MAIN));
-        let replayed = replay_live_events(&pre_live, &evs);
+        assert_open_projection_matches_doc(&b);
+        assert_eq!(a.open_item_ids(&other), b.open_item_ids(&other));
+        assert_eq!(a.open_item_ids(LIST_MAIN), b.open_item_ids(LIST_MAIN));
+        let replayed = replay_open_events(&pre_open, &evs);
         assert_eq!(
             replayed.get(other.as_str()).cloned().unwrap_or_default(),
-            b.live_item_ids(&other)
+            b.open_item_ids(&other)
         );
         assert_eq!(
             replayed.get(LIST_MAIN).cloned().unwrap_or_default(),
-            b.live_item_ids(LIST_MAIN)
+            b.open_item_ids(LIST_MAIN)
         );
     }
 
@@ -5660,7 +5311,7 @@ mod tests {
             matches!(evs.as_slice(), [AppEvent::ItemRemoved { id }] if id == &victim),
             "expected surgical ItemRemoved, got {evs:?}"
         );
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
@@ -5686,11 +5337,11 @@ mod tests {
                 AppEvent::ItemListChanged {
                     id: lid,
                     list_id,
-                    live_index: li1,
+                    open_index: li1,
                 },
                 AppEvent::ItemMoved {
                     id: mid,
-                    live_index: li2,
+                    open_index: li2,
                 },
             ] => {
                 assert_eq!(lid, &roamer);
@@ -5701,8 +5352,8 @@ mod tests {
             }
             other_evs => panic!("expected ItemListChanged + ItemMoved, got {other_evs:?}"),
         }
-        assert_live_projection_matches_doc(&b);
-        assert_eq!(b.live_item_ids(&other)[1], roamer);
+        assert_open_projection_matches_doc(&b);
+        assert_eq!(b.open_item_ids(&other)[1], roamer);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
@@ -5723,9 +5374,9 @@ mod tests {
 
         let evs = b.drain_events();
         assert_eq!(evs, vec![AppEvent::FullResync]);
-        assert_live_projection_matches_doc(&b);
+        assert_open_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert!(b.live_item_ids(LIST_MAIN).is_empty());
+        assert!(b.open_item_ids(LIST_MAIN).is_empty());
     }
 
     #[test]
@@ -5861,7 +5512,7 @@ mod tests {
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
         let c = doc.add_item(LIST_MAIN, "c").unwrap();
         let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, mid, b, c]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, mid, b, c]);
     }
 
     #[test]
@@ -5869,11 +5520,11 @@ mod tests {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let b = doc.add_item_at(LIST_MAIN, "b", 99).unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b]);
     }
 
     #[test]
-    fn add_item_at_skips_other_lists_and_non_live_when_counting() {
+    fn add_item_at_skips_other_lists_and_non_open_when_counting() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
@@ -5881,14 +5532,14 @@ mod tests {
         let b = doc.add_item(LIST_MAIN, "b").unwrap();
         let done = doc.add_item(LIST_MAIN, "done").unwrap();
         doc.set_item_done(&done, true).unwrap();
-        // Position 1 in main's live view should land between a and b
+        // Position 1 in main's open view should land between a and b
         // regardless of the other-list and done items in between.
         let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, mid, b]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, mid, b]);
     }
 
     #[test]
-    fn add_item_at_emits_item_added_with_live_index() {
+    fn add_item_at_emits_item_added_with_open_index() {
         let doc = Doc::new().unwrap();
         let _a = doc.add_item(LIST_MAIN, "a").unwrap();
         let _b = doc.add_item(LIST_MAIN, "b").unwrap();
@@ -5897,16 +5548,16 @@ mod tests {
         let evs = doc.drain_events();
         assert_eq!(evs.len(), 1);
         match &evs[0] {
-            AppEvent::ItemAdded { id, live_index, .. } => {
+            AppEvent::ItemAdded { id, open_index, .. } => {
                 assert_eq!(id, &mid);
-                assert_eq!(*live_index, Some(1));
+                assert_eq!(*open_index, Some(1));
             }
             other => panic!("expected ItemAdded, got {other:?}"),
         }
     }
 
     #[test]
-    fn local_move_item_emits_destination_live_index() {
+    fn local_move_item_emits_destination_open_index() {
         let doc = Doc::new().unwrap();
         let first = doc.add_item(LIST_MAIN, "first").unwrap();
         let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
@@ -5916,15 +5567,15 @@ mod tests {
         doc.move_item(&moved, LIST_MAIN, 0).unwrap();
 
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![moved.clone(), first, third]
         );
         let evs = doc.drain_events();
         assert!(
             evs.iter().any(
-                |e| matches!(e, AppEvent::ItemMoved { id, live_index } if id == &moved && *live_index == Some(0))
+                |e| matches!(e, AppEvent::ItemMoved { id, open_index } if id == &moved && *open_index == Some(0))
             ),
-            "expected ItemMoved to live index 0, got {evs:?}"
+            "expected ItemMoved to open index 0, got {evs:?}"
         );
     }
 
@@ -5945,23 +5596,23 @@ mod tests {
                 AppEvent::ItemLifecycleChanged {
                     id,
                     binned_at,
-                    live_index,
+                    open_index,
                     ..
                 },
             ] => {
                 assert_eq!(id, &second);
                 assert!(binned_at.is_some());
-                assert_eq!(*live_index, None);
+                assert_eq!(*open_index, None);
             }
             other => panic!("expected one surgical ItemLifecycleChanged, got {other:?}"),
         }
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![first.clone(), third.clone()]
         );
 
-        // Restore: re-enters the live projection at its former position
+        // Restore: re-enters the open projection at its former position
         // (between first and third — the entry never moved), and the
         // event says so.
         doc.set_items_binned(&[second.as_str()], false).unwrap();
@@ -5971,18 +5622,18 @@ mod tests {
                 AppEvent::ItemLifecycleChanged {
                     id,
                     binned_at,
-                    live_index,
+                    open_index,
                     ..
                 },
             ] => {
                 assert_eq!(id, &second);
                 assert!(binned_at.is_none());
-                assert_eq!(*live_index, Some(1));
+                assert_eq!(*open_index, Some(1));
             }
             other => panic!("expected one surgical ItemLifecycleChanged, got {other:?}"),
         }
-        assert_live_projection_matches_doc(&doc);
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![first, second, third]);
+        assert_open_projection_matches_doc(&doc);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![first, second, third]);
     }
 
     #[test]
@@ -5994,7 +5645,7 @@ mod tests {
         doc.set_items_binned(&[first.as_str(), second.as_str()], true)
             .unwrap();
 
-        assert_eq!(doc.live_item_ids(LIST_MAIN), Vec::<String>::new());
+        assert_eq!(doc.open_item_ids(LIST_MAIN), Vec::<String>::new());
         assert_eq!(doc.binned_item_ids().len(), 2);
     }
 
@@ -6010,7 +5661,7 @@ mod tests {
         doc.delete_binned_items(&[first.as_str(), second.as_str()])
             .unwrap();
 
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![keep]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![keep]);
         assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
 
@@ -6029,7 +5680,7 @@ mod tests {
         let ids = doc.add_items_at(LIST_MAIN, &["x", "y", "z"], 1).unwrap();
         assert_eq!(ids.len(), 3);
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![a, ids[0].clone(), ids[1].clone(), ids[2].clone(), b],
         );
     }
@@ -6040,13 +5691,13 @@ mod tests {
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
         let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 99).unwrap();
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![a, ids[0].clone(), ids[1].clone()]
         );
     }
 
     #[test]
-    fn add_items_at_emits_one_event_per_item_with_increasing_live_indices() {
+    fn add_items_at_emits_one_event_per_item_with_increasing_open_indices() {
         let doc = Doc::new().unwrap();
         let _a = doc.add_item(LIST_MAIN, "a").unwrap();
         let _b = doc.add_item(LIST_MAIN, "b").unwrap();
@@ -6056,7 +5707,7 @@ mod tests {
         let added: Vec<(String, Option<usize>)> = evs
             .iter()
             .filter_map(|e| match e {
-                AppEvent::ItemAdded { id, live_index, .. } => Some((id.clone(), *live_index)),
+                AppEvent::ItemAdded { id, open_index, .. } => Some((id.clone(), *open_index)),
                 _ => None,
             })
             .collect();
@@ -6075,7 +5726,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, DocError::Invalid(_)));
         // Nothing landed.
-        assert_eq!(doc.live_item_ids(LIST_MAIN).len(), 1);
+        assert_eq!(doc.open_item_ids(LIST_MAIN).len(), 1);
         assert!(doc.drain_events().is_empty());
     }
 
@@ -6400,7 +6051,7 @@ mod tests {
         assert!(names.contains(&"Imported".to_string()));
         assert_eq!(names.len(), 2);
 
-        // Both `src-main` and `local-main` live in main.
+        // Both `src-main` and `local-main` open in main.
         let main_texts: Vec<String> = dst
             .iter_items()
             .filter(|i| i.list_id == LIST_MAIN)
@@ -6426,15 +6077,13 @@ mod tests {
                 name: LIST_MAIN_NAME.to_string(),
                 created_at: None,
                 builtin: true,
-                default_column_name: None,
-                columns: Vec::new(),
             }],
             items: vec![ExportItem {
                 id: "orphan-id".to_string(),
                 text: "stranded".to_string(),
                 notes: String::new(),
                 list_id: "no-such-list".to_string(),
-                column: None,
+                live: false,
                 due_on: None,
                 created_at: 1_700_000_000_000,
                 done_at: None,
@@ -6662,10 +6311,10 @@ mod tests {
             &evs[0],
             AppEvent::ItemMoved {
                 id,
-                live_index: Some(199),
+                open_index: Some(199),
             } if id == &moved
         ));
-        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), ids);
     }
 
     #[test]
@@ -6680,24 +6329,24 @@ mod tests {
 
         // Cross-list move is one commit — one undo step.
         doc.move_item(&b, &other, 1).unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
-        assert_eq!(doc.live_item_ids(&other), vec![o.clone(), b.clone()]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+        assert_eq!(doc.open_item_ids(&other), vec![o.clone(), b.clone()]);
 
         assert!(doc.undo().unwrap());
         assert_eq!(
-            doc.live_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_MAIN),
             vec![a.clone(), b.clone(), c.clone()],
             "undo restores the item to its former position in the source list"
         );
-        assert_eq!(doc.live_item_ids(&other), vec![o.clone()]);
+        assert_eq!(doc.open_item_ids(&other), vec![o.clone()]);
         assert_eq!(doc.get_item(&b).unwrap().list_id, LIST_MAIN);
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
 
         assert!(doc.redo().unwrap());
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c]);
-        assert_eq!(doc.live_item_ids(&other), vec![o, b.clone()]);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c]);
+        assert_eq!(doc.open_item_ids(&other), vec![o, b.clone()]);
         assert_eq!(doc.get_item(&b).unwrap().list_id, other);
-        assert_live_projection_matches_doc(&doc);
+        assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
@@ -6731,18 +6380,18 @@ mod tests {
             }
         }
 
-        let after_move = doc.live_item_ids(LIST_MAIN);
+        let after_move = doc.open_item_ids(LIST_MAIN);
         assert_eq!(after_move, next_ids);
 
         for _ in 0..steps {
             assert!(doc.undo().unwrap());
         }
-        assert_eq!(doc.live_item_ids(LIST_MAIN), ids);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), ids);
 
         for _ in 0..steps {
             assert!(doc.redo().unwrap());
         }
-        assert_eq!(doc.live_item_ids(LIST_MAIN), after_move);
+        assert_eq!(doc.open_item_ids(LIST_MAIN), after_move);
     }
 
     #[test]
@@ -6780,482 +6429,268 @@ mod tests {
         );
     }
 
-    // ---------- board columns (spec/kanban.md) ----------
+    // ---------- lifecycle (spec/data-model.md, spec/board.md) ----------
 
     #[test]
-    fn column_crud_and_views() {
+    fn new_item_defaults_to_backlog() {
         let doc = Doc::new().unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let _ = doc.drain_events();
-
-        let c1 = doc.add_column(&l, "Doing").unwrap();
-        let c2 = doc.add_column(&l, "Done-ish").unwrap();
-        assert_eq!(
-            doc.columns_of(&l)
-                .iter()
-                .map(|c| c.id.as_str())
-                .collect::<Vec<_>>(),
-            vec![c1.as_str(), c2.as_str()]
-        );
-
-        doc.rename_column(&l, &c1, "In progress").unwrap();
-        assert_eq!(doc.columns_of(&l)[0].name, "In progress");
-
-        doc.move_column(&l, &c1, 1).unwrap();
-        assert_eq!(doc.columns_of(&l)[1].id, c1);
-
-        doc.delete_column(&l, &c2).unwrap();
-        assert_eq!(doc.columns_of(&l).len(), 1);
-
-        let evs = doc.drain_events();
-        assert!(matches!(
-            &evs[0],
-            AppEvent::ColumnAdded { list_id, name, index: 0, .. }
-                if list_id == &l && name == "Doing"
-        ));
-        assert!(matches!(
-            &evs[1],
-            AppEvent::ColumnAdded { name, index: 1, .. } if name == "Done-ish"
-        ));
-        assert!(matches!(
-            &evs[2],
-            AppEvent::ColumnRenamed { id, name, .. } if id == &c1 && name == "In progress"
-        ));
-        assert!(matches!(
-            &evs[3],
-            AppEvent::ColumnMoved { id, index: 1, .. } if id == &c1
-        ));
-        assert!(matches!(
-            &evs[4],
-            AppEvent::ColumnRemoved { id, .. } if id == &c2
-        ));
-
-        // Empty / whitespace names are rejected; unknown ids error.
-        assert!(doc.add_column(&l, "   ").is_err());
-        assert!(doc.rename_column(&l, &c1, "").is_err());
-        assert!(doc.rename_column(&l, "nope", "x").is_err());
-        assert!(doc.add_column("no-such-list", "x").is_err());
+        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        let it = doc.get_item(&id).unwrap();
+        assert_eq!(it.lifecycle(), ItemLifecycle::Backlog);
+        assert!(!it.live);
+        assert!(it.is_open());
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
     }
 
     #[test]
-    fn main_supports_columns_without_a_listmeta_row() {
+    fn add_item_live_creates_live() {
         let doc = Doc::new().unwrap();
-        let c = doc.add_column(LIST_MAIN, "Later").unwrap();
-        assert_eq!(doc.columns_of(LIST_MAIN)[0].id, c);
-
-        doc.set_default_column_name(LIST_MAIN, "Now").unwrap();
-        assert_eq!(
-            doc.get_settings().main_default_column_name.as_deref(),
-            Some("Now")
-        );
-        doc.set_default_column_name(LIST_MAIN, "  ").unwrap();
-        assert_eq!(doc.get_settings().main_default_column_name, None);
+        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        let it = doc.get_item(&id).unwrap();
+        assert_eq!(it.lifecycle(), ItemLifecycle::Live);
+        assert!(it.live && it.is_open());
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
     }
 
     #[test]
-    fn default_column_name_roundtrip_on_user_list() {
+    fn backlog_live_flip_preserves_list_order() {
         let doc = Doc::new().unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let _ = doc.drain_events();
-
-        doc.set_default_column_name(&l, "Backlog").unwrap();
-        assert_eq!(
-            doc.get_list_meta(&l)
-                .unwrap()
-                .default_column_name
-                .as_deref(),
-            Some("Backlog")
-        );
-        // No-op save emits no phantom event.
-        doc.set_default_column_name(&l, "Backlog").unwrap();
-        doc.set_default_column_name(&l, "").unwrap();
-        assert_eq!(doc.get_list_meta(&l).unwrap().default_column_name, None);
-
-        let evs = doc.drain_events();
-        assert_eq!(
-            evs,
-            vec![
-                AppEvent::DefaultColumnRenamed {
-                    list_id: l.clone(),
-                    name: Some("Backlog".into())
-                },
-                AppEvent::DefaultColumnRenamed {
-                    list_id: l.clone(),
-                    name: None
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn set_item_column_writes_register_and_optionally_reorders() {
-        let doc = Doc::new().unwrap();
-        // Seed main so the incremental index carries the same (empty)
-        // main shadow a fresh recompute materializes.
-        let _seed = doc.add_item(LIST_MAIN, "seed").unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let col = doc.add_column(&l, "Doing").unwrap();
-        let a = doc.add_item(&l, "a").unwrap();
-        let b = doc.add_item(&l, "b").unwrap();
-        let c = doc.add_item(&l, "c").unwrap();
-        let _ = doc.drain_events();
-
-        // Register-only: linear position untouched.
-        doc.set_item_column(&c, Some(&col), None).unwrap();
-        assert_eq!(doc.get_item(&c).unwrap().column.as_deref(), Some(&*col));
-        assert_eq!(doc.live_item_ids(&l), vec![a.clone(), b.clone(), c.clone()]);
-        let evs = doc.drain_events();
-        assert_eq!(
-            evs,
-            vec![AppEvent::ItemColumnChanged {
-                id: c.clone(),
-                column: Some(col.clone())
-            }]
-        );
-
-        // Register + reorder in one commit → one undo step.
-        doc.set_item_column(&a, Some(&col), Some(2)).unwrap();
-        assert_eq!(doc.get_item(&a).unwrap().column.as_deref(), Some(&*col));
-        assert_eq!(doc.live_item_ids(&l), vec![b.clone(), c.clone(), a.clone()]);
-        let evs = doc.drain_events();
-        assert!(evs.contains(&AppEvent::ItemColumnChanged {
-            id: a.clone(),
-            column: Some(col.clone())
-        }));
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ItemMoved { id, live_index: Some(2) } if id == &a
-        )));
-        assert!(doc.undo().unwrap());
-        assert_eq!(doc.get_item(&a).unwrap().column, None);
-        assert_eq!(doc.live_item_ids(&l), vec![a.clone(), b.clone(), c.clone()]);
-
-        // Back to default clears the key.
-        doc.set_item_column(&c, None, None).unwrap();
-        assert_eq!(doc.get_item(&c).unwrap().column, None);
-
-        // Pure no-op emits nothing.
-        let _ = doc.drain_events();
-        doc.set_item_column(&c, None, None).unwrap();
-        assert!(doc.drain_events().is_empty());
-
-        // Unknown column of the item's current list is rejected.
-        assert!(doc.set_item_column(&c, Some("nope"), None).is_err());
-        assert_live_projection_matches_doc(&doc);
-    }
-
-    #[test]
-    fn add_item_in_column_appends_with_register() {
-        let doc = Doc::new().unwrap();
-        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
         let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let _ = doc.drain_events();
-
-        let b = doc.add_item_in_column(LIST_MAIN, &col, "b").unwrap();
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, b.clone()]);
-        assert_eq!(doc.get_item(&b).unwrap().column.as_deref(), Some(&*col));
-        let evs = doc.drain_events();
-        assert!(matches!(
-            &evs[0],
-            AppEvent::ItemAdded { id, column: Some(c), .. } if id == &b && c == &col
-        ));
-
-        assert!(doc.add_item_in_column(LIST_MAIN, "nope", "x").is_err());
+        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let ordered = vec![a.clone(), b.clone(), c.clone()];
+        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        // Flip b Backlog→Live: shared Open order is untouched.
+        doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
+        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        assert_eq!(doc.get_item(&b).unwrap().lifecycle(), ItemLifecycle::Live);
+        // ...and back to Backlog.
+        doc.set_item_lifecycle(&b, ItemLifecycle::Backlog).unwrap();
+        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        assert_eq!(
+            doc.get_item(&b).unwrap().lifecycle(),
+            ItemLifecycle::Backlog
+        );
     }
 
     #[test]
-    fn add_item_in_column_at_inserts_below_anchor() {
+    fn complete_backlog_then_undo_returns_to_backlog() {
         let doc = Doc::new().unwrap();
-        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
-        // Two cards in `col`, one in the default column.
-        let a = doc.add_item_in_column(LIST_MAIN, &col, "a").unwrap();
-        let b = doc.add_item_in_column(LIST_MAIN, &col, "b").unwrap();
-        let d = doc.add_item(LIST_MAIN, "d").unwrap();
-        let _ = doc.drain_events();
+        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
+        assert!(!doc.get_item(&id).unwrap().live, "masked Backlog preserved");
+        doc.set_item_done(&id, false).unwrap();
+        assert_eq!(
+            doc.get_item(&id).unwrap().lifecycle(),
+            ItemLifecycle::Backlog
+        );
+    }
 
-        // Insert "c" directly below "a" (linear index of a + 1), in `col`.
-        let a_idx = doc
-            .live_item_ids(LIST_MAIN)
-            .iter()
-            .position(|id| id == &a)
+    #[test]
+    fn complete_live_then_undo_returns_to_live() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        let it = doc.get_item(&id).unwrap();
+        assert_eq!(it.lifecycle(), ItemLifecycle::Done);
+        assert!(it.live, "Done preserves the underlying Live flag");
+        doc.set_item_done(&id, false).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Live);
+    }
+
+    #[test]
+    fn binning_and_restoring_preserves_underlying_state() {
+        let doc = Doc::new().unwrap();
+        let backlog = doc.add_item(LIST_MAIN, "backlog").unwrap();
+        let live = doc.add_item_live(LIST_MAIN, "live").unwrap();
+        let done = doc.add_item_live(LIST_MAIN, "done").unwrap();
+        doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
+
+        for id in [&backlog, &live, &done] {
+            doc.set_item_lifecycle(id, ItemLifecycle::Binned).unwrap();
+            assert_eq!(doc.get_item(id).unwrap().lifecycle(), ItemLifecycle::Binned);
+        }
+        // Restore (clear binned only) reveals each preserved underlying state.
+        doc.set_item_binned(&backlog, false).unwrap();
+        doc.set_item_binned(&live, false).unwrap();
+        doc.set_item_binned(&done, false).unwrap();
+        assert_eq!(
+            doc.get_item(&backlog).unwrap().lifecycle(),
+            ItemLifecycle::Backlog
+        );
+        assert_eq!(
+            doc.get_item(&live).unwrap().lifecycle(),
+            ItemLifecycle::Live
+        );
+        assert_eq!(
+            doc.get_item(&done).unwrap().lifecycle(),
+            ItemLifecycle::Done
+        );
+    }
+
+    #[test]
+    fn explicit_transitions_clear_the_right_overlays() {
+        let doc = Doc::new().unwrap();
+        // Live → Done → Binned, then explicit Backlog clears everything.
+        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Backlog).unwrap();
+        let it = doc.get_item(&id).unwrap();
+        assert_eq!(it.lifecycle(), ItemLifecycle::Backlog);
+        assert!(!it.live && it.done_at.is_none() && it.binned_at.is_none());
+
+        // Binned+Done → Live sets live and clears both timestamps.
+        let j = doc.add_item(LIST_MAIN, "y").unwrap();
+        doc.set_item_lifecycle(&j, ItemLifecycle::Done).unwrap();
+        doc.set_item_lifecycle(&j, ItemLifecycle::Binned).unwrap();
+        doc.set_item_lifecycle(&j, ItemLifecycle::Live).unwrap();
+        let jt = doc.get_item(&j).unwrap();
+        assert_eq!(jt.lifecycle(), ItemLifecycle::Live);
+        assert!(jt.live && jt.done_at.is_none() && jt.binned_at.is_none());
+    }
+
+    #[test]
+    fn lifecycle_precedence_binned_over_done_over_live() {
+        let doc = Doc::new().unwrap();
+        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
+        doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
+        let it = doc.get_item(&id).unwrap();
+        assert_eq!(it.lifecycle(), ItemLifecycle::Binned);
+        // All three underlying fields survive under the precedence mask.
+        assert!(it.live && it.done_at.is_some() && it.binned_at.is_some());
+    }
+
+    #[test]
+    fn open_projection_contains_only_backlog_and_live() {
+        let doc = Doc::new().unwrap();
+        let backlog = doc.add_item(LIST_MAIN, "backlog").unwrap();
+        let live = doc.add_item_live(LIST_MAIN, "live").unwrap();
+        let done = doc.add_item(LIST_MAIN, "done").unwrap();
+        let binned = doc.add_item(LIST_MAIN, "binned").unwrap();
+        doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
+        doc.set_item_lifecycle(&binned, ItemLifecycle::Binned)
             .unwrap();
-        let c = doc
-            .add_item_in_column_at(LIST_MAIN, Some(&col), "c", a_idx + 1)
-            .unwrap();
-        assert_eq!(doc.get_item(&c).unwrap().column.as_deref(), Some(&*col));
-        // Linear order: a, c, b, d — c landed right after a.
-        assert_eq!(doc.live_item_ids(LIST_MAIN), vec![a, c.clone(), b, d]);
-
-        // A None column inserts into the default column at the given index.
-        let top = doc.add_item_in_column_at(LIST_MAIN, None, "top", 0).unwrap();
-        assert_eq!(doc.get_item(&top).unwrap().column, None);
-        assert_eq!(doc.live_item_ids(LIST_MAIN)[0], top);
-
-        // Unknown column still rejects.
-        assert!(doc
-            .add_item_in_column_at(LIST_MAIN, Some("nope"), "x", 0)
-            .is_err());
+        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![backlog, live]);
+        assert_eq!(doc.done_item_ids(), vec![done]);
+        assert_eq!(doc.binned_item_ids(), vec![binned]);
     }
 
     #[test]
-    fn cross_list_move_clears_column_register() {
+    fn events_carry_live_and_open_index() {
         let doc = Doc::new().unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let col = doc.add_column(&l, "Doing").unwrap();
-        let id = doc.add_item(&l, "a").unwrap();
-        doc.set_item_column(&id, Some(&col), None).unwrap();
         let _ = doc.drain_events();
-
-        doc.move_item(&id, LIST_MAIN, 0).unwrap();
-        assert_eq!(doc.get_item(&id).unwrap().column, None);
+        let a = doc.add_item(LIST_MAIN, "a").unwrap(); // Backlog
+        let b = doc.add_item_live(LIST_MAIN, "b").unwrap(); // Live
+        match doc.drain_events().as_slice() {
+            [
+                AppEvent::ItemAdded {
+                    id: ia,
+                    live: la,
+                    open_index: oa,
+                    ..
+                },
+                AppEvent::ItemAdded {
+                    id: ib,
+                    live: lb,
+                    open_index: ob,
+                    ..
+                },
+            ] => {
+                assert_eq!((ia, *la, *oa), (&a, false, Some(0)));
+                assert_eq!((ib, *lb, *ob), (&b, true, Some(1)));
+            }
+            other => panic!("unexpected add events: {other:?}"),
+        }
+        // Backlog→Live flip keeps the item at its open index, live now true.
+        doc.set_item_lifecycle(&a, ItemLifecycle::Live).unwrap();
         let evs = doc.drain_events();
-        assert!(evs.contains(&AppEvent::ItemColumnChanged {
-            id: id.clone(),
-            column: None
-        }));
-
-        // Undo restores list *and* grouping in one step.
-        assert!(doc.undo().unwrap());
-        assert_eq!(doc.get_item(&id).unwrap().list_id, l);
-        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
-        assert_live_projection_matches_doc(&doc);
+        assert!(
+            matches!(
+                evs.as_slice(),
+                [AppEvent::ItemLifecycleChanged {
+                    id,
+                    live: true,
+                    done_at: None,
+                    binned_at: None,
+                    open_index: Some(0),
+                }] if id == &a
+            ),
+            "got {evs:?}"
+        );
     }
 
     #[test]
-    fn delete_column_leaves_registers_and_undo_restores_grouping() {
+    fn export_import_preserves_lifecycle() {
+        let src = Doc::new().unwrap();
+        let _backlog = src.add_item(LIST_MAIN, "backlog").unwrap();
+        let _live = src.add_item_live(LIST_MAIN, "live").unwrap();
+        let done = src.add_item_live(LIST_MAIN, "done").unwrap();
+        src.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
+
+        let export = src.export_json();
+        let by_text = |t: &str| export.items.iter().find(|i| i.text == t).unwrap();
+        assert!(!by_text("backlog").live, "Backlog omits live");
+        assert!(by_text("live").live);
+        assert!(by_text("done").live, "Done keeps its underlying Live flag");
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+        let lifecycle_of = |t: &str| {
+            dst.all_items()
+                .into_iter()
+                .find(|i| i.text == t)
+                .unwrap()
+                .lifecycle()
+        };
+        assert_eq!(lifecycle_of("backlog"), ItemLifecycle::Backlog);
+        assert_eq!(lifecycle_of("live"), ItemLifecycle::Live);
+        assert_eq!(lifecycle_of("done"), ItemLifecycle::Done);
+    }
+
+    #[test]
+    fn fingerprint_covers_live_state() {
         let doc = Doc::new().unwrap();
-        let col = doc.add_column(LIST_MAIN, "Doing").unwrap();
-        let id = doc.add_item(LIST_MAIN, "a").unwrap();
-        doc.set_item_column(&id, Some(&col), None).unwrap();
-        let _ = doc.drain_events();
-
-        doc.delete_column(LIST_MAIN, &col).unwrap();
-        // Register untouched — the def is gone, so clients resolve the
-        // item to the default column.
-        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
-        assert!(doc.columns_of(LIST_MAIN).is_empty());
-
-        assert!(doc.undo().unwrap());
-        assert_eq!(doc.columns_of(LIST_MAIN).len(), 1);
-        assert_eq!(doc.get_item(&id).unwrap().column.as_deref(), Some(&*col));
+        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        let before = doc.fingerprint();
+        doc.set_item_lifecycle(&id, ItemLifecycle::Live).unwrap();
+        assert_ne!(doc.fingerprint(), before, "live flag must diverge the hash");
+        // Reverting the flag returns to the original hash — the flag is the
+        // only difference and is folded into the item hash.
+        doc.set_item_lifecycle(&id, ItemLifecycle::Backlog).unwrap();
+        assert_eq!(doc.fingerprint(), before);
     }
 
     #[test]
-    fn delete_list_clears_column_registers_of_relocated_items() {
-        let doc = Doc::new().unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let col = doc.add_column(&l, "Doing").unwrap();
-        let id = doc.add_item(&l, "a").unwrap();
-        doc.set_item_column(&id, Some(&col), None).unwrap();
-
-        doc.delete_list(&l).unwrap();
-        let item = doc.get_item(&id).unwrap();
-        assert_eq!(item.list_id, LIST_MAIN);
-        assert!(item.is_binned());
-        assert_eq!(item.column, None);
-    }
-
-    #[test]
-    fn column_ops_converge_across_replicas() {
+    fn concurrent_lifecycle_writes_converge() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
-        let item = a.add_item(LIST_MAIN, "x").unwrap();
-        a.set_item_column(&item, Some(&col), None).unwrap();
-        a.set_default_column_name(LIST_MAIN, "Now").unwrap();
-
+        let item = a.add_item(LIST_MAIN, "shared").unwrap();
         let mut b = Doc::empty();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         b.apply_remote(&dek, &blob).unwrap();
 
-        assert_eq!(b.columns_of(LIST_MAIN).len(), 1);
-        assert_eq!(b.get_item(&item).unwrap().column.as_deref(), Some(&*col));
-        assert_eq!(a.fingerprint(), b.fingerprint());
-
-        // Concurrent column changes: LWW on the register, no data loss.
-        let col_b = b.add_column(LIST_MAIN, "Blocked").unwrap();
-        b.set_item_column(&item, Some(&col_b), None).unwrap();
-        a.set_item_column(&item, None, None).unwrap();
-        let blob_b = b.pending_export(&dek).unwrap().unwrap();
-        b.mark_pushed();
+        // Concurrent divergent lifecycle writes: A marks Done, B marks Live.
+        a.set_item_lifecycle(&item, ItemLifecycle::Done).unwrap();
+        b.set_item_lifecycle(&item, ItemLifecycle::Live).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
+        b.mark_pushed();
         a.apply_remote(&dek, &blob_b).unwrap();
         b.apply_remote(&dek, &blob_a).unwrap();
-        assert_eq!(a.fingerprint(), b.fingerprint());
+
+        assert_eq!(a.fingerprint(), b.fingerprint(), "replicas must converge");
+        // Both fields merged by LWW; precedence resolves the same lane on each.
         assert_eq!(
-            a.get_item(&item).unwrap().column,
-            b.get_item(&item).unwrap().column
+            a.get_item(&item).unwrap().lifecycle(),
+            b.get_item(&item).unwrap().lifecycle()
         );
-    }
-
-    #[test]
-    fn remote_column_ops_translate_to_surgical_events() {
-        let dek = Dek::generate();
-        let mut a = Doc::new().unwrap();
-        let item = a.add_item(LIST_MAIN, "x").unwrap();
-        let seed = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
-        let mut b = Doc::empty();
-        b.apply_remote(&dek, &seed).unwrap();
-        let _ = b.drain_events();
-
-        // Column def churn + a register write, shipped as one frame.
-        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
-        a.set_item_column(&item, Some(&col), None).unwrap();
-        a.set_default_column_name(LIST_MAIN, "Now").unwrap();
-        let frame = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
-        b.apply_remote(&dek, &frame).unwrap();
-
-        let evs = b.drain_events();
-        assert!(
-            !evs.contains(&AppEvent::FullResync),
-            "column frame should translate surgically, got {evs:?}"
-        );
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ColumnAdded { id, index: 0, .. } if id == &col
-        )));
-        assert!(evs.contains(&AppEvent::ItemColumnChanged {
-            id: item.clone(),
-            column: Some(col.clone())
-        }));
-        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
-            list_id: LIST_MAIN.to_string(),
-            name: Some("Now".into())
-        }));
-
-        // Rename translates; a column added *and* deleted within the
-        // same frame nets out of the wholesale pre/post diff — the
-        // consumer never learns it existed.
-        let col2 = a.add_column(LIST_MAIN, "Later").unwrap();
-        a.rename_column(LIST_MAIN, &col, "In progress").unwrap();
-        a.delete_column(LIST_MAIN, &col2).unwrap();
-        let frame = a.pending_export(&dek).unwrap().unwrap();
-        a.mark_pushed();
-        b.apply_remote(&dek, &frame).unwrap();
-        let evs = b.drain_events();
-        assert!(!evs.contains(&AppEvent::FullResync));
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ColumnRenamed { id, name, .. } if id == &col && name == "In progress"
-        )));
-        assert!(!evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ColumnAdded { id, .. } | AppEvent::ColumnRemoved { id, .. } if id == &col2
-        )));
-        assert_eq!(
-            b.columns_of(LIST_MAIN)
-                .iter()
-                .map(|c| c.name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["In progress"]
-        );
-        assert_eq!(a.fingerprint(), b.fingerprint());
-    }
-
-    #[test]
-    fn snapshot_events_include_columns_and_default_names() {
-        let doc = Doc::new().unwrap();
-        let l = doc.add_list("Project").unwrap();
-        let c_main = doc.add_column(LIST_MAIN, "Doing").unwrap();
-        let c_l = doc.add_column(&l, "Review").unwrap();
-        doc.set_default_column_name(&l, "Backlog").unwrap();
-        doc.set_default_column_name(LIST_MAIN, "Now").unwrap();
-        let id = doc.add_item_in_column(LIST_MAIN, &c_main, "x").unwrap();
-
-        let evs = doc.snapshot_events();
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ColumnAdded { list_id, id, .. }
-                if list_id == LIST_MAIN && id == &c_main
-        )));
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ColumnAdded { list_id, id, .. } if list_id == &l && id == &c_l
-        )));
-        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
-            list_id: LIST_MAIN.to_string(),
-            name: Some("Now".into())
-        }));
-        assert!(evs.contains(&AppEvent::DefaultColumnRenamed {
-            list_id: l.clone(),
-            name: Some("Backlog".into())
-        }));
-        assert!(evs.iter().any(|e| matches!(
-            e,
-            AppEvent::ItemAdded { id: i, column: Some(c), .. } if i == &id && c == &c_main
-        )));
-    }
-
-    #[test]
-    fn json_roundtrip_carries_columns_and_registers() {
-        let src = Doc::new().unwrap();
-        let l = src.add_list("Project").unwrap();
-        let col = src.add_column(&l, "Doing").unwrap();
-        src.set_default_column_name(&l, "Backlog").unwrap();
-        let item = src.add_item(&l, "grouped").unwrap();
-        src.set_item_column(&item, Some(&col), None).unwrap();
-        // A register for main's (never-exported-as-user-list) column
-        // survives export but drops on import: main metadata is not
-        // imported, so the register can't map.
-        let main_col = src.add_column(LIST_MAIN, "MainCol").unwrap();
-        let main_item = src
-            .add_item_in_column(LIST_MAIN, &main_col, "ungrouped")
-            .unwrap();
-
-        let json = src.export_json_string();
-        let dst = Doc::new().unwrap();
-        let summary = dst.import_json_str(&json).unwrap();
-        assert_eq!(summary.lists_added, 1);
-
-        let new_list = dst.all_lists()[0].clone();
-        assert_eq!(new_list.default_column_name.as_deref(), Some("Backlog"));
-        let cols = dst.columns_of(&new_list.id);
-        assert_eq!(cols.len(), 1);
-        assert_eq!(cols[0].name, "Doing");
-        assert_ne!(cols[0].id, col, "imported column ids must be fresh");
-
-        let imported: Vec<ItemView> = dst.iter_items().collect();
-        let grouped = imported.iter().find(|i| i.text == "grouped").unwrap();
-        assert_eq!(grouped.column.as_deref(), Some(cols[0].id.as_str()));
-        let ungrouped = imported.iter().find(|i| i.text == "ungrouped").unwrap();
-        assert_eq!(
-            ungrouped.column, None,
-            "register into main's columns drops to default on import"
-        );
-        let _ = main_item;
-    }
-
-    #[test]
-    fn fingerprint_covers_column_state() {
-        let a = Doc::new().unwrap();
-        let b = Doc::new().unwrap();
-        let base_a = a.fingerprint();
-
-        // Column defs alone diverge the hash.
-        let col = a.add_column(LIST_MAIN, "Doing").unwrap();
-        assert_ne!(a.fingerprint(), b.fingerprint());
-        let _ = b;
-
-        // Register alone diverges the hash.
-        let c = Doc::new().unwrap();
-        let d = Doc::new().unwrap();
-        // Same text/list; only the register differs — but ids differ
-        // per-doc, so compare each doc against itself over time instead.
-        let id = c.add_item(LIST_MAIN, "x").unwrap();
-        let col_c = c.add_column(LIST_MAIN, "Doing").unwrap();
-        let before = c.fingerprint();
-        c.set_item_column(&id, Some(&col_c), None).unwrap();
-        assert_ne!(c.fingerprint(), before);
-        let _ = (d, base_a, col);
-
-        // Default-name override diverges the hash.
-        let e = Doc::new().unwrap();
-        let before = e.fingerprint();
-        e.set_default_column_name(LIST_MAIN, "Now").unwrap();
-        assert_ne!(e.fingerprint(), before);
+        assert_open_projection_matches_doc(&a);
+        assert_open_projection_matches_doc(&b);
     }
 }

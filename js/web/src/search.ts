@@ -8,7 +8,7 @@ import type { AppEventJs } from "@airday/core/wasm";
 import type { ItemView, ListView, WorkspaceState } from "./sync/store.ts";
 
 export type SearchKind = "item" | "list";
-export type SearchLifecycle = "live" | "done" | "binned";
+export type SearchLifecycle = "backlog" | "live" | "done" | "binned";
 
 export interface SearchResult {
   id: string;
@@ -64,16 +64,33 @@ export function tokenize(input: string): string[] {
 function lifecycleOf(item: ItemView): SearchLifecycle {
   if (item.binnedAt != null) return "binned";
   if (item.doneAt != null) return "done";
-  return "live";
+  return item.live ? "live" : "backlog";
 }
 
 function lifecycleFromAt(
   doneAt: number | undefined,
   binnedAt: number | undefined,
+  live: boolean,
 ): SearchLifecycle {
   if (binnedAt != null) return "binned";
   if (doneAt != null) return "done";
-  return "live";
+  return live ? "live" : "backlog";
+}
+
+// Rank order for tie-breaking: Live > Backlog > Done > Binned
+// (spec/search.md). Open items outrank closed ones; within Open, Live
+// (actively worked) outranks Backlog.
+function lifecycleRankOf(s: SearchLifecycle | undefined): number {
+  switch (s) {
+    case "live":
+      return 3;
+    case "backlog":
+      return 2;
+    case "done":
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 function bigToNum(v: bigint | number | undefined | null): number | undefined {
@@ -259,6 +276,7 @@ export function createSearchEngine(): SearchEngine {
         const lifecycle = lifecycleFromAt(
           bigToNum(event.doneAt),
           bigToNum(event.binnedAt),
+          event.live ?? false,
         );
         const updatedAt = bigToNum(event.createdAt) ?? Date.now();
         reindexItem({
@@ -307,6 +325,7 @@ export function createSearchEngine(): SearchEngine {
         prev.lifecycle = lifecycleFromAt(
           bigToNum(event.doneAt),
           bigToNum(event.binnedAt),
+          event.live ?? false,
         );
         prev.updatedAt = Date.now();
         break;
@@ -447,8 +466,7 @@ export function createSearchEngine(): SearchEngine {
       contextHits++;
     else return null;
 
-    const lifecycleRank =
-      doc.lifecycle === "live" ? 2 : doc.lifecycle === "done" ? 1 : 0;
+    const lifecycleRank = lifecycleRankOf(doc.lifecycle);
     // Flat numeric score for the public SearchResult.score field. The
     // sort comparator below uses the bucket counts directly so this
     // collapse never affects ordering — it's purely a debugging /
@@ -461,10 +479,6 @@ export function createSearchEngine(): SearchEngine {
       lifecycleRank;
 
     return { doc, titleExact, titlePrefix, bodyHits, contextHits, score };
-  }
-
-  function lifecycleRank(s: SearchLifecycle | undefined): number {
-    return s === "live" ? 2 : s === "done" ? 1 : 0;
   }
 
   function query(input: string, limit = 50): SearchResult[] {
@@ -498,8 +512,8 @@ export function createSearchEngine(): SearchEngine {
       if (a.bodyHits !== b.bodyHits) return b.bodyHits - a.bodyHits;
       if (a.contextHits !== b.contextHits)
         return b.contextHits - a.contextHits;
-      const sa = lifecycleRank(a.doc.lifecycle);
-      const sb = lifecycleRank(b.doc.lifecycle);
+      const sa = lifecycleRankOf(a.doc.lifecycle);
+      const sb = lifecycleRankOf(b.doc.lifecycle);
       if (sa !== sb) return sb - sa;
       if (a.doc.updatedAt !== b.doc.updatedAt)
         return b.doc.updatedAt - a.doc.updatedAt;

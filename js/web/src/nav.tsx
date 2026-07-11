@@ -187,10 +187,10 @@ export function Nav(props: {
   app: DocApp;
   lists: { id: string; name: string }[];
   binCount: number;
-  /** Live-item count per list id. Queue's row always renders a badge
-   *  (showing "-" when zero); non-Queue rows render theirs only when
-   *  `showListCounts` is true, again with "-" for zero. */
-  liveCountsByList: Record<string, number>;
+  /** Open-item count (Backlog + Live) per list id. Queue's row always
+   *  renders a badge (showing "-" when zero); non-Queue rows render theirs
+   *  only when `showListCounts` is true, again with "-" for zero. */
+  openCountsByList: Record<string, number>;
   /** Resolved Queue label — user override from doc-level settings if
    *  present, otherwise the localized built-in label. */
   homeName: string;
@@ -408,8 +408,8 @@ export function Nav(props: {
               registerStart={(fn) => (startHomeRename = fn)}
             />
             <span class="nav-item-count">
-              {(props.liveCountsByList["main"] ?? 0) > 0
-                ? props.liveCountsByList["main"]
+              {(props.openCountsByList["main"] ?? 0) > 0
+                ? props.openCountsByList["main"]
                 : "-"}
             </span>
           </ContextMenu.Trigger>
@@ -518,8 +518,8 @@ export function Nav(props: {
                     />
                     <Show when={props.showListCounts}>
                       <span class="nav-item-count">
-                        {(props.liveCountsByList[l().id] ?? 0) > 0
-                          ? props.liveCountsByList[l().id]
+                        {(props.openCountsByList[l().id] ?? 0) > 0
+                          ? props.openCountsByList[l().id]
                           : "-"}
                       </span>
                     </Show>
@@ -551,7 +551,7 @@ export function Nav(props: {
                             const { id, name } = l();
                             // Confirm only when the list has visible
                             // (live) items to lose; empty lists just go.
-                            if ((props.liveCountsByList[id] ?? 0) > 0) {
+                            if ((props.openCountsByList[id] ?? 0) > 0) {
                               setPendingDeleteList({ id, name });
                             } else {
                               performDeleteList(id);

@@ -42,7 +42,7 @@ import { useSession } from "./SessionContext.tsx";
 import {
   isBinned,
   isDone,
-  isInListView,
+  isOpen,
   type DocApp,
   type ItemView,
   type ListView,
@@ -135,10 +135,12 @@ export function Workspace(props: {
   // null when not capturing. Mutually exclusive with `openItemId`.
   const [newItemTarget, setNewItemTarget] = createSignal<{
     listId: string;
-    columnId: string | null;
-    /** Linear live-projection index to insert at (Space capture below a
-     *  selected board card, or at the top). Omitted for "+" captures,
-     *  which append to the column. */
+    /** Which board lane to capture into: `true` = Live, `false` =
+     *  Backlog (also the list view's default). */
+    live: boolean;
+    /** Open-projection index to insert at (Space capture below a selected
+     *  board card, or at the top). Omitted for "+" captures, which append
+     *  to the lane. */
     index?: number;
   } | null>(null);
   // Ids to select + scroll into view in the board once they land in their
@@ -310,7 +312,7 @@ export function Workspace(props: {
   });
 
   // Per-view item slice. A list view reads only its own
-  // `state.listLive[id]` array, so mutations in other lists (or in
+  // `state.listOpen[id]` array, so mutations in other lists (or in
   // Done/Bin) never invalidate it; item field edits track per-item
   // paths independently of the ordering. Done/Bin scan `itemsById`
   // lazily — the scan only runs while that view is active, and no
@@ -319,13 +321,13 @@ export function Workspace(props: {
     const v = view();
     if (v.kind === "list") {
       const out: ItemView[] = [];
-      for (const id of state.listLive[v.id] ?? []) {
+      for (const id of state.listOpen[v.id] ?? []) {
         const it = state.itemsById[id];
         if (it) out.push(it);
       }
       // Re-insert the linger group at the positions its rows vacated.
       // Each index was captured after earlier Done rows had already left
-      // `listLive`, so replay the removals in reverse capture order to
+      // `listOpen`, so replay the removals in reverse capture order to
       // reconstruct the original layout.
       lingerTick();
       const { ids: lingerIds, expiry } = lingerChain();
@@ -360,14 +362,14 @@ export function Workspace(props: {
       .filter((l): l is ListView => l !== undefined),
   );
 
-  // Per-list live-item counts for the nav badge, read straight off the
-  // per-list projection arrays — no item scan. (The bin badge reads the
-  // store's maintained `state.binCount` directly.) Home's count always
-  // renders; non-Home lists are gated by the doc-level `showListCounts`
-  // flag.
-  const liveCountsByList = createMemo((): Record<string, number> => {
+  // Per-list open-item counts (Backlog + Live) for the nav badge, read
+  // straight off the per-list projection arrays — no item scan. (The bin
+  // badge reads the store's maintained `state.binCount` directly.) Home's
+  // count always renders; non-Home lists are gated by the doc-level
+  // `showListCounts` flag.
+  const openCountsByList = createMemo((): Record<string, number> => {
     const counts: Record<string, number> = {};
-    for (const [listId, ids] of Object.entries(state.listLive)) {
+    for (const [listId, ids] of Object.entries(state.listOpen)) {
       counts[listId] = ids.length;
     }
     return counts;
@@ -449,6 +451,7 @@ export function Workspace(props: {
       listId: v.id,
       text: "",
       notes: "",
+      live: false,
       createdAt: Date.now(),
     };
     setDraft({ item: draftItem, insertIndex, listId: v.id });
@@ -625,44 +628,36 @@ export function Workspace(props: {
     if (v.kind !== "list") return;
     const visible = items().map((it) => it.id);
     const sourceSet = new Set(sourceIds);
-    // Only inherit a column register that actually resolves to a live column
-    // of this list — a stale/default register is left off so the clone falls
-    // to the default column (and `setItemColumn` never rejects an unknown id).
-    const validCols = new Set(
-      (state.columnsByList[v.id] ?? []).map((c) => c.id),
-    );
+    // Clones inherit the source's board lane: a dupe of a Live card stays
+    // Live, a Backlog dupe stays Backlog.
     const sourcesInOrder: {
       idx: number;
       text: string;
-      column: string | undefined;
+      live: boolean;
     }[] = [];
     visible.forEach((id, idx) => {
       if (!sourceSet.has(id)) return;
       const it = app.getItem(id);
-      if (!it || !isInListView(it)) return;
-      const column =
-        it.column && validCols.has(it.column) ? it.column : undefined;
-      sourcesInOrder.push({ idx, text: it.text, column });
+      if (!it || !isOpen(it)) return;
+      sourcesInOrder.push({ idx, text: it.text, live: it.live });
     });
     if (sourcesInOrder.length === 0) return;
     const insertAt = sourcesInOrder[sourcesInOrder.length - 1].idx + 1;
     const texts = sourcesInOrder.map((s) => s.text);
-    // Create the block, then copy each source's (valid) column register onto
-    // its clone in one undo step, so a dupe made inside a board column lands
-    // in that column instead of the default one. setItemColumn with no index
-    // keeps the clone's just-assigned linear position.
+    // Create the block (as Backlog), then flip each clone whose source was
+    // Live in the same undo step. The `live` flip keeps the clone's
+    // just-assigned Open position (spec/board.md).
     const newIds = app.withActionBatch(() => {
       const ids = app.addItemsAt(v.id, texts, insertAt);
       ids.forEach((id, i) => {
-        const col = sourcesInOrder[i]?.column;
-        if (col) app.setItemColumn(id, col);
+        if (sourcesInOrder[i]?.live) app.setLifecycle(id, "live");
       });
       return ids;
     });
     if (newIds.length === 0) return;
     if (boardListId() !== null) {
       // On the board, hand the whole clone block to the reveal path so it
-      // becomes the active column selection and scrolls into view.
+      // becomes the active lane selection and scrolls into view.
       setBoardRevealIds(newIds);
       return;
     }
@@ -825,25 +820,18 @@ export function Workspace(props: {
       e.preventDefault();
       const top = actionSelection()?.getSelectionTop() ?? null;
       const anchor = top !== null ? app.getItem(String(top)) : undefined;
-      if (anchor && isInListView(anchor)) {
-        // Below the selected card, in its resolved column. A register
-        // naming a deleted column falls back to the default column so the
-        // core's find_column check can't reject it.
-        const cols = app.state.columnsByList[boardId] ?? [];
-        const columnId =
-          anchor.column && cols.some((c) => c.id === anchor.column)
-            ? anchor.column
-            : null;
-        const linear = app.state.listLive[boardId] ?? [];
+      if (anchor && isOpen(anchor)) {
+        // Below the selected card, in the selected card's lane.
+        const linear = app.state.listOpen[boardId] ?? [];
         const at = linear.indexOf(anchor.id);
         setNewItemTarget({
           listId: boardId,
-          columnId,
+          live: anchor.live,
           index: at >= 0 ? at + 1 : 0,
         });
       } else {
-        // Nothing selected: top of the default column.
-        setNewItemTarget({ listId: boardId, columnId: null, index: 0 });
+        // Nothing selected: top of the Backlog lane.
+        setNewItemTarget({ listId: boardId, live: false, index: 0 });
       }
       return;
     }
@@ -1065,7 +1053,7 @@ export function Workspace(props: {
         app={app}
         lists={lists()}
         binCount={state.binCount}
-        liveCountsByList={liveCountsByList()}
+        openCountsByList={openCountsByList()}
         homeName={homeName()}
         showListCounts={state.settings.showListCounts}
         view={view()}
@@ -1329,9 +1317,9 @@ export function Workspace(props: {
                   const boardId = boardListId();
                   if (boardId !== null) {
                     // Board view has no inline draft flow; capture a new item
-                    // into the implicit default column (top of the list),
-                    // mirroring the board's own default-column "+".
-                    setNewItemTarget({ listId: boardId, columnId: null });
+                    // into the Backlog lane, mirroring the board's own
+                    // Backlog "+".
+                    setNewItemTarget({ listId: boardId, live: false });
                   } else {
                     startDraft();
                   }
@@ -1426,8 +1414,8 @@ export function Workspace(props: {
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}
-              onAddItem={(listId, columnId) =>
-                setNewItemTarget({ listId, columnId })
+              onAddItem={(listId, live) =>
+                setNewItemTarget({ listId, live })
               }
               revealIds={boardRevealIds}
               clearReveal={() => setBoardRevealIds(null)}

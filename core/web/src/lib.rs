@@ -10,7 +10,8 @@ use airday_core::{
     AEAD_NONCE_LEN, AppEvent as CoreAppEvent, BootState as CoreBootState,
     ClientOpId as CoreClientOpId, Dek as CoreDek, Doc as CoreDoc, DocId as CoreDocId,
     EngineOptions as CoreEngineOptions, Event as CoreEvent, ImportSummary as CoreImportSummary,
-    Kek as CoreKek, LocalOpRow as CoreLocalOpRow, LocalSeq as CoreLocalSeq,
+    ItemLifecycle as CoreItemLifecycle, Kek as CoreKek, LocalOpRow as CoreLocalOpRow,
+    LocalSeq as CoreLocalSeq,
     LocalStorage as CoreLocalStorage, OutboxRow as CoreOutboxRow, RemoteOpRow as CoreRemoteOpRow,
     ServerSeq as CoreServerSeq, SnapshotCutoff as CoreSnapshotCutoff,
     StorageError as CoreStorageError, SyncEngine as CoreSyncEngine, WrappedDek as CoreWrappedDek,
@@ -28,6 +29,32 @@ pub fn _start() {
 
 fn js_err<E: std::fmt::Display>(e: E) -> JsError {
     JsError::new(&e.to_string())
+}
+
+// ---------- lifecycle ----------
+
+/// Derived four-state item lifecycle (`spec/data-model.md`), mirrored
+/// from `airday_core::ItemLifecycle` for the wasm boundary. Passed to
+/// `setItemLifecycle` / `setItemsLifecycle`; the board's lane-drop
+/// primitive.
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum ItemLifecycle {
+    Backlog,
+    Live,
+    Done,
+    Binned,
+}
+
+impl From<ItemLifecycle> for CoreItemLifecycle {
+    fn from(l: ItemLifecycle) -> Self {
+        match l {
+            ItemLifecycle::Backlog => CoreItemLifecycle::Backlog,
+            ItemLifecycle::Live => CoreItemLifecycle::Live,
+            ItemLifecycle::Done => CoreItemLifecycle::Done,
+            ItemLifecycle::Binned => CoreItemLifecycle::Binned,
+        }
+    }
 }
 
 // ---------- Doc ----------
@@ -214,86 +241,54 @@ impl Doc {
         self.inner.set_main_name(name).map_err(js_err)
     }
 
-    // ---------- board columns (spec/kanban.md) ----------
+    // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
 
-    #[wasm_bindgen(js_name = addColumn)]
-    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, JsError> {
-        self.inner.add_column(list_id, name).map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = renameColumn)]
-    pub fn rename_column(&self, list_id: &str, column_id: &str, name: &str) -> Result<(), JsError> {
-        self.inner
-            .rename_column(list_id, column_id, name)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = moveColumn)]
-    pub fn move_column(
-        &self,
-        list_id: &str,
-        column_id: &str,
-        target_index: usize,
-    ) -> Result<(), JsError> {
-        self.inner
-            .move_column(list_id, column_id, target_index)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = deleteColumn)]
-    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), JsError> {
-        self.inner.delete_column(list_id, column_id).map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setDefaultColumnName)]
-    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), JsError> {
-        self.inner
-            .set_default_column_name(list_id, name)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setItemColumn)]
-    pub fn set_item_column(
+    /// Move one item to `lifecycle` in a single commit (the board's
+    /// lane-drop primitive). Writes `live` / `done_at` / `binned_at` per
+    /// the transition table.
+    #[wasm_bindgen(js_name = setItemLifecycle)]
+    pub fn set_item_lifecycle(
         &self,
         item_id: &str,
-        column_id: Option<String>,
-        target_index: Option<usize>,
+        lifecycle: ItemLifecycle,
     ) -> Result<(), JsError> {
         self.inner
-            .set_item_column(item_id, column_id.as_deref(), target_index)
+            .set_item_lifecycle(item_id, lifecycle.into())
             .map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = addItemInColumn)]
-    pub fn add_item_in_column(
+    /// Bulk [`Self::set_item_lifecycle`] — move many items to the same
+    /// target lifecycle in one commit.
+    #[wasm_bindgen(js_name = setItemsLifecycle)]
+    pub fn set_items_lifecycle(
         &self,
-        list_id: &str,
-        column_id: &str,
-        text: &str,
-    ) -> Result<String, JsError> {
+        item_ids: Vec<String>,
+        lifecycle: ItemLifecycle,
+    ) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
         self.inner
-            .add_item_in_column(list_id, column_id, text)
+            .set_items_lifecycle(&refs, lifecycle.into())
             .map_err(js_err)
     }
 
-    /// Insert a new item at `target_index` in the list's linear live order
-    /// with its column set to `column_id` (`undefined` = default column).
-    #[wasm_bindgen(js_name = addItemInColumnAt)]
-    pub fn add_item_in_column_at(
+    /// Append a new item directly as Live (board Live-lane capture).
+    #[wasm_bindgen(js_name = addItemLive)]
+    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, JsError> {
+        self.inner.add_item_live(list_id, text).map_err(js_err)
+    }
+
+    /// Insert a new Live item at `target_index` in the list's Open
+    /// projection (same index space as `addItemAt`), one commit.
+    #[wasm_bindgen(js_name = addItemLiveAt)]
+    pub fn add_item_live_at(
         &self,
         list_id: &str,
-        column_id: Option<String>,
         text: &str,
         target_index: usize,
     ) -> Result<String, JsError> {
         self.inner
-            .add_item_in_column_at(list_id, column_id.as_deref(), text, target_index)
+            .add_item_live_at(list_id, text, target_index)
             .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = columnsOfJson)]
-    pub fn columns_of_json(&self, list_id: &str) -> String {
-        columns_to_json(&self.inner.columns_of(list_id))
     }
 
     // -- reads (return JSON for now; replace with serde-wasm-bindgen
@@ -323,11 +318,13 @@ impl Doc {
     // -- view-id helpers: order-stable id arrays that the JS store
     //    turns into per-view DnD sources --
 
-    /// Ids of `Live` items in `list_id`, in resolved per-list order
-    /// (`spec/data-model.md` "Resolved order").
-    #[wasm_bindgen(js_name = liveItemIds)]
-    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
-        self.inner.live_item_ids(list_id)
+    /// Ids of `Open` items (Backlog + Live) in `list_id`, in resolved
+    /// per-list order (`spec/data-model.md` "Resolved order"). The board
+    /// partitions this by each item's `live` flag into the Backlog and
+    /// Live lanes.
+    #[wasm_bindgen(js_name = openItemIds)]
+    pub fn open_item_ids(&self, list_id: &str) -> Vec<String> {
+        self.inner.open_item_ids(list_id)
     }
 
     /// Ids of all `Done` items, sorted by `done_at` descending.
@@ -1388,95 +1385,59 @@ impl SyncEngine {
         self.inner.doc().set_main_name(name).map_err(js_err)
     }
 
-    // ---------- board columns (spec/kanban.md) ----------
+    // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
 
-    #[wasm_bindgen(js_name = addColumn)]
-    pub fn add_column(&self, list_id: &str, name: &str) -> Result<String, JsError> {
-        self.inner.doc().add_column(list_id, name).map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = renameColumn)]
-    pub fn rename_column(&self, list_id: &str, column_id: &str, name: &str) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .rename_column(list_id, column_id, name)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = moveColumn)]
-    pub fn move_column(
-        &self,
-        list_id: &str,
-        column_id: &str,
-        target_index: usize,
-    ) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .move_column(list_id, column_id, target_index)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = deleteColumn)]
-    pub fn delete_column(&self, list_id: &str, column_id: &str) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .delete_column(list_id, column_id)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setDefaultColumnName)]
-    pub fn set_default_column_name(&self, list_id: &str, name: &str) -> Result<(), JsError> {
-        self.inner
-            .doc()
-            .set_default_column_name(list_id, name)
-            .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = setItemColumn)]
-    pub fn set_item_column(
+    /// Move one item to `lifecycle` in a single commit (the board's
+    /// lane-drop primitive).
+    #[wasm_bindgen(js_name = setItemLifecycle)]
+    pub fn set_item_lifecycle(
         &self,
         item_id: &str,
-        column_id: Option<String>,
-        target_index: Option<usize>,
+        lifecycle: ItemLifecycle,
     ) -> Result<(), JsError> {
         self.inner
             .doc()
-            .set_item_column(item_id, column_id.as_deref(), target_index)
+            .set_item_lifecycle(item_id, lifecycle.into())
             .map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = addItemInColumn)]
-    pub fn add_item_in_column(
+    /// Bulk [`Self::set_item_lifecycle`] — move many items to the same
+    /// target lifecycle in one commit.
+    #[wasm_bindgen(js_name = setItemsLifecycle)]
+    pub fn set_items_lifecycle(
         &self,
-        list_id: &str,
-        column_id: &str,
-        text: &str,
-    ) -> Result<String, JsError> {
+        item_ids: Vec<String>,
+        lifecycle: ItemLifecycle,
+    ) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
         self.inner
             .doc()
-            .add_item_in_column(list_id, column_id, text)
+            .set_items_lifecycle(&refs, lifecycle.into())
             .map_err(js_err)
     }
 
-    /// Insert a new item at `target_index` in the list's linear live order
-    /// with its column set to `column_id` (`undefined` = default column).
-    #[wasm_bindgen(js_name = addItemInColumnAt)]
-    pub fn add_item_in_column_at(
+    /// Append a new item directly as Live (board Live-lane capture).
+    #[wasm_bindgen(js_name = addItemLive)]
+    pub fn add_item_live(&self, list_id: &str, text: &str) -> Result<String, JsError> {
+        self.inner
+            .doc()
+            .add_item_live(list_id, text)
+            .map_err(js_err)
+    }
+
+    /// Insert a new Live item at `target_index` in the list's Open
+    /// projection (same index space as `addItemAt`), one commit.
+    #[wasm_bindgen(js_name = addItemLiveAt)]
+    pub fn add_item_live_at(
         &self,
         list_id: &str,
-        column_id: Option<String>,
         text: &str,
         target_index: usize,
     ) -> Result<String, JsError> {
         self.inner
             .doc()
-            .add_item_in_column_at(list_id, column_id.as_deref(), text, target_index)
+            .add_item_live_at(list_id, text, target_index)
             .map_err(js_err)
-    }
-
-    #[wasm_bindgen(js_name = columnsOfJson)]
-    pub fn columns_of_json(&self, list_id: &str) -> String {
-        columns_to_json(&self.inner.doc().columns_of(list_id))
     }
 
     // -- undo / redo --
@@ -1521,9 +1482,9 @@ impl SyncEngine {
         settings_to_json(&self.inner.doc().get_settings())
     }
 
-    #[wasm_bindgen(js_name = liveItemIds)]
-    pub fn live_item_ids(&self, list_id: &str) -> Vec<String> {
-        self.inner.doc().live_item_ids(list_id)
+    #[wasm_bindgen(js_name = openItemIds)]
+    pub fn open_item_ids(&self, list_id: &str) -> Vec<String> {
+        self.inner.doc().open_item_ids(list_id)
     }
 
     #[wasm_bindgen(js_name = doneItemIds)]
@@ -1632,24 +1593,18 @@ impl From<CoreEvent> for EngineEvent {
 ///
 /// Variant → fields:
 /// - `fullResync` — no fields; rematerialize current state once
-/// - `itemAdded` — id, listId, text, notes, createdAt, doneAt?, binnedAt?, column?, dueOn?, liveIndex?
+/// - `itemAdded` — id, listId, text, notes, createdAt, live, doneAt?, binnedAt?, dueOn?, openIndex?
 /// - `itemRemoved` — id
-/// - `itemMoved` — id, liveIndex?
+/// - `itemMoved` — id, openIndex?
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
 /// - `itemDueChanged` — id, dueOn? (undefined = no due date)
-/// - `itemLifecycleChanged` — id, doneAt?, binnedAt?, liveIndex?
-/// - `itemColumnChanged` — id, column? (undefined = default column)
-/// - `itemListChanged` — id, listId, liveIndex?
+/// - `itemLifecycleChanged` — id, live, doneAt?, binnedAt?, openIndex?
+/// - `itemListChanged` — id, listId, openIndex?
 /// - `listAdded` — id, name, createdAt, index
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
-/// - `columnAdded` — id (column id), listId, name, createdAt, index
-/// - `columnRemoved` — id, listId
-/// - `columnMoved` — id, listId, index
-/// - `columnRenamed` — id, listId, name
-/// - `defaultColumnRenamed` — listId (in `id` too), name? (undefined = built-in label)
 /// - `settingsChanged` — showListCounts, mainName?
 #[wasm_bindgen]
 pub struct AppEventJs {
@@ -1659,9 +1614,10 @@ pub struct AppEventJs {
     text: Option<String>,
     notes: Option<String>,
     name: Option<String>,
-    /// Raw board-column register value (`itemAdded` /
-    /// `itemColumnChanged`); resolve valid-or-default client-side.
-    column: Option<String>,
+    /// Lifecycle flag (`itemAdded` / `itemLifecycleChanged`): `true` ≡
+    /// Live, `false` ≡ Backlog underneath any done/binned mask. `None`
+    /// on events that don't carry lifecycle.
+    live: Option<bool>,
     /// Date-only due date `YYYY-MM-DD` (`itemAdded` / `itemDueChanged`);
     /// `None` means no due date.
     due_on: Option<String>,
@@ -1675,13 +1631,13 @@ pub struct AppEventJs {
     main_name: Option<String>,
     /// List-event ordering position (`listAdded` / `listMoved`). Item
     /// events no longer carry a doc-wide index in the v2 schema — use
-    /// `live_index`.
+    /// `open_index`.
     index: Option<usize>,
-    /// Position within the owning list's *live* projection (done/binned
-    /// excluded). Present on item events whenever the item is live
-    /// after the change; `undefined` otherwise. See
+    /// Position within the owning list's *Open* projection (Backlog +
+    /// Live; done/binned excluded). Present on item events whenever the
+    /// item is open after the change; `undefined` otherwise. See
     /// `airday_core::AppEvent` for per-variant semantics.
-    live_index: Option<usize>,
+    open_index: Option<usize>,
 }
 
 #[wasm_bindgen]
@@ -1726,9 +1682,9 @@ impl AppEventJs {
     pub fn index(&self) -> Option<usize> {
         self.index
     }
-    #[wasm_bindgen(getter, js_name = liveIndex)]
-    pub fn live_index(&self) -> Option<usize> {
-        self.live_index
+    #[wasm_bindgen(getter, js_name = openIndex)]
+    pub fn open_index(&self) -> Option<usize> {
+        self.open_index
     }
     #[wasm_bindgen(getter, js_name = showListCounts)]
     pub fn show_list_counts(&self) -> Option<bool> {
@@ -1739,8 +1695,8 @@ impl AppEventJs {
         self.main_name.clone()
     }
     #[wasm_bindgen(getter)]
-    pub fn column(&self) -> Option<String> {
-        self.column.clone()
+    pub fn live(&self) -> Option<bool> {
+        self.live
     }
     #[wasm_bindgen(getter, js_name = dueOn)]
     pub fn due_on(&self) -> Option<String> {
@@ -1757,7 +1713,7 @@ impl From<CoreAppEvent> for AppEventJs {
             text: None,
             notes: None,
             name: None,
-            column: None,
+            live: None,
             due_on: None,
             created_at: None,
             done_at: None,
@@ -1765,7 +1721,7 @@ impl From<CoreAppEvent> for AppEventJs {
             show_list_counts: None,
             main_name: None,
             index: None,
-            live_index: None,
+            open_index: None,
         };
         match e {
             CoreAppEvent::FullResync => AppEventJs {
@@ -1780,9 +1736,9 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at,
                 done_at,
                 binned_at,
-                column,
+                live,
                 due_on,
-                live_index,
+                open_index,
             } => AppEventJs {
                 kind: "itemAdded",
                 id,
@@ -1792,9 +1748,9 @@ impl From<CoreAppEvent> for AppEventJs {
                 created_at: Some(created_at),
                 done_at,
                 binned_at,
-                column,
+                live: Some(live),
                 due_on,
-                live_index,
+                open_index,
                 ..blank
             },
             CoreAppEvent::ItemRemoved { id } => AppEventJs {
@@ -1802,10 +1758,10 @@ impl From<CoreAppEvent> for AppEventJs {
                 id,
                 ..blank
             },
-            CoreAppEvent::ItemMoved { id, live_index } => AppEventJs {
+            CoreAppEvent::ItemMoved { id, open_index } => AppEventJs {
                 kind: "itemMoved",
                 id,
-                live_index,
+                open_index,
                 ..blank
             },
             CoreAppEvent::ItemTextChanged { id, text } => AppEventJs {
@@ -1828,32 +1784,28 @@ impl From<CoreAppEvent> for AppEventJs {
             },
             CoreAppEvent::ItemLifecycleChanged {
                 id,
+                live,
                 done_at,
                 binned_at,
-                live_index,
+                open_index,
             } => AppEventJs {
                 kind: "itemLifecycleChanged",
                 id,
+                live: Some(live),
                 done_at,
                 binned_at,
-                live_index,
-                ..blank
-            },
-            CoreAppEvent::ItemColumnChanged { id, column } => AppEventJs {
-                kind: "itemColumnChanged",
-                id,
-                column,
+                open_index,
                 ..blank
             },
             CoreAppEvent::ItemListChanged {
                 id,
                 list_id,
-                live_index,
+                open_index,
             } => AppEventJs {
                 kind: "itemListChanged",
                 id,
                 list_id: Some(list_id),
-                live_index,
+                open_index,
                 ..blank
             },
             CoreAppEvent::ListAdded {
@@ -1886,48 +1838,6 @@ impl From<CoreAppEvent> for AppEventJs {
                 name: Some(name),
                 ..blank
             },
-            CoreAppEvent::ColumnAdded {
-                list_id,
-                id,
-                name,
-                created_at,
-                index,
-            } => AppEventJs {
-                kind: "columnAdded",
-                id,
-                list_id: Some(list_id),
-                name: Some(name),
-                created_at: Some(created_at),
-                index: Some(index),
-                ..blank
-            },
-            CoreAppEvent::ColumnRemoved { list_id, id } => AppEventJs {
-                kind: "columnRemoved",
-                id,
-                list_id: Some(list_id),
-                ..blank
-            },
-            CoreAppEvent::ColumnMoved { list_id, id, index } => AppEventJs {
-                kind: "columnMoved",
-                id,
-                list_id: Some(list_id),
-                index: Some(index),
-                ..blank
-            },
-            CoreAppEvent::ColumnRenamed { list_id, id, name } => AppEventJs {
-                kind: "columnRenamed",
-                id,
-                list_id: Some(list_id),
-                name: Some(name),
-                ..blank
-            },
-            CoreAppEvent::DefaultColumnRenamed { list_id, name } => AppEventJs {
-                kind: "defaultColumnRenamed",
-                id: list_id.clone(),
-                list_id: Some(list_id),
-                name,
-                ..blank
-            },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
                 main_name,
@@ -1944,45 +1854,18 @@ impl From<CoreAppEvent> for AppEventJs {
 // ---------- private helpers ----------
 
 fn list_to_json(l: &airday_core::ListView) -> String {
-    let mut s = format!(
-        "{{\"id\":{},\"name\":{},\"createdAt\":{}",
+    format!(
+        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
         json_string(&l.id),
         json_string(&l.name),
         l.created_at,
-    );
-    if let Some(n) = &l.default_column_name {
-        s.push_str(",\"defaultColumnName\":");
-        s.push_str(&json_string(n));
-    }
-    s.push('}');
-    s
-}
-
-fn columns_to_json(cols: &[airday_core::ColumnView]) -> String {
-    let mut s = String::from("[");
-    for (i, c) in cols.iter().enumerate() {
-        if i > 0 {
-            s.push(',');
-        }
-        s.push_str(&format!(
-            "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
-            json_string(&c.id),
-            json_string(&c.name),
-            c.created_at,
-        ));
-    }
-    s.push(']');
-    s
+    )
 }
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(n) = &s.main_name {
         out.push_str(",\"mainName\":");
-        out.push_str(&json_string(n));
-    }
-    if let Some(n) = &s.main_default_column_name {
-        out.push_str(",\"mainDefaultColumnName\":");
         out.push_str(&json_string(n));
     }
     out.push('}');
@@ -2016,9 +1899,8 @@ fn item_to_json(it: &airday_core::ItemView) -> String {
     if let Some(t) = it.binned_at {
         s.push_str(&format!(",\"binnedAt\":{t}"));
     }
-    if let Some(c) = &it.column {
-        s.push_str(",\"column\":");
-        s.push_str(&json_string(c));
+    if it.live {
+        s.push_str(",\"live\":true");
     }
     if let Some(d) = &it.due_on {
         s.push_str(",\"dueOn\":");
@@ -2053,26 +1935,7 @@ fn workspace_snapshot_json(doc: &CoreDoc) -> String {
         }
         out.push_str(&list_to_json(list));
     }
-    // Board-column defs per list, keyed by list id; lists without
-    // columns are omitted (`main` included only when it has some).
-    out.push_str("],\"columns\":{");
-    let mut first = true;
-    let mut column_list_ids = vec![airday_core::LIST_MAIN.to_string()];
-    column_list_ids.extend(lists.iter().map(|l| l.id.clone()));
-    for list_id in &column_list_ids {
-        let cols = doc.columns_of(list_id);
-        if cols.is_empty() {
-            continue;
-        }
-        if !first {
-            out.push(',');
-        }
-        first = false;
-        out.push_str(&json_string(list_id));
-        out.push(':');
-        out.push_str(&columns_to_json(&cols));
-    }
-    out.push_str("},\"items\":[");
+    out.push_str("],\"items\":[");
     for (i, item) in items.iter().enumerate() {
         if i > 0 {
             out.push(',');

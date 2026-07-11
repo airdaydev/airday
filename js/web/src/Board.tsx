@@ -1,59 +1,55 @@
-// Kanban board view of one list (spec/kanban.md). A second lens over
-// the same live projection the list view renders: grouping is each
-// item's column register resolved valid-or-default, ordering within a
-// column is the list's single linear order filtered to that column.
+// Board view of one list (spec/board.md). A second lens over the same
+// Open projection the list view renders: three fixed lanes driven by
+// item lifecycle — Backlog | Live | Done — with no user-created,
+// renamed, reordered, or deleted lanes.
 //
-// Every column hosts its own Dnd instance, so within-column reorders
-// use the standard placeholder/nudge machinery. Cross-column drops ride
-// the dnd's foreign-drop-zone contract: each column carries a
-// `data-drop-column-id`, a document-level `primavera-dnd-dragend`
-// listener hit-tests the pointer and consumes the drag (preventDefault
-// suppresses the source column's snap-back reorder), and the move maps
-// to one `setItemColumn` per dragged row — register write + linear
-// reorder in one commit each.
+// Backlog and Live are two views of the list's single Open order,
+// partitioned by each item's `live` flag; Done is the list's
+// done-but-not-binned items, timestamp-sorted. Every lane hosts its own
+// Dnd instance, so within-lane reorders use the standard
+// placeholder/nudge machinery. Cross-lane drops ride the dnd's
+// foreign-drop-zone contract: each lane carries a `data-drop-column-id`,
+// a document-level `primavera-dnd-dragend` listener hit-tests the
+// pointer and consumes the drag (preventDefault suppresses the source
+// lane's snap-back reorder), and the move maps to a `setItemLifecycle`
+// (Backlog/Live/Done) — the lane-drop primitive — plus an optional
+// same-commit reorder within the shared Open order.
 
 import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   onCleanup,
   Show,
 } from "solid-js";
-import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Dnd, DndSelection, type DndImperative, type DndOp } from "./dnd/solid";
 import type { DndDragEventDetail } from "./dnd";
 import checkSvg from "./icons/check.svg?raw";
-import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import plusSvg from "./icons/plus.svg?raw";
 import { useAppI18n } from "./i18n.tsx";
-import { EditableNavLabel } from "./nav.tsx";
 import { Row } from "./Row.tsx";
 import { planReorderMoves } from "./reorder.ts";
 import {
   isBinned,
   isDone,
-  type ColumnView,
   type DocApp,
   type ItemView,
+  type Lifecycle,
 } from "./sync/store.ts";
 
-/** Sentinel key for the implicit default column in DOM attributes and
- *  group maps — a column id can never be the empty string. */
-const DEFAULT_COL = "";
-
-/** Sentinel key for the pinned virtual "Done" column. Real column ids are
- *  uuid-v7 hex, so this can never collide; the leading NUL keeps it out of
- *  any user-typed value too. Not a real column def — it groups the list's
- *  done items by lifecycle, not by a `column` register. */
-const DONE_COL = "\0done";
+/** Fixed lane keys — used as DOM `data-drop-column-id` attributes and as
+ *  the keys of the per-lane handle / selection maps. Item ids are uuid-v7
+ *  hex or `main`, so these plain words can never collide with one. */
+const BACKLOG_LANE = "backlog";
+const LIVE_LANE = "live";
+const DONE_LANE = "done";
 
 /** Imperative handle the workspace holds to steer focus back into the
  *  board (e.g. after the detail dialog closes), mirroring the list view's
  *  `DndImperative.focus`. */
 export type BoardImperative = { focusActive: () => void };
 
-/** Fixed card height — the `itemHeight` passed to each column's Dnd. The
+/** Fixed card height — the `itemHeight` passed to each lane's Dnd. The
  *  foreign-drag preview (placeholder/nudge) and its insertion-slot math
  *  live in the Dnd controller now; the board only needs this to size the
  *  cards uniformly. Board cards are taller than list rows so the title can
@@ -62,7 +58,7 @@ const CARD_HEIGHT = 96;
 
 /** Px gutter below each card within its fixed slot — mirrors the card's
  *  `height: calc(100% - 6px)` so the drop placeholder lines up with the
- *  cards. Passed to each column's Dnd. */
+ *  cards. Passed to each lane's Dnd. */
 const CARD_GAP = 6;
 
 /** Pointer-driven horizontal autoscroll for the board strip. */
@@ -77,65 +73,48 @@ export function Board(props: {
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
-  /** Open the new-item dialog targeting a column (`null` = default). */
-  onAddItem: (listId: string, columnId: string | null) => void;
+  /** Open the new-item dialog targeting a lane (`live` = Live lane,
+   *  otherwise Backlog). */
+  onAddItem: (listId: string, live: boolean) => void;
   /** Ids to select and scroll into view once they land in their (shared)
-   *  resolved column — a "+" capture, a duplicated block, or a find pick;
-   *  `null` when nothing pending. */
+   *  lane — a "+" capture, a duplicated block, or a find pick; `null`
+   *  when nothing pending. */
   revealIds?: () => string[] | null;
   /** Called by the board once it has revealed `revealIds`. */
   clearReveal?: () => void;
-  /** Whether the pinned virtual Done column is shown (local per-list
-   *  preference owned by the workspace). Defaults to shown when absent. */
+  /** Whether the Done lane is shown (local per-list preference owned by
+   *  the workspace). Defaults to shown when absent. */
   showDoneColumn?: () => boolean;
-  /** Publishes the board's active (most recently populated) column
+  /** Publishes the board's active (most recently populated) lane
    *  selection, or `null` when nothing is selected, so the workspace's
    *  global item shortcuts can act on it. */
   onActiveSelectionChange?: (sel: DndSelection | null) => void;
   /** Receives an imperative handle so the workspace can restore keyboard
-   *  focus to the active column (e.g. after the detail dialog closes). */
+   *  focus to the active lane (e.g. after the detail dialog closes). */
   ref?: (h: BoardImperative) => void;
 }) {
   const { m } = useAppI18n();
   const app = props.app;
   const state = app.state;
 
-  const columns = createMemo(
-    (): ColumnView[] => state.columnsByList[props.listId] ?? [],
-  );
-  const defaultName = createMemo(
-    (): string =>
-      state.defaultColumnNames[props.listId] ?? m().board.defaultColumn,
-  );
-
-  // Live projection partitioned by resolved column. One walk of the
-  // list's live array; a register naming no current column resolves to
-  // the default group, so deleted columns' members fall through here
-  // with zero item writes (spec/kanban.md).
-  const membersByColumn = createMemo((): Map<string, ItemView[]> => {
-    const valid = new Set(columns().map((c) => c.id));
-    const groups = new Map<string, ItemView[]>();
-    groups.set(DEFAULT_COL, []);
-    for (const c of columns()) groups.set(c.id, []);
-    for (const id of state.listLive[props.listId] ?? []) {
+  // Open projection partitioned by the `live` flag into the Backlog and
+  // Live lanes. One walk of the list's Open array; both lanes preserve
+  // the shared relative order (spec/board.md).
+  const laneMembers = createMemo((): { backlog: ItemView[]; live: ItemView[] } => {
+    const backlog: ItemView[] = [];
+    const live: ItemView[] = [];
+    for (const id of state.listOpen[props.listId] ?? []) {
       const it = state.itemsById[id];
       if (!it) continue;
-      const key = it.column && valid.has(it.column) ? it.column : DEFAULT_COL;
-      groups.get(key)!.push(it);
+      (it.live ? live : backlog).push(it);
     }
-    return groups;
+    return { backlog, live };
   });
 
-  const resolvedColumnOf = (id: string): string => {
-    const it = state.itemsById[id];
-    if (!it?.column) return DEFAULT_COL;
-    return columns().some((c) => c.id === it.column) ? it.column : DEFAULT_COL;
-  };
-
-  // Members of the pinned Done column: this list's done-but-not-binned
-  // items, newest-done first — the same slice (and sort) the list view's
-  // Done filter and the global Done view use. Not order-container backed:
-  // the board's linear projection only covers live items, so this is a
+  // Members of the Done lane: this list's done-but-not-binned items,
+  // newest-done first — the same slice (and sort) the list view's Done
+  // filter and the global Done view use. Not order-container backed: the
+  // board's Open projection only covers open items, so this is a
   // timestamp scan of `itemsById` scoped to the list. Runs only while a
   // board is mounted.
   const doneMembers = createMemo((): ItemView[] => {
@@ -149,126 +128,104 @@ export function Board(props: {
     return out;
   });
 
-  // Resolve any column key (including the Done sentinel) to its member
-  // list — the Done column draws from `doneMembers`, every other from the
-  // live partition.
-  const membersOf = (colKey: string): ItemView[] =>
-    colKey === DONE_COL
-      ? doneMembers()
-      : (membersByColumn().get(colKey) ?? []);
-
-  // Whether the pinned Done column is rendered (workspace preference).
-  const doneVisible = (): boolean => props.showDoneColumn?.() ?? true;
-
-  // Which column a dragged card currently lives in. A done card's home is
-  // the Done column regardless of its (preserved) `column` register, so
-  // drops back onto its own column no-op and drops elsewhere un-done it.
-  const sourceColOf = (id: string): string => {
-    const it = state.itemsById[id];
-    if (it && isDone(it) && !isBinned(it)) return DONE_COL;
-    return resolvedColumnOf(id);
+  // Resolve a lane key to its member list.
+  const membersOf = (laneKey: string): ItemView[] => {
+    if (laneKey === DONE_LANE) return doneMembers();
+    if (laneKey === LIVE_LANE) return laneMembers().live;
+    return laneMembers().backlog;
   };
 
-  // End-of-column drops have no `beforeKey`; anchor on the first live
-  // item after the column's last surviving member so the block lands at
-  // the column's tail without disturbing other columns' interleaving.
-  // `null` = append to the list end; `undefined` = the column has no
-  // surviving members, so linear position is irrelevant (register-only).
+  // Whether the Done lane is rendered (workspace preference).
+  const doneVisible = (): boolean => props.showDoneColumn?.() ?? true;
+
+  // Which lane a card currently lives in. A done card's home is the Done
+  // lane regardless of its (preserved) `live` flag, so drops back onto its
+  // own lane no-op and drops elsewhere un-done it.
+  const sourceLaneOf = (id: string): string => {
+    const it = state.itemsById[id];
+    if (!it) return BACKLOG_LANE;
+    if (isDone(it) && !isBinned(it)) return DONE_LANE;
+    return it.live ? LIVE_LANE : BACKLOG_LANE;
+  };
+
+  // End-of-lane drops have no `beforeKey`; anchor on the first Open item
+  // after the lane's last surviving member so the block lands at the
+  // lane's tail without disturbing the interleaving of the other lane.
+  // `null` = append to the list end; `undefined` = the lane has no
+  // surviving members, so linear position is irrelevant.
   const planAnchor = (
     memberIds: readonly string[],
     moved: ReadonlySet<string>,
     beforeKey: string | null,
   ): string | null | undefined => {
     if (beforeKey !== null) return beforeKey;
-    const live = state.listLive[props.listId] ?? [];
+    const open = state.listOpen[props.listId] ?? [];
     const remaining = memberIds.filter((id) => !moved.has(id));
     if (remaining.length === 0) return undefined;
     const last = remaining[remaining.length - 1];
-    for (let i = live.indexOf(last) + 1; i < live.length; i++) {
-      if (!moved.has(live[i])) return live[i];
+    for (let i = open.indexOf(last) + 1; i < open.length; i++) {
+      if (!moved.has(open[i])) return open[i];
     }
     return null;
   };
 
-  // Within-column reorder: map the column-local drop to global linear
-  // moves. Registers are untouched — same column, same membership.
-  const reorderWithin = (colKey: string, op: DndOp<ItemView>): void => {
+  // Within-lane reorder: map the lane-local drop to moves in the shared
+  // Open order. The `live` flag is untouched — same lane, same lifecycle.
+  const reorderWithin = (laneKey: string, op: DndOp<ItemView>): void => {
     if (op.type !== "move") return;
     const moved = op.keys.map(String);
-    const memberIds = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+    const memberIds = membersOf(laneKey).map((it) => it.id);
     const anchor = planAnchor(
       memberIds,
       new Set(moved),
       op.beforeKey === null ? null : String(op.beforeKey),
     );
     if (anchor === undefined) return;
-    const live = state.listLive[props.listId] ?? [];
-    const moves = planReorderMoves(live, moved, anchor);
+    const open = state.listOpen[props.listId] ?? [];
+    const moves = planReorderMoves(open, moved, anchor);
     if (moves.length === 0) return;
     app.withActionBatch(() => {
       for (const move of moves) app.moveItem(move.id, props.listId, move.index);
     });
   };
 
-  // Cross-column drop: register write + linear placement before
-  // `anchor`, one commit per row (`setItemColumn`). `anchor: null`
-  // appends to the list end; `undefined` means the target column has
-  // no surviving members, so linear position is irrelevant.
-  const dropIntoColumn = (
-    colKey: string,
-    movedInOrder: string[],
-    anchor: string | null | undefined,
-  ): void => {
-    const targetCol = colKey === DEFAULT_COL ? null : colKey;
-    const live = state.listLive[props.listId] ?? [];
-    const planned =
-      anchor === undefined ? [] : planReorderMoves(live, movedInOrder, anchor);
-    const plannedIds = new Set(planned.map((p) => p.id));
-    app.withActionBatch(() => {
-      for (const p of planned) app.setItemColumn(p.id, targetCol, p.index);
-      for (const id of movedInOrder) {
-        if (!plannedIds.has(id)) app.setItemColumn(id, targetCol);
-      }
-    });
-  };
-
-  // Live Dnd handles per column (keyed by colKey), registered by each
-  // BoardColumn on mount. The cross-column drag listener drives the
-  // hovered foreign column's placeholder/nudge/autoscroll preview through
-  // these and reads back the previewed insertion slot at drop time — so
-  // the drop lands exactly where the preview showed. This is the shared
-  // "DragContext": the board is the context coordinating its columns.
-  const columnHandles = new Map<string, DndImperative>();
-  const registerHandle = (colKey: string, handle: DndImperative | null) => {
-    if (handle) columnHandles.set(colKey, handle);
-    else columnHandles.delete(colKey);
+  // Live Dnd handles per lane (keyed by laneKey), registered by each
+  // BoardColumn on mount. The cross-lane drag listener drives the hovered
+  // foreign lane's placeholder/nudge/autoscroll preview through these and
+  // reads back the previewed insertion slot at drop time — so the drop
+  // lands exactly where the preview showed. This is the shared
+  // "DragContext": the board coordinates its lanes.
+  const laneHandles = new Map<string, DndImperative>();
+  const registerHandle = (laneKey: string, handle: DndImperative | null) => {
+    if (handle) laneHandles.set(laneKey, handle);
+    else laneHandles.delete(laneKey);
   };
   const clearAllForeignHover = () => {
-    for (const h of columnHandles.values()) h.clearForeignHover();
+    for (const h of laneHandles.values()) h.clearForeignHover();
   };
 
-  // One selection model per column, owned by the board (keyed by the
-  // stable colKey) so a column remount doesn't drop its selection and so
-  // the cross-column drop below can make the moved rows the target
-  // column's new selection. Cross-column multi-select still isn't
-  // supported — each column's Dnd owns its own order.
+  // One selection model per lane, owned by the board (keyed by the stable
+  // laneKey) so a lane remount doesn't drop its selection and so the
+  // cross-lane drop below can make the moved rows the target lane's new
+  // selection. Cross-lane multi-select still isn't supported — each lane's
+  // Dnd owns its own order.
   //
-  // The board also tracks which column's selection is "active" (the most
+  // The board also tracks which lane's selection is "active" (the most
   // recently populated one) and publishes it upward, so the workspace's
   // global item shortcuts (Enter/open, x/done, ⌫/bin, ⌘C, ⌘D) act on the
   // board selection just as they do on the list view's single selection.
-  const columnSelections = new Map<string, DndSelection>();
+  const laneSelections = new Map<string, DndSelection>();
   const [activeSelection, setActiveSelection] =
     createSignal<DndSelection | null>(null);
-  const selectionFor = (colKey: string): DndSelection => {
-    let s = columnSelections.get(colKey);
+  const selectionFor = (laneKey: string): DndSelection => {
+    let s = laneSelections.get(laneKey);
     if (!s) {
       const sel = new DndSelection();
       sel.onChange(() => {
         if (sel.hasSelection()) {
-          // Selecting in one column is board-wide single selection: drop any
-          // stale highlight in the other columns and become the active one.
-          for (const other of columnSelections.values()) {
+          // Selecting in one lane is board-wide single selection: drop any
+          // stale highlight in the other lanes and become the active one.
+          for (const other of laneSelections.values()) {
             if (other !== sel && other.hasSelection()) other.clear();
           }
           setActiveSelection(sel);
@@ -276,7 +233,7 @@ export function Board(props: {
           setActiveSelection(null);
         }
       });
-      columnSelections.set(colKey, sel);
+      laneSelections.set(laneKey, sel);
       s = sel;
     }
     return s;
@@ -284,61 +241,59 @@ export function Board(props: {
   createEffect(() => props.onActiveSelectionChange?.(activeSelection()));
   onCleanup(() => props.onActiveSelectionChange?.(null));
 
-  // After a cross-column drop, make the dropped rows the target column's
+  // After a cross-lane drop, make the dropped rows the target lane's
   // selection. The mutation is applied synchronously but the moved rows
   // only appear in the target's member list once the reactive graph
   // settles, so we stage the request and apply it when the rows have
   // actually landed (their order is then known, so the block ranges are
   // correct regardless of effect timing).
   const [pendingSelect, setPendingSelect] = createSignal<{
-    colKey: string;
+    laneKey: string;
     ids: string[];
   } | null>(null);
   createEffect(() => {
     const p = pendingSelect();
     if (!p) return;
-    const memberIds = membersOf(p.colKey).map((it) => it.id);
+    const memberIds = membersOf(p.laneKey).map((it) => it.id);
     const present = new Set(memberIds);
     if (!p.ids.every((id) => present.has(id))) return;
-    const sel = columnSelections.get(p.colKey);
+    const sel = laneSelections.get(p.laneKey);
     if (sel) {
       sel.updateOrder(memberIds);
       sel.setSelectedKeys(p.ids);
-      const handle = columnHandles.get(p.colKey);
+      const handle = laneHandles.get(p.laneKey);
       handle?.focus();
       // Scroll the (last) selected card into view — after a board "+"
-      // capture the new card may be below the fold in a tall column.
+      // capture the new card may be below the fold in a tall lane.
       if (p.ids.length > 0) handle?.scrollToKey(p.ids[p.ids.length - 1]);
     }
     setPendingSelect(null);
   });
 
   // Reveal a just-created item (board "+" capture): once it lands in its
-  // resolved column, stage it as that column's selection — the effect
-  // above then selects, focuses, and scrolls it into view. Waits for the
-  // reactive graph to settle (the item may not be projected yet).
+  // lane, stage it as that lane's selection — the effect above then
+  // selects, focuses, and scrolls it into view. Waits for the reactive
+  // graph to settle (the item may not be projected yet).
   createEffect(() => {
     const ids = props.revealIds?.() ?? null;
     if (!ids || ids.length === 0) return;
-    // The revealed ids share a column (a duplicated block, or a single
+    // The revealed ids share a lane (a duplicated block, or a single
     // item); resolve it from the first and wait until every id has landed
-    // there before staging them all as that column's selection.
+    // there before staging them all as that lane's selection.
     if (!state.itemsById[ids[0]]) return;
-    const colKey = resolvedColumnOf(ids[0]);
-    const members = membersByColumn().get(colKey);
-    if (!members) return;
-    const present = new Set(members.map((it) => it.id));
+    const laneKey = sourceLaneOf(ids[0]);
+    const present = new Set(membersOf(laneKey).map((it) => it.id));
     if (!ids.every((id) => present.has(id))) return;
-    setPendingSelect({ colKey, ids });
+    setPendingSelect({ laneKey, ids });
     props.clearReveal?.();
   });
 
   // Foreign-drop wiring (see dnd/spec.md "Foreign drop zones"). The
   // workspace's own nav/bin drop listener coexists: hit-tests are
   // disjoint, and this one only consumes drops landing on a *different*
-  // column — same-column drops fall through to the source Dnd's
-  // internal reorder.
-  const findColumnAt = (x: number, y: number): HTMLElement | null =>
+  // lane — same-lane drops fall through to the source Dnd's internal
+  // reorder.
+  const findLaneAt = (x: number, y: number): HTMLElement | null =>
     document
       .elementFromPoint(x, y)
       ?.closest<HTMLElement>("[data-drop-column-id]") ?? null;
@@ -346,7 +301,7 @@ export function Board(props: {
     const first = detail.firstItem;
     return typeof first === "object" && first !== null && "listId" in first;
   };
-  const clearColumnHighlight = () => {
+  const clearLaneHighlight = () => {
     document
       .querySelectorAll<HTMLElement>(".board-col[data-drop-active]")
       .forEach((el) => delete el.dataset.dropActive);
@@ -366,101 +321,103 @@ export function Board(props: {
         }
       }
     }
-    clearColumnHighlight();
-    const el = findColumnAt(ce.detail.x, ce.detail.y);
+    clearLaneHighlight();
+    const el = findLaneAt(ce.detail.x, ce.detail.y);
     const keys = ce.detail.keys.map(String);
-    // The hovered column is a *foreign* drop target only when it's a
-    // different column from where the dragged rows currently live.
-    const targetCol =
+    // The hovered lane is a *foreign* drop target only when it's a
+    // different lane from where the dragged rows currently live.
+    const targetLane =
       el &&
       !keys.every(
-        (k) => sourceColOf(k) === (el.dataset.dropColumnId ?? DEFAULT_COL),
+        (k) => sourceLaneOf(k) === (el.dataset.dropColumnId ?? BACKLOG_LANE),
       )
-        ? (el.dataset.dropColumnId ?? DEFAULT_COL)
+        ? (el.dataset.dropColumnId ?? BACKLOG_LANE)
         : null;
-    // Preview the drop in the hovered foreign column; clear every other
-    // column (including the source, whose own controller suppresses its
+    // Preview the drop in the hovered foreign lane; clear every other
+    // lane (including the source, whose own controller suppresses its
     // placeholder/nudge once the pointer leaves its bounds).
-    for (const [colKey, handle] of columnHandles) {
-      if (colKey === targetCol) handle.setForeignHover(ce.detail.x, ce.detail.y);
+    for (const [laneKey, handle] of laneHandles) {
+      if (laneKey === targetLane) handle.setForeignHover(ce.detail.x, ce.detail.y);
       else handle.clearForeignHover();
     }
-    if (targetCol !== null && el) el.dataset.dropActive = "";
+    if (targetLane !== null && el) el.dataset.dropActive = "";
   };
   const onDragEnd = (e: Event) => {
     const ce = e as CustomEvent<DndDragEventDetail>;
-    clearColumnHighlight();
+    clearLaneHighlight();
     if (!isItemDrag(ce.detail)) {
       clearAllForeignHover();
       return;
     }
-    const el = findColumnAt(ce.detail.x, ce.detail.y);
-    const colKey = el ? (el.dataset.dropColumnId ?? DEFAULT_COL) : null;
+    const el = findLaneAt(ce.detail.x, ce.detail.y);
+    const laneKey = el ? (el.dataset.dropColumnId ?? BACKLOG_LANE) : null;
     const keys = ce.detail.keys.map(String);
-    // Same-column (or off-board) drop → the source column's internal
-    // reorder owns it; nothing to consume here. (Done→Done lands here too:
-    // the Done column has no linear order, so a drop within it is a no-op.)
-    if (colKey === null || keys.every((k) => sourceColOf(k) === colKey)) {
+    // Same-lane (or off-board) drop → the source lane's internal reorder
+    // owns it; nothing to consume here. (Done→Done lands here too: the
+    // Done lane has no linear order, so a drop within it is a no-op.)
+    if (laneKey === null || keys.every((k) => sourceLaneOf(k) === laneKey)) {
       clearAllForeignHover();
       return;
     }
     ce.preventDefault();
-    // The target column's preview computed the exact insertion slot — read
+    // The target lane's preview computed the exact insertion slot — read
     // it back so the drop lands where the placeholder was. `foreignIdx` is
-    // a slot in that column's member order (0..count); >= count (or null,
-    // if the pointer never registered a hover) means tail append.
-    const foreignIdx = columnHandles.get(colKey)?.getForeignHoverIndex() ?? null;
+    // a slot in that lane's member order (0..count); >= count (or null, if
+    // the pointer never registered a hover) means tail append.
+    const foreignIdx = laneHandles.get(laneKey)?.getForeignHoverIndex() ?? null;
     clearAllForeignHover();
-    // A drag carries rows from exactly one source column (cross-column
-    // multi-select isn't supported), so it's all-live or all-done. Order
-    // live rows by the list's linear order; done rows by newest-done.
+    // A drag carries rows from exactly one source lane (cross-lane
+    // multi-select isn't supported), so it's all-open or all-done. Order
+    // open rows by the shared Open order; done rows by newest-done.
     const keySet = new Set(keys);
-    const live = state.listLive[props.listId] ?? [];
-    const fromLive = live.filter((id) => keySet.has(id));
-    const sourceIsDone = fromLive.length === 0;
+    const open = state.listOpen[props.listId] ?? [];
+    const fromOpen = open.filter((id) => keySet.has(id));
+    const sourceIsDone = fromOpen.length === 0;
     const inOrder = sourceIsDone
       ? doneMembers()
           .map((it) => it.id)
           .filter((id) => keySet.has(id))
-      : fromLive;
+      : fromOpen;
     if (inOrder.length === 0) return;
 
-    if (colKey === DONE_COL) {
-      // Drop into Done → mark the (live) rows done. Their `column`
-      // register is preserved, so un-doning later returns them to their
-      // column (spec/kanban.md: done items keep their register).
-      app.setDoneMany(inOrder, true);
+    if (laneKey === DONE_LANE) {
+      // Drop into Done → mark the (open) rows done. Their `live` flag is
+      // preserved by the core, so un-doning later returns them to their
+      // Backlog/Live lane (spec/board.md).
+      app.setLifecycleMany(inOrder, "done");
     } else if (sourceIsDone) {
-      // Drop a done row onto a live column → un-done it and regroup. Its
-      // order entry was preserved, so it reappears at its former linear
-      // slot; precise vertical placement within the column is out of
-      // scope here (the register write is what moves it between columns).
-      const targetCol = colKey === DEFAULT_COL ? null : colKey;
-      app.withActionBatch(() => {
-        app.setDoneMany(inOrder, false);
-        for (const id of inOrder) app.setItemColumn(id, targetCol);
-      });
+      // Drop a done row onto Backlog/Live → the target lane selects the
+      // lifecycle (clears done). Its order entry was preserved, so it
+      // reappears at its former Open slot; precise vertical placement
+      // within the lane is out of scope here.
+      app.setLifecycleMany(inOrder, laneKey === LIVE_LANE ? "live" : "backlog");
     } else {
-      // Live → live cross-column drop (unchanged): register write +
-      // linear placement before the previewed anchor.
-      const memberIds = (membersByColumn().get(colKey) ?? []).map((it) => it.id);
+      // Backlog↔Live cross-lane drop: flip `live` and place the rows
+      // before the previewed anchor in the shared Open order, one commit.
+      const target: Lifecycle = laneKey === LIVE_LANE ? "live" : "backlog";
+      const memberIds = membersOf(laneKey).map((it) => it.id);
       const remaining = memberIds.filter((id) => !keySet.has(id));
       const anchor =
         foreignIdx !== null && foreignIdx < remaining.length
           ? remaining[foreignIdx]
           : planAnchor(memberIds, keySet, null);
-      dropIntoColumn(colKey, inOrder, anchor);
+      const planned =
+        anchor === undefined ? [] : planReorderMoves(open, inOrder, anchor);
+      app.withActionBatch(() => {
+        for (const id of inOrder) app.setLifecycle(id, target);
+        for (const p of planned) app.moveItem(p.id, props.listId, p.index);
+      });
     }
-    // Clear the source column's now-stale selection, then stage the moved
-    // rows to become the target column's selection once they land.
-    const sourceCols = new Set(keys.map((k) => sourceColOf(k)));
-    for (const c of sourceCols) columnSelections.get(c)?.clear();
-    setPendingSelect({ colKey, ids: inOrder });
+    // Clear the source lane's now-stale selection, then stage the moved
+    // rows to become the target lane's selection once they land.
+    const sourceLanes = new Set(keys.map((k) => sourceLaneOf(k)));
+    for (const c of sourceLanes) laneSelections.get(c)?.clear();
+    setPendingSelect({ laneKey, ids: inOrder });
   };
-  // Escape mid-drag: the source column tears its own drag down; here we just
-  // drop any cross-column placeholder preview the drag had painted.
+  // Escape mid-drag: the source lane tears its own drag down; here we just
+  // drop any cross-lane placeholder preview the drag had painted.
   const onDragCancel = () => {
-    clearColumnHighlight();
+    clearLaneHighlight();
     clearAllForeignHover();
   };
   document.addEventListener("primavera-dnd-dragmove", onDragMove);
@@ -474,74 +431,61 @@ export function Board(props: {
 
   let boardRef: HTMLDivElement | undefined;
 
-  // Add-column affordance: a ghost column that flips into an input.
-  const [addingColumn, setAddingColumn] = createSignal(false);
-  let addColumnInput: HTMLInputElement | undefined;
-  createEffect(() => {
-    if (addingColumn()) queueMicrotask(() => addColumnInput?.focus());
-  });
-  const commitNewColumn = () => {
-    const name = addColumnInput?.value.trim() ?? "";
-    setAddingColumn(false);
-    if (name.length === 0) return;
-    app.addColumn(props.listId, name);
-  };
-
-  // ArrowLeft / ArrowRight: hop the selection to the nearest column in that
+  // ArrowLeft / ArrowRight: hop the selection to the nearest lane in that
   // direction that holds cards, keeping the same vertical slot (clamped to
-  // the target column's length). Columns render default-first, then user
-  // columns in order. No wrap — left/right is spatial. Empty columns are
-  // skipped (nothing to land on); with nothing selected, → enters at the
-  // first non-empty column and ← at the last.
-  const orderedColKeys = (): string[] => [
-    DEFAULT_COL,
-    ...columns().map((c) => c.id),
-    ...(doneVisible() ? [DONE_COL] : []),
+  // the target lane's length). Lanes render Backlog, Live, then Done. No
+  // wrap — left/right is spatial. Empty lanes are skipped (nothing to land
+  // on); with nothing selected, → enters at the first non-empty lane and ←
+  // at the last.
+  const orderedLaneKeys = (): string[] => [
+    BACKLOG_LANE,
+    LIVE_LANE,
+    ...(doneVisible() ? [DONE_LANE] : []),
   ];
-  const jumpColumn = (dir: -1 | 1): void => {
-    const order = orderedColKeys();
+  const jumpLane = (dir: -1 | 1): void => {
+    const order = orderedLaneKeys();
     const active = activeSelection();
-    // Locate the active column and the caret's vertical slot within it.
+    // Locate the active lane and the caret's vertical slot within it.
     let curIdx = dir === 1 ? -1 : order.length;
     let curPos = 0;
     if (active) {
-      for (const [colKey, sel] of columnSelections) {
+      for (const [laneKey, sel] of laneSelections) {
         if (sel !== active) continue;
-        curIdx = order.indexOf(colKey);
-        const ids = membersOf(colKey).map((it) => it.id);
+        curIdx = order.indexOf(laneKey);
+        const ids = membersOf(laneKey).map((it) => it.id);
         const top = active.getSelectionTop();
         curPos = top != null ? Math.max(0, ids.indexOf(String(top))) : 0;
         break;
       }
     }
     for (let i = curIdx + dir; i >= 0 && i < order.length; i += dir) {
-      const colKey = order[i];
-      const ids = membersOf(colKey).map((it) => it.id);
+      const laneKey = order[i];
+      const ids = membersOf(laneKey).map((it) => it.id);
       if (ids.length === 0) continue;
       const key = ids[Math.min(curPos, ids.length - 1)];
-      const sel = selectionFor(colKey);
+      const sel = selectionFor(laneKey);
       sel.updateOrder(ids);
-      // Selecting here clears the other columns via selectionFor's onChange.
+      // Selecting here clears the other lanes via selectionFor's onChange.
       sel.selectOnly(key);
-      const handle = columnHandles.get(colKey);
+      const handle = laneHandles.get(laneKey);
       handle?.focus();
       handle?.scrollToKey(key);
       return;
     }
   };
-  // Restore keyboard focus to the column that currently owns the active
+  // Restore keyboard focus to the lane that currently owns the active
   // selection (its Dnd listbox is what up/down nav is bound to). Used after
   // the detail dialog closes so board nav resumes where it left off.
-  const focusActiveColumn = (): void => {
+  const focusActiveLane = (): void => {
     const active = activeSelection();
     if (!active) return;
-    for (const [colKey, sel] of columnSelections) {
+    for (const [laneKey, sel] of laneSelections) {
       if (sel !== active) continue;
-      columnHandles.get(colKey)?.focus();
+      laneHandles.get(laneKey)?.focus();
       return;
     }
   };
-  props.ref?.({ focusActive: focusActiveColumn });
+  props.ref?.({ focusActive: focusActiveLane });
 
   const onBoardKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -549,26 +493,19 @@ export function Board(props: {
     const target = e.target as Element | null;
     if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     e.preventDefault();
-    jumpColumn(e.key === "ArrowRight" ? 1 : -1);
+    jumpLane(e.key === "ArrowRight" ? 1 : -1);
   };
 
   return (
-    <div
-      class="board"
-      role="group"
-      ref={boardRef}
-      onKeyDown={onBoardKeyDown}
-    >
+    <div class="board" role="group" ref={boardRef} onKeyDown={onBoardKeyDown}>
       <BoardColumn
         app={app}
-        listId={props.listId}
-        colKey={DEFAULT_COL}
-        name={defaultName()}
-        selection={selectionFor(DEFAULT_COL)}
-        members={() => membersByColumn().get(DEFAULT_COL) ?? []}
-        onRename={(name) => app.setDefaultColumnName(props.listId, name)}
-        onReorder={(op) => reorderWithin(DEFAULT_COL, op)}
-        onAddItem={() => props.onAddItem(props.listId, null)}
+        laneKey={BACKLOG_LANE}
+        name={m().board.backlogLane}
+        selection={selectionFor(BACKLOG_LANE)}
+        members={() => laneMembers().backlog}
+        onReorder={(op) => reorderWithin(BACKLOG_LANE, op)}
+        onAddItem={() => props.onAddItem(props.listId, false)}
         registerHandle={registerHandle}
         autofocus
         onOpen={props.onOpen}
@@ -577,83 +514,34 @@ export function Board(props: {
         duplicateBlock={props.duplicateBlock}
         copyBlock={props.copyBlock}
       />
-      <For each={columns()}>
-        {(col, i) => (
-          <BoardColumn
-            app={app}
-            listId={props.listId}
-            colKey={col.id}
-            name={col.name}
-            selection={selectionFor(col.id)}
-            members={() => membersByColumn().get(col.id) ?? []}
-            onRename={(name) => {
-              if (name.length > 0) app.renameColumn(props.listId, col.id, name);
-            }}
-            onReorder={(op) => reorderWithin(col.id, op)}
-            onAddItem={() => props.onAddItem(props.listId, col.id)}
-            registerHandle={registerHandle}
-            onOpen={props.onOpen}
-            onSetDue={props.onSetDue}
-            openOnTap={props.openOnTap}
-            duplicateBlock={props.duplicateBlock}
-            copyBlock={props.copyBlock}
-            menu={{
-              moveLeft:
-                i() > 0
-                  ? () => app.moveColumn(props.listId, col.id, i() - 1)
-                  : undefined,
-              moveRight:
-                i() < columns().length - 1
-                  ? () => app.moveColumn(props.listId, col.id, i() + 1)
-                  : undefined,
-              // Members fall to the default column visually; registers
-              // stay put so undo restores the grouping (spec/kanban.md).
-              delete: () => app.deleteColumn(props.listId, col.id),
-            }}
-          />
-        )}
-      </For>
-      <div class="board-add-col">
-        <Show
-          when={addingColumn()}
-          fallback={
-            <button
-              type="button"
-              class="board-add-col-button"
-              onClick={() => setAddingColumn(true)}
-            >
-              <span class="add-button-icon" innerHTML={plusSvg} />
-              <span>{m().board.addColumn}</span>
-            </button>
-          }
-        >
-          <input
-            ref={addColumnInput}
-            class="board-add-col-input"
-            placeholder={m().board.columnNamePlaceholder}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitNewColumn();
-              if (e.key === "Escape") setAddingColumn(false);
-            }}
-            onBlur={commitNewColumn}
-          />
-        </Show>
-      </div>
-      {/* Pinned virtual Done column: this list's done items, newest first.
-          A drop target (drag a card in to mark it done) and a drag source
-          (drag a card out to un-done it), but never internally reordered —
-          it has no linear order of its own. Toggled by a per-list
-          preference from the view-mode popover. */}
+      <BoardColumn
+        app={app}
+        laneKey={LIVE_LANE}
+        name={m().board.liveLane}
+        selection={selectionFor(LIVE_LANE)}
+        members={() => laneMembers().live}
+        onReorder={(op) => reorderWithin(LIVE_LANE, op)}
+        onAddItem={() => props.onAddItem(props.listId, true)}
+        registerHandle={registerHandle}
+        onOpen={props.onOpen}
+        onSetDue={props.onSetDue}
+        openOnTap={props.openOnTap}
+        duplicateBlock={props.duplicateBlock}
+        copyBlock={props.copyBlock}
+      />
+      {/* Fixed Done lane: this list's done items, newest first. A drop
+          target (drag a card in to mark it done) and a drag source (drag a
+          card out to un-done it), but never internally reordered — it has
+          no linear order of its own. Toggled by a per-list preference from
+          the view-mode popover. */}
       <Show when={doneVisible()}>
         <BoardColumn
           app={app}
-          listId={props.listId}
-          colKey={DONE_COL}
+          laneKey={DONE_LANE}
           variant="done"
-          name={m().board.doneColumn}
-          selection={selectionFor(DONE_COL)}
+          name={m().board.doneLane}
+          selection={selectionFor(DONE_LANE)}
           members={() => doneMembers()}
-          onRename={() => {}}
           onReorder={() => {}}
           onAddItem={() => {}}
           registerHandle={registerHandle}
@@ -670,142 +558,73 @@ export function Board(props: {
 
 function BoardColumn(props: {
   app: DocApp;
-  listId: string;
-  /** Column id, or `DEFAULT_COL` for the implicit default column. */
-  colKey: string;
+  /** Fixed lane key: `backlog`, `live`, or `done`. */
+  laneKey: string;
   name: string;
-  /** Selection model for this column, owned by the board. */
+  /** Selection model for this lane, owned by the board. */
   selection: DndSelection;
   members: () => ItemView[];
-  onRename: (name: string) => void;
   onReorder: (op: DndOp<ItemView>) => void;
-  /** Open the new-item dialog targeting this column. */
+  /** Open the new-item dialog targeting this lane. */
   onAddItem: () => void;
   onOpen: (id: string, focus?: "notes", caret?: number) => void;
   onSetDue: (ids: readonly string[], initial: string | null) => void;
   openOnTap: () => boolean;
   duplicateBlock: (sourceIds: readonly string[]) => void;
   copyBlock: (sourceIds: readonly string[]) => void;
-  /** Publish this column's Dnd handle to the board so the cross-column
-   *  drag listener can drive its foreign-drop preview. */
-  registerHandle: (colKey: string, handle: DndImperative | null) => void;
-  /** Focus this column's listbox on mount, so arrow-key nav works the
-   *  moment the board opens — the first column claims it (matches how the
-   *  list view autofocuses). Only one column should set this. */
+  /** Publish this lane's Dnd handle to the board so the cross-lane drag
+   *  listener can drive its foreign-drop preview. */
+  registerHandle: (laneKey: string, handle: DndImperative | null) => void;
+  /** Focus this lane's listbox on mount, so arrow-key nav works the moment
+   *  the board opens — the Backlog lane claims it (matches how the list
+   *  view autofocuses). Only one lane should set this. */
   autofocus?: boolean;
-  /** User columns only — the default column can't move or be deleted. */
-  menu?: {
-    moveLeft?: () => void;
-    moveRight?: () => void;
-    delete: () => void;
-  };
-  /** `"done"` renders the pinned virtual Done column: a fixed label (no
-   *  rename), no add/menu affordances, and no internal reorder — its cards
-   *  are lifecycle-grouped and timestamp-sorted, not order-container backed. */
+  /** `"done"` renders the Done lane: a check-marked label, no add
+   *  affordance, and no internal reorder — its cards are lifecycle-grouped
+   *  and timestamp-sorted, not order-container backed. */
   variant?: "done";
 }) {
   const { m } = useAppI18n();
   const app = props.app;
   const isDoneCol = props.variant === "done";
-  // Selection is owned by the board (per column) — see Board.selectionFor.
+  // Selection is owned by the board (per lane) — see Board.selectionFor.
   const selection = props.selection;
   const [dndItems, setDndItems] = createSignal<ItemView[]>([]);
   createEffect(() => setDndItems(props.members()));
-  onCleanup(() => props.registerHandle(props.colKey, null));
-  let startRename: (() => void) | undefined;
+  onCleanup(() => props.registerHandle(props.laneKey, null));
 
   return (
     <section
       class="board-col"
       classList={{ "board-col-done": isDoneCol }}
-      data-drop-column-id={props.colKey}
+      data-drop-column-id={props.laneKey}
     >
       <header class="board-col-header">
-        <Show
-          when={!isDoneCol}
-          fallback={
-            <span class="board-col-name board-col-name-fixed">
-              <span
-                class="board-col-done-icon"
-                aria-hidden="true"
-                innerHTML={checkSvg}
-              />
-              {props.name}
-            </span>
-          }
-        >
-          <EditableNavLabel
-            class="board-col-name"
-            name={props.name}
-            onSave={props.onRename}
-            registerStart={(fn) => (startRename = fn)}
-          />
-        </Show>
+        <span class="board-col-name board-col-name-fixed">
+          <Show when={isDoneCol}>
+            <span
+              class="board-col-done-icon"
+              aria-hidden="true"
+              innerHTML={checkSvg}
+            />
+          </Show>
+          {props.name}
+        </span>
         <span class="board-col-count">{props.members().length}</span>
         <Show when={!isDoneCol}>
-        <button
-          type="button"
-          class="board-col-add-btn"
-          aria-label={m().board.addItem}
-          onClick={() => props.onAddItem()}
-          innerHTML={plusSvg}
-        />
-        <DropdownMenu>
-          <DropdownMenu.Trigger
-            class="board-col-menu-trigger"
-            aria-label={m().common.menu}
-            innerHTML={dotsVerticalSvg}
+          <button
+            type="button"
+            class="board-col-add-btn"
+            aria-label={m().board.addItem}
+            onClick={() => props.onAddItem()}
+            innerHTML={plusSvg}
           />
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content class="dropdown-menu-content">
-              <DropdownMenu.Item
-                class="dropdown-menu-item"
-                onSelect={() => {
-                  // Defer past the menu close + focus restore so the
-                  // contenteditable keeps the focus it grabs.
-                  requestAnimationFrame(() => startRename?.());
-                }}
-              >
-                {m().board.renameColumn}
-              </DropdownMenu.Item>
-              <Show when={props.menu}>
-                {(menu) => (
-                  <>
-                    <Show when={menu().moveLeft}>
-                      <DropdownMenu.Item
-                        class="dropdown-menu-item"
-                        onSelect={() => menu().moveLeft!()}
-                      >
-                        {m().board.moveLeft}
-                      </DropdownMenu.Item>
-                    </Show>
-                    <Show when={menu().moveRight}>
-                      <DropdownMenu.Item
-                        class="dropdown-menu-item"
-                        onSelect={() => menu().moveRight!()}
-                      >
-                        {m().board.moveRight}
-                      </DropdownMenu.Item>
-                    </Show>
-                    <DropdownMenu.Separator class="dropdown-menu-separator" />
-                    <DropdownMenu.Item
-                      class="dropdown-menu-item"
-                      onSelect={() => menu().delete()}
-                    >
-                      {m().board.deleteColumn}
-                    </DropdownMenu.Item>
-                  </>
-                )}
-              </Show>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu>
         </Show>
       </header>
       <div class="board-col-body">
         <Dnd
           class="board-col-dnd"
-          ref={(h) => props.registerHandle(props.colKey, h)}
+          ref={(h) => props.registerHandle(props.laneKey, h)}
           items={dndItems()}
           setItems={setDndItems}
           getKey={(it) => it.id}

@@ -72,7 +72,7 @@ proptest dependency (deterministic LCG seeds, no shrinking):
   full mesh sync. After **every** op it asserts the v2 projection
   invariants (`spec/data-model.md`) through the public API *and* replays
   the emitted `AppEvent`s into a naive consumer mirror (the JS-store
-  contract: per-list arrays, remove-then-insert at `live_index`) that
+  contract: per-list Open arrays, remove-then-insert at `open_index`) that
   must never drift from the doc. Final fingerprints must converge.
   Default 6 seeds in CI; deepen locally with
   `AIRDAY_FUZZ_SEEDS=50 cargo test -p airday-core --test order_schema --release`.

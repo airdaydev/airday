@@ -73,7 +73,7 @@ type SearchDoc = {
   title: string;
   body: string;
   listId?: string;
-  lifecycle?: "live" | "done" | "binned";
+  lifecycle?: "backlog" | "live" | "done" | "binned";
   updatedAt?: number;
   tokens: string[];
 };
@@ -139,7 +139,8 @@ Suggested precedence:
 2. Prefix title/name hits
 3. Notes hits
 4. List-name context hits on items
-5. `live` items before `done`, `done` before `binned`
+5. Lifecycle order when text match is otherwise equal: `live`, then `backlog`,
+   then `done`, then `binned` (Live outranks Backlog — active work first)
 6. More recently updated items before older items
 7. Stable tie-breaker by id
 
@@ -233,7 +234,7 @@ type SearchResult = {
   title: string;
   body?: string;
   listId?: string;
-  lifecycle?: "live" | "done" | "binned";
+  lifecycle?: "backlog" | "live" | "done" | "binned";
   score: number;
 };
 
@@ -261,7 +262,7 @@ Minimum test coverage:
 6. delete removes result from queries
 7. multi-token AND queries
 8. last-token prefix queries
-9. ranking preference: live over done over binned when textual match is otherwise equal
+9. ranking preference: live over backlog over done over binned when textual match is otherwise equal
 
 Where feasible, use the same event stream the app uses rather than bespoke test-only mutation paths.
 

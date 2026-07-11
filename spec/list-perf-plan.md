@@ -5,14 +5,14 @@
 
 ## Status (2026-07-02)
 
-**Phase 1 landed.** Core emits `live_index` (position in the owning
-list's live projection) on `ItemAdded` / `ItemMoved` /
+**Phase 1 landed.** Core emits `open_index` (position in the owning
+list's open projection) on `ItemAdded` / `ItemMoved` /
 `ItemLifecycleChanged` / `ItemListChanged`, alongside the global `index`;
-wasm surfaces it as `liveIndex`. The web store dropped `itemsOrder`
-entirely: `WorkspaceState.listLive` per-list arrays + maintained
+wasm surfaces it as `openIndex`. The web store dropped `itemsOrder`
+entirely: `WorkspaceState.listOpen` per-list arrays + maintained
 `binCount`, list-local dispatch, lazy Done/Bin timestamp sorts. The
 done-linger affordance survives via a store-side `recentDone` capture
-(id, listId, vacated live index, doneAt) that `Workspace.items()`
+(id, listId, vacated open index, doneAt) that `Workspace.items()`
 overlays for the linger window.
 
 **Also fixed (found post-Phase-1 on a 13k-item store):** the batch
@@ -77,7 +77,7 @@ instead of one move per displaced row, while the web action stack keeps the
 whole selection drag as one visible undo.
 
 **Boot/refresh follow-up landed:** local snapshot + tail hydration uses deferred
-oplog replay and builds `ItemIndex` once at completion, with no historical live
+oplog replay and builds `ItemIndex` once at completion, with no historical open-projection
 events. Server snapshot bootstrap persists the received encrypted blob with a
 `ServerFrontier(up_to_seq)` cutoff (pruning the confirmed rows it contains, so
 refresh no longer replays the full history), then emits one `FullResync`. Initial
@@ -111,11 +111,11 @@ an atomic `location` register. Structural consequences for perf:
 - Cross-list moves are register writes + scalar entry ops, not `mov`s
   on a giant container; the multi-peer move/undo wasm traps
   (`loro-bug/`) are no longer reachable through this path.
-- Hot mutations are O(live) in-memory splices, gated by per-list
+- Hot mutations are O(open) in-memory splices, gated by per-list
   visible-entry counts; restores and remote frames recompute one list's
   projection (O(that list's lifetime entries), pure memory).
 
-Same bench, same shape (13k lifetime, 200 live in main): `add_item`
+Same bench, same shape (13k lifetime, 200 open in main): `add_item`
 0.17ms · `set_item_done` 0.011ms · `set_items_binned(1)` 0.009ms ·
 `apply_remote(1 op)` 5.2ms · `snapshot_blob` 59ms · `iter_items
 ().collect()` 19ms · `rebuild_index` 15ms · reloaded-doc move undo
@@ -142,7 +142,7 @@ doc, M = current-view length:
    - `items()` `Workspace.tsx:170-196` — maps N→new array; filter reads
      `listId/doneAt/binnedAt`, so any lifecycle change re-runs it.
    - `lingerChain()` `:130-151`
-   - `liveCountsByList()` `:221-229`
+   - `openCountsByList()` `:221-229`
    - `binCount()` `:207-214`
    - → Done/Bin items are dead weight in every list-view mutation (explains
      Done-heavy slowness).
@@ -165,8 +165,8 @@ re-derives every view + count from it each mutation. The core event contract
 "track a single global order and filter per view."
 
 ## Key enabler (already exists in core)
-`da4a631c` added `ItemIndex.live_by_list` in `core/src/doc.rs:218` — **per-list
-live-order arrays** (Done/binned excluded). The projection exists in Rust but is
+`da4a631c` added `ItemIndex.open_by_list` in `core/src/doc.rs:218` — **per-list
+open-order arrays** (Done/binned excluded). The projection exists in Rust but is
 flattened back to global at the event boundary. Finishing the job = surfacing
 per-list local index through events.
 
@@ -174,7 +174,7 @@ per-list local index through events.
 Goal: **no global-order evaluation on any mutation path**; only per-list arrays,
 built once at boot.
 - Global order is not fundamentally needed post-startup: list views =
-  `live_by_list[L]` (CRDT order); Done/Bin = timestamp sort (`doneAt`/`binnedAt`
+  `open_by_list[L]` (CRDT order); Done/Bin = timestamp sort (`doneAt`/`binnedAt`
   desc), not CRDT order.
 - Mandatory boot O(N) is `itemsById` + **search index** (`store.ts:407`) — a
   *content* pass, not an order pass. Build per-list arrays as a byproduct; drop
@@ -186,8 +186,8 @@ built once at boot.
 ```ts
 interface WorkspaceState {
   itemsById: Record<string, ItemView>;
-  listLive: Record<string, string[]>;       // per-list live order (the projection)
-  liveCountsByList: Record<string, number>;  // maintained, not scanned
+  listOpen: Record<string, string[]>;       // per-list open order (the projection)
+  openCountsByList: Record<string, number>;  // maintained, not scanned
   binCount: number;                          // maintained, not scanned
   listsOrder: string[];
   listsById: Record<string, ListView>;
@@ -195,26 +195,26 @@ interface WorkspaceState {
   // no global itemsOrder
 }
 ```
-Dispatch becomes list-local (splice into one `listLive[listId]`, adjust
+Dispatch becomes list-local (splice into one `listOpen[listId]`, adjust
 counters). Done/Bin computed lazily only while that view is active, memoized.
 
 ### Core change needed
-Emit **per-list local live index** on `ItemAdded`/`ItemMoved`/`ItemListChanged`
-(position within that list's live array), instead of/alongside global index.
-Optionally expose `live_by_list` snapshot for boot.
+Emit **per-list local open index** on `ItemAdded`/`ItemMoved`/`ItemListChanged`
+(position within that list's open array), instead of/alongside global index.
+Optionally expose `open_by_list` snapshot for boot.
 
 ## Recommended sequencing
 **Phase 0 — cheap, no core change, measure after:**
 1. Order-version guard on `selection.updateOrder` (`selection.ts:43`) → no-op
    when order unchanged; kills per-scroll rebuild + double-rebuild-per-mutation.
-2. Incremental counters for `binCount`/`liveCountsByList` → drop the two global
+2. Incremental counters for `binCount`/`openCountsByList` → drop the two global
    scans.
 
-**Phase 1 — real fix:** per-list `listLive` arrays + per-list index in events;
+**Phase 1 — real fix:** per-list `listOpen` arrays + per-list index in events;
 drop `itemsOrder`; lazy Done/Bin.
 
 ## Residual ceiling (defer)
 Intra-list add/move is still O(M_list) store splice (cheap pointer memmove; the
-list you're viewing). A pathological single 10k live list keeps one O(M) splice.
+list you're viewing). A pathological single 10k open list keeps one O(M) splice.
 Truly sub-linear would need fractional indexing / order-statistic tree —
 over-engineering for now.

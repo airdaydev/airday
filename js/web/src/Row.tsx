@@ -17,7 +17,7 @@ import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
   isDone,
-  isInListView,
+  isOpen,
   type DocApp,
   type ItemView,
 } from "./sync/store.ts";
@@ -454,7 +454,7 @@ export function Row(props: {
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class="context-menu-content">
-          <Show when={isInListView(props.item())}>
+          <Show when={isOpen(props.item())}>
             <ContextMenu.Item
               class="context-menu-item"
               onSelect={() => props.onOpen?.(props.item().id)}
@@ -515,7 +515,7 @@ export function Row(props: {
             <span>{m().common.copy}</span>
             <kbd class="menu-shortcut">⌘C</kbd>
           </ContextMenu.Item>
-          <Show when={isInListView(props.item())}>
+          <Show when={isOpen(props.item())}>
             <ContextMenu.Item class="context-menu-item" onSelect={onDuplicate}>
               <span>{m().workspace.duplicate}</span>
               <kbd class="menu-shortcut">⌘D</kbd>

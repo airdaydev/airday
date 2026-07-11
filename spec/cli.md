@@ -18,13 +18,17 @@ Single binary `airday`. Subcommands:
 - `airday devices revoke <device_id>`
 
 ### Items
-- `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line
+- `airday add <text> [--list <list>]` — `<text>` of `-` reads from stdin; one item per non-blank line. New items are created in **Backlog** (the `live` flag is omitted).
 - `airday ls [--list <list>]`
-- `airday done <item_id>`
-- `airday bin <item_id>`
-- `airday restore <item_id>`
+- `airday backlog <item_id>` — lifecycle → Backlog (clear `live`, `done_at`, `binned_at`)
+- `airday live <item_id>` — lifecycle → Live (set `live`; clear `done_at`, `binned_at`)
+- `airday done <item_id>` — lifecycle → Done (preserves the underlying Backlog/Live state)
+- `airday bin <item_id>` — lifecycle → Binned (preserves the underlying state)
+- `airday restore <item_id>` — clear the bin overlay only; reveals the preserved lifecycle (Backlog / Live / Done)
 - `airday mv <item_id> <list>`
 - `airday edit <item_id> <text>`
+
+Lifecycle is derived by precedence (Binned > Done > Live > Backlog) from the stored `live` flag plus `done_at` / `binned_at` timestamps — see `spec/data-model.md`. Each transition is a single commit.
 
 ### Lists
 - `airday lists ls`

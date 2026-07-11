@@ -51,43 +51,43 @@ impl Lcg {
 // ---------- naive consumer mirror (the JS store contract) ----------
 
 /// Mirrors `js/web/src/sync/store.ts` dispatch semantics: per-list
-/// live arrays, one remove-then-insert-at-live_index per event, in
+/// open arrays, one remove-then-insert-at-open_index per event, in
 /// emission order. If this drifts from the doc's own projection, the
 /// emitted event stream was wrong even though the CRDT converged.
 #[derive(Default)]
 struct Mirror {
     /// item id → (list_id, is_live)
     items: HashMap<String, (String, bool)>,
-    live: HashMap<String, Vec<String>>,
+    open: HashMap<String, Vec<String>>,
 }
 
 impl Mirror {
     fn materialize(doc: &Doc) -> Self {
         let mut m = Mirror::default();
         for item in doc.all_items() {
-            let live = item.is_in_list_view();
-            if live {
-                m.live
+            let open = item.is_open();
+            if open {
+                m.open
                     .entry(item.list_id.clone())
                     .or_default()
                     .push(item.id.clone());
             }
-            m.items.insert(item.id, (item.list_id, live));
+            m.items.insert(item.id, (item.list_id, open));
         }
         m
     }
 
-    fn remove_live(&mut self, list_id: &str, id: &str) {
-        if let Some(arr) = self.live.get_mut(list_id) {
+    fn remove_open(&mut self, list_id: &str, id: &str) {
+        if let Some(arr) = self.open.get_mut(list_id) {
             arr.retain(|x| x != id);
             if arr.is_empty() {
-                self.live.remove(list_id);
+                self.open.remove(list_id);
             }
         }
     }
 
-    fn insert_live(&mut self, list_id: &str, id: &str, at: Option<usize>) {
-        let arr = self.live.entry(list_id.to_string()).or_default();
+    fn insert_open(&mut self, list_id: &str, id: &str, at: Option<usize>) {
+        let arr = self.open.entry(list_id.to_string()).or_default();
         arr.retain(|x| x != id);
         let at = at.unwrap_or(arr.len()).min(arr.len());
         arr.insert(at, id.to_string());
@@ -101,68 +101,69 @@ impl Mirror {
                 list_id,
                 done_at,
                 binned_at,
-                live_index,
+                open_index,
                 ..
             } => {
                 if let Some((old_list, was_live)) = self.items.get(id).cloned()
                     && was_live
                 {
-                    self.remove_live(&old_list, id);
+                    self.remove_open(&old_list, id);
                 }
-                let live = done_at.is_none() && binned_at.is_none();
-                if live {
-                    self.insert_live(list_id, id, *live_index);
+                let open = done_at.is_none() && binned_at.is_none();
+                if open {
+                    self.insert_open(list_id, id, *open_index);
                 }
-                self.items.insert(id.clone(), (list_id.clone(), live));
+                self.items.insert(id.clone(), (list_id.clone(), open));
             }
             AppEvent::ItemRemoved { id } => {
                 if let Some((list, was_live)) = self.items.remove(id)
                     && was_live
                 {
-                    self.remove_live(&list, id);
+                    self.remove_open(&list, id);
                 }
             }
-            AppEvent::ItemMoved { id, live_index } => {
-                let Some((list, live)) = self.items.get(id).cloned() else {
+            AppEvent::ItemMoved { id, open_index } => {
+                let Some((list, open)) = self.items.get(id).cloned() else {
                     return;
                 };
-                if live && let Some(at) = live_index {
-                    self.insert_live(&list, id, Some(*at));
+                if open && let Some(at) = open_index {
+                    self.insert_open(&list, id, Some(*at));
                 }
             }
             AppEvent::ItemLifecycleChanged {
                 id,
                 done_at,
                 binned_at,
-                live_index,
+                open_index,
+                ..
             } => {
                 let Some((list, was_live)) = self.items.get(id).cloned() else {
                     return;
                 };
                 let now_live = done_at.is_none() && binned_at.is_none();
                 if was_live && !now_live {
-                    self.remove_live(&list, id);
+                    self.remove_open(&list, id);
                 }
                 if !was_live && now_live {
-                    self.insert_live(&list, id, *live_index);
+                    self.insert_open(&list, id, *open_index);
                 }
                 self.items.insert(id.clone(), (list, now_live));
             }
             AppEvent::ItemListChanged {
                 id,
                 list_id,
-                live_index,
+                open_index,
             } => {
-                let Some((old_list, live)) = self.items.get(id).cloned() else {
+                let Some((old_list, open)) = self.items.get(id).cloned() else {
                     return;
                 };
-                if live {
-                    self.remove_live(&old_list, id);
-                    self.insert_live(list_id, id, *live_index);
+                if open {
+                    self.remove_open(&old_list, id);
+                    self.insert_open(list_id, id, *open_index);
                 }
-                self.items.insert(id.clone(), (list_id.clone(), live));
+                self.items.insert(id.clone(), (list_id.clone(), open));
             }
-            // List / settings events don't affect the live projections.
+            // List / settings events don't affect the open projections.
             _ => {}
         }
     }
@@ -171,16 +172,16 @@ impl Mirror {
 // ---------- invariant checks (public API only) ----------
 
 /// Every projection invariant observable through the public API:
-/// - no duplicate ids within a list's live view
-/// - no id visible in two lists' live views
-/// - exactly the live items (from `all_items`) are visible, each in
+/// - no duplicate ids within a list's open view
+/// - no id visible in two lists' open views
+/// - exactly the open items (from `all_items`) are visible, each in
 ///   its own list — nothing hidden, nothing leaked
 /// - done/binned views contain exactly the done/binned items
 fn assert_projection_invariants(doc: &Doc, ctx: &str) {
     let items = doc.all_items();
     let mut expected_live: HashMap<String, HashSet<String>> = HashMap::new();
     for it in &items {
-        if it.is_in_list_view() {
+        if it.is_open() {
             expected_live
                 .entry(it.list_id.clone())
                 .or_default()
@@ -195,29 +196,29 @@ fn assert_projection_invariants(doc: &Doc, ctx: &str) {
 
     let mut seen_anywhere: HashSet<String> = HashSet::new();
     for list_id in &lists {
-        let live = doc.live_item_ids(list_id);
-        let unique: HashSet<&String> = live.iter().collect();
+        let open = doc.open_item_ids(list_id);
+        let unique: HashSet<&String> = open.iter().collect();
         assert_eq!(
             unique.len(),
-            live.len(),
-            "{ctx}: duplicate visible item in list {list_id}: {live:?}"
+            open.len(),
+            "{ctx}: duplicate visible item in list {list_id}: {open:?}"
         );
-        for id in &live {
+        for id in &open {
             assert!(
                 seen_anywhere.insert(id.clone()),
                 "{ctx}: item {id} visible in two lists at once"
             );
         }
         let expected = expected_live.remove(list_id).unwrap_or_default();
-        let got: HashSet<String> = live.into_iter().collect();
+        let got: HashSet<String> = open.into_iter().collect();
         assert_eq!(
             got, expected,
-            "{ctx}: live view of {list_id} disagrees with item locations"
+            "{ctx}: open view of {list_id} disagrees with item locations"
         );
     }
     assert!(
         expected_live.is_empty(),
-        "{ctx}: live items whose list has no projection: {expected_live:?}"
+        "{ctx}: open items whose list has no projection: {expected_live:?}"
     );
 
     let done: HashSet<String> = doc.done_item_ids().into_iter().collect();
@@ -239,7 +240,7 @@ fn assert_projection_invariants(doc: &Doc, ctx: &str) {
 }
 
 fn assert_mirror_matches(doc: &Doc, mirror: &Mirror, ctx: &str) {
-    let mut lists: HashSet<String> = mirror.live.keys().cloned().collect();
+    let mut lists: HashSet<String> = mirror.open.keys().cloned().collect();
     lists.insert(LIST_MAIN.to_string());
     for l in doc.all_lists() {
         lists.insert(l.id);
@@ -248,8 +249,8 @@ fn assert_mirror_matches(doc: &Doc, mirror: &Mirror, ctx: &str) {
         lists.insert(it.list_id);
     }
     for list_id in lists {
-        let doc_live = doc.live_item_ids(&list_id);
-        let mirror_live = mirror.live.get(&list_id).cloned().unwrap_or_default();
+        let doc_live = doc.open_item_ids(&list_id);
+        let mirror_live = mirror.open.get(&list_id).cloned().unwrap_or_default();
         assert_eq!(
             mirror_live, doc_live,
             "{ctx}: consumer mirror drifted from doc for list {list_id}"
@@ -290,13 +291,13 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
         // in-list reorder
         30..=44 => {
             let list = pick_list(rng, &lists);
-            let live = doc.live_item_ids(&list);
-            if !live.is_empty() {
-                let id = live[rng.below(live.len())].clone();
-                let _ = doc.move_item(&id, &list, rng.below(live.len() + 1));
+            let open = doc.open_item_ids(&list);
+            if !open.is_empty() {
+                let id = open[rng.below(open.len())].clone();
+                let _ = doc.move_item(&id, &list, rng.below(open.len() + 1));
             }
         }
-        // cross-list move (live or hidden)
+        // cross-list move (open or hidden)
         45..=59 => {
             if !items.is_empty() {
                 let it = &items[rng.below(items.len())];
@@ -362,10 +363,10 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
         }
         // explicit reconciliation (must never change visible state)
         _ => {
-            let before: Vec<String> = doc.live_item_ids(LIST_MAIN);
+            let before: Vec<String> = doc.open_item_ids(LIST_MAIN);
             let _ = doc.reconcile();
             assert_eq!(
-                doc.live_item_ids(LIST_MAIN),
+                doc.open_item_ids(LIST_MAIN),
                 before,
                 "reconcile changed a visible projection"
             );
@@ -453,17 +454,17 @@ fn randomized_multi_peer_convergence() {
         // (stale/duplicate garbage removal is invisible) and re-syncs
         // cleanly.
         let visible_before: Vec<Vec<String>> = {
-            let mut v = vec![docs[0].live_item_ids(LIST_MAIN)];
+            let mut v = vec![docs[0].open_item_ids(LIST_MAIN)];
             for l in docs[0].all_lists() {
-                v.push(docs[0].live_item_ids(&l.id));
+                v.push(docs[0].open_item_ids(&l.id));
             }
             v
         };
         docs[0].reconcile().unwrap();
         let visible_after: Vec<Vec<String>> = {
-            let mut v = vec![docs[0].live_item_ids(LIST_MAIN)];
+            let mut v = vec![docs[0].open_item_ids(LIST_MAIN)];
             for l in docs[0].all_lists() {
-                v.push(docs[0].live_item_ids(&l.id));
+                v.push(docs[0].open_item_ids(&l.id));
             }
             v
         };
@@ -543,7 +544,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
 
         // Multi-select move: 6 old items into list-a, like the store's
         // planReorderMoves emits (one commit each).
-        let live_main = doc.live_item_ids(LIST_MAIN);
+        let live_main = doc.open_item_ids(LIST_MAIN);
         let selection: Vec<String> = live_main
             .iter()
             .skip(session * 7)
@@ -562,7 +563,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
         assert_projection_invariants(&doc, &format!("session {session} after undo/redo"));
 
         // Some lifecycle churn + a bin purge.
-        let live_main = doc.live_item_ids(LIST_MAIN);
+        let live_main = doc.open_item_ids(LIST_MAIN);
         for id in live_main.iter().step_by(37).take(8) {
             doc.set_item_binned(id, true).unwrap();
         }

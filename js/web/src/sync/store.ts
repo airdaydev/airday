@@ -2,19 +2,20 @@
 // SolidJS `createStore` keyed by id; mutations go through the engine,
 // which emits domain-level `AppEvent`s that this layer mirrors into the
 // store via surgical `setState` calls. The store is the single source
-// of truth the UI reads from — `state.listLive[listId]` for a list
+// of truth the UI reads from — `state.listOpen[listId]` for a list
 // view's iteration order, `state.itemsById[id]` for content. Solid's
 // proxy tracks each property path independently, so a peer editing one
 // item doesn't invalidate the iteration and vice versa.
 //
 // There is deliberately no global item order: each mutation touches
-// only the affected list's live array (splice at the event's
-// `liveIndex`) plus maintained counters, so dispatch cost scales with
+// only the affected list's Open array (splice at the event's
+// `openIndex`) plus maintained counters, so dispatch cost scales with
 // the touched list, never with total items in the doc. Done/Bin views
 // derive lazily from `itemsById` (timestamp sorts), not CRDT order.
 // See spec/list-perf-plan.md.
 
 import type { AppEventJs, SyncEngine } from "@airday/core/wasm";
+import { ItemLifecycle } from "@airday/core/wasm";
 import { batch, createSignal, type Accessor } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { createSearchEngine, type SearchEngine } from "../search.ts";
@@ -27,10 +28,10 @@ export interface ItemView {
   text: string;
   notes: string;
   listId: string;
-  /** Raw board-column register (`spec/kanban.md`). Resolve
-   *  valid-or-default against `columnsByList[listId]` — a value that
-   *  names no existing column of the item's list means default. */
-  column?: string;
+  /** Lifecycle flag (`spec/data-model.md`): `true` ≡ Live, `false` ≡
+   *  Backlog underneath any done/binned mask. The board's Backlog/Live
+   *  lanes partition a list's Open items by this flag. */
+  live: boolean;
   /** Optional date-only due date as a raw `YYYY-MM-DD` string (floating
    *  local calendar date — never parse it with `new Date("YYYY-MM-DD")`,
    *  which reads as UTC midnight). Absent means no due date. */
@@ -40,11 +41,36 @@ export interface ItemView {
   binnedAt?: number;
 }
 
+/** Derived four-state lifecycle (`spec/data-model.md`). */
+export type Lifecycle = "backlog" | "live" | "done" | "binned";
+
+/** Map the JS lifecycle string onto the wasm `ItemLifecycle` enum the
+ *  engine's `setItemLifecycle` / `setItemsLifecycle` expect. */
+function lifecycleEnum(l: Lifecycle): ItemLifecycle {
+  switch (l) {
+    case "backlog":
+      return ItemLifecycle.Backlog;
+    case "live":
+      return ItemLifecycle.Live;
+    case "done":
+      return ItemLifecycle.Done;
+    case "binned":
+      return ItemLifecycle.Binned;
+  }
+}
+
 export const isDone = (it: ItemView): boolean => it.doneAt != null;
 export const isBinned = (it: ItemView): boolean => it.binnedAt != null;
-/** Visible in a per-list view: not done, not binned. */
-export const isInListView = (it: ItemView): boolean =>
+/** Open (Backlog + Live): not done, not binned — the per-list view. */
+export const isOpen = (it: ItemView): boolean =>
   !isDone(it) && !isBinned(it);
+/** In the board's Live lane: open and flagged live. */
+export const isLive = (it: ItemView): boolean => isOpen(it) && it.live;
+/** In the board's Backlog lane: open and not flagged live. */
+export const isBacklog = (it: ItemView): boolean => isOpen(it) && !it.live;
+/** Resolved lifecycle by precedence Binned > Done > Live > Backlog. */
+export const lifecycleOf = (it: ItemView): Lifecycle =>
+  isBinned(it) ? "binned" : isDone(it) ? "done" : it.live ? "live" : "backlog";
 
 export interface ListView {
   id: string;
@@ -52,34 +78,19 @@ export interface ListView {
   createdAt: number;
 }
 
-/** One board-column def of a list (`spec/kanban.md`). The default
- *  column is implicit — never an entry here. */
-export interface ColumnView {
-  id: string;
-  name: string;
-  createdAt: number;
-}
-
 export interface WorkspaceState {
   itemsById: Record<string, ItemView>;
-  /** Per-list live order — mirrors the core's `live_by_list`
+  /** Per-list Open order (Backlog + Live) — mirrors the core's `open`
    *  projection of the list's `order/<list-id>` container. Done/binned
-   *  items never appear here; a list with no live items may be absent
-   *  or hold `[]`. */
-  listLive: Record<string, string[]>;
+   *  items never appear here; a list with no open items may be absent
+   *  or hold `[]`. The board partitions this array by each item's
+   *  `live` flag into the Backlog and Live lanes. */
+  listOpen: Record<string, string[]>;
   /** Binned-item count, maintained incrementally so the Bin badge
    *  never needs a global scan. */
   binCount: number;
   listsOrder: string[];
   listsById: Record<string, ListView>;
-  /** Board-column defs per list in board order; lists with no
-   *  user-created columns are absent. Keyed by list id (`main`
-   *  included). */
-  columnsByList: Record<string, ColumnView[]>;
-  /** Display-name override for each list's implicit default column.
-   *  Absent = localized built-in label. Uniform for `main` and user
-   *  lists (storage differs core-side; this map doesn't care). */
-  defaultColumnNames: Record<string, string>;
   settings: SettingsView;
 }
 
@@ -90,7 +101,7 @@ export interface WorkspaceState {
 export interface RecentDoneEntry {
   id: string;
   listId: string;
-  /** Live index the item occupied just before leaving the projection. */
+  /** Open index the item occupied just before leaving the projection. */
   index: number;
   doneAt: number;
 }
@@ -166,6 +177,16 @@ export interface DocApp {
    *  done item keeps it done; restoring keeps the done state alone. */
   setBinned(id: string, binned: boolean): void;
   setBinnedMany(ids: string[], binned: boolean): void;
+  /** Move one item to a lifecycle in a single commit — the board's
+   *  lane-drop primitive (`spec/board.md`). A Backlog↔Live flip keeps
+   *  the item in its list's Open order; Done/Binned remove it. */
+  setLifecycle(id: string, lifecycle: Lifecycle): void;
+  setLifecycleMany(ids: string[], lifecycle: Lifecycle): void;
+  /** Board Live-lane capture: append a new item directly as Live. */
+  addItemLive(listId: string, text: string): string;
+  /** Board Live-lane capture at a position: insert a new Live item at
+   *  `indexInList` in the list's Open projection (like `addItemAt`). */
+  addItemLiveAt(listId: string, text: string, indexInList: number): string;
   moveItem(id: string, listId: string, indexInList: number): void;
   deleteBinned(id: string): void;
   deleteBinnedMany(ids: string[]): void;
@@ -181,33 +202,6 @@ export interface DocApp {
   /** Set or clear the user-chosen display name for the reserved
    *  `main` (Queue) list. Passing `""` clears the override. */
   setMainName(name: string): void;
-  // Board columns (spec/kanban.md)
-  addColumn(listId: string, name: string): string;
-  renameColumn(listId: string, columnId: string, name: string): void;
-  /** `index` addresses user columns only — the implicit default column
-   *  is pinned first and not an entry. */
-  moveColumn(listId: string, columnId: string, index: number): void;
-  /** Members fall to the default column visually; their registers are
-   *  left intact so undo restores the grouping. */
-  deleteColumn(listId: string, columnId: string): void;
-  /** Set or clear (via `""`) the implicit default column's display
-   *  name. Works for `main` and user lists alike. */
-  setDefaultColumnName(listId: string, name: string): void;
-  /** Move an item to a column (`null` = default). `indexInList`, when
-   *  given, applies a same-list reorder in the same commit and
-   *  addresses the list's live projection like `moveItem`. */
-  setItemColumn(id: string, columnId: string | null, indexInList?: number): void;
-  /** Board quick-capture: append to the list with the register set. */
-  addItemInColumn(listId: string, columnId: string, text: string): string;
-  /** Board quick-capture at a position: insert at `indexInList` (the
-   *  list's linear live projection, like `moveItem`) with the column
-   *  register set to `columnId` (`null` = default column). One commit. */
-  addItemInColumnAt(
-    listId: string,
-    columnId: string | null,
-    text: string,
-    indexInList: number,
-  ): string;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -239,41 +233,34 @@ const COARSE_EVENT_KINDS = new Set([
 ]);
 
 interface WorkspaceSnapshotPayload {
-  settings: SettingsView & { mainDefaultColumnName?: string };
-  lists: (ListView & { defaultColumnName?: string })[];
-  columns?: Record<string, ColumnView[]>;
-  items: ItemView[];
+  settings: SettingsView;
+  lists: ListView[];
+  /** `live` is omitted from the JSON when false (Backlog); normalize on
+   *  read so `ItemView.live` is always a real boolean. */
+  items: (Omit<ItemView, "live"> & { live?: boolean })[];
 }
 
 function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
   const payload = JSON.parse(engine.workspaceSnapshotJson()) as WorkspaceSnapshotPayload;
   const itemsById: Record<string, ItemView> = {};
-  const listLive: Record<string, string[]> = {};
+  const listOpen: Record<string, string[]> = {};
   let binCount = 0;
-  for (const item of payload.items) {
+  for (const raw of payload.items) {
+    const item: ItemView = { ...raw, live: raw.live ?? false };
     itemsById[item.id] = item;
-    if (isInListView(item)) (listLive[item.listId] ??= []).push(item.id);
+    if (isOpen(item)) (listOpen[item.listId] ??= []).push(item.id);
     if (isBinned(item)) binCount++;
   }
   const listsById: Record<string, ListView> = {};
-  const defaultColumnNames: Record<string, string> = {};
-  if (payload.settings.mainDefaultColumnName != null) {
-    defaultColumnNames["main"] = payload.settings.mainDefaultColumnName;
-  }
   for (const list of payload.lists) {
     listsById[list.id] = { id: list.id, name: list.name, createdAt: list.createdAt };
-    if (list.defaultColumnName != null) {
-      defaultColumnNames[list.id] = list.defaultColumnName;
-    }
   }
   return {
     itemsById,
-    listLive,
+    listOpen,
     binCount,
     listsOrder: payload.lists.map((list) => list.id),
     listsById,
-    columnsByList: payload.columns ?? {},
-    defaultColumnNames,
     settings: {
       showListCounts: payload.settings.showListCounts ?? true,
       mainName: payload.settings.mainName ?? null,
@@ -293,12 +280,10 @@ function shouldUseCoarseProjection(events: readonly AppEventJs[]): boolean {
 export function createSyncedApp(engine: SyncEngine): DocApp {
   const [state, setState] = createStore<WorkspaceState>({
     itemsById: {},
-    listLive: {},
+    listOpen: {},
     binCount: 0,
     listsOrder: [],
     listsById: {},
-    columnsByList: {},
-    defaultColumnNames: {},
     settings: {
       showListCounts: true,
       mainName: null,
@@ -316,24 +301,24 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
   const undoStack: number[] = [];
   const redoStack: number[] = [];
 
-  // ---- listLive helpers: every write is list-local. `insertLive`
+  // ---- listOpen helpers: every write is list-local. `insertOpen`
   // removes any existing occurrence first so re-dispatch of an id
   // (e.g. an add event for an item we already track) stays idempotent.
-  const insertLive = (
+  const insertOpen = (
     listId: string,
     id: string,
     index: number | undefined,
   ): void => {
-    const cur = state.listLive[listId];
+    const cur = state.listOpen[listId];
     const next = cur ? cur.filter((x) => x !== id) : [];
     next.splice(Math.min(index ?? next.length, next.length), 0, id);
-    setState("listLive", listId, next);
+    setState("listOpen", listId, next);
   };
-  const removeLive = (listId: string, id: string): void => {
-    const cur = state.listLive[listId];
+  const removeOpen = (listId: string, id: string): void => {
+    const cur = state.listOpen[listId];
     if (!cur || !cur.includes(id)) return;
     setState(
-      "listLive",
+      "listOpen",
       listId,
       cur.filter((x) => x !== id),
     );
@@ -368,7 +353,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemAdded": {
         const prev = state.itemsById[ev.id];
         if (prev) {
-          if (isInListView(prev)) removeLive(prev.listId, ev.id);
+          if (isOpen(prev)) removeOpen(prev.listId, ev.id);
           if (isBinned(prev)) adjustBinCount(-1);
         }
         const item: ItemView = {
@@ -376,21 +361,21 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           listId: ev.listId ?? "",
           text: ev.text ?? "",
           notes: ev.notes ?? "",
-          column: ev.column ?? undefined,
+          live: ev.live ?? false,
           dueOn: ev.dueOn ?? undefined,
           createdAt: Number(ev.createdAt ?? 0),
           doneAt: ev.doneAt != null ? Number(ev.doneAt) : undefined,
           binnedAt: ev.binnedAt != null ? Number(ev.binnedAt) : undefined,
         };
         setState("itemsById", ev.id, item);
-        if (isInListView(item)) insertLive(item.listId, ev.id, ev.liveIndex);
+        if (isOpen(item)) insertOpen(item.listId, ev.id, ev.openIndex);
         if (isBinned(item)) adjustBinCount(1);
         break;
       }
       case "itemRemoved": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
-        if (isInListView(prev)) removeLive(prev.listId, ev.id);
+        if (isOpen(prev)) removeOpen(prev.listId, ev.id);
         if (isBinned(prev)) adjustBinCount(-1);
         dropRecentDone(ev.id);
         setState(
@@ -404,12 +389,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemMoved": {
         // Pure reordering. Any list change arrived as the preceding
         // `itemListChanged`, so `prev.listId` is already the
-        // destination; done/binned items carry no liveIndex and their
+        // destination; done/binned items carry no openIndex and their
         // view order is timestamp-derived, so there is nothing to do.
         const prev = state.itemsById[ev.id];
         if (!prev) break;
-        if (isInListView(prev) && ev.liveIndex != null) {
-          insertLive(prev.listId, ev.id, ev.liveIndex);
+        if (isOpen(prev) && ev.openIndex != null) {
+          insertOpen(prev.listId, ev.id, ev.openIndex);
         }
         break;
       }
@@ -428,35 +413,33 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemLifecycleChanged": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
-        const wasLive = isInListView(prev);
+        const wasOpen = isOpen(prev);
         const wasBinned = isBinned(prev);
+        const live = ev.live ?? prev.live;
         const doneAt = ev.doneAt != null ? Number(ev.doneAt) : undefined;
         const binnedAt = ev.binnedAt != null ? Number(ev.binnedAt) : undefined;
-        const nowLive = doneAt == null && binnedAt == null;
-        if (wasLive && doneAt != null && binnedAt == null) {
-          // Leaving the live projection by being marked done: snapshot
+        const nowOpen = doneAt == null && binnedAt == null;
+        if (wasOpen && doneAt != null && binnedAt == null) {
+          // Leaving the Open projection by being marked done: snapshot
           // the vacated position (before the removal below) for the
           // linger re-insert.
-          const idx = state.listLive[prev.listId]?.indexOf(ev.id) ?? -1;
+          const idx = state.listOpen[prev.listId]?.indexOf(ev.id) ?? -1;
           captureRecentDone({
             id: ev.id,
             listId: prev.listId,
             index: idx >= 0 ? idx : 0,
             doneAt,
           });
-        } else if (nowLive || binnedAt != null) {
+        } else if (nowOpen || binnedAt != null) {
           dropRecentDone(ev.id);
         }
-        if (wasLive && !nowLive) removeLive(prev.listId, ev.id);
-        if (!wasLive && nowLive) insertLive(prev.listId, ev.id, ev.liveIndex);
-        setState("itemsById", ev.id, { doneAt, binnedAt });
+        // Only an open↔closed transition touches `listOpen`. A Backlog↔Live
+        // flip (wasOpen && nowOpen) leaves the item in place — its lane is
+        // recomputed from the updated `live` flag below.
+        if (wasOpen && !nowOpen) removeOpen(prev.listId, ev.id);
+        if (!wasOpen && nowOpen) insertOpen(prev.listId, ev.id, ev.openIndex);
+        setState("itemsById", ev.id, { live, doneAt, binnedAt });
         adjustBinCount((binnedAt != null ? 1 : 0) - (wasBinned ? 1 : 0));
-        break;
-      }
-      case "itemColumnChanged": {
-        if (state.itemsById[ev.id]) {
-          setState("itemsById", ev.id, "column", ev.column ?? undefined);
-        }
         break;
       }
       case "itemDueChanged": {
@@ -468,12 +451,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemListChanged": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
-        // Lifecycle is untouched by this event — membership in the live
+        // Lifecycle is untouched by this event — membership in the Open
         // projection carries over, only the owning list changes.
-        const live = isInListView(prev);
-        if (live) removeLive(prev.listId, ev.id);
+        const open = isOpen(prev);
+        if (open) removeOpen(prev.listId, ev.id);
         setState("itemsById", ev.id, "listId", ev.listId ?? "");
-        if (live) insertLive(ev.listId ?? "", ev.id, ev.liveIndex);
+        if (open) insertOpen(ev.listId ?? "", ev.id, ev.openIndex);
         dropRecentDone(ev.id);
         break;
       }
@@ -504,22 +487,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
           }),
         );
         // Core reassigns the list's items to `main` (as preceding
-        // `itemListChanged` events), so the live array is empty by now
-        // — drop the key so `listLive` doesn't accumulate dead lists.
+        // `itemListChanged` events), so the Open array is empty by now
+        // — drop the key so `listOpen` doesn't accumulate dead lists.
         setState(
-          "listLive",
-          produce((by) => {
-            delete by[ev.id];
-          }),
-        );
-        setState(
-          "columnsByList",
-          produce((by) => {
-            delete by[ev.id];
-          }),
-        );
-        setState(
-          "defaultColumnNames",
+          "listOpen",
           produce((by) => {
             delete by[ev.id];
           }),
@@ -542,71 +513,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "listRenamed": {
         if (state.listsById[ev.id]) {
           setState("listsById", ev.id, "name", ev.name ?? "");
-        }
-        break;
-      }
-      case "columnAdded": {
-        const listId = ev.listId ?? "";
-        const col: ColumnView = {
-          id: ev.id,
-          name: ev.name ?? "",
-          createdAt: Number(ev.createdAt ?? 0),
-        };
-        const cur = state.columnsByList[listId] ?? [];
-        const next = cur.filter((c) => c.id !== ev.id);
-        next.splice(Math.min(ev.index ?? next.length, next.length), 0, col);
-        setState("columnsByList", listId, next);
-        break;
-      }
-      case "columnRemoved": {
-        const listId = ev.listId ?? "";
-        const cur = state.columnsByList[listId];
-        if (!cur) break;
-        const next = cur.filter((c) => c.id !== ev.id);
-        if (next.length === 0) {
-          setState(
-            "columnsByList",
-            produce((by) => {
-              delete by[listId];
-            }),
-          );
-        } else {
-          setState("columnsByList", listId, next);
-        }
-        break;
-      }
-      case "columnMoved": {
-        const listId = ev.listId ?? "";
-        const cur = state.columnsByList[listId];
-        if (!cur) break;
-        const moving = cur.find((c) => c.id === ev.id);
-        if (!moving) break;
-        const next = cur.filter((c) => c.id !== ev.id);
-        next.splice(Math.min(ev.index ?? next.length, next.length), 0, moving);
-        setState("columnsByList", listId, next);
-        break;
-      }
-      case "columnRenamed": {
-        const listId = ev.listId ?? "";
-        const idx = (state.columnsByList[listId] ?? []).findIndex(
-          (c) => c.id === ev.id,
-        );
-        if (idx >= 0) {
-          setState("columnsByList", listId, idx, "name", ev.name ?? "");
-        }
-        break;
-      }
-      case "defaultColumnRenamed": {
-        const listId = ev.listId ?? "";
-        if (ev.name != null && ev.name !== "") {
-          setState("defaultColumnNames", listId, ev.name);
-        } else {
-          setState(
-            "defaultColumnNames",
-            produce((by) => {
-              delete by[listId];
-            }),
-          );
         }
         break;
       }
@@ -742,6 +648,18 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     setBinnedMany(ids, binned) {
       mutate(() => engine.setItemsBinned(ids, binned));
     },
+    setLifecycle(id, lifecycle) {
+      mutate(() => engine.setItemLifecycle(id, lifecycleEnum(lifecycle)));
+    },
+    setLifecycleMany(ids, lifecycle) {
+      mutate(() => engine.setItemsLifecycle(ids, lifecycleEnum(lifecycle)));
+    },
+    addItemLive(listId, text) {
+      return mutate(() => engine.addItemLive(listId, text));
+    },
+    addItemLiveAt(listId, text, indexInList) {
+      return mutate(() => engine.addItemLiveAt(listId, text, indexInList));
+    },
     moveItem(id, listId, indexInList) {
       mutate(() => engine.moveItem(id, listId, indexInList));
     },
@@ -783,37 +701,6 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     setMainName(name) {
       mutate(() => engine.setMainName(name));
-    },
-    addColumn(listId, name) {
-      return mutate(() => engine.addColumn(listId, name));
-    },
-    renameColumn(listId, columnId, name) {
-      mutate(() => engine.renameColumn(listId, columnId, name));
-    },
-    moveColumn(listId, columnId, index) {
-      mutate(() => engine.moveColumn(listId, columnId, index));
-    },
-    deleteColumn(listId, columnId) {
-      mutate(() => engine.deleteColumn(listId, columnId));
-    },
-    setDefaultColumnName(listId, name) {
-      mutate(() => engine.setDefaultColumnName(listId, name));
-    },
-    setItemColumn(id, columnId, indexInList) {
-      mutate(() => engine.setItemColumn(id, columnId ?? undefined, indexInList));
-    },
-    addItemInColumnAt(listId, columnId, text, indexInList) {
-      return mutate(() =>
-        engine.addItemInColumnAt(
-          listId,
-          columnId ?? undefined,
-          text,
-          indexInList,
-        ),
-      );
-    },
-    addItemInColumn(listId, columnId, text) {
-      return mutate(() => engine.addItemInColumn(listId, columnId, text));
     },
     undo() {
       const steps = undoStack.pop();

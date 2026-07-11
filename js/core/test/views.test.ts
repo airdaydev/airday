@@ -1,4 +1,4 @@
-// The four view-id helpers (live / done / binned) plus get_item /
+// The view-id helpers (open / done / binned) plus get_item /
 // get_list_meta as JS-side primitives. Rust unit tests cover
 // correctness; this file pins the wasm-bindgen surface so a rename or
 // signature drift is caught before the web client breaks.
@@ -16,12 +16,12 @@ async function sleep(ms: number) {
 describe("Doc view helpers", () => {
   test("empty doc returns empty arrays for every view", () => {
     const doc = Doc.create();
-    expect(doc.liveItemIds(LIST_MAIN)).toEqual([]);
+    expect(doc.openItemIds(LIST_MAIN)).toEqual([]);
     expect(doc.doneItemIds()).toEqual([]);
     expect(doc.binnedItemIds()).toEqual([]);
   });
 
-  test("liveItemIds returns ids in MovableList order, scoped to list and view", async () => {
+  test("openItemIds returns ids in MovableList order, scoped to list and view", async () => {
     const doc = Doc.create();
     const other = doc.addList("Other");
     const a = doc.addItem(LIST_MAIN, "a");
@@ -32,8 +32,8 @@ describe("Doc view helpers", () => {
     const d = doc.addItem(LIST_MAIN, "d");
     doc.setItemBinned(d, true);
 
-    expect(doc.liveItemIds(LIST_MAIN)).toEqual([a, c]);
-    expect(doc.liveItemIds(other).length).toBe(1);
+    expect(doc.openItemIds(LIST_MAIN)).toEqual([a, c]);
+    expect(doc.openItemIds(other).length).toBe(1);
   });
 
   test("doneItemIds sorted by doneAt desc with id tiebreaker", async () => {

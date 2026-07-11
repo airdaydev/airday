@@ -47,14 +47,14 @@ export function TaskDialog(props: {
   /** The open item's id, or null when closed. */
   itemId: () => string | null;
   setItemId: (id: string | null) => void;
-  /** New-item mode: a target column to capture into (`columnId: null` = the
-   *  list's default column / list view). Mutually exclusive with `itemId`;
+  /** New-item mode: a target lane to capture into (`live: true` = Live,
+   *  `false` = Backlog / list view). Mutually exclusive with `itemId`;
    *  nothing is written until a non-empty title is committed on close.
-   *  `index`, when set, inserts at that position in the list's linear live
+   *  `index`, when set, inserts at that position in the list's Open
    *  projection (Space capture below a board card); omitted appends. */
   newItem?: () => {
     listId: string;
-    columnId: string | null;
+    live: boolean;
     index?: number;
   } | null;
   setNewItem?: (v: null) => void;
@@ -108,7 +108,7 @@ export function TaskDialog(props: {
   const moveItemToList = (targetId: string, currentListId: string) => {
     const id = props.itemId();
     if (!id || targetId === currentListId) return;
-    const idx = props.app.state.listLive[targetId]?.length ?? 0;
+    const idx = props.app.state.listOpen[targetId]?.length ?? 0;
     props.app.moveItem(id, targetId, idx);
   };
 
@@ -194,19 +194,20 @@ export function TaskDialog(props: {
     if (!open()) loadedId = null;
   });
 
-  // Commit new-item mode: create the item in its target column (default
-  // column when `columnId` is null) iff the title is non-empty, then close.
+  // Commit new-item mode: create the item in its target lane (Live when
+  // `live`, else Backlog) iff the title is non-empty, then close.
   const commitNew = () => {
     const nw = newItemTarget();
     if (nw) {
       const t = editorText(titleRef).trim();
       if (t) {
-        const id =
-          nw.index != null
-            ? props.app.addItemInColumnAt(nw.listId, nw.columnId, t, nw.index)
-            : nw.columnId
-              ? props.app.addItemInColumn(nw.listId, nw.columnId, t)
-              : props.app.addItem(nw.listId, t);
+        const id = nw.live
+          ? nw.index != null
+            ? props.app.addItemLiveAt(nw.listId, t, nw.index)
+            : props.app.addItemLive(nw.listId, t)
+          : nw.index != null
+            ? props.app.addItemAt(nw.listId, t, nw.index)
+            : props.app.addItem(nw.listId, t);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
         props.onCreated?.(id);

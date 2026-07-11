@@ -17,11 +17,13 @@ compatibility" below; v2 docs must never sync with v1 clients.
   logical list (`order/main` for the built-in list). Entries are **encoded
   scalar strings only** (OrderEntry, below) — never child containers. The
   order container carries ordering; the `items` map carries everything else.
-- `doc.get_movable_list("columns/<list-id>")` — one **column-defs container**
-  per list that has user-created board columns. See [`spec/kanban.md`](kanban.md).
 
 There is **no document-wide item MovableList**. Reordering one list mutates
 only that list's order container.
+
+Historical `columns/<list-id>` containers may exist in old accounts (custom
+board columns, removed). They are unreachable history: v2 code never opens
+them and never projects them.
 
 ## Item
 
@@ -33,7 +35,7 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 | `text` | string | the user's content |
 | `notes` | string | optional richer text; empty string when absent in simple clients |
 | `location` | string | **atomic placement register** — encoded `"<list_id>:<placement_id>"`, see below |
-| `column` | string? | board-column grouping register; absent or non-resolving ≡ default column — see [`spec/kanban.md`](kanban.md) |
+| `live` | bool? | lifecycle flag. Absent or `false` ≡ Backlog; `true` ≡ Live. New items omit it (Backlog). See "Lifecycle" below. |
 | `due_on` | string? | optional **date-only** due date, a floating local calendar date in `YYYY-MM-DD` format (no time, no timezone, not unix millis). Absent ≡ no due date; clearing deletes the key. Values that are not a well-formed `YYYY-MM-DD` calendar date are rejected by the mutation. |
 | `created_at` | i64 | unix millis (client clock) |
 | `done_at` | i64? | set when lifecycle → Done |
@@ -42,15 +44,43 @@ One child `LoroMap` under `items`, keyed by `ItemId`.
 Item type is implicit (currently always text). Add an `item_type` field when
 other kinds appear.
 
-There is no separate persisted `lifecycle` field. Visibility is derived from the
-timestamps:
+### Lifecycle
 
-- live = `done_at == null && binned_at == null`
-- done = `done_at != null && binned_at == null`
-- binned = `binned_at != null` (an item may have been done earlier and still carry `done_at`)
+There is no single persisted `lifecycle` field. The persisted representation is
+the `live` boolean plus the `done_at` / `binned_at` timestamps; the four-state
+lifecycle is **derived** from them. The API-level enum is:
+
+```
+enum ItemLifecycle { Backlog, Live, Done, Binned }
+```
+
+Resolution precedence — **Binned > Done > Live > Backlog**:
+
+- binned = `binned_at != null` (regardless of `live` / `done_at`)
+- else done = `done_at != null`
+- else live = `live == true`
+- else Backlog
+
+`done_at`, `binned_at` and `live` are **independent** stored fields. An item
+may carry `done_at` *and* `binned_at` (done earlier, later binned) and may carry
+`live == true` underneath either — the timestamps only *mask* the underlying
+Backlog/Live state, which is revealed again when they clear (un-done, restore).
+
+`ItemView::lifecycle()` returns the resolved `ItemLifecycle`. The **Open**
+projection (Backlog + Live) is `done_at == null && binned_at == null` — i.e.
+neither done nor binned, exactly the old "live view".
+
+**Concurrency.** `live`, `done_at` and `binned_at` are three independent LWW
+registers. Concurrent lifecycle writes converge per-field by last-writer-wins,
+then the precedence rule resolves the merged fields deterministically — every
+replica derives the same `ItemLifecycle` from the same field values, so
+lifecycle never diverges. (Example: device A marks an item Done while device B
+marks it Backlog; `done_at` and `live` each merge by LWW, and precedence shows
+Done as long as `done_at` survives.)
 
 `Binned` and `Done` items keep their `location` (and therefore their logical
-list membership) so "restore to original list" works. Hard delete (e.g.
+list membership) so "restore to original list" works, and keep their `live`
+flag so restore/un-done reveal the correct Backlog/Live state. Hard delete (e.g.
 emptying the bin) removes the key from the `items` map — Loro handles the
 tombstone — and best-effort removes the item's order entries.
 
@@ -120,11 +150,13 @@ match wins), and can be cleaned opportunistically (see Reconciliation).
 ### Resolved order
 
 The **resolved order** of list `L` = visible entries of `order/L` in
-container order, then the fallback tail. It covers items of *all* lifecyclees
-(live, done, binned) that locate to `L`. The live view of `L` is the resolved
-order filtered to live items. The resolved order — not just the live view —
-is part of logical state (it fixes restore positions), so `doc_fingerprint`
-hashes it.
+container order, then the fallback tail. It covers items of *all* lifecycles
+(backlog, live, done, binned) that locate to `L`. The **Open** projection of
+`L` (Backlog + Live) is the resolved order filtered to open items (`done_at ==
+null && binned_at == null`). Backlog and Live share this single order — the
+`live` flag partitions Open into two board lanes without reordering. The
+resolved order — not just the Open projection — is part of logical state (it
+fixes restore positions), so `doc_fingerprint` hashes it.
 
 ## Done / binned items stay in the order container
 
@@ -163,17 +195,38 @@ Every mutation below forms **one Loro commit** (one undo step, one op group).
   container; best-effort delete the old entry (and any other entries for
   this item) from the source order container. Concurrent moves converge via
   the location register; the loser's entry goes stale.
-- **Done / binned** — timestamp writes on the item map only. Order
-  containers are untouched (see decision above).
-- **Restore** — clears `binned_at` (done state untouched). The item's entry
-  is still in place, so it reappears at its former position; if its entry was
-  lost it lands in the fallback tail deterministically.
+- **Set lifecycle** — every lifecycle transition is **one Loro commit** on the
+  item map only (order containers are untouched — see decision above). The
+  displayed state is derived by precedence (Binned > Done > Live > Backlog), so
+  transitions write the *stored* fields directly:
+
+  | Target | `live` | `done_at` | `binned_at` |
+  |---|---|---|---|
+  | Backlog | clear | clear | clear |
+  | Live | set `true` | clear | clear |
+  | Done | *preserve* | set now | clear |
+  | Binned | *preserve* | *preserve* | set now |
+
+  Two convenience transitions are the inverses of Done/Binned and preserve the
+  masked state rather than setting it:
+
+  - **Un-done** — clear `done_at` only, revealing the preserved Backlog/Live
+    state (`live`).
+  - **Restore from Bin** — clear `binned_at` only, revealing the preserved
+    underlying state (which may itself be Done, if the item was done before it
+    was binned).
+
+  Because Backlog↔Live is a single `live`-register write and Done/Binned are
+  single timestamp writes, an item's order entry never moves on a lifecycle
+  change; restore/un-done reveal it in its former position (or the fallback
+  tail if its entry was lost). Board drops that additionally reorder within the
+  shared Open order fold the `move_item` reorder into the *same* commit.
 - **Hard delete** — delete the item's key from `items`; best-effort remove
   its entries from its located order container. Entries elsewhere are
   invisible anyway (item lookup fails) and left to reconciliation.
 - **Delete list** — refuses for `main`. Deleting a list *discards its
-  contents to the bin* rather than dumping them live into Home. Every item
-  locating to the list (live, done *and* binned) is moved to `main` with a
+  contents to the bin* rather than dumping them into Home's Open view. Every item
+  locating to the list (open, done *and* binned) is moved to `main` with a
   fresh placement, appended to `order/main` in the deleted list's resolved
   order, and — unless it was already binned — marked binned with a shared
   `binned_at` timestamp (already-binned items keep their original one). The
@@ -198,9 +251,8 @@ opportunistically (e.g. after bootstrap); nothing depends on it running.
 | `id` | string | uuid v7 hex; stable, used in `Location.list_id` |
 | `name` | string | display name |
 | `created_at` | i64 | unix millis |
-| `default_column_name` | string? | display-name override for the implicit default board column; absent ≡ built-in label — see [`spec/kanban.md`](kanban.md) |
 
-Whether the nav shows a live-item count beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Queue's count is always shown regardless.
+Whether the nav shows an open-item count (Backlog + Live) beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Queue's count is always shown regardless.
 
 ## Built-in lists
 
@@ -220,9 +272,8 @@ Doc-level synced settings that are not owned by any specific `ListMeta`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `show_list_counts` | bool? | when true, clients render each non-Queue list's live-item count in the nav (subject to a `count > 0` gate). Queue's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
+| `show_list_counts` | bool? | when true, clients render each non-Queue list's open-item count (Backlog + Live) in the nav (subject to a `count > 0` gate). Queue's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
 | `main_name` | string? | user-chosen display-name override for the reserved `main` (Queue) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. |
-| `main_default_column_name` | string? | same override for `main`'s implicit default board column (main has no ListMeta row) — see [`spec/kanban.md`](kanban.md) |
 
 ## Mutations (rust core API surface)
 
@@ -233,7 +284,7 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
   `target_list_id` equals the current list (order `mov`, placement kept);
   cross-list move otherwise (fresh placement, atomic location write,
   entry delete+insert). One commit either way.
-- `set_item_lifecycle(item_id, lifecycle)` where `lifecycle` is the API-level concept `Live | Done | Binned`, implemented by mutating `done_at` / `binned_at`
+- `set_item_lifecycle(item_id, lifecycle)` / `set_items_lifecycle(item_ids, lifecycle)` — move one or many items to an `ItemLifecycle` (`Backlog | Live | Done | Binned`) in a single commit, writing `live` / `done_at` / `binned_at` per the transition table above. This is the primitive the board uses; the `done`/`bin`/`restore`/`un-done` helpers below are convenience wrappers over it.
 - `edit_item_text(item_id, text)`
 - `set_item_due_on(item_id, due_on)` — `Some(date)` validates a `YYYY-MM-DD`
   calendar date and writes the `due_on` register; `None` deletes the key. One
@@ -243,9 +294,6 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
 - `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Queue lists" flag. Queue's count is always visible (subject to count > 0) and is not gated by this.
 - `set_main_name(name)` — sets or clears the reserved `main` (Queue) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
 - `delete_list(list_id)` — refuses for `main`; see "Delete list" contract above.
-- board-column mutations (`add_column`, `rename_column`, `move_column`,
-  `delete_column`, `set_default_column_name`, `set_item_column`,
-  `add_item_in_column`) — see [`spec/kanban.md`](kanban.md).
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.
 - `reconcile()` — explicit stale/duplicate/missing order-entry repair; see

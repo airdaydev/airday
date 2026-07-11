@@ -2320,13 +2320,6 @@ body {
   border-radius: 4px;
 }
 
-.board-col-name[contenteditable="true"] {
-  white-space: pre-wrap;
-  box-shadow: 0 0 0 1px var(--border-input);
-  background: var(--bg-elevated);
-  padding: 0 4px;
-}
-
 .board-col-count {
   margin-right: auto;
   font-size: 12px;
@@ -2334,7 +2327,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.board-col-menu-trigger,
 .board-col-add-btn {
   display: inline-flex;
   align-items: center;
@@ -2348,7 +2340,6 @@ body {
   cursor: pointer;
 }
 
-.board-col-menu-trigger:hover,
 .board-col-add-btn:hover {
   background: var(--bg-hover);
 }
@@ -2358,9 +2349,9 @@ body {
   height: 16px;
 }
 
-/* Pinned virtual Done column: visually recessed vs. the working columns
-   and tagged so its drop target reads without a placeholder preview (it
-   runs reorder-off, so there is none). */
+/* Fixed Done lane: visually recessed vs. the Backlog / Live lanes and
+   tagged so its drop target reads without a placeholder preview (it runs
+   reorder-off, so there is none). */
 .board-col-done {
   background: color-mix(in srgb, var(--bg-nav) 28%, var(--bg));
 }
@@ -2509,45 +2500,4 @@ body {
    (already scoped to the card) carry the selection instead. */
 .board-col-dnd [data-selected] {
   background: transparent;
-}
-
-
-.board-add-col-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 5px 8px;
-  font-size: 13px;
-  color: var(--text);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-input);
-  border-radius: 6px;
-  outline: none;
-}
-
-.board-add-col-input::placeholder {
-  color: var(--text-empty);
-}
-
-.board-add-col {
-  flex: 0 0 200px;
-  width: 200px;
-}
-
-.board-add-col-button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px dashed var(--border-input);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.board-add-col-button:hover {
-  background: var(--bg-hover);
-  color: var(--text);
 }

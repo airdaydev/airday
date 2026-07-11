@@ -2,7 +2,7 @@
 
 Airday is a low-friction, FOSS, single-human-user/small-tteam, E2EE, multi-device capture/clarify/organise tool for ideas, intents, goals, projects. It is flexible but built with particular regard to improving users' productivity & focus.
 
-Workflow: a reserved primary capture list ("Home", id `main`), any number of user-created lists/kanban boards, and a bin. Items move between lists, can be done, binned, restored, and deleted.
+Workflow: a reserved primary capture list ("Home", id `main`), any number of user-created lists (each viewable as a fixed Backlog/Live/Done board), and a bin. Items move between lists, transition through the lifecycle (Backlog, Live, Done, Binned), can be restored, and deleted.
 
 ## Architecture
 
@@ -34,8 +34,8 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/admin.md`](spec/admin.md) | Operator-only JSON API, authentication, deployment exposure |
 | [`spec/sync-protocol.md`](spec/sync-protocol.md) | WS framing, push / pull / ack, frontier, snapshot orchestration |
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
-| [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, status semantics |
-| [`spec/kanban.md`](spec/kanban.md) | Board view: per-item column register, column defs, implicit default column |
+| [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, lifecycle semantics |
+| [`spec/board.md`](spec/board.md) | Board view: fixed Backlog / Live / Done lanes driven by item lifecycle |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |
