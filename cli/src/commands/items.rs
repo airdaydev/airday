@@ -1,4 +1,5 @@
-//! Item commands: add / ls / done / bin (verb) / restore / mv / edit.
+//! Item commands: add / ls / backlog / live / done / bin (verb) /
+//! restore / mv / edit.
 //!
 //! Every action goes through `Session` (open → mutate → flush). The
 //! session reads from and writes to the local Loro doc; it only talks
@@ -7,7 +8,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemView, LIST_MAIN};
+use airday_core::{ItemLifecycle, ItemView, LIST_MAIN};
 use clap::Parser;
 use serde::Serialize;
 
@@ -141,11 +142,35 @@ pub fn print_json<T: Serialize>(value: &T) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ---------- done / bin / restore ----------
+// ---------- backlog / live / done / bin / restore ----------
 
 #[derive(Parser, Debug)]
 pub struct IdArg {
     pub item_id: String,
+}
+
+/// Move an item to the Backlog lane: clears `live`, `done_at`, and
+/// `binned_at` (`spec/data-model.md`). One commit.
+pub async fn backlog(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
+    session
+        .doc()
+        .set_item_lifecycle(&args.item_id, ItemLifecycle::Backlog)?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
+}
+
+/// Move an item to the Live lane: sets `live`; clears `done_at` and
+/// `binned_at` (`spec/data-model.md`). One commit.
+pub async fn live(args: IdArg, sync: bool) -> anyhow::Result<()> {
+    let session = Session::open(sync).await?;
+    session
+        .doc()
+        .set_item_lifecycle(&args.item_id, ItemLifecycle::Live)?;
+    session.flush().await?;
+    println!("{}", args.item_id);
+    Ok(())
 }
 
 pub async fn done(args: IdArg, sync: bool) -> anyhow::Result<()> {

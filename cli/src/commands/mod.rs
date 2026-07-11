@@ -54,11 +54,15 @@ enum Cmd {
     Add(items::AddArgs),
     /// List items.
     Ls(items::LsArgs),
+    /// Move an item to the Backlog lane.
+    Backlog(items::IdArg),
+    /// Move an item to the Live lane.
+    Live(items::IdArg),
     /// Mark an item done.
     Done(items::IdArg),
     /// Send an item to the bin (or operate on the bin namespace).
     Bin(bin::BinArgs),
-    /// Restore an item from done/bin to live.
+    /// Restore an item from the bin (reveals its preserved lifecycle).
     Restore(items::IdArg),
     /// Move an item to a different list.
     Mv(items::MvArgs),
@@ -87,6 +91,8 @@ impl Cli {
             Cmd::Password => password::run().await,
             Cmd::Add(a) => items::add(a, sync).await,
             Cmd::Ls(a) => items::ls(a, sync).await,
+            Cmd::Backlog(a) => items::backlog(a, sync).await,
+            Cmd::Live(a) => items::live(a, sync).await,
             Cmd::Done(a) => items::done(a, sync).await,
             Cmd::Bin(a) => bin::run(a, sync).await,
             Cmd::Restore(a) => items::restore(a, sync).await,
