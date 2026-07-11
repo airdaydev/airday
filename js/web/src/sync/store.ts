@@ -75,6 +75,9 @@ export const lifecycleOf = (it: ItemView): Lifecycle =>
 export interface ListView {
   id: string;
   name: string;
+  /** User-chosen display icon (a literal emoji grapheme), or absent when
+   *  unset — consumers render a built-in fallback glyph. */
+  icon?: string;
   createdAt: number;
 }
 
@@ -193,6 +196,9 @@ export interface DocApp {
   emptyBin(): number;
   addList(name: string): string;
   renameList(id: string, name: string): void;
+  /** Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
+   *  display icon. */
+  setListIcon(id: string, icon: string): void;
   moveList(id: string, index: number): void;
   deleteList(id: string): void;
   /** Toggle the global "show counts on non-Queue lists" setting.
@@ -253,7 +259,12 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
   }
   const listsById: Record<string, ListView> = {};
   for (const list of payload.lists) {
-    listsById[list.id] = { id: list.id, name: list.name, createdAt: list.createdAt };
+    listsById[list.id] = {
+      id: list.id,
+      name: list.name,
+      icon: list.icon,
+      createdAt: list.createdAt,
+    };
   }
   return {
     itemsById,
@@ -516,6 +527,14 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         }
         break;
       }
+      case "listIconChanged": {
+        if (state.listsById[ev.id]) {
+          // `ev.icon` is undefined when the icon was removed — mirror
+          // that so the nav falls back to the built-in glyph.
+          setState("listsById", ev.id, "icon", ev.icon ?? undefined);
+        }
+        break;
+      }
       case "settingsChanged": {
         // Mirror the whole event payload — settings are tiny and the
         // wire format always sends the full known shape, so a single
@@ -683,6 +702,9 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     },
     renameList(id, name) {
       mutate(() => engine.renameList(id, name));
+    },
+    setListIcon(id, icon) {
+      mutate(() => engine.setListIcon(id, icon));
     },
     importJson(json) {
       return mutate(() => {

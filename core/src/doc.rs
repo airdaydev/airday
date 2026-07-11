@@ -86,6 +86,11 @@ const KEY_LIVE: &str = "live";
 /// `set_item_due_on`).
 const KEY_DUE_ON: &str = "due_on";
 const KEY_NAME: &str = "name";
+/// Optional per-list display icon. Stored as the literal emoji grapheme
+/// the user picked (e.g. `"📥"`); absent/empty means "no icon, render the
+/// built-in fallback". A future SVG-icon set can share this key via a
+/// `"svg:<id>"` prefix convention without a schema change.
+const KEY_ICON: &str = "icon";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
@@ -213,6 +218,11 @@ impl ItemView {
 pub struct ListView {
     pub id: String,
     pub name: String,
+    /// The user's chosen display icon (a literal emoji grapheme), or
+    /// `None` when unset. Consumers render a built-in fallback for
+    /// `None`. Reserved `main` (Queue) has no ListMeta row, so it is
+    /// always `None` here.
+    pub icon: Option<String>,
     pub created_at: i64,
 }
 
@@ -1894,6 +1904,41 @@ impl Doc {
         Ok(())
     }
 
+    /// Set or clear a user-created list's display icon. `icon` is stored
+    /// verbatim as a whole grapheme string (an emoji); a trimmed-empty
+    /// value clears it (so clients fall back to the built-in glyph).
+    /// No-op when the resulting value matches the current one, so repeat
+    /// saves don't emit phantom events or undo steps. Reserved `main`
+    /// (Queue) has no ListMeta row, so it cannot carry an icon.
+    pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), DocError> {
+        if list_id == LIST_MAIN {
+            return Err(DocError::CannotRenameBuiltin(LIST_MAIN.into()));
+        }
+        let (_, map) = self.find_list(list_id)?;
+        let trimmed = icon.trim();
+        let next: Option<String> = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+        let current = read_string(&map, KEY_ICON).filter(|s| !s.is_empty());
+        if current.as_deref() == next.as_deref() {
+            return Ok(());
+        }
+        match &next {
+            Some(s) => map.insert(KEY_ICON, s.as_str())?,
+            None => {
+                map.delete(KEY_ICON)?;
+            }
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::ListIconChanged {
+            id: list_id.to_string(),
+            icon: next,
+        });
+        Ok(())
+    }
+
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), DocError> {
         if list_id == LIST_MAIN {
             return Err(DocError::CannotMoveBuiltin(LIST_MAIN.into()));
@@ -3564,6 +3609,7 @@ fn list_view(map: &LoroMap) -> Option<ListView> {
     Some(ListView {
         id: read_string(map, KEY_ID)?,
         name: read_string(map, KEY_NAME)?,
+        icon: read_string(map, KEY_ICON).filter(|s| !s.is_empty()),
         created_at: read_i64(map, KEY_CREATED_AT)?,
     })
 }
@@ -3811,6 +3857,12 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
                         name: post_l.name.clone(),
                     });
                 }
+                if pre_l.icon != post_l.icon {
+                    out.push(AppEvent::ListIconChanged {
+                        id: post_l.id.clone(),
+                        icon: post_l.icon.clone(),
+                    });
+                }
                 if pre_idx != post_idx {
                     out.push(AppEvent::ListMoved {
                         id: post_l.id.clone(),
@@ -4050,6 +4102,67 @@ mod tests {
             doc.rename_list(LIST_MAIN, "Today").unwrap_err(),
             DocError::CannotRenameBuiltin(_)
         ));
+    }
+
+    #[test]
+    fn set_list_icon_round_trips_and_clears() {
+        let doc = Doc::new().unwrap();
+        let list = doc.add_list("Work").unwrap();
+        let _ = doc.drain_events();
+
+        // Set → stored on the view + ListIconChanged emitted.
+        doc.set_list_icon(&list, "📥").unwrap();
+        assert_eq!(
+            doc.get_list_meta(&list).unwrap().icon.as_deref(),
+            Some("📥")
+        );
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListIconChanged { id, icon } if id == &list && icon.as_deref() == Some("📥")
+        )));
+
+        // No-op when unchanged (no phantom event).
+        doc.set_list_icon(&list, "📥").unwrap();
+        assert!(doc.drain_events().is_empty());
+
+        // Empty clears → view drops the icon, event carries None.
+        doc.set_list_icon(&list, "   ").unwrap();
+        assert_eq!(doc.get_list_meta(&list).unwrap().icon, None);
+        assert!(doc.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListIconChanged { id, icon: None } if id == &list
+        )));
+    }
+
+    #[test]
+    fn set_list_icon_refuses_main() {
+        let doc = Doc::new().unwrap();
+        assert!(matches!(
+            doc.set_list_icon(LIST_MAIN, "📥").unwrap_err(),
+            DocError::CannotRenameBuiltin(_)
+        ));
+    }
+
+    #[test]
+    fn remote_icon_change_emits_list_icon_changed() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let list = a.add_list("Work").unwrap();
+        let seed = a.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        let mut b = Doc::empty();
+        b.apply_remote(&dek, &seed).unwrap();
+        let _ = b.drain_events();
+
+        // A sets an icon; the op replays into B as a ListIconChanged.
+        a.set_list_icon(&list, "🎯").unwrap();
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+        assert_eq!(b.get_list_meta(&list).unwrap().icon.as_deref(), Some("🎯"));
+        assert!(b.drain_events().iter().any(|e| matches!(
+            e,
+            AppEvent::ListIconChanged { id, icon } if id == &list && icon.as_deref() == Some("🎯")
+        )));
     }
 
     #[test]

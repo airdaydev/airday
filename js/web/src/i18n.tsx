@@ -100,6 +100,12 @@ type Messages = {
     doneOptions: string;
     /** Switch label (Done options popover) toggling the origin-list badge. */
     showDoneList: string;
+    /** Accessible name for the list-icon picker trigger in the header. */
+    listIcon: string;
+    /** Label for the button that clears a list's custom icon. */
+    removeIcon: string;
+    /** Placeholder for the free-form emoji input in the icon picker. */
+    iconInputPlaceholder: string;
   };
   board: {
     viewAsBoard: string;
@@ -263,6 +269,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToList: "Mover a la lista",
       doneOptions: "Opciones de visualización",
       showDoneList: "Mostrar lista",
+      listIcon: "Icono de la lista",
+      removeIcon: "Quitar icono",
+      iconInputPlaceholder: "Emoji",
     },
     board: {
       viewAsBoard: "Vista de tablero",
@@ -412,6 +421,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToList: "Move to list",
       doneOptions: "Display options",
       showDoneList: "Show list",
+      listIcon: "List icon",
+      removeIcon: "Remove icon",
+      iconInputPlaceholder: "Emoji",
     },
     board: {
       viewAsBoard: "Board view",

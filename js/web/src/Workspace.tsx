@@ -28,6 +28,7 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { DueCalendarDialog } from "./DueCalendarDialog.tsx";
 import { FindPalette } from "./FindPalette.tsx";
 import { useAppI18n } from "./i18n.tsx";
+import { ListIconPicker } from "./ListIconPicker.tsx";
 import { restoreCapturedPositions } from "./linger.ts";
 import { EditableNavLabel, Nav, StatusSlot } from "./nav.tsx";
 import { isOverlayOpen, onGlobalKey } from "./overlay.ts";
@@ -1214,6 +1215,16 @@ export function Workspace(props: {
               onClick={() => setNavOpen((o) => !o)}
               innerHTML={menuSvg}
             />
+            {/* User-created lists carry a display icon (chosen emoji or
+                the default glyph). Reserved `main` (Home) has no
+                `ListMeta` row, so it can't store one — gated out. */}
+            <Show when={editableListId() !== null && editableListId() !== "main"}>
+              <ListIconPicker
+                icon={state.listsById[editableListId() ?? ""]?.icon}
+                onPick={(icon) => app.setListIcon(editableListId() ?? "", icon)}
+                onClear={() => app.setListIcon(editableListId() ?? "", "")}
+              />
+            </Show>
             <h1>
             <Show
               keyed

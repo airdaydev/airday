@@ -220,6 +220,13 @@ impl Doc {
         self.inner.rename_list(list_id, name).map_err(js_err)
     }
 
+    /// Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
+    /// display icon. See `airday_core::Doc::set_list_icon`.
+    #[wasm_bindgen(js_name = setListIcon)]
+    pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), JsError> {
+        self.inner.set_list_icon(list_id, icon).map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveList)]
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
         self.inner.move_list(list_id, target_index).map_err(js_err)
@@ -1361,6 +1368,16 @@ impl SyncEngine {
         self.inner.doc().rename_list(list_id, name).map_err(js_err)
     }
 
+    /// Set (`icon` = emoji grapheme) or clear (`icon` = "") a list's
+    /// display icon. See `airday_core::Doc::set_list_icon`.
+    #[wasm_bindgen(js_name = setListIcon)]
+    pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .set_list_icon(list_id, icon)
+            .map_err(js_err)
+    }
+
     #[wasm_bindgen(js_name = moveList)]
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), JsError> {
         self.inner
@@ -1604,6 +1621,7 @@ impl From<CoreEvent> for EngineEvent {
 /// - `listRemoved` — id
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
+/// - `listIconChanged` — id, icon? (undefined = icon removed)
 /// - `settingsChanged` — showListCounts, mainName?
 #[wasm_bindgen]
 pub struct AppEventJs {
@@ -1613,6 +1631,9 @@ pub struct AppEventJs {
     text: Option<String>,
     notes: Option<String>,
     name: Option<String>,
+    /// List display icon (`listIconChanged`): `Some(grapheme)` when set,
+    /// `None` when the icon was removed or on events that don't carry one.
+    icon: Option<String>,
     /// Lifecycle flag (`itemAdded` / `itemLifecycleChanged`): `true` ≡
     /// Live, `false` ≡ Backlog underneath any done/binned mask. `None`
     /// on events that don't carry lifecycle.
@@ -1665,6 +1686,10 @@ impl AppEventJs {
     pub fn name(&self) -> Option<String> {
         self.name.clone()
     }
+    #[wasm_bindgen(getter)]
+    pub fn icon(&self) -> Option<String> {
+        self.icon.clone()
+    }
     #[wasm_bindgen(getter, js_name = createdAt)]
     pub fn created_at(&self) -> Option<i64> {
         self.created_at
@@ -1712,6 +1737,7 @@ impl From<CoreAppEvent> for AppEventJs {
             text: None,
             notes: None,
             name: None,
+            icon: None,
             live: None,
             due_on: None,
             created_at: None,
@@ -1837,6 +1863,12 @@ impl From<CoreAppEvent> for AppEventJs {
                 name: Some(name),
                 ..blank
             },
+            CoreAppEvent::ListIconChanged { id, icon } => AppEventJs {
+                kind: "listIconChanged",
+                id,
+                icon,
+                ..blank
+            },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
                 main_name,
@@ -1853,12 +1885,17 @@ impl From<CoreAppEvent> for AppEventJs {
 // ---------- private helpers ----------
 
 fn list_to_json(l: &airday_core::ListView) -> String {
-    format!(
-        "{{\"id\":{},\"name\":{},\"createdAt\":{}}}",
+    let mut s = format!(
+        "{{\"id\":{},\"name\":{}",
         json_string(&l.id),
         json_string(&l.name),
-        l.created_at,
-    )
+    );
+    if let Some(icon) = &l.icon {
+        s.push_str(",\"icon\":");
+        s.push_str(&json_string(icon));
+    }
+    s.push_str(&format!(",\"createdAt\":{}}}", l.created_at));
+    s
 }
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {

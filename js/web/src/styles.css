@@ -887,6 +887,117 @@ body {
   height: 15px;
 }
 
+/* ---- list-icon picker (header) ---- */
+.list-icon-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.list-icon-trigger:hover {
+  background: var(--bg-hover);
+}
+
+.list-icon-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.list-icon-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+.list-icon-popover {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  outline: none;
+  z-index: 60;
+  width: 232px;
+}
+
+.list-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+}
+
+.list-icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.list-icon-option:hover {
+  background: var(--bg-hover);
+}
+
+.list-icon-option[data-active] {
+  border-color: var(--border-surface);
+  background: var(--bg-hover);
+}
+
+.list-icon-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.list-icon-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+
+.list-icon-input:focus {
+  border-color: var(--text-muted);
+}
+
+.list-icon-remove {
+  padding: 5px 8px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.list-icon-remove:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.list-icon-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Done-column toggle in the view-mode popover. Kobalte Switch, sized at
    50% of the component's default (44×24 track / 20px thumb → 22×12 / 10px).
    The track is padded 1px, so the 10px thumb travels 22 − 2 − 10 = 10px. */

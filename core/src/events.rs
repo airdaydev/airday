@@ -123,6 +123,13 @@ pub enum AppEvent {
         id: String,
         name: String,
     },
+    /// A user-created list's display icon was set or cleared. `icon` is
+    /// the literal emoji grapheme after the change, or `None` when the
+    /// icon was removed (consumers fall back to the built-in glyph).
+    ListIconChanged {
+        id: String,
+        icon: Option<String>,
+    },
 
     // ---------- workspace settings ----------
     /// Doc-level synced settings changed. The payload carries the
