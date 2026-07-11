@@ -96,6 +96,10 @@ type Messages = {
     duplicate: string;
     moveToBin: string;
     moveToList: string;
+    /** Accessible name for the Done view's display-options popover trigger. */
+    doneOptions: string;
+    /** Switch label (Done options popover) toggling the origin-list badge. */
+    showDoneList: string;
   };
   board: {
     viewAsBoard: string;
@@ -257,6 +261,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicar",
       moveToBin: "Mover a la papelera",
       moveToList: "Mover a la lista",
+      doneOptions: "Opciones de visualización",
+      showDoneList: "Mostrar lista",
     },
     board: {
       viewAsBoard: "Vista de tablero",
@@ -404,6 +410,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       duplicate: "Duplicate",
       moveToBin: "Move to bin",
       moveToList: "Move to list",
+      doneOptions: "Display options",
+      showDoneList: "Show list",
     },
     board: {
       viewAsBoard: "Board view",

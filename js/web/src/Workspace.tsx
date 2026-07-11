@@ -86,6 +86,19 @@ function loadDoneHidePrefs(): Record<string, boolean> {
   }
 }
 
+// Global (not per-list) "show the origin-list badge on the Done view"
+// preference. The Done view is a single global view, so this is one flag,
+// not a per-list map. Same local-only storage rationale as the board prefs.
+// On by default — only the "off" state is persisted (stored as "0").
+const DONE_SHOW_LIST_PREF_KEY = "airday:done-show-list";
+function loadDoneShowListPref(): boolean {
+  try {
+    return localStorage.getItem(DONE_SHOW_LIST_PREF_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
 // Heuristic for "user has a real keyboard + precise pointer" — i.e. the
 // shortcut hints are worth showing. Reactive: an iPad gaining a Magic
 // Keyboard or a laptop docked to a touchscreen will flip live.
@@ -202,6 +215,19 @@ export function Workspace(props: {
     setDoneHidden(next);
     try {
       localStorage.setItem(DONE_HIDE_PREF_KEY, JSON.stringify(next));
+    } catch {
+      // Quota/private-mode failures just lose the preference.
+    }
+  };
+  // Whether the global Done view badges each item with its origin list.
+  const [doneShowList, setDoneShowListSignal] = createSignal<boolean>(
+    loadDoneShowListPref(),
+  );
+  const setDoneShowList = (show: boolean) => {
+    setDoneShowListSignal(show);
+    try {
+      if (show) localStorage.removeItem(DONE_SHOW_LIST_PREF_KEY);
+      else localStorage.setItem(DONE_SHOW_LIST_PREF_KEY, "0");
     } catch {
       // Quota/private-mode failures just lose the preference.
     }
@@ -396,6 +422,14 @@ export function Workspace(props: {
     const override = state.settings.mainName;
     return override && override.length > 0 ? override : m().nav.home;
   });
+
+  // Resolved display label for any list id, matching the header/nav rules:
+  // `main` uses the Home override/built-in, others use the stored name.
+  // Used by Done-view rows to badge each item with its origin list.
+  const listLabel = (listId: string): string =>
+    listId === "main"
+      ? homeName()
+      : (state.listsById[listId]?.name ?? listId);
 
   createEffect(() => {
     const next = items();
@@ -1300,6 +1334,32 @@ export function Workspace(props: {
                 </Popover.Portal>
               </Popover>
             </Show>
+            <Show when={view().kind === "done"}>
+              <Popover placement="bottom-end" gutter={6}>
+                <Popover.Trigger
+                  class="add-button view-mode-trigger"
+                  aria-label={m().workspace.doneOptions}
+                  innerHTML={mixerHzSvg}
+                />
+                <Popover.Portal>
+                  <Popover.Content class="view-mode-popover">
+                    <Switch
+                      class="done-switch"
+                      checked={doneShowList()}
+                      onChange={(checked) => setDoneShowList(checked)}
+                    >
+                      <Switch.Label class="done-switch-label">
+                        {m().workspace.showDoneList}
+                      </Switch.Label>
+                      <Switch.Input class="done-switch-input" />
+                      <Switch.Control class="done-switch-control">
+                        <Switch.Thumb class="done-switch-thumb" />
+                      </Switch.Control>
+                    </Switch>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover>
+            </Show>
             <Show when={view().kind === "list"}>
               <button
                 type="button"
@@ -1383,6 +1443,8 @@ export function Workspace(props: {
                         app={app}
                         selection={selection}
                         viewKind={view().kind}
+                        showList={doneShowList}
+                        listLabel={listLabel}
                         duplicateBlock={duplicateBlock}
                         copyBlock={copyBlock}
                         onDraftSettle={settleDraft}

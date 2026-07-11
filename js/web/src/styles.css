@@ -653,6 +653,22 @@ body {
   line-height: 1.3em;
 }
 
+/* Origin-list badge on the Done view (spec/board.md — the global Done view
+   is cross-list). A subtle pill so it reads as metadata, not row text. */
+.row-list {
+  flex-shrink: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.3em;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)
    makes it a scroll container, which trips the browser's caret-scroll-into-view
    while typing in the expanded row's contenteditable: text wraps below the

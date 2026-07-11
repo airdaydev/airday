@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DndSelection } from "./dnd/solid";
 import { trackOverlay } from "./overlay.ts";
@@ -63,11 +63,23 @@ export function Row(props: {
   /** Board cards show the item's created date in their bottom-left corner
    *  (list rows don't). */
   showCreated?: boolean;
+  /** Done view only: when true, badge the row with its origin list name.
+   *  Resolved via `listLabel` so `main` shows the Home label. */
+  showList?: () => boolean;
+  /** Resolves a list id to its display label (see Workspace `listLabel`). */
+  listLabel?: (listId: string) => string;
   /** Open the shared calendar modal to set a due date on the target set.
    *  `initial` seeds the calendar (this row's current due date, or null). */
   onSetDue?: (ids: readonly string[], initial: string | null) => void;
 }) {
   const { m, locale } = useAppI18n();
+  // Origin-list badge text for the Done view (null when the badge is off,
+  // the view isn't Done, or no label resolves).
+  const originList = createMemo(() =>
+    props.viewKind === "done" && props.showList?.()
+      ? (props.listLabel?.(props.item().listId) || null)
+      : null,
+  );
   // Open state of this row's context menu, mirrored into the shared
   // overlay count so global keyboard shortcuts stand down while it's up.
   const [menuOpen, setMenuOpen] = createSignal(false);
@@ -440,6 +452,13 @@ export function Row(props: {
               dueOn={due()}
               muted={isDone(props.item()) || isBinned(props.item())}
             />
+          )}
+        </Show>
+        <Show when={originList()}>
+          {(name) => (
+            <span class="row-list" title={name()}>
+              {name()}
+            </span>
           )}
         </Show>
         <Show when={lifecycleTimestamp(props.item())}>
