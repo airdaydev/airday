@@ -8,7 +8,7 @@ import type { AppEventJs } from "@airday/core/wasm";
 import type { ItemView, ListView, WorkspaceState } from "./sync/store.ts";
 
 export type SearchKind = "item" | "list";
-export type SearchStatus = "live" | "done" | "binned";
+export type SearchLifecycle = "live" | "done" | "binned";
 
 export interface SearchResult {
   id: string;
@@ -16,7 +16,7 @@ export interface SearchResult {
   title: string;
   body?: string;
   listId?: string;
-  status?: SearchStatus;
+  lifecycle?: SearchLifecycle;
   score: number;
 }
 
@@ -34,7 +34,7 @@ interface SearchDoc {
   title: string;
   body: string;
   listId?: string;
-  status?: SearchStatus;
+  lifecycle?: SearchLifecycle;
   updatedAt: number;
   titleTokens: Set<string>;
   bodyTokens: Set<string>;
@@ -61,16 +61,16 @@ export function tokenize(input: string): string[] {
   return out;
 }
 
-function statusOf(item: ItemView): SearchStatus {
+function lifecycleOf(item: ItemView): SearchLifecycle {
   if (item.binnedAt != null) return "binned";
   if (item.doneAt != null) return "done";
   return "live";
 }
 
-function statusFromAt(
+function lifecycleFromAt(
   doneAt: number | undefined,
   binnedAt: number | undefined,
-): SearchStatus {
+): SearchLifecycle {
   if (binnedAt != null) return "binned";
   if (doneAt != null) return "done";
   return "live";
@@ -143,7 +143,7 @@ export function createSearchEngine(): SearchEngine {
     text: string;
     notes: string;
     listId: string;
-    status: SearchStatus;
+    lifecycle: SearchLifecycle;
     updatedAt: number;
   }): SearchDoc {
     const titleTokens = new Set(tokenize(args.text));
@@ -160,7 +160,7 @@ export function createSearchEngine(): SearchEngine {
       title: args.text,
       body: args.notes,
       listId: args.listId || undefined,
-      status: args.status,
+      lifecycle: args.lifecycle,
       updatedAt: args.updatedAt,
       titleTokens,
       bodyTokens,
@@ -193,7 +193,7 @@ export function createSearchEngine(): SearchEngine {
     text: string;
     notes: string;
     listId: string;
-    status: SearchStatus;
+    lifecycle: SearchLifecycle;
     updatedAt: number;
   }): void {
     unindexDoc(args.id);
@@ -212,7 +212,7 @@ export function createSearchEngine(): SearchEngine {
         text: itemDoc.title,
         notes: itemDoc.body,
         listId: itemDoc.listId ?? "",
-        status: itemDoc.status ?? "live",
+        lifecycle: itemDoc.lifecycle ?? "live",
         updatedAt: itemDoc.updatedAt,
       });
     }
@@ -246,7 +246,7 @@ export function createSearchEngine(): SearchEngine {
           text: item.text,
           notes: item.notes,
           listId: item.listId,
-          status: statusOf(item),
+          lifecycle: lifecycleOf(item),
           updatedAt,
         }),
       );
@@ -256,7 +256,7 @@ export function createSearchEngine(): SearchEngine {
   function apply(event: AppEventJs): void {
     switch (event.kind) {
       case "itemAdded": {
-        const status = statusFromAt(
+        const lifecycle = lifecycleFromAt(
           bigToNum(event.doneAt),
           bigToNum(event.binnedAt),
         );
@@ -266,7 +266,7 @@ export function createSearchEngine(): SearchEngine {
           text: event.text ?? "",
           notes: event.notes ?? "",
           listId: event.listId ?? "",
-          status,
+          lifecycle,
           updatedAt,
         });
         break;
@@ -283,7 +283,7 @@ export function createSearchEngine(): SearchEngine {
           text: event.text ?? "",
           notes: prev.body,
           listId: prev.listId ?? "",
-          status: prev.status ?? "live",
+          lifecycle: prev.lifecycle ?? "live",
           updatedAt: Date.now(),
         });
         break;
@@ -296,15 +296,15 @@ export function createSearchEngine(): SearchEngine {
           text: prev.title,
           notes: event.notes ?? "",
           listId: prev.listId ?? "",
-          status: prev.status ?? "live",
+          lifecycle: prev.lifecycle ?? "live",
           updatedAt: Date.now(),
         });
         break;
       }
-      case "itemStatusChanged": {
+      case "itemLifecycleChanged": {
         const prev = docsById.get(event.id);
         if (!prev || prev.kind !== "item") break;
-        prev.status = statusFromAt(
+        prev.lifecycle = lifecycleFromAt(
           bigToNum(event.doneAt),
           bigToNum(event.binnedAt),
         );
@@ -319,7 +319,7 @@ export function createSearchEngine(): SearchEngine {
           text: prev.title,
           notes: prev.body,
           listId: event.listId ?? "",
-          status: prev.status ?? "live",
+          lifecycle: prev.lifecycle ?? "live",
           updatedAt: Date.now(),
         });
         break;
@@ -352,7 +352,7 @@ export function createSearchEngine(): SearchEngine {
             text: itemDoc.title,
             notes: itemDoc.body,
             listId: itemDoc.listId ?? "",
-            status: itemDoc.status ?? "live",
+            lifecycle: itemDoc.lifecycle ?? "live",
             updatedAt: itemDoc.updatedAt,
           });
         }
@@ -447,8 +447,8 @@ export function createSearchEngine(): SearchEngine {
       contextHits++;
     else return null;
 
-    const statusRank =
-      doc.status === "live" ? 2 : doc.status === "done" ? 1 : 0;
+    const lifecycleRank =
+      doc.lifecycle === "live" ? 2 : doc.lifecycle === "done" ? 1 : 0;
     // Flat numeric score for the public SearchResult.score field. The
     // sort comparator below uses the bucket counts directly so this
     // collapse never affects ordering — it's purely a debugging /
@@ -458,12 +458,12 @@ export function createSearchEngine(): SearchEngine {
       titlePrefix * 1000 +
       bodyHits * 100 +
       contextHits * 10 +
-      statusRank;
+      lifecycleRank;
 
     return { doc, titleExact, titlePrefix, bodyHits, contextHits, score };
   }
 
-  function statusRank(s: SearchStatus | undefined): number {
+  function lifecycleRank(s: SearchLifecycle | undefined): number {
     return s === "live" ? 2 : s === "done" ? 1 : 0;
   }
 
@@ -498,8 +498,8 @@ export function createSearchEngine(): SearchEngine {
       if (a.bodyHits !== b.bodyHits) return b.bodyHits - a.bodyHits;
       if (a.contextHits !== b.contextHits)
         return b.contextHits - a.contextHits;
-      const sa = statusRank(a.doc.status);
-      const sb = statusRank(b.doc.status);
+      const sa = lifecycleRank(a.doc.lifecycle);
+      const sb = lifecycleRank(b.doc.lifecycle);
       if (sa !== sb) return sb - sa;
       if (a.doc.updatedAt !== b.doc.updatedAt)
         return b.doc.updatedAt - a.doc.updatedAt;
@@ -511,7 +511,7 @@ export function createSearchEngine(): SearchEngine {
       title: s.doc.title,
       body: s.doc.body || undefined,
       listId: s.doc.listId,
-      status: s.doc.status,
+      lifecycle: s.doc.lifecycle,
       score: s.score,
     }));
   }

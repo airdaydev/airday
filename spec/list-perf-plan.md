@@ -7,7 +7,7 @@
 
 **Phase 1 landed.** Core emits `live_index` (position in the owning
 list's live projection) on `ItemAdded` / `ItemMoved` /
-`ItemStatusChanged` / `ItemListChanged`, alongside the global `index`;
+`ItemLifecycleChanged` / `ItemListChanged`, alongside the global `index`;
 wasm surfaces it as `liveIndex`. The web store dropped `itemsOrder`
 entirely: `WorkspaceState.listLive` per-list arrays + maintained
 `binCount`, list-local dispatch, lazy Done/Bin timestamp sorts. The
@@ -16,12 +16,12 @@ done-linger affordance survives via a store-side `recentDone` capture
 overlays for the linger window.
 
 **Also fixed (found post-Phase-1 on a 13k-item store):** the batch
-status mutations in core (`set_items_done` / `set_items_binned` /
+lifecycle mutations in core (`set_items_done` / `set_items_binned` /
 `delete_binned_items`) did a full-doc materialize → `rebuild_item_index`
 → diff on *every* call — and the web Delete-key path always routes
 through the `*Many` variants, so binning ONE item cost three O(N)
 whole-doc passes in wasm. They are now surgical below 64 ids
-(`BULK_STATUS_EVENT_THRESHOLD`, matching the store's coarse threshold)
+(`BULK_LIFECYCLE_EVENT_THRESHOLD`, matching the store's coarse threshold)
 and fall back to rebuild+diff above it.
 
 **Snapshot-per-ack fixed:** the dominant remaining lag was persistence
@@ -134,13 +134,13 @@ over *all* items in the doc) on every mutation. Matches the note in
 of ms in JS).
 
 ## Confirmed seams (file:line)
-Per single mutation (e.g. one move / status toggle), with N = total items in
+Per single mutation (e.g. one move / lifecycle toggle), with N = total items in
 doc, M = current-view length:
 
 1. **Four global O(N) memos in `js/web/src/Workspace.tsx`**, all scanning the
    global `state.itemsOrder` (all lists + Done + Bin):
    - `items()` `Workspace.tsx:170-196` — maps N→new array; filter reads
-     `listId/doneAt/binnedAt`, so any status change re-runs it.
+     `listId/doneAt/binnedAt`, so any lifecycle change re-runs it.
    - `lingerChain()` `:130-151`
    - `liveCountsByList()` `:221-229`
    - `binCount()` `:207-214`

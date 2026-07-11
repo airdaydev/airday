@@ -234,7 +234,7 @@ const COARSE_EVENT_KINDS = new Set([
   "itemAdded",
   "itemMoved",
   "itemRemoved",
-  "itemStatusChanged",
+  "itemLifecycleChanged",
   "itemListChanged",
 ]);
 
@@ -425,7 +425,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         }
         break;
       }
-      case "itemStatusChanged": {
+      case "itemLifecycleChanged": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
         const wasLive = isInListView(prev);
@@ -468,7 +468,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       case "itemListChanged": {
         const prev = state.itemsById[ev.id];
         if (!prev) break;
-        // Status is untouched by this event — membership in the live
+        // Lifecycle is untouched by this event — membership in the live
         // projection carries over, only the owning list changes.
         const live = isInListView(prev);
         if (live) removeLive(prev.listId, ev.id);

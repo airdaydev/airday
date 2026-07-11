@@ -179,7 +179,7 @@ describe("last-token prefix", () => {
   });
 });
 
-describe("status tiebreak", () => {
+describe("lifecycle tiebreak", () => {
   test("live > done > binned when textual buckets are equal", () => {
     const { eng, search } = newSearch();
     const liveId = eng.addItem(LIST_MAIN, "Apple");

@@ -45,7 +45,7 @@ Single binary `airday`. Subcommands:
 - `airday cache clear [--force]` — truncate the doc cache (`ops` + `snapshots`) and reset the per-doc sync cursor to 0, **keeping** account identity (so it does not log you out); the next `airday sync` rehydrates from the server. If there are unsynced local ops, prompts for confirmation (TTY) or refuses with an error (non-TTY) unless `--force` is passed.
 
 ### Export
-- `airday export-json [--out PATH]` — semantic account export: built-in/user lists plus items/status/timestamps as regular JSON. Defaults to stdout; `--out` writes a file. This is a portability dump, not a CRDT backup/restore format.
+- `airday export-json [--out PATH]` — semantic account export: built-in/user lists plus items/lifecycle/timestamps as regular JSON. Defaults to stdout; `--out` writes a file. This is a portability dump, not a CRDT backup/restore format.
 
 ### Sync
 - `airday sync` — pull peer ops, push any pending local ops, then exit. Connect failure is a hard error.

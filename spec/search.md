@@ -73,7 +73,7 @@ type SearchDoc = {
   title: string;
   body: string;
   listId?: string;
-  status?: "live" | "done" | "binned";
+  lifecycle?: "live" | "done" | "binned";
   updatedAt?: number;
   tokens: string[];
 };
@@ -85,7 +85,7 @@ Notes:
 - `postings` is the inverted index: token -> matching doc ids.
 - `tokens` must be stored on each `SearchDoc` so updates can remove stale postings before re-inserting the new token set.
 - `updatedAt` is for ranking only; it is not part of tokenization.
-- `status` is for ranking / filtering only; it is not part of tokenization.
+- `lifecycle` is for ranking / filtering only; it is not part of tokenization.
 
 ## Normalization
 
@@ -155,7 +155,7 @@ Required behaviors by event kind:
 - `ItemRemoved`: remove doc and its postings
 - `ItemTextChanged`: rebuild that item's token set
 - `ItemNotesChanged`: rebuild that item's token set
-- `ItemStatusChanged`: update rank/filter metadata only
+- `ItemLifecycleChanged`: update rank/filter metadata only
 - `ItemListChanged`: rebuild that item's token set because list-name context may have changed
 - `ListAdded`: add the list doc
 - `ListRemoved`: remove the list doc; rebuild any item docs that referenced that list name as context
@@ -233,7 +233,7 @@ type SearchResult = {
   title: string;
   body?: string;
   listId?: string;
-  status?: "live" | "done" | "binned";
+  lifecycle?: "live" | "done" | "binned";
   score: number;
 };
 

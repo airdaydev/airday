@@ -1638,7 +1638,7 @@ impl From<CoreEvent> for EngineEvent {
 /// - `itemTextChanged` — id, text
 /// - `itemNotesChanged` — id, notes
 /// - `itemDueChanged` — id, dueOn? (undefined = no due date)
-/// - `itemStatusChanged` — id, doneAt?, binnedAt?, liveIndex?
+/// - `itemLifecycleChanged` — id, doneAt?, binnedAt?, liveIndex?
 /// - `itemColumnChanged` — id, column? (undefined = default column)
 /// - `itemListChanged` — id, listId, liveIndex?
 /// - `listAdded` — id, name, createdAt, index
@@ -1826,13 +1826,13 @@ impl From<CoreAppEvent> for AppEventJs {
                 due_on,
                 ..blank
             },
-            CoreAppEvent::ItemStatusChanged {
+            CoreAppEvent::ItemLifecycleChanged {
                 id,
                 done_at,
                 binned_at,
                 live_index,
             } => AppEventJs {
-                kind: "itemStatusChanged",
+                kind: "itemLifecycleChanged",
                 id,
                 done_at,
                 binned_at,

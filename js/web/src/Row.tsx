@@ -33,7 +33,7 @@ export const isDraftId = (id: string): boolean => id.startsWith(DRAFT_ID_PREFIX)
 // done because it's the later transition: a done-then-binned item shows
 // when it was binned in the Bin view; a plain done item shows doneAt in
 // the Done view.
-function statusTimestamp(it: ItemView): number | undefined {
+function lifecycleTimestamp(it: ItemView): number | undefined {
   return it.binnedAt ?? it.doneAt;
 }
 
@@ -442,7 +442,7 @@ export function Row(props: {
             />
           )}
         </Show>
-        <Show when={statusTimestamp(props.item())}>
+        <Show when={lifecycleTimestamp(props.item())}>
           {(ts) => (
             <span class="row-timestamp" title={new Date(ts()).toLocaleString(locale())}>
               {props.viewKind === "done"

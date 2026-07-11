@@ -5,7 +5,7 @@
 //!
 //! - `randomized_multi_peer_convergence` — N docs, a deterministic
 //!   pseudo-random stream of mutations (adds, reorders, cross-list
-//!   moves, status flips, deletes, list churn, undo/redo, reconcile)
+//!   moves, lifecycle flips, deletes, list churn, undo/redo, reconcile)
 //!   interleaved with random pairwise syncs, then a full mesh sync.
 //!   Properties: every doc's projection invariants hold after every
 //!   op, a naive event-consumer mirror (the JS store contract) never
@@ -130,7 +130,7 @@ impl Mirror {
                     self.insert_live(&list, id, Some(*at));
                 }
             }
-            AppEvent::ItemStatusChanged {
+            AppEvent::ItemLifecycleChanged {
                 id,
                 done_at,
                 binned_at,
@@ -304,7 +304,7 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
                 let _ = doc.move_item(&it.id, &target, rng.below(8));
             }
         }
-        // status flips
+        // lifecycle flips
         60..=69 => {
             if !items.is_empty() {
                 let it = &items[rng.below(items.len())];
@@ -561,7 +561,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
         assert!(doc.redo().unwrap());
         assert_projection_invariants(&doc, &format!("session {session} after undo/redo"));
 
-        // Some status churn + a bin purge.
+        // Some lifecycle churn + a bin purge.
         let live_main = doc.live_item_ids(LIST_MAIN);
         for id in live_main.iter().step_by(37).take(8) {
             doc.set_item_binned(id, true).unwrap();

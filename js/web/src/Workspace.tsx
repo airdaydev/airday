@@ -853,7 +853,7 @@ export function Workspace(props: {
   onGlobalKey(onBracketNavigate);
 
   // Drag items into a list nav button to move them to that list as the
-  // first items, or onto Bin to status-bin them. Discriminate from the
+  // first items, or onto Bin to bin them. Discriminate from the
   // nav's own list-reorder drag by checking detail.items[0] for an
   // item-shaped record (`listId` is present on ItemView, absent on
   // ListView). Bubbling + composed means a single document-level
@@ -946,7 +946,7 @@ export function Workspace(props: {
 
   // Selecting a palette result: jump to the view that contains it and
   // re-anchor the dnd selection on the row. Lists go straight to that
-  // list. Items pick the view based on their status — binned items live
+  // list. Items pick the view based on their lifecycle — binned items live
   // in the Bin, done-only items in Done, otherwise their list. The
   // selection + scroll bounce is deferred past the view-change effect
   // (which clears selection) and past the keyed Dnd remount, so the
@@ -957,9 +957,9 @@ export function Workspace(props: {
       return;
     }
     const target: ViewKey =
-      r.status === "binned"
+      r.lifecycle === "binned"
         ? { kind: "bin" }
-        : r.status === "done"
+        : r.lifecycle === "done"
           ? { kind: "done" }
           : { kind: "list", id: r.listId || "main" };
     setView(target);

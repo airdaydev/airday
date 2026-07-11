@@ -262,7 +262,7 @@ mod tests {
     use super::*;
 
     /// Round-trip across a close/reopen: mutations captured on the first
-    /// handle must replay from disk on a second one, statuses intact.
+    /// handle must replay from disk on a second one, lifecycle states intact.
     /// (`items_in_list` returns every non-binned item, done included — so
     /// the done item stays visible with its `done_at` set, and the binned
     /// item drops out.)
@@ -304,7 +304,7 @@ mod tests {
             .iter()
             .find(|i| i.id == done_id)
             .expect("done item present");
-        assert!(done.done_at.is_some(), "done status survived reopen");
+        assert!(done.done_at.is_some(), "done lifecycle survived reopen");
 
         let groceries = store.items_in_list(list_id);
         assert_eq!(groceries.len(), 1);

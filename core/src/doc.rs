@@ -25,7 +25,7 @@
 //! invariants"). Stale/duplicate entries left behind by concurrent
 //! cross-list moves are harmless and cleaned by [`Doc::reconcile`].
 //!
-//! Binned is a status & items keep their location. One well-known
+//! Binned is a lifecycle & items keep their location. One well-known
 //! list id is *reserved*: [`LIST_MAIN`]. It has **no ListMeta row** —
 //! items reference it by string id and clients render it with a
 //! hardcoded label ("Queue").
@@ -107,11 +107,11 @@ const KEY_DEFAULT_COLUMN_NAME: &str = "default_column_name";
 /// Same override for the reserved `main` list, which has no ListMeta
 /// row — lives on the doc-level settings map.
 const KEY_MAIN_DEFAULT_COLUMN_NAME: &str = "main_default_column_name";
-/// Batch status mutations at/above this many ids stop emitting
+/// Batch lifecycle mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
 /// layers flip regimes together.
-const BULK_STATUS_EVENT_THRESHOLD: usize = 64;
+const BULK_LIFECYCLE_EVENT_THRESHOLD: usize = 64;
 /// Captured operations touching at least this many items abandon per-item
 /// diff translation for the whole-doc resync fallback — one O(doc) pass
 /// beats per-item projection syncs for bulk imports or undo steps.
@@ -389,7 +389,7 @@ struct TargetPlan {
 /// fallback. Never persisted.
 #[derive(Default)]
 struct ProjectionIndex {
-    /// item id → location/status slice.
+    /// item id → location/lifecycle slice.
     meta: HashMap<String, ItemMeta>,
     /// list id → item ids located there (authoritative membership).
     members: HashMap<String, HashSet<String>>,
@@ -401,7 +401,7 @@ struct ProjectionIndex {
     /// items carry no key.
     live_by_list: HashMap<String, Vec<String>>,
     /// list id → number of *visible* entries in that list's order
-    /// container (any status). `members(list).len() == visible` ⟺ the
+    /// container (any lifecycle). `members(list).len() == visible` ⟺ the
     /// list has no fallback tail — the precondition for the O(live)
     /// splice fast paths; anything tail-adjacent falls back to a full
     /// `refresh_live` walk. Lists with zero visible entries carry no
@@ -410,7 +410,7 @@ struct ProjectionIndex {
 }
 
 impl ProjectionIndex {
-    /// Visible entry ids of `list_id` in container order (all statuses,
+    /// Visible entry ids of `list_id` in container order (all lifecyclees,
     /// duplicate-guarded), borrowed — plus the visible set for the tail
     /// computation. An entry is visible iff its item exists, its
     /// placement matches the item's authoritative location, and no
@@ -458,7 +458,7 @@ impl ProjectionIndex {
     }
 
     /// Resolved order of one list — visible entries in container order,
-    /// then the fallback tail; all statuses. Pure — reads only the
+    /// then the fallback tail; all lifecyclees. Pure — reads only the
     /// in-memory mirrors.
     fn resolved(&self, list_id: &str) -> Vec<String> {
         let (mut ids, seen) = self.visible_ids(list_id);
@@ -1537,7 +1537,7 @@ impl Doc {
         let binned_at = read_i64(&map, KEY_BINNED_AT);
         self.inner.commit();
         let live_index = self.sync_item_liveness(item_id, &map);
-        self.push_event(AppEvent::ItemStatusChanged {
+        self.push_event(AppEvent::ItemLifecycleChanged {
             id: item_id.to_string(),
             done_at: new_done,
             binned_at,
@@ -1547,11 +1547,11 @@ impl Doc {
     }
 
     /// Set or clear done state for many items in one commit. Surgical
-    /// below `BULK_STATUS_EVENT_THRESHOLD`: work is proportional to the
+    /// below `BULK_LIFECYCLE_EVENT_THRESHOLD`: work is proportional to the
     /// touched items' lists, never total doc size. At/above the
     /// threshold it falls back to one rebuild + diff.
     pub fn set_items_done(&self, item_ids: &[&str], done: bool) -> Result<(), DocError> {
-        self.set_items_status(item_ids, done, KEY_DONE_AT)
+        self.set_items_lifecycle(item_ids, done, KEY_DONE_AT)
     }
 
     /// Set or clear an item's binned state. Independent of `done` —
@@ -1577,7 +1577,7 @@ impl Doc {
         let done_at = read_i64(&map, KEY_DONE_AT);
         self.inner.commit();
         let live_index = self.sync_item_liveness(item_id, &map);
-        self.push_event(AppEvent::ItemStatusChanged {
+        self.push_event(AppEvent::ItemLifecycleChanged {
             id: item_id.to_string(),
             done_at,
             binned_at: new_binned,
@@ -1590,15 +1590,15 @@ impl Doc {
     /// Surgical / bulk-fallback split for the same reason as
     /// `set_items_done`.
     pub fn set_items_binned(&self, item_ids: &[&str], binned: bool) -> Result<(), DocError> {
-        self.set_items_status(item_ids, binned, KEY_BINNED_AT)
+        self.set_items_lifecycle(item_ids, binned, KEY_BINNED_AT)
     }
 
-    fn set_items_status(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
+    fn set_items_lifecycle(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
         }
         assert_unique_item_ids(item_ids)?;
-        let pre_items = (item_ids.len() >= BULK_STATUS_EVENT_THRESHOLD)
+        let pre_items = (item_ids.len() >= BULK_LIFECYCLE_EVENT_THRESHOLD)
             .then(|| self.iter_items().collect::<Vec<ItemView>>());
         // Resolve everything up front so an unknown id errors before
         // any map is touched.
@@ -1640,7 +1640,7 @@ impl Doc {
             } else {
                 (read_i64(&map, KEY_DONE_AT), new)
             };
-            self.push_event(AppEvent::ItemStatusChanged {
+            self.push_event(AppEvent::ItemLifecycleChanged {
                 id: item_id.to_string(),
                 done_at,
                 binned_at,
@@ -1970,7 +1970,7 @@ impl Doc {
         // two lists' shadows plus membership.
         self.rebuild_index();
         // Emit the full pre/post state diff: each item picks up an
-        // `ItemStatusChanged` (now binned) and `ItemListChanged` (now
+        // `ItemLifecycleChanged` (now binned) and `ItemListChanged` (now
         // `main`), plus the `ListRemoved` for the gone list.
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings, &pre_columns);
         Ok(())
@@ -2291,7 +2291,7 @@ impl Doc {
 
     // ---------- reads ----------
 
-    /// Items of one list in resolved order, all statuses except binned
+    /// Items of one list in resolved order, all lifecyclees except binned
     /// unless `include_binned`.
     pub fn items_in_list(&self, list_id: &str, include_binned: bool) -> Vec<ItemView> {
         let resolved = {
@@ -3128,7 +3128,7 @@ impl Doc {
                 continue;
             }
             if has(KEY_DONE_AT) || has(KEY_BINNED_AT) {
-                self.push_event(AppEvent::ItemStatusChanged {
+                self.push_event(AppEvent::ItemLifecycleChanged {
                     id: id.clone(),
                     done_at: view.done_at,
                     binned_at: view.binned_at,
@@ -3195,7 +3195,7 @@ impl Doc {
                     let view = view_of(id)?;
                     insert_type.insert(
                         id,
-                        AppEvent::ItemStatusChanged {
+                        AppEvent::ItemLifecycleChanged {
                             id: id.clone(),
                             done_at: view.done_at,
                             binned_at: view.binned_at,
@@ -3674,12 +3674,12 @@ impl Doc {
             )));
         }
         let plaintext = dek.open(&blob.ciphertext, &blob.nonce)?;
-        let status = self.inner.import_with(&plaintext, "remote")?;
+        let import_status = self.inner.import_with(&plaintext, "remote")?;
         // VersionRange is `(start, end)` per peer — `end` is the
         // exclusive upper bound, which matches `VersionVector`'s
         // counter semantics (cf. loro `VersionRange::from_vv`).
         let mut imported_vv = VersionVector::new();
-        for (peer, (_, end)) in status.success.iter() {
+        for (peer, (_, end)) in import_status.success.iter() {
             imported_vv.insert(*peer, *end);
         }
         self.last_pushed_vv.merge(&imported_vv);
@@ -3807,7 +3807,7 @@ fn settings_view(map: &LoroMap) -> SettingsView {
     }
 }
 
-/// Location/status slice used by the projection index. Items with a
+/// Location/lifecycle slice used by the projection index. Items with a
 /// missing or unparseable `location` deterministically project into
 /// `main`'s fallback tail (empty placement never matches an entry) so
 /// data is never hidden by a bad register.
@@ -4027,7 +4027,7 @@ fn diff_items(pre: &[ItemView], post: &[ItemView], out: &mut Vec<AppEvent>) {
                     });
                 }
                 if pre_it.done_at != post_it.done_at || pre_it.binned_at != post_it.binned_at {
-                    out.push(AppEvent::ItemStatusChanged {
+                    out.push(AppEvent::ItemLifecycleChanged {
                         id: post_it.id.clone(),
                         done_at: post_it.done_at,
                         binned_at: post_it.binned_at,
@@ -4463,7 +4463,7 @@ mod tests {
     }
 
     #[test]
-    fn status_flips_do_not_touch_order_containers() {
+    fn lifecycle_flips_do_not_touch_order_containers() {
         // Decision pinned by spec/data-model.md: done/binned are pure
         // item-map writes; the entry stays where it is so restore is
         // exact-position for free.
@@ -4904,7 +4904,7 @@ mod tests {
     }
 
     #[test]
-    fn json_export_includes_notes_and_status_timestamps() {
+    fn json_export_includes_notes_and_lifecycle_timestamps() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
         doc.edit_item_notes(&id, "whole milk").unwrap();
@@ -5000,11 +5000,11 @@ mod tests {
         assert_live_projection_matches_doc(&b);
     }
 
-    /// Concurrent reorder on one replica and status change on another
-    /// must merge cleanly: the order mov and the status flip touch
+    /// Concurrent reorder on one replica and lifecycle change on another
+    /// must merge cleanly: the order mov and the lifecycle flip touch
     /// disjoint containers.
     #[test]
-    fn concurrent_reorder_and_status_change_converge() {
+    fn concurrent_reorder_and_lifecycle_change_converge() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let ids: Vec<String> = ["a", "b", "c", "d"]
@@ -5195,7 +5195,7 @@ mod tests {
     }
 
     #[test]
-    fn local_set_done_emits_status_changed_with_timestamps() {
+    fn local_set_done_emits_lifecycle_changed_with_timestamps() {
         let doc = Doc::new().unwrap();
         let id = doc.add_item(LIST_MAIN, "task").unwrap();
         let _ = doc.drain_events();
@@ -5203,7 +5203,7 @@ mod tests {
         let evs = doc.drain_events();
         match evs.as_slice() {
             [
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id: eid,
                     done_at,
                     binned_at,
@@ -5229,7 +5229,7 @@ mod tests {
         let evs = doc.drain_events();
         match evs.as_slice() {
             [
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id: eid,
                     done_at,
                     binned_at,
@@ -5282,7 +5282,7 @@ mod tests {
         doc.delete_list(&other).unwrap();
         let evs = doc.drain_events();
         // The item is relocated to `main` (ItemListChanged) and binned
-        // (ItemStatusChanged, so it drops out of the live projection),
+        // (ItemLifecycleChanged, so it drops out of the live projection),
         // then the list is removed (ListRemoved).
         let mut saw_reassign = false;
         let mut saw_binned = false;
@@ -5299,7 +5299,7 @@ mod tests {
                     assert_eq!(*live_index, None, "binned item is not in a live view");
                     saw_reassign = true;
                 }
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id: eid, binned_at, ..
                 } => {
                     assert_eq!(eid, &id);
@@ -5330,7 +5330,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_status_change_translates_to_one_surgical_event() {
+    fn remote_lifecycle_change_translates_to_one_surgical_event() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let first = a.add_item(LIST_MAIN, "first").unwrap();
@@ -5346,7 +5346,7 @@ mod tests {
         let evs = b.drain_events();
         match evs.as_slice() {
             [
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id,
                     done_at,
                     binned_at,
@@ -5358,7 +5358,7 @@ mod tests {
                 assert!(binned_at.is_none());
                 assert_eq!(*live_index, None);
             }
-            other => panic!("expected surgical ItemStatusChanged, got {other:?}"),
+            other => panic!("expected surgical ItemLifecycleChanged, got {other:?}"),
         }
         assert_live_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
@@ -5454,12 +5454,12 @@ mod tests {
                         insert_at(&mut live, list_id, id, at);
                     }
                 }
-                AppEvent::ItemStatusChanged { id, live_index, .. } => {
-                    // A status event either hides the item (None) or
+                AppEvent::ItemLifecycleChanged { id, live_index, .. } => {
+                    // A lifecycle event either hides the item (None) or
                     // re-inserts it at its list position. The replayer
                     // needs the list; the store reads it off its item
                     // mirror, the test gets it from the final doc — so
-                    // status re-entries are handled by the caller
+                    // lifecycle re-entries are handled by the caller
                     // passing docs whose lists are stable. For pure
                     // reorder/move tests this arm only hides.
                     if live_index.is_none() {
@@ -5942,7 +5942,7 @@ mod tests {
         let evs = doc.drain_events();
         match evs.as_slice() {
             [
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id,
                     binned_at,
                     live_index,
@@ -5953,7 +5953,7 @@ mod tests {
                 assert!(binned_at.is_some());
                 assert_eq!(*live_index, None);
             }
-            other => panic!("expected one surgical ItemStatusChanged, got {other:?}"),
+            other => panic!("expected one surgical ItemLifecycleChanged, got {other:?}"),
         }
         assert_live_projection_matches_doc(&doc);
         assert_eq!(
@@ -5968,7 +5968,7 @@ mod tests {
         let evs = doc.drain_events();
         match evs.as_slice() {
             [
-                AppEvent::ItemStatusChanged {
+                AppEvent::ItemLifecycleChanged {
                     id,
                     binned_at,
                     live_index,
@@ -5979,7 +5979,7 @@ mod tests {
                 assert!(binned_at.is_none());
                 assert_eq!(*live_index, Some(1));
             }
-            other => panic!("expected one surgical ItemStatusChanged, got {other:?}"),
+            other => panic!("expected one surgical ItemLifecycleChanged, got {other:?}"),
         }
         assert_live_projection_matches_doc(&doc);
         assert_eq!(doc.live_item_ids(LIST_MAIN), vec![first, second, third]);

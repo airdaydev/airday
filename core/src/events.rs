@@ -46,7 +46,7 @@ pub enum AppEvent {
     },
     /// Item removed from the doc (deleteBinned / emptyBin). Toggling
     /// `binned_at` does *not* emit this — that emits
-    /// `ItemStatusChanged`.
+    /// `ItemLifecycleChanged`.
     ItemRemoved {
         id: String,
     },
@@ -83,7 +83,7 @@ pub enum AppEvent {
     /// position within its list's live projection when the item is live
     /// after the change (restore / un-done re-entry point); `None` when
     /// it is done/binned (consumers drop it from the live array).
-    ItemStatusChanged {
+    ItemLifecycleChanged {
         id: String,
         done_at: Option<i64>,
         binned_at: Option<i64>,

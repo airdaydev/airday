@@ -215,7 +215,7 @@ export function FindPalette(props: {
                   class="palette__item"
                   classList={{
                     "palette__item--selected": i() === selectedIndex(),
-                    "palette__item--binned": item.status === "binned",
+                    "palette__item--binned": item.lifecycle === "binned",
                   }}
                   onMouseEnter={() => setSelectedIndex(i())}
                   onClick={() => selectItem(item)}
@@ -225,7 +225,7 @@ export function FindPalette(props: {
                   <span
                     class="palette__item-check"
                     data-kind={item.kind}
-                    data-checked={item.status === "done" ? "" : undefined}
+                    data-checked={item.lifecycle === "done" ? "" : undefined}
                     aria-hidden="true"
                   />
                   <span class="palette__item-name">{item.title}</span>
