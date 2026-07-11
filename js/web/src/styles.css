@@ -284,6 +284,14 @@ body {
   height: 12px;
 }
 
+/* Emoji list icon in the nav: color is intrinsic to the glyph, so drop
+   the muted currentColor and size it to sit on the row's cap height. */
+.nav-item-icon-emoji {
+  font-size: 12px;
+  line-height: 1;
+  color: inherit;
+}
+
 @media (max-width: 768px) and (pointer: coarse) {
   .nav-item {
     height: 40px;
@@ -389,7 +397,7 @@ body {
 
 .main-header {
   height: 3em;
-  padding: 8px 12px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -185,7 +185,7 @@ export function StatusSlot(props: {
 
 export function Nav(props: {
   app: DocApp;
-  lists: { id: string; name: string }[];
+  lists: { id: string; name: string; icon?: string }[];
   binCount: number;
   /** Open-item count (Backlog + Live) per list id. Queue's row always
    *  renders a badge (showing "-" when zero); non-Queue rows render theirs
@@ -242,7 +242,7 @@ export function Nav(props: {
   // `main` is a reserved id with no MovableList entry — clients
   // render it as a static nav button, so the dnd source is just
   // `props.lists` directly.
-  type NavList = { id: string; name: string };
+  type NavList = { id: string; name: string; icon?: string };
   const [dndLists, setDndLists] = createSignal<NavList[]>([]);
   createEffect(() => setDndLists(props.lists));
 
@@ -510,7 +510,14 @@ export function Nav(props: {
                     data-drop-list-id={l().id}
                     onClick={(e) => onNavItemClick(e, l().id)}
                   >
-                    <span class="nav-item-icon" innerHTML={fileSvg} />
+                    <Show
+                      when={l().icon}
+                      fallback={<span class="nav-item-icon" innerHTML={fileSvg} />}
+                    >
+                      {(icon) => (
+                        <span class="nav-item-icon nav-item-icon-emoji">{icon()}</span>
+                      )}
+                    </Show>
                     <EditableNavLabel
                       name={l().name}
                       onSave={(name) => props.app.renameList(l().id, name)}
