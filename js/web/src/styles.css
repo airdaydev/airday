@@ -23,6 +23,8 @@
   --dnd-select-bg: #dbeafe;
   --dnd-placeholder-color: #cbd5e1;
   --dnd-drag-shadow: 0 12px 60px #00000026, 0 12px 32px -16px #0009321f;
+  /* Soft "Focus is getting big" tint (spec/focus.md "Feels finite"). */
+  --focus-warn: #b45309;
 }
 
 /* Round the primavera-dnd drag overlay clones. The package exposes no
@@ -51,6 +53,7 @@ body > div[style*="z-index: 9999"] > div[style*="overflow: hidden"] {
   --error-text: #f87171;
   --dnd-select-bg: #293a5b;
   --dnd-placeholder-color: #475569;
+  --focus-warn: #f59e0b;
 }
 
 * {
@@ -675,6 +678,112 @@ body {
   padding: 1px 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
+}
+
+/* Add-to-focus toggle (target icon) on list/board rows, and the remove (×)
+   affordance shown inside the Focus lens. Both sit at the row's trailing
+   edge and stay hidden until the row is hovered / selected — removing a
+   pinned item must be as cheap as adding it (spec/focus.md). */
+.row-focus-toggle,
+.row-focus-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-top: -1px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.row-focus-toggle svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.row-focus-remove {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.row:hover .row-focus-toggle,
+.row:hover .row-focus-remove,
+[aria-selected="true"] .row-focus-toggle,
+[aria-selected="true"] .row-focus-remove {
+  opacity: 1;
+}
+
+/* A pinned item keeps its toggle lit even when idle, so Focus membership
+   is glanceable while scanning a list. */
+.row-focus-toggle.is-focused {
+  opacity: 1;
+  color: var(--link);
+}
+
+.row-focus-toggle:hover,
+.row-focus-remove:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Touch viewports have no hover — always show the affordances so pinning /
+   removing stays reachable. */
+@media (pointer: coarse) {
+  .row-focus-toggle,
+  .row-focus-remove {
+    opacity: 1;
+  }
+}
+
+/* Soft-cap tint on the Focus nav count once the lens gets big. */
+.nav-item[data-soft-cap] .nav-item-count {
+  color: var(--focus-warn);
+  font-weight: 600;
+}
+
+/* Add-to-focus toggle in the task dialog header (mirrors the close button
+   box, lit when the item is in Focus). */
+.task-dialog-focus-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.task-dialog-focus-toggle svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.task-dialog-focus-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.task-dialog-focus-toggle.is-focused {
+  color: var(--link);
 }
 
 /* `overflow: hidden` on .dnd-item (set by primavera-dnd's inline stylesheet)

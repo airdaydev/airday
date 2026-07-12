@@ -21,7 +21,7 @@ import type { EngineStorage } from "../wasm/airday_core_web.js";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
 const PROTOCOL_VERSION = 1;
-const LIST_MAIN = "main";
+const LIST_MAIN = "inbox";
 const DOC_ID = "00000000-0000-0000-0000-000000000000";
 
 function helloAckBytes(): Uint8Array {

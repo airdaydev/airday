@@ -18,12 +18,18 @@ import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import externalLinkSvg from "./icons/external-link.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
+import targetSvg from "./icons/target.svg?raw";
 import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
 import type { DocApp } from "./sync/store.ts";
+
+// Soft "Focus is getting big" threshold (spec/focus.md "Feels finite"):
+// at or above this many visible refs the nav count shifts colour. A gentle
+// signal, never a hard cap — you can always add more.
+const FOCUS_SOFT_CAP = 9;
 
 function ConnectionStatusPopover(props: {
   app: DocApp;
@@ -187,16 +193,19 @@ export function Nav(props: {
   app: DocApp;
   lists: { id: string; name: string; icon?: string }[];
   binCount: number;
-  /** Open-item count (Backlog + Live) per list id. Queue's row always
-   *  renders a badge (showing "-" when zero); non-Queue rows render theirs
+  /** Number of visible Focus refs — the Focus nav entry's count badge, and
+   *  what drives the soft "getting big" signal past the threshold. */
+  focusCount: number;
+  /** Open-item count (Backlog + Live) per list id. Inbox's row always
+   *  renders a badge (showing "-" when zero); non-Inbox rows render theirs
    *  only when `showListCounts` is true, again with "-" for zero. */
   openCountsByList: Record<string, number>;
-  /** Resolved Queue label — user override from doc-level settings if
+  /** Resolved Inbox label — user override from doc-level settings if
    *  present, otherwise the localized built-in label. */
   homeName: string;
   /** Doc-level settings flag; when true, render the live-item count
-   *  badge beside each non-Queue list in the nav (showing "-" when the
-   *  list is empty). Queue's badge is always shown regardless. */
+   *  badge beside each non-Inbox list in the nav (showing "-" when the
+   *  list is empty). Inbox's badge is always shown regardless. */
   showListCounts: boolean;
   view: ViewKey;
   setView: (v: ViewKey) => void;
@@ -223,9 +232,9 @@ export function Nav(props: {
   } | null>(null);
   const performDeleteList = (id: string) => {
     // Deleting the list we're viewing would leave us on a dead view;
-    // fall back to Home first.
+    // fall back to Inbox first.
     if (props.view.kind === "list" && props.view.id === id) {
-      props.setView({ kind: "list", id: "main" });
+      props.setView({ kind: "list", id: "inbox" });
     }
     props.app.deleteList(id);
   };
@@ -394,22 +403,22 @@ export function Nav(props: {
             type="button"
             class="nav-item"
             data-active={
-              props.view.kind === "list" && props.view.id === "main"
+              props.view.kind === "list" && props.view.id === "inbox"
                 ? ""
                 : undefined
             }
-            data-drop-list-id="main"
-            onClick={() => props.setView({ kind: "list", id: "main" })}
+            data-drop-list-id="inbox"
+            onClick={() => props.setView({ kind: "list", id: "inbox" })}
           >
             <span class="nav-item-icon" innerHTML={arrowRightSvg} />
             <EditableNavLabel
               name={props.homeName}
-              onSave={(name) => props.app.setMainName(name)}
+              onSave={(name) => props.app.setInboxName(name)}
               registerStart={(fn) => (startHomeRename = fn)}
             />
             <span class="nav-item-count">
-              {(props.openCountsByList["main"] ?? 0) > 0
-                ? props.openCountsByList["main"]
+              {(props.openCountsByList["inbox"] ?? 0) > 0
+                ? props.openCountsByList["inbox"]
                 : "-"}
             </span>
           </ContextMenu.Trigger>
@@ -429,6 +438,23 @@ export function Nav(props: {
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu>
+        {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
+            it's a static entry with a fixed icon — like Done / Bin. Past the
+            soft threshold the count badge shifts colour to signal "getting
+            big" (a gentle nudge, never a hard cap). */}
+        <button
+          type="button"
+          class="nav-item"
+          data-active={props.view.kind === "focus" ? "" : undefined}
+          data-soft-cap={props.focusCount >= FOCUS_SOFT_CAP ? "" : undefined}
+          onClick={() => props.setView({ kind: "focus" })}
+        >
+          <span class="nav-item-icon" innerHTML={targetSvg} />
+          {m().nav.focus}
+          <Show when={props.focusCount > 0}>
+            <span class="nav-item-count">{props.focusCount}</span>
+          </Show>
+        </button>
         <button
           type="button"
           class="nav-item"

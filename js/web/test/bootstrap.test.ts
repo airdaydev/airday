@@ -11,7 +11,7 @@ test("bulk bootstrap crosses the app boundary as one full resync", () => {
   const dek = Dek.generate();
   const source = Doc.create();
   source.addItemsAt(
-    "main",
+    "inbox",
     Array.from({ length: 100 }, (_, i) => `bootstrap ${i}`),
     0,
   );
@@ -49,5 +49,5 @@ test("bulk bootstrap crosses the app boundary as one full resync", () => {
   expect(Object.keys(app.state.itemsById)).toHaveLength(100);
   app.drainEvents();
   expect(Object.keys(app.state.itemsById)).toHaveLength(100);
-  expect(app.state.listOpen.main).toHaveLength(100);
+  expect(app.state.listOpen.inbox).toHaveLength(100);
 });

@@ -13,6 +13,7 @@ import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { DueField } from "./DueField.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
+import targetSvg from "./icons/target.svg?raw";
 import {
   addDaysToStamp,
   formatDoneStamp,
@@ -39,7 +40,7 @@ import {
   type ListView,
 } from "./sync/store.ts";
 
-// One entry in the header's move-to-list Select: the reserved `main` list
+// One entry in the header's move-to-list Select: the reserved `inbox` list
 // plus every user list, `{ id, name }`.
 type ListOption = { id: string; name: string };
 
@@ -95,14 +96,26 @@ export function TaskDialog(props: {
     return id ? props.app.state.itemsById[id] : undefined;
   });
 
+  // Whether the open item currently has a visible Focus ref (spec/focus.md).
+  const focused = createMemo(() => {
+    const id = props.itemId();
+    return id ? props.app.state.focusOrder.includes(id) : false;
+  });
+  const toggleFocus = () => {
+    const id = props.itemId();
+    if (!id) return;
+    if (focused()) props.app.removeFromFocus(id);
+    else props.app.addToFocus(id);
+  };
+
   // If the open item vanishes (deleted here or by a peer), close.
   createEffect(() => {
     if (props.itemId() !== null && !item()) props.setItemId(null);
   });
 
-  // Move-to-list options: Home (main) followed by every user list.
+  // Move-to-list options: Inbox followed by every user list.
   const listOptions = createMemo<ListOption[]>(() => [
-    { id: "main", name: props.homeName() },
+    { id: "inbox", name: props.homeName() },
     ...props.lists().map((l) => ({ id: l.id, name: l.name })),
   ]);
   const moveItemToList = (targetId: string, currentListId: string) => {
@@ -453,6 +466,21 @@ export function TaskDialog(props: {
                       </span>
                     </div>
                     <div class="task-dialog-header-actions">
+                      {/* Add-to-focus toggle: available on Open items (a
+                          Done/Binned item can't be in Focus — spec/focus.md).
+                          Filled when the item is in the Focus lens. */}
+                      <Show when={!isDone(it()) && !isBinned(it())}>
+                        <button
+                          type="button"
+                          class="task-dialog-focus-toggle"
+                          classList={{ "is-focused": focused() }}
+                          aria-pressed={focused()}
+                          aria-label={focused() ? m().focus.remove : m().focus.add}
+                          title={focused() ? m().focus.remove : m().focus.add}
+                          onClick={toggleFocus}
+                          innerHTML={targetSvg}
+                        />
+                      </Show>
                       <Show when={!isBinned(it())}>
                         <DropdownMenu>
                           <DropdownMenu.Trigger

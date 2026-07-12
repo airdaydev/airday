@@ -18,7 +18,7 @@ import {
   type SearchEngine,
 } from "../src/search.ts";
 
-const LIST_MAIN = "main";
+const LIST_MAIN = "inbox";
 
 function newSearch(): { eng: SyncEngine; search: SearchEngine } {
   // Search only consumes the engine's AppEvent stream — it never

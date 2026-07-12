@@ -59,7 +59,8 @@ type Messages = {
     serverMissingDeviceCredential: string;
   };
   nav: {
-    home: string;
+    inbox: string;
+    focus: string;
     done: string;
     bin: string;
     deleteList: string;
@@ -166,6 +167,17 @@ type Messages = {
     noMatches: string;
     typeToFind: string;
   };
+  focus: {
+    /** Add-to-focus toggle (row + context menu). */
+    add: string;
+    /** Remove-from-focus toggle / × affordance / context menu. */
+    remove: string;
+    /** Flat Focus view lifecycle toggles (no lanes — spec/focus.md). */
+    markLive: string;
+    markBacklog: string;
+    /** Empty-state hint shown when the Focus lens has no visible refs. */
+    empty: string;
+  };
   settings: {
     general: string;
     account: string;
@@ -227,7 +239,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "el servidor no devolvió una credencial de dispositivo",
     },
     nav: {
-      home: "Cola",
+      inbox: "Bandeja de entrada",
+      focus: "Enfoque",
       done: "Hecho",
       bin: "Papelera",
       deleteList: "Eliminar",
@@ -318,6 +331,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       noMatches: "Sin resultados",
       typeToFind: "Escribe para buscar",
     },
+    focus: {
+      add: "Añadir a Enfoque",
+      remove: "Quitar de Enfoque",
+      markLive: "Marcar en curso",
+      markBacklog: "Marcar como pendiente",
+      empty:
+        "Enfoque está vacío. Fija elementos con el botón ◎ para organizar en qué estás trabajando.",
+    },
     settings: {
       general: "General",
       account: "Cuenta",
@@ -379,7 +400,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       serverMissingDeviceCredential: "server did not return a device credential",
     },
     nav: {
-      home: "Queue",
+      inbox: "Inbox",
+      focus: "Focus",
       done: "Done",
       bin: "Bin",
       deleteList: "Delete",
@@ -469,6 +491,14 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       placeholder: "Find",
       noMatches: "No matches",
       typeToFind: "Type to find",
+    },
+    focus: {
+      add: "Add to Focus",
+      remove: "Remove from Focus",
+      markLive: "Mark as live",
+      markBacklog: "Mark as backlog",
+      empty:
+        "Nothing in Focus yet. Pin items with the ◎ toggle to line up what you're working on.",
     },
     settings: {
       general: "General",

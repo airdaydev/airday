@@ -1,6 +1,6 @@
 # Focus + Inbox rename — implementation plan
 
-Status: **Phase 0 + Phase 1 DONE; resuming at Phase 2 (WASM).** See "Progress &
+Status: **Phase 0–3 DONE; resuming at Phase 4 (CLI/FFI).** See "Progress &
 handoff" at the bottom for exactly what's built, what deviated from this plan, and
 where a fresh context should pick up. This doc is the handoff for that context.
 Two features:
@@ -294,58 +294,15 @@ the server. No wire-version bump, no server work.
   Phase 3 flips them to `inboxName` / `setInboxName` (already on the Phase 3 list).
   Note: `cargo check -p airday-core-web` fails off-target (E0308, pre-existing wasm-only
   crate) — build it only via `bun run build:wasm`.
-- ⏭️ **Phase 3 — Web (NEXT, not started).** i18n (`home`→`inbox` key, `Queue`→`Inbox` en,
-  `Cola`→`Bandeja de entrada` es; add `focus` label en+es), nav Focus entry + count +
-  soft-cap, Focus view component, add-to-focus toggle, store + events wiring (subscribe
-  `FocusChanged` **and** re-derive `focus_view` on item events), reserved-id literals
-  `id:"main"`→`id:"inbox"` (prefs/runtime/nav/Workspace), `mainName`→`inboxName` in
-  `store.ts`. Verify in-browser: two tabs, DnD reorder converges, **done-auto-removes**,
-  **un-done-does-NOT-reappear**, remove-keeps-item.
-
-  **WASM surface now available (from Phase 2), JS-facing names:** `addToFocus(itemId, index)`
-  (large index / append; no-op if already focused or not Open; throws if unknown),
-  `removeFromFocus(itemId)`, `moveInFocus(itemId, index)`, `focusRefIds(): string[]`
-  (visible curated-order ids), `focusViewJson(): string` (array of ItemView, same shape as
-  `itemsInListJson`). New app-event `kind:"focusChanged"` (no payload — re-derive). Inbox
-  rename is **already live in wasm**: `setInboxName(name)`, event/​settings key is now
-  `inboxName` (was `mainName`) — the JS below still reads the old names and **breaks until
-  flipped**.
-
-  **Edit-site map (grepped 2026-07-12; line numbers may drift):**
-  - *Store (`js/web/src/sync/store.ts`)* — add `focusOrder: string[]` to `WorkspaceState`;
-    seed it in `materializeEngineSnapshot` via `engine.focusRefIds()` (covers the
-    coarse/fullResync reconcile path too); re-derive it once at the end of `drainEvents`'
-    per-event branch (a `focusChanged` **or** any item add/remove/lifecycle event can change
-    visibility — cheapest correct approach is one `engine.focusRefIds()` call per non-empty
-    drain, not per-event). Add DocApp methods `addToFocus`/`removeFromFocus`/`moveInFocus`
-    (through `mutate(...)`; default add index = `state.focusOrder.length` to append).
-    Rename `SettingsView.mainName`→`inboxName` and flip all reads: `materialize` (`:277`),
-    `settingsChanged` dispatch (`:544` `ev.mainName`→`ev.inboxName`), init default (`:300`),
-    the `setMainName` method (`:210` iface, `:724-725` → `setInboxName` calling
-    `engine.setInboxName`).
-  - *Prefs (`prefs.ts:19-22`)* — add `{ kind: "focus" }` to `ViewKey`.
-  - *Runtime (`sync/runtime.ts:84,86`)* — initial-view default `{kind:"list",id:"main"}`
-    → `id:"inbox"` (both the missing-prefs default and the deleted-list fallback).
-  - *Nav (`nav.tsx`)* — reserved-id literals `id:"main"` at `:228,:397,:401-402,:411-412`
-    → `inbox`; `setMainName` call at `:407`; new static **Focus** entry (mirror the Done
-    entry at `:435-436` / Bin at `:447-449`) placed above user lists, count = focusOrder
-    length, soft-cap colour past ~7–10.
-  - *Workspace (`Workspace.tsx`)* — reserved-id literals at `:431,:890,:1017,:1221,:1238,
-    :1247,:1555`; `state.settings.mainName` read at `:423`; `app.setMainName` at `:1247`;
-    add `view().kind === "focus"` branches alongside the `done`/`bin`/`list` dispatch
-    (`:374,:851,:891-892,:960,:1009-1017,:1258,:1271,:1348,:1374,:1414,:1437,:1456,:1511,
-    :1558`); nav-label helper `v.id === "main"` at `:1555`.
-  - *Also consuming `mainName` / `"main"`* — `FindPalette.tsx:165-167`
-    (`state.settings.mainName`, `m().nav.home`, `listId === "main"`), `TaskDialog.tsx:105`
-    (`id:"main"` synthetic Home row). Flip these too.
-  - *i18n (`i18n.tsx`)* — key `home`→`inbox`, en `"Queue"`→`"Inbox"`, es `"Cola"`→`"Bandeja
-    de entrada"`, add `nav.focus` en+es; then update `m().nav.home` call sites
-    (`FindPalette.tsx:167`, `Workspace.tsx:424`) to `nav.inbox`.
-  - *DnD* — reuse existing infra in `js/web/src/dnd/` (`core`/`dom`/`solid`/`vanilla`) +
-    `reorder.ts` for the Focus view's drag-to-reorder → `moveInFocus`. Not yet read.
-  - *New file* — a Focus view component (flat ordered list over `focusOrder` → `itemsById`;
-    per-row toggle-Live / mark-Done / remove-from-focus). Model on `Board.tsx` / the
-    list-view render in `Workspace.tsx`.
+- ✅ **Phase 3 — Web. DONE, all JS tests green.** i18n, nav Focus entry, Focus lens
+  render, add-to-focus toggles, store/event wiring, and the `main`→`inbox` literal sweep
+  all landed. Details + deviations in "Progress & handoff" (Phase 3 section). Notable
+  choice: **no new Focus view component** — the Focus lens reuses the existing list-view
+  `Dnd` render path (branch on `view().kind === "focus"`) rather than a `Board`-style
+  standalone component, so selection / expansion / open-dialog / global shortcuts come for
+  free. In-browser verification was done by Daniel (single context); the **two-tab
+  convergence + CLI↔web fingerprint parity checks move to Phase 5**, since CLI focus
+  parity doesn't exist until Phase 4.
 - **Phase 4 — CLI/FFI.** Focus commands (`focus` / `focus add` / `rm` / `mv`) + FFI
   wrappers; CLI↔web integration test. (`sync_smoke.rs` Queue→Inbox assertion already
   fixed in Phase 1.)
@@ -358,9 +315,10 @@ the server. No wire-version bump, no server work.
 
 ## Progress & handoff (as of 2026-07-12)
 
-Everything below Phase 1 is on `main`'s working tree (not yet committed). Full
-`cargo test` is green; `cargo fmt` clean; no new clippy hits (repo lint was already red
-pre-existing).
+Phases 1–3 are on `main`'s working tree (commit state per git). Full `cargo test` green;
+`cargo fmt` clean; no new clippy hits (repo lint was already red pre-existing). Web +
+core **JS** suites green (`bun test` in `js/web` and `js/core`) and `tsc --noEmit` clean
+in `js/web`.
 
 **Phase 1a — `main` → `inbox` rename (done).**
 - `core/src/doc.rs`: `LIST_MAIN`→`LIST_INBOX` (`"main"`→`"inbox"`), `LIST_MAIN_NAME`→
@@ -394,8 +352,46 @@ pre-existing).
   **done-auto-removes** / **un-done-does-not-reappear** cases (NOT the old
   "un-done-reappears").
 
+**Phase 3 — Web (done).**
+- **Inbox rename swept across `js/web`:** every `"main"` reserved-id literal → `"inbox"`
+  (prefs/runtime/nav/Workspace/FindPalette/TaskDialog); `SettingsView.mainName`→`inboxName`
+  + all reads; `setMainName`→`setInboxName`; i18n key `home`→`inbox` (en `Inbox`, es
+  `Bandeja de entrada`). `grep '"main"'` in `js/web/src` now only hits the `<main>` tag.
+- **JS test fallout:** `js/core/test` + `js/web/test` hardcoded the reserved id as `"main"`
+  (const `LIST_MAIN`, inline literals, a `listOpen.main` assertion). Flipped their *values*
+  to `"inbox"` (kept the `LIST_MAIN` const name). These broke the moment Phase 2 rebuilt the
+  wasm; not enumerated in the original Phase 3 list.
+- **Store (`sync/store.ts`):** `focusOrder: string[]` on `WorkspaceState`, seeded in
+  `materializeEngineSnapshot` via `engine.focusRefIds()` (also covers coarse/fullResync).
+  `drainEvents` re-derives it once per non-empty drain with
+  `setState("focusOrder", reconcile(engine.focusRefIds()))` — one call covers both
+  `focusChanged` and any item lifecycle/add/remove that changes visibility. `focusChanged`
+  needs no `dispatch` case (unknown kinds fall through; `search.apply` ignores it). New
+  `DocApp` methods `addToFocus`/`removeFromFocus`/`moveInFocus` (default add index =
+  `state.focusOrder.length`).
+- **Focus lens render:** reuses the **list-view `Dnd` path**, not a new component —
+  `items()` gets a `kind==="focus"` branch, `onReorder` a focus branch → `moveInFocus`,
+  `reorder` enabled for focus. So selection/expansion/open-dialog/global shortcuts (x, ⌫,
+  Enter, ⌘C) all work in Focus for free. Draft/paste/Space-add stay list-only (already
+  gated). Focus added to the `[`/`]` bracket-nav sequence.
+- **Affordances (`Row.tsx`):** Row self-serves Focus membership from
+  `props.app.state.focusOrder` (no threading). Open list/board rows show a hover/selected
+  **target-icon pin toggle** (lit when focused) + a context-menu "Add/Remove from Focus".
+  Focus-lens rows instead show an **× remove** button + context items "Remove from Focus"
+  and a **toggle-Live** ("Mark as live"/"Mark as backlog", since the lens is flat/no-lanes).
+  `TaskDialog` header carries the same pin toggle (Open items only). New icon
+  `icons/target.svg`; new i18n `focus.*` group; CSS incl. `--focus-warn` soft-cap tint.
+- **Nav:** static **Focus** entry (target icon) between Inbox and Done, count badge =
+  `focusCount` (new prop = `state.focusOrder.length`), soft-cap colour shift at
+  `FOCUS_SOFT_CAP = 9` via `data-soft-cap`. **Decided the Phase-3 UI open question:**
+  soft threshold = **9** visible refs, treatment = amber count + bold (gentle, no hard cap).
+- *Watch-outs for Phase 4/5:* focus toggles act on a **single item** (not the multi-select),
+  by design. `moveInFocus` is driven through `planReorderMoves` exactly like `moveItem`
+  (assumes the same visible-index semantics). The two-tab convergence + fingerprint-parity
+  verification is deferred to Phase 5 (needs CLI focus from Phase 4).
+
 **Decisions locked (see "Open decisions" above):** auto-remove-on-Done · no-op re-add ·
-additive-v2 · bare-uuid FocusRef.
+additive-v2 · bare-uuid FocusRef · **soft-cap = 9 (Phase 3 UI call, was open #5)**.
 
 **Handoff notes / watch-outs:**
 1. `reconcile()` is exposed to WASM but **never called** in web/CLI (only unit tests).
@@ -435,8 +431,9 @@ additive-v2 · bare-uuid FocusRef.
 4. ~~i18n key `home` → `inbox`~~ **Resolved: full flip including the stored id** —
    `main` → `inbox` everywhere, with a one-time export/wipe/import cutover on the live
    doc (Part A).
-5. **Soft-cap threshold** (~7–10) and its visual treatment (B.11) — *UI call, decide
-   in Phase 3.*
+5. **Soft-cap threshold** (~7–10) and its visual treatment (B.11) — **RESOLVED in
+   Phase 3: threshold = 9 visible refs; treatment = amber + bold count badge** (gentle,
+   no hard cap). `FOCUS_SOFT_CAP` in `nav.tsx`, `--focus-warn` in `styles.css`.
 6. **FocusRef — RESOLVED: bare uuid now** (parser accepts colon-less as local doc;
    `<doc_id>:<item_id>` reserved for cross-doc).
 </content>

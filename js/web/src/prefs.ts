@@ -18,6 +18,7 @@ import { STORE_PREFS, openAirdayDb } from "@airday/core/storage/web-db";
  *  `App.tsx`; persisted verbatim. */
 export type ViewKey =
   | { kind: "list"; id: string }
+  | { kind: "focus" }
   | { kind: "done" }
   | { kind: "bin" };
 

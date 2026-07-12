@@ -17,7 +17,7 @@ import { Dek, Doc, SyncEngine } from "../wasm/airday_core_web.js";
 import type { EngineStorage } from "../wasm/airday_core_web.js";
 import { MemEngineStorage } from "./mem-engine-storage.ts";
 
-const LIST_MAIN = "main";
+const LIST_MAIN = "inbox";
 
 function memStorage(): EngineStorage {
   return new MemEngineStorage() as unknown as EngineStorage;

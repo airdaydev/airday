@@ -34,7 +34,7 @@ function engineFrom(doc: Doc): SyncEngine {
 describe("store dueOn", () => {
   test("hydrates dueOn from the attach burst", () => {
     const doc = Doc.create();
-    const id = doc.addItem("main", "with a due date");
+    const id = doc.addItem("inbox", "with a due date");
     doc.setItemDueOn(id, "2026-07-15");
 
     const app = createSyncedApp(engineFrom(doc));
@@ -43,7 +43,7 @@ describe("store dueOn", () => {
 
   test("patches dueOn on set, then clears it", () => {
     const doc = Doc.create();
-    const id = doc.addItem("main", "task");
+    const id = doc.addItem("inbox", "task");
     const app = createSyncedApp(engineFrom(doc));
     expect(app.state.itemsById[id]?.dueOn).toBeUndefined();
 

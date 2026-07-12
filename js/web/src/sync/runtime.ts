@@ -77,13 +77,13 @@ export function createWorkspaceRuntime(props: {
   // Workspace view lives at this level so the prefs-save effect
   // below can persist it independently of the device-frontier write.
   // Seed from the prefs row; a `kind:"list"` pointing at a
-  // since-deleted list falls back to Home silently. `done`/`bin` are
-  // global views and always resolvable.
+  // since-deleted list falls back to Inbox silently. `focus`/`done`/`bin`
+  // are global views and always resolvable.
   const initialView: ViewKey = (() => {
     const v = props.boot.prefs?.currentView;
-    if (!v) return { kind: "list", id: "main" };
+    if (!v) return { kind: "list", id: "inbox" };
     if (v.kind === "list" && !app.state.listsById[v.id]) {
-      return { kind: "list", id: "main" };
+      return { kind: "list", id: "inbox" };
     }
     return v;
   })();

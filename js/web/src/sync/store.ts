@@ -92,6 +92,12 @@ export interface WorkspaceState {
   /** Binned-item count, maintained incrementally so the Bin badge
    *  never needs a global scan. */
   binCount: number;
+  /** Visible Focus refs in curated order (`engine.focusRefIds()` — Open,
+   *  local, deduped). The Focus lens iterates this; each id resolves to
+   *  `itemsById`. Re-derived wholesale per non-empty event drain, since a
+   *  focus mutation *or* an item lifecycle change elsewhere can alter
+   *  visibility. See spec/focus.md. */
+  focusOrder: string[];
   listsOrder: string[];
   listsById: Record<string, ListView>;
   settings: SettingsView;
@@ -111,14 +117,14 @@ export interface RecentDoneEntry {
 
 export interface SettingsView {
   /** When true, the nav renders the live-item count beside each
-   *  non-Queue list (subject to the count > 0 gate). Queue's count is
+   *  non-Inbox list (subject to the count > 0 gate). Inbox's count is
    *  always shown regardless. Single global flag; default false. Synced
    *  via the doc-level settings map. */
   showListCounts: boolean;
-  /** User-chosen display-name override for the reserved `main` (Queue)
-   *  list. `null` when no override is set — clients fall back to the
-   *  localized built-in label. Synced via the doc-level settings map. */
-  mainName: string | null;
+  /** User-chosen display-name override for the reserved `inbox` list.
+   *  `null` when no override is set — clients fall back to the localized
+   *  built-in label. Synced via the doc-level settings map. */
+  inboxName: string | null;
 }
 
 export interface DocApp {
@@ -205,9 +211,17 @@ export interface DocApp {
    *  Queue's own count is always visible (subject to count > 0) and is
    *  not gated by this flag. */
   setShowListCounts(show: boolean): void;
-  /** Set or clear the user-chosen display name for the reserved
-   *  `main` (Queue) list. Passing `""` clears the override. */
-  setMainName(name: string): void;
+  /** Set or clear the user-chosen display name for the reserved `inbox`
+   *  list. Passing `""` clears the override. */
+  setInboxName(name: string): void;
+  /** Pin an item into the Focus lens at `index` in the visible curated
+   *  order (default: append). No-op if the item already has a visible
+   *  ref or isn't Open; throws if the item is unknown. See spec/focus.md. */
+  addToFocus(id: string, index?: number): void;
+  /** Remove an item's ref(s) from the Focus lens. The item is untouched. */
+  removeFromFocus(id: string): void;
+  /** Reorder an item within the Focus lens to visible position `index`. */
+  moveInFocus(id: string, index: number): void;
   /** Per-session local undo. Returns whether a step was applied so the
    *  caller can decide whether to `preventDefault()` the keybinding.
    *  Remote-applied ops are excluded by origin tag — see
@@ -270,11 +284,16 @@ function materializeEngineSnapshot(engine: SyncEngine): WorkspaceState {
     itemsById,
     listOpen,
     binCount,
+    // Not part of the workspace snapshot JSON (which is items + lists +
+    // settings only) — read straight from the engine's focus projection.
+    // Covers the coarse / fullResync reconcile path too, since both
+    // rematerialize through here.
+    focusOrder: engine.focusRefIds(),
     listsOrder: payload.lists.map((list) => list.id),
     listsById,
     settings: {
       showListCounts: payload.settings.showListCounts ?? true,
-      mainName: payload.settings.mainName ?? null,
+      inboxName: payload.settings.inboxName ?? null,
     },
   };
 }
@@ -293,11 +312,12 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     itemsById: {},
     listOpen: {},
     binCount: 0,
+    focusOrder: [],
     listsOrder: [],
     listsById: {},
     settings: {
       showListCounts: true,
-      mainName: null,
+      inboxName: null,
     },
   });
   const [version, setVersion] = createSignal(0);
@@ -541,7 +561,7 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         // setState keeps the store in lockstep with the doc.
         setState("settings", {
           showListCounts: ev.showListCounts ?? true,
-          mainName: ev.mainName ?? null,
+          inboxName: ev.inboxName ?? null,
         });
         break;
       }
@@ -573,6 +593,15 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
         for (const ev of events) {
           dispatch(ev);
           search.apply(ev);
+        }
+        // Focus visibility depends on both focus-container mutations
+        // (`focusChanged`) and item add/remove/lifecycle events elsewhere
+        // (a Done/Bin drops a focused item from the view, and Done also
+        // auto-removes its ref). One wholesale re-derive per non-empty
+        // drain is the cheapest correct approach — `reconcile` no-ops when
+        // the order is unchanged. See spec/focus.md B.8.
+        if (events.length > 0) {
+          setState("focusOrder", reconcile(engine.focusRefIds()));
         }
       }
       if (events.length > 0) setVersion((v) => v + 1);
@@ -721,8 +750,19 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
     setShowListCounts(show) {
       mutate(() => engine.setShowListCounts(show));
     },
-    setMainName(name) {
-      mutate(() => engine.setMainName(name));
+    setInboxName(name) {
+      mutate(() => engine.setInboxName(name));
+    },
+    addToFocus(id, index) {
+      // A large index appends (the engine clamps to the visible tail);
+      // default to the current visible length so callers can omit it.
+      mutate(() => engine.addToFocus(id, index ?? state.focusOrder.length));
+    },
+    removeFromFocus(id) {
+      mutate(() => engine.removeFromFocus(id));
+    },
+    moveInFocus(id, index) {
+      mutate(() => engine.moveInFocus(id, index));
     },
     undo() {
       const steps = undoStack.pop();

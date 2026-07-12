@@ -371,6 +371,17 @@ export function Workspace(props: {
       }
       return out;
     }
+    if (v.kind === "focus") {
+      // The Focus lens: visible refs in curated order (spec/focus.md).
+      // `focusOrder` is already Open-filtered + deduped by the engine; just
+      // resolve each id to its item.
+      const out: ItemView[] = [];
+      for (const id of state.focusOrder) {
+        const it = state.itemsById[id];
+        if (it) out.push(it);
+      }
+      return out;
+    }
     if (v.kind === "done") {
       // Done view excludes binned items: a done-then-binned item lives
       // in the Bin (see context menu — Bin owns the next transition).
@@ -420,15 +431,15 @@ export function Workspace(props: {
   // localized built-in label. Centralised here so the nav row, the
   // workspace header, and `viewTitle` agree.
   const homeName = createMemo((): string => {
-    const override = state.settings.mainName;
-    return override && override.length > 0 ? override : m().nav.home;
+    const override = state.settings.inboxName;
+    return override && override.length > 0 ? override : m().nav.inbox;
   });
 
   // Resolved display label for any list id, matching the header/nav rules:
-  // `main` uses the Home override/built-in, others use the stored name.
+  // `inbox` uses the Inbox override/built-in, others use the stored name.
   // Used by Done-view rows to badge each item with its origin list.
   const listLabel = (listId: string): string =>
-    listId === "main"
+    listId === "inbox"
       ? homeName()
       : (state.listsById[listId]?.name ?? listId);
 
@@ -448,6 +459,21 @@ export function Workspace(props: {
   const onReorder = (op: DndOp<ItemView>) => {
     if (op.type !== "move") return;
     const v = view();
+    if (v.kind === "focus") {
+      // Drag-to-reorder within the Focus lens maps to `moveInFocus`, which
+      // reorders the FocusRef in the curated (visible) order.
+      const ids = items().map((it) => it.id);
+      const moves = planReorderMoves(
+        ids,
+        op.keys.map(String),
+        op.beforeKey === null ? null : String(op.beforeKey),
+      );
+      if (moves.length === 0) return;
+      app.withActionBatch(() => {
+        for (const move of moves) app.moveInFocus(move.id, move.index);
+      });
+      return;
+    }
     if (v.kind !== "list") return;
     const ids = items().map((it) => it.id);
     const moves = planReorderMoves(
@@ -887,7 +913,8 @@ export function Workspace(props: {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const seq: ViewKey[] = [
-      { kind: "list", id: "main" },
+      { kind: "list", id: "inbox" },
+      { kind: "focus" },
       { kind: "done" },
       ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
       ...lists().map((l): ViewKey => ({ kind: "list", id: l.id })),
@@ -1014,7 +1041,7 @@ export function Workspace(props: {
         ? { kind: "bin" }
         : r.lifecycle === "done"
           ? { kind: "done" }
-          : { kind: "list", id: r.listId || "main" };
+          : { kind: "list", id: r.listId || "inbox" };
     setView(target);
     // If the destination list renders as a board, the list-view Dnd isn't
     // mounted — hand the id to the Board's reveal path (select + scroll in
@@ -1088,6 +1115,7 @@ export function Workspace(props: {
         app={app}
         lists={lists()}
         binCount={state.binCount}
+        focusCount={state.focusOrder.length}
         openCountsByList={openCountsByList()}
         homeName={homeName()}
         showListCounts={state.settings.showListCounts}
@@ -1216,9 +1244,9 @@ export function Workspace(props: {
               innerHTML={menuSvg}
             />
             {/* User-created lists carry a display icon (chosen emoji or
-                the default glyph). Reserved `main` (Home) has no
-                `ListMeta` row, so it can't store one — gated out. */}
-            <Show when={editableListId() !== null && editableListId() !== "main"}>
+                the default glyph). Reserved `inbox` has no `ListMeta` row,
+                so it can't store one — gated out. */}
+            <Show when={editableListId() !== null && editableListId() !== "inbox"}>
               <ListIconPicker
                 icon={state.listsById[editableListId() ?? ""]?.icon}
                 onPick={(icon) => app.setListIcon(editableListId() ?? "", icon)}
@@ -1235,16 +1263,16 @@ export function Workspace(props: {
                 <EditableNavLabel
                   class="editable-title"
                   name={
-                    listId === "main"
+                    listId === "inbox"
                       ? homeName()
                       : (lists().find((l) => l.id === listId)?.name ?? listId)
                   }
                   onSave={(name) => {
-                    // Home's name lives on the doc-level settings map,
+                    // Inbox's name lives on the doc-level settings map,
                     // not as a `ListMeta` row — route to the right
                     // mutation so the override survives sync. Empty
                     // input clears the override (falls back to default).
-                    if (listId === "main") app.setMainName(name);
+                    if (listId === "inbox") app.setInboxName(name);
                     else app.renameList(listId, name);
                   }}
                 />
@@ -1411,9 +1439,11 @@ export function Workspace(props: {
               when={dndItems().length > 0}
               fallback={
                 <div class="dnd-host empty">
-                  {view().kind === "list" && matchesKbDevice()
-                    ? m().workspace.createWithSpace
-                    : m().workspace.emptyState}
+                  {view().kind === "focus"
+                    ? m().focus.empty
+                    : view().kind === "list" && matchesKbDevice()
+                      ? m().workspace.createWithSpace
+                      : m().workspace.emptyState}
                 </div>
               }
             >
@@ -1434,7 +1464,7 @@ export function Workspace(props: {
                   clearOnClickOutside
                   fillHeight
                   autofocus
-                  reorder={view().kind === "list"}
+                  reorder={view().kind === "list" || view().kind === "focus"}
                   onReorder={onReorder}
                 >
                   {(item, expanded) => {
@@ -1552,9 +1582,10 @@ function viewTitle(
   if (v.kind === "list") {
     // `homeName` already resolves the user override → localized default
     // chain (see `App.homeName`); pass through verbatim.
-    if (v.id === "main") return homeName;
+    if (v.id === "inbox") return homeName;
     return lists.find((l) => l.id === v.id)?.name ?? v.id;
   }
+  if (v.kind === "focus") return m.nav.focus;
   if (v.kind === "done") return m.nav.done;
   return m.nav.bin;
 }

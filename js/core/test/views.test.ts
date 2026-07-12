@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Doc } from "../wasm/airday_core_web.js";
 
-const LIST_MAIN = "main";
+const LIST_MAIN = "inbox";
 
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));

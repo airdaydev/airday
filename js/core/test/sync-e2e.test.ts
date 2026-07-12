@@ -33,7 +33,7 @@ import { MemEngineStorage } from "./mem-engine-storage.ts";
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const SERVER_BIN = join(REPO_ROOT, "target/debug/airday-server");
 
-const LIST_MAIN = "main";
+const LIST_MAIN = "inbox";
 const SNAPSHOT_THRESHOLD = 5;
 // Weak Argon2 keeps signup ~ms; matches `server/tests/sync.rs::weak_params`.
 const KDF = { m_kib: 8, t: 1, p: 1 } as const;

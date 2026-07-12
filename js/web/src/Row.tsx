@@ -13,6 +13,7 @@ import {
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { setLinkifiedText } from "./linkify.ts";
+import targetSvg from "./icons/target.svg?raw";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -84,6 +85,34 @@ export function Row(props: {
   // overlay count so global keyboard shortcuts stand down while it's up.
   const [menuOpen, setMenuOpen] = createSignal(false);
   trackOverlay(menuOpen);
+
+  // Whether this row currently has a visible Focus ref. `focusOrder` is a
+  // small (bounded) store array, so the membership scan is cheap and only
+  // re-runs when the Focus lens actually changes. See spec/focus.md.
+  const focused = createMemo(() =>
+    props.app.state.focusOrder.includes(props.item().id),
+  );
+  // The add-to-focus toggle shows on any open item outside the Focus /
+  // Done / Bin views (i.e. list + board lanes). Inside the Focus lens the
+  // row carries a remove (×) affordance instead. Drafts never show either.
+  const canPinToFocus = (): boolean =>
+    props.viewKind === "list" &&
+    isOpen(props.item()) &&
+    !isDraftId(props.item().id);
+  const inFocusView = (): boolean =>
+    props.viewKind === "focus" && !isDraftId(props.item().id);
+  const onToggleFocus = () => {
+    const id = props.item().id;
+    if (focused()) props.app.removeFromFocus(id);
+    else props.app.addToFocus(id);
+  };
+  const onRemoveFromFocus = () => props.app.removeFromFocus(props.item().id);
+  // Flip the item between the Backlog and Live lifecycles from within the
+  // flat Focus view (which has no lanes — spec/focus.md B.6).
+  const onToggleLive = () => {
+    const it = props.item();
+    props.app.setLifecycle(it.id, it.live ? "backlog" : "live");
+  };
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -446,6 +475,44 @@ export function Row(props: {
             </div>
           </Show>
         </div>
+        {/* Add-to-focus toggle (target icon) — a cheap pin/unpin gesture on
+            any open list/board row; filled when the item is in Focus. In the
+            Focus lens itself the row instead carries a remove (×), since
+            membership is a given there. tabIndex -1 + pointerdown-stop so
+            neither steals dnd focus nor starts a drag. */}
+        <Show when={canPinToFocus() && !props.expanded()}>
+          <button
+            type="button"
+            tabIndex={-1}
+            class="row-focus-toggle"
+            classList={{ "is-focused": focused() }}
+            aria-pressed={focused()}
+            aria-label={focused() ? m().focus.remove : m().focus.add}
+            title={focused() ? m().focus.remove : m().focus.add}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFocus();
+            }}
+            innerHTML={targetSvg}
+          />
+        </Show>
+        <Show when={inFocusView() && !props.expanded()}>
+          <button
+            type="button"
+            tabIndex={-1}
+            class="row-focus-remove"
+            aria-label={m().focus.remove}
+            title={m().focus.remove}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveFromFocus();
+            }}
+          >
+            ✕
+          </button>
+        </Show>
         <Show when={!props.showCreated && !props.expanded() && props.item().dueOn}>
           {(due) => (
             <DueBadge
@@ -492,6 +559,26 @@ export function Row(props: {
             <ContextMenu.Item class="context-menu-item" onSelect={onMarkNotDone}>
               <span>{m().workspace.markNotDone}</span>
               <kbd class="menu-shortcut">X</kbd>
+            </ContextMenu.Item>
+          </Show>
+          <Show when={inFocusView()}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onToggleLive}>
+              <span>
+                {props.item().live ? m().focus.markBacklog : m().focus.markLive}
+              </span>
+            </ContextMenu.Item>
+          </Show>
+          <Show when={canPinToFocus()}>
+            <ContextMenu.Item class="context-menu-item" onSelect={onToggleFocus}>
+              {focused() ? m().focus.remove : m().focus.add}
+            </ContextMenu.Item>
+          </Show>
+          <Show when={inFocusView()}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={onRemoveFromFocus}
+            >
+              {m().focus.remove}
             </ContextMenu.Item>
           </Show>
           <Show when={!isBinned(props.item())}>
