@@ -334,7 +334,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       typeToFind: "Escribe para buscar",
     },
     focus: {
-      add: "Añadir a Enfoque",
+      add: "Enfoque",
       remove: "Quitar de Enfoque",
       badge: "Enfoque",
       markLive: "Marcar en curso",
@@ -496,7 +496,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       typeToFind: "Type to find",
     },
     focus: {
-      add: "Add to Focus",
+      add: "Focus",
       remove: "Remove from Focus",
       badge: "Focus",
       markLive: "Mark as live",
