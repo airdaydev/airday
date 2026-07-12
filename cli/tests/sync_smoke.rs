@@ -24,7 +24,8 @@ use uuid::Uuid;
 mod support;
 
 use support::{
-    TestServer, materialize_signup_profile, register_device, reopen_profile, signup_via_http,
+    TestServer, materialize_profile, materialize_signup_profile, register_device, reopen_profile,
+    signup_via_http,
 };
 
 #[tokio::test]
@@ -320,6 +321,119 @@ async fn second_device_observes_first_devices_items_via_pull() {
     assert_eq!(view.text, "from-A");
     assert_eq!(view.list_id, LIST_INBOX);
     session_b.flush().await.unwrap();
+}
+
+/// Focus lens convergence across two devices (`spec/focus.md`). Device A
+/// curates Focus (add / reorder / auto-remove-on-Done); device B pulls and
+/// must observe the identical Focus order, and both docs' fingerprints must
+/// match — the fingerprint hashes the focus order, so this is the CLI↔web
+/// parity guard Phase 5 calls for. Also pins the two lifecycle rules:
+/// marking a focused item Done removes it from Focus, and un-doing it does
+/// **not** bring it back.
+#[tokio::test]
+async fn focus_curation_converges_across_devices() {
+    let server = TestServer::start().await;
+    let dek = Dek::generate();
+    let signup = signup_via_http(&server, &dek, "focus-A").await;
+
+    // Device A: full profile, fresh seeded doc.
+    let tmp_a = tempfile::tempdir().unwrap();
+    let profile_a = materialize_signup_profile(
+        tmp_a.path(),
+        &server.base,
+        &signup,
+        &dek,
+        "focus@example.com",
+        true,
+    )
+    .await;
+
+    // Device B: register a second device on the same account, share the DEK.
+    let device_b = register_device(&server, &signup.device_token, "focus-B").await;
+    let tmp_b = tempfile::tempdir().unwrap();
+    let profile_b = materialize_profile(
+        tmp_b.path(),
+        &server.base,
+        &signup.account_id,
+        &signup.primary_doc_id,
+        &device_b.device_id,
+        &device_b.device_token,
+        &dek,
+        "focus@example.com",
+        false,
+    )
+    .await;
+
+    // A curates: three inbox items, all pinned to Focus, then reorder the
+    // third to the front → focus order [i3, i1, i2].
+    let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
+    let i1 = session_a.doc().add_item(LIST_INBOX, "one").unwrap();
+    let i2 = session_a.doc().add_item(LIST_INBOX, "two").unwrap();
+    let i3 = session_a.doc().add_item(LIST_INBOX, "three").unwrap();
+    for id in [&i1, &i2, &i3] {
+        session_a.doc().add_to_focus(id, usize::MAX).unwrap();
+    }
+    session_a.doc().move_in_focus(&i3, 0).unwrap();
+    assert_eq!(
+        session_a.doc().focus_refs(),
+        vec![i3.clone(), i1.clone(), i2.clone()],
+        "A's local focus order after reorder"
+    );
+    let fp_curated = session_a.doc().fingerprint();
+    session_a.flush().await.unwrap();
+
+    // B pulls on open: identical focus order, identical fingerprint.
+    let session_b = Session::open_with_profile(profile_b, true).await.unwrap();
+    assert!(session_b.is_online());
+    assert_eq!(
+        session_b.doc().focus_refs(),
+        vec![i3.clone(), i1.clone(), i2.clone()],
+        "B observes A's curated focus order via pull"
+    );
+    assert_eq!(
+        session_b.doc().fingerprint(),
+        fp_curated,
+        "fingerprint parity (focus order is hashed)"
+    );
+    session_b.flush().await.unwrap();
+
+    // A reopens and marks the focused i1 Done: it self-removes from Focus in
+    // the same commit → [i3, i2]. Un-doing it back to Backlog must NOT re-add
+    // it.
+    let session_a2 = Session::open_with_profile(reopen_profile(tmp_a.path()), true)
+        .await
+        .unwrap();
+    session_a2.doc().set_item_done(&i1, true).unwrap();
+    assert_eq!(
+        session_a2.doc().focus_refs(),
+        vec![i3.clone(), i2.clone()],
+        "Done auto-removes the focus ref"
+    );
+    session_a2.doc().set_item_done(&i1, false).unwrap();
+    assert_eq!(
+        session_a2.doc().focus_refs(),
+        vec![i3.clone(), i2.clone()],
+        "un-done does not reappear in Focus"
+    );
+    let fp_compacted = session_a2.doc().fingerprint();
+    session_a2.flush().await.unwrap();
+
+    // B reopens to pull the Done + un-done ops; converges to [i3, i2] with
+    // matching fingerprint.
+    let session_b2 = Session::open_with_profile(reopen_profile(tmp_b.path()), true)
+        .await
+        .unwrap();
+    assert_eq!(
+        session_b2.doc().focus_refs(),
+        vec![i3, i2],
+        "B converges to the self-compacted focus order"
+    );
+    assert_eq!(
+        session_b2.doc().fingerprint(),
+        fp_compacted,
+        "fingerprint parity after Done self-clean + un-done"
+    );
+    session_b2.flush().await.unwrap();
 }
 
 async fn wait_for_ops(server: &TestServer, doc_id: Uuid, target: usize) -> queries::FetchedBatch {

@@ -1,8 +1,9 @@
 # Focus + Inbox rename — implementation plan
 
-Status: **Phase 0–3 DONE; resuming at Phase 4 (CLI/FFI).** See "Progress &
-handoff" at the bottom for exactly what's built, what deviated from this plan, and
-where a fresh context should pick up. This doc is the handoff for that context.
+Status: **Phase 0–4 DONE; Phase 5 verification DONE — only the live-doc cutover
+remains (Daniel triggers the wipe).** See "Progress & handoff" at the bottom for
+exactly what's built, what deviated from this plan, and where a fresh context should
+pick up. This doc is the handoff for that context.
 Two features:
 
 1. **Rename "Queue" → "Inbox"** (label only; `main` id and settings keys unchanged).
@@ -303,13 +304,18 @@ the server. No wire-version bump, no server work.
   free. In-browser verification was done by Daniel (single context); the **two-tab
   convergence + CLI↔web fingerprint parity checks move to Phase 5**, since CLI focus
   parity doesn't exist until Phase 4.
-- **Phase 4 — CLI/FFI.** Focus commands (`focus` / `focus add` / `rm` / `mv`) + FFI
-  wrappers; CLI↔web integration test. (`sync_smoke.rs` Queue→Inbox assertion already
-  fixed in Phase 1.)
-- **Phase 5 — Verify + cutover.** Multi-device convergence, fingerprint parity across
-  CLI/web, self-clean-on-done, un-done-does-not-reappear. `/verify`. **Then** run the
-  live-doc export → wipe → import cutover (handoff note 5) — dry-run on a scratch
-  account first; Daniel triggers the wipe.
+- ✅ **Phase 4 — CLI/FFI. DONE.** `airday focus` / `focus add` / `rm` / `mv` commands
+  (`cli/src/commands/focus.rs`, wired in `commands/mod.rs`); FFI wrappers
+  (`add_to_focus` / `remove_from_focus` / `move_in_focus` / `focus_view` on
+  `AirdayStore`). CLI↔web convergence + fingerprint-parity integration test
+  (`focus_curation_converges_across_devices` in `sync_smoke.rs`). Details in "Progress
+  & handoff" (Phase 4 section).
+- **Phase 5 — Verify (DONE) + cutover (PENDING Daniel).** ✅ Multi-device convergence,
+  fingerprint parity across CLI devices, self-clean-on-done, un-done-does-not-reappear —
+  all covered by the automated integration test **and** a live server-backed CLI drive
+  (two devices, real WS, bidirectional). ⏳ **Remaining:** the live-doc export → wipe →
+  import cutover (handoff note 5) — dry-run on a scratch account first; **Daniel triggers
+  the wipe**, not the agent.
 
 ---
 
@@ -389,6 +395,49 @@ in `js/web`.
   by design. `moveInFocus` is driven through `planReorderMoves` exactly like `moveItem`
   (assumes the same visible-index semantics). The two-tab convergence + fingerprint-parity
   verification is deferred to Phase 5 (needs CLI focus from Phase 4).
+
+**Phase 4 — CLI/FFI (done).**
+- **CLI (`cli/src/commands/focus.rs`, new):** `airday focus` (list, default action),
+  `focus add <item> [pos]`, `focus rm <item>`, `focus mv <item> <pos>`. Bare `focus`
+  lists the view via `Option<FocusCmd>` (None ⇒ list) — same optional-subcommand shape
+  clap gives `lists`. **Positions on the CLI are 1-based** (matches the numbered listing
+  the user sees); converted to the doc layer's 0-based visible index via
+  `one_based_to_index` (`add` with no pos ⇒ `usize::MAX` append). List output shows
+  `<pos>  <id>  [mark] text` where `*` = Live (Focus is Open-only, so Live is the only
+  lifecycle distinction). `--json` global emits `{pos,id,text,list_id,live}`. Wired into
+  `commands/mod.rs` (`Cmd::Focus` between `Edit` and `Lists`).
+- **FFI (`core/ffi/src/lib.rs`):** added `add_to_focus(item, index: Option<u32>)`
+  (None ⇒ append), `remove_from_focus(item)`, `move_in_focus(item, index: u32)`,
+  `focus_view() -> Vec<ItemView>` to `AirdayStore`, mirroring the existing
+  add_item/set_item_done pattern (lock → mutate → `persist`). Index is 0-based across the
+  boundary (the CLI's 1-based sugar is CLI-only).
+- **Integration test (`cli/tests/sync_smoke.rs`):**
+  `focus_curation_converges_across_devices` — device A curates (add ×3, reorder), B pulls
+  and observes the identical focus order + matching `fingerprint()`; then A marks a
+  focused item Done (auto-removes the ref) and un-dones it (does **not** reappear), and B
+  reconverges with matching fingerprint. This is the CLI↔web parity check the plan called
+  for (the CLI uses the same `airday-core` that compiles to the web wasm).
+- **Pre-existing bug fixed in passing:** the Phase 1 `main`→`inbox` rename left
+  `core/ffi/src/lib.rs`'s `persists_across_reopen` test seeding items into a now-unreserved
+  `"main"` list (`add_item` → `list not found: main`); it was never run in Phases 1–3
+  (`cargo test -p airday-ffi` wasn't in the loop). Flipped the test's `"main"` → `"inbox"`
+  and corrected the stale `all_lists` doc comment. **Watch-out:** `cargo test --workspace`
+  still fails to *compile* `airday-core-web` off-target (E0308, pre-existing wasm-only
+  crate, Phase 2 note) — run `cargo test --workspace --exclude airday-core-web` (21 test
+  binaries green) or build web via `bun run build:wasm`.
+
+**Phase 5 — Verify (done); cutover pending Daniel.**
+- Automated: the Phase 4 integration test covers convergence + fingerprint parity +
+  self-clean-on-Done + un-done-does-not-reappear.
+- Manual server-backed drive (throwaway server on `:8899` + temp sqlite, to avoid the
+  running `:8000` dev server): signed up device A, drove every command
+  (`add`/`focus add`/`focus`/`focus mv`/`focus rm`/`focus --json` + `done`/`backlog`
+  lifecycle interplay), then logged in device B and confirmed **bidirectional** pull/push
+  convergence over real WS. All behaviours correct (Done auto-removes, un-done stays out,
+  re-add is a no-op, 1-based positions, `*` Live marker, `list_id:"inbox"`).
+- ⏳ **Not done (by design — Daniel triggers):** the live-doc export → wipe → import
+  cutover (`main`→`inbox`; handoff note 5). Dry-run on a scratch account first; the agent
+  must not run the production wipe.
 
 **Decisions locked (see "Open decisions" above):** auto-remove-on-Done · no-op re-add ·
 additive-v2 · bare-uuid FocusRef · **soft-cap = 9 (Phase 3 UI call, was open #5)**.

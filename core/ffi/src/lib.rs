@@ -200,6 +200,38 @@ impl AirdayStore {
         Ok(id)
     }
 
+    /// Add a reference to `item_id` in the Focus lens (`spec/focus.md`).
+    /// `index` is the 0-based visible position; `None` appends. No-op if
+    /// the item is already focused or is not Open.
+    pub fn add_to_focus(&self, item_id: String, index: Option<u32>) -> Result<(), AirdayError> {
+        let mut doc = self.doc.lock().expect("doc mutex poisoned");
+        let at = index.map(|i| i as usize).unwrap_or(usize::MAX);
+        doc.add_to_focus(&item_id, at)?;
+        self.persist(&mut doc)
+    }
+
+    /// Remove `item_id`'s reference(s) from the Focus lens. The item is
+    /// untouched (it stays in its home list).
+    pub fn remove_from_focus(&self, item_id: String) -> Result<(), AirdayError> {
+        let mut doc = self.doc.lock().expect("doc mutex poisoned");
+        doc.remove_from_focus(&item_id)?;
+        self.persist(&mut doc)
+    }
+
+    /// Reorder `item_id`'s reference to 0-based visible position `index`.
+    pub fn move_in_focus(&self, item_id: String, index: u32) -> Result<(), AirdayError> {
+        let mut doc = self.doc.lock().expect("doc mutex poisoned");
+        doc.move_in_focus(&item_id, index as usize)?;
+        self.persist(&mut doc)
+    }
+
+    /// The Focus lens as an ordered list of Open referenced items
+    /// (`spec/focus.md`), in curated order.
+    pub fn focus_view(&self) -> Vec<ItemView> {
+        let doc = self.doc.lock().expect("doc mutex poisoned");
+        doc.focus_view().into_iter().map(Into::into).collect()
+    }
+
     /// Items of `list_id` in resolved order, excluding binned.
     pub fn items_in_list(&self, list_id: String) -> Vec<ItemView> {
         let doc = self.doc.lock().expect("doc mutex poisoned");
@@ -210,7 +242,7 @@ impl AirdayStore {
     }
 
     /// All user-created lists (the built-in `inbox`/Inbox list is virtual
-    /// and not included — items reference it by the id `"main"`).
+    /// and not included — items reference it by the id `"inbox"`).
     pub fn all_lists(&self) -> Vec<ListView> {
         let doc = self.doc.lock().expect("doc mutex poisoned");
         doc.all_lists().into_iter().map(Into::into).collect()
@@ -277,16 +309,16 @@ mod tests {
         let binned_id;
         {
             let store = AirdayStore::open(dir_str.clone(), dek.clone()).unwrap();
-            store.add_item("main".into(), "first".into()).unwrap();
-            done_id = store.add_item("main".into(), "second".into()).unwrap();
+            store.add_item("inbox".into(), "first".into()).unwrap();
+            done_id = store.add_item("inbox".into(), "second".into()).unwrap();
             store.set_item_done(done_id.clone(), true).unwrap();
-            binned_id = store.add_item("main".into(), "third".into()).unwrap();
+            binned_id = store.add_item("inbox".into(), "third".into()).unwrap();
             store.set_item_binned(binned_id.clone(), true).unwrap();
             list_id = store.add_list("Groceries".into()).unwrap();
             store.add_item(list_id.clone(), "milk".into()).unwrap();
 
             // Live view: "first" + done "second"; binned "third" excluded.
-            let main = store.items_in_list("main".into());
+            let main = store.items_in_list("inbox".into());
             assert_eq!(
                 main.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),
                 ["first", "second"]
@@ -294,7 +326,7 @@ mod tests {
         } // drop: no explicit close; storage was synchronously durable.
 
         let store = AirdayStore::open(dir_str, dek).unwrap();
-        let main = store.items_in_list("main".into());
+        let main = store.items_in_list("inbox".into());
         assert_eq!(
             main.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),
             ["first", "second"],

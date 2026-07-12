@@ -6,6 +6,7 @@ pub const MIN_PASSWORD_LEN: usize = 10;
 pub mod bin;
 pub mod cache;
 pub mod export;
+pub mod focus;
 pub mod items;
 pub mod lists;
 mod login;
@@ -68,6 +69,8 @@ enum Cmd {
     Mv(items::MvArgs),
     /// Edit an item's text.
     Edit(items::EditArgs),
+    /// Curated Focus lens: list (default), add, rm, mv.
+    Focus(focus::FocusArgs),
     /// Manage lists.
     Lists(lists::ListsArgs),
     /// Inspect the local cache.
@@ -98,6 +101,7 @@ impl Cli {
             Cmd::Restore(a) => items::restore(a, sync).await,
             Cmd::Mv(a) => items::mv(a, sync).await,
             Cmd::Edit(a) => items::edit(a, sync).await,
+            Cmd::Focus(a) => focus::run(a, sync).await,
             Cmd::Lists(a) => lists::run(a, sync).await,
             Cmd::Cache(a) => cache::run(a).await,
             Cmd::ExportJson(a) => export::run(a, sync).await,
