@@ -242,7 +242,7 @@ impl Doc {
         self.inner.set_show_list_counts(show).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setMainName)]
+    #[wasm_bindgen(js_name = setInboxName)]
     pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
         self.inner.set_inbox_name(name).map_err(js_err)
     }
@@ -295,6 +295,44 @@ impl Doc {
         self.inner
             .add_item_live_at(list_id, text, target_index)
             .map_err(js_err)
+    }
+
+    // ---------- focus (spec/focus.md) ----------
+
+    /// Add a FocusRef to `item_id` at visible position `index`
+    /// (`usize::MAX` / a large number appends), one commit. No-op if the
+    /// item is already focused or is not Open; errors if unknown. Folds a
+    /// dead-ref sweep into the same commit.
+    #[wasm_bindgen(js_name = addToFocus)]
+    pub fn add_to_focus(&self, item_id: &str, index: usize) -> Result<(), JsError> {
+        self.inner.add_to_focus(item_id, index).map_err(js_err)
+    }
+
+    /// Remove `item_id`'s FocusRef(s) from the Focus lens, one commit.
+    /// The item itself is untouched.
+    #[wasm_bindgen(js_name = removeFromFocus)]
+    pub fn remove_from_focus(&self, item_id: &str) -> Result<(), JsError> {
+        self.inner.remove_from_focus(item_id).map_err(js_err)
+    }
+
+    /// Reorder `item_id`'s FocusRef to visible position `index` within the
+    /// Focus lens, one commit.
+    #[wasm_bindgen(js_name = moveInFocus)]
+    pub fn move_in_focus(&self, item_id: &str, index: usize) -> Result<(), JsError> {
+        self.inner.move_in_focus(item_id, index).map_err(js_err)
+    }
+
+    /// Visible Focus item ids in curated order (Open, local, deduped).
+    #[wasm_bindgen(js_name = focusRefIds)]
+    pub fn focus_ref_ids(&self) -> Vec<String> {
+        self.inner.focus_refs()
+    }
+
+    /// The Focus lens as a JSON array of `ItemView`s in curated order —
+    /// same element shape as `itemsInListJson`.
+    #[wasm_bindgen(js_name = focusViewJson)]
+    pub fn focus_view_json(&self) -> String {
+        items_to_json(&self.inner.focus_view())
     }
 
     // -- reads (return JSON for now; replace with serde-wasm-bindgen
@@ -1396,7 +1434,7 @@ impl SyncEngine {
         self.inner.doc().set_show_list_counts(show).map_err(js_err)
     }
 
-    #[wasm_bindgen(js_name = setMainName)]
+    #[wasm_bindgen(js_name = setInboxName)]
     pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
         self.inner.doc().set_inbox_name(name).map_err(js_err)
     }
@@ -1454,6 +1492,50 @@ impl SyncEngine {
             .doc()
             .add_item_live_at(list_id, text, target_index)
             .map_err(js_err)
+    }
+
+    // ---------- focus (spec/focus.md) ----------
+
+    /// Add a FocusRef to `item_id` at visible position `index`
+    /// (`usize::MAX` / a large number appends), one commit. No-op if the
+    /// item is already focused or is not Open; errors if unknown. Folds a
+    /// dead-ref sweep into the same commit.
+    #[wasm_bindgen(js_name = addToFocus)]
+    pub fn add_to_focus(&self, item_id: &str, index: usize) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .add_to_focus(item_id, index)
+            .map_err(js_err)
+    }
+
+    /// Remove `item_id`'s FocusRef(s) from the Focus lens, one commit.
+    /// The item itself is untouched.
+    #[wasm_bindgen(js_name = removeFromFocus)]
+    pub fn remove_from_focus(&self, item_id: &str) -> Result<(), JsError> {
+        self.inner.doc().remove_from_focus(item_id).map_err(js_err)
+    }
+
+    /// Reorder `item_id`'s FocusRef to visible position `index` within the
+    /// Focus lens, one commit.
+    #[wasm_bindgen(js_name = moveInFocus)]
+    pub fn move_in_focus(&self, item_id: &str, index: usize) -> Result<(), JsError> {
+        self.inner
+            .doc()
+            .move_in_focus(item_id, index)
+            .map_err(js_err)
+    }
+
+    /// Visible Focus item ids in curated order (Open, local, deduped).
+    #[wasm_bindgen(js_name = focusRefIds)]
+    pub fn focus_ref_ids(&self) -> Vec<String> {
+        self.inner.doc().focus_refs()
+    }
+
+    /// The Focus lens as a JSON array of `ItemView`s in curated order —
+    /// same element shape as `itemsInListJson`.
+    #[wasm_bindgen(js_name = focusViewJson)]
+    pub fn focus_view_json(&self) -> String {
+        items_to_json(&self.inner.doc().focus_view())
     }
 
     // -- undo / redo --
@@ -1622,7 +1704,8 @@ impl From<CoreEvent> for EngineEvent {
 /// - `listMoved` — id, index
 /// - `listRenamed` — id, name
 /// - `listIconChanged` — id, icon? (undefined = icon removed)
-/// - `settingsChanged` — showListCounts, mainName?
+/// - `settingsChanged` — showListCounts, inboxName?
+/// - `focusChanged` — no fields; re-derive the Focus projection
 #[wasm_bindgen]
 pub struct AppEventJs {
     kind: &'static str,
@@ -1714,7 +1797,7 @@ impl AppEventJs {
     pub fn show_list_counts(&self) -> Option<bool> {
         self.show_list_counts
     }
-    #[wasm_bindgen(getter, js_name = mainName)]
+    #[wasm_bindgen(getter, js_name = inboxName)]
     pub fn inbox_name(&self) -> Option<String> {
         self.inbox_name.clone()
     }
@@ -1751,6 +1834,10 @@ impl From<CoreAppEvent> for AppEventJs {
         match e {
             CoreAppEvent::FullResync => AppEventJs {
                 kind: "fullResync",
+                ..blank
+            },
+            CoreAppEvent::FocusChanged => AppEventJs {
+                kind: "focusChanged",
                 ..blank
             },
             CoreAppEvent::ItemAdded {
@@ -1901,7 +1988,7 @@ fn list_to_json(l: &airday_core::ListView) -> String {
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
     if let Some(n) = &s.inbox_name {
-        out.push_str(",\"mainName\":");
+        out.push_str(",\"inboxName\":");
         out.push_str(&json_string(n));
     }
     out.push('}');
