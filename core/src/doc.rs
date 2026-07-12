@@ -29,9 +29,9 @@
 //! cross-list moves are harmless and cleaned by [`Doc::reconcile`].
 //!
 //! Binned is a lifecycle & items keep their location. One well-known
-//! list id is *reserved*: [`LIST_MAIN`]. It has **no ListMeta row** —
+//! list id is *reserved*: [`LIST_INBOX`]. It has **no ListMeta row** —
 //! items reference it by string id and clients render it with a
-//! hardcoded label ("Queue").
+//! hardcoded label ("Inbox").
 //!
 //! The struct holds a `last_pushed_vv` so we can hand the sync engine
 //! "what's new since the last server interaction" as a single sealed
@@ -56,8 +56,11 @@ use crate::crypto::{AEAD_NONCE_LEN, Dek};
 use crate::events::AppEvent;
 use airday_protocol::EncryptedBlob;
 
-pub const LIST_MAIN: &str = "main";
-pub const LIST_MAIN_NAME: &str = "Queue";
+pub const LIST_INBOX: &str = "inbox";
+/// Legacy reserved id from before the Inbox rename; the JSON importer
+/// aliases it to [`LIST_INBOX`] during the one-time cutover.
+pub const LEGACY_LIST_MAIN: &str = "main";
+pub const INBOX_NAME: &str = "Inbox";
 
 const ROOT_ITEMS: &str = "items";
 const ROOT_LISTS: &str = "lists";
@@ -66,6 +69,11 @@ const ROOT_SETTINGS: &str = "settings";
 /// `order/main`, `order/<list-uuid>`. The container for a deleted list
 /// is simply never projected again (root containers can't be removed).
 const ORDER_PREFIX: &str = "order/";
+/// Reserved singleton container name: the curated Focus lens
+/// (`spec/focus.md`). A `LoroMovableList` of encoded `FocusRef` scalars
+/// — never child containers, same discipline as order containers. Its
+/// own element order *is* the Focus order.
+const FOCUS_CONTAINER: &str = "focus";
 
 const KEY_ID: &str = "id";
 const KEY_TEXT: &str = "text";
@@ -94,16 +102,16 @@ const KEY_ICON: &str = "icon";
 const KEY_CREATED_AT: &str = "created_at";
 const KEY_DONE_AT: &str = "done_at";
 const KEY_BINNED_AT: &str = "binned_at";
-/// Global "show counts on non-Queue lists" flag. Lives on the doc-level
-/// settings map; Queue's own count is always visible (when non-zero) and
+/// Global "show counts on non-Inbox lists" flag. Lives on the doc-level
+/// settings map; Inbox's own count is always visible (when non-zero) and
 /// is not gated by this. Absent ≡ false — written only when toggled on
 /// (and removed when toggled back off) so docs that have never enabled
 /// it carry no key.
 const KEY_SHOW_LIST_COUNTS: &str = "show_list_counts";
-/// Optional user-chosen display name override for the reserved `main`
-/// (Queue) list. Absent ≡ no override; clients render the localized
-/// built-in label (`LIST_MAIN_NAME` / `i18n nav.home`) in that case.
-const KEY_MAIN_NAME: &str = "main_name";
+/// Optional user-chosen display name override for the reserved `inbox`
+/// (Inbox) list. Absent ≡ no override; clients render the localized
+/// built-in label (`INBOX_NAME` / `i18n nav.home`) in that case.
+const KEY_INBOX_NAME: &str = "inbox_name";
 /// Batch lifecycle mutations at/above this many ids stop emitting
 /// surgical per-item events and fall back to one whole-doc rebuild +
 /// diff. Matches the web store's coarse-projection threshold so both
@@ -220,7 +228,7 @@ pub struct ListView {
     pub name: String,
     /// The user's chosen display icon (a literal emoji grapheme), or
     /// `None` when unset. Consumers render a built-in fallback for
-    /// `None`. Reserved `main` (Queue) has no ListMeta row, so it is
+    /// `None`. Reserved `inbox` (Inbox) has no ListMeta row, so it is
     /// always `None` here.
     pub icon: Option<String>,
     pub created_at: i64,
@@ -228,15 +236,15 @@ pub struct ListView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SettingsView {
-    /// When true, clients render each non-Queue list's open-item count
+    /// When true, clients render each non-Inbox list's open-item count
     /// (Backlog + Live) in the nav (subject to the count > 0 gate).
-    /// Queue's count is always shown regardless. Single global flag;
+    /// Inbox's count is always shown regardless. Single global flag;
     /// default false.
     pub show_list_counts: bool,
-    /// User-chosen override for the reserved `main` (Queue) list's
+    /// User-chosen override for the reserved `inbox` (Inbox) list's
     /// display name. `None` (or absent in storage) means clients render
     /// the localized built-in label.
-    pub main_name: Option<String>,
+    pub inbox_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -263,11 +271,11 @@ pub struct ImportSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
     pub show_list_counts: bool,
-    /// `None` when the user hasn't overridden Queue's display name.
+    /// `None` when the user hasn't overridden Inbox's display name.
     /// Skipped when serializing to keep the JSON dump minimal for the
     /// default case.
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub main_name: Option<String>,
+    pub inbox_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -306,7 +314,7 @@ pub struct ExportItem {
 /// entry is the canonical one for it. Encoded as a single scalar string
 /// (`"<list_id>:<placement_id>"`) so both halves are written in one
 /// register op — no independently-mergeable sub-fields to conflict.
-/// `:` is reserved: ids are uuid-v7 hex or the literal `main`.
+/// `:` is reserved: ids are uuid-v7 hex or the literal `inbox`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Location {
     list_id: String,
@@ -355,6 +363,71 @@ impl OrderEntry {
 
 fn order_root_name(list_id: &str) -> String {
     format!("{ORDER_PREFIX}{list_id}")
+}
+
+/// One element of the reserved `focus` container (`spec/focus.md`).
+/// Encoded as a scalar string: bare `"<item_id>"` for a local-doc ref
+/// (the only form the emitter writes today), or `"<doc_id>:<item_id>"`
+/// for a future cross-doc ref. Split on the **first** `:`; uuid-hex
+/// components mean `:` never collides. A colon-less string is a local
+/// ref — that is the forward-compat hook for sharing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FocusRef {
+    /// `None` ≡ local doc. `Some(doc_id)` is a foreign ref, unresolvable
+    /// today — projection skips it (later: renders a placeholder).
+    doc_id: Option<String>,
+    item_id: String,
+}
+
+impl FocusRef {
+    fn local(item_id: &str) -> FocusRef {
+        FocusRef {
+            doc_id: None,
+            item_id: item_id.to_string(),
+        }
+    }
+    fn encode(&self) -> String {
+        match &self.doc_id {
+            Some(d) => format!("{d}:{}", self.item_id),
+            None => self.item_id.clone(),
+        }
+    }
+    fn parse(s: &str) -> Option<FocusRef> {
+        if s.is_empty() {
+            return None;
+        }
+        match s.split_once(':') {
+            Some((doc_id, item_id)) => {
+                if doc_id.is_empty() || item_id.is_empty() {
+                    return None;
+                }
+                Some(FocusRef {
+                    doc_id: Some(doc_id.to_string()),
+                    item_id: item_id.to_string(),
+                })
+            }
+            None => Some(FocusRef {
+                doc_id: None,
+                item_id: s.to_string(),
+            }),
+        }
+    }
+    fn is_local(&self) -> bool {
+        self.doc_id.is_none()
+    }
+}
+
+/// Classification of the current `focus` container against the item
+/// index: which raw slots project to a visible Open item, and which are
+/// dead garbage (unparseable, foreign-doc, missing, non-open, or a
+/// later duplicate of an already-visible item) to be swept.
+struct FocusScan {
+    /// Raw encoded elements in container order.
+    raw: Vec<String>,
+    /// Visible item ids in container order, deduped (first wins).
+    visible_item_ids: Vec<String>,
+    /// Raw indices that are dead garbage, ascending.
+    dead_idx: Vec<usize>,
 }
 
 // ---------- disposable projection index ----------
@@ -686,6 +759,9 @@ enum CapturedDiff {
     Lists,
     /// Doc-level settings map changed.
     Settings,
+    /// The `focus` container changed (`spec/focus.md`). Consumers
+    /// re-derive the Focus projection; no positional translation needed.
+    Focus,
     /// A diff shape we don't translate — forces the full-resync
     /// fallback for the frame.
     Opaque,
@@ -740,6 +816,7 @@ fn classify_captured_diff(
         }
         Some(name) if name == ROOT_LISTS => CapturedDiff::Lists,
         Some(name) if name == ROOT_SETTINGS => CapturedDiff::Settings,
+        Some(name) if name == FOCUS_CONTAINER => CapturedDiff::Focus,
         Some(name) => {
             let Some(list_id) = name.strip_prefix(ORDER_PREFIX) else {
                 return CapturedDiff::Opaque;
@@ -856,7 +933,7 @@ fn make_undo_manager(inner: &LoroDoc) -> UndoManager {
 
 impl Doc {
     /// New doc with built-in state initialised. There are no persisted
-    /// user-list seeds; only the virtual built-in `main` exists at
+    /// user-list seeds; only the virtual built-in `inbox` exists at
     /// first open. Device-2 bootstrap via snapshot bypasses this path
     /// entirely.
     pub fn new() -> Result<Self, DocError> {
@@ -935,7 +1012,7 @@ impl Doc {
             idx.meta.insert(id, meta);
         }
         let mut candidates: HashSet<String> = idx.members.keys().cloned().collect();
-        candidates.insert(LIST_MAIN.to_string());
+        candidates.insert(LIST_INBOX.to_string());
         for list in self.all_lists() {
             candidates.insert(list.id);
         }
@@ -1490,6 +1567,13 @@ impl Doc {
             }
         }
         let binned_at = read_i64(&map, KEY_BINNED_AT);
+        // Done self-compacts Focus: setting done removes the item's focus
+        // ref in the same commit (`spec/focus.md`).
+        let focus_removed = if new_done.is_some() {
+            self.prune_focus_refs(&std::iter::once(item_id.to_string()).collect())
+        } else {
+            0
+        };
         self.inner.commit();
         let open_index = self.sync_item_openness(item_id, &map);
         self.push_event(AppEvent::ItemLifecycleChanged {
@@ -1499,6 +1583,9 @@ impl Doc {
             binned_at,
             open_index,
         });
+        if focus_removed > 0 {
+            self.push_event(AppEvent::FocusChanged);
+        }
         Ok(())
     }
 
@@ -1591,7 +1678,21 @@ impl Doc {
         if changed.is_empty() {
             return Ok(());
         }
+        // Focus self-compacts on completion: a Done transition removes the
+        // item's focus ref(s) in the *same* commit (`spec/focus.md`). This
+        // is the one lifecycle transition that touches a second container —
+        // a Done focus ref renders nothing, so Focus stays finite without
+        // relying on the unwired `reconcile()`. Binned is left to the sweep.
+        let focus_removed = if lifecycle == ItemLifecycle::Done {
+            let done_ids: HashSet<String> = changed.iter().map(|(id, _)| id.to_string()).collect();
+            self.prune_focus_refs(&done_ids)
+        } else {
+            0
+        };
         self.inner.commit();
+        if focus_removed > 0 {
+            self.push_event(AppEvent::FocusChanged);
+        }
         if let Some(pre) = pre_items {
             self.rebuild_index();
             self.emit_item_diffs(&pre);
@@ -1608,6 +1709,111 @@ impl Doc {
             });
         }
         Ok(())
+    }
+
+    // ---------- mutations: focus (`spec/focus.md`) ----------
+
+    /// Add a reference to `item_id` in the Focus lens at visible position
+    /// `index` (`usize::MAX` appends), one commit. No-ops if the item is
+    /// already focused (does *not* move-to-top) or is not Open (a Done /
+    /// binned item cannot be focused). Errors if the item is unknown.
+    /// Folds a dead-ref sweep into the same commit.
+    pub fn add_to_focus(&self, item_id: &str, index: usize) -> Result<(), DocError> {
+        let open = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            match guard.meta.get(item_id) {
+                None => return Err(DocError::ItemNotFound(item_id.to_string())),
+                Some(m) => m.open,
+            }
+        };
+        let scan = self.scan_focus();
+        if scan.visible_item_ids.iter().any(|id| id == item_id) {
+            return Ok(());
+        }
+        if !open {
+            return Ok(());
+        }
+        let focus = self.focus_list();
+        for &i in scan.dead_idx.iter().rev() {
+            focus.delete(i, 1)?;
+        }
+        // After the sweep the container holds exactly the visible refs, so
+        // raw position == visible position.
+        let new_len = scan.visible_item_ids.len();
+        let at = index.min(new_len);
+        let encoded = FocusRef::local(item_id).encode();
+        if at >= new_len {
+            focus.push(encoded.as_str())?;
+        } else {
+            focus.insert(at, encoded.as_str())?;
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::FocusChanged);
+        Ok(())
+    }
+
+    /// Remove `item_id`'s reference(s) from the Focus lens, one commit.
+    /// The item itself is untouched. No-op (no commit) when the item has
+    /// no ref and there is no garbage to sweep. Folds a dead-ref sweep in.
+    pub fn remove_from_focus(&self, item_id: &str) -> Result<(), DocError> {
+        let target: HashSet<String> = std::iter::once(item_id.to_string()).collect();
+        let removed = self.prune_focus_refs(&target);
+        if removed == 0 {
+            return Ok(());
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::FocusChanged);
+        Ok(())
+    }
+
+    /// Reorder `item_id`'s reference to visible position `index` within
+    /// the Focus lens, one commit. No-op when the item is not focused (and
+    /// nothing was swept). Folds a dead-ref sweep in first.
+    pub fn move_in_focus(&self, item_id: &str, index: usize) -> Result<(), DocError> {
+        let scan = self.scan_focus();
+        let focus = self.focus_list();
+        for &i in scan.dead_idx.iter().rev() {
+            focus.delete(i, 1)?;
+        }
+        // After the sweep, positions align with `visible_item_ids`.
+        let swept = !scan.dead_idx.is_empty();
+        let commit_sweep = |doc: &Self| {
+            doc.inner.commit();
+            doc.push_event(AppEvent::FocusChanged);
+        };
+        let Some(from) = scan.visible_item_ids.iter().position(|id| id == item_id) else {
+            if swept {
+                commit_sweep(self);
+            }
+            return Ok(());
+        };
+        let to = index.min(scan.visible_item_ids.len().saturating_sub(1));
+        if from == to {
+            if swept {
+                commit_sweep(self);
+            }
+            return Ok(());
+        }
+        focus.mov(from, to)?;
+        self.inner.commit();
+        self.push_event(AppEvent::FocusChanged);
+        Ok(())
+    }
+
+    // ---------- reads: focus ----------
+
+    /// Visible Focus item ids in curated order (Open, local, deduped).
+    pub fn focus_refs(&self) -> Vec<String> {
+        self.scan_focus().visible_item_ids
+    }
+
+    /// The Focus lens as an ordered `Vec<ItemView>` — the projection in
+    /// `spec/focus.md`. Pure; never mutates.
+    pub fn focus_view(&self) -> Vec<ItemView> {
+        self.focus_refs()
+            .into_iter()
+            .filter_map(|id| self.get_item(&id))
+            .collect()
     }
 
     fn set_items_timestamp(&self, item_ids: &[&str], on: bool, key: &str) -> Result<(), DocError> {
@@ -1644,7 +1850,26 @@ impl Doc {
         if changed.is_empty() {
             return Ok(());
         }
+        // Setting done (not clearing) self-compacts Focus in the same
+        // commit (`spec/focus.md`); only the `done_at` key does this.
+        let focus_removed = if key == KEY_DONE_AT && on {
+            let done_ids: HashSet<String> = changed
+                .iter()
+                .filter(|(_, _, new)| new.is_some())
+                .map(|(id, _, _)| id.to_string())
+                .collect();
+            if done_ids.is_empty() {
+                0
+            } else {
+                self.prune_focus_refs(&done_ids)
+            }
+        } else {
+            0
+        };
         self.inner.commit();
+        if focus_removed > 0 {
+            self.push_event(AppEvent::FocusChanged);
+        }
         if let Some(pre) = pre_items {
             self.rebuild_index();
             self.emit_item_diffs(&pre);
@@ -1832,7 +2057,7 @@ impl Doc {
         Ok(id)
     }
 
-    /// Toggle the global "show counts on non-Queue lists" setting. Queue
+    /// Toggle the global "show counts on non-Inbox lists" setting. Inbox
     /// is unaffected — its count is always visible (subject to count >
     /// 0) and is not gated by this flag. No-op when the value is
     /// unchanged, so flicking the menu twice doesn't emit phantom
@@ -1854,17 +2079,17 @@ impl Doc {
         let post = settings_view(&settings);
         self.push_event(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
-            main_name: post.main_name,
+            inbox_name: post.inbox_name,
         });
         Ok(())
     }
 
-    /// Set or clear the reserved `main` (Queue) list's display-name
+    /// Set or clear the reserved `inbox` (Inbox) list's display-name
     /// override. Trims `name`; an empty trimmed string clears the
     /// override (so clients fall back to the localized built-in label).
     /// No-op when the resulting value matches the current value, so
     /// repeat saves of the same name don't emit phantom events.
-    pub fn set_main_name(&self, name: &str) -> Result<(), DocError> {
+    pub fn set_inbox_name(&self, name: &str) -> Result<(), DocError> {
         let settings = self.settings_map();
         let trimmed = name.trim();
         let next: Option<String> = if trimmed.is_empty() {
@@ -1872,26 +2097,26 @@ impl Doc {
         } else {
             Some(trimmed.to_string())
         };
-        let current = read_string(&settings, KEY_MAIN_NAME);
+        let current = read_string(&settings, KEY_INBOX_NAME);
         if current.as_deref() == next.as_deref() {
             return Ok(());
         }
         match &next {
-            Some(s) => settings.insert(KEY_MAIN_NAME, s.as_str())?,
-            None => settings.delete(KEY_MAIN_NAME)?,
+            Some(s) => settings.insert(KEY_INBOX_NAME, s.as_str())?,
+            None => settings.delete(KEY_INBOX_NAME)?,
         }
         self.inner.commit();
         let post = settings_view(&settings);
         self.push_event(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
-            main_name: post.main_name,
+            inbox_name: post.inbox_name,
         });
         Ok(())
     }
 
     pub fn rename_list(&self, list_id: &str, name: &str) -> Result<(), DocError> {
-        if list_id == LIST_MAIN {
-            return Err(DocError::CannotRenameBuiltin(LIST_MAIN.into()));
+        if list_id == LIST_INBOX {
+            return Err(DocError::CannotRenameBuiltin(LIST_INBOX.into()));
         }
         let name = name.trim();
         let (_, map) = self.find_list(list_id)?;
@@ -1908,11 +2133,11 @@ impl Doc {
     /// verbatim as a whole grapheme string (an emoji); a trimmed-empty
     /// value clears it (so clients fall back to the built-in glyph).
     /// No-op when the resulting value matches the current one, so repeat
-    /// saves don't emit phantom events or undo steps. Reserved `main`
-    /// (Queue) has no ListMeta row, so it cannot carry an icon.
+    /// saves don't emit phantom events or undo steps. Reserved `inbox`
+    /// (Inbox) has no ListMeta row, so it cannot carry an icon.
     pub fn set_list_icon(&self, list_id: &str, icon: &str) -> Result<(), DocError> {
-        if list_id == LIST_MAIN {
-            return Err(DocError::CannotRenameBuiltin(LIST_MAIN.into()));
+        if list_id == LIST_INBOX {
+            return Err(DocError::CannotRenameBuiltin(LIST_INBOX.into()));
         }
         let (_, map) = self.find_list(list_id)?;
         let trimmed = icon.trim();
@@ -1940,8 +2165,8 @@ impl Doc {
     }
 
     pub fn move_list(&self, list_id: &str, target_index: usize) -> Result<(), DocError> {
-        if list_id == LIST_MAIN {
-            return Err(DocError::CannotMoveBuiltin(LIST_MAIN.into()));
+        if list_id == LIST_INBOX {
+            return Err(DocError::CannotMoveBuiltin(LIST_INBOX.into()));
         }
         let lists = self.lists();
         let (from, _) = self.find_list(list_id)?;
@@ -1962,14 +2187,14 @@ impl Doc {
         Ok(())
     }
 
-    /// Refuses for the always-on `main` list. Every item locating to
-    /// the deleted list (open, done and binned) is moved to `main` with
+    /// Refuses for the always-on `inbox` list. Every item locating to
+    /// the deleted list (open, done and binned) is moved to `inbox` with
     /// a fresh placement, appended to `order/main` in the deleted
     /// list's resolved order. The abandoned order container remains as
     /// unreachable history.
     pub fn delete_list(&self, list_id: &str) -> Result<(), DocError> {
-        if list_id == LIST_MAIN {
-            return Err(DocError::CannotDeleteBuiltin(LIST_MAIN.into()));
+        if list_id == LIST_INBOX {
+            return Err(DocError::CannotDeleteBuiltin(LIST_INBOX.into()));
         }
         let (idx, _) = self.find_list(list_id)?;
         let resolved = {
@@ -1980,20 +2205,20 @@ impl Doc {
         let pre_lists: Vec<ListView> = self.all_lists();
         let pre_settings = self.get_settings();
         // Deleting a list discards its contents to the bin rather than
-        // dumping them live into Home: every item is relocated to `main`
+        // dumping them live into Home: every item is relocated to `inbox`
         // (so it has a real home list if later restored) and, unless it
         // was already binned, marked binned with a shared timestamp. The
         // location move keeps `order/main` and restore-target semantics
         // valid without leaning on orphan fallback.
         let binned_at = now_millis();
-        let main_order = self.order_list(LIST_MAIN);
+        let main_order = self.order_list(LIST_INBOX);
         for item_id in &resolved {
             let map = self.find_item(item_id)?;
             let placement = new_id();
             map.insert(
                 KEY_LOCATION,
                 Location {
-                    list_id: LIST_MAIN.to_string(),
+                    list_id: LIST_INBOX.to_string(),
                     placement_id: placement.clone(),
                 }
                 .encode()
@@ -2018,7 +2243,7 @@ impl Doc {
         self.rebuild_index();
         // Emit the full pre/post state diff: each item picks up an
         // `ItemLifecycleChanged` (now binned) and `ItemListChanged` (now
-        // `main`), plus the `ListRemoved` for the gone list.
+        // `inbox`), plus the `ListRemoved` for the gone list.
         self.emit_state_diff(&pre_items, &pre_lists, &pre_settings);
         Ok(())
     }
@@ -2098,7 +2323,12 @@ impl Doc {
                 }
             }
         }
-        if plans.is_empty() {
+        // Focus backstop: prune dead refs (missing / done / binned /
+        // foreign / duplicate) from the focus container. Idempotent; the
+        // primary compaction paths are auto-remove-on-Done and the sweep
+        // folded into each focus mutation (`spec/focus.md`).
+        let focus_dead = self.scan_focus().dead_idx;
+        if plans.is_empty() && focus_dead.is_empty() {
             return Ok(0);
         }
         let mut repairs = 0usize;
@@ -2107,7 +2337,7 @@ impl Doc {
             map.insert(
                 KEY_LOCATION,
                 Location {
-                    list_id: LIST_MAIN.to_string(),
+                    list_id: LIST_INBOX.to_string(),
                     placement_id: placement.clone(),
                 }
                 .encode()
@@ -2124,6 +2354,11 @@ impl Doc {
                 order.push(entry.encode().as_str())?;
                 repairs += 1;
             }
+        }
+        let focus = self.focus_list();
+        for p in focus_dead.iter().rev() {
+            focus.delete(*p, 1)?;
+            repairs += 1;
         }
         self.inner.commit();
         self.rebuild_index();
@@ -2175,8 +2410,8 @@ impl Doc {
         let s = self.get_settings();
         let mut lists = Vec::with_capacity(self.lists().len() + 1);
         lists.push(ExportList {
-            id: LIST_MAIN.to_string(),
-            name: LIST_MAIN_NAME.to_string(),
+            id: LIST_INBOX.to_string(),
+            name: INBOX_NAME.to_string(),
             created_at: None,
             builtin: true,
         });
@@ -2206,7 +2441,7 @@ impl Doc {
             version: 1,
             settings: ExportSettings {
                 show_list_counts: s.show_list_counts,
-                main_name: s.main_name,
+                inbox_name: s.inbox_name,
             },
             lists,
             items,
@@ -2227,10 +2462,10 @@ impl Doc {
     /// Additive JSON import. Source lists are created as fresh user
     /// lists (new IDs); source items keep their text / notes /
     /// timestamps / done-binned state but get fresh IDs and placements
-    /// and follow the id-map: anything in the source's `main` lands in
-    /// the local `main`, builtin entries are not duplicated, and items
+    /// and follow the id-map: anything in the source's `inbox` lands in
+    /// the local `inbox`, builtin entries are not duplicated, and items
     /// whose `list_id` references a list not present in the export fall
-    /// back to `main` (same orphan handling as `delete_list`).
+    /// back to `inbox` (same orphan handling as `delete_list`).
     /// Existing local content is untouched. All writes land in a
     /// single Loro commit; UI events are emitted via the standard
     /// pre/post state-diff.
@@ -2247,13 +2482,16 @@ impl Doc {
         let pre_settings = self.get_settings();
 
         let mut id_map: HashMap<String, String> = HashMap::new();
-        id_map.insert(LIST_MAIN.to_string(), LIST_MAIN.to_string());
+        id_map.insert(LIST_INBOX.to_string(), LIST_INBOX.to_string());
+        // One-time cutover alias: pre-rename exports carry the reserved
+        // list as `inbox`; fold it onto the new reserved id.
+        id_map.insert(LEGACY_LIST_MAIN.to_string(), LIST_INBOX.to_string());
 
         let lists = self.lists();
         let mut lists_added: usize = 0;
         for src_list in &export.lists {
-            if src_list.builtin || src_list.id == LIST_MAIN {
-                id_map.insert(src_list.id.clone(), LIST_MAIN.to_string());
+            if src_list.builtin || src_list.id == LIST_INBOX || src_list.id == LEGACY_LIST_MAIN {
+                id_map.insert(src_list.id.clone(), LIST_INBOX.to_string());
                 continue;
             }
             let name = src_list.name.trim();
@@ -2282,7 +2520,7 @@ impl Doc {
             let target_list_id = id_map
                 .get(&src_item.list_id)
                 .cloned()
-                .unwrap_or_else(|| LIST_MAIN.to_string());
+                .unwrap_or_else(|| LIST_INBOX.to_string());
             let new_item_id = new_id();
             let placement = new_id();
             let map = items.insert_container(&new_item_id, LoroMap::new())?;
@@ -2401,7 +2639,7 @@ impl Doc {
         items.into_iter().map(|i| i.id).collect()
     }
 
-    /// Materialize every item in canonical walk order: `main` first,
+    /// Materialize every item in canonical walk order: `inbox` first,
     /// then user lists in `lists` container order, then any orphan list
     /// ids (sorted) — each list in its resolved order. This grouped
     /// order is the deterministic replacement for the v1 global CRDT
@@ -2415,7 +2653,7 @@ impl Doc {
     /// Canonical list-id walk order backing `iter_items` — see
     /// [`Doc::all_items`].
     fn ordered_list_ids(&self) -> Vec<String> {
-        let mut out = vec![LIST_MAIN.to_string()];
+        let mut out = vec![LIST_INBOX.to_string()];
         let mut known: HashSet<String> = out.iter().cloned().collect();
         for list in self.all_lists() {
             if known.insert(list.id.clone()) {
@@ -2632,6 +2870,7 @@ impl Doc {
         // ---- Phase 1: plan (read-only) ----
         let mut lists_dirty = false;
         let mut settings_dirty = false;
+        let mut focus_dirty = false;
         let mut upserts = HashSet::<String>::new();
         let mut removals = HashSet::<String>::new();
         let mut map_dirty = HashMap::<ContainerID, HashSet<String>>::new();
@@ -2649,6 +2888,7 @@ impl Doc {
                     CapturedDiff::Opaque => return Err(()),
                     CapturedDiff::Lists => lists_dirty = true,
                     CapturedDiff::Settings => settings_dirty = true,
+                    CapturedDiff::Focus => focus_dirty = true,
                     CapturedDiff::ItemsRoot { upserted, removed } => {
                         upserts.extend(upserted);
                         removals.extend(removed);
@@ -3106,6 +3346,10 @@ impl Doc {
                 self.push_event(ev);
             }
         }
+
+        if focus_dirty {
+            self.push_event(AppEvent::FocusChanged);
+        }
         Ok(())
     }
 
@@ -3192,7 +3436,7 @@ impl Doc {
         let s = self.get_settings();
         out.push(AppEvent::SettingsChanged {
             show_list_counts: s.show_list_counts,
-            main_name: s.main_name,
+            inbox_name: s.inbox_name,
         });
         let lists = self.all_lists();
         for (idx, list) in lists.iter().enumerate() {
@@ -3291,10 +3535,10 @@ impl Doc {
         let settings = self.get_settings();
         hasher.update(b"S");
         hasher.update([settings.show_list_counts as u8]);
-        // `main_name` is `Option<String>`; hash a presence byte so an
+        // `inbox_name` is `Option<String>`; hash a presence byte so an
         // empty string and `None` (which the reader collapses anyway)
         // can't collide with a non-empty value of the same bytes.
-        match &settings.main_name {
+        match &settings.inbox_name {
             Some(n) => {
                 hasher.update([1u8]);
                 hash_str(&mut hasher, n);
@@ -3327,6 +3571,16 @@ impl Doc {
             hash_opt_i64(&mut hasher, i.done_at);
             hash_opt_i64(&mut hasher, i.binned_at);
         }
+        // Focus: the curated order fixes logical state (`spec/focus.md`),
+        // exactly as each list's resolved order does. Hash the raw
+        // container contents in order so converged replicas match and a
+        // reordered / diverged Focus is caught.
+        let focus = self.focus_raw();
+        hasher.update(b"F");
+        hasher.update((focus.len() as u32).to_be_bytes());
+        for s in &focus {
+            hash_str(&mut hasher, s);
+        }
         hasher.finalize().into()
     }
 
@@ -3347,6 +3601,86 @@ impl Doc {
     fn order_list(&self, list_id: &str) -> LoroMovableList {
         self.inner
             .get_movable_list(order_root_name(list_id).as_str())
+    }
+
+    fn focus_list(&self) -> LoroMovableList {
+        self.inner.get_movable_list(FOCUS_CONTAINER)
+    }
+
+    /// Raw encoded elements of the `focus` container in order. A
+    /// non-string slot (never emitted) surfaces as an unparseable dead
+    /// ref rather than aborting the read.
+    fn focus_raw(&self) -> Vec<String> {
+        let list = self.focus_list();
+        (0..list.len())
+            .map(|i| match list.get(i) {
+                Some(ValueOrContainer::Value(v)) => v.into_string().ok().map(|s| s.to_string()),
+                _ => None,
+            })
+            .map(|s| s.unwrap_or_default())
+            .collect()
+    }
+
+    /// Classify the focus container against the item index. Locks the
+    /// index once; a ref is *visible* iff it parses, is local, names an
+    /// item the index knows to be Open, and is the first ref for that
+    /// item. Everything else is dead garbage to sweep.
+    fn scan_focus(&self) -> FocusScan {
+        let raw = self.focus_raw();
+        let guard = self.item_index.lock().expect("item index mutex poisoned");
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut visible_item_ids = Vec::new();
+        let mut dead_idx = Vec::new();
+        for (i, s) in raw.iter().enumerate() {
+            let item_id = match FocusRef::parse(s) {
+                Some(r)
+                    if r.is_local()
+                        && guard.meta.get(&r.item_id).is_some_and(|m| m.open)
+                        && seen.insert(r.item_id.clone()) =>
+                {
+                    Some(r.item_id)
+                }
+                _ => None,
+            };
+            match item_id {
+                Some(id) => visible_item_ids.push(id),
+                None => dead_idx.push(i),
+            }
+        }
+        FocusScan {
+            raw,
+            visible_item_ids,
+            dead_idx,
+        }
+    }
+
+    /// Delete, in one uncommitted batch, every focus ref whose item id is
+    /// in `remove_items` **plus** all dead refs (the folded sweep).
+    /// Returns the number of slots removed; the caller commits.
+    fn prune_focus_refs(&self, remove_items: &HashSet<String>) -> usize {
+        let scan = self.scan_focus();
+        let mut to_delete: Vec<usize> = scan.dead_idx.clone();
+        for (i, s) in scan.raw.iter().enumerate() {
+            if let Some(r) = FocusRef::parse(s)
+                && r.is_local()
+                && remove_items.contains(&r.item_id)
+            {
+                to_delete.push(i);
+            }
+        }
+        to_delete.sort_unstable();
+        to_delete.dedup();
+        if to_delete.is_empty() {
+            return 0;
+        }
+        let focus = self.focus_list();
+        let mut removed = 0;
+        for &i in to_delete.iter().rev() {
+            if focus.delete(i, 1).is_ok() {
+                removed += 1;
+            }
+        }
+        removed
     }
 
     /// Item container lookup, gated on the disposable index so a doc
@@ -3380,7 +3714,7 @@ impl Doc {
     }
 
     fn assert_list_exists(&self, list_id: &str) -> Result<(), DocError> {
-        if list_id == LIST_MAIN {
+        if list_id == LIST_INBOX {
             return Ok(());
         }
         self.find_list(list_id).map(|_| ())
@@ -3460,14 +3794,14 @@ fn assert_unique_item_ids(item_ids: &[&str]) -> Result<(), DocError> {
 }
 
 fn seed_builtins(doc: &LoroDoc) -> Result<bool, DocError> {
-    // `LIST_MAIN` is a *reserved id*, not a ListMeta row — items
-    // reference it as the string "main" and clients render its label
+    // `LIST_INBOX` is a *reserved id*, not a ListMeta row — items
+    // reference it as the string "inbox" and clients render its label
     // client-side. Touch the root containers so fresh docs keep the
     // same top-level shape; no ops are emitted for untouched roots.
     let _ = doc.get_map(ROOT_ITEMS);
     let _ = doc.get_movable_list(ROOT_LISTS);
     let _ = doc.get_map(ROOT_SETTINGS);
-    let _ = doc.get_movable_list(order_root_name(LIST_MAIN).as_str());
+    let _ = doc.get_movable_list(order_root_name(LIST_INBOX).as_str());
     Ok(false)
 }
 
@@ -3523,19 +3857,19 @@ fn settings_view(map: &LoroMap) -> SettingsView {
         // string is treated the same — the mutation deletes the key on
         // empty input, but a caller that bypassed it shouldn't surface
         // a confusing blank label.
-        main_name: read_string(map, KEY_MAIN_NAME).filter(|s| !s.is_empty()),
+        inbox_name: read_string(map, KEY_INBOX_NAME).filter(|s| !s.is_empty()),
     }
 }
 
 /// Location/lifecycle slice used by the projection index. Items with a
 /// missing or unparseable `location` deterministically project into
-/// `main`'s fallback tail (empty placement never matches an entry) so
+/// `inbox`'s fallback tail (empty placement never matches an entry) so
 /// data is never hidden by a bad register.
 fn item_meta(map: &LoroMap) -> ItemMeta {
     let (list_id, placement_id) = read_string(map, KEY_LOCATION)
         .and_then(|s| Location::parse(&s))
         .map(|l| (l.list_id, l.placement_id))
-        .unwrap_or_else(|| (LIST_MAIN.to_string(), String::new()));
+        .unwrap_or_else(|| (LIST_INBOX.to_string(), String::new()));
     ItemMeta {
         list_id,
         placement_id,
@@ -3591,7 +3925,7 @@ fn item_view(map: &LoroMap) -> Option<ItemView> {
     let location = read_string(map, KEY_LOCATION)
         .and_then(|s| Location::parse(&s))
         .map(|l| l.list_id)
-        .unwrap_or_else(|| LIST_MAIN.to_string());
+        .unwrap_or_else(|| LIST_INBOX.to_string());
     Some(ItemView {
         id: read_string(map, KEY_ID)?,
         text: read_string(map, KEY_TEXT)?,
@@ -3875,10 +4209,10 @@ fn diff_lists(pre: &[ListView], post: &[ListView], out: &mut Vec<AppEvent>) {
 }
 
 fn diff_settings(pre: &SettingsView, post: &SettingsView, out: &mut Vec<AppEvent>) {
-    if pre.show_list_counts != post.show_list_counts || pre.main_name != post.main_name {
+    if pre.show_list_counts != post.show_list_counts || pre.inbox_name != post.inbox_name {
         out.push(AppEvent::SettingsChanged {
             show_list_counts: post.show_list_counts,
-            main_name: post.main_name.clone(),
+            inbox_name: post.inbox_name.clone(),
         });
     }
 }
@@ -3922,13 +4256,13 @@ mod tests {
         // user-reported shape (many small lists, large Done history).
         let texts: Vec<String> = (0..13_000).map(|i| format!("item number {i}")).collect();
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-        let ids = doc.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &refs, 0).unwrap();
         let done_refs: Vec<&str> = ids[..12_800].iter().map(String::as_str).collect();
         doc.set_items_done(&done_refs, true).unwrap();
         let _ = doc.drain_events();
 
         let t = Instant::now();
-        let id = doc.add_item(LIST_MAIN, "one more").unwrap();
+        let id = doc.add_item(LIST_INBOX, "one more").unwrap();
         println!("add_item:            {:?}", t.elapsed());
 
         let t = Instant::now();
@@ -3973,7 +4307,7 @@ mod tests {
         // current session's action rather than the 13k-item fixture setup.
         let saved = doc.save().unwrap();
         let doc = Doc::load(&saved).unwrap();
-        doc.move_item(&ids[12_999], LIST_MAIN, 0).unwrap();
+        doc.move_item(&ids[12_999], LIST_INBOX, 0).unwrap();
         let _ = doc.drain_events();
         let t = Instant::now();
         assert!(doc.undo().unwrap());
@@ -3986,7 +4320,7 @@ mod tests {
 
         let doc = Doc::load(&saved).unwrap();
         for (index, id) in ids[12_980..13_000].iter().enumerate() {
-            doc.move_item(id, LIST_MAIN, index).unwrap();
+            doc.move_item(id, LIST_INBOX, index).unwrap();
         }
         let _ = doc.drain_events();
         let t = Instant::now();
@@ -4001,7 +4335,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let texts2: Vec<String> = (0..13_000).map(|i| format!("item number {i}")).collect();
         let refs2: Vec<&str> = texts2.iter().map(String::as_str).collect();
-        let a_ids = a.add_items_at(LIST_MAIN, &refs2, 0).unwrap();
+        let a_ids = a.add_items_at(LIST_INBOX, &refs2, 0).unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         let mut b = Doc::empty();
@@ -4024,17 +4358,17 @@ mod tests {
         let doc = Doc::new().unwrap();
         let lists = doc.all_lists();
         assert!(lists.is_empty());
-        assert!(!lists.iter().any(|l| l.id == LIST_MAIN));
+        assert!(!lists.iter().any(|l| l.id == LIST_INBOX));
     }
 
     #[test]
     fn add_item_to_main_works_without_list_meta_row() {
-        // `LIST_MAIN` is virtual — items can address it even though
+        // `LIST_INBOX` is virtual — items can address it even though
         // no ListMeta row exists for it.
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "milk").unwrap();
-        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
+        let id = doc.add_item(LIST_INBOX, "milk").unwrap();
+        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_INBOX);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id]);
     }
 
     #[test]
@@ -4043,13 +4377,13 @@ mod tests {
         // by item id, ordering lives in per-list order containers, and
         // the old global MovableList root never materializes.
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let other = doc.add_list("Other").unwrap();
         let b = doc.add_item(&other, "b").unwrap();
 
         assert!(doc.items().get(&a).is_some());
         assert!(doc.items().get(&b).is_some());
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 1);
         assert_eq!(doc.order_list(&other).len(), 1);
         // The v1 root (`items` as a MovableList) is a different
         // container type entirely and stays empty.
@@ -4060,8 +4394,8 @@ mod tests {
     fn reordering_one_list_does_not_touch_other_order_containers() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let _b = doc.add_item(LIST_INBOX, "b").unwrap();
         let o1 = doc.add_item(&other, "o1").unwrap();
         let o2 = doc.add_item(&other, "o2").unwrap();
 
@@ -4073,7 +4407,7 @@ mod tests {
         };
         let vv_before = doc.oplog_vv();
 
-        doc.move_item(&a, LIST_MAIN, 1).unwrap();
+        doc.move_item(&a, LIST_INBOX, 1).unwrap();
 
         let other_after: Vec<Option<OrderEntry>> = {
             let order = doc.order_list(&other);
@@ -4090,7 +4424,7 @@ mod tests {
     fn move_list_refuses_main() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
-            doc.move_list(LIST_MAIN, 0).unwrap_err(),
+            doc.move_list(LIST_INBOX, 0).unwrap_err(),
             DocError::CannotMoveBuiltin(_)
         ));
     }
@@ -4099,7 +4433,7 @@ mod tests {
     fn rename_list_refuses_main() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
-            doc.rename_list(LIST_MAIN, "Today").unwrap_err(),
+            doc.rename_list(LIST_INBOX, "Today").unwrap_err(),
             DocError::CannotRenameBuiltin(_)
         ));
     }
@@ -4138,7 +4472,7 @@ mod tests {
     fn set_list_icon_refuses_main() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
-            doc.set_list_icon(LIST_MAIN, "📥").unwrap_err(),
+            doc.set_list_icon(LIST_INBOX, "📥").unwrap_err(),
             DocError::CannotRenameBuiltin(_)
         ));
     }
@@ -4168,10 +4502,10 @@ mod tests {
     #[test]
     fn add_item_round_trips_through_get() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
+        let id = doc.add_item(LIST_INBOX, "buy milk").unwrap();
         let view = doc.get_item(&id).unwrap();
         assert_eq!(view.text, "buy milk");
-        assert_eq!(view.list_id, LIST_MAIN);
+        assert_eq!(view.list_id, LIST_INBOX);
         assert!(!view.is_done());
         assert!(!view.is_binned());
     }
@@ -4179,7 +4513,7 @@ mod tests {
     #[test]
     fn empty_text_rejected() {
         let doc = Doc::new().unwrap();
-        let err = doc.add_item(LIST_MAIN, "   ").unwrap_err();
+        let err = doc.add_item(LIST_INBOX, "   ").unwrap_err();
         assert!(matches!(err, DocError::Invalid(_)));
     }
 
@@ -4193,7 +4527,7 @@ mod tests {
     #[test]
     fn done_and_binned_are_orthogonal() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "thing").unwrap();
+        let id = doc.add_item(LIST_INBOX, "thing").unwrap();
         doc.set_item_done(&id, true).unwrap();
         assert!(doc.get_item(&id).unwrap().is_done());
         // Binning a done item must keep it done.
@@ -4216,7 +4550,7 @@ mod tests {
     #[test]
     fn set_done_idempotent() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "thing").unwrap();
+        let id = doc.add_item(LIST_INBOX, "thing").unwrap();
         doc.set_item_done(&id, true).unwrap();
         let first = doc.get_item(&id).unwrap().done_at.unwrap();
         let _ = doc.drain_events();
@@ -4231,26 +4565,26 @@ mod tests {
         // item-map writes; the entry stays where it is so restore is
         // exact-position for free.
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
-        let order_len_before = doc.order_list(LIST_MAIN).len();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
+        let order_len_before = doc.order_list(LIST_INBOX).len();
 
         doc.set_item_done(&b, true).unwrap();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), order_len_before);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a.clone(), c.clone()]);
 
         doc.set_item_done(&b, false).unwrap();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), order_len_before);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b, c]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), order_len_before);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, b, c]);
         assert_open_projection_matches_doc(&doc);
     }
 
     #[test]
     fn empty_bin_removes_only_binned() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "keep").unwrap();
-        let b = doc.add_item(LIST_MAIN, "drop").unwrap();
+        let a = doc.add_item(LIST_INBOX, "keep").unwrap();
+        let b = doc.add_item(LIST_INBOX, "drop").unwrap();
         doc.set_item_binned(&b, true).unwrap();
         let removed = doc.empty_bin().unwrap();
         assert_eq!(removed, 1);
@@ -4261,7 +4595,7 @@ mod tests {
     #[test]
     fn delete_binned_only_works_for_binned() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "live").unwrap();
+        let id = doc.add_item(LIST_INBOX, "live").unwrap();
         assert!(matches!(
             doc.delete_binned(&id).unwrap_err(),
             DocError::NotBinned
@@ -4274,13 +4608,13 @@ mod tests {
     #[test]
     fn hard_delete_removes_order_entries() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
         doc.set_item_binned(&b, true).unwrap();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 2);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 2);
         doc.delete_binned(&b).unwrap();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 1);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a]);
         assert_open_projection_matches_doc(&doc);
     }
 
@@ -4291,7 +4625,7 @@ mod tests {
         let id = doc.add_item(&mylist, "milk").unwrap();
         doc.delete_list(&mylist).unwrap();
         let view = doc.get_item(&id).unwrap();
-        assert_eq!(view.list_id, LIST_MAIN);
+        assert_eq!(view.list_id, LIST_INBOX);
         assert!(view.is_binned(), "deleting a list bins its items");
     }
 
@@ -4304,16 +4638,16 @@ mod tests {
         let binned = doc.add_item(&mylist, "binned").unwrap();
         doc.set_item_done(&done, true).unwrap();
         doc.set_item_binned(&binned, true).unwrap();
-        let main_existing = doc.add_item(LIST_MAIN, "already here").unwrap();
+        let main_existing = doc.add_item(LIST_INBOX, "already here").unwrap();
 
         doc.delete_list(&mylist).unwrap();
 
         for id in [&open, &done, &binned] {
-            assert_eq!(doc.get_item(id).unwrap().list_id, LIST_MAIN);
+            assert_eq!(doc.get_item(id).unwrap().list_id, LIST_INBOX);
         }
         // Everything from the deleted list is now binned, so the open
         // projection of main is unchanged (only the pre-existing item).
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![main_existing]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![main_existing]);
         // The formerly-done item is now done *and* binned, so it leaves
         // the done-only view; all three land in the bin.
         assert_eq!(doc.done_item_ids(), Vec::<String>::new());
@@ -4329,7 +4663,7 @@ mod tests {
     fn delete_main_refused() {
         let doc = Doc::new().unwrap();
         assert!(matches!(
-            doc.delete_list(LIST_MAIN).unwrap_err(),
+            doc.delete_list(LIST_INBOX).unwrap_err(),
             DocError::CannotDeleteBuiltin(_)
         ));
     }
@@ -4384,23 +4718,23 @@ mod tests {
     #[test]
     fn main_name_round_trips() {
         let doc = Doc::new().unwrap();
-        assert_eq!(doc.get_settings().main_name, None);
-        doc.set_main_name("Today").unwrap();
-        assert_eq!(doc.get_settings().main_name.as_deref(), Some("Today"));
+        assert_eq!(doc.get_settings().inbox_name, None);
+        doc.set_inbox_name("Today").unwrap();
+        assert_eq!(doc.get_settings().inbox_name.as_deref(), Some("Today"));
         // Save/load preserves the override across the on-disk envelope.
         let bytes = doc.save().unwrap();
         let restored = Doc::load(&bytes).unwrap();
-        assert_eq!(restored.get_settings().main_name.as_deref(), Some("Today"));
+        assert_eq!(restored.get_settings().inbox_name.as_deref(), Some("Today"));
         // Whitespace is trimmed; surrounding spaces collapse, internal
         // spaces survive verbatim.
-        doc.set_main_name("  My Day  ").unwrap();
-        assert_eq!(doc.get_settings().main_name.as_deref(), Some("My Day"));
+        doc.set_inbox_name("  My Day  ").unwrap();
+        assert_eq!(doc.get_settings().inbox_name.as_deref(), Some("My Day"));
         // Empty input clears the override entirely — clients fall back
         // to the localized built-in label.
-        doc.set_main_name("").unwrap();
-        assert_eq!(doc.get_settings().main_name, None);
-        doc.set_main_name("  ").unwrap();
-        assert_eq!(doc.get_settings().main_name, None);
+        doc.set_inbox_name("").unwrap();
+        assert_eq!(doc.get_settings().inbox_name, None);
+        doc.set_inbox_name("  ").unwrap();
+        assert_eq!(doc.get_settings().inbox_name, None);
     }
 
     #[test]
@@ -4408,26 +4742,26 @@ mod tests {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
         // Setting empty when already empty is a no-op.
-        doc.set_main_name("").unwrap();
+        doc.set_inbox_name("").unwrap();
         assert!(doc.drain_events().is_empty());
-        doc.set_main_name("Today").unwrap();
+        doc.set_inbox_name("Today").unwrap();
         let evs = doc.drain_events();
         assert!(matches!(
             evs.as_slice(),
             [AppEvent::SettingsChanged {
-                main_name: Some(_),
+                inbox_name: Some(_),
                 ..
             }]
         ));
         // Setting the same value (after trim) is also a no-op.
-        doc.set_main_name("  Today  ").unwrap();
+        doc.set_inbox_name("  Today  ").unwrap();
         assert!(doc.drain_events().is_empty());
     }
 
     #[test]
     fn save_load_round_trip_preserves_state() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "persisted").unwrap();
+        let id = doc.add_item(LIST_INBOX, "persisted").unwrap();
         let bytes = doc.save().unwrap();
         let restored = Doc::load(&bytes).unwrap();
         assert_eq!(restored.get_item(&id).unwrap().text, "persisted");
@@ -4448,7 +4782,7 @@ mod tests {
 
         // Replica A is the originator and creates the first item.
         let mut a = Doc::new().unwrap();
-        let item_a = a.add_item(LIST_MAIN, "from A").unwrap();
+        let item_a = a.add_item(LIST_INBOX, "from A").unwrap();
 
         // Replica B starts empty. Real device-2 bootstrap typically
         // uses snapshot, but the convergence guarantee is what we're
@@ -4460,7 +4794,7 @@ mod tests {
         assert!(b.get_item(&item_a).is_some());
 
         // B mutates concurrently, ships back to A.
-        let item_b = b.add_item(LIST_MAIN, "from B").unwrap();
+        let item_b = b.add_item(LIST_INBOX, "from B").unwrap();
         let blob_b1 = b.pending_export(&dek).unwrap().unwrap();
         b.mark_pushed();
         a.apply_remote(&dek, &blob_b1).unwrap();
@@ -4475,8 +4809,8 @@ mod tests {
     fn fingerprint_diverges_when_state_diverges() {
         let mut a = Doc::new().unwrap();
         let mut b = Doc::new().unwrap();
-        let _ = a.add_item(LIST_MAIN, "A only").unwrap();
-        let _ = b.add_item(LIST_MAIN, "B only").unwrap();
+        let _ = a.add_item(LIST_INBOX, "A only").unwrap();
+        let _ = b.add_item(LIST_INBOX, "B only").unwrap();
         a.mark_pushed();
         b.mark_pushed();
         assert_ne!(a.fingerprint(), b.fingerprint());
@@ -4486,29 +4820,29 @@ mod tests {
     fn fingerprint_diverges_when_order_diverges() {
         let a = Doc::new().unwrap();
         let b = Doc::new().unwrap();
-        let a1 = a.add_item(LIST_MAIN, "one").unwrap();
-        let a2 = a.add_item(LIST_MAIN, "two").unwrap();
-        let b1 = b.add_item(LIST_MAIN, "one").unwrap();
-        let b2 = b.add_item(LIST_MAIN, "two").unwrap();
+        let a1 = a.add_item(LIST_INBOX, "one").unwrap();
+        let a2 = a.add_item(LIST_INBOX, "two").unwrap();
+        let b1 = b.add_item(LIST_INBOX, "one").unwrap();
+        let b2 = b.add_item(LIST_INBOX, "two").unwrap();
 
-        a.move_item(&a1, LIST_MAIN, 1).unwrap();
+        a.move_item(&a1, LIST_INBOX, 1).unwrap();
 
-        assert_eq!(a.open_item_ids(LIST_MAIN), vec![a2, a1]);
-        assert_eq!(b.open_item_ids(LIST_MAIN), vec![b1, b2]);
+        assert_eq!(a.open_item_ids(LIST_INBOX), vec![a2, a1]);
+        assert_eq!(b.open_item_ids(LIST_INBOX), vec![b1, b2]);
         assert_ne!(a.fingerprint(), b.fingerprint());
     }
 
     #[test]
     fn repeated_moves_keep_index_in_sync() {
         let doc = Doc::new().unwrap();
-        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let _c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let _a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let _c = doc.add_item(LIST_INBOX, "c").unwrap();
 
         for target in [0, 2, 0, 2, 1, 0, 2, 0, 1, 2] {
-            doc.move_item(&b, LIST_MAIN, target).unwrap();
+            doc.move_item(&b, LIST_INBOX, target).unwrap();
             assert_eq!(
-                doc.open_item_ids(LIST_MAIN).iter().position(|id| id == &b),
+                doc.open_item_ids(LIST_INBOX).iter().position(|id| id == &b),
                 Some(target)
             );
             assert_open_projection_matches_doc(&doc);
@@ -4519,7 +4853,7 @@ mod tests {
     fn cross_list_move_preserves_identity_and_content() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let id = doc.add_item(LIST_MAIN, "wandering").unwrap();
+        let id = doc.add_item(LIST_INBOX, "wandering").unwrap();
         doc.edit_item_notes(&id, "some notes").unwrap();
         let before = doc.get_item(&id).unwrap();
 
@@ -4532,7 +4866,7 @@ mod tests {
         assert_eq!(after.created_at, before.created_at);
         assert_eq!(after.list_id, other);
         assert_eq!(doc.open_item_ids(&other), vec![id]);
-        assert!(doc.open_item_ids(LIST_MAIN).is_empty());
+        assert!(doc.open_item_ids(LIST_INBOX).is_empty());
         assert_open_projection_matches_doc(&doc);
     }
 
@@ -4540,11 +4874,11 @@ mod tests {
     fn cross_list_move_removes_source_entry_best_effort() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let id = doc.add_item(LIST_MAIN, "x").unwrap();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 1);
         doc.move_item(&id, &other, 0).unwrap();
         assert_eq!(
-            doc.order_list(LIST_MAIN).len(),
+            doc.order_list(LIST_INBOX).len(),
             0,
             "source order entry cleaned up"
         );
@@ -4555,18 +4889,18 @@ mod tests {
     fn open_projection_survives_bulk_archive_then_reorder() {
         let doc = Doc::new().unwrap();
         let historical = doc
-            .add_items_at(LIST_MAIN, &["old 1", "old 2", "old 3"], 0)
+            .add_items_at(LIST_INBOX, &["old 1", "old 2", "old 3"], 0)
             .unwrap();
         let historical_refs: Vec<&str> = historical.iter().map(String::as_str).collect();
         doc.set_items_done(&historical_refs, true).unwrap();
 
         let open = doc
-            .add_items_at(LIST_MAIN, &["current 1", "current 2", "current 3"], 0)
+            .add_items_at(LIST_INBOX, &["current 1", "current 2", "current 3"], 0)
             .unwrap();
-        doc.move_item(&open[2], LIST_MAIN, 0).unwrap();
+        doc.move_item(&open[2], LIST_INBOX, 0).unwrap();
 
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![open[2].clone(), open[0].clone(), open[1].clone()]
         );
         assert_open_projection_matches_doc(&doc);
@@ -4575,7 +4909,7 @@ mod tests {
     #[test]
     fn view_helpers_empty_doc() {
         let doc = Doc::new().unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), Vec::<String>::new());
+        assert_eq!(doc.open_item_ids(LIST_INBOX), Vec::<String>::new());
         assert_eq!(doc.done_item_ids(), Vec::<String>::new());
         assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
@@ -4584,26 +4918,26 @@ mod tests {
     fn open_item_ids_match_order_container() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
         // Items in another list must not leak into main's view.
         let _h = doc.add_item(&other, "h").unwrap();
         // Done/binned items must not leak into the open view.
         doc.set_item_done(&b, true).unwrap();
-        let d = doc.add_item(LIST_MAIN, "d").unwrap();
+        let d = doc.add_item(LIST_INBOX, "d").unwrap();
         doc.set_item_binned(&d, true).unwrap();
 
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, c]);
     }
 
     #[test]
     fn done_item_ids_sorted_by_done_at_desc() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
+        let first = doc.add_item(LIST_INBOX, "first").unwrap();
         let second = doc.add_item(&other, "second").unwrap();
-        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let third = doc.add_item(LIST_INBOX, "third").unwrap();
         doc.set_item_done(&first, true).unwrap();
         // tiny gap so the millisecond timestamps definitely differ
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -4617,8 +4951,8 @@ mod tests {
     #[test]
     fn binned_item_ids_sorted_by_binned_at_desc() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
         doc.set_item_binned(&a, true).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
         doc.set_item_binned(&b, true).unwrap();
@@ -4634,8 +4968,8 @@ mod tests {
         // Items are discarded to the bin: gone from every open view,
         // relocated to main, and present in the cross-list bin view.
         assert!(doc.open_item_ids(&mylist).is_empty());
-        assert!(doc.open_item_ids(LIST_MAIN).is_empty());
-        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_MAIN);
+        assert!(doc.open_item_ids(LIST_INBOX).is_empty());
+        assert_eq!(doc.get_item(&id).unwrap().list_id, LIST_INBOX);
         assert_eq!(doc.binned_item_ids(), vec![id]);
     }
 
@@ -4652,8 +4986,8 @@ mod tests {
         assert_eq!(
             export.lists[0],
             ExportList {
-                id: LIST_MAIN.to_string(),
-                name: LIST_MAIN_NAME.to_string(),
+                id: LIST_INBOX.to_string(),
+                name: INBOX_NAME.to_string(),
                 created_at: None,
                 builtin: true,
             }
@@ -4667,7 +5001,7 @@ mod tests {
     #[test]
     fn json_export_includes_notes_and_lifecycle_timestamps() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
+        let id = doc.add_item(LIST_INBOX, "buy milk").unwrap();
         doc.edit_item_notes(&id, "whole milk").unwrap();
         doc.set_item_done(&id, true).unwrap();
         doc.set_item_binned(&id, true).unwrap();
@@ -4677,7 +5011,7 @@ mod tests {
 
         assert_eq!(item.text, "buy milk");
         assert_eq!(item.notes, "whole milk");
-        assert_eq!(item.list_id, LIST_MAIN);
+        assert_eq!(item.list_id, LIST_INBOX);
         assert!(item.done_at.is_some());
         assert!(item.binned_at.is_some());
     }
@@ -4689,7 +5023,7 @@ mod tests {
         let hidden = doc.add_item(&other, "hidden").unwrap();
         doc.set_item_done(&hidden, true).unwrap();
         let anchor = doc.add_item(&other, "anchor").unwrap();
-        let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
+        let moved = doc.add_item(LIST_INBOX, "moved").unwrap();
 
         doc.move_item(&moved, &other, 1).unwrap();
 
@@ -4701,7 +5035,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         // Main has no ListMeta row, so no metadata in the doc —
         // clients render its label themselves.
-        assert!(doc.get_list_meta(LIST_MAIN).is_none());
+        assert!(doc.get_list_meta(LIST_INBOX).is_none());
         assert!(doc.get_list_meta("nope").is_none());
     }
 
@@ -4710,7 +5044,7 @@ mod tests {
         let dek1 = Dek::generate();
         let dek2 = Dek::generate();
         let a = Doc::new().unwrap();
-        let _ = a.add_item(LIST_MAIN, "x").unwrap();
+        let _ = a.add_item(LIST_INBOX, "x").unwrap();
         let blob = a.pending_export(&dek1).unwrap().unwrap();
 
         let mut b = Doc::empty();
@@ -4730,7 +5064,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let list_x = a.add_list("X").unwrap();
         let list_y = a.add_list("Y").unwrap();
-        let id = a.add_item(LIST_MAIN, "contested").unwrap();
+        let id = a.add_item(LIST_INBOX, "contested").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         let mut b = Doc::empty();
@@ -4750,7 +5084,7 @@ mod tests {
         let winner = a.get_item(&id).unwrap().list_id;
         assert!(winner == list_x || winner == list_y);
         let visible_in = |d: &Doc| {
-            [LIST_MAIN, list_x.as_str(), list_y.as_str()]
+            [LIST_INBOX, list_x.as_str(), list_y.as_str()]
                 .iter()
                 .filter(|l| d.open_item_ids(l).contains(&id))
                 .count()
@@ -4770,14 +5104,14 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let ids: Vec<String> = ["a", "b", "c", "d"]
             .iter()
-            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .map(|t| a.add_item(LIST_INBOX, t).unwrap())
             .collect();
         let seed = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         let mut b = Doc::empty();
         b.apply_remote(&dek, &seed).unwrap();
 
-        a.move_item(&ids[3], LIST_MAIN, 0).unwrap();
+        a.move_item(&ids[3], LIST_INBOX, 0).unwrap();
         b.set_item_done(&ids[1], true).unwrap();
         let blob_a = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
@@ -4788,7 +5122,7 @@ mod tests {
 
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_eq!(
-            a.open_item_ids(LIST_MAIN),
+            a.open_item_ids(LIST_INBOX),
             vec![ids[3].clone(), ids[0].clone(), ids[2].clone()]
         );
         assert!(a.get_item(&ids[1]).unwrap().is_done());
@@ -4801,8 +5135,8 @@ mod tests {
     #[test]
     fn stale_and_duplicate_entries_are_invisible() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
 
         // Duplicate of a's canonical entry + a stale entry with a bogus
         // placement + an entry for a nonexistent item.
@@ -4810,7 +5144,7 @@ mod tests {
             let guard = doc.item_index.lock().unwrap();
             guard.meta[&a].placement_id.clone()
         };
-        let order = doc.order_list(LIST_MAIN);
+        let order = doc.order_list(LIST_INBOX);
         order
             .push(
                 OrderEntry {
@@ -4835,8 +5169,8 @@ mod tests {
         doc.inner.commit();
         doc.rebuild_index();
 
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b]);
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 5);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, b]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 5);
         assert_open_projection_matches_doc(&doc);
     }
 
@@ -4847,34 +5181,34 @@ mod tests {
     #[test]
     fn missing_entry_falls_back_deterministically_and_reconciles() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
 
         // Simulate a lost entry: delete b's canonical entry directly.
         let b_pos = {
             let guard = doc.item_index.lock().unwrap();
-            guard.canonical_raw_pos(LIST_MAIN, &b).unwrap()
+            guard.canonical_raw_pos(LIST_INBOX, &b).unwrap()
         };
-        doc.order_list(LIST_MAIN).delete(b_pos, 1).unwrap();
+        doc.order_list(LIST_INBOX).delete(b_pos, 1).unwrap();
         doc.inner.commit();
         doc.rebuild_index();
 
         // b is not hidden: it lands in the fallback tail (after the
         // entry-backed items, created_at/id order).
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![a.clone(), c.clone(), b.clone()]
         );
 
         // Reads must not have mutated anything.
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 2);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 2);
 
         // Reconcile materializes b's entry; visible order unchanged.
         let repairs = doc.reconcile().unwrap();
         assert!(repairs >= 1, "expected at least one repair");
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 3);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c, b]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 3);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, c, b]);
         assert_open_projection_matches_doc(&doc);
         // Second run is a no-op.
         assert_eq!(doc.reconcile().unwrap(), 0);
@@ -4883,12 +5217,12 @@ mod tests {
     #[test]
     fn reconcile_removes_stale_and_duplicate_entries() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let a_placement = {
             let guard = doc.item_index.lock().unwrap();
             guard.meta[&a].placement_id.clone()
         };
-        let order = doc.order_list(LIST_MAIN);
+        let order = doc.order_list(LIST_INBOX);
         order
             .push(
                 OrderEntry {
@@ -4902,12 +5236,12 @@ mod tests {
         order.push("ghost:stale").unwrap();
         doc.inner.commit();
         doc.rebuild_index();
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 3);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 3);
 
         let repairs = doc.reconcile().unwrap();
         assert_eq!(repairs, 2);
-        assert_eq!(doc.order_list(LIST_MAIN).len(), 1);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a]);
+        assert_eq!(doc.order_list(LIST_INBOX).len(), 1);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a]);
         assert_eq!(doc.reconcile().unwrap(), 0);
         assert_open_projection_matches_doc(&doc);
     }
@@ -4918,7 +5252,7 @@ mod tests {
     fn local_add_item_emits_item_added() {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
-        let id = doc.add_item(LIST_MAIN, "milk").unwrap();
+        let id = doc.add_item(LIST_INBOX, "milk").unwrap();
         let evs = doc.drain_events();
         assert_eq!(evs.len(), 1);
         match &evs[0] {
@@ -4932,7 +5266,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(eid, &id);
-                assert_eq!(list_id, LIST_MAIN);
+                assert_eq!(list_id, LIST_INBOX);
                 assert_eq!(text, "milk");
                 assert!(done_at.is_none());
                 assert!(binned_at.is_none());
@@ -4945,7 +5279,7 @@ mod tests {
     #[test]
     fn local_edit_text_emits_text_changed() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "old").unwrap();
+        let id = doc.add_item(LIST_INBOX, "old").unwrap();
         let _ = doc.drain_events();
         doc.edit_item_text(&id, "new").unwrap();
         let evs = doc.drain_events();
@@ -4958,7 +5292,7 @@ mod tests {
     #[test]
     fn local_set_done_emits_lifecycle_changed_with_timestamps() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "task").unwrap();
+        let id = doc.add_item(LIST_INBOX, "task").unwrap();
         let _ = doc.drain_events();
         doc.set_item_done(&id, true).unwrap();
         let evs = doc.drain_events();
@@ -4984,7 +5318,7 @@ mod tests {
     #[test]
     fn local_set_binned_preserves_done_in_event() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "task").unwrap();
+        let id = doc.add_item(LIST_INBOX, "task").unwrap();
         doc.set_item_done(&id, true).unwrap();
         let _ = doc.drain_events();
         doc.set_item_binned(&id, true).unwrap();
@@ -5013,7 +5347,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
         let anchor = doc.add_item(&other, "anchor").unwrap();
-        let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
+        let moved = doc.add_item(LIST_INBOX, "moved").unwrap();
         let _ = doc.drain_events();
 
         doc.move_item(&moved, &other, 1).unwrap();
@@ -5044,7 +5378,7 @@ mod tests {
         let _ = doc.drain_events();
         doc.delete_list(&other).unwrap();
         let evs = doc.drain_events();
-        // The item is relocated to `main` (ItemListChanged) and binned
+        // The item is relocated to `inbox` (ItemListChanged) and binned
         // (ItemLifecycleChanged, so it drops out of the open projection),
         // then the list is removed (ListRemoved).
         let mut saw_reassign = false;
@@ -5058,7 +5392,7 @@ mod tests {
                     open_index,
                 } => {
                     assert_eq!(eid, &id);
-                    assert_eq!(list_id, LIST_MAIN);
+                    assert_eq!(list_id, LIST_INBOX);
                     assert_eq!(*open_index, None, "binned item is not in a open view");
                     saw_reassign = true;
                 }
@@ -5096,8 +5430,8 @@ mod tests {
     fn remote_lifecycle_change_translates_to_one_surgical_event() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let first = a.add_item(LIST_MAIN, "first").unwrap();
-        let _second = a.add_item(LIST_MAIN, "second").unwrap();
+        let first = a.add_item(LIST_INBOX, "first").unwrap();
+        let _second = a.add_item(LIST_INBOX, "second").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
         a.set_item_done(&first, true).unwrap();
@@ -5132,12 +5466,12 @@ mod tests {
     fn remote_move_translates_to_item_moved_with_open_index() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let _first = a.add_item(LIST_MAIN, "first").unwrap();
-        let _second = a.add_item(LIST_MAIN, "second").unwrap();
-        let third = a.add_item(LIST_MAIN, "third").unwrap();
+        let _first = a.add_item(LIST_INBOX, "first").unwrap();
+        let _second = a.add_item(LIST_INBOX, "second").unwrap();
+        let third = a.add_item(LIST_INBOX, "third").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
-        a.move_item(&third, LIST_MAIN, 0).unwrap();
+        a.move_item(&third, LIST_INBOX, 0).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &blob).unwrap();
 
@@ -5150,7 +5484,7 @@ mod tests {
             other => panic!("expected surgical ItemMoved, got {other:?}"),
         }
         assert_open_projection_matches_doc(&b);
-        assert_eq!(b.open_item_ids(LIST_MAIN)[0], third);
+        assert_eq!(b.open_item_ids(LIST_INBOX)[0], third);
         assert_eq!(a.fingerprint(), b.fingerprint());
     }
 
@@ -5249,7 +5583,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let ids: Vec<String> = ["a", "b", "c", "d", "e"]
             .iter()
-            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .map(|t| a.add_item(LIST_INBOX, t).unwrap())
             .collect();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
@@ -5258,8 +5592,8 @@ mod tests {
         // move b to open index 3, then a to open index 2. Final order:
         // [c, d, a, b, e].
         let pre_open = open_state(&b);
-        a.move_item(&ids[1], LIST_MAIN, 3).unwrap();
-        a.move_item(&ids[0], LIST_MAIN, 2).unwrap();
+        a.move_item(&ids[1], LIST_INBOX, 3).unwrap();
+        a.move_item(&ids[0], LIST_INBOX, 2).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &blob).unwrap();
 
@@ -5271,7 +5605,7 @@ mod tests {
             ids[1].clone(),
             ids[4].clone(),
         ];
-        assert_eq!(a.open_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.open_item_ids(LIST_INBOX), expected);
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_open_projection_matches_doc(&b);
         assert!(
@@ -5280,7 +5614,7 @@ mod tests {
         );
         assert_eq!(
             replay_open_events(&pre_open, &evs)
-                .get(LIST_MAIN)
+                .get(LIST_INBOX)
                 .cloned()
                 .unwrap_or_default(),
             expected,
@@ -5294,15 +5628,15 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let ids: Vec<String> = ["a", "b", "c", "d", "e"]
             .iter()
-            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .map(|t| a.add_item(LIST_INBOX, t).unwrap())
             .collect();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
         // Select c, d and drag them to the top — `planReorderMoves`
         // emits move c to 0, then d to 1. Final order: [c, d, a, b, e].
         let pre_open = open_state(&b);
-        a.move_item(&ids[2], LIST_MAIN, 0).unwrap();
-        a.move_item(&ids[3], LIST_MAIN, 1).unwrap();
+        a.move_item(&ids[2], LIST_INBOX, 0).unwrap();
+        a.move_item(&ids[3], LIST_INBOX, 1).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &blob).unwrap();
 
@@ -5314,7 +5648,7 @@ mod tests {
             ids[1].clone(),
             ids[4].clone(),
         ];
-        assert_eq!(a.open_item_ids(LIST_MAIN), expected);
+        assert_eq!(a.open_item_ids(LIST_INBOX), expected);
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_open_projection_matches_doc(&b);
         assert!(
@@ -5323,7 +5657,7 @@ mod tests {
         );
         assert_eq!(
             replay_open_events(&pre_open, &evs)
-                .get(LIST_MAIN)
+                .get(LIST_INBOX)
                 .cloned()
                 .unwrap_or_default(),
             expected,
@@ -5337,15 +5671,15 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let ids: Vec<String> = ["a", "b", "c", "d", "e", "f"]
             .iter()
-            .map(|t| a.add_item(LIST_MAIN, t).unwrap())
+            .map(|t| a.add_item(LIST_INBOX, t).unwrap())
             .collect();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
         // Discontiguous selection {a, c} dragged down to sit before f:
         // move a below e, then c below e. Exercises a non-adjacent widen.
         let pre_open = open_state(&b);
-        a.move_item(&ids[0], LIST_MAIN, 3).unwrap();
-        a.move_item(&ids[2], LIST_MAIN, 4).unwrap();
+        a.move_item(&ids[0], LIST_INBOX, 3).unwrap();
+        a.move_item(&ids[2], LIST_INBOX, 4).unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         b.apply_remote(&dek, &blob).unwrap();
 
@@ -5358,10 +5692,10 @@ mod tests {
         );
         assert_eq!(
             replay_open_events(&pre_open, &evs)
-                .get(LIST_MAIN)
+                .get(LIST_INBOX)
                 .cloned()
                 .unwrap_or_default(),
-            a.open_item_ids(LIST_MAIN),
+            a.open_item_ids(LIST_INBOX),
             "emitted events interleave on the consumer; got {evs:?}"
         );
     }
@@ -5374,8 +5708,8 @@ mod tests {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let other = a.add_list("Other").unwrap();
-        let m0 = a.add_item(LIST_MAIN, "m0").unwrap();
-        let m1 = a.add_item(LIST_MAIN, "m1").unwrap();
+        let m0 = a.add_item(LIST_INBOX, "m0").unwrap();
+        let m1 = a.add_item(LIST_INBOX, "m1").unwrap();
         let _o0 = a.add_item(&other, "o0").unwrap();
         let _o1 = a.add_item(&other, "o1").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
@@ -5394,15 +5728,15 @@ mod tests {
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_open_projection_matches_doc(&b);
         assert_eq!(a.open_item_ids(&other), b.open_item_ids(&other));
-        assert_eq!(a.open_item_ids(LIST_MAIN), b.open_item_ids(LIST_MAIN));
+        assert_eq!(a.open_item_ids(LIST_INBOX), b.open_item_ids(LIST_INBOX));
         let replayed = replay_open_events(&pre_open, &evs);
         assert_eq!(
             replayed.get(other.as_str()).cloned().unwrap_or_default(),
             b.open_item_ids(&other)
         );
         assert_eq!(
-            replayed.get(LIST_MAIN).cloned().unwrap_or_default(),
-            b.open_item_ids(LIST_MAIN)
+            replayed.get(LIST_INBOX).cloned().unwrap_or_default(),
+            b.open_item_ids(LIST_INBOX)
         );
     }
 
@@ -5410,8 +5744,8 @@ mod tests {
     fn remote_delete_translates_to_item_removed() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let victim = a.add_item(LIST_MAIN, "victim").unwrap();
-        let _keeper = a.add_item(LIST_MAIN, "keeper").unwrap();
+        let victim = a.add_item(LIST_INBOX, "victim").unwrap();
+        let _keeper = a.add_item(LIST_INBOX, "keeper").unwrap();
         a.set_item_binned(&victim, true).unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
@@ -5433,7 +5767,7 @@ mod tests {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
         let other = a.add_list("Other").unwrap();
-        let roamer = a.add_item(LIST_MAIN, "roamer").unwrap();
+        let roamer = a.add_item(LIST_INBOX, "roamer").unwrap();
         let _anchor1 = a.add_item(&other, "anchor1").unwrap();
         let _anchor2 = a.add_item(&other, "anchor2").unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
@@ -5476,7 +5810,7 @@ mod tests {
         let mut a = Doc::new().unwrap();
         let texts: Vec<String> = (0..100).map(|i| format!("bulk {i}")).collect();
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-        let ids = a.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        let ids = a.add_items_at(LIST_INBOX, &refs, 0).unwrap();
         let mut b = sync_fresh_peer(&mut a, &dek);
 
         // 100 dirty items in one frame → over DIFF_TRANSLATE_MAX_DIRTY.
@@ -5489,14 +5823,14 @@ mod tests {
         assert_eq!(evs, vec![AppEvent::FullResync]);
         assert_open_projection_matches_doc(&b);
         assert_eq!(a.fingerprint(), b.fingerprint());
-        assert!(b.open_item_ids(LIST_MAIN).is_empty());
+        assert!(b.open_item_ids(LIST_INBOX).is_empty());
     }
 
     #[test]
     fn apply_remote_emits_item_added_for_peer_inserts() {
         let dek = Dek::generate();
         let a = Doc::new().unwrap();
-        let item_id = a.add_item(LIST_MAIN, "from peer").unwrap();
+        let item_id = a.add_item(LIST_INBOX, "from peer").unwrap();
         let blob = a.pending_export(&dek).unwrap().unwrap();
 
         let mut b = Doc::empty();
@@ -5508,7 +5842,7 @@ mod tests {
         // ListMeta row, so no ListAdded is emitted for it.
         assert!(
             !evs.iter()
-                .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_MAIN)),
+                .any(|e| matches!(e, AppEvent::ListAdded { id, .. } if id == LIST_INBOX)),
             "main is virtual; no ListAdded should be emitted: {evs:?}"
         );
         assert!(
@@ -5522,7 +5856,7 @@ mod tests {
     fn apply_remote_emits_text_changed_for_peer_edits() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let id = a.add_item(LIST_MAIN, "old").unwrap();
+        let id = a.add_item(LIST_INBOX, "old").unwrap();
         let setup_blob = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
 
@@ -5545,7 +5879,7 @@ mod tests {
     fn apply_remote_batch_emits_final_state_once_for_multi_blob_catchup() {
         let dek = Dek::generate();
         let mut src = Doc::new().unwrap();
-        let id = src.add_item(LIST_MAIN, "old").unwrap();
+        let id = src.add_item(LIST_INBOX, "old").unwrap();
         let setup_blob = src.pending_export(&dek).unwrap().unwrap();
         src.mark_pushed();
 
@@ -5585,7 +5919,7 @@ mod tests {
 
         // Five captured ops, one delta each.
         for i in 0..5 {
-            a.add_item(LIST_MAIN, &format!("item {i}")).unwrap();
+            a.add_item(LIST_INBOX, &format!("item {i}")).unwrap();
             let _ = a.pending_export(&dek).unwrap().unwrap();
             a.mark_pushed();
         }
@@ -5595,7 +5929,7 @@ mod tests {
         // Three more captured ops, one delta each.
         let mut trailing = Vec::new();
         for i in 5..8 {
-            a.add_item(LIST_MAIN, &format!("item {i}")).unwrap();
+            a.add_item(LIST_INBOX, &format!("item {i}")).unwrap();
             trailing.push(a.pending_export(&dek).unwrap().unwrap());
             a.mark_pushed();
         }
@@ -5607,7 +5941,7 @@ mod tests {
 
         assert_eq!(b.fingerprint(), a.fingerprint());
         let texts: Vec<String> = b
-            .items_in_list(LIST_MAIN, false)
+            .items_in_list(LIST_INBOX, false)
             .into_iter()
             .map(|it| it.text)
             .collect();
@@ -5621,43 +5955,43 @@ mod tests {
     #[test]
     fn add_item_at_inserts_at_target_position() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
-        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, mid, b, c]);
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
+        let mid = doc.add_item_at(LIST_INBOX, "mid", 1).unwrap();
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, mid, b, c]);
     }
 
     #[test]
     fn add_item_at_appends_when_target_past_end() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item_at(LIST_MAIN, "b", 99).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, b]);
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item_at(LIST_INBOX, "b", 99).unwrap();
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, b]);
     }
 
     #[test]
     fn add_item_at_skips_other_lists_and_non_open_when_counting() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let _hidden = doc.add_item(&other, "hidden").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let done = doc.add_item(LIST_MAIN, "done").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let done = doc.add_item(LIST_INBOX, "done").unwrap();
         doc.set_item_done(&done, true).unwrap();
         // Position 1 in main's open view should land between a and b
         // regardless of the other-list and done items in between.
-        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, mid, b]);
+        let mid = doc.add_item_at(LIST_INBOX, "mid", 1).unwrap();
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, mid, b]);
     }
 
     #[test]
     fn add_item_at_emits_item_added_with_open_index() {
         let doc = Doc::new().unwrap();
-        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let _a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let _b = doc.add_item(LIST_INBOX, "b").unwrap();
         let _ = doc.drain_events();
-        let mid = doc.add_item_at(LIST_MAIN, "mid", 1).unwrap();
+        let mid = doc.add_item_at(LIST_INBOX, "mid", 1).unwrap();
         let evs = doc.drain_events();
         assert_eq!(evs.len(), 1);
         match &evs[0] {
@@ -5672,15 +6006,15 @@ mod tests {
     #[test]
     fn local_move_item_emits_destination_open_index() {
         let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let moved = doc.add_item(LIST_MAIN, "moved").unwrap();
-        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let first = doc.add_item(LIST_INBOX, "first").unwrap();
+        let moved = doc.add_item(LIST_INBOX, "moved").unwrap();
+        let third = doc.add_item(LIST_INBOX, "third").unwrap();
         let _ = doc.drain_events();
 
-        doc.move_item(&moved, LIST_MAIN, 0).unwrap();
+        doc.move_item(&moved, LIST_INBOX, 0).unwrap();
 
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![moved.clone(), first, third]
         );
         let evs = doc.drain_events();
@@ -5695,9 +6029,9 @@ mod tests {
     #[test]
     fn set_items_binned_small_batch_is_surgical_and_restores_position() {
         let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let second = doc.add_item(LIST_MAIN, "second").unwrap();
-        let third = doc.add_item(LIST_MAIN, "third").unwrap();
+        let first = doc.add_item(LIST_INBOX, "first").unwrap();
+        let second = doc.add_item(LIST_INBOX, "second").unwrap();
+        let third = doc.add_item(LIST_INBOX, "third").unwrap();
         let _ = doc.drain_events();
 
         // Below the bulk threshold: exactly one per-item event, no
@@ -5721,7 +6055,7 @@ mod tests {
         }
         assert_open_projection_matches_doc(&doc);
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![first.clone(), third.clone()]
         );
 
@@ -5746,54 +6080,54 @@ mod tests {
             other => panic!("expected one surgical ItemLifecycleChanged, got {other:?}"),
         }
         assert_open_projection_matches_doc(&doc);
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![first, second, third]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![first, second, third]);
     }
 
     #[test]
     fn set_items_binned_updates_many_in_one_call() {
         let doc = Doc::new().unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        let first = doc.add_item(LIST_INBOX, "first").unwrap();
+        let second = doc.add_item(LIST_INBOX, "second").unwrap();
 
         doc.set_items_binned(&[first.as_str(), second.as_str()], true)
             .unwrap();
 
-        assert_eq!(doc.open_item_ids(LIST_MAIN), Vec::<String>::new());
+        assert_eq!(doc.open_item_ids(LIST_INBOX), Vec::<String>::new());
         assert_eq!(doc.binned_item_ids().len(), 2);
     }
 
     #[test]
     fn delete_binned_items_removes_many_in_one_call() {
         let doc = Doc::new().unwrap();
-        let keep = doc.add_item(LIST_MAIN, "keep").unwrap();
-        let first = doc.add_item(LIST_MAIN, "first").unwrap();
-        let second = doc.add_item(LIST_MAIN, "second").unwrap();
+        let keep = doc.add_item(LIST_INBOX, "keep").unwrap();
+        let first = doc.add_item(LIST_INBOX, "first").unwrap();
+        let second = doc.add_item(LIST_INBOX, "second").unwrap();
         doc.set_items_binned(&[first.as_str(), second.as_str()], true)
             .unwrap();
 
         doc.delete_binned_items(&[first.as_str(), second.as_str()])
             .unwrap();
 
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![keep]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![keep]);
         assert_eq!(doc.binned_item_ids(), Vec::<String>::new());
     }
 
     #[test]
     fn add_item_at_rejects_empty_text() {
         let doc = Doc::new().unwrap();
-        let err = doc.add_item_at(LIST_MAIN, "  ", 0).unwrap_err();
+        let err = doc.add_item_at(LIST_INBOX, "  ", 0).unwrap_err();
         assert!(matches!(err, DocError::Invalid(_)));
     }
 
     #[test]
     fn add_items_at_inserts_in_order() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let ids = doc.add_items_at(LIST_MAIN, &["x", "y", "z"], 1).unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &["x", "y", "z"], 1).unwrap();
         assert_eq!(ids.len(), 3);
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![a, ids[0].clone(), ids[1].clone(), ids[2].clone(), b],
         );
     }
@@ -5801,10 +6135,10 @@ mod tests {
     #[test]
     fn add_items_at_appends_when_target_past_end() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 99).unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &["x", "y"], 99).unwrap();
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![a, ids[0].clone(), ids[1].clone()]
         );
     }
@@ -5812,10 +6146,10 @@ mod tests {
     #[test]
     fn add_items_at_emits_one_event_per_item_with_increasing_open_indices() {
         let doc = Doc::new().unwrap();
-        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let _b = doc.add_item(LIST_MAIN, "b").unwrap();
+        let _a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let _b = doc.add_item(LIST_INBOX, "b").unwrap();
         let _ = doc.drain_events();
-        let ids = doc.add_items_at(LIST_MAIN, &["x", "y"], 1).unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &["x", "y"], 1).unwrap();
         let evs = doc.drain_events();
         let added: Vec<(String, Option<usize>)> = evs
             .iter()
@@ -5832,14 +6166,14 @@ mod tests {
     #[test]
     fn add_items_at_rejects_batch_atomically_on_empty_text() {
         let doc = Doc::new().unwrap();
-        let _a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _a = doc.add_item(LIST_INBOX, "a").unwrap();
         let _ = doc.drain_events();
         let err = doc
-            .add_items_at(LIST_MAIN, &["ok", "  ", "also ok"], 0)
+            .add_items_at(LIST_INBOX, &["ok", "  ", "also ok"], 0)
             .unwrap_err();
         assert!(matches!(err, DocError::Invalid(_)));
         // Nothing landed.
-        assert_eq!(doc.open_item_ids(LIST_MAIN).len(), 1);
+        assert_eq!(doc.open_item_ids(LIST_INBOX).len(), 1);
         assert!(doc.drain_events().is_empty());
     }
 
@@ -5847,7 +6181,7 @@ mod tests {
     fn add_items_at_empty_input_is_a_noop() {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
-        let ids = doc.add_items_at(LIST_MAIN, &[], 0).unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &[], 0).unwrap();
         assert!(ids.is_empty());
         assert!(doc.drain_events().is_empty());
     }
@@ -5856,7 +6190,7 @@ mod tests {
     fn snapshot_events_materializes_current_state() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let b = doc.add_item(&other, "b").unwrap();
         doc.set_show_list_counts(true).unwrap();
         let _ = doc.drain_events();
@@ -5885,7 +6219,7 @@ mod tests {
             })
             .collect();
         // Main is virtual; no ListAdded is emitted for it.
-        assert!(!lists.contains(&LIST_MAIN));
+        assert!(!lists.contains(&LIST_INBOX));
         assert!(lists.contains(&other.as_str()));
         assert!(items.contains(&a.as_str()));
         assert!(items.contains(&b.as_str()));
@@ -5895,7 +6229,7 @@ mod tests {
     fn export_json_string_is_valid_pretty_json() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let _ = doc.add_item(LIST_MAIN, "a").unwrap();
+        let _ = doc.add_item(LIST_INBOX, "a").unwrap();
         let _ = doc.add_item(&other, "b").unwrap();
 
         let s = doc.export_json_string();
@@ -5911,7 +6245,7 @@ mod tests {
     fn import_json_creates_lists_with_fresh_ids_and_routes_main_locally() {
         let src = Doc::new().unwrap();
         let other = src.add_list("Other").unwrap();
-        let _ = src.add_item(LIST_MAIN, "in-main").unwrap();
+        let _ = src.add_item(LIST_INBOX, "in-main").unwrap();
         let _ = src.add_item(&other, "in-other").unwrap();
         let export = src.export_json();
 
@@ -5931,7 +6265,7 @@ mod tests {
 
         let texts_main: Vec<String> = dst
             .iter_items()
-            .filter(|i| i.list_id == LIST_MAIN)
+            .filter(|i| i.list_id == LIST_INBOX)
             .map(|i| i.text)
             .collect();
         assert_eq!(texts_main, vec!["in-main"]);
@@ -5947,9 +6281,9 @@ mod tests {
     #[test]
     fn import_json_preserves_timestamps_done_binned_and_notes() {
         let src = Doc::new().unwrap();
-        let a = src.add_item(LIST_MAIN, "alpha").unwrap();
-        let b = src.add_item(LIST_MAIN, "beta").unwrap();
-        let c = src.add_item(LIST_MAIN, "gamma").unwrap();
+        let a = src.add_item(LIST_INBOX, "alpha").unwrap();
+        let b = src.add_item(LIST_INBOX, "beta").unwrap();
+        let c = src.add_item(LIST_INBOX, "gamma").unwrap();
         src.edit_item_notes(&a, "alpha notes").unwrap();
         src.set_item_done(&b, true).unwrap();
         src.set_item_binned(&c, true).unwrap();
@@ -5981,7 +6315,7 @@ mod tests {
     #[test]
     fn set_and_clear_item_due_on() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "pay rent").unwrap();
+        let id = doc.add_item(LIST_INBOX, "pay rent").unwrap();
         let _ = doc.drain_events();
 
         doc.set_item_due_on(&id, Some("2026-07-15")).unwrap();
@@ -6020,7 +6354,7 @@ mod tests {
     #[test]
     fn set_item_due_on_rejects_malformed_dates() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "task").unwrap();
+        let id = doc.add_item(LIST_INBOX, "task").unwrap();
         let _ = doc.drain_events();
 
         for bad in [
@@ -6058,8 +6392,8 @@ mod tests {
     #[test]
     fn export_import_preserves_due_on() {
         let src = Doc::new().unwrap();
-        let a = src.add_item(LIST_MAIN, "with due").unwrap();
-        let _b = src.add_item(LIST_MAIN, "no due").unwrap();
+        let a = src.add_item(LIST_INBOX, "with due").unwrap();
+        let _b = src.add_item(LIST_INBOX, "no due").unwrap();
         src.set_item_due_on(&a, Some("2026-09-30")).unwrap();
 
         let export = src.export_json();
@@ -6084,7 +6418,7 @@ mod tests {
     fn due_on_converges_between_peers() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let id = a.add_item(LIST_MAIN, "sync me").unwrap();
+        let id = a.add_item(LIST_INBOX, "sync me").unwrap();
         let seed = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
         let mut b = Doc::empty();
@@ -6147,12 +6481,12 @@ mod tests {
     fn import_json_is_additive_existing_content_untouched() {
         let dst = Doc::new().unwrap();
         let local_list = dst.add_list("LocalKeep").unwrap();
-        let local_item = dst.add_item(LIST_MAIN, "local-main").unwrap();
+        let local_item = dst.add_item(LIST_INBOX, "local-main").unwrap();
         let _ = dst.add_item(&local_list, "local-other").unwrap();
 
         let src = Doc::new().unwrap();
         let _ = src.add_list("Imported").unwrap();
-        let _ = src.add_item(LIST_MAIN, "src-main").unwrap();
+        let _ = src.add_item(LIST_INBOX, "src-main").unwrap();
         let export = src.export_json();
 
         dst.import_json(&export).unwrap();
@@ -6167,7 +6501,7 @@ mod tests {
         // Both `src-main` and `local-main` open in main.
         let main_texts: Vec<String> = dst
             .iter_items()
-            .filter(|i| i.list_id == LIST_MAIN)
+            .filter(|i| i.list_id == LIST_INBOX)
             .map(|i| i.text)
             .collect();
         assert!(main_texts.contains(&"local-main".to_string()));
@@ -6183,11 +6517,11 @@ mod tests {
             version: 1,
             settings: ExportSettings {
                 show_list_counts: false,
-                main_name: None,
+                inbox_name: None,
             },
             lists: vec![ExportList {
-                id: LIST_MAIN.to_string(),
-                name: LIST_MAIN_NAME.to_string(),
+                id: LIST_INBOX.to_string(),
+                name: INBOX_NAME.to_string(),
                 created_at: None,
                 builtin: true,
             }],
@@ -6212,7 +6546,7 @@ mod tests {
         let items: Vec<ItemView> = dst.iter_items().collect();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].text, "stranded");
-        assert_eq!(items[0].list_id, LIST_MAIN);
+        assert_eq!(items[0].list_id, LIST_INBOX);
     }
 
     #[test]
@@ -6234,7 +6568,7 @@ mod tests {
             version: 99,
             settings: ExportSettings {
                 show_list_counts: false,
-                main_name: None,
+                inbox_name: None,
             },
             lists: vec![],
             items: vec![],
@@ -6247,8 +6581,8 @@ mod tests {
     #[test]
     fn import_json_emits_item_added_events() {
         let src = Doc::new().unwrap();
-        let _ = src.add_item(LIST_MAIN, "e1").unwrap();
-        let _ = src.add_item(LIST_MAIN, "e2").unwrap();
+        let _ = src.add_item(LIST_INBOX, "e1").unwrap();
+        let _ = src.add_item(LIST_INBOX, "e2").unwrap();
         let export = src.export_json();
 
         let dst = Doc::new().unwrap();
@@ -6296,7 +6630,7 @@ mod tests {
         // the same logical state when imported into a fresh Loro doc.
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let _ = doc.add_item(&other, "b").unwrap();
         doc.set_item_done(&a, true).unwrap();
 
@@ -6328,12 +6662,12 @@ mod tests {
     #[test]
     fn oplog_replay_rebuilds_item_index() {
         let source = Doc::new().unwrap();
-        let id = source.add_item(LIST_MAIN, "replayed").unwrap();
+        let id = source.add_item(LIST_INBOX, "replayed").unwrap();
         let updates = source.export_updates_after_bytes(&[]).unwrap();
 
         let mut restored = Doc::empty();
         restored.import_oplog_updates(&updates).unwrap();
-        restored.move_item(&id, LIST_MAIN, 0).unwrap();
+        restored.move_item(&id, LIST_INBOX, 0).unwrap();
 
         assert_eq!(restored.get_item(&id).unwrap().text, "replayed");
     }
@@ -6341,10 +6675,10 @@ mod tests {
     #[test]
     fn deferred_oplog_replay_rebuilds_once_and_stays_silent() {
         let source = Doc::new().unwrap();
-        let first = source.add_item(LIST_MAIN, "first").unwrap();
+        let first = source.add_item(LIST_INBOX, "first").unwrap();
         let first_updates = source.export_updates_after_bytes(&[]).unwrap();
         let after_first = source.oplog_vv_bytes();
-        let second = source.add_item(LIST_MAIN, "second").unwrap();
+        let second = source.add_item(LIST_INBOX, "second").unwrap();
         let second_updates = source.export_updates_after_bytes(&after_first).unwrap();
 
         let mut restored = Doc::empty();
@@ -6374,7 +6708,7 @@ mod tests {
     #[test]
     fn undo_reverses_local_add_and_redo_replays_it() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "buy milk").unwrap();
+        let id = doc.add_item(LIST_INBOX, "buy milk").unwrap();
         assert!(doc.can_undo());
 
         assert!(doc.undo().unwrap());
@@ -6389,7 +6723,7 @@ mod tests {
     #[test]
     fn undo_emits_app_events() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "thing").unwrap();
+        let id = doc.add_item(LIST_INBOX, "thing").unwrap();
         let _ = doc.drain_events();
 
         assert!(doc.undo().unwrap());
@@ -6410,11 +6744,11 @@ mod tests {
         let doc = Doc::new().unwrap();
         let texts: Vec<String> = (0..200).map(|i| format!("item {i}")).collect();
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-        let ids = doc.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &refs, 0).unwrap();
         let _ = doc.drain_events();
 
         let moved = ids[199].clone();
-        doc.move_item(&moved, LIST_MAIN, 0).unwrap();
+        doc.move_item(&moved, LIST_INBOX, 0).unwrap();
         let _ = doc.drain_events();
         assert!(doc.undo().unwrap());
 
@@ -6427,36 +6761,36 @@ mod tests {
                 open_index: Some(199),
             } if id == &moved
         ));
-        assert_eq!(doc.open_item_ids(LIST_MAIN), ids);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), ids);
     }
 
     #[test]
     fn undo_redo_round_trips_cross_list_move() {
         let doc = Doc::new().unwrap();
         let other = doc.add_list("Other").unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
         let o = doc.add_item(&other, "o").unwrap();
         let _ = doc.drain_events();
 
         // Cross-list move is one commit — one undo step.
         doc.move_item(&b, &other, 1).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a.clone(), c.clone()]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a.clone(), c.clone()]);
         assert_eq!(doc.open_item_ids(&other), vec![o.clone(), b.clone()]);
 
         assert!(doc.undo().unwrap());
         assert_eq!(
-            doc.open_item_ids(LIST_MAIN),
+            doc.open_item_ids(LIST_INBOX),
             vec![a.clone(), b.clone(), c.clone()],
             "undo restores the item to its former position in the source list"
         );
         assert_eq!(doc.open_item_ids(&other), vec![o.clone()]);
-        assert_eq!(doc.get_item(&b).unwrap().list_id, LIST_MAIN);
+        assert_eq!(doc.get_item(&b).unwrap().list_id, LIST_INBOX);
         assert_open_projection_matches_doc(&doc);
 
         assert!(doc.redo().unwrap());
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![a, c]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![a, c]);
         assert_eq!(doc.open_item_ids(&other), vec![o, b.clone()]);
         assert_eq!(doc.get_item(&b).unwrap().list_id, other);
         assert_open_projection_matches_doc(&doc);
@@ -6467,7 +6801,7 @@ mod tests {
         let doc = Doc::new().unwrap();
         let texts: Vec<String> = (0..20).map(|i| format!("item {i}")).collect();
         let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
-        let ids = doc.add_items_at(LIST_MAIN, &text_refs, 0).unwrap();
+        let ids = doc.add_items_at(LIST_INBOX, &text_refs, 0).unwrap();
 
         let moved_ids = vec![ids[5].clone(), ids[6].clone(), ids[7].clone()];
         let remaining: Vec<String> = ids
@@ -6486,25 +6820,25 @@ mod tests {
                     .iter()
                     .position(|cur| cur == id)
                     .expect("moved id must still exist");
-                doc.move_item(id, LIST_MAIN, index).unwrap();
+                doc.move_item(id, LIST_INBOX, index).unwrap();
                 current_ids.remove(current_index);
                 current_ids.insert(index, id.clone());
                 steps += 1;
             }
         }
 
-        let after_move = doc.open_item_ids(LIST_MAIN);
+        let after_move = doc.open_item_ids(LIST_INBOX);
         assert_eq!(after_move, next_ids);
 
         for _ in 0..steps {
             assert!(doc.undo().unwrap());
         }
-        assert_eq!(doc.open_item_ids(LIST_MAIN), ids);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), ids);
 
         for _ in 0..steps {
             assert!(doc.redo().unwrap());
         }
-        assert_eq!(doc.open_item_ids(LIST_MAIN), after_move);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), after_move);
     }
 
     #[test]
@@ -6515,7 +6849,7 @@ mod tests {
         let dek = Dek::generate();
 
         let mut a = Doc::new().unwrap();
-        let remote_id = a.add_item(LIST_MAIN, "from A").unwrap();
+        let remote_id = a.add_item(LIST_INBOX, "from A").unwrap();
         let remote_blob = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
 
@@ -6524,7 +6858,7 @@ mod tests {
         // One remote import landed but b has made no local commits.
         assert!(!b.can_undo(), "remote-only ops must not be undoable");
 
-        let local_id = b.add_item(LIST_MAIN, "local on top").unwrap();
+        let local_id = b.add_item(LIST_INBOX, "local on top").unwrap();
         assert!(b.can_undo());
 
         assert!(b.undo().unwrap());
@@ -6547,39 +6881,39 @@ mod tests {
     #[test]
     fn new_item_defaults_to_backlog() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
         let it = doc.get_item(&id).unwrap();
         assert_eq!(it.lifecycle(), ItemLifecycle::Backlog);
         assert!(!it.live);
         assert!(it.is_open());
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id]);
     }
 
     #[test]
     fn add_item_live_creates_live() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
         let it = doc.get_item(&id).unwrap();
         assert_eq!(it.lifecycle(), ItemLifecycle::Live);
         assert!(it.live && it.is_open());
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![id]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![id]);
     }
 
     #[test]
     fn backlog_live_flip_preserves_list_order() {
         let doc = Doc::new().unwrap();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap();
-        let b = doc.add_item(LIST_MAIN, "b").unwrap();
-        let c = doc.add_item(LIST_MAIN, "c").unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
         let ordered = vec![a.clone(), b.clone(), c.clone()];
-        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
         // Flip b Backlog→Live: shared Open order is untouched.
         doc.set_item_lifecycle(&b, ItemLifecycle::Live).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
         assert_eq!(doc.get_item(&b).unwrap().lifecycle(), ItemLifecycle::Live);
         // ...and back to Backlog.
         doc.set_item_lifecycle(&b, ItemLifecycle::Backlog).unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), ordered);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), ordered);
         assert_eq!(
             doc.get_item(&b).unwrap().lifecycle(),
             ItemLifecycle::Backlog
@@ -6589,7 +6923,7 @@ mod tests {
     #[test]
     fn complete_backlog_then_undo_returns_to_backlog() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
         assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
         assert!(!doc.get_item(&id).unwrap().live, "masked Backlog preserved");
@@ -6603,7 +6937,7 @@ mod tests {
     #[test]
     fn complete_live_then_undo_returns_to_live() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
         let it = doc.get_item(&id).unwrap();
         assert_eq!(it.lifecycle(), ItemLifecycle::Done);
@@ -6615,9 +6949,9 @@ mod tests {
     #[test]
     fn binning_and_restoring_preserves_underlying_state() {
         let doc = Doc::new().unwrap();
-        let backlog = doc.add_item(LIST_MAIN, "backlog").unwrap();
-        let live = doc.add_item_live(LIST_MAIN, "live").unwrap();
-        let done = doc.add_item_live(LIST_MAIN, "done").unwrap();
+        let backlog = doc.add_item(LIST_INBOX, "backlog").unwrap();
+        let live = doc.add_item_live(LIST_INBOX, "live").unwrap();
+        let done = doc.add_item_live(LIST_INBOX, "done").unwrap();
         doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
 
         for id in [&backlog, &live, &done] {
@@ -6646,7 +6980,7 @@ mod tests {
     fn explicit_transitions_clear_the_right_overlays() {
         let doc = Doc::new().unwrap();
         // Live → Done → Binned, then explicit Backlog clears everything.
-        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Backlog).unwrap();
@@ -6655,7 +6989,7 @@ mod tests {
         assert!(!it.live && it.done_at.is_none() && it.binned_at.is_none());
 
         // Binned+Done → Live sets live and clears both timestamps.
-        let j = doc.add_item(LIST_MAIN, "y").unwrap();
+        let j = doc.add_item(LIST_INBOX, "y").unwrap();
         doc.set_item_lifecycle(&j, ItemLifecycle::Done).unwrap();
         doc.set_item_lifecycle(&j, ItemLifecycle::Binned).unwrap();
         doc.set_item_lifecycle(&j, ItemLifecycle::Live).unwrap();
@@ -6667,7 +7001,7 @@ mod tests {
     #[test]
     fn lifecycle_precedence_binned_over_done_over_live() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item_live(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item_live(LIST_INBOX, "x").unwrap();
         doc.set_item_lifecycle(&id, ItemLifecycle::Done).unwrap();
         assert_eq!(doc.get_item(&id).unwrap().lifecycle(), ItemLifecycle::Done);
         doc.set_item_lifecycle(&id, ItemLifecycle::Binned).unwrap();
@@ -6680,14 +7014,14 @@ mod tests {
     #[test]
     fn open_projection_contains_only_backlog_and_live() {
         let doc = Doc::new().unwrap();
-        let backlog = doc.add_item(LIST_MAIN, "backlog").unwrap();
-        let live = doc.add_item_live(LIST_MAIN, "live").unwrap();
-        let done = doc.add_item(LIST_MAIN, "done").unwrap();
-        let binned = doc.add_item(LIST_MAIN, "binned").unwrap();
+        let backlog = doc.add_item(LIST_INBOX, "backlog").unwrap();
+        let live = doc.add_item_live(LIST_INBOX, "live").unwrap();
+        let done = doc.add_item(LIST_INBOX, "done").unwrap();
+        let binned = doc.add_item(LIST_INBOX, "binned").unwrap();
         doc.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
         doc.set_item_lifecycle(&binned, ItemLifecycle::Binned)
             .unwrap();
-        assert_eq!(doc.open_item_ids(LIST_MAIN), vec![backlog, live]);
+        assert_eq!(doc.open_item_ids(LIST_INBOX), vec![backlog, live]);
         assert_eq!(doc.done_item_ids(), vec![done]);
         assert_eq!(doc.binned_item_ids(), vec![binned]);
     }
@@ -6696,8 +7030,8 @@ mod tests {
     fn events_carry_live_and_open_index() {
         let doc = Doc::new().unwrap();
         let _ = doc.drain_events();
-        let a = doc.add_item(LIST_MAIN, "a").unwrap(); // Backlog
-        let b = doc.add_item_live(LIST_MAIN, "b").unwrap(); // Live
+        let a = doc.add_item(LIST_INBOX, "a").unwrap(); // Backlog
+        let b = doc.add_item_live(LIST_INBOX, "b").unwrap(); // Live
         match doc.drain_events().as_slice() {
             [
                 AppEvent::ItemAdded {
@@ -6739,9 +7073,9 @@ mod tests {
     #[test]
     fn export_import_preserves_lifecycle() {
         let src = Doc::new().unwrap();
-        let _backlog = src.add_item(LIST_MAIN, "backlog").unwrap();
-        let _live = src.add_item_live(LIST_MAIN, "live").unwrap();
-        let done = src.add_item_live(LIST_MAIN, "done").unwrap();
+        let _backlog = src.add_item(LIST_INBOX, "backlog").unwrap();
+        let _live = src.add_item_live(LIST_INBOX, "live").unwrap();
+        let done = src.add_item_live(LIST_INBOX, "done").unwrap();
         src.set_item_lifecycle(&done, ItemLifecycle::Done).unwrap();
 
         let export = src.export_json();
@@ -6767,7 +7101,7 @@ mod tests {
     #[test]
     fn fingerprint_covers_live_state() {
         let doc = Doc::new().unwrap();
-        let id = doc.add_item(LIST_MAIN, "x").unwrap();
+        let id = doc.add_item(LIST_INBOX, "x").unwrap();
         let before = doc.fingerprint();
         doc.set_item_lifecycle(&id, ItemLifecycle::Live).unwrap();
         assert_ne!(doc.fingerprint(), before, "live flag must diverge the hash");
@@ -6781,7 +7115,7 @@ mod tests {
     fn concurrent_lifecycle_writes_converge() {
         let dek = Dek::generate();
         let mut a = Doc::new().unwrap();
-        let item = a.add_item(LIST_MAIN, "shared").unwrap();
+        let item = a.add_item(LIST_INBOX, "shared").unwrap();
         let mut b = Doc::empty();
         let blob = a.pending_export(&dek).unwrap().unwrap();
         a.mark_pushed();
@@ -6805,5 +7139,252 @@ mod tests {
         );
         assert_open_projection_matches_doc(&a);
         assert_open_projection_matches_doc(&b);
+    }
+
+    // ---------- focus (spec/focus.md) ----------
+
+    #[test]
+    fn focus_ref_encode_parse_roundtrips_both_forms() {
+        let local = FocusRef::local("abc");
+        assert_eq!(local.encode(), "abc");
+        assert_eq!(FocusRef::parse("abc"), Some(FocusRef::local("abc")));
+        assert!(FocusRef::parse("abc").unwrap().is_local());
+
+        let cross = FocusRef {
+            doc_id: Some("doc1".into()),
+            item_id: "item2".into(),
+        };
+        assert_eq!(cross.encode(), "doc1:item2");
+        assert_eq!(FocusRef::parse("doc1:item2"), Some(cross));
+        assert!(!FocusRef::parse("doc1:item2").unwrap().is_local());
+
+        // Malformed: empty, empty component either side.
+        assert_eq!(FocusRef::parse(""), None);
+        assert_eq!(FocusRef::parse(":x"), None);
+        assert_eq!(FocusRef::parse("x:"), None);
+    }
+
+    #[test]
+    fn focus_add_reorder_remove() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
+
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+        doc.add_to_focus(&c, 0).unwrap(); // insert at top
+        assert_eq!(doc.focus_refs(), vec![c.clone(), a.clone(), b.clone()]);
+        assert_eq!(
+            doc.focus_view()
+                .iter()
+                .map(|v| v.id.clone())
+                .collect::<Vec<_>>(),
+            vec![c.clone(), a.clone(), b.clone()]
+        );
+
+        doc.move_in_focus(&c, 2).unwrap(); // c to the bottom
+        assert_eq!(doc.focus_refs(), vec![a.clone(), b.clone(), c.clone()]);
+
+        doc.remove_from_focus(&b).unwrap();
+        assert_eq!(doc.focus_refs(), vec![a, c]);
+    }
+
+    #[test]
+    fn focus_add_already_focused_is_noop() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+        // Re-adding `a` must not move it to top and must not duplicate.
+        doc.add_to_focus(&a, 0).unwrap();
+        assert_eq!(doc.focus_refs(), vec![a, b]);
+        assert_eq!(doc.focus_list().len(), 2);
+    }
+
+    #[test]
+    fn focus_add_unknown_item_errors() {
+        let doc = Doc::new().unwrap();
+        assert!(matches!(
+            doc.add_to_focus("deadbeef", 0).unwrap_err(),
+            DocError::ItemNotFound(_)
+        ));
+    }
+
+    #[test]
+    fn focus_add_done_item_is_noop() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        doc.set_item_done(&a, true).unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        assert!(doc.focus_refs().is_empty());
+        assert_eq!(doc.focus_list().len(), 0);
+    }
+
+    #[test]
+    fn focus_dedup_first_wins_and_reconcile_prunes() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        // Inject a raw duplicate directly (a concurrent double-add shape).
+        doc.focus_list()
+            .push(FocusRef::local(&a).encode().as_str())
+            .unwrap();
+        doc.inner.commit();
+        assert_eq!(doc.focus_list().len(), 2);
+        // Projection dedups (first wins), read never mutates.
+        assert_eq!(doc.focus_refs(), vec![a.clone()]);
+        assert_eq!(doc.focus_list().len(), 2);
+        // Reconcile prunes the duplicate.
+        assert_eq!(doc.reconcile().unwrap(), 1);
+        assert_eq!(doc.focus_list().len(), 1);
+        assert_eq!(doc.focus_refs(), vec![a]);
+        assert_eq!(doc.reconcile().unwrap(), 0);
+    }
+
+    #[test]
+    fn focus_done_auto_removes_ref_and_undone_does_not_reappear() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        assert_eq!(doc.focus_list().len(), 1);
+        let _ = doc.drain_events();
+
+        // Done evaporates the item from Focus AND removes the underlying ref.
+        doc.set_item_done(&a, true).unwrap();
+        assert!(doc.focus_refs().is_empty());
+        assert_eq!(doc.focus_list().len(), 0, "ref physically removed on Done");
+        assert!(
+            doc.drain_events().contains(&AppEvent::FocusChanged),
+            "Done that clears a focus ref emits FocusChanged"
+        );
+
+        // Un-done does NOT bring it back — re-add is deliberate.
+        doc.set_item_done(&a, false).unwrap();
+        assert!(doc.focus_refs().is_empty());
+        assert_eq!(doc.focus_list().len(), 0);
+    }
+
+    #[test]
+    fn focus_done_removes_ref_via_lifecycle_and_bulk_paths() {
+        // The board uses set_item_lifecycle; other callers use set_items_done.
+        // Both must self-compact Focus, like set_item_done.
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+
+        doc.set_item_lifecycle(&a, ItemLifecycle::Done).unwrap();
+        assert_eq!(doc.focus_refs(), vec![b.clone()]);
+        assert_eq!(doc.focus_list().len(), 1);
+
+        doc.set_items_done(&[b.as_str()], true).unwrap();
+        assert!(doc.focus_refs().is_empty());
+        assert_eq!(doc.focus_list().len(), 0);
+    }
+
+    #[test]
+    fn focus_binned_is_filtered_then_swept_on_next_interaction() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+
+        // Binning does NOT touch the focus container (unlike Done).
+        doc.set_item_binned(&a, true).unwrap();
+        assert!(doc.focus_refs().is_empty(), "binned filtered from view");
+        assert_eq!(doc.focus_list().len(), 1, "ref left in place, not swept");
+
+        // The next focus interaction folds in the sweep.
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+        assert_eq!(doc.focus_refs(), vec![b]);
+        assert_eq!(doc.focus_list().len(), 1, "dead binned ref swept");
+    }
+
+    #[test]
+    fn focus_hard_delete_leaves_dead_ref_gcd_by_reconcile() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.set_item_binned(&a, true).unwrap();
+        doc.delete_binned(&a).unwrap(); // hard delete
+        assert!(doc.focus_refs().is_empty(), "missing item filtered out");
+        assert_eq!(doc.focus_list().len(), 1, "dead ref survives as garbage");
+        assert_eq!(doc.reconcile().unwrap(), 1);
+        assert_eq!(doc.focus_list().len(), 0);
+    }
+
+    #[test]
+    fn focus_local_add_and_remote_apply_emit_focus_changed() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let x = a.add_item(LIST_INBOX, "x").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        a.add_to_focus(&x, usize::MAX).unwrap();
+        assert!(
+            a.drain_events().contains(&AppEvent::FocusChanged),
+            "local focus add emits FocusChanged"
+        );
+        let blob = a.pending_export(&dek).unwrap().unwrap();
+        b.apply_remote(&dek, &blob).unwrap();
+        let evs = b.drain_events();
+        assert!(
+            evs.contains(&AppEvent::FocusChanged),
+            "remote focus op emits FocusChanged, got {evs:?}"
+        );
+        assert!(
+            !evs.contains(&AppEvent::FullResync),
+            "focus-only frame should translate surgically, got {evs:?}"
+        );
+        assert_eq!(b.focus_refs(), vec![x]);
+    }
+
+    #[test]
+    fn focus_concurrent_add_converges() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let x = a.add_item(LIST_INBOX, "x").unwrap();
+        let y = a.add_item(LIST_INBOX, "y").unwrap();
+        let mut b = sync_fresh_peer(&mut a, &dek);
+
+        // Concurrent, divergent focus adds.
+        a.add_to_focus(&x, usize::MAX).unwrap();
+        b.add_to_focus(&y, usize::MAX).unwrap();
+        let blob_a = a.pending_export(&dek).unwrap().unwrap();
+        let blob_b = b.pending_export(&dek).unwrap().unwrap();
+        a.mark_pushed();
+        b.mark_pushed();
+        a.apply_remote(&dek, &blob_b).unwrap();
+        b.apply_remote(&dek, &blob_a).unwrap();
+
+        assert_eq!(a.fingerprint(), b.fingerprint(), "replicas must converge");
+        let refs = a.focus_refs();
+        assert_eq!(refs.len(), 2);
+        assert!(refs.contains(&x) && refs.contains(&y));
+    }
+
+    #[test]
+    fn fingerprint_includes_focus_membership_and_order() {
+        let dek = Dek::generate();
+        let mut a = Doc::new().unwrap();
+        let x = a.add_item(LIST_INBOX, "x").unwrap();
+        let y = a.add_item(LIST_INBOX, "y").unwrap();
+        let z = a.add_item(LIST_INBOX, "z").unwrap();
+        let b = sync_fresh_peer(&mut a, &dek);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+
+        // Adding a focus ref diverges the hash.
+        a.add_to_focus(&x, usize::MAX).unwrap();
+        assert_ne!(a.fingerprint(), b.fingerprint(), "focus membership hashed");
+
+        // Curated order is hashed too.
+        a.add_to_focus(&y, usize::MAX).unwrap();
+        a.add_to_focus(&z, usize::MAX).unwrap();
+        let before = a.fingerprint();
+        a.move_in_focus(&z, 0).unwrap();
+        assert_ne!(a.fingerprint(), before, "focus order hashed");
     }
 }

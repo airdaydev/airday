@@ -36,6 +36,7 @@ Migrations: while pre-release, keep exactly one migration file per database (`00
 | [`spec/storage.md`](spec/storage.md) | Sqlite schema, indexes, compaction policy |
 | [`spec/data-model.md`](spec/data-model.md) | Loro doc layout, Item / ListMeta, lifecycle semantics |
 | [`spec/board.md`](spec/board.md) | Board view: fixed Backlog / Live / Done lanes driven by item lifecycle |
+| [`spec/focus.md`](spec/focus.md) | Focus lens: curated single-tier list-by-reference, FocusRef grammar, auto-remove-on-Done |
 | [`spec/search.md`](spec/search.md) | Local search index + command palette query contract |
 | [`spec/cli.md`](spec/cli.md) | Commands, local key storage, device bootstrap UX |
 | [`spec/sharing-plan.md`](spec/sharing-plan.md) | Future (not built): multi-doc + sharing design + implementation plan |

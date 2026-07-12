@@ -24,7 +24,7 @@ pub enum ListsCmd {
     },
     /// Add a new list.
     Add { name: String },
-    /// Rename a user-created list. The reserved `main` list is not
+    /// Rename a user-created list. The reserved `inbox` list is not
     /// renamable from the doc layer (its label is client-side until a
     /// meta CRDT lands).
     Rename { list: String, name: String },

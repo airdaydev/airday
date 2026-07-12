@@ -1,6 +1,9 @@
 # Focus + Inbox rename — implementation plan
 
-Status: **planning**. This doc is the handoff for a fresh context. Two features:
+Status: **Phase 0 + Phase 1 DONE; resuming at Phase 2 (WASM).** See "Progress &
+handoff" at the bottom for exactly what's built, what deviated from this plan, and
+where a fresh context should pick up. This doc is the handoff for that context.
+Two features:
 
 1. **Rename "Queue" → "Inbox"** (label only; `main` id and settings keys unchanged).
 2. **Add "Focus"** — a reserved, single-tier, curated *list-by-reference*: it points
@@ -147,6 +150,11 @@ are harmless" invariant. **Reads never mutate** (no self-repair on projection).
 
 ### B.5 Lifecycle interplay — the key semantic decision
 
+> **SUPERSEDED (2026-07-12).** After investigation, Daniel chose **auto-remove the
+> focus ref on Done** — the opposite of the recommendation below. Rationale and the
+> final contract live in `spec/focus.md` "Lifecycle interplay" and Open-decision #1
+> above. The text below is kept for the reasoning trail only.
+
 **Recommended: keep the ref, filter by Open.** `set_item_lifecycle` stays a single
 map-write and **never touches the focus container** — exactly the discipline the board
 adopted for order containers (`data-model.md` "Done / binned items stay in the order
@@ -267,40 +275,118 @@ the server. No wire-version bump, no server work.
 
 ## Phasing (checkpoint with Daniel between phases)
 
-- **Phase 0 — Specs.** Write `spec/focus.md`; update `data-model.md` (focus container +
-  FocusRef + mutations + fingerprint); do the Inbox rename across specs. *Checkpoint.*
-- **Phase 1 — Core (Rust).** *First:* the Part A `main` → `inbox` stored-id rename
-  (const, `order/inbox`, `location`/`OrderEntry` reserved literal, `inbox_name` key +
-  `set_inbox_name`, all reserved-id guards) + the import alias for the cutover, so Focus
-  builds against `inbox`. *Then Focus:* container constant; FocusRef encode/parse (both
-  forms); `add_to_focus` / `remove_from_focus` / `move_in_focus`; `focus_view`; reconcile
-  extension; fingerprint; events. Unit tests (rename round-trips; add/remove/reorder,
-  dedup, done-evaporates, un-done-reappears, hard-delete GC, concurrent-add convergence,
-  fingerprint-includes-focus). `bun run test`. **Land the live-doc cutover at this
-  checkpoint** (export → wipe → import). *Checkpoint.*
-- **Phase 2 — WASM.** Both handle structs; `bun run build:wasm`.
-- **Phase 3 — Web.** i18n, nav Focus entry + count + soft-cap, Focus view component,
-  add-to-focus toggle, store + events wiring, Inbox label. Verify in-browser: two tabs,
-  DnD reorder converges, done-evaporates, un-done-reappears, remove-keeps-item.
-- **Phase 4 — CLI/FFI.** Focus commands + FFI; CLI↔web integration test; fix
-  `sync_smoke.rs` assertion.
-- **Phase 5 — Verify.** Multi-device convergence, fingerprint parity across CLI/web,
-  self-clean-on-done, un-done-reappears. `/verify`.
+- ✅ **Phase 0 — Specs. DONE.** `spec/focus.md` written; `data-model.md`, `cli.md`,
+  `board.md`, `sharing-plan.md`, and the `AGENTS.md`/`CLAUDE.md` spec table updated;
+  Inbox rename swept across specs.
+- ✅ **Phase 1 — Core (Rust). DONE, all tests green.** `main`→`inbox` rename landed
+  (1a) and Focus core landed (1b). Details + deviations in "Progress & handoff". The
+  **live-doc cutover was deliberately NOT run** — moved to after Phases 3–4 (see
+  handoff note 5).
+- ⏭️ **Phase 2 — WASM (NEXT).** Add `add_to_focus` / `remove_from_focus` /
+  `move_in_focus` / `focus_view` (+ `focus_refs` if useful) to **both** handle structs
+  in `core/web/src/lib.rs` (~L107 and ~L1236 — mirror how `move_item` /
+  `set_item_lifecycle` appear twice). Also rename the existing WASM getter call sites:
+  the Rust method is now `set_inbox_name` and the settings getter is `inbox_name()`
+  (JS-facing `setInboxName` / `inboxName`). `bun run build:wasm`.
+- **Phase 3 — Web.** i18n (`home`→`inbox` key, `Queue`→`Inbox` en, `Cola`→`Bandeja de
+  entrada` es; add `focus` label en+es), nav Focus entry + count + soft-cap, Focus view
+  component, add-to-focus toggle, store + events wiring (subscribe `FocusChanged` **and**
+  re-derive `focus_view` on item events), reserved-id literals `id:"main"`→`id:"inbox"`
+  (prefs/runtime/nav/Workspace), `mainName`→`inboxName` in `store.ts`. Verify in-browser:
+  two tabs, DnD reorder converges, **done-auto-removes**, **un-done-does-NOT-reappear**,
+  remove-keeps-item.
+- **Phase 4 — CLI/FFI.** Focus commands (`focus` / `focus add` / `rm` / `mv`) + FFI
+  wrappers; CLI↔web integration test. (`sync_smoke.rs` Queue→Inbox assertion already
+  fixed in Phase 1.)
+- **Phase 5 — Verify + cutover.** Multi-device convergence, fingerprint parity across
+  CLI/web, self-clean-on-done, un-done-does-not-reappear. `/verify`. **Then** run the
+  live-doc export → wipe → import cutover (handoff note 5) — dry-run on a scratch
+  account first; Daniel triggers the wipe.
 
 ---
 
-## Open decisions to confirm before/early in Phase 0
+## Progress & handoff (as of 2026-07-12)
 
-1. **Un-done reappears in Focus** (keep-ref-and-filter, B.5) — confirm acceptable.
-   *Recommend: yes.*
-2. **Adding an already-focused item no-ops** vs moves-to-top (B.7). *Recommend: no-op.*
-3. **Schema treated as additive within v2** (no version bump) for the `focus` container
-   (B.2). *Recommend: additive.*
+Everything below Phase 1 is on `main`'s working tree (not yet committed). Full
+`cargo test` is green; `cargo fmt` clean; no new clippy hits (repo lint was already red
+pre-existing).
+
+**Phase 1a — `main` → `inbox` rename (done).**
+- `core/src/doc.rs`: `LIST_MAIN`→`LIST_INBOX` (`"main"`→`"inbox"`), `LIST_MAIN_NAME`→
+  `INBOX_NAME` (`"Queue"`→`"Inbox"`), `KEY_MAIN_NAME`→`KEY_INBOX_NAME`
+  (`"main_name"`→`"inbox_name"`), `set_main_name`→`set_inbox_name`; re-exported in
+  `lib.rs`. `order/inbox` follows from the const. Doc-comment sweep done.
+- **Import alias:** added `pub const LEGACY_LIST_MAIN = "main"`; the JSON importer maps
+  legacy `main` ⇒ `inbox` (id-map seed + the builtin/legacy list guard). This is the
+  **only** place `"main"` is still referenced — the cutover bridge.
+- WASM getter `main_name()`→`inbox_name()` renamed in `core/web` (Rust side only; the JS
+  call sites are Phase 3). CLI `--list` default already resolves to `inbox`.
+
+**Phase 1b — Focus core (done).** In `core/src/doc.rs` unless noted:
+- `FOCUS_CONTAINER="focus"`; `FocusRef` (`encode`/`parse`, both forms, `is_local`);
+  `FocusScan` + `scan_focus()` (classify raw refs → visible/dead) + `prune_focus_refs()`
+  (delete matching + dead in one uncommitted batch).
+- Public: `add_to_focus(item,index)` (no-op if already visible or not Open; `ItemNotFound`
+  on unknown; folds sweep), `remove_from_focus(item)`, `move_in_focus(item,index)`,
+  `focus_refs()`, `focus_view()`. Index addresses the **visible** focus order (raw==visible
+  after the folded sweep).
+- **Auto-remove-on-Done wired into THREE paths** (the gotcha): `set_item_done`,
+  `set_items_timestamp` (key==`done_at`, on), **and** `set_items_lifecycle(Done)`. The
+  board path is `set_item_lifecycle`; CLI/other use `set_item_done`/`set_items_done`. Any
+  future "done" path must also prune. Binned deliberately does **not** prune.
+- `AppEvent::FocusChanged` (no payload) in `core/src/events.rs`; emitted on every
+  focus-mutating local commit and on Done-that-clears-a-ref; remote frames classify via
+  new `CapturedDiff::Focus` → `FocusChanged` (surgical, no FullResync).
+- `reconcile()` extended to prune focus dead refs + dedup. `fingerprint()` hashes the raw
+  focus container order.
+- 13 focus unit tests in the `doc::tests` module (all green), incl. the revised
+  **done-auto-removes** / **un-done-does-not-reappear** cases (NOT the old
+  "un-done-reappears").
+
+**Decisions locked (see "Open decisions" above):** auto-remove-on-Done · no-op re-add ·
+additive-v2 · bare-uuid FocusRef.
+
+**Handoff notes / watch-outs:**
+1. `reconcile()` is exposed to WASM but **never called** in web/CLI (only unit tests).
+   It's a backstop only; Focus stays bounded via auto-remove-on-Done + the folded sweep.
+   Don't rely on reconcile for correctness.
+2. `FocusChanged` carries no payload by design — the web store must re-derive
+   `focus_view()` on item events too (a Done/Bin elsewhere changes focus visibility).
+3. WASM has **two** handle structs; every prior method appears twice. Add focus methods
+   to both, or CLI-vs-web parity silently breaks.
+4. Fingerprint now includes focus order → any web/CLI convergence check will compare it;
+   this is intended.
+5. **Cutover sequencing (important):** the plan said "land the cutover at the Phase 1
+   checkpoint," but that would break the live web app, which still has `id:"main"`
+   literals until Phase 3. The cutover is therefore deferred to **Phase 5**, after web +
+   CLI speak `inbox`. Dry-run on a scratch account; **Daniel runs the wipe**, not the
+   agent.
+
+---
+
+## Open decisions — RESOLVED (2026-07-12, confirmed with Daniel)
+
+1. **Lifecycle interplay — RESOLVED: auto-remove focus ref on Done** (reverses the
+   B.5 keep-and-filter recommendation). Investigation found: (a) a Done focus ref
+   renders *nothing* (Focus view is Open-only), unlike a Done order entry that still
+   renders in the board's Done lane — so the "mirror order-container discipline"
+   analogy doesn't transfer; (b) `reconcile()` is **not wired to run** in web or CLI
+   (only unit tests call it), so keep-and-filter would accumulate dead refs without
+   bound. So: the **Done** transition removes the item's focus ref in the same commit
+   (the one lifecycle→second-container write); **Bin** stays filter-only and is swept
+   on the next focus interaction; **un-done does NOT reappear** in Focus (re-add
+   deliberately). Focus mutations (`add`/`remove`/`move`) fold a dead-ref sweep into
+   their commit. See `spec/focus.md` "Lifecycle interplay". *Phase 1 tests change
+   accordingly: replace "un-done-reappears" with "done-auto-removes-ref" and
+   "un-done-does-not-reappear".*
+2. **Adding an already-focused item — RESOLVED: no-op** (don't move-to-top).
+3. **Schema — RESOLVED: additive within v2** (no version bump) for `focus`.
 4. ~~i18n key `home` → `inbox`~~ **Resolved: full flip including the stored id** —
    `main` → `inbox` everywhere, with a one-time export/wipe/import cutover on the live
    doc (Part A).
-5. **Soft-cap threshold** (~7–10) and its visual treatment (B.11). *UI call.*
-6. **FocusRef bare-uuid now** vs a `local:` prefix (B.3). *Recommend: bare; parser treats
-   colon-less as local.*
+5. **Soft-cap threshold** (~7–10) and its visual treatment (B.11) — *UI call, decide
+   in Phase 3.*
+6. **FocusRef — RESOLVED: bare uuid now** (parser accepts colon-less as local doc;
+   `<doc_id>:<item_id>` reserved for cross-doc).
 </content>
 </invoke>

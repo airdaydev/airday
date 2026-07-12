@@ -30,6 +30,16 @@ Single binary `airday`. Subcommands:
 
 Lifecycle is derived by precedence (Binned > Done > Live > Backlog) from the stored `live` flag plus `done_at` / `binned_at` timestamps — see `spec/data-model.md`. Each transition is a single commit.
 
+### Focus
+The curated single-tier Focus lens (`spec/focus.md`). References items across lists; the item stays in its home list.
+
+- `airday focus` — list the Focus view (Open referenced items, in curated order)
+- `airday focus add <item_id> [pos]` — add a reference (default append); no-op if already focused
+- `airday focus rm <item_id>` — remove the reference (item untouched)
+- `airday focus mv <item_id> <pos>` — reorder within Focus
+
+Marking a focused item `done` removes it from Focus automatically; binning/deleting drops it from the view.
+
 ### Lists
 - `airday lists ls`
 - `airday lists add <name>`
@@ -125,4 +135,4 @@ Done.
 
 Default output: human-readable. `--json` flag on every read command emits machine-parseable JSON for tests and scripting.
 
-Item and list ids: full uuid v7 hex (32 chars), shown verbatim and required in full when an id is passed in. Built-in list `now` is the one literal id. (Earlier drafts of this spec proposed prefix matching; dropped because it adds parsing complexity for marginal ergonomic gain over shell completion / copy-paste.)
+Item and list ids: full uuid v7 hex (32 chars), shown verbatim and required in full when an id is passed in. Built-in list `inbox` is the one literal id. (Earlier drafts of this spec proposed prefix matching; dropped because it adds parsing complexity for marginal ergonomic gain over shell completion / copy-paste.)

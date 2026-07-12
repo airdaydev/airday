@@ -1,5 +1,5 @@
 use airday_cli::sync::Session;
-use airday_core::LIST_MAIN;
+use airday_core::LIST_INBOX;
 
 mod support;
 
@@ -32,7 +32,7 @@ async fn login_registers_second_device_and_pulls_existing_doc() {
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a
         .doc()
-        .add_item(LIST_MAIN, "from-device-a")
+        .add_item(LIST_INBOX, "from-device-a")
         .unwrap();
     session_a.flush().await.unwrap();
 
@@ -84,7 +84,7 @@ async fn password_change_preserves_dek_and_existing_items_for_new_login() {
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
     let item_id = session_a
         .doc()
-        .add_item(LIST_MAIN, "password-change-item")
+        .add_item(LIST_INBOX, "password-change-item")
         .unwrap();
     session_a.flush().await.unwrap();
 
@@ -145,7 +145,7 @@ async fn recovery_reset_bootstraps_fresh_device_with_existing_items() {
     )
     .await;
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
-    let item_id = session_a.doc().add_item(LIST_MAIN, "recover-me").unwrap();
+    let item_id = session_a.doc().add_item(LIST_INBOX, "recover-me").unwrap();
     session_a.flush().await.unwrap();
 
     let recovered = recover_device(

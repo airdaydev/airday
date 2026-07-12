@@ -131,18 +131,26 @@ pub enum AppEvent {
         icon: Option<String>,
     },
 
+    // ---------- focus ----------
+    /// The Focus lens (`spec/focus.md`) changed — a ref was added, removed,
+    /// reordered, or swept, including the auto-removal when a focused item
+    /// goes Done. Carries no payload: visibility depends on item lifecycle
+    /// too, so consumers re-derive `focus_view()` on this event *and* on
+    /// item events. Emitted once per focus-mutating commit.
+    FocusChanged,
+
     // ---------- workspace settings ----------
     /// Doc-level synced settings changed. The payload carries the
     /// current known value for each surfaced field so consumers can
     /// mirror a small settings object with a single write.
     SettingsChanged {
-        /// When true, clients render each non-Queue list's open-item
+        /// When true, clients render each non-Inbox list's open-item
         /// count (Backlog + Live) in the nav (subject to the count > 0
-        /// gate). Queue always shows its count regardless. Single global flag —
+        /// gate). Inbox always shows its count regardless. Single global flag —
         /// there is no per-list override.
         show_list_counts: bool,
-        /// `None` when the user hasn't overridden Queue's display name;
+        /// `None` when the user hasn't overridden Inbox's display name;
         /// clients should fall back to the localized built-in label.
-        main_name: Option<String>,
+        inbox_name: Option<String>,
     },
 }

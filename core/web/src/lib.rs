@@ -243,8 +243,8 @@ impl Doc {
     }
 
     #[wasm_bindgen(js_name = setMainName)]
-    pub fn set_main_name(&self, name: &str) -> Result<(), JsError> {
-        self.inner.set_main_name(name).map_err(js_err)
+    pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
+        self.inner.set_inbox_name(name).map_err(js_err)
     }
 
     // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
@@ -434,8 +434,8 @@ impl Doc {
     }
 
     /// Additive JSON import — counterpart to `exportJson`. Source lists
-    /// become fresh local lists; `main`-bound items land in the local
-    /// `main`; existing local content is untouched. Returns a JSON
+    /// become fresh local lists; `inbox`-bound items land in the local
+    /// `inbox`; existing local content is untouched. Returns a JSON
     /// string of `{ listsAdded, itemsAdded, itemsSkipped }` for UI
     /// summary.
     #[wasm_bindgen(js_name = importJson)]
@@ -1397,8 +1397,8 @@ impl SyncEngine {
     }
 
     #[wasm_bindgen(js_name = setMainName)]
-    pub fn set_main_name(&self, name: &str) -> Result<(), JsError> {
-        self.inner.doc().set_main_name(name).map_err(js_err)
+    pub fn set_inbox_name(&self, name: &str) -> Result<(), JsError> {
+        self.inner.doc().set_inbox_name(name).map_err(js_err)
     }
 
     // ---------- lifecycle (spec/board.md, spec/data-model.md) ----------
@@ -1645,10 +1645,10 @@ pub struct AppEventJs {
     done_at: Option<i64>,
     binned_at: Option<i64>,
     show_list_counts: Option<bool>,
-    /// Settings: `Some(name)` when the user has overridden Queue's
+    /// Settings: `Some(name)` when the user has overridden Inbox's
     /// label; `None` (or absent on non-`settingsChanged` events) means
     /// fall back to the localized built-in label.
-    main_name: Option<String>,
+    inbox_name: Option<String>,
     /// List-event ordering position (`listAdded` / `listMoved`). Item
     /// events no longer carry a doc-wide index in the v2 schema — use
     /// `open_index`.
@@ -1715,8 +1715,8 @@ impl AppEventJs {
         self.show_list_counts
     }
     #[wasm_bindgen(getter, js_name = mainName)]
-    pub fn main_name(&self) -> Option<String> {
-        self.main_name.clone()
+    pub fn inbox_name(&self) -> Option<String> {
+        self.inbox_name.clone()
     }
     #[wasm_bindgen(getter)]
     pub fn live(&self) -> Option<bool> {
@@ -1744,7 +1744,7 @@ impl From<CoreAppEvent> for AppEventJs {
             done_at: None,
             binned_at: None,
             show_list_counts: None,
-            main_name: None,
+            inbox_name: None,
             index: None,
             open_index: None,
         };
@@ -1871,11 +1871,11 @@ impl From<CoreAppEvent> for AppEventJs {
             },
             CoreAppEvent::SettingsChanged {
                 show_list_counts,
-                main_name,
+                inbox_name,
             } => AppEventJs {
                 kind: "settingsChanged",
                 show_list_counts: Some(show_list_counts),
-                main_name,
+                inbox_name,
                 ..blank
             },
         }
@@ -1900,7 +1900,7 @@ fn list_to_json(l: &airday_core::ListView) -> String {
 
 fn settings_to_json(s: &airday_core::SettingsView) -> String {
     let mut out = format!("{{\"showListCounts\":{}", s.show_list_counts);
-    if let Some(n) = &s.main_name {
+    if let Some(n) = &s.inbox_name {
         out.push_str(",\"mainName\":");
         out.push_str(&json_string(n));
     }

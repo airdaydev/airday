@@ -45,6 +45,13 @@ Constraints:
 - **A member can leave any doc except their primary.** The primary doc is non-leavable, non-deletable; it's the account's Home.
 - **Member removal is forward-only** (see "Known limitations").
 
+**Forward hook already in place:** the Focus lens (`spec/focus.md`) encodes
+references as `FocusRef = "<doc_id>:<item_id>"`, with the bare `"<item_id>"` form
+meaning the local doc. The parser accepts both forms today; only the emitter is
+local-only. When sharing lands, a shared item can be pulled into a member's Focus
+by emitting the cross-doc form — no migration, no schema change to the focus
+container.
+
 ### Per-doc DEK
 
 DEK is generated **at doc creation** (32 bytes random). Encrypts every op + snapshot blob for that doc. Different docs have independent, unrelated DEKs. The DEK wrap is per-membership, on `doc_members`, not on `accounts`. The account row holds password material only.

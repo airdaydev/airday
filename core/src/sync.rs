@@ -875,7 +875,7 @@ impl SyncEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::doc::{Doc, LIST_MAIN};
+    use crate::doc::{Doc, LIST_INBOX};
     use crate::storage::MemStorage;
     use airday_protocol::{EncryptedBlob, ServerFrame, StoredBlob};
 
@@ -1099,7 +1099,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
 
-        eng.doc_mut().add_item(LIST_MAIN, "thing").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "thing").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let frame: ClientFrame = dec(&eng.pop_outbox().expect("PushOps"));
@@ -1146,7 +1146,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
 
-        eng.doc_mut().add_item(LIST_MAIN, "thing").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "thing").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
@@ -1182,13 +1182,13 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // First mutation + flush starts a push.
-        eng.doc_mut().add_item(LIST_MAIN, "first").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "first").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let _first_push = eng.pop_outbox().expect("first PushOps");
 
         // Mutate again while the push is in flight.
-        let item_id = eng.doc_mut().add_item(LIST_MAIN, "during-push").unwrap();
+        let item_id = eng.doc_mut().add_item(LIST_INBOX, "during-push").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         // No new wire bytes yet — engine is in PushingDirty, waiting.
@@ -1230,7 +1230,7 @@ mod tests {
         let _ = eng.pop_outbox().unwrap(); // PullOps
 
         // User mutates and flushes while we're still Pulling.
-        eng.doc_mut().add_item(LIST_MAIN, "during pull").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "during pull").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         assert!(eng.pop_outbox().is_none(), "Pulling defers push until Idle");
@@ -1255,7 +1255,7 @@ mod tests {
         // OpsBroadcast at seq=1 (the contiguous next after the empty
         // initial pull).
         let remote_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from peer").unwrap();
+            d.add_item(LIST_INBOX, "from peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
@@ -1287,7 +1287,7 @@ mod tests {
         // Local doc reflects the applied peer op.
         let names: Vec<_> = eng
             .doc()
-            .items_in_list(LIST_MAIN, false)
+            .items_in_list(LIST_INBOX, false)
             .into_iter()
             .map(|i| i.text)
             .collect();
@@ -1299,7 +1299,7 @@ mod tests {
         let mut eng = fresh_engine_clean();
         let dek = eng.dek.clone();
         let mut remote = Doc::new().unwrap();
-        let id = remote.add_item(LIST_MAIN, "old").unwrap();
+        let id = remote.add_item(LIST_INBOX, "old").unwrap();
         let setup_blob = remote.pending_export(&dek).unwrap().unwrap();
         remote.mark_pushed();
         remote.edit_item_text(&id, "new").unwrap();
@@ -1359,7 +1359,7 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         // Mutate locally, start a push.
-        eng.doc_mut().add_item(LIST_MAIN, "local-pushing").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "local-pushing").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let _ = eng.pop_outbox().expect("PushOps");
@@ -1369,7 +1369,7 @@ mod tests {
         // assign it to whichever device's push the primary committed
         // first.
         let remote_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "peer-during-push").unwrap();
+            d.add_item(LIST_INBOX, "peer-during-push").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
@@ -1382,7 +1382,7 @@ mod tests {
         // Peer op applied.
         assert!(
             eng.doc()
-                .items_in_list(LIST_MAIN, false)
+                .items_in_list(LIST_INBOX, false)
                 .iter()
                 .any(|i| i.text == "peer-during-push")
         );
@@ -1417,7 +1417,7 @@ mod tests {
 
         // First batch: not complete, engine stays Pulling.
         let blob1 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "p1").unwrap();
+            d.add_item(LIST_INBOX, "p1").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredBlob {
@@ -1432,7 +1432,7 @@ mod tests {
 
         // Second batch: complete=true, transitions to Idle.
         let blob2 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "p2").unwrap();
+            d.add_item(LIST_INBOX, "p2").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![StoredBlob {
@@ -1452,7 +1452,7 @@ mod tests {
         let mut eng = fresh_engine_clean();
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
-        eng.doc_mut().add_item(LIST_MAIN, "stranded").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "stranded").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let _ = eng.pop_outbox().unwrap();
@@ -1546,14 +1546,14 @@ mod tests {
         // Make our doc non-trivial and bump our frontier above the
         // requested value so the tag-with-true-frontier behavior is
         // visible.
-        eng.doc_mut().add_item(LIST_MAIN, "alpha").unwrap();
-        eng.doc_mut().add_item(LIST_MAIN, "beta").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "alpha").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "beta").unwrap();
         // Bump our frontier via a contiguous broadcast at seq=1.
         // Numbers don't matter here — only the invariant "engine's
         // frontier ≥ requested up_to".
         let dek = eng.dek.clone();
         let bump_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from-peer").unwrap();
+            d.add_item(LIST_INBOX, "from-peer").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
@@ -1640,7 +1640,7 @@ mod tests {
         // Build a snapshot blob from a parallel doc — same DEK, with a
         // peer item we expect to land in the bootstrapped state.
         let snapshot_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from-snapshot").unwrap();
+            d.add_item(LIST_INBOX, "from-snapshot").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
             up_to_seq: 42,
@@ -1659,7 +1659,7 @@ mod tests {
         reloaded.apply_remote(&dek, &persisted.payload).unwrap();
         assert!(
             reloaded
-                .items_in_list(LIST_MAIN, false)
+                .items_in_list(LIST_INBOX, false)
                 .iter()
                 .any(|item| item.text == "from-snapshot")
         );
@@ -1691,7 +1691,7 @@ mod tests {
         // Bootstrapped item is in the doc.
         assert!(
             eng.doc()
-                .items_in_list(LIST_MAIN, false)
+                .items_in_list(LIST_INBOX, false)
                 .iter()
                 .any(|i| i.text == "from-snapshot")
         );
@@ -1763,7 +1763,7 @@ mod tests {
         eng.handle_server_bytes(&enc(&ServerFrame::SnapshotRequired { up_to_seq: 42 }));
         let _ = eng.pop_outbox().unwrap(); // PullSnapshot
         let snapshot_blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from-snapshot").unwrap();
+            d.add_item(LIST_INBOX, "from-snapshot").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::Snapshot {
             up_to_seq: 42,
@@ -1797,7 +1797,7 @@ mod tests {
 
         // Broadcast while bootstrapping — must be ignored entirely.
         let stray = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "should-not-appear").unwrap();
+            d.add_item(LIST_INBOX, "should-not-appear").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob {
@@ -1807,7 +1807,7 @@ mod tests {
         }));
         assert!(
             !eng.doc()
-                .items_in_list(LIST_MAIN, false)
+                .items_in_list(LIST_INBOX, false)
                 .iter()
                 .any(|i| i.text == "should-not-appear"),
             "broadcast applied during Bootstrapping",
@@ -1879,7 +1879,7 @@ mod tests {
         }
 
         // -- A makes a real-content change --
-        let item_id = a.doc_mut().add_item(LIST_MAIN, "snapshotted").unwrap();
+        let item_id = a.doc_mut().add_item(LIST_INBOX, "snapshotted").unwrap();
         a.capture_local_ops().unwrap();
         a.flush();
         if let Some(bytes) = a.pop_outbox() {
@@ -1924,7 +1924,7 @@ mod tests {
         // -- A keeps mutating after the snapshot was taken, so B's
         //    bootstrap exercises both the snapshot apply *and* the
         //    post-snapshot catch-up via OpsBatch. --
-        let post_snap_id = a.doc_mut().add_item(LIST_MAIN, "post-snap").unwrap();
+        let post_snap_id = a.doc_mut().add_item(LIST_INBOX, "post-snap").unwrap();
         a.capture_local_ops().unwrap();
         a.flush();
         let mut post_snap_ops: Vec<StoredBlob> = Vec::new();
@@ -2030,7 +2030,7 @@ mod tests {
         let _ = drain_outbox(&mut eng);
         let _ = drain_events(&mut eng);
         let blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "x").unwrap();
+            d.add_item(LIST_INBOX, "x").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob { seq: 1, blob }],
@@ -2053,7 +2053,7 @@ mod tests {
         let _ = drain_outbox(&mut eng);
         let _ = drain_events(&mut eng);
         let b1 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "a").unwrap();
+            d.add_item(LIST_INBOX, "a").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob { seq: 1, blob: b1 }],
@@ -2086,7 +2086,7 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         let blob = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "remote").unwrap();
+            d.add_item(LIST_INBOX, "remote").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBroadcast {
             ops: vec![StoredBlob { seq: 1, blob }],
@@ -2184,7 +2184,7 @@ mod tests {
         let _ = drain_outbox(&mut a);
 
         // -- A makes a local change and pushes --
-        let item_a = a.doc_mut().add_item(LIST_MAIN, "from-a").unwrap();
+        let item_a = a.doc_mut().add_item(LIST_INBOX, "from-a").unwrap();
         a.capture_local_ops().unwrap();
         a.flush();
         let push: ClientFrame = dec(&a.pop_outbox().expect("PushOps"));
@@ -2257,7 +2257,7 @@ mod tests {
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
 
-        eng.doc_mut().add_item(LIST_MAIN, "buy milk").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "buy milk").unwrap();
         // Host captures the mutation into a durable op-log row first.
         let seq = eng.capture_local_ops().unwrap();
         assert_eq!(seq, Some(crate::storage::LocalSeq(1)));
@@ -2302,12 +2302,12 @@ mod tests {
         let _ = drain_events(&mut eng);
         let _ = drain_outbox(&mut eng);
 
-        eng.doc_mut().add_item(LIST_MAIN, "first").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "first").unwrap();
         assert_eq!(
             eng.capture_local_ops().unwrap(),
             Some(crate::storage::LocalSeq(1))
         );
-        eng.doc_mut().add_item(LIST_MAIN, "second").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "second").unwrap();
         assert_eq!(
             eng.capture_local_ops().unwrap(),
             Some(crate::storage::LocalSeq(2))
@@ -2338,10 +2338,10 @@ mod tests {
         let _ = drain_events(&mut eng);
 
         let blob1 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from peer A").unwrap();
+            d.add_item(LIST_INBOX, "from peer A").unwrap();
         });
         let blob2 = make_remote_blob(&dek, |d| {
-            d.add_item(LIST_MAIN, "from peer B").unwrap();
+            d.add_item(LIST_INBOX, "from peer B").unwrap();
         });
         eng.handle_server_bytes(&enc(&ServerFrame::OpsBatch {
             ops: vec![
@@ -2394,7 +2394,7 @@ mod tests {
         drive_to_idle(&mut eng);
         let _ = drain_events(&mut eng);
 
-        eng.doc_mut().add_item(LIST_MAIN, "stranded op").unwrap();
+        eng.doc_mut().add_item(LIST_INBOX, "stranded op").unwrap();
         eng.capture_local_ops().unwrap();
         eng.flush();
         let _push = eng.pop_outbox().expect("PushOps");

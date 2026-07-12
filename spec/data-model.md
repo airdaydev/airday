@@ -14,9 +14,13 @@ compatibility" below; v2 docs must never sync with v1 clients.
 - `doc.get_map("settings")` — `LoroMap` for account-wide synced workspace
   settings. Unchanged from v1.
 - `doc.get_movable_list("order/<list-id>")` — one **order container** per
-  logical list (`order/main` for the built-in list). Entries are **encoded
+  logical list (`order/inbox` for the built-in list). Entries are **encoded
   scalar strings only** (OrderEntry, below) — never child containers. The
   order container carries ordering; the `items` map carries everything else.
+- `doc.get_movable_list("focus")` — the reserved **focus container**: a curated
+  list-by-reference of **encoded scalar FocusRef strings only** (never child
+  containers). Its own element order *is* the Focus order. Additive within v2 —
+  a focus-unaware client simply never projects it. See `spec/focus.md`.
 
 There is **no document-wide item MovableList**. Reordering one list mutates
 only that list's order container.
@@ -89,15 +93,19 @@ tombstone — and best-effort removes the item's order entries.
 ```
 Location   = "<list_id>:<placement_id>"     (value of item.location)
 OrderEntry = "<item_id>:<placement_id>"     (element of order/<list_id>)
+FocusRef   = "<item_id>"                     (element of focus; local doc)
+           = "<doc_id>:<item_id>"            (future: cross-doc — see spec/focus.md)
 ```
 
-Both are single **encoded scalar strings**. Rationale (vs a structured
+All three are single **encoded scalar strings**. Rationale (vs a structured
 `LoroValue::Map`): a scalar register is written in one op, so `list_id` and
 `placement_id` can never be torn apart by concurrent edits — there are no
 independently-mergeable sub-fields to conflict. It is also smaller on the wire
 and trivially comparable. The separator `:` is reserved: ids are uuid-v7 hex
-(`[0-9a-f]{32}`) or the literal `main`, so it can never appear inside a
-component. Parsing splits on the **first** `:`.
+(`[0-9a-f]{32}`) or the literal `inbox`, so it can never appear inside a
+component. Parsing splits on the **first** `:`. (A bare `FocusRef` has no `:` and
+is a local-doc item id; the emitter writes only this form today — see
+`spec/focus.md`.)
 
 A `placement_id` is a fresh uuid-v7 generated whenever an item is *placed*
 into a list (add, cross-list move, delete-list reassignment). It is **not**
@@ -156,7 +164,9 @@ container order, then the fallback tail. It covers items of *all* lifecycles
 null && binned_at == null`). Backlog and Live share this single order — the
 `live` flag partitions Open into two board lanes without reordering. The
 resolved order — not just the Open projection — is part of logical state (it
-fixes restore positions), so `doc_fingerprint` hashes it.
+fixes restore positions), so `doc_fingerprint` hashes it. The **Focus order** is
+logical state too (it fixes the curated Focus sequence), so `doc_fingerprint`
+hashes the focus container's order as well (`spec/focus.md`).
 
 ## Done / binned items stay in the order container
 
@@ -171,7 +181,7 @@ Tradeoffs considered:
   order churn). Cost: an order container's length grows with the list's
   *lifetime* item count, so projecting a list is O(lifetime items in that
   list). At the 13k-lifetime-items yardstick this matches today's cost for
-  `main` while making every *other* list's projection proportional to its own
+  `inbox` while making every *other* list's projection proportional to its own
   history — and hard delete (bin emptying) is the natural pruning mechanism:
   deleting a binned item removes its entry.
 - *Remove entries + restoration anchors (rejected)*: keeps order containers
@@ -221,16 +231,26 @@ Every mutation below forms **one Loro commit** (one undo step, one op group).
   change; restore/un-done reveal it in its former position (or the fallback
   tail if its entry was lost). Board drops that additionally reorder within the
   shared Open order fold the `move_item` reorder into the *same* commit.
+
+  **Focus exception (the one second-container write).** The **Done** transition
+  additionally removes the item's focus ref(s) from the `focus` container in the
+  same commit, so completing an item removes it from Focus and it does not return
+  on un-done. This is the sole lifecycle transition that touches a container other
+  than the item map; it is justified because a Done focus ref renders nothing (the
+  Focus view is Open-only) and Focus must stay finite without relying on the
+  unwired `reconcile()`. **Binned does not** touch the focus container — binned
+  refs are filtered from the view and swept on the next focus interaction. See
+  `spec/focus.md` "Lifecycle interplay".
 - **Hard delete** — delete the item's key from `items`; best-effort remove
   its entries from its located order container. Entries elsewhere are
   invisible anyway (item lookup fails) and left to reconciliation.
-- **Delete list** — refuses for `main`. Deleting a list *discards its
+- **Delete list** — refuses for `inbox`. Deleting a list *discards its
   contents to the bin* rather than dumping them into Home's Open view. Every item
-  locating to the list (open, done *and* binned) is moved to `main` with a
-  fresh placement, appended to `order/main` in the deleted list's resolved
+  locating to the list (open, done *and* binned) is moved to `inbox` with a
+  fresh placement, appended to `order/inbox` in the deleted list's resolved
   order, and — unless it was already binned — marked binned with a shared
   `binned_at` timestamp (already-binned items keep their original one). The
-  relocation to `main` gives each item a real home list for when it is later
+  relocation to `inbox` gives each item a real home list for when it is later
   restored from the bin; the bin move keeps discarded items out of every
   live view without losing them. The ListMeta row is deleted. The abandoned
   `order/<list-id>` container remains as unreachable history (root containers
@@ -241,8 +261,11 @@ Every mutation below forms **one Loro commit** (one undo step, one op group).
 `reconcile()` is an explicit, idempotent maintenance mutation (never run
 implicitly by reads): for every list it removes stale/duplicate entries and
 appends real entries for fallback-tail items (using each item's existing
-placement id). One commit; a no-op when the doc is clean. Clients may run it
-opportunistically (e.g. after bootstrap); nothing depends on it running.
+placement id). It also prunes **focus** refs that are missing / done / binned /
+foreign and dedups them (`spec/focus.md`). One commit; a no-op when the doc is
+clean. Clients may run it opportunistically (e.g. after bootstrap); nothing
+depends on it running — Focus stays bounded via auto-remove-on-Done and the
+sweep folded into each focus mutation.
 
 ## ListMeta
 
@@ -252,19 +275,25 @@ opportunistically (e.g. after bootstrap); nothing depends on it running.
 | `name` | string | display name |
 | `created_at` | i64 | unix millis |
 
-Whether the nav shows an open-item count (Backlog + Live) beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Queue's count is always shown regardless.
+Whether the nav shows an open-item count (Backlog + Live) beside each list is governed by a single doc-level flag — see `WorkspaceSettings.show_list_counts`. There is no per-list override; Inbox's count is always shown regardless.
 
 ## Built-in lists
 
 Airday has one reserved primary capture list:
 
-- `main` — rendered as "Queue". This id is reserved and addressable by items,
+- `inbox` — rendered as "Inbox". This id is reserved and addressable by items,
   but it is not stored as a `ListMeta` row in the `lists` MovableList. Its
-  order container is `order/main`. Its label is currently client-defined and
+  order container is `order/inbox`. Its label is currently client-defined and
   it is non-renamable, non-movable, and non-deletable. Doc-level settings for
-  it live in `settings`.
+  it live in `settings`. (Pre-rename docs stored this id as `main`; the JSON
+  importer aliases `main` ⇒ `inbox` for the reserved list — see "Schema
+  versioning & compatibility".)
 
 The bin is *not* a list; it's the `Binned` lifecycle on items.
+
+**Focus** is a reserved lens, not a list — the `focus` container of FocusRefs
+(`spec/focus.md`), projected as a flat ordered view of Open referenced items. It
+is non-renamable and non-deletable, and like the bin it is not a `ListMeta` row.
 
 ## WorkspaceSettings
 
@@ -272,8 +301,8 @@ Doc-level synced settings that are not owned by any specific `ListMeta`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `show_list_counts` | bool? | when true, clients render each non-Queue list's open-item count (Backlog + Live) in the nav (subject to a `count > 0` gate). Queue's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
-| `main_name` | string? | user-chosen display-name override for the reserved `main` (Queue) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. |
+| `show_list_counts` | bool? | when true, clients render each non-Inbox list's open-item count (Backlog + Live) in the nav (subject to a `count > 0` gate). Inbox's count is always shown regardless. Absent ≡ false; the mutation deletes the key on the off path so an unset flag leaves no on-disk trace. |
+| `inbox_name` | string? | user-chosen display-name override for the reserved `inbox` (Inbox) list. Absent ≡ no override; clients fall back to the localized built-in label. The mutation deletes the key on empty/whitespace input so an unset override leaves no on-disk trace. (Stored settings key: `inbox_name`.) |
 
 ## Mutations (rust core API surface)
 
@@ -291,13 +320,15 @@ All mutations go through Loro APIs internally; the core exposes typed helpers:
   commit. Rejects malformed dates with `Invalid`.
 - `add_list(name) -> ListId`
 - `rename_list(list_id, name)`
-- `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Queue lists" flag. Queue's count is always visible (subject to count > 0) and is not gated by this.
-- `set_main_name(name)` — sets or clears the reserved `main` (Queue) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
-- `delete_list(list_id)` — refuses for `main`; see "Delete list" contract above.
+- `set_show_list_counts(show)` — toggles the doc-level "show counts on non-Inbox lists" flag. Inbox's count is always visible (subject to count > 0) and is not gated by this.
+- `set_inbox_name(name)` — sets or clears the reserved `inbox` (Inbox) list's display-name override in the doc-level `settings` map. Trims input; an empty trimmed string clears the override.
+- `delete_list(list_id)` — refuses for `inbox`; see "Delete list" contract above.
 - `empty_bin()` — hard-deletes all `Binned` items.
 - `delete_binned(item_id)` — hard-deletes one `Binned` item.
-- `reconcile()` — explicit stale/duplicate/missing order-entry repair; see
-  Reconciliation.
+- `add_to_focus(item_id, index)` / `remove_from_focus(item_id)` / `move_in_focus(item_id, index)` — curated Focus lens mutations over the `focus` container (`spec/focus.md`). Each is one commit and sweeps dead focus refs. `add_to_focus` no-ops when the item already has a visible ref.
+- `focus_view()` / `focus_refs()` — the Focus projection (Open, deduped, resolved order). Pure reads.
+- `reconcile()` — explicit stale/duplicate/missing order-entry repair plus focus
+  ref pruning/dedup; see Reconciliation.
 
 The wire format for ops is whatever Loro emits — opaque bytes from the server's POV.
 
@@ -316,3 +347,26 @@ legacy bridge, no data-carry-over guarantee while pre-release:
   containers rather than garbage — but don't mix them; wipe.)
 - Pre-v2 accounts, local databases, and server op logs are simply discarded
   and re-created.
+
+### Inbox rename (`main` → `inbox`) — a v2-internal cutover
+
+Renaming the reserved list's stored id from `main` to `inbox` is a **stored-data
+change, not additive**: the reserved literal appears in every reserved-list
+item's `location` register and in the order-container name (`order/main` →
+`order/inbox`). The container *shapes* are unchanged (only the reserved literal
+and the `order/*` name differ), so **no schema-version renumber** — it stays v2 —
+but it rides the same one-time **export → wipe → import** cutover as the v1→v2
+break above, run once on the live doc at a clean checkpoint.
+
+The **JSON importer aliases the legacy reserved id `main` ⇒ `inbox`** for the
+reserved list only: exported JSON carries `list_id: "main"` for reserved-list
+items, and the new build reserves `inbox`. This keeps the cutover a pure data
+round-trip (no `sed` on the export file). `main` is stored verbatim in exported
+JSON *only* as the reserved list's id — the alias is the only translation needed.
+
+### Focus container — additive within v2
+
+The `focus` container (`spec/focus.md`) is **additive within schema v2**: it
+reinterprets no existing container, and Loro roots are typed by `(name, type)`,
+so a focus-unaware v2 client simply never projects it. No version bump; the
+sqlite migration (`001_init.sql`) is unaffected (opaque blobs).

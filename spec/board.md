@@ -1,7 +1,7 @@
 # Board (lifecycle view)
 
 Board view is a **second lens on an existing list**, not a new container kind.
-Every list (including the reserved `main`) can be viewed as a board. The board
+Every list (including the reserved `inbox`) can be viewed as a board. The board
 has **three fixed lanes** driven by item lifecycle — there are no user-created,
 renamed, reordered, or deleted lanes:
 

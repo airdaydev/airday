@@ -8,7 +8,7 @@
 
 use std::io::{BufRead, IsTerminal};
 
-use airday_core::{ItemLifecycle, ItemView, LIST_MAIN};
+use airday_core::{ItemLifecycle, ItemView, LIST_INBOX};
 use clap::Parser;
 use serde::Serialize;
 
@@ -20,8 +20,8 @@ use crate::sync::Session;
 pub struct AddArgs {
     /// Item text. Use `-` to read one item per non-blank line from stdin.
     pub text: String,
-    /// Target list. Defaults to `main`.
-    #[arg(long, default_value = LIST_MAIN)]
+    /// Target list. Defaults to `inbox`.
+    #[arg(long, default_value = LIST_INBOX)]
     pub list: String,
 }
 
@@ -68,8 +68,8 @@ fn collect_texts(arg: &str) -> anyhow::Result<Vec<String>> {
 
 #[derive(Parser, Debug)]
 pub struct LsArgs {
-    /// List to show. Defaults to `main`.
-    #[arg(long, default_value = LIST_MAIN)]
+    /// List to show. Defaults to `inbox`.
+    #[arg(long, default_value = LIST_INBOX)]
     pub list: String,
     /// Include items marked `Done`.
     #[arg(long)]

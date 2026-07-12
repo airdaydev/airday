@@ -20,7 +20,7 @@
 use std::collections::{HashMap, HashSet};
 
 use airday_core::crypto::Dek;
-use airday_core::doc::{Doc, LIST_MAIN};
+use airday_core::doc::{Doc, LIST_INBOX};
 use airday_core::events::AppEvent;
 
 // ---------- deterministic rng ----------
@@ -189,7 +189,7 @@ fn assert_projection_invariants(doc: &Doc, ctx: &str) {
         }
     }
     let mut lists: HashSet<String> = expected_live.keys().cloned().collect();
-    lists.insert(LIST_MAIN.to_string());
+    lists.insert(LIST_INBOX.to_string());
     for l in doc.all_lists() {
         lists.insert(l.id);
     }
@@ -241,7 +241,7 @@ fn assert_projection_invariants(doc: &Doc, ctx: &str) {
 
 fn assert_mirror_matches(doc: &Doc, mirror: &Mirror, ctx: &str) {
     let mut lists: HashSet<String> = mirror.open.keys().cloned().collect();
-    lists.insert(LIST_MAIN.to_string());
+    lists.insert(LIST_INBOX.to_string());
     for l in doc.all_lists() {
         lists.insert(l.id);
     }
@@ -267,7 +267,7 @@ fn drain_into_mirror(doc: &Doc, mirror: &mut Mirror) {
 // ---------- random op driver ----------
 
 fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
-    let lists: Vec<String> = std::iter::once(LIST_MAIN.to_string())
+    let lists: Vec<String> = std::iter::once(LIST_INBOX.to_string())
         .chain(doc.all_lists().into_iter().map(|l| l.id))
         .collect();
     let items = doc.all_items();
@@ -363,10 +363,10 @@ fn random_op(doc: &Doc, rng: &mut Lcg, op_no: usize) {
         }
         // explicit reconciliation (must never change visible state)
         _ => {
-            let before: Vec<String> = doc.open_item_ids(LIST_MAIN);
+            let before: Vec<String> = doc.open_item_ids(LIST_INBOX);
             let _ = doc.reconcile();
             assert_eq!(
-                doc.open_item_ids(LIST_MAIN),
+                doc.open_item_ids(LIST_INBOX),
                 before,
                 "reconcile changed a visible projection"
             );
@@ -454,7 +454,7 @@ fn randomized_multi_peer_convergence() {
         // (stale/duplicate garbage removal is invisible) and re-syncs
         // cleanly.
         let visible_before: Vec<Vec<String>> = {
-            let mut v = vec![docs[0].open_item_ids(LIST_MAIN)];
+            let mut v = vec![docs[0].open_item_ids(LIST_INBOX)];
             for l in docs[0].all_lists() {
                 v.push(docs[0].open_item_ids(&l.id));
             }
@@ -462,7 +462,7 @@ fn randomized_multi_peer_convergence() {
         };
         docs[0].reconcile().unwrap();
         let visible_after: Vec<Vec<String>> = {
-            let mut v = vec![docs[0].open_item_ids(LIST_MAIN)];
+            let mut v = vec![docs[0].open_item_ids(LIST_INBOX)];
             for l in docs[0].all_lists() {
                 v.push(docs[0].open_item_ids(&l.id));
             }
@@ -518,7 +518,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
         s1.add_list("list-b").unwrap();
         let texts: Vec<String> = (0..800).map(|i| format!("s1-item-{i}")).collect();
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-        ids = s1.add_items_at(LIST_MAIN, &refs, 0).unwrap();
+        ids = s1.add_items_at(LIST_INBOX, &refs, 0).unwrap();
         for i in 0..20 {
             s1.set_item_done(&ids[i * 11], true).unwrap();
         }
@@ -538,13 +538,13 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
         let more: Vec<String> = {
             let texts: Vec<String> = (0..300).map(|i| format!("s{session}-item-{i}")).collect();
             let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-            doc.add_items_at(LIST_MAIN, &refs, 0).unwrap()
+            doc.add_items_at(LIST_INBOX, &refs, 0).unwrap()
         };
         ids.extend(more);
 
         // Multi-select move: 6 old items into list-a, like the store's
         // planReorderMoves emits (one commit each).
-        let live_main = doc.open_item_ids(LIST_MAIN);
+        let live_main = doc.open_item_ids(LIST_INBOX);
         let selection: Vec<String> = live_main
             .iter()
             .skip(session * 7)
@@ -563,7 +563,7 @@ fn large_synthetic_history_many_peers_lists_moves_undos() {
         assert_projection_invariants(&doc, &format!("session {session} after undo/redo"));
 
         // Some lifecycle churn + a bin purge.
-        let live_main = doc.open_item_ids(LIST_MAIN);
+        let live_main = doc.open_item_ids(LIST_INBOX);
         for id in live_main.iter().step_by(37).take(8) {
             doc.set_item_binned(id, true).unwrap();
         }

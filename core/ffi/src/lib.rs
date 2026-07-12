@@ -209,7 +209,7 @@ impl AirdayStore {
             .collect()
     }
 
-    /// All user-created lists (the built-in `main`/Queue list is virtual
+    /// All user-created lists (the built-in `inbox`/Inbox list is virtual
     /// and not included — items reference it by the id `"main"`).
     pub fn all_lists(&self) -> Vec<ListView> {
         let doc = self.doc.lock().expect("doc mutex poisoned");

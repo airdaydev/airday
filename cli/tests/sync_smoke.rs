@@ -17,7 +17,7 @@ use airday_cli::config::{Config, Profile, Secrets};
 use airday_cli::keystore::dek_to_hex;
 use airday_cli::storage::Account;
 use airday_cli::sync::Session;
-use airday_core::{Dek, Doc, LIST_MAIN};
+use airday_core::{Dek, Doc, LIST_INBOX};
 use airday_server::sync::queries;
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ async fn session_pushes_and_acks_then_reopen_is_clean() {
     // ship on flush.
     let session = Session::open_with_profile(profile, true).await.unwrap();
     assert!(session.is_online(), "expected to connect to local server");
-    let item_id = session.doc().add_item(LIST_MAIN, "hello world").unwrap();
+    let item_id = session.doc().add_item(LIST_INBOX, "hello world").unwrap();
     session.flush().await.unwrap();
 
     let primary_doc_id = Uuid::parse_str(&signup.primary_doc_id).unwrap();
@@ -107,7 +107,7 @@ async fn offline_add_survives_restart_then_syncs() {
     // Offline add — no connect; the mutation is captured to the op log.
     let session = Session::open_with_profile(profile, false).await.unwrap();
     assert!(!session.is_online());
-    let item_id = session.doc().add_item(LIST_MAIN, "offline item").unwrap();
+    let item_id = session.doc().add_item(LIST_INBOX, "offline item").unwrap();
     session.flush().await.unwrap();
 
     // Restart (still offline): the captured op replays from storage.
@@ -169,7 +169,7 @@ async fn last_sync_at_set_only_after_online_sync() {
     // Offline flush, even with a mutation, must not stamp last_sync_at.
     let session = Session::open_with_profile(profile, false).await.unwrap();
     assert!(!session.is_online());
-    session.doc().add_item(LIST_MAIN, "offline item").unwrap();
+    session.doc().add_item(LIST_INBOX, "offline item").unwrap();
     session.flush().await.unwrap();
     {
         let storage = airday_cli::storage::open_storage(&reopen_profile(tmp.path())).unwrap();
@@ -253,8 +253,8 @@ async fn export_json_writes_semantic_account_dump() {
 
     let value: serde_json::Value = serde_json::from_slice(&std::fs::read(out).unwrap()).unwrap();
     assert_eq!(value["version"], 1);
-    assert_eq!(value["lists"][0]["id"], LIST_MAIN);
-    assert_eq!(value["lists"][0]["name"], "Queue");
+    assert_eq!(value["lists"][0]["id"], LIST_INBOX);
+    assert_eq!(value["lists"][0]["name"], "Inbox");
     assert_eq!(value["items"][0]["id"], item_id);
     assert_eq!(value["items"][0]["notes"], "whole milk");
 }
@@ -309,7 +309,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
 
     // A pushes a new item.
     let session_a = Session::open_with_profile(profile_a, true).await.unwrap();
-    let item_id = session_a.doc().add_item(LIST_MAIN, "from-A").unwrap();
+    let item_id = session_a.doc().add_item(LIST_INBOX, "from-A").unwrap();
     session_a.flush().await.unwrap();
 
     // B opens a session — its pull should ingest A's seed + add_item
@@ -318,7 +318,7 @@ async fn second_device_observes_first_devices_items_via_pull() {
     assert!(session_b.is_online());
     let view = session_b.doc().get_item(&item_id).unwrap();
     assert_eq!(view.text, "from-A");
-    assert_eq!(view.list_id, LIST_MAIN);
+    assert_eq!(view.list_id, LIST_INBOX);
     session_b.flush().await.unwrap();
 }
 
