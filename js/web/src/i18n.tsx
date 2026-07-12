@@ -168,10 +168,12 @@ type Messages = {
     typeToFind: string;
   };
   focus: {
-    /** Add-to-focus toggle (row + context menu). */
+    /** Add-to-focus context-menu action. */
     add: string;
-    /** Remove-from-focus toggle / × affordance / context menu. */
+    /** Remove-from-focus × affordance / context menu. */
     remove: string;
+    /** Static Focus-membership badge shown on pinned list rows. */
+    badge: string;
     /** Flat Focus view lifecycle toggles (no lanes — spec/focus.md). */
     markLive: string;
     markBacklog: string;
@@ -334,10 +336,11 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     focus: {
       add: "Añadir a Enfoque",
       remove: "Quitar de Enfoque",
+      badge: "Enfoque",
       markLive: "Marcar en curso",
       markBacklog: "Marcar como pendiente",
       empty:
-        "Enfoque está vacío. Fija elementos con el botón ◎ para organizar en qué estás trabajando.",
+        "Enfoque está vacío. Haz clic derecho en un elemento y elige «Añadir a Enfoque» para organizar en qué estás trabajando.",
     },
     settings: {
       general: "General",
@@ -495,10 +498,11 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
     focus: {
       add: "Add to Focus",
       remove: "Remove from Focus",
+      badge: "Focus",
       markLive: "Mark as live",
       markBacklog: "Mark as backlog",
       empty:
-        "Nothing in Focus yet. Pin items with the ◎ toggle to line up what you're working on.",
+        "Nothing in Focus yet. Right-click an item and choose “Add to Focus” to line up what you're working on.",
     },
     settings: {
       general: "General",

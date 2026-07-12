@@ -218,8 +218,14 @@ export interface DocApp {
    *  order (default: append). No-op if the item already has a visible
    *  ref or isn't Open; throws if the item is unknown. See spec/focus.md. */
   addToFocus(id: string, index?: number): void;
+  /** Batch add: pin each id into the Focus lens (appended in order) in a
+   *  single commit. Unknown / not-Open / already-focused ids are skipped.
+   *  Backs multi-select "add to focus". */
+  addToFocusMany(ids: string[]): void;
   /** Remove an item's ref(s) from the Focus lens. The item is untouched. */
   removeFromFocus(id: string): void;
+  /** Batch remove: drop each id's ref(s) from the Focus lens in one commit. */
+  removeFromFocusMany(ids: string[]): void;
   /** Reorder an item within the Focus lens to visible position `index`. */
   moveInFocus(id: string, index: number): void;
   /** Per-session local undo. Returns whether a step was applied so the
@@ -758,8 +764,14 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       // default to the current visible length so callers can omit it.
       mutate(() => engine.addToFocus(id, index ?? state.focusOrder.length));
     },
+    addToFocusMany(ids) {
+      mutate(() => engine.addToFocusMany(ids));
+    },
     removeFromFocus(id) {
       mutate(() => engine.removeFromFocus(id));
+    },
+    removeFromFocusMany(ids) {
+      mutate(() => engine.removeFromFocusMany(ids));
     },
     moveInFocus(id, index) {
       mutate(() => engine.moveInFocus(id, index));

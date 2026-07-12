@@ -308,11 +308,28 @@ impl Doc {
         self.inner.add_to_focus(item_id, index).map_err(js_err)
     }
 
+    /// Batch add: append a FocusRef for each of `item_ids` (in order) to
+    /// the Focus lens in one commit. Unknown / not-Open / already-focused
+    /// ids are skipped.
+    #[wasm_bindgen(js_name = addToFocusMany)]
+    pub fn add_to_focus_many(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.add_to_focus_many(&refs).map_err(js_err)
+    }
+
     /// Remove `item_id`'s FocusRef(s) from the Focus lens, one commit.
     /// The item itself is untouched.
     #[wasm_bindgen(js_name = removeFromFocus)]
     pub fn remove_from_focus(&self, item_id: &str) -> Result<(), JsError> {
         self.inner.remove_from_focus(item_id).map_err(js_err)
+    }
+
+    /// Batch remove: drop each id's FocusRef(s) from the Focus lens in one
+    /// commit. The items are untouched.
+    #[wasm_bindgen(js_name = removeFromFocusMany)]
+    pub fn remove_from_focus_many(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.remove_from_focus_many(&refs).map_err(js_err)
     }
 
     /// Reorder `item_id`'s FocusRef to visible position `index` within the
@@ -1508,11 +1525,31 @@ impl SyncEngine {
             .map_err(js_err)
     }
 
+    /// Batch add: append a FocusRef for each of `item_ids` (in order) to
+    /// the Focus lens in one commit. Unknown / not-Open / already-focused
+    /// ids are skipped. Backs multi-select "add to focus".
+    #[wasm_bindgen(js_name = addToFocusMany)]
+    pub fn add_to_focus_many(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner.doc().add_to_focus_many(&refs).map_err(js_err)
+    }
+
     /// Remove `item_id`'s FocusRef(s) from the Focus lens, one commit.
     /// The item itself is untouched.
     #[wasm_bindgen(js_name = removeFromFocus)]
     pub fn remove_from_focus(&self, item_id: &str) -> Result<(), JsError> {
         self.inner.doc().remove_from_focus(item_id).map_err(js_err)
+    }
+
+    /// Batch remove: drop each id's FocusRef(s) from the Focus lens in one
+    /// commit. The items are untouched.
+    #[wasm_bindgen(js_name = removeFromFocusMany)]
+    pub fn remove_from_focus_many(&self, item_ids: Vec<String>) -> Result<(), JsError> {
+        let refs: Vec<&str> = item_ids.iter().map(|s| s.as_str()).collect();
+        self.inner
+            .doc()
+            .remove_from_focus_many(&refs)
+            .map_err(js_err)
     }
 
     /// Reorder `item_id`'s FocusRef to visible position `index` within the

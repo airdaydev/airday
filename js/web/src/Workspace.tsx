@@ -903,9 +903,9 @@ export function Workspace(props: {
   };
   onGlobalKey(onSpaceAdd);
 
-  // [ / ]: cycle through the nav views in top-to-bottom order — Home, Done,
-  // Bin, then the user lists (Bin only earns a slot while it holds items,
-  // matching its nav visibility). Wraps at both ends. From a view that
+  // [ / ]: cycle through the nav views in top-to-bottom order — Focus, Home,
+  // Done, Bin, then the user lists (Bin only earns a slot while it holds
+  // items, matching its nav visibility). Wraps at both ends. From a view that
   // isn't in the sequence (e.g. an emptied Bin), ] enters at the top and
   // [ at the bottom, so the bracket pair always re-enters the set.
   const viewKey = (v: ViewKey) => (v.kind === "list" ? `list:${v.id}` : v.kind);
@@ -913,8 +913,8 @@ export function Workspace(props: {
     if (e.key !== "[" && e.key !== "]") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const seq: ViewKey[] = [
-      { kind: "list", id: "inbox" },
       { kind: "focus" },
+      { kind: "list", id: "inbox" },
       { kind: "done" },
       ...(state.binCount > 0 ? [{ kind: "bin" } as ViewKey] : []),
       ...lists().map((l): ViewKey => ({ kind: "list", id: l.id })),

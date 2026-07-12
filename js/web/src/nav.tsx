@@ -10,6 +10,7 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
+import archiveSvg from "./icons/archive.svg?raw";
 import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import checkSvg from "./icons/check.svg?raw";
 import cloudSvg from "./icons/cloud.svg?raw";
@@ -18,18 +19,12 @@ import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
 import externalLinkSvg from "./icons/external-link.svg?raw";
 import fileSvg from "./icons/file.svg?raw";
-import targetSvg from "./icons/target.svg?raw";
 import { formatRelative } from "./format.tsx";
 import { useAppI18n } from "./i18n.tsx";
 import { AuthDialog, type Session } from "./Login.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import type { ViewKey } from "./prefs.ts";
 import type { DocApp } from "./sync/store.ts";
-
-// Soft "Focus is getting big" threshold (spec/focus.md "Feels finite"):
-// at or above this many visible refs the nav count shifts colour. A gentle
-// signal, never a hard cap — you can always add more.
-const FOCUS_SOFT_CAP = 9;
 
 function ConnectionStatusPopover(props: {
   app: DocApp;
@@ -397,6 +392,22 @@ export function Nav(props: {
       />
       <div class="nav-scroll">
       <div class="nav-group">
+        {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
+            it's a static entry with a fixed icon — like Done / Bin. Sits at
+            the very top, above Inbox: it's the "what am I working on now"
+            answer the user reaches for first. */}
+        <button
+          type="button"
+          class="nav-item"
+          data-active={props.view.kind === "focus" ? "" : undefined}
+          onClick={() => props.setView({ kind: "focus" })}
+        >
+          <span class="nav-item-icon" innerHTML={arrowRightSvg} />
+          {m().nav.focus}
+          <Show when={props.focusCount > 0}>
+            <span class="nav-item-count">{props.focusCount}</span>
+          </Show>
+        </button>
         <ContextMenu>
           <ContextMenu.Trigger
             as="button"
@@ -410,7 +421,7 @@ export function Nav(props: {
             data-drop-list-id="inbox"
             onClick={() => props.setView({ kind: "list", id: "inbox" })}
           >
-            <span class="nav-item-icon" innerHTML={arrowRightSvg} />
+            <span class="nav-item-icon" innerHTML={archiveSvg} />
             <EditableNavLabel
               name={props.homeName}
               onSave={(name) => props.app.setInboxName(name)}
@@ -438,23 +449,6 @@ export function Nav(props: {
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu>
-        {/* Focus: a reserved lens (spec/focus.md), not a `ListMeta` row, so
-            it's a static entry with a fixed icon — like Done / Bin. Past the
-            soft threshold the count badge shifts colour to signal "getting
-            big" (a gentle nudge, never a hard cap). */}
-        <button
-          type="button"
-          class="nav-item"
-          data-active={props.view.kind === "focus" ? "" : undefined}
-          data-soft-cap={props.focusCount >= FOCUS_SOFT_CAP ? "" : undefined}
-          onClick={() => props.setView({ kind: "focus" })}
-        >
-          <span class="nav-item-icon" innerHTML={targetSvg} />
-          {m().nav.focus}
-          <Show when={props.focusCount > 0}>
-            <span class="nav-item-count">{props.focusCount}</span>
-          </Show>
-        </button>
         <button
           type="button"
           class="nav-item"

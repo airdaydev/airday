@@ -1752,11 +1752,75 @@ impl Doc {
         Ok(())
     }
 
+    /// Batch form of [`add_to_focus`](Self::add_to_focus): append a
+    /// FocusRef for each of `item_ids` to the Focus lens, in the given
+    /// order, in a **single commit**. Items that are unknown, not Open,
+    /// already focused, or repeated within `item_ids` are skipped (each a
+    /// no-op, mirroring the single-item form — unlike the bulk lifecycle
+    /// paths, an unknown id does not abort the batch). Folds one dead-ref
+    /// sweep into the same commit and emits at most one `FocusChanged`.
+    /// Backs multi-select "add to focus".
+    pub fn add_to_focus_many(&self, item_ids: &[&str]) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        let scan = self.scan_focus();
+        // Seed the "already present" set with the currently-visible refs so
+        // the filter dedups against Focus *and* against repeats within
+        // `item_ids` (first occurrence wins) in one pass.
+        let mut present: HashSet<String> = scan.visible_item_ids.iter().cloned().collect();
+        let to_add: Vec<&str> = {
+            let guard = self.item_index.lock().expect("item index mutex poisoned");
+            item_ids
+                .iter()
+                .copied()
+                .filter(|id| {
+                    guard.meta.get(*id).is_some_and(|m| m.open) && present.insert((*id).to_string())
+                })
+                .collect()
+        };
+        let swept = !scan.dead_idx.is_empty();
+        if to_add.is_empty() && !swept {
+            return Ok(());
+        }
+        let focus = self.focus_list();
+        for &i in scan.dead_idx.iter().rev() {
+            focus.delete(i, 1)?;
+        }
+        // After the sweep the container holds exactly the visible refs, so
+        // appending preserves both existing order and `item_ids` order.
+        for id in &to_add {
+            focus.push(FocusRef::local(id).encode().as_str())?;
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::FocusChanged);
+        Ok(())
+    }
+
     /// Remove `item_id`'s reference(s) from the Focus lens, one commit.
     /// The item itself is untouched. No-op (no commit) when the item has
     /// no ref and there is no garbage to sweep. Folds a dead-ref sweep in.
     pub fn remove_from_focus(&self, item_id: &str) -> Result<(), DocError> {
         let target: HashSet<String> = std::iter::once(item_id.to_string()).collect();
+        let removed = self.prune_focus_refs(&target);
+        if removed == 0 {
+            return Ok(());
+        }
+        self.inner.commit();
+        self.push_event(AppEvent::FocusChanged);
+        Ok(())
+    }
+
+    /// Batch form of [`remove_from_focus`](Self::remove_from_focus):
+    /// remove the ref(s) of every id in `item_ids` from the Focus lens in
+    /// a **single commit**. The items themselves are untouched. No-op (no
+    /// commit) when nothing matched and there was no garbage to sweep.
+    /// Folds the dead-ref sweep in.
+    pub fn remove_from_focus_many(&self, item_ids: &[&str]) -> Result<(), DocError> {
+        if item_ids.is_empty() {
+            return Ok(());
+        }
+        let target: HashSet<String> = item_ids.iter().map(|s| s.to_string()).collect();
         let removed = self.prune_focus_refs(&target);
         if removed == 0 {
             return Ok(());
@@ -7201,6 +7265,38 @@ mod tests {
         doc.add_to_focus(&a, 0).unwrap();
         assert_eq!(doc.focus_refs(), vec![a, b]);
         assert_eq!(doc.focus_list().len(), 2);
+    }
+
+    #[test]
+    fn focus_add_many_appends_in_order_and_skips_ineligible() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
+        let d = doc.add_item(LIST_INBOX, "d").unwrap();
+        // `a` is already focused; `c` is done (ineligible); `d` repeats.
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.set_item_done(&c, true).unwrap();
+
+        doc.add_to_focus_many(&[&a, &b, &c, &d, &d, "deadbeef"])
+            .unwrap();
+        // a kept (already present, not moved), b + d appended in order,
+        // c skipped (done), the duplicate d and the unknown id skipped.
+        assert_eq!(doc.focus_refs(), vec![a, b, d]);
+    }
+
+    #[test]
+    fn focus_remove_many_removes_all_targets_in_one_commit() {
+        let doc = Doc::new().unwrap();
+        let a = doc.add_item(LIST_INBOX, "a").unwrap();
+        let b = doc.add_item(LIST_INBOX, "b").unwrap();
+        let c = doc.add_item(LIST_INBOX, "c").unwrap();
+        doc.add_to_focus(&a, usize::MAX).unwrap();
+        doc.add_to_focus(&b, usize::MAX).unwrap();
+        doc.add_to_focus(&c, usize::MAX).unwrap();
+
+        doc.remove_from_focus_many(&[&a, &c, "deadbeef"]).unwrap();
+        assert_eq!(doc.focus_refs(), vec![b]);
     }
 
     #[test]

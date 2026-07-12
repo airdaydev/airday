@@ -13,7 +13,6 @@ import {
 import { useAppI18n } from "./i18n.tsx";
 import { pasteAsPlainText } from "./plainTextPaste.ts";
 import { setLinkifiedText } from "./linkify.ts";
-import targetSvg from "./icons/target.svg?raw";
 import type { ViewKey } from "./prefs.ts";
 import {
   isBinned,
@@ -101,11 +100,6 @@ export function Row(props: {
     !isDraftId(props.item().id);
   const inFocusView = (): boolean =>
     props.viewKind === "focus" && !isDraftId(props.item().id);
-  const onToggleFocus = () => {
-    const id = props.item().id;
-    if (focused()) props.app.removeFromFocus(id);
-    else props.app.addToFocus(id);
-  };
   const onRemoveFromFocus = () => props.app.removeFromFocus(props.item().id);
   // Flip the item between the Backlog and Live lifecycles from within the
   // flat Focus view (which has no lanes — spec/focus.md B.6).
@@ -257,6 +251,17 @@ export function Row(props: {
     const ids = targetIds();
     if (ids.length === 0) return;
     props.app.setDoneMany(ids, false);
+  };
+  // Focus toggle from the context menu acts on the whole target set (the
+  // selection when this row is part of it, else this row alone) in a single
+  // commit, mirroring Mark done / Mark not done. Direction follows the
+  // right-clicked row's current focus state; the core skips any target that
+  // is already focused / not Open, so a mixed selection resolves cleanly.
+  const onToggleFocusSelection = () => {
+    const ids = targetIds();
+    if (ids.length === 0) return;
+    if (focused()) props.app.removeFromFocusMany(ids);
+    else props.app.addToFocusMany(ids);
   };
   // Restore from bin: clear binned only, preserving done state. A
   // done-then-binned item lands back in the Done view; a plain binned
@@ -475,27 +480,13 @@ export function Row(props: {
             </div>
           </Show>
         </div>
-        {/* Add-to-focus toggle (target icon) — a cheap pin/unpin gesture on
-            any open list/board row; filled when the item is in Focus. In the
-            Focus lens itself the row instead carries a remove (×), since
-            membership is a given there. tabIndex -1 + pointerdown-stop so
-            neither steals dnd focus nor starts a drag. */}
-        <Show when={canPinToFocus() && !props.expanded()}>
-          <button
-            type="button"
-            tabIndex={-1}
-            class="row-focus-toggle"
-            classList={{ "is-focused": focused() }}
-            aria-pressed={focused()}
-            aria-label={focused() ? m().focus.remove : m().focus.add}
-            title={focused() ? m().focus.remove : m().focus.add}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFocus();
-            }}
-            innerHTML={targetSvg}
-          />
+        {/* Focus-membership badge — a static, non-interactive pill shown
+            only when the item is pinned to Focus; nothing otherwise. There
+            is no hover toggle: adding / removing goes through the row
+            context menu (spec/focus.md). In the Focus lens itself the row
+            instead carries a remove (×), since membership is a given there. */}
+        <Show when={canPinToFocus() && focused() && !props.expanded()}>
+          <span class="row-focus-badge">{m().focus.badge}</span>
         </Show>
         <Show when={inFocusView() && !props.expanded()}>
           <button
@@ -569,7 +560,10 @@ export function Row(props: {
             </ContextMenu.Item>
           </Show>
           <Show when={canPinToFocus()}>
-            <ContextMenu.Item class="context-menu-item" onSelect={onToggleFocus}>
+            <ContextMenu.Item
+              class="context-menu-item"
+              onSelect={onToggleFocusSelection}
+            >
               {focused() ? m().focus.remove : m().focus.add}
             </ContextMenu.Item>
           </Show>

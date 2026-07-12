@@ -22,9 +22,11 @@ on right now", drawn from across every list, in one hand-curated order.
 - **Flat, not a board.** Focus renders as one ordered flat list of Open items.
   You can flip an item Live/Done from within it, but there are **no lanes** (no
   Backlog/Live/Done split, no board lens). Keeping it flat is the point.
-- **Feels finite.** Past a soft threshold (~7–10 items) the UI gives a gentle
-  "getting big" signal — a colour shift, not a hard cap. Focus that grows without
-  bound is Focus that has stopped meaning anything.
+- **Feels finite.** Focus is kept small by construction — single-tier, flat, and
+  auto-compacting on Done — not by a cap or a nag. Focus that grows without bound
+  is Focus that has stopped meaning anything. (An earlier soft-threshold colour
+  nudge on the nav count was tried and dropped; the count renders plainly, like
+  every other list.)
 
 ## Why Focus can't reuse the list/order machinery
 
@@ -146,8 +148,15 @@ New mutations (each **one Loro commit**):
 - `add_to_focus(item_id, index)` — insert a FocusRef at `index` (default append).
   If the item already has a *visible* ref, **no-op** (do not move-to-top). Sweeps
   dead refs.
+- `add_to_focus_many(item_ids)` — batch: append a FocusRef for each id, in the
+  given order, in **one commit**. Ids that are unknown, not Open, already
+  focused, or repeated within the batch are skipped (each a no-op — unlike the
+  bulk lifecycle paths, an unknown id does not abort). Sweeps dead refs; emits at
+  most one `FocusChanged`. Backs multi-select "add to focus".
 - `remove_from_focus(item_id)` — remove the item's ref(s) from the focus
   container. Item untouched. Sweeps dead refs.
+- `remove_from_focus_many(item_ids)` — batch remove of every listed id's ref(s)
+  in **one commit**. Items untouched. Sweeps dead refs.
 - `move_in_focus(item_id, index)` — reorder within Focus (`MovableList::mov`).
   Sweeps dead refs.
 
@@ -176,16 +185,23 @@ event — so the web store must re-derive `focus_view` on **item events too**
 ## Client (web) contract
 
 - Focus is a static nav entry alongside Done and Bin (not a `ListMeta` row), with
-  a fixed icon and a count badge = number of visible refs. Placed near the top,
-  above user-created lists. Past the ~7–10 soft threshold the entry shows a gentle
-  "getting big" signal (colour shift, not a hard cap).
+  a fixed icon and a count badge = number of visible refs. Placed at the very top
+  of the nav — above Inbox/Home and the user-created lists — as the first "what am
+  I working on now" entry. The count renders plainly, like every other list count
+  (no special colour treatment).
 - The Focus view is a flat ordered list of `focus_view()`; drag-to-reorder reuses
   the existing DnD infrastructure. Per-row actions: toggle Live, mark Done, and
   **remove-from-focus as a single cheap gesture** (× / swipe). Removing must be as
   frictionless as adding — that's what keeps Focus lean.
-- Any item row (list, board, task dialog) carries an **add-to-focus toggle**
-  (pin/star) whose state reflects whether the item currently has a visible focus
-  ref. Toggling calls `add_to_focus` / `remove_from_focus`.
+- A pinned list row carries a **static, non-interactive "Focus" badge** when it
+  has a visible focus ref, and nothing when it does not — a glanceable
+  membership indicator, not a control. There is no per-row hover toggle.
+- Adding / removing is driven entirely from the row **context menu**'s
+  add/remove-focus entry, which acts on the whole multi-selection (or the row
+  alone when it is not part of the selection), mirroring "Mark done" — it calls
+  the batch `add_to_focus_many` / `remove_from_focus_many` so a selection is
+  pinned/unpinned in one commit. Inside the Focus lens the row instead carries a
+  cheap remove (×) gesture.
 
 ## Sync protocol
 
