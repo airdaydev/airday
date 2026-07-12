@@ -16,8 +16,12 @@ import type { DndDragEventDetail } from "./dnd";
 import { Popover } from "@kobalte/core/popover";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
+import archiveSvg from "./icons/archive.svg?raw";
+import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
 import cardStackSvg from "./icons/card-stack.svg?raw";
+import checkSvg from "./icons/check.svg?raw";
+import crumpledPaperSvg from "./icons/crumpled-paper.svg?raw";
 import listBulletSvg from "./icons/list-bullet.svg?raw";
 import mixerHzSvg from "./icons/mixer-hz.svg?raw";
 import menuSvg from "./icons/menu.svg?raw";
@@ -1253,6 +1257,12 @@ export function Workspace(props: {
                 onClear={() => app.setListIcon(editableListId() ?? "", "")}
               />
             </Show>
+            {/* Reserved views (Focus, Home/Inbox, Done, Bin) can't store a
+                custom icon, so mirror their fixed navbar glyph here as a
+                static, non-interactive counterpart to the list icon. */}
+            <Show when={viewIcon(view())} keyed>
+              {(svg) => <span class="list-icon-static" innerHTML={svg} />}
+            </Show>
             <h1>
             <Show
               keyed
@@ -1588,4 +1598,15 @@ function viewTitle(
   if (v.kind === "focus") return m.nav.focus;
   if (v.kind === "done") return m.nav.done;
   return m.nav.bin;
+}
+
+/** Fixed navbar glyph for a reserved view (Focus, Home/Inbox, Done, Bin),
+ *  or `null` for user lists (which carry their own `ListIconPicker`). Keep
+ *  these in sync with the icons used in `nav.tsx`. */
+function viewIcon(v: ViewKey): string | null {
+  if (v.kind === "focus") return arrowRightSvg;
+  if (v.kind === "done") return checkSvg;
+  if (v.kind === "bin") return crumpledPaperSvg;
+  if (v.kind === "list" && v.id === "inbox") return archiveSvg;
+  return null;
 }

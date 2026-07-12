@@ -680,39 +680,6 @@ body {
 /* Remove (×) affordance shown inside the Focus lens, at the row's trailing
    edge; stays hidden until the row is hovered / selected — removing a
    pinned item must be as cheap as adding it (spec/focus.md). */
-.row-focus-remove {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  margin-top: -1px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 0;
-  font-size: 14px;
-  line-height: 1;
-  transition:
-    opacity 0.12s ease,
-    color 0.12s ease,
-    background-color 0.12s ease;
-}
-
-.row:hover .row-focus-remove,
-[aria-selected="true"] .row-focus-remove {
-  opacity: 1;
-}
-
-.row-focus-remove:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
 /* Static Focus-membership badge on list rows — a non-interactive pill,
    always visible (not hover-gated) so Focus membership is glanceable while
    scanning a list. Add / remove happens via the row context menu. */
@@ -729,14 +696,6 @@ body {
   color: var(--link);
   background: transparent;
   border: 1px solid var(--border-row);
-}
-
-/* Touch viewports have no hover — always show the remove affordance so
-   removing stays reachable. */
-@media (pointer: coarse) {
-  .row-focus-remove {
-    opacity: 1;
-  }
 }
 
 /* Add-to-focus toggle in the task dialog header (mirrors the close button
@@ -1017,6 +976,23 @@ body {
 }
 
 .list-icon-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Static counterpart to `.list-icon-trigger` for reserved views whose
+   icon is fixed and not user-editable (Focus, Home, Done, Bin). */
+.list-icon-static {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.list-icon-static svg {
   width: 16px;
   height: 16px;
 }

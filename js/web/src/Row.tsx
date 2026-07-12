@@ -73,13 +73,18 @@ export function Row(props: {
   onSetDue?: (ids: readonly string[], initial: string | null) => void;
 }) {
   const { m, locale } = useAppI18n();
-  // Origin-list badge text for the Done view (null when the badge is off,
-  // the view isn't Done, or no label resolves).
-  const originList = createMemo(() =>
-    props.viewKind === "done" && props.showList?.()
+  // Origin-list badge text for the flat cross-list views. Always shown in
+  // the Focus lens (the owning category is useful context there), and in
+  // the Done view when its "show list" toggle is on. Null otherwise, or
+  // when no label resolves.
+  const originList = createMemo(() => {
+    if (props.viewKind === "focus") {
+      return props.listLabel?.(props.item().listId) || null;
+    }
+    return props.viewKind === "done" && props.showList?.()
       ? (props.listLabel?.(props.item().listId) || null)
-      : null,
-  );
+      : null;
+  });
   // Open state of this row's context menu, mirrored into the shared
   // overlay count so global keyboard shortcuts stand down while it's up.
   const [menuOpen, setMenuOpen] = createSignal(false);
@@ -100,13 +105,6 @@ export function Row(props: {
     !isDraftId(props.item().id);
   const inFocusView = (): boolean =>
     props.viewKind === "focus" && !isDraftId(props.item().id);
-  const onRemoveFromFocus = () => props.app.removeFromFocus(props.item().id);
-  // Flip the item between the Backlog and Live lifecycles from within the
-  // flat Focus view (which has no lanes — spec/focus.md B.6).
-  const onToggleLive = () => {
-    const it = props.item();
-    props.app.setLifecycle(it.id, it.live ? "backlog" : "live");
-  };
   let textRef!: HTMLSpanElement;
   // Set by the Enter keydown handler before it dispatches the synthetic
   // Escape that drives collapse. The collapse effect reads (and resets)
@@ -262,6 +260,14 @@ export function Row(props: {
     if (ids.length === 0) return;
     if (focused()) props.app.removeFromFocusMany(ids);
     else props.app.addToFocusMany(ids);
+  };
+  // Remove from focus within the Focus view. Every row here is already
+  // focused, so unlike the list-view toggle this only ever removes — but
+  // it must still act on the whole target set, not just the clicked row.
+  const onRemoveFromFocusSelection = () => {
+    const ids = targetIds();
+    if (ids.length === 0) return;
+    props.app.removeFromFocusMany(ids);
   };
   // Restore from bin: clear binned only, preserving done state. A
   // done-then-binned item lands back in the Done view; a plain binned
@@ -483,26 +489,9 @@ export function Row(props: {
         {/* Focus-membership badge — a static, non-interactive pill shown
             only when the item is pinned to Focus; nothing otherwise. There
             is no hover toggle: adding / removing goes through the row
-            context menu (spec/focus.md). In the Focus lens itself the row
-            instead carries a remove (×), since membership is a given there. */}
+            context menu (spec/focus.md). */}
         <Show when={canPinToFocus() && focused() && !props.expanded()}>
           <span class="row-focus-badge">{m().focus.badge}</span>
-        </Show>
-        <Show when={inFocusView() && !props.expanded()}>
-          <button
-            type="button"
-            tabIndex={-1}
-            class="row-focus-remove"
-            aria-label={m().focus.remove}
-            title={m().focus.remove}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemoveFromFocus();
-            }}
-          >
-            ✕
-          </button>
         </Show>
         <Show when={!props.showCreated && !props.expanded() && props.item().dueOn}>
           {(due) => (
@@ -552,13 +541,6 @@ export function Row(props: {
               <kbd class="menu-shortcut">X</kbd>
             </ContextMenu.Item>
           </Show>
-          <Show when={inFocusView()}>
-            <ContextMenu.Item class="context-menu-item" onSelect={onToggleLive}>
-              <span>
-                {props.item().live ? m().focus.markBacklog : m().focus.markLive}
-              </span>
-            </ContextMenu.Item>
-          </Show>
           <Show when={canPinToFocus()}>
             <ContextMenu.Item
               class="context-menu-item"
@@ -570,7 +552,7 @@ export function Row(props: {
           <Show when={inFocusView()}>
             <ContextMenu.Item
               class="context-menu-item"
-              onSelect={onRemoveFromFocus}
+              onSelect={onRemoveFromFocusSelection}
             >
               {m().focus.remove}
             </ContextMenu.Item>
