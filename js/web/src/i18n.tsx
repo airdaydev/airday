@@ -340,7 +340,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markLive: "Marcar en curso",
       markBacklog: "Marcar como pendiente",
       empty:
-        "Enfoque está vacío. Haz clic derecho en un elemento y elige «Añadir a Enfoque» para organizar en qué estás trabajando.",
+        "Enfoque está vacío. Añade un elemento nuevo aquí, o haz clic derecho en uno existente y elige «Añadir a Enfoque», para organizar en qué estás trabajando.",
     },
     settings: {
       general: "General",
@@ -502,7 +502,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       markLive: "Mark as live",
       markBacklog: "Mark as backlog",
       empty:
-        "Nothing in Focus yet. Right-click an item and choose “Add to Focus” to line up what you're working on.",
+        "Nothing in Focus yet. Add a new item here, or right-click an existing one and choose “Add to Focus”, to line up what you're working on.",
     },
     settings: {
       general: "General",

@@ -215,12 +215,13 @@ export interface DocApp {
    *  list. Passing `""` clears the override. */
   setInboxName(name: string): void;
   /** Pin an item into the Focus lens at `index` in the visible curated
-   *  order (default: append). No-op if the item already has a visible
-   *  ref or isn't Open; throws if the item is unknown. See spec/focus.md. */
+   *  order (default: the top — new focus items are "what am I working on
+   *  now"). No-op if the item already has a visible ref or isn't Open;
+   *  throws if the item is unknown. See spec/focus.md. */
   addToFocus(id: string, index?: number): void;
-  /** Batch add: pin each id into the Focus lens (appended in order) in a
-   *  single commit. Unknown / not-Open / already-focused ids are skipped.
-   *  Backs multi-select "add to focus". */
+  /** Batch add: pin each id into the Focus lens (prepended to the top in
+   *  order) in a single commit. Unknown / not-Open / already-focused ids
+   *  are skipped. Backs multi-select "add to focus". */
   addToFocusMany(ids: string[]): void;
   /** Remove an item's ref(s) from the Focus lens. The item is untouched. */
   removeFromFocus(id: string): void;

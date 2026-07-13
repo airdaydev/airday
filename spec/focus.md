@@ -204,6 +204,15 @@ event — so the web store must re-derive `focus_view` on **item events too**
   the batch `add_to_focus_many` / `remove_from_focus_many` so a selection is
   pinned/unpinned in one commit. Inside the Focus lens the row instead carries a
   cheap remove (×) gesture.
+- **Direct capture into Focus.** The Focus lens is itself a capture surface: the
+  same inline-draft gestures a list has (Space / the add button / the mobile
+  FAB / Enter-to-chain / paste) work here too. Because Focus owns no items — it
+  is a lens — a captured item is created in the **inbox** (the default home) and
+  a FocusRef is pinned to it in the **same undo step**, landing at the draft's
+  visible slot (top when nothing is selected). This is the one place the client
+  composes `add_item*` + `add_to_focus` rather than mutating Focus in isolation;
+  the item lives in the inbox and merely *appears* in Focus, exactly as if it had
+  been captured in Home and then pinned.
 
 ## Sync protocol
 

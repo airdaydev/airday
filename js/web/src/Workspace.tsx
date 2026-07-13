@@ -257,6 +257,10 @@ export function Workspace(props: {
     item: ItemView;
     insertIndex: number;
     listId: string;
+    // Focus-lens capture: the item is created in `listId` (the inbox) and
+    // simultaneously pinned into Focus at `insertIndex` (a *focus* slot,
+    // not a list slot). Plain list drafts leave this false.
+    focus?: boolean;
   } | null>(null);
   const [expandedKey, setExpandedKey] = createSignal<string | null>(null);
 
@@ -493,6 +497,21 @@ export function Workspace(props: {
     });
   };
 
+  // Capture new items straight into the Focus lens: each is created in the
+  // inbox (Focus owns no items of its own — it's a lens) and pinned with a
+  // FocusRef at a contiguous run starting at visible slot `atIndex`, all in
+  // one undo step. Returns the new item ids.
+  const captureToFocus = (texts: string[], atIndex: number): string[] =>
+    app.withActionBatch(() => {
+      // Append to the inbox (its open length is the append slot — a large
+      // sentinel would overflow the wasm `usize`); the item's inbox position
+      // is independent of its Focus position, fixed explicitly below.
+      const inboxLen = app.state.listOpen["inbox"]?.length ?? 0;
+      const ids = app.addItemsAt("inbox", texts, inboxLen);
+      ids.forEach((id, i) => app.addToFocus(id, atIndex + i));
+      return ids;
+    });
+
   // Start a draft row: pseudo-item just below the topmost selected
   // item (or at the top if nothing is selected). Expanding it via the
   // controlled `expandedKey` flips the row into edit mode through the
@@ -501,8 +520,12 @@ export function Workspace(props: {
   // settle it first.
   const startDraft = () => {
     const v = view();
-    if (v.kind !== "list") return;
+    // Capture runs in list views and in the Focus lens; a Focus draft
+    // creates its item in the inbox and pins it (see settleDraft).
+    if (v.kind !== "list" && v.kind !== "focus") return;
     if (draft() !== null) return;
+    const isFocus = v.kind === "focus";
+    const listId = isFocus ? "inbox" : v.id;
     const ids = items().map((i) => i.id);
     const top = selection.getSelectionTop();
     let insertIndex = 0;
@@ -513,13 +536,13 @@ export function Workspace(props: {
     const id = `${DRAFT_ID_PREFIX}${crypto.randomUUID()}`;
     const draftItem: ItemView = {
       id,
-      listId: v.id,
+      listId,
       text: "",
       notes: "",
       live: false,
       createdAt: Date.now(),
     };
-    setDraft({ item: draftItem, insertIndex, listId: v.id });
+    setDraft({ item: draftItem, insertIndex, listId, focus: isFocus });
     setExpandedKey(id);
   };
 
@@ -550,7 +573,9 @@ export function Workspace(props: {
       selection.selectOnly(target.id);
       return;
     }
-    const newId = app.addItemAt(d.listId, text, d.insertIndex);
+    const newId = d.focus
+      ? captureToFocus([text], d.insertIndex)[0]
+      : app.addItemAt(d.listId, text, d.insertIndex);
     // Notes are no longer captured inline — a new item starts noteless and
     // the user adds notes later by opening it in the detail dialog.
     // The store dispatch that adds the new item runs before this
@@ -573,7 +598,7 @@ export function Workspace(props: {
   const onPaste = (e: ClipboardEvent) => {
     if (isOverlayOpen()) return;
     const v = view();
-    if (v.kind !== "list") return;
+    if (v.kind !== "list" && v.kind !== "focus") return;
     const target = e.target as Element | null;
     if (target?.closest('input, textarea, [contenteditable="true"]')) return;
     const data = e.clipboardData?.getData("text") ?? "";
@@ -590,7 +615,10 @@ export function Workspace(props: {
       .filter((idx) => idx >= 0);
     const insertAt =
       selectedHere.length === 0 ? visible.length : Math.max(...selectedHere) + 1;
-    const ids = app.addItemsAt(v.id, lines, insertAt);
+    const ids =
+      v.kind === "focus"
+        ? captureToFocus(lines, insertAt)
+        : app.addItemsAt(v.id, lines, insertAt);
     if (ids.length === 0) return;
     // Wait for the dnd's source to absorb the new ids — see the
     // matching note in onDuplicate.
@@ -878,8 +906,10 @@ export function Workspace(props: {
   const onSpaceAdd = (e: KeyboardEvent) => {
     if (e.key !== " ") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    if (view().kind !== "list") return;
+    if (view().kind !== "list" && view().kind !== "focus") return;
 
+    // Focus is never a board, so boardId is null there and we fall through
+    // to the inline-draft path below.
     const boardId = boardListId();
     if (boardId !== null) {
       e.preventDefault();
@@ -1409,7 +1439,7 @@ export function Workspace(props: {
                 </Popover.Portal>
               </Popover>
             </Show>
-            <Show when={view().kind === "list"}>
+            <Show when={view().kind === "list" || view().kind === "focus"}>
               <button
                 type="button"
                 class="add-button"
@@ -1548,7 +1578,12 @@ export function Workspace(props: {
           onClick={() => setNavOpen(true)}
           innerHTML={caretLeftSvg}
         />
-        <Show when={view().kind === "list" && boardListId() === null}>
+        <Show
+          when={
+            (view().kind === "list" || view().kind === "focus") &&
+            boardListId() === null
+          }
+        >
           <button
             type="button"
             class="fab fab-add"
