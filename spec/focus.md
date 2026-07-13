@@ -145,11 +145,13 @@ is the product thesis.
 
 New mutations (each **one Loro commit**):
 
-- `add_to_focus(item_id, index)` — insert a FocusRef at `index` (default append).
-  If the item already has a *visible* ref, **no-op** (do not move-to-top). Sweeps
-  dead refs.
-- `add_to_focus_many(item_ids)` — batch: append a FocusRef for each id, in the
-  given order, in **one commit**. Ids that are unknown, not Open, already
+- `add_to_focus(item_id, index)` — insert a FocusRef at `index`. Clients default
+  to `index 0` (the **top**): a newly-focused item is "what am I working on now"
+  and belongs at the head. If the item already has a *visible* ref, **no-op** (do
+  not move-to-top). Sweeps dead refs.
+- `add_to_focus_many(item_ids)` — batch: prepend a FocusRef for each id to the
+  **top**, in the given order, in **one commit** (so the batch lands above the
+  existing Focus items, first id on top). Ids that are unknown, not Open, already
   focused, or repeated within the batch are skipped (each a no-op — unlike the
   bulk lifecycle paths, an unknown id does not abort). Sweeps dead refs; emits at
   most one `FocusChanged`. Backs multi-select "add to focus".

@@ -1752,14 +1752,15 @@ impl Doc {
         Ok(())
     }
 
-    /// Batch form of [`add_to_focus`](Self::add_to_focus): append a
-    /// FocusRef for each of `item_ids` to the Focus lens, in the given
-    /// order, in a **single commit**. Items that are unknown, not Open,
-    /// already focused, or repeated within `item_ids` are skipped (each a
-    /// no-op, mirroring the single-item form — unlike the bulk lifecycle
-    /// paths, an unknown id does not abort the batch). Folds one dead-ref
-    /// sweep into the same commit and emits at most one `FocusChanged`.
-    /// Backs multi-select "add to focus".
+    /// Batch form of [`add_to_focus`](Self::add_to_focus): prepend a
+    /// FocusRef for each of `item_ids` to the **top** of the Focus lens,
+    /// in the given order, in a **single commit** — newly-focused items
+    /// surface first ("what am I working on now", ordered top-down). Items
+    /// that are unknown, not Open, already focused, or repeated within
+    /// `item_ids` are skipped (each a no-op, mirroring the single-item
+    /// form — unlike the bulk lifecycle paths, an unknown id does not abort
+    /// the batch). Folds one dead-ref sweep into the same commit and emits
+    /// at most one `FocusChanged`. Backs multi-select "add to focus".
     pub fn add_to_focus_many(&self, item_ids: &[&str]) -> Result<(), DocError> {
         if item_ids.is_empty() {
             return Ok(());
@@ -1788,9 +1789,10 @@ impl Doc {
             focus.delete(i, 1)?;
         }
         // After the sweep the container holds exactly the visible refs, so
-        // appending preserves both existing order and `item_ids` order.
-        for id in &to_add {
-            focus.push(FocusRef::local(id).encode().as_str())?;
+        // inserting from index 0 upward prepends the batch to the top while
+        // preserving `item_ids` order (to_add[0] ends up first).
+        for (offset, id) in to_add.iter().enumerate() {
+            focus.insert(offset, FocusRef::local(id).encode().as_str())?;
         }
         self.inner.commit();
         self.push_event(AppEvent::FocusChanged);
@@ -7268,7 +7270,7 @@ mod tests {
     }
 
     #[test]
-    fn focus_add_many_appends_in_order_and_skips_ineligible() {
+    fn focus_add_many_prepends_in_order_and_skips_ineligible() {
         let doc = Doc::new().unwrap();
         let a = doc.add_item(LIST_INBOX, "a").unwrap();
         let b = doc.add_item(LIST_INBOX, "b").unwrap();
@@ -7280,9 +7282,10 @@ mod tests {
 
         doc.add_to_focus_many(&[&a, &b, &c, &d, &d, "deadbeef"])
             .unwrap();
-        // a kept (already present, not moved), b + d appended in order,
-        // c skipped (done), the duplicate d and the unknown id skipped.
-        assert_eq!(doc.focus_refs(), vec![a, b, d]);
+        // b + d prepended to the top in order, landing above the already-
+        // present a; c skipped (done), the duplicate d and unknown id
+        // skipped.
+        assert_eq!(doc.focus_refs(), vec![b, d, a]);
     }
 
     #[test]

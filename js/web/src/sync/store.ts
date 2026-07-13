@@ -760,9 +760,10 @@ export function createSyncedApp(engine: SyncEngine): DocApp {
       mutate(() => engine.setInboxName(name));
     },
     addToFocus(id, index) {
-      // A large index appends (the engine clamps to the visible tail);
-      // default to the current visible length so callers can omit it.
-      mutate(() => engine.addToFocus(id, index ?? state.focusOrder.length));
+      // Default to the top: newly-focused items are "what am I working on
+      // now" and belong at the head of the lens. An explicit index (e.g.
+      // drag-to-reorder) still wins.
+      mutate(() => engine.addToFocus(id, index ?? 0));
     },
     addToFocusMany(ids) {
       mutate(() => engine.addToFocusMany(ids));
