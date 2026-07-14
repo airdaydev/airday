@@ -608,6 +608,38 @@ export function Workspace(props: {
       .filter((l) => l.length > 0);
     if (lines.length === 0) return;
     e.preventDefault();
+
+    // Board: land the block below the bottom-most selected card, in that
+    // card's lane — same shape as duplicateBlock. Slots come straight from
+    // the shared Open order (Backlog and Live are one array), so a Done-lane
+    // or empty selection finds no slot and the block appends to Backlog.
+    const boardId = boardListId();
+    if (boardId !== null) {
+      const linear = state.listOpen[boardId] ?? [];
+      const selectedSlots = (actionSelection()?.getSelectedKeys() ?? [])
+        .map((k) => linear.indexOf(String(k)))
+        .filter((idx) => idx >= 0);
+      const anchorIdx =
+        selectedSlots.length === 0 ? -1 : Math.max(...selectedSlots);
+      const anchor = anchorIdx >= 0 ? app.getItem(linear[anchorIdx]) : undefined;
+      const boardIds = app.withActionBatch(() => {
+        const created = app.addItemsAt(
+          boardId,
+          lines,
+          anchorIdx >= 0 ? anchorIdx + 1 : linear.length,
+        );
+        // Created as Backlog; flip to the anchor's lane in the same undo
+        // step, which keeps the just-assigned Open position (spec/board.md).
+        if (anchor?.live) app.setLifecycleMany(created, "live");
+        return created;
+      });
+      if (boardIds.length === 0) return;
+      // Hand the block to the reveal path so it becomes the active lane
+      // selection and scrolls into view.
+      setBoardRevealIds(boardIds);
+      return;
+    }
+
     const visible = items().map((it) => it.id);
     const selectedHere = selection
       .getSelectedKeys()
