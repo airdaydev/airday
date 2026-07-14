@@ -655,10 +655,15 @@ body {
 
 .row-timestamp {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
   line-height: 1.3em;
+  padding: 1px 6px;
+  border: 1px solid var(--border-row);
+  border-radius: 4px;
 }
 
 /* Origin-list badge on the Done view (spec/board.md — the global Done view
@@ -672,9 +677,9 @@ body {
   color: var(--text-faint);
   font-size: 12px;
   line-height: 1.3em;
-  padding: 1px 7px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-row);
+  border-radius: 4px;
 }
 
 /* Remove (×) affordance shown inside the Focus lens, at the row's trailing
@@ -2676,9 +2681,6 @@ body {
 
 .due-badge[data-tone="muted"] {
   color: var(--text-faint);
-  border-color: transparent;
-  padding-left: 0;
-  padding-right: 0;
 }
 
 /* Card feel: each dnd slot is CARD_HEIGHT tall, but the row sits shorter so

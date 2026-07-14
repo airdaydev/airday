@@ -283,6 +283,11 @@ pub struct ExportSettings {
 pub struct ExportList {
     pub id: String,
     pub name: String,
+    /// The list's display icon (a literal emoji grapheme). Skipped when
+    /// unset so pre-icon dumps stay byte-identical; the reserved Inbox
+    /// carries no icon.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub icon: Option<String>,
     pub created_at: Option<i64>,
     pub builtin: bool,
 }
@@ -2478,12 +2483,14 @@ impl Doc {
         lists.push(ExportList {
             id: LIST_INBOX.to_string(),
             name: INBOX_NAME.to_string(),
+            icon: None,
             created_at: None,
             builtin: true,
         });
         lists.extend(self.all_lists().into_iter().map(|list| ExportList {
             id: list.id,
             name: list.name,
+            icon: list.icon,
             created_at: Some(list.created_at),
             builtin: false,
         }));
@@ -2570,6 +2577,11 @@ impl Doc {
             map.insert(KEY_ID, new_list_id.as_str())?;
             map.insert(KEY_NAME, name)?;
             map.insert(KEY_CREATED_AT, created_at)?;
+            // Carry the display icon through; a trimmed-empty value (or none)
+            // leaves the key unset so clients fall back to the built-in glyph.
+            if let Some(icon) = src_list.icon.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                map.insert(KEY_ICON, icon)?;
+            }
             id_map.insert(src_list.id.clone(), new_list_id);
             lists_added += 1;
         }
@@ -5054,6 +5066,7 @@ mod tests {
             ExportList {
                 id: LIST_INBOX.to_string(),
                 name: INBOX_NAME.to_string(),
+                icon: None,
                 created_at: None,
                 builtin: true,
             }
@@ -6345,6 +6358,35 @@ mod tests {
     }
 
     #[test]
+    fn import_json_round_trips_list_icon() {
+        let src = Doc::new().unwrap();
+        let with_icon = src.add_list("Errands").unwrap();
+        src.set_list_icon(&with_icon, "🛒").unwrap();
+        let _plain = src.add_list("Notes").unwrap();
+        let export = src.export_json();
+
+        // The icon rides on the source list's export entry (and Inbox has
+        // none), while an iconless list serializes with the key absent.
+        let exported = export
+            .lists
+            .iter()
+            .find(|l| l.id == with_icon)
+            .expect("source list in export");
+        assert_eq!(exported.icon.as_deref(), Some("🛒"));
+
+        let dst = Doc::new().unwrap();
+        dst.import_json(&export).unwrap();
+
+        let icons: Vec<(String, Option<String>)> = dst
+            .all_lists()
+            .into_iter()
+            .map(|l| (l.name, l.icon))
+            .collect();
+        assert!(icons.contains(&("Errands".to_string(), Some("🛒".to_string()))));
+        assert!(icons.contains(&("Notes".to_string(), None)));
+    }
+
+    #[test]
     fn import_json_preserves_timestamps_done_binned_and_notes() {
         let src = Doc::new().unwrap();
         let a = src.add_item(LIST_INBOX, "alpha").unwrap();
@@ -6588,6 +6630,7 @@ mod tests {
             lists: vec![ExportList {
                 id: LIST_INBOX.to_string(),
                 name: INBOX_NAME.to_string(),
+                icon: None,
                 created_at: None,
                 builtin: true,
             }],

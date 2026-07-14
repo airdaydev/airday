@@ -13,7 +13,6 @@ import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { DueField } from "./DueField.tsx";
 import caretSortSvg from "./icons/caret-sort.svg?raw";
 import dotsVerticalSvg from "./icons/dots-vertical.svg?raw";
-import targetSvg from "./icons/target.svg?raw";
 import {
   addDaysToStamp,
   formatDoneStamp,
@@ -466,21 +465,6 @@ export function TaskDialog(props: {
                       </span>
                     </div>
                     <div class="task-dialog-header-actions">
-                      {/* Add-to-focus toggle: available on Open items (a
-                          Done/Binned item can't be in Focus — spec/focus.md).
-                          Filled when the item is in the Focus lens. */}
-                      <Show when={!isDone(it()) && !isBinned(it())}>
-                        <button
-                          type="button"
-                          class="task-dialog-focus-toggle"
-                          classList={{ "is-focused": focused() }}
-                          aria-pressed={focused()}
-                          aria-label={focused() ? m().focus.remove : m().focus.add}
-                          title={focused() ? m().focus.remove : m().focus.add}
-                          onClick={toggleFocus}
-                          innerHTML={targetSvg}
-                        />
-                      </Show>
                       <Show when={!isBinned(it())}>
                         <DropdownMenu>
                           <DropdownMenu.Trigger
@@ -490,6 +474,17 @@ export function TaskDialog(props: {
                           />
                           <DropdownMenu.Portal>
                             <DropdownMenu.Content class="dropdown-menu-content task-dialog-menu-content">
+                              {/* Add / remove from Focus: only on Open items
+                                  (a Done/Binned item can't be in Focus —
+                                  spec/focus.md). */}
+                              <Show when={!isDone(it())}>
+                                <DropdownMenu.Item
+                                  class="dropdown-menu-item"
+                                  onSelect={toggleFocus}
+                                >
+                                  {focused() ? m().focus.remove : m().focus.add}
+                                </DropdownMenu.Item>
+                              </Show>
                               <DropdownMenu.Sub gutter={4}>
                                 <DropdownMenu.SubTrigger class="dropdown-menu-item">
                                   <span>{m().due.label}</span>

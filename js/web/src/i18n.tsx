@@ -454,7 +454,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       viewAsBoard: "Board view",
       viewAsList: "List view",
       backlogLane: "Backlog",
-      liveLane: "Live",
+      liveLane: "In progress",
       doneLane: "Done",
       addItem: "Add item",
       viewMode: "View mode",
@@ -499,7 +499,7 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       add: "Focus",
       remove: "Remove from Focus",
       badge: "Focus",
-      markLive: "Mark as live",
+      markLive: "Mark as in progress",
       markBacklog: "Mark as backlog",
       empty:
         "Nothing in Focus yet. Add a new item here, or right-click an existing one and choose “Add to Focus”, to line up what you're working on.",
