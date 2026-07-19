@@ -16,6 +16,7 @@ import type { DndDragEventDetail } from "./dnd";
 import { Popover } from "@kobalte/core/popover";
 import { SegmentedControl } from "@kobalte/core/segmented-control";
 import { Switch } from "@kobalte/core/switch";
+import { Tooltip } from "@kobalte/core/tooltip";
 import archiveSvg from "./icons/archive.svg?raw";
 import arrowRightSvg from "./icons/arrow-right.svg?raw";
 import caretLeftSvg from "./icons/caret-left.svg?raw";
@@ -160,6 +161,10 @@ export function Workspace(props: {
      *  board card, or at the top). Omitted for "+" captures, which append
      *  to the lane. */
     index?: number;
+    /** Log a directly-completed item: created open, then marked done on
+     *  commit (the Done lane "+" and the Done view's "Log" button). The
+     *  modal shows a checked box the user can flip back off. */
+    done?: boolean;
   } | null>(null);
   // Ids to select + scroll into view in the board once they land in their
   // column (a "+" capture, a duplicated block, or a find-palette pick that
@@ -672,6 +677,18 @@ export function Workspace(props: {
     const v = view();
     const visibleIds = items().map((it) => it.id);
     const visibleSet = new Set(visibleIds);
+    // On a board, the Done lane's members come from a scan of `itemsById`
+    // (Board's `doneMembers`), not the list's Open projection — so `items()`
+    // covers only Backlog + Live. Add this board's done-but-not-binned items
+    // so ⌫ can bin a card selected in the Done lane.
+    const boardId = boardListId();
+    if (boardId !== null) {
+      for (const it of Object.values(state.itemsById)) {
+        if (it.listId === boardId && isDone(it) && !isBinned(it)) {
+          visibleSet.add(it.id);
+        }
+      }
+    }
     const ids = sel
       .getSelectedKeys()
       .map(String)
@@ -1453,15 +1470,20 @@ export function Workspace(props: {
             </Show>
             <Show when={view().kind === "list"}>
               <Popover placement="bottom-end" gutter={6}>
-                <Popover.Trigger
-                  class="add-button view-mode-trigger"
-                  aria-label={
-                    boardListId() !== null
-                      ? m().board.viewAsBoard
-                      : m().board.viewAsList
-                  }
-                  innerHTML={mixerHzSvg}
-                />
+                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
+                  <Tooltip.Trigger
+                    as={Popover.Trigger}
+                    class="add-button view-mode-trigger"
+                    aria-label={m().nav.settings}
+                    innerHTML={mixerHzSvg}
+                  />
+                  <Tooltip.Portal>
+                    <Tooltip.Content class="tooltip-content">
+                      {m().nav.settings}
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip>
                 <Popover.Portal>
                   <Popover.Content class="view-mode-popover">
                     <SegmentedControl
@@ -1530,11 +1552,20 @@ export function Workspace(props: {
             </Show>
             <Show when={view().kind === "done"}>
               <Popover placement="bottom-end" gutter={6}>
-                <Popover.Trigger
-                  class="add-button view-mode-trigger"
-                  aria-label={m().workspace.doneOptions}
-                  innerHTML={mixerHzSvg}
-                />
+                <Tooltip openDelay={200} closeDelay={0} placement="bottom">
+                  <Tooltip.Trigger
+                    as={Popover.Trigger}
+                    class="add-button view-mode-trigger"
+                    aria-label={m().workspace.doneOptions}
+                    innerHTML={mixerHzSvg}
+                  />
+                  <Tooltip.Portal>
+                    <Tooltip.Content class="tooltip-content">
+                      {m().workspace.doneOptions}
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip>
                 <Popover.Portal>
                   <Popover.Content class="view-mode-popover">
                     <Switch
@@ -1553,9 +1584,34 @@ export function Workspace(props: {
                   </Popover.Content>
                 </Popover.Portal>
               </Popover>
+              <Tooltip openDelay={200} closeDelay={0} placement="bottom">
+                <Tooltip.Trigger
+                  as="button"
+                  type="button"
+                  class="add-button"
+                  aria-label={m().workspace.log}
+                  onClick={() =>
+                    setNewItemTarget({
+                      listId: "inbox",
+                      live: false,
+                      done: true,
+                    })
+                  }
+                >
+                  <span class="add-button-icon" innerHTML={plusSvg} />
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content class="tooltip-content">
+                    {m().workspace.log}
+                    <Tooltip.Arrow />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip>
             </Show>
             <Show when={view().kind === "list" || view().kind === "focus"}>
-              <button
+              <Tooltip openDelay={200} closeDelay={0} placement="bottom">
+              <Tooltip.Trigger
+                as="button"
                 type="button"
                 class="add-button"
                 onClick={(e) => {
@@ -1582,7 +1638,14 @@ export function Workspace(props: {
                 aria-label={m().common.add}
               >
                 <span class="add-button-icon" innerHTML={plusSvg} />
-              </button>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content class="tooltip-content">
+                  {m().common.add}
+                  <Tooltip.Arrow />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+              </Tooltip>
             </Show>
           </div>
         </header>
@@ -1672,8 +1735,8 @@ export function Workspace(props: {
               openOnTap={itemsIsMobile}
               duplicateBlock={duplicateBlock}
               copyBlock={copyBlock}
-              onAddItem={(listId, live) =>
-                setNewItemTarget({ listId, live })
+              onAddItem={(listId, live, done) =>
+                setNewItemTarget({ listId, live, done })
               }
               revealIds={boardRevealIds}
               clearReveal={() => setBoardRevealIds(null)}

@@ -69,8 +69,9 @@ type Messages = {
     newList: string;
     connected: string;
     disconnected: string;
-    allSynced: string;
-    pendingChanges: string;
+    offline: string;
+    synced: string;
+    syncing: string;
     lastSynced: (rel: string) => string;
     seqLabel: (n: string) => string;
     itemsListsCount: (items: number, lists: number) => string;
@@ -101,6 +102,12 @@ type Messages = {
     doneOptions: string;
     /** Switch label (Done options popover) toggling the origin-list badge. */
     showDoneList: string;
+    /** Done-view header button that opens the modal to record a completed
+     *  item directly (defaults to Inbox). */
+    log: string;
+    /** Title-field placeholder / indicator shown when the creation modal is
+     *  logging an already-completed item. */
+    logCompleted: string;
     /** Accessible name for the list-icon picker trigger in the header. */
     listIcon: string;
     /** Label for the button that clears a list's custom icon. */
@@ -261,8 +268,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       newList: "+ Nueva lista",
       connected: "Conectado",
       disconnected: "Desconectado",
-      allSynced: "Todo sincronizado",
-      pendingChanges: "Cambios pendientes",
+      offline: "Sin conexión",
+      synced: "Sincronizado",
+      syncing: "Sincronizando",
       lastSynced: (rel) => `Sincronizado ${rel}`,
       seqLabel: (n) => `seq #${n}`,
       itemsListsCount: (items, lists) =>
@@ -293,6 +301,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToList: "Mover a la lista",
       doneOptions: "Opciones de visualización",
       showDoneList: "Mostrar lista",
+      log: "Registrar",
+      logCompleted: "Registrar elemento completado",
       listIcon: "Icono de la lista",
       removeIcon: "Quitar icono",
       iconInputPlaceholder: "Emoji",
@@ -429,8 +439,9 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       newList: "+ Add list",
       connected: "Connected",
       disconnected: "Disconnected",
-      allSynced: "All synced",
-      pendingChanges: "Pending changes",
+      offline: "Offline",
+      synced: "Synced",
+      syncing: "Syncing",
       lastSynced: (rel) => `Synced ${rel}`,
       seqLabel: (n) => `seq #${n}`,
       itemsListsCount: (items, lists) =>
@@ -461,6 +472,8 @@ const messagesByLanguage: Record<AppLanguage, Messages> = {
       moveToList: "Move to list",
       doneOptions: "Display options",
       showDoneList: "Show list",
+      log: "Log",
+      logCompleted: "Log completed item",
       listIcon: "List icon",
       removeIcon: "Remove icon",
       iconInputPlaceholder: "Emoji",

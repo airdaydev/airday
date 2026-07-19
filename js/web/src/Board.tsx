@@ -75,7 +75,7 @@ export function Board(props: {
   copyBlock: (sourceIds: readonly string[]) => void;
   /** Open the new-item dialog targeting a lane (`live` = Live lane,
    *  otherwise Backlog). */
-  onAddItem: (listId: string, live: boolean) => void;
+  onAddItem: (listId: string, live: boolean, done?: boolean) => void;
   /** Ids to select and scroll into view once they land in their (shared)
    *  lane — a "+" capture, a duplicated block, or a find pick; `null`
    *  when nothing pending. */
@@ -543,7 +543,7 @@ export function Board(props: {
           selection={selectionFor(DONE_LANE)}
           members={() => doneMembers()}
           onReorder={() => {}}
-          onAddItem={() => {}}
+          onAddItem={() => props.onAddItem(props.listId, false, true)}
           registerHandle={registerHandle}
           onOpen={props.onOpen}
           onSetDue={props.onSetDue}
@@ -579,9 +579,9 @@ function BoardColumn(props: {
    *  the board opens — the Backlog lane claims it (matches how the list
    *  view autofocuses). Only one lane should set this. */
   autofocus?: boolean;
-  /** `"done"` renders the Done lane: a check-marked label, no add
-   *  affordance, and no internal reorder — its cards are lifecycle-grouped
-   *  and timestamp-sorted, not order-container backed. */
+  /** `"done"` renders the Done lane: a check-marked label and no internal
+   *  reorder — its cards are lifecycle-grouped and timestamp-sorted, not
+   *  order-container backed. Its "+" logs a directly-completed item. */
   variant?: "done";
 }) {
   const { m } = useAppI18n();
@@ -611,15 +611,13 @@ function BoardColumn(props: {
           {props.name}
         </span>
         <span class="board-col-count">{props.members().length}</span>
-        <Show when={!isDoneCol}>
-          <button
-            type="button"
-            class="board-col-add-btn"
-            aria-label={m().board.addItem}
-            onClick={() => props.onAddItem()}
-            innerHTML={plusSvg}
-          />
-        </Show>
+        <button
+          type="button"
+          class="board-col-add-btn"
+          aria-label={isDoneCol ? m().workspace.logCompleted : m().board.addItem}
+          onClick={() => props.onAddItem()}
+          innerHTML={plusSvg}
+        />
       </header>
       <div class="board-col-body">
         <Dnd

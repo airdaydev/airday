@@ -463,6 +463,19 @@ body {
   width: 13px;
 }
 
+.add-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.add-button[data-expanded] {
+  background: var(--bg-active);
+}
+
+.add-button:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
 .add-button:disabled {
   opacity: 0.5;
   cursor: default;
@@ -782,9 +795,38 @@ body {
   line-height: 0;
 }
 
-.connection-indicator:hover,
-.connection-indicator[data-expanded] {
+.connection-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.connection-indicator:hover {
+  background: var(--bg-hover);
   color: var(--text);
+}
+
+.connection-indicator[data-expanded] {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.tooltip-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 60;
+}
+
+.tooltip-content .status-dot {
+  width: 7px;
+  height: 7px;
 }
 
 .status-popover {
@@ -848,8 +890,12 @@ body {
   background: #22c55e;
 }
 
-.status-dot[data-state="pending"] {
+.status-dot[data-state="syncing"] {
   background: #f59e0b;
+}
+
+.status-dot[data-state="disconnected"] {
+  background: #ef4444;
 }
 
 .status-dot[data-state="offline"] {

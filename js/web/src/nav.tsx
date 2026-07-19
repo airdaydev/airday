@@ -8,6 +8,7 @@ import {
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Popover } from "@kobalte/core/popover";
+import { Tooltip } from "@kobalte/core/tooltip";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Dnd, DndSelection, type DndOp } from "./dnd/solid";
 import archiveSvg from "./icons/archive.svg?raw";
@@ -74,6 +75,38 @@ function ConnectionStatusPopover(props: {
     Object.keys(props.app.state.itemsById).length;
   const listsCount = (): number => props.app.state.listsOrder.length;
 
+  // Browser network reachability, distinct from `props.online` (the WS
+  // link). Lets us split "no network at all" (Offline) from "network is
+  // up but we're not connected to the server" (Disconnected).
+  const [navOnline, setNavOnline] = createSignal(navigator.onLine);
+  const onNet = () => setNavOnline(navigator.onLine);
+  window.addEventListener("online", onNet);
+  window.addEventListener("offline", onNet);
+  onCleanup(() => {
+    window.removeEventListener("online", onNet);
+    window.removeEventListener("offline", onNet);
+  });
+
+  // Single source of truth for the sync state, shared by the cloud
+  // indicator's inline label and the popover's first line.
+  const status = (): "offline" | "disconnected" | "syncing" | "synced" => {
+    if (!navOnline()) return "offline";
+    if (!props.online) return "disconnected";
+    return pending() ? "syncing" : "synced";
+  };
+  const statusLabel = (): string => {
+    switch (status()) {
+      case "offline":
+        return m().nav.offline;
+      case "disconnected":
+        return m().nav.disconnected;
+      case "syncing":
+        return m().nav.syncing;
+      default:
+        return m().nav.synced;
+    }
+  };
+
   const sinceLabel = (): string | null => {
     const ts = props.lastSyncAt;
     if (!ts) return null;
@@ -90,34 +123,36 @@ function ConnectionStatusPopover(props: {
 
   return (
     <Popover open={open()} onOpenChange={setOpen} placement="top-start" gutter={6}>
-      <Popover.Trigger
-        class="connection-indicator"
-        aria-label={props.online ? m().nav.connected : m().nav.disconnected}
-      >
-        <Show
-          when={props.online}
-          fallback={<span innerHTML={cloudOffSvg} />}
+      <Tooltip openDelay={200} closeDelay={0} placement="top">
+        <Tooltip.Trigger
+          as={Popover.Trigger}
+          class="connection-indicator"
+          aria-label={statusLabel()}
         >
-          <span innerHTML={cloudSvg} />
-        </Show>
-      </Popover.Trigger>
+          <Show
+            when={props.online}
+            fallback={<span class="connection-icon" innerHTML={cloudOffSvg} />}
+          >
+            <span class="connection-icon" innerHTML={cloudSvg} />
+          </Show>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content class="tooltip-content">
+            <span class="status-dot" data-state={status()} aria-hidden="true" />
+            {statusLabel()}
+            <Tooltip.Arrow />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content class="status-popover">
           <div class="status-line">
             <span
               class="status-dot"
-              data-state={
-                !props.online ? "offline" : pending() ? "pending" : "synced"
-              }
+              data-state={status()}
               aria-hidden="true"
             />
-            <span>
-              {!props.online
-                ? m().nav.disconnected
-                : pending()
-                  ? m().nav.pendingChanges
-                  : m().nav.allSynced}
-            </span>
+            <span>{statusLabel()}</span>
           </div>
           <Show when={sinceLabel()}>
             {(label) => <div class="status-line status-muted">{label()}</div>}
@@ -633,11 +668,20 @@ export function Nav(props: {
       </div>
       <div class="nav-footer">
         <DropdownMenu>
-          <DropdownMenu.Trigger
-            class="nav-menu-trigger"
-            aria-label={m().common.menu}
-            innerHTML={dotsVerticalSvg}
-          />
+          <Tooltip openDelay={200} closeDelay={0} placement="top">
+            <Tooltip.Trigger
+              as={DropdownMenu.Trigger}
+              class="nav-menu-trigger"
+              aria-label={m().common.menu}
+              innerHTML={dotsVerticalSvg}
+            />
+            <Tooltip.Portal>
+              <Tooltip.Content class="tooltip-content">
+                {m().common.menu}
+                <Tooltip.Arrow />
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip>
           <DropdownMenu.Portal>
             <DropdownMenu.Content class="dropdown-menu-content">
               <DropdownMenu.Item

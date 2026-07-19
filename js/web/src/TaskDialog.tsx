@@ -56,8 +56,17 @@ export function TaskDialog(props: {
     listId: string;
     live: boolean;
     index?: number;
+    /** Log an already-completed item: created open, marked done on commit. */
+    done?: boolean;
   } | null;
-  setNewItem?: (v: null) => void;
+  setNewItem?: (
+    v: {
+      listId: string;
+      live: boolean;
+      index?: number;
+      done?: boolean;
+    } | null,
+  ) => void;
   app: DocApp;
   /** Resolved display name for the reserved `main` list. */
   homeName: () => string;
@@ -124,12 +133,27 @@ export function TaskDialog(props: {
     props.app.moveItem(id, targetId, idx);
   };
 
-  // Display name of the list a new item is being captured into.
-  const newItemListName = createMemo((): string => {
+  // The list option a new item is currently targeting (drives the header
+  // picker's selected value).
+  const newItemListOption = createMemo<ListOption | null>(() => {
     const nw = newItemTarget();
-    if (!nw) return "";
-    return listOptions().find((o) => o.id === nw.listId)?.name ?? nw.listId;
+    if (!nw) return null;
+    return listOptions().find((o) => o.id === nw.listId) ?? null;
   });
+  // Re-target a new-item capture at a different list. The insert index is
+  // dropped — a position in the old list's Open projection is meaningless in
+  // the new one, so the item appends.
+  const setNewItemList = (targetId: string) => {
+    const nw = newItemTarget();
+    if (!nw || targetId === nw.listId) return;
+    props.setNewItem?.({ listId: targetId, live: nw.live, done: nw.done });
+  };
+  // Toggle whether a new capture is logged as already-done.
+  const setNewItemDone = (done: boolean) => {
+    const nw = newItemTarget();
+    if (!nw) return;
+    props.setNewItem?.({ ...nw, done });
+  };
 
   const [text, setText] = createSignal("");
   const [notes, setNotes] = createSignal("");
@@ -207,21 +231,23 @@ export function TaskDialog(props: {
   });
 
   // Commit new-item mode: create the item in its target lane (Live when
-  // `live`, else Backlog) iff the title is non-empty, then close.
+  // `live`, else Backlog) iff the title is non-empty, then close. A capture
+  // without an explicit slot lands at the TOP of the lane (index 0) —
+  // matching the list view's inline-draft default — rather than appending.
   const commitNew = () => {
     const nw = newItemTarget();
     if (nw) {
       const t = editorText(titleRef).trim();
       if (t) {
+        const at = nw.index ?? 0;
         const id = nw.live
-          ? nw.index != null
-            ? props.app.addItemLiveAt(nw.listId, t, nw.index)
-            : props.app.addItemLive(nw.listId, t)
-          : nw.index != null
-            ? props.app.addItemAt(nw.listId, t, nw.index)
-            : props.app.addItem(nw.listId, t);
+          ? props.app.addItemLiveAt(nw.listId, t, at)
+          : props.app.addItemAt(nw.listId, t, at);
         const n = editorText(notesRef);
         if (n.trim()) props.app.editItemNotes(id, n);
+        // Logged-as-done capture: create open, then mark done in a second op
+        // (mirrors a drag-into-Done). Stamps doneAt = now.
+        if (nw.done) props.app.setDone(id, true);
         props.onCreated?.(id);
       }
     }
@@ -364,9 +390,43 @@ export function TaskDialog(props: {
             <Show when={isNew()}>
               <header class="task-dialog-header">
                 <div class="task-dialog-header-meta">
-                  <span class="task-dialog-list-value">
-                    {newItemListName()}
-                  </span>
+                  <Select<ListOption>
+                    placement="bottom-start"
+                    gutter={4}
+                    options={listOptions()}
+                    optionValue="id"
+                    optionTextValue="name"
+                    value={newItemListOption()}
+                    onChange={(opt) => {
+                      if (opt) setNewItemList(opt.id);
+                    }}
+                    itemComponent={(iprops) => (
+                      <Select.Item item={iprops.item} class="select-item">
+                        <Select.ItemLabel>
+                          {iprops.item.rawValue.name}
+                        </Select.ItemLabel>
+                      </Select.Item>
+                    )}
+                  >
+                    <Select.Trigger
+                      class="task-dialog-list"
+                      aria-label={m().workspace.moveToList}
+                    >
+                      <Select.Value<ListOption> class="task-dialog-list-value">
+                        {(state) => state.selectedOption()?.name}
+                      </Select.Value>
+                      <span
+                        class="task-dialog-list-caret"
+                        aria-hidden="true"
+                        innerHTML={caretSortSvg}
+                      />
+                    </Select.Trigger>
+                    <Select.Portal>
+                      <Select.Content class="select-content task-dialog-menu-content">
+                        <Select.Listbox class="select-listbox" />
+                      </Select.Content>
+                    </Select.Portal>
+                  </Select>
                 </div>
                 <div class="task-dialog-header-actions">
                   <Dialog.CloseButton
@@ -378,7 +438,22 @@ export function TaskDialog(props: {
                 </div>
               </header>
               <div class="task-dialog-body">
-                <div class="task-dialog-gutter" />
+                <div class="task-dialog-gutter">
+                  {/* Checked = this capture is logged as already-done. Pre-set
+                      by the Done lane "+" and the Done view's "Log" button;
+                      flip it off to file the item as a normal open task. */}
+                  <input
+                    type="checkbox"
+                    class="task-dialog-check"
+                    checked={newItemTarget()?.done ?? false}
+                    aria-label={
+                      newItemTarget()?.done
+                        ? m().workspace.markNotDone
+                        : m().workspace.markDone
+                    }
+                    onChange={(e) => setNewItemDone(e.currentTarget.checked)}
+                  />
+                </div>
                 <div class="task-dialog-content">
                   <div
                     ref={(el) => {
@@ -391,7 +466,12 @@ export function TaskDialog(props: {
                     }}
                     class="task-dialog-title"
                     role="textbox"
-                    data-placeholder={m().board.addItem}
+                    data-done={newItemTarget()?.done ? "" : undefined}
+                    data-placeholder={
+                      newItemTarget()?.done
+                        ? m().workspace.logCompleted
+                        : m().board.addItem
+                    }
                     onInput={() => setText(editorText(titleRef))}
                     onKeyDown={onTitleKeyDown}
                     onPaste={pasteAsPlainText}
